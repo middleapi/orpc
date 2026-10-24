@@ -254,6 +254,8 @@ export default defineConfig({
         '- You want to design the API as a contract first, then implement it and call it from clients that only import the contract.',
         '- The API runs on Node.js, Bun, Deno, or Cloudflare Workers, inside a framework like Next.js, Nuxt, SvelteKit, or Hono, or feeds TanStack Query.',
         '',
+        'Choosing between oRPC, tRPC, and Hono? See [oRPC vs tRPC vs Hono](https://orpc.dev/docs/comparison). To add OpenAPI to a tRPC router, see [tRPC Integration](https://orpc.dev/docs/integrations/trpc).',
+        '',
         'Install the server and client with `npm install @orpc/server@beta @orpc/client@beta zod`, then follow [Getting Started](https://orpc.dev/docs/getting-started). These docs cover oRPC v2, currently in beta. The v1 docs live at https://v1.orpc.dev, and [Migrating from oRPC v1](https://orpc.dev/docs/migrations/from-v1) lists what changed.',
       ].join('\n'),
     },

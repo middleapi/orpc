@@ -1,12 +1,135 @@
 ---
 title: "oRPC vs tRPC vs Hono"
-description: "See how oRPC compares to tRPC and Hono across type safety, OpenAPI support, framework integrations, and runtime performance."
+description: "Compare oRPC, tRPC, and Hono for typesafe TypeScript APIs: when to choose each, OpenAPI support, features, benchmarks, and how to use them together."
 sidebar:
   label: "Comparison"
   icon: scale
 ---
 
-oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to-end typesafe APIs in TypeScript, but they take different approaches. tRPC focuses on RPC for full-stack TypeScript apps, Hono is a general-purpose web framework with an RPC feature, and oRPC combines typesafe RPC with first-class OpenAPI support.
+oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all give you end-to-end typesafe APIs in TypeScript without code generation. tRPC is RPC for TypeScript clients, Hono is a web framework with a typed client, and oRPC is RPC that also serves the same procedures as a RESTful API with an OpenAPI spec.
+
+tRPC and Hono claims were last checked on October 24, 2026, against tRPC 11.19.0 and Hono 4.13.13. See [Sources](#sources).
+
+## At a Glance
+
+|  | oRPC | tRPC | Hono |
+| --- | --- | --- | --- |
+| API style | RPC and RESTful routes from one router | RPC | RESTful routes |
+| OpenAPI | First-party | Official `@trpc/openapi` (alpha), RPC-shaped paths only | Third-party middleware |
+| Contract-first | First-party | Not supported | Third-party middleware |
+| Data types | JSON plus `Date`, `Map`, `Set`, `BigInt`, `File`, streams, ... | JSON, more with a transformer | JSON |
+
+## When to Choose oRPC
+
+- You need a [RESTful API](/docs/openapi/handler) or an [OpenAPI spec](/docs/openapi/specification) from the same procedures your client calls.
+- You want to [design a contract first](/docs/contract-first) and share only the contract with clients.
+- Your procedures return [files or binary streams](/docs/binary-data) and you want them typed.
+- You use `Date`, `Map`, `BigInt`, or `File` without configuring a [transformer](/docs/rpc/serializer#supported-data-types).
+- You use [TanStack Query](/docs/integrations/tanstack-query) outside React, or want first-party [MCP](/docs/integrations/mcp), [AI SDK](/docs/integrations/ai-sdk), [NestJS](/docs/integrations/nest), or [OpenTelemetry](/docs/integrations/opentelemetry) integrations.
+
+## When tRPC May Fit Better
+
+- You want a stable major version: tRPC v11 is stable, while oRPC v2 is in beta.
+- Your team or starter (such as [create-t3-app](https://create.t3.gg/)) already uses tRPC. tRPC is older, with a much larger community.
+- Your tRPC app works and needs none of the features above.
+
+## When Hono May Fit Better
+
+- You are building a web server first (routing, middleware, HTML, static files) and a typed client is a bonus.
+- You design the HTTP interface by hand, and your app is small enough that Hono's [RPC types stay fast](https://hono.dev/docs/guides/rpc#known-issues).
+
+## Use Them Together
+
+- **tRPC:** [`toORPCRouter`](/docs/integrations/trpc) converts a tRPC router into an oRPC router, so you can serve it with the [OpenAPI Handler](/docs/openapi/handler) and [migrate](/docs/migrations/from-trpc) later, if at all.
+- **Hono:** the [Hono adapter](/docs/adapters/hono) mounts oRPC as Hono middleware.
+
+```ts
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { toORPCRouter } from '@orpc/trpc'
+
+const handler = new OpenAPIHandler(toORPCRouter(trpcRouter))
+```
+
+## The Same Endpoint in Each
+
+The `openapi` line is optional: it gives the oRPC procedure the RESTful route `GET /planets/{id}`.
+
+<CodeGroup>
+
+```ts oRPC
+import { openapi } from '@orpc/openapi'
+import { ORPCError, os } from '@orpc/server'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+export const router = {
+  planet: {
+    find: os
+      .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+      .input(z.object({ id: z.string() }))
+      .handler(async ({ input }) => {
+        const planet = planets.find(planet => planet.id === input.id)
+        if (!planet) {
+          throw new ORPCError('NOT_FOUND')
+        }
+        return planet
+      }),
+  },
+}
+```
+
+```ts tRPC
+import { initTRPC, TRPCError } from '@trpc/server'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+const t = initTRPC.create()
+
+export const appRouter = t.router({
+  planet: t.router({
+    find: t.procedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const planet = planets.find(planet => planet.id === input.id)
+        if (!planet) {
+          throw new TRPCError({ code: 'NOT_FOUND' })
+        }
+        return planet
+      }),
+  }),
+})
+
+export type AppRouter = typeof appRouter
+```
+
+```ts Hono
+import { zValidator } from '@hono/zod-validator'
+import { Hono } from 'hono'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+const app = new Hono().get(
+  '/planets/:id',
+  zValidator('param', z.object({ id: z.string() })),
+  async (c) => {
+    const { id } = c.req.valid('param')
+    const planet = planets.find(planet => planet.id === id)
+    if (!planet) {
+      return c.json({ error: 'Planet not found' }, 404)
+    }
+    return c.json(planet, 200)
+  },
+)
+
+export type AppType = typeof app
+```
+
+</CodeGroup>
+
+On the client, oRPC calls `client.planet.find({ id })`, tRPC calls `trpc.planet.find.query({ id })`, and Hono calls `client.planets[':id'].$get({ param: { id } })`, which returns a typed `Response`.
 
 ## Features
 
@@ -14,7 +137,7 @@ oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to
 - 🟡 Lacks features or requires third-party integrations
 - 🛑 Not supported or not documented
 
-Checked against tRPC 11.19 and Hono 4.13 (October 2026).
+Ratings for tRPC and Hono are sourced under [Sources](#sources).
 
 ### Type Safety
 
@@ -27,7 +150,7 @@ Checked against tRPC 11.19 and Hono 4.13 (October 2026).
 | [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 |
 | [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | 🛑 |
 
-oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare errors](/docs/error-handling) on a single procedure or a shared builder, or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). tRPC (as of 11.19) exposes one global error shape, and Hono only types errors returned with an explicit status code. oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
+oRPC types errors per procedure or globally, with [declared errors](/docs/error-handling) or an [error factory](/docs/error-handling#error-factory). tRPC (as of 11.19) has one global `errorFormatter`. Hono types errors returned with a status code, such as `c.json({ error }, 404)`, but not a thrown `HTTPException`. Only oRPC types binary responses; tRPC and Hono type uploads only.
 
 ### API Design & OpenAPI
 
@@ -39,10 +162,10 @@ oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare
 | [Standard Schema (Zod, Valibot, ArkType, ...)](/docs/integrations/standard-schema) | ✅ | ✅ | 🟡 |
 | [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 |
 | [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 |
-| [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
+| [Bracket notation (nested query and form data)](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🟡 |
 | [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
 
-oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the spec with a first-party package. tRPC's `@trpc/openapi` is alpha and covers only tRPC-style endpoints, and Hono relies on third-party middleware like `@hono/zod-openapi`. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
+oRPC serves one router over its [RPC protocol](/docs/rpc/protocol) and as [RESTful routes](/docs/openapi/handler). tRPC's `@trpc/openapi` is in alpha and only describes its RPC endpoints, and Hono's OpenAPI and contract-first support come from third-party middleware such as `@hono/zod-openapi`. tRPC needs a transformer for types like `Date`, and Hono sends JSON only. Hono parses nested form fields with `parseBody({ dot: true })`.
 
 ### Integrations & Ecosystem
 
@@ -68,11 +191,7 @@ oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and 
 | [OpenTelemetry integration](/docs/integrations/opentelemetry) | ✅ | 🛑 | 🟡 |
 | [Cloudflare Workers Traces integration](/docs/integrations/cloudflare-traces) | ✅ | 🛑 | 🛑 |
 
-Every oRPC integration above is first-party, while tRPC leaves several to community packages and Hono's typed client is a bare fetch wrapper you wire into query libraries yourself.
-
-:::info
-Coming from tRPC? Follow the [migration guide](/docs/migrations/from-trpc), or [use both together](/docs/integrations/trpc) during a gradual migration.
-:::
+Every oRPC integration above is first-party; tRPC and Hono rely on community packages for several. Hono's WebSocket client (`$ws()`) is an untyped `WebSocket`. tRPC's Server Actions API and oRPC's [lock](/docs/helpers/lock) and [Cloudflare tracing](/docs/integrations/cloudflare-traces) helpers are marked experimental.
 
 ## Performance
 
@@ -131,3 +250,29 @@ Bundle sizes for a minimal client and server pair, measured with the same versio
 | Minified + gzip | 14.5 kB | 23.7 kB | 17.0 kB |
 
 Measure yourself: [oRPC](https://bundlejs.com/?q=%40orpc%2Fclient%402.0.0-beta.37%2C%40orpc%2Fclient%402.0.0-beta.37%2Ffetch%2C%40orpc%2Fserver%402.0.0-beta.37%2C%40orpc%2Fserver%402.0.0-beta.37%2Fnode&treeshake=%5B%7B+createORPCClient+%7D%5D%2C%5B%7B+RPCLink+%7D%5D%2C%5B%7B+os+%7D%5D%2C%5B%7B+RPCHandler+%7D%5D) · [tRPC](https://bundlejs.com/?q=%40trpc%2Fclient%4011.19.0%2C%40trpc%2Fserver%4011.19.0%2C%40trpc%2Fserver%4011.19.0%2Fadapters%2Fstandalone%2Csuperjson%402.2.6&treeshake=%5B%7B+createTRPCClient%2ChttpLink%2ChttpSubscriptionLink%2CsplitLink+%7D%5D%2C%5B%7B+initTRPC+%7D%5D%2C%5B%7B+createHTTPServer+%7D%5D%2C%5B%7B+default+as+SuperJSON+%7D%5D) · [Hono](https://bundlejs.com/?q=hono%404.13.8%2Chono%404.13.8%2Fclient%2C%40hono%2Fnode-server%402.1.1&treeshake=%5B%7B+Hono+%7D%5D%2C%5B%7B+hc+%7D%5D%2C%5B%7B+serve+%7D%5D)
+
+## FAQ
+
+### Is oRPC a tRPC alternative?
+
+Yes. Like tRPC, you define procedures in a router and call them from a fully typed client, and most concepts map one to one (see the [migration guide](/docs/migrations/from-trpc#core-concepts-comparison)). oRPC adds RESTful routes, an OpenAPI spec, contract-first, and native types without a transformer.
+
+### Can I use oRPC with an existing tRPC router?
+
+Yes. `toORPCRouter` from `@orpc/trpc` turns it into an oRPC router you can serve with oRPC's RPC or OpenAPI handlers. tRPC error formatting is not carried over. See [tRPC Integration](/docs/integrations/trpc).
+
+### Does tRPC support OpenAPI?
+
+Partly. The official `@trpc/openapi` (alpha) generates a spec for tRPC's own endpoints (`GET` or `POST /procedure.path`), without subscriptions or RESTful routes. To serve a tRPC router as OpenAPI, [wrap it with oRPC](#use-them-together).
+
+### Can I use oRPC with Hono?
+
+Yes. The [Hono adapter](/docs/adapters/hono) mounts oRPC as Hono middleware, and hono.dev lists oRPC among its [third-party middleware](https://hono.dev/docs/middleware/third-party).
+
+## Sources
+
+**tRPC 11.19.0:** [retryLink](https://trpc.io/docs/client/links/retryLink) (built-in plugins 🟡), [error formatting](https://trpc.io/docs/server/error-formatting) (errors 🟡), [content types](https://trpc.io/docs/server/non-json-content-types) (File/Blob inputs only), [subscriptions](https://trpc.io/docs/server/subscriptions), [WebSockets](https://trpc.io/docs/server/websockets), [data transformers](https://trpc.io/docs/server/data-transformers) (native types 🟡), [OpenAPI (alpha)](https://trpc.io/docs/openapi) (🟡), [lazy routers](https://trpc.io/docs/server/merging-routers#lazy-load), [Server Actions](https://trpc.io/docs/client/nextjs/server-actions), and [Awesome tRPC](https://trpc.io/docs/community/awesome-trpc) for the community packages behind the other 🟡 ratings.
+
+**Hono 4.13.13:** [RPC](https://hono.dev/docs/guides/rpc) (typed status codes, SWR, [IDE performance](https://hono.dev/docs/guides/rpc#known-issues)), [third-party middleware](https://hono.dev/docs/middleware/third-party) (OpenAPI, contract-first, Standard Schema, rate limiting, OpenTelemetry, and MCP 🟡), [WebSocket helper](https://hono.dev/docs/helpers/websocket#rpc-mode) (🟡), [streaming](https://hono.dev/docs/helpers/streaming) (SSE untyped on the client), [dot notation](https://hono.dev/docs/api/request#dot-notation) (🟡), [CORS](https://hono.dev/docs/middleware/builtin/cors), [CSRF](https://hono.dev/docs/middleware/builtin/csrf), [cookie](https://hono.dev/docs/helpers/cookie), and [hono-rpc-query](https://www.npmjs.com/package/hono-rpc-query) (TanStack Query in React 🟡).
+
+Found an outdated rating? [Edit this page](https://github.com/middleapi/orpc/edit/main/apps/content/docs/comparison.mdx).
