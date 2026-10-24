@@ -1,86 +1,239 @@
 ---
-title: "oRPC vs tRPC vs Hono"
-description: "See how oRPC compares to tRPC and Hono across type safety, OpenAPI support, framework integrations, and runtime performance."
+title: "oRPC vs tRPC vs ts-rest vs Hono vs Elysia"
+description: "Compare oRPC, tRPC, ts-rest, Hono, and Elysia side by side: API style, OpenAPI, contract-first, typesafe errors, streaming, integrations, and benchmarks."
 sidebar:
   label: "Comparison"
   icon: scale
 ---
 
-oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to-end typesafe APIs in TypeScript, but they take different approaches. tRPC focuses on RPC for full-stack TypeScript apps, Hono is a general-purpose web framework with an RPC feature, and oRPC combines typesafe RPC with first-class OpenAPI support.
+oRPC, [tRPC](https://trpc.io/), [ts-rest](https://ts-rest.com/), [Hono](https://hono.dev/), and [Elysia](https://elysiajs.com/) all give you end-to-end typesafe APIs in TypeScript without code generation. This page lists what each one ships, so you can decide which fits your project.
+
+Other frameworks were last checked on October 24, 2026, against tRPC 11.19.0, ts-rest 3.52.1, Hono 4.13.13, and Elysia 1.4.30. See [Sources](#sources).
+
+## At a Glance
+
+|  | oRPC | tRPC | ts-rest | Hono | Elysia |
+| --- | --- | --- | --- | --- | --- |
+| API style | RPC and RESTful routes from one router | RPC | RESTful routes from a contract | Web framework with typed routes | Web framework with typed routes |
+| OpenAPI | First-party | Official `@trpc/openapi` (alpha), RPC paths only | First-party `@ts-rest/open-api` | Third-party middleware | Official `@elysiajs/openapi` plugin |
+| Contract-first | First-party | Not supported | Required | Third-party middleware | Not supported |
+
+## The Same Endpoint in Each
+
+Each example finds a planet by `id` and responds with a 404 when it is missing. The `openapi` line is optional: it gives the oRPC procedure the RESTful route `GET /planets/{id}`.
+
+<CodeGroup>
+
+```ts oRPC
+import { openapi } from '@orpc/openapi'
+import { ORPCError, os } from '@orpc/server'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+export const router = {
+  planet: {
+    find: os
+      .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+      .input(z.object({ id: z.string() }))
+      .handler(async ({ input }) => {
+        const planet = planets.find(planet => planet.id === input.id)
+        if (!planet) {
+          throw new ORPCError('NOT_FOUND')
+        }
+        return planet
+      }),
+  },
+}
+```
+
+```ts tRPC
+import { initTRPC, TRPCError } from '@trpc/server'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+const t = initTRPC.create()
+
+export const appRouter = t.router({
+  planet: t.router({
+    find: t.procedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const planet = planets.find(planet => planet.id === input.id)
+        if (!planet) {
+          throw new TRPCError({ code: 'NOT_FOUND' })
+        }
+        return planet
+      }),
+  }),
+})
+
+export type AppRouter = typeof appRouter
+```
+
+```ts ts-rest
+import { initContract } from '@ts-rest/core'
+import { initServer } from '@ts-rest/express'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+const c = initContract()
+
+export const contract = c.router({
+  planet: {
+    find: {
+      method: 'GET',
+      path: '/planets/:id',
+      pathParams: z.object({ id: z.string() }),
+      responses: {
+        200: z.object({ id: z.string(), name: z.string() }),
+        404: z.object({ error: z.string() }),
+      },
+    },
+  },
+})
+
+export const router = initServer().router(contract, {
+  planet: {
+    find: async ({ params }) => {
+      const planet = planets.find(planet => planet.id === params.id)
+      if (!planet) {
+        return { status: 404, body: { error: 'Planet not found' } }
+      }
+      return { status: 200, body: planet }
+    },
+  },
+})
+```
+
+```ts Hono
+import { zValidator } from '@hono/zod-validator'
+import { Hono } from 'hono'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+const app = new Hono().get(
+  '/planets/:id',
+  zValidator('param', z.object({ id: z.string() })),
+  async (c) => {
+    const { id } = c.req.valid('param')
+    const planet = planets.find(planet => planet.id === id)
+    if (!planet) {
+      return c.json({ error: 'Planet not found' }, 404)
+    }
+    return c.json(planet, 200)
+  },
+)
+
+export type AppType = typeof app
+```
+
+```ts Elysia
+import { Elysia } from 'elysia'
+import * as z from 'zod'
+
+const planets = [{ id: 'earth', name: 'Earth' }]
+
+const app = new Elysia().get(
+  '/planets/:id',
+  ({ params, status }) => {
+    const planet = planets.find(planet => planet.id === params.id)
+    if (!planet) {
+      return status(404, 'Planet not found')
+    }
+    return planet
+  },
+  { params: z.object({ id: z.string() }) },
+)
+
+export type App = typeof app
+```
+
+</CodeGroup>
+
+On the client:
+
+| Framework | Call | Result |
+| --- | --- | --- |
+| oRPC | `client.planet.find({ id })` | The planet, or throws an `ORPCError` |
+| tRPC | `trpc.planet.find.query({ id })` | The planet, or throws a `TRPCClientError` |
+| ts-rest | `client.planet.find({ params: { id } })` | `{ status, body }`, typed per status |
+| Hono | `client.planets[':id'].$get({ param: { id } })` | A typed `Response` |
+| Elysia | `client.planets({ id }).get()` | `{ data, error }`, with `error` typed per status |
 
 ## Features
 
 - ✅ First-class, built-in support
 - 🟡 Lacks features or requires third-party integrations
 - 🛑 Not supported or not documented
+- – Not measured
 
-Checked against tRPC 11.19 and Hono 4.13 (October 2026).
+Ratings for other frameworks are sourced under [Sources](#sources).
 
 ### Type Safety
 
-| Feature | oRPC | tRPC | Hono |
-| --- | --- | --- | --- |
-| End-to-end typesafe input/output | ✅ | ✅ | ✅ |
-| [End-to-end typesafe errors](/docs/client/error-handling) | ✅ | 🟡 | ✅ |
-| [End-to-end typesafe File/Blob](/docs/binary-data) | ✅ | 🟡 | 🟡 |
-| [End-to-end typesafe Server-Sent Events](/docs/async-iterator-object) | ✅ | ✅ | 🛑 |
-| [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 |
-| [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | 🛑 |
+| Feature | oRPC | tRPC | ts-rest | Hono | Elysia |
+| --- | --- | --- | --- | --- | --- |
+| End-to-end typesafe input/output | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [End-to-end typesafe errors](/docs/client/error-handling) | ✅ | 🟡 | ✅ | ✅ | ✅ |
+| [End-to-end typesafe File/Blob](/docs/binary-data) | ✅ | 🟡 | 🟡 | 🟡 | 🟡 |
+| [End-to-end typesafe Server-Sent Events](/docs/async-iterator-object) | ✅ | ✅ | 🛑 | 🛑 | ✅ |
+| [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 | 🛑 | 🛑 |
+| [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | – | 🛑 | – |
 
-oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare errors](/docs/error-handling) on a single procedure or a shared builder, or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). tRPC (as of 11.19) exposes one global error shape, and Hono only types errors returned with an explicit status code. oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
+oRPC types errors per procedure or globally, with [declared errors](/docs/error-handling) or an [error factory](/docs/error-handling#error-factory). tRPC (as of 11.19) has one global `errorFormatter`. ts-rest and Elysia type each response by status code. Hono types errors returned with a status code, such as `c.json({ error }, 404)`, but not a thrown `HTTPException`.
 
 ### API Design & OpenAPI
 
-| Feature | oRPC | tRPC | Hono |
-| --- | --- | --- | --- |
-| Implementation-first approach | ✅ | ✅ | ✅ |
-| [Contract-first approach](/docs/contract-first) | ✅ | 🛑 | 🟡 |
-| [OpenAPI spec generation](/docs/openapi/specification) | ✅ | 🟡 | 🟡 |
-| [Standard Schema (Zod, Valibot, ArkType, ...)](/docs/integrations/standard-schema) | ✅ | ✅ | 🟡 |
-| [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 |
-| [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 |
-| [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
-| [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
+| Feature | oRPC | tRPC | ts-rest | Hono | Elysia |
+| --- | --- | --- | --- | --- | --- |
+| Implementation-first approach | ✅ | ✅ | 🛑 | ✅ | ✅ |
+| [Contract-first approach](/docs/contract-first) | ✅ | 🛑 | ✅ | 🟡 | 🛑 |
+| [OpenAPI spec generation](/docs/openapi/specification) | ✅ | 🟡 | ✅ | 🟡 | ✅ |
+| [Standard Schema (Zod, Valibot, ArkType, ...)](/docs/integrations/standard-schema) | ✅ | ✅ | 🟡 | 🟡 | ✅ |
+| [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 | 🛑 | 🟡 |
+| [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 | 🛑 | 🛑 |
+| [Bracket notation (nested query and form data)](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🟡 | 🟡 | 🟡 |
+| [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 | 🛑 | ✅ |
 
-oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the spec with a first-party package. tRPC's `@trpc/openapi` is alpha and covers only tRPC-style endpoints, and Hono relies on third-party middleware like `@hono/zod-openapi`. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
+oRPC serves one router over its [RPC protocol](/docs/rpc/protocol) and as [RESTful routes](/docs/openapi/handler). tRPC's `@trpc/openapi` is in alpha and only describes its RPC endpoints. ts-rest always starts from a contract. Hono's OpenAPI and contract-first support come from third-party middleware such as `@hono/zod-openapi`. ts-rest 3.52 accepts Zod only; Standard Schema support is in its 3.53 release candidate. tRPC needs a transformer for types like `Date`, and Elysia's client parses `Date` strings.
 
 ### Integrations & Ecosystem
 
-| Feature | oRPC | tRPC | Hono |
-| --- | --- | --- | --- |
-| [WebSockets](/docs/adapters/websocket) | ✅ | ✅ | 🟡 |
-| [Hibernation APIs (Cloudflare WebSocket Hibernation, ...)](/docs/integrations/hibernation) | ✅ | 🛑 | 🛑 |
-| [Message Port (Electron, browser extensions, workers, ...)](/docs/adapters/message-port) | ✅ | 🟡 | 🛑 |
-| [Batch requests](/docs/plugins/batch) | ✅ | ✅ | 🛑 |
-| [Pub/Sub publisher (Redis, Upstash, Durable Objects, ...)](/docs/helpers/publisher) | ✅ | 🟡 | 🛑 |
-| [Rate limiting (Redis, Upstash, Cloudflare, ...)](/docs/helpers/ratelimit) | ✅ | 🛑 | 🟡 |
-| [Locking (Redis, Upstash, Durable Objects, ...)](/docs/helpers/lock) | ✅ | 🛑 | 🛑 |
-| [Client plugins and interceptors](/docs/rpc/link) | ✅ | ✅ | 🛑 |
-| [TanStack Query integration (React)](/docs/integrations/tanstack-query) | ✅ | ✅ | 🟡 |
-| [TanStack Query integration (Vue, Solid, Svelte, Angular)](/docs/integrations/tanstack-query) | ✅ | 🟡 | 🛑 |
-| [SWR and Pinia Colada integrations](/docs/integrations/swr) | ✅ | 🟡 | 🟡 |
-| [AI SDK integration](/docs/integrations/ai-sdk) | ✅ | 🛑 | 🛑 |
-| [MCP integration (procedures as AI agent tools)](/docs/integrations/mcp) | ✅ | 🟡 | 🟡 |
-| [Next.js Server Actions support](/docs/integrations/next) | ✅ | ✅ | 🛑 |
-| [Built-in plugins (CORS, CSRF, Retry, ...)](/docs/plugins/cors) | ✅ | 🟡 | ✅ |
-| [Built-in helpers (cookie, encryption, signing, ...)](/docs/helpers/cookie) | ✅ | 🛑 | ✅ |
-| [NestJS integration](/docs/integrations/nest) | ✅ | 🟡 | 🛑 |
-| [OpenTelemetry integration](/docs/integrations/opentelemetry) | ✅ | 🛑 | 🟡 |
-| [Cloudflare Workers Traces integration](/docs/integrations/cloudflare-traces) | ✅ | 🛑 | 🛑 |
+| Feature | oRPC | tRPC | ts-rest | Hono | Elysia |
+| --- | --- | --- | --- | --- | --- |
+| [WebSockets](/docs/adapters/websocket) | ✅ | ✅ | 🛑 | 🟡 | ✅ |
+| [Hibernation APIs (Cloudflare WebSocket Hibernation, ...)](/docs/integrations/hibernation) | ✅ | 🛑 | 🛑 | 🛑 | 🛑 |
+| [Message Port (Electron, browser extensions, workers, ...)](/docs/adapters/message-port) | ✅ | 🟡 | 🛑 | 🛑 | 🛑 |
+| [Batch requests](/docs/plugins/batch) | ✅ | ✅ | 🛑 | 🛑 | 🛑 |
+| [Pub/Sub publisher (Redis, Upstash, Durable Objects, ...)](/docs/helpers/publisher) | ✅ | 🟡 | 🛑 | 🛑 | 🛑 |
+| [Rate limiting (Redis, Upstash, Cloudflare, ...)](/docs/helpers/ratelimit) | ✅ | 🛑 | 🛑 | 🟡 | 🟡 |
+| [Locking (Redis, Upstash, Durable Objects, ...)](/docs/helpers/lock) | ✅ | 🛑 | 🛑 | 🛑 | 🛑 |
+| [Client plugins and interceptors](/docs/rpc/link) | ✅ | ✅ | 🟡 | 🛑 | 🟡 |
+| [TanStack Query integration (React)](/docs/integrations/tanstack-query) | ✅ | ✅ | ✅ | 🟡 | 🟡 |
+| [TanStack Query integration (Vue, Solid, Svelte, Angular)](/docs/integrations/tanstack-query) | ✅ | 🟡 | 🟡 | 🛑 | 🛑 |
+| [SWR and Pinia Colada integrations](/docs/integrations/swr) | ✅ | 🟡 | 🛑 | 🟡 | 🛑 |
+| [AI SDK integration](/docs/integrations/ai-sdk) | ✅ | 🛑 | 🛑 | 🛑 | 🟡 |
+| [MCP integration (procedures as AI agent tools)](/docs/integrations/mcp) | ✅ | 🟡 | 🛑 | 🟡 | 🛑 |
+| [Next.js Server Actions support](/docs/integrations/next) | ✅ | ✅ | 🛑 | 🛑 | 🛑 |
+| [Built-in plugins (CORS, CSRF, Retry, ...)](/docs/plugins/cors) | ✅ | 🟡 | 🟡 | ✅ | ✅ |
+| [Built-in helpers (cookie, encryption, signing, ...)](/docs/helpers/cookie) | ✅ | 🛑 | 🛑 | ✅ | ✅ |
+| [NestJS integration](/docs/integrations/nest) | ✅ | 🟡 | ✅ | 🛑 | 🛑 |
+| [OpenTelemetry integration](/docs/integrations/opentelemetry) | ✅ | 🛑 | 🛑 | 🟡 | ✅ |
+| [Cloudflare Workers Traces integration](/docs/integrations/cloudflare-traces) | ✅ | 🛑 | 🛑 | 🛑 | 🛑 |
 
-Every oRPC integration above is first-party, while tRPC leaves several to community packages and Hono's typed client is a bare fetch wrapper you wire into query libraries yourself.
-
-:::info
-Coming from tRPC? Follow the [migration guide](/docs/migrations/from-trpc), or [use both together](/docs/integrations/trpc) during a gradual migration.
-:::
+Every oRPC integration above is first-party. Hono's WebSocket client (`$ws()`) is an untyped `WebSocket`. ts-rest's Vue and Solid packages target TanStack Query v4, and its only built-in plugin is the CORS option of `@ts-rest/serverless`. tRPC's Server Actions API and oRPC's [lock](/docs/helpers/lock) and [Cloudflare tracing](/docs/integrations/cloudflare-traces) helpers are marked experimental.
 
 ## Performance
 
 :::warning
-Treat these numbers as reference measurements, not a reason to switch frameworks. All three are fast enough for production. The per-request difference is tiny next to your business logic, database, and network, and results vary across environments and workloads.
+Treat these numbers as reference measurements. All of these frameworks are fast enough for production, the per-request difference is tiny next to your business logic, database, and network, and results vary across environments and workloads.
 :::
 
-All numbers come from [middleapi/orpc-benchmarks](https://github.com/middleapi/orpc-benchmarks) and were measured on the same machine with oRPC 2.0.0-beta.37, tRPC 11.19.0, and Hono 4.13.8. Handlers are no-ops with pass-through validation, so the results measure framework overhead only.
+All numbers come from [middleapi/orpc-benchmarks](https://github.com/middleapi/orpc-benchmarks) and were measured on the same machine with oRPC 2.0.0-beta.37, tRPC 11.19.0, and Hono 4.13.8. Handlers are no-ops with pass-through validation, so the results measure framework overhead only. ts-rest and Elysia are not part of these benchmarks.
 
 ### Throughput
 
@@ -89,8 +242,6 @@ All numbers come from [middleapi/orpc-benchmarks](https://github.com/middleapi/o
 | RPC over HTTP (req/s avg) | 20,279 | 4,821 | n/a |
 | RPC over WebSocket (req/s avg) | 22,979 | 5,228 | n/a |
 | OpenAPI (RESTful) over HTTP (req/s avg) | 19,799 | n/a | 18,694 |
-
-oRPC handles about 4.2x as many requests as tRPC over HTTP and 4.4x over WebSocket. oRPC and Hono are close on RESTful throughput, with oRPC about 6% ahead.
 
 ### Clinic Doctor Profiles
 
@@ -105,13 +256,11 @@ Every run also profiles the server with [Clinic.js Doctor](https://clinicjs.org/
 | OpenAPI over HTTP · oRPC | ~104% | 72-90 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/openapi-orpc/.clinic/report.clinic-doctor.html) |
 | OpenAPI over HTTP · Hono | ~103% | 77-95 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/openapi-hono/.clinic/report.clinic-doctor.html) |
 
-The profiles show where the throughput gap comes from. Over HTTP, oRPC serves over 4x tRPC's requests at similar CPU usage (~104% vs ~113%), so its per-request CPU cost is several times lower, and its event loop stays responsive: 0.04 ms average delay versus tRPC's 0.77 ms. Memory stays flat between 71 and 107 MB in every oRPC run, while tRPC's HTTP run climbs to 248 MB, more than double oRPC's highest reading, a sign of per-request allocation pressure. oRPC and Hono profile nearly identically, in line with their close throughput.
-
-tRPC's low WebSocket CPU is not an advantage: the `cpu: performance` issue means the server cannot keep the CPU busy, so throughput is capped elsewhere in the stack.
+The `cpu: performance` issue means the server could not keep the CPU busy, so throughput was limited elsewhere in the stack.
 
 ### Type-Checking Performance
 
-On a large, fully typed project with 3,000 procedures across 1,501 routers, oRPC type-checks about 30% faster than tRPC, uses about 31% less memory, and needs about 19% fewer type instantiations:
+A fully typed project with 3,000 procedures across 1,501 routers:
 
 | Metric | oRPC | tRPC |
 | --- | --- | --- |
@@ -119,7 +268,7 @@ On a large, fully typed project with 3,000 procedures across 1,501 routers, oRPC
 | Memory used | 469 MB | 677 MB |
 | Instantiations | 2,198,304 | 2,719,560 |
 
-Hono has no column because it does not scale to this size. Its RPC types hit [known limits](https://hono.dev/docs/guides/rpc#known-issues) well before this point and the project becomes effectively unusable, an issue oRPC avoids by design.
+Hono has no column because its RPC types hit [known limits](https://hono.dev/docs/guides/rpc#known-issues) well before this size. ts-rest and Elysia were not measured.
 
 ### Bundle Size
 
@@ -131,3 +280,20 @@ Bundle sizes for a minimal client and server pair, measured with the same versio
 | Minified + gzip | 14.5 kB | 23.7 kB | 17.0 kB |
 
 Measure yourself: [oRPC](https://bundlejs.com/?q=%40orpc%2Fclient%402.0.0-beta.37%2C%40orpc%2Fclient%402.0.0-beta.37%2Ffetch%2C%40orpc%2Fserver%402.0.0-beta.37%2C%40orpc%2Fserver%402.0.0-beta.37%2Fnode&treeshake=%5B%7B+createORPCClient+%7D%5D%2C%5B%7B+RPCLink+%7D%5D%2C%5B%7B+os+%7D%5D%2C%5B%7B+RPCHandler+%7D%5D) · [tRPC](https://bundlejs.com/?q=%40trpc%2Fclient%4011.19.0%2C%40trpc%2Fserver%4011.19.0%2C%40trpc%2Fserver%4011.19.0%2Fadapters%2Fstandalone%2Csuperjson%402.2.6&treeshake=%5B%7B+createTRPCClient%2ChttpLink%2ChttpSubscriptionLink%2CsplitLink+%7D%5D%2C%5B%7B+initTRPC+%7D%5D%2C%5B%7B+createHTTPServer+%7D%5D%2C%5B%7B+default+as+SuperJSON+%7D%5D) · [Hono](https://bundlejs.com/?q=hono%404.13.8%2Chono%404.13.8%2Fclient%2C%40hono%2Fnode-server%402.1.1&treeshake=%5B%7B+Hono+%7D%5D%2C%5B%7B+hc+%7D%5D%2C%5B%7B+serve+%7D%5D)
+
+## Using oRPC With Them
+
+- **tRPC:** [`toORPCRouter`](/docs/integrations/trpc) converts a tRPC router into an oRPC router, which you can serve with the [OpenAPI Handler](/docs/openapi/handler).
+- **Hono and Elysia:** the [Hono adapter](/docs/adapters/hono) and [Elysia adapter](/docs/adapters/elysia) mount oRPC inside an existing app.
+
+## Sources
+
+**tRPC 11.19.0:** [retryLink](https://trpc.io/docs/client/links/retryLink) (built-in plugins 🟡), [error formatting](https://trpc.io/docs/server/error-formatting) (errors 🟡), [content types](https://trpc.io/docs/server/non-json-content-types) (File/Blob inputs only), [subscriptions](https://trpc.io/docs/server/subscriptions), [WebSockets](https://trpc.io/docs/server/websockets), [data transformers](https://trpc.io/docs/server/data-transformers) (native types 🟡), [OpenAPI (alpha)](https://trpc.io/docs/openapi) (🟡), [lazy routers](https://trpc.io/docs/server/merging-routers#lazy-load), [Server Actions](https://trpc.io/docs/client/nextjs/server-actions), and [Awesome tRPC](https://trpc.io/docs/community/awesome-trpc) for the community packages behind the other 🟡 ratings.
+
+**ts-rest 3.52.1:** [contract](https://ts-rest.com/contract/overview) (responses typed per status), [fetch client](https://ts-rest.com/client/fetch) (multipart uploads, custom `api` function as interceptors 🟡), [query encoding](https://github.com/ts-rest/ts-rest/blob/main/libs/ts-rest/core/src/lib/query.ts) (nested query only 🟡), [OpenAPI](https://ts-rest.com/openapi), [serverless options](https://ts-rest.com/server/serverless/options) (CORS 🟡), [React Query](https://ts-rest.com/client/react-query-v5), [Vue Query](https://ts-rest.com/client/vue-query-v4) and [`@ts-rest/solid-query`](https://www.npmjs.com/package/@ts-rest/solid-query) (🟡), [NestJS](https://ts-rest.com/server/nest), and [FAQ](https://ts-rest.com/faq) (Standard Schema from 3.53 🟡).
+
+**Hono 4.13.13:** [RPC](https://hono.dev/docs/guides/rpc) (typed status codes, SWR, [IDE performance](https://hono.dev/docs/guides/rpc#known-issues)), [third-party middleware](https://hono.dev/docs/middleware/third-party) (OpenAPI, contract-first, Standard Schema, rate limiting, OpenTelemetry, and MCP 🟡), [WebSocket helper](https://hono.dev/docs/helpers/websocket#rpc-mode) (🟡), [streaming](https://hono.dev/docs/helpers/streaming) (SSE untyped on the client), [dot notation](https://hono.dev/docs/api/request#dot-notation) (🟡), [CORS](https://hono.dev/docs/middleware/builtin/cors), [CSRF](https://hono.dev/docs/middleware/builtin/csrf), [cookie](https://hono.dev/docs/helpers/cookie), and [hono-rpc-query](https://www.npmjs.com/package/hono-rpc-query) (TanStack Query in React 🟡).
+
+**Elysia 1.4.30:** [Eden Treaty responses](https://elysiajs.com/eden/treaty/response) (errors typed per status, SSE), [Eden config](https://elysiajs.com/eden/treaty/config) (`parseDate`, `onRequest`, and `onResponse` 🟡), [Eden WebSocket](https://elysiajs.com/eden/treaty/websocket), [validation](https://elysiajs.com/essential/validation) (Standard Schema, query arrays 🟡), [handler](https://elysiajs.com/essential/handler) (files, streams), [lazy load](https://elysiajs.com/essential/plugin#lazy-load), [OpenAPI](https://elysiajs.com/plugins/openapi), [OpenTelemetry](https://elysiajs.com/plugins/opentelemetry), [CORS](https://elysiajs.com/plugins/cors), [cookie](https://elysiajs.com/patterns/cookie), [AI SDK](https://elysiajs.com/integrations/ai-sdk) (🟡), and [plugins](https://elysiajs.com/plugins/overview) for the community packages behind rate limiting and TanStack Query 🟡.
+
+Found an outdated rating? [Edit this page](https://github.com/middleapi/orpc/edit/main/apps/content/docs/comparison.mdx).
