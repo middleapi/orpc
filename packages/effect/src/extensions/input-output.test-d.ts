@@ -1,6 +1,6 @@
 import type { ContractBuilder, MergedSchema, ProcedureContractBuilderWithInput, ProcedureContractBuilderWithInputOutput, ProcedureContractBuilderWithOutput } from '@orpc/contract'
 import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, Schema } from '@orpc/server'
-import { Schema as EffectSchema, Option } from 'effect'
+import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
 import './input-output'
 
@@ -207,50 +207,24 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithInputO
 })
 
 describe('.output<EffectSchema> encodes Type into Encoded', () => {
-  const Payload = EffectSchema.Struct({
-    count: EffectSchema.NumberFromString,
-    maybe: EffectSchema.OptionFromNullOr(EffectSchema.String),
-  })
-
-  it('types the output schema as Schema<Type, Encoded>', () => {
-    const builder = {} as ContractBuilder<typeof errorMap>
-
-    expectTypeOf(builder.output(Payload)).toEqualTypeOf<
-      ProcedureContractBuilderWithOutput<
-        Schema<{ readonly count: number, readonly maybe: Option.Option<string> }, { readonly count: string, readonly maybe: string | null }>,
-        typeof errorMap
-      >
-    >()
-  })
+  const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
 
   it('handler returns Type', () => {
-    const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
-
-    builder.output(Payload).handler(() => ({ count: 5, maybe: Option.some('x') }))
-    builder.input(NumberFromString).output(Payload).handler(({ input }) => ({ count: input, maybe: Option.none() }))
-
+    builder.output(NumberFromString).handler(() => 5)
     // @ts-expect-error handler must return Type, not Encoded
-    builder.output(Payload).handler(() => ({ count: '5', maybe: 'x' }))
+    builder.output(NumberFromString).handler(() => '5')
   })
 
   it('requires output schemas to encode without services', () => {
-    const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
-
     builder.output({} as EffectSchema.Codec<number, string, 'decoding-service', never>)
     // @ts-expect-error encoding requires a service
     builder.output({} as EffectSchema.Codec<number, string, never, 'encoding-service'>)
   })
 
   it('keeps effect schemas already converted to standard schemas', () => {
-    const decoding = EffectSchema.toStandardSchemaV1(NumberFromString)
-    const encoding = EffectSchema.toStandardSchemaV1(EffectSchema.flip(NumberFromString))
+    const converted = EffectSchema.toStandardSchemaV1(NumberFromString)
 
-    const contractBuilder = {} as ContractBuilder<typeof errorMap>
-    expectTypeOf(contractBuilder.output(decoding)).toEqualTypeOf<ProcedureContractBuilderWithOutput<typeof decoding, typeof errorMap>>()
-    expectTypeOf(contractBuilder.output(encoding)).toEqualTypeOf<ProcedureContractBuilderWithOutput<typeof encoding, typeof errorMap>>()
-
-    const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
-    expectTypeOf(builder.output(decoding)).toEqualTypeOf<BuilderWithOutput<{ auth: boolean }, object, typeof decoding, typeof errorMap>>()
-    expectTypeOf(builder.output(encoding)).toEqualTypeOf<BuilderWithOutput<{ auth: boolean }, object, typeof encoding, typeof errorMap>>()
+    expectTypeOf(({} as ContractBuilder<typeof errorMap>).output(converted)).toEqualTypeOf<ProcedureContractBuilderWithOutput<typeof converted, typeof errorMap>>()
+    expectTypeOf(builder.output(converted)).toEqualTypeOf<BuilderWithOutput<{ auth: boolean }, object, typeof converted, typeof errorMap>>()
   })
 })

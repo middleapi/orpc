@@ -2,19 +2,22 @@ import type { Schema } from '@orpc/contract'
 import { getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
 import { Schema as EffectSchema } from 'effect'
 
+function withHiddenMetaPluginsOf<T extends object>(source: object, target: T): T {
+  const metaPlugins = getHiddenMetaPlugins(source)
+  if (metaPlugins) {
+    setHiddenMetaPlugins(target, metaPlugins)
+  }
+
+  return target
+}
+
 /**
  * Converts an Effect schema into a Standard Schema that decodes `Encoded` into `Type`.
  */
 export function toStandardSchema<S extends EffectSchema.ConstraintDecoder<any>>(
   schema: S,
 ): Schema<S['Encoded'], S['Type']> & S {
-  const converted = EffectSchema.toStandardSchemaV1(schema)
-  const metaPlugins = getHiddenMetaPlugins(schema)
-  if (metaPlugins) {
-    setHiddenMetaPlugins(converted, metaPlugins)
-  }
-
-  return converted
+  return withHiddenMetaPluginsOf(schema, EffectSchema.toStandardSchemaV1(schema))
 }
 
 /**
@@ -24,13 +27,5 @@ export function toStandardSchema<S extends EffectSchema.ConstraintDecoder<any>>(
 export function toStandardOutputSchema<S extends EffectSchema.Top & EffectSchema.ConstraintEncoder<any>>(
   schema: S,
 ): Schema<S['Type'], S['Encoded']> {
-  const flipped = EffectSchema.flip(schema)
-
-  // `flip` returns a new schema, so the meta plugins must be carried over explicitly
-  const metaPlugins = getHiddenMetaPlugins(schema)
-  if (metaPlugins) {
-    setHiddenMetaPlugins(flipped, metaPlugins)
-  }
-
-  return toStandardSchema(flipped)
+  return withHiddenMetaPluginsOf(schema, EffectSchema.toStandardSchemaV1(EffectSchema.flip(schema)))
 }

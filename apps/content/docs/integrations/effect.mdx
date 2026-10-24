@@ -359,7 +359,7 @@ const procedure = base
 ```
 
 :::warning
-The extensions only convert plain Effect schemas. A schema that is already a Standard Schema is used as is, so `.output(Schema.toStandardSchemaV1(MySchema))` still decodes, and the handler has to return the `Encoded` form. Pass `MySchema` directly, or `Schema.toStandardSchemaV1(Schema.flip(MySchema))`.
+The extensions only convert plain Effect schemas. A schema that is already a Standard Schema is used as is, so `.output(Schema.toStandardSchemaV1(MySchema))` still decodes.
 :::
 
 ### JSON Schema Converter

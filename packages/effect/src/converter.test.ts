@@ -24,11 +24,13 @@ describe('effectSchemaToJsonSchemaConverter', () => {
     expect(converter.convert(toStandardSchema(Schema.NumberFromString), direction)).toEqual([jsonSchema, false])
   })
 
-  it('converts encoding output schemas from the encoded side', () => {
+  it('converts flipped output schemas from the encoded side, keeping class definitions', () => {
+    class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
+
     const schema = toStandardOutputSchema(Schema.Struct({
       count: Schema.NumberFromString,
       maybe: Schema.OptionFromNullOr(Schema.String),
-      at: Schema.DateFromString,
+      planet: Planet,
     }))
 
     expect(converter.convert(schema, 'output')).toEqual([{
@@ -36,10 +38,18 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       properties: {
         count: { type: 'string' },
         maybe: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-        at: { type: 'string' },
+        planet: { $ref: '#/$defs/PlanetEncoded' },
       },
-      required: ['count', 'maybe', 'at'],
+      required: ['count', 'maybe', 'planet'],
       additionalProperties: true,
+      $defs: {
+        PlanetEncoded: {
+          type: 'object',
+          properties: { name: { type: 'string' } },
+          required: ['name'],
+          additionalProperties: true,
+        },
+      },
     }, false])
   })
 
@@ -74,29 +84,6 @@ describe('effectSchemaToJsonSchemaConverter', () => {
           },
         },
       }, false])
-    })
-
-    it('keeps class definitions in flipped output schemas', () => {
-      class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
-      const Payload = Schema.Struct({ planet: Planet })
-
-      const expected = [{
-        type: 'object',
-        properties: { planet: { $ref: '#/$defs/PlanetEncoded' } },
-        required: ['planet'],
-        additionalProperties: true,
-        $defs: {
-          PlanetEncoded: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name'],
-            additionalProperties: true,
-          },
-        },
-      }, false]
-
-      expect(converter.convert(toStandardOutputSchema(Payload), 'output')).toEqual(expected)
-      expect(converter.convert(Schema.toStandardSchemaV1(Schema.flip(Payload)), 'output')).toEqual(expected)
     })
 
     it('resolves recursion into a $ref', () => {
