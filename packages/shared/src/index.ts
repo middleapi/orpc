@@ -14,25 +14,10 @@ export * from './object'
 export * from './plugin'
 export * from './promise'
 export * from './proxy'
+export * from './queue'
 export * from './signal'
 export * from './stream'
-export {
-  getTracer,
-  recordSpanError,
-  runWithSpan,
-  setTracer,
-  toSpanAttributeValue,
-  toTracingException,
-} from './tracing'
-export type {
-  StartSpanOptions,
-  Tracer,
-  TracingAttributeValue,
-  TracingException,
-  TracingExceptionLevel,
-  TracingHeaders,
-  TracingSpan,
-} from './tracing'
+export * from './tracing'
 export * from './types'
 export * from './value'
 
