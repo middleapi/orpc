@@ -76,13 +76,15 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       }, false])
     })
 
-    it('keeps class definitions in encoding output schemas when the encoded side has an identifier', () => {
-      class Planet extends Schema.Class<Planet>('Planet')(
-        Schema.Struct({ name: Schema.String }).annotate({ identifier: 'PlanetEncoded' }),
-      ) {}
+    it('keeps class definitions in flipped output schemas', () => {
+      class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
+      const Payload = Schema.Struct({ planet: Planet })
 
-      expect(converter.convert(toStandardOutputSchema(Planet), 'output')).toEqual([{
-        $ref: '#/$defs/PlanetEncoded',
+      const expected = [{
+        type: 'object',
+        properties: { planet: { $ref: '#/$defs/PlanetEncoded' } },
+        required: ['planet'],
+        additionalProperties: true,
         $defs: {
           PlanetEncoded: {
             type: 'object',
@@ -91,7 +93,10 @@ describe('effectSchemaToJsonSchemaConverter', () => {
             additionalProperties: true,
           },
         },
-      }, false])
+      }, false]
+
+      expect(converter.convert(toStandardOutputSchema(Payload), 'output')).toEqual(expected)
+      expect(converter.convert(Schema.toStandardSchemaV1(Schema.flip(Payload)), 'output')).toEqual(expected)
     })
 
     it('resolves recursion into a $ref', () => {

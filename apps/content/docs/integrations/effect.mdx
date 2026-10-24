@@ -380,10 +380,6 @@ const generator = new OpenAPIGenerator({
 
 Schemas with an `identifier` annotation, including `Schema.Class` and recursive schemas, are preserved in `$defs`, which `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) into `components.schemas`.
 
-:::info
-`.output` schemas describe the encoded side, which for a `Schema.Class` has no identifier of its own, so it is inlined. To keep it in `$defs`, annotate the fields struct: `Schema.Class<Planet>('Planet')(Schema.Struct({ name: Schema.String }).annotate({ identifier: 'PlanetEncoded' }))`.
-:::
-
 :::tip
 Enable the `cache` option to reuse conversion results when the same schema instance is converted repeatedly. When enabled, repeated conversions return the same JSON schema object, so treat the results as immutable.
 
