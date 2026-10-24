@@ -1,6 +1,6 @@
 import type { ClientContext } from '@orpc/client'
 import type { ContractClientFactory, RouterContract, RouterContractClient } from '@orpc/contract'
-import type { JsonifiedClient } from '@orpc/openapi'
+import type { ContractJsonifiedClientFactory, JsonifiedClient } from '@orpc/openapi'
 import type { RouterUtils, RouterUtilsOptions } from './router-utils'
 import { resolveBasePathMeta } from '@orpc/contract'
 import { get } from '@orpc/shared'
@@ -56,11 +56,22 @@ export interface ContractJsonifiedUtilsFactoryOptions<
 > extends Omit<RouterUtilsOptions<JsonifiedClient<RouterContractClient<RouterContract, TClientContext>>>, 'path'> {
 }
 
+/**
+ * Like `createContractUtilsFactory`, but for clients whose types are wrapped in `JsonifiedClient`,
+ * such as clients using OpenAPI Link.
+ *
+ * @remarks
+ * Takes a client factory created by `createContractJsonifiedClientFactory` from `@orpc/openapi`.
+ *
+ * **Note**: The contract must define a `path` meta matching its position in the root router contract.
+ *
+ * @see {@link https://orpc.dev/docs/contract/client-factory#pinia-colada-integration | Contract Client Factory - Pinia Colada Integration}
+ */
 export function createContractJsonifiedUtilsFactory<
   TClientContext extends ClientContext,
 >(
-  clientFactory: ContractClientFactory<TClientContext>,
+  clientFactory: ContractJsonifiedClientFactory<TClientContext>,
   options: ContractJsonifiedUtilsFactoryOptions<TClientContext>,
 ): ContractJsonifiedUtilsFactory<TClientContext> {
-  return createContractUtilsFactory(clientFactory, options) as ContractJsonifiedUtilsFactory<TClientContext>
+  return createContractUtilsFactory(clientFactory as ContractClientFactory<TClientContext>, options) as ContractJsonifiedUtilsFactory<TClientContext>
 }

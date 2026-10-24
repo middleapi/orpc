@@ -1,5 +1,6 @@
 import type { ORPCError } from '@orpc/client'
 import type { ContractClientFactory } from '@orpc/contract'
+import type { ContractJsonifiedClientFactory } from '@orpc/openapi'
 import type { PromiseWithError } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
 import type { SharedUtils } from './shared-utils'
@@ -18,9 +19,10 @@ const contract = {
   },
 }
 
-describe('createContractUtilsFactory', () => {
-  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
 
+describe('createContractUtilsFactory', () => {
   it('infers interceptor input, output, errors types', () => {
     createContractUtilsFactory(clientFactory, {
       mutationInterceptors: [
@@ -98,10 +100,8 @@ describe('createContractUtilsFactory', () => {
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
-  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
-
   it('infers interceptor input, output, errors types', () => {
-    createContractJsonifiedUtilsFactory(clientFactory, {
+    createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
@@ -156,7 +156,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('return jsonified general and procedure utils', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {})
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
@@ -165,7 +165,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('returns jsonified router utils when a router contract is passed', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {})
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
