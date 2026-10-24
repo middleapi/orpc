@@ -1,0 +1,18 @@
+---
+title: "Client"
+description: "Call oRPC procedures with full type safety from browsers, apps, and servers: create clients over links, call locally during SSR, handle errors, and stream."
+seo:
+  title: "Clients: Call Procedures with End-to-End Types"
+sidebar:
+  hidden: true
+---
+
+A client calls procedures like local functions, typed from your router or contract. Client-side clients call a server through a link, such as the [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link). Server-side clients call procedures in the same process.
+
+- [Server-Side Clients](/docs/client/server-side): call procedures directly, without HTTP.
+- [Client-Side Clients](/docs/client/client-side): create a client over a link, with context and interceptors.
+- [Error Handling](/docs/client/error-handling): handle errors with `try/catch` or fully typed `safe` calls.
+- [AsyncIteratorObject (SSE)](/docs/client/async-iterator-object): consume streamed events.
+- [DynamicLink](/docs/client/dynamic-link): choose a link per call at runtime.
+
+To add retries, batching, or timeouts, see [Plugins](/docs/plugins).
