@@ -14,6 +14,8 @@ oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to
 - 🟡 Lacks features or requires third-party integrations
 - 🛑 Not supported or not documented
 
+Checked against tRPC 11.19 and Hono 4.13 (October 2026).
+
 ### Type Safety
 
 | Feature | oRPC | tRPC | Hono |
@@ -25,22 +27,22 @@ oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to
 | [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 |
 | [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | 🛑 |
 
-oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare errors](/docs/error-handling) on a single procedure or a shared builder, or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). tRPC exposes one global error shape, and Hono only types errors returned with an explicit status code. oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
+oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare errors](/docs/error-handling) on a single procedure or a shared builder, or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). tRPC (as of 11.19) exposes one global error shape, and Hono only types errors returned with an explicit status code. oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
 
 ### API Design & OpenAPI
 
 | Feature | oRPC | tRPC | Hono |
 | --- | --- | --- | --- |
 | Implementation-first approach | ✅ | ✅ | ✅ |
-| [Contract-first approach](/docs/contract-first) | ✅ | 🛑 | ✅ |
-| [OpenAPI spec generation](/docs/openapi/specification) | ✅ | 🟡 | ✅ |
+| [Contract-first approach](/docs/contract-first) | ✅ | 🛑 | 🟡 |
+| [OpenAPI spec generation](/docs/openapi/specification) | ✅ | 🟡 | 🟡 |
 | [Standard Schema (Zod, Valibot, ArkType, ...)](/docs/integrations/standard-schema) | ✅ | ✅ | 🟡 |
 | [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 |
 | [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 |
 | [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
 | [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
 
-oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler) and generates the OpenAPI spec natively, while tRPC and Hono depend on extra packages for OpenAPI. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
+oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the spec with a first-party package. tRPC's `@trpc/openapi` is alpha and covers only tRPC-style endpoints, and Hono relies on third-party middleware like `@hono/zod-openapi`. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
 
 ### Integrations & Ecosystem
 
@@ -60,7 +62,7 @@ oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and 
 | [AI SDK integration](/docs/integrations/ai-sdk) | ✅ | 🛑 | 🛑 |
 | [MCP integration (procedures as AI agent tools)](/docs/integrations/mcp) | ✅ | 🟡 | 🟡 |
 | [Next.js Server Actions support](/docs/integrations/next) | ✅ | ✅ | 🛑 |
-| [Built-in plugins (CORS, CSRF, Retry, ...)](/docs/plugins/cors) | ✅ | 🛑 | ✅ |
+| [Built-in plugins (CORS, CSRF, Retry, ...)](/docs/plugins/cors) | ✅ | 🟡 | ✅ |
 | [Built-in helpers (cookie, encryption, signing, ...)](/docs/helpers/cookie) | ✅ | 🛑 | ✅ |
 | [NestJS integration](/docs/integrations/nest) | ✅ | 🟡 | 🛑 |
 | [OpenTelemetry integration](/docs/integrations/opentelemetry) | ✅ | 🛑 | 🟡 |

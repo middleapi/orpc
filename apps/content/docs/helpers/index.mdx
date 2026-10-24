@@ -1,0 +1,28 @@
+---
+title: "Helpers"
+description: "Utilities that ship with oRPC for cookies, signing, encryption, base64url, and form data, plus packages for rate limiting, locks, and publish/subscribe."
+seo:
+  title: "Helpers: Cookies, Signing, Rate Limits, and More"
+sidebar:
+  hidden: true
+---
+
+Helpers handle common jobs inside procedures, middleware, and plugins.
+
+## Built In
+
+These come from `@orpc/server/helpers`, except Form Data, which comes from `@orpc/openapi/helpers`.
+
+- [Cookie](/docs/helpers/cookie): set, read, and delete cookies on `Headers`.
+- [Signing](/docs/helpers/signing): sign and verify data with HMAC-SHA256.
+- [Encryption](/docs/helpers/encryption): encrypt and decrypt data with AES-GCM.
+- [Base64Url](/docs/helpers/base64url): encode and decode URL-safe base64.
+- [Form Data](/docs/helpers/form-data): parse nested form data and extract validation errors.
+
+## With Storage Adapters
+
+Each is a separate package with adapters for memory, Redis, Upstash, Bun, and Cloudflare.
+
+- [Rate Limit](/docs/helpers/ratelimit): limit how often clients call a procedure.
+- [Lock](/docs/helpers/lock): stop the same work from running concurrently (experimental).
+- [Publisher](/docs/helpers/publisher): publish and subscribe to events, with resume support.
