@@ -12,7 +12,7 @@ This guide assumes familiarity with [Effect](https://effect.website/). Review th
 ## Installation
 
 ```package-install
-npm install @orpc/experimental-effect@beta effect
+npm install @orpc/effect@beta effect
 ```
 
 ## Effectful Handlers
@@ -22,7 +22,7 @@ npm install @orpc/experimental-effect@beta effect
 ```ts twoslash
 import { os } from '@orpc/server'
 // ---cut---
-import { handlerGen } from '@orpc/experimental-effect'
+import { handlerGen } from '@orpc/effect'
 import { Effect } from 'effect'
 
 const procedure = os.handler(handlerGen(function* ({ input, context }) {
@@ -34,7 +34,7 @@ const procedure = os.handler(handlerGen(function* ({ input, context }) {
 
 ### `.effect` extension
 
-Import `@orpc/experimental-effect/extensions/effect` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This adds an `.effect` method to the builder so you can write effectful handlers directly.
+Import `@orpc/effect/extensions/effect` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This adds an `.effect` method to the builder so you can write effectful handlers directly.
 
 <CodeGroup>
 
@@ -47,7 +47,7 @@ const procedure = base.effect(function* ({ input, context }) {
 ```
 
 ```ts setup
-import '@orpc/experimental-effect/extensions/effect'
+import '@orpc/effect/extensions/effect'
 
 import { os } from '@orpc/server'
 
@@ -71,7 +71,7 @@ You can provide Effect services through the oRPC context in a typesafe way with 
 ```ts twoslash
 import { call, os } from '@orpc/server'
 // ---cut---
-import { handlerGen, WithEffectContext } from '@orpc/experimental-effect'
+import { handlerGen, WithEffectContext } from '@orpc/effect'
 import { Context, Effect } from 'effect'
 
 class Random extends Context.Service<
@@ -135,7 +135,7 @@ This integration preserves the original error whenever possible. If you call `Ef
 To customize this behavior, wrap the effect before execution using `effect/wrap` in the context:
 
 ```ts twoslash
-import type { WithEffectContext } from '@orpc/experimental-effect'
+import type { WithEffectContext } from '@orpc/effect'
 import { RPCHandler } from '@orpc/server/fetch'
 
 interface ServerContext extends WithEffectContext<never> {}
@@ -215,7 +215,7 @@ if (isDefinedError(error)) {
 Use `catchORPCError` to recover from every `ORPCError` failure in the error channel of an effect, or `catchORPCErrorCode` and `catchORPCErrorCodes` to recover from specific codes only. Recovered errors are excluded from the resulting effect, and other failures re-fail with their original cause:
 
 ```ts
-import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from '@orpc/experimental-effect'
+import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from '@orpc/effect'
 import { Effect } from 'effect'
 
 const recovered = program.pipe(
@@ -251,7 +251,7 @@ When a request is aborted, `handlerGen` and `middlewareGen` fibers are interrupt
 ```ts twoslash
 import { os } from '@orpc/server'
 // ---cut---
-import { middlewareGen } from '@orpc/experimental-effect'
+import { middlewareGen } from '@orpc/effect'
 import { Clock } from 'effect'
 
 const procedure = os
@@ -268,7 +268,7 @@ const procedure = os
 `createEffectClient` wraps any oRPC client, whether [server-side](/docs/client/server-side) or [client-side](/docs/client/client-side), so every procedure returns a lazy Effect instead of a promise, ready to `yield*` inside Effect generators. The output becomes the success value, and errors land in the error channel with their original types preserved, ready for utilities like `catchORPCErrorCodes`:
 
 ```ts
-import { catchORPCErrorCodes, createEffectClient } from '@orpc/experimental-effect'
+import { catchORPCErrorCodes, createEffectClient } from '@orpc/effect'
 import { Effect } from 'effect'
 
 const effectClient = createEffectClient(client)
@@ -317,7 +317,7 @@ const procedure = os
 
 ### `.input` and `.output` Extensions
 
-Import `@orpc/experimental-effect/extensions/input-output` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This lets you define `.input` and `.output` directly with Effect Schema:
+Import `@orpc/effect/extensions/input-output` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This lets you define `.input` and `.output` directly with Effect Schema:
 
 <CodeGroup>
 
@@ -331,7 +331,7 @@ const procedure = base
 ```
 
 ```ts setup
-import '@orpc/experimental-effect/extensions/input-output'
+import '@orpc/effect/extensions/input-output'
 
 import { os } from '@orpc/server'
 
@@ -349,7 +349,7 @@ You can also use these extensions with the [contract builder](/docs/contract/pro
 This integration also provides `EffectSchemaToJsonSchemaConverter`, which wraps Effect's built-in [Schema.toJsonSchemaDocument](https://effect.website/docs/schema/json-schema/). Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator). It accepts the same options as `Schema.toJsonSchemaDocument`, such as `onExcessProperty`, `generateDescriptions`, `includeAnnotationKey`, and `referencePolicy`:
 
 ```ts
-import { EffectSchemaToJsonSchemaConverter } from '@orpc/experimental-effect'
+import { EffectSchemaToJsonSchemaConverter } from '@orpc/effect'
 
 const generator = new OpenAPIGenerator({
   converters: [
