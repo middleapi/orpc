@@ -101,7 +101,7 @@ export const createUtils = createContractUtilsFactory(createClient, { /** option
 ```
 
 :::warning
-If you are using [OpenAPI Link](/docs/openapi/link), or any link that requires the client to be wrapped in `JsonifiedClient`, use `createContractJsonifiedUtilsFactory` from `@orpc/tanstack-query` instead of `createContractUtilsFactory`.
+If you are using [OpenAPI Link](/docs/openapi/link), or any link that requires the client to be wrapped in `JsonifiedClient`, use `createContractJsonifiedUtilsFactory` from `@orpc/tanstack-query` instead of `createContractUtilsFactory`, and pass it a client factory created by [`createContractJsonifiedClientFactory`](#contract-client-factory).
 :::
 
 You can then create utilities for each procedure contract:
@@ -135,7 +135,7 @@ export const createUtils = createContractUtilsFactory(createClient, { /** option
 ```
 
 :::warning
-If you are using [OpenAPI Link](/docs/openapi/link), or any link that requires the client to be wrapped in `JsonifiedClient`, use `createContractJsonifiedUtilsFactory` from `@orpc/pinia-colada` instead of `createContractUtilsFactory`.
+If you are using [OpenAPI Link](/docs/openapi/link), or any link that requires the client to be wrapped in `JsonifiedClient`, use `createContractJsonifiedUtilsFactory` from `@orpc/pinia-colada` instead of `createContractUtilsFactory`, and pass it a client factory created by [`createContractJsonifiedClientFactory`](#contract-client-factory).
 :::
 
 You can then create utilities for each procedure contract:

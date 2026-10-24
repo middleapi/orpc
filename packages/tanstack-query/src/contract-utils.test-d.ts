@@ -106,7 +106,7 @@ describe('createContractUtilsFactory', () => {
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
-  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+  const clientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
 
   it('infers interceptor input, output, errors types', () => {
     createContractJsonifiedUtilsFactory(clientFactory, {
@@ -181,24 +181,10 @@ describe('createContractJsonifiedUtilsFactory', () => {
     >()
   })
 
-  it('accepts a jsonified client factory', () => {
-    const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
+  it('rejects a non-jsonified client factory', () => {
+    const plainClientFactory = {} as ContractClientFactory<{ cache?: boolean }>
 
-    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {
-      mutationInterceptors: [
-        async ({ context, next }) => {
-          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
-
-          return next()
-        },
-      ],
-    })
-
-    expectTypeOf(createUtils(contract.nested.pong)).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
-    >()
-    expectTypeOf(createUtils(contract).nested.pong).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
-    >()
+    // @ts-expect-error a non-jsonified client factory needs createContractUtilsFactory
+    createContractJsonifiedUtilsFactory(plainClientFactory, {})
   })
 })

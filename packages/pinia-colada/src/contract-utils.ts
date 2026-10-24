@@ -61,16 +61,16 @@ export interface ContractJsonifiedUtilsFactoryOptions<
  * such as clients using OpenAPI Link.
  *
  * @remarks
- * Accepts a client factory created by either `createContractJsonifiedClientFactory` or `createContractClientFactory`.
+ * Takes a client factory created by `createContractJsonifiedClientFactory` from `@orpc/openapi`.
  *
  * @see {@link https://orpc.dev/docs/contract/client-factory#pinia-colada-integration | Contract Client Factory - Pinia Colada Integration}
  */
 export function createContractJsonifiedUtilsFactory<
   TClientContext extends ClientContext,
 >(
-  clientFactory: ContractClientFactory<TClientContext> | ContractJsonifiedClientFactory<TClientContext>,
+  clientFactory: ContractJsonifiedClientFactory<TClientContext>,
   options: ContractJsonifiedUtilsFactoryOptions<TClientContext>,
 ): ContractJsonifiedUtilsFactory<TClientContext> {
-  // Both factories are the same function at runtime; they differ only in the client type they declare.
+  // Both client factories are the same function at runtime; they differ only in the client type they declare.
   return createContractUtilsFactory(clientFactory as ContractClientFactory<TClientContext>, options) as ContractJsonifiedUtilsFactory<TClientContext>
 }
