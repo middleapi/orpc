@@ -63,6 +63,8 @@ export interface ContractJsonifiedUtilsFactoryOptions<
  * @remarks
  * Takes a client factory created by `createContractJsonifiedClientFactory` from `@orpc/openapi`.
  *
+ * **Note**: The contract must define a `path` meta matching its position in the root router contract.
+ *
  * @see {@link https://orpc.dev/docs/contract/client-factory#tanstack-query-integration | Contract Client Factory - TanStack Query Integration}
  */
 export function createContractJsonifiedUtilsFactory<
