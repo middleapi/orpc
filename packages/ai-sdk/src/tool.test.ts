@@ -1,10 +1,25 @@
 import { asyncIteratorObject, oc, type } from '@orpc/contract'
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { generateText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import z from 'zod'
 import { createToolFactory, implementToolFactory } from './tool'
 import { aiSdkTool } from './tool-meta'
+
+function toolCallModel(toolName: string, args: unknown) {
+  return new MockLanguageModelV4({
+    doGenerate: async () => ({
+      content: [{ type: 'tool-call', toolCallId: 'call-1', toolName, input: JSON.stringify(args) }],
+      finishReason: { unified: 'tool-calls', raw: undefined },
+      usage: {
+        inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+        outputTokens: { total: 20, text: 20, reasoning: undefined },
+      },
+      warnings: [],
+    }),
+  })
+}
 
 describe('implementToolFactory', () => {
   const inputSchema = z.object({
@@ -260,22 +275,7 @@ describe('implementToolFactory', () => {
     })
 
     const result = await generateText({
-      model: new MockLanguageModelV4({
-        doGenerate: async () => ({
-          content: [{
-            type: 'tool-call',
-            toolCallId: 'call-1',
-            toolName: 'greet',
-            input: JSON.stringify({ name: 'Alice' }),
-          }],
-          finishReason: { unified: 'tool-calls', raw: undefined },
-          usage: {
-            inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-            outputTokens: { total: 20, text: 20, reasoning: undefined },
-          },
-          warnings: [],
-        }),
-      }),
+      model: toolCallModel('greet', { name: 'Alice' }),
       tools: { greet },
       prompt: 'Greet Alice',
     })
@@ -297,6 +297,79 @@ describe('implementToolFactory', () => {
       expect(
         implementToolFactory()(oc.input(inputSchema).output(asyncIteratorObject(yieldSchema, returnSchema))).outputSchema,
       ).toBe(yieldSchema)
+    })
+  })
+
+  describe('model output', () => {
+    const toModelOutput = (tool: any, output: unknown) => tool.toModelOutput({ toolCallId: 'call-1', input: {}, output })
+    const pdfBase64 = btoa('pdf')
+
+    it('serializes outputs like OpenAPI responses', async () => {
+      const tool = implementToolFactory()(oc)
+
+      await expect(toModelOutput(tool, { date: new Date('2024-01-01T00:00:00.000Z'), big: 1n, set: new Set([1, 2]) })).resolves.toEqual({
+        type: 'json',
+        value: { date: '2024-01-01T00:00:00.000Z', big: '1', set: [1, 2] },
+      })
+      await expect(toModelOutput(tool, 'hello')).resolves.toEqual({ type: 'text', value: 'hello' })
+      await expect(toModelOutput(tool, undefined)).resolves.toEqual({ type: 'json', value: null })
+    })
+
+    it('sends files as file content, nested ones named by their path', async () => {
+      const tool = implementToolFactory()(oc)
+      const pdf = new File(['pdf'], 'q3.pdf', { type: 'application/pdf' })
+
+      await expect(toModelOutput(tool, pdf)).resolves.toEqual({
+        type: 'content',
+        value: [{ type: 'file', mediaType: 'application/pdf', data: { type: 'data', data: pdfBase64 }, filename: 'q3.pdf' }],
+      })
+
+      await expect(toModelOutput(tool, new Blob(['bytes']))).resolves.toEqual({
+        type: 'content',
+        value: [{ type: 'file', mediaType: 'application/octet-stream', data: { type: 'data', data: btoa('bytes') } }],
+      })
+
+      await expect(toModelOutput(tool, { title: 'Q3', files: [pdf] })).resolves.toEqual({
+        type: 'content',
+        value: [
+          { type: 'text', text: '{"title":"Q3","files":[{}]}' },
+          { type: 'file', mediaType: 'application/pdf', data: { type: 'data', data: pdfBase64 }, filename: 'files/0/q3.pdf' },
+        ],
+      })
+    })
+
+    it('uses the serializer option', async () => {
+      class Money {
+        constructor(readonly cents: number) {}
+      }
+
+      const serializer = new OpenAPIJsonSerializer({
+        handlers: { money: { condition: data => data instanceof Money, serialize: (data: Money) => `$${data.cents / 100}`, isTerminal: true } },
+      })
+
+      await expect(toModelOutput(implementToolFactory({ serializer })(oc), { price: new Money(150) })).resolves.toEqual({
+        type: 'json',
+        value: { price: '$1.5' },
+      })
+    })
+
+    it('can be overridden by tool options or meta', () => {
+      const custom = () => ({ type: 'text' as const, value: 'custom' })
+
+      expect(implementToolFactory()(oc, { toModelOutput: custom }).toModelOutput).toBe(custom)
+      expect(implementToolFactory()(oc.meta(aiSdkTool({ toModelOutput: custom }))).toModelOutput).toBe(custom)
+    })
+
+    it('sends files to the model through the AI SDK', async () => {
+      const report = implementToolFactory()(oc, {
+        execute: async () => new File(['pdf'], 'q3.pdf', { type: 'application/pdf' }),
+      })
+
+      const result = await generateText({ model: toolCallModel('report', {}), tools: { report }, prompt: 'Report' })
+
+      expect(result.response.messages.at(-1)?.content).toEqual([expect.objectContaining({
+        output: { type: 'content', value: [{ type: 'file', mediaType: 'application/pdf', data: { type: 'data', data: pdfBase64 }, filename: 'q3.pdf' }] },
+      })])
     })
   })
 })

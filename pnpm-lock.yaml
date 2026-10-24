@@ -451,6 +451,9 @@ importers:
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:../json-schema
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
       '@orpc/server':
         specifier: workspace:*
         version: link:../server

@@ -2,13 +2,14 @@ import type { ClientOptions } from '@orpc/client'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput, ProcedureContract, Schema } from '@orpc/contract'
 import type { JsonSchema } from '@orpc/json-schema'
 import type { Context, ProcedureClientOptions } from '@orpc/server'
-import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { FlexibleSchema, Tool } from 'ai'
+import type { MaybeOptionalOptions, Public } from '@orpc/shared'
+import type { FlexibleSchema, JSONValue, Tool, ToolResultPart } from 'ai'
 import type { FunctionTool } from './tool-meta'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { call, Procedure } from '@orpc/server'
-import { isAsyncGeneratorFunction, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { encodeBase64, isAsyncGeneratorFunction, loadBytes, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, stringifyJSON, toArray } from '@orpc/shared'
 import { tool } from 'ai'
 import { getAiSdkToolMeta } from './tool-meta'
 
@@ -95,6 +96,37 @@ function combineOutputSchemas(outputSchemas: AnySchema[]): FlexibleSchema | unde
 }
 
 /**
+ * Serializes an output like an OpenAPI response body. JSON shows a `Blob` as an empty object,
+ * so blobs, nested or not, are sent as file parts named by their path, such as `report/q3.pdf`.
+ */
+async function toModelOutput(serializer: Public<OpenAPIJsonSerializer>, output: unknown): Promise<ToolResultPart['output']> {
+  const { json, maps, blobs } = serializer.serializeJson(output)
+
+  if (typeof json === 'string') {
+    return { type: 'text', value: json }
+  }
+
+  if (!blobs?.length) {
+    return { type: 'json', value: (json ?? null) as JSONValue }
+  }
+
+  const files = await Promise.all(blobs.map(async (blob, i) => {
+    const path = maps[i]!
+    const names = blob instanceof File && blob.name !== '' ? [...path, blob.name] : path
+
+    return {
+      type: 'file' as const,
+      mediaType: blob.type || 'application/octet-stream',
+      // base64 is encoded once, providers would otherwise re-encode the bytes on every step
+      data: { type: 'data' as const, data: encodeBase64(await loadBytes(blob)) },
+      ...(names.length === 0 ? {} : { filename: names.join('/') }),
+    }
+  }))
+
+  return { type: 'content', value: json instanceof Blob ? files : [{ type: 'text', text: stringifyJSON(json)! }, ...files] }
+}
+
+/**
  * Infers the value an AI SDK tool outputs for a given oRPC output type.
  *
  * For [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object) outputs, the tool streams
@@ -108,8 +140,14 @@ export type ToolOutput<T> = T extends AsyncIteratorObject<infer TYield, any, any
   : T
 
 export interface ImplementToolFactoryOptions {
-  // TODO: add a `converter` option after JSON Schema converters support synchronous conversion,
-  // because the AI SDK reads JSON Schemas synchronously
+  /**
+   * Serializes outputs for the default `toModelOutput`, converting types such as `Date`, `BigInt`, and `Set`
+   * the same way OpenAPI responses do.
+   *
+   * @default new OpenAPIJsonSerializer()
+   * @see {@link https://orpc.dev/docs/integrations/ai-sdk#tool-outputs | AI SDK Integration - Tool Outputs}
+   */
+  serializer?: Public<OpenAPIJsonSerializer> | undefined
 }
 
 export interface ToolImplementer {
@@ -162,7 +200,10 @@ export interface ToolImplementer {
  *
  * @see {@link https://orpc.dev/docs/integrations/ai-sdk#tool-implementer | AI SDK Integration - Tool Implementer}
  */
-export function implementToolFactory(_options: ImplementToolFactoryOptions = {}): ToolImplementer {
+export function implementToolFactory(options: ImplementToolFactoryOptions = {}): ToolImplementer {
+  const serializer = options.serializer ?? new OpenAPIJsonSerializer()
+  const defaultToModelOutput: NonNullable<FunctionTool['toModelOutput']> = ({ output }) => toModelOutput(serializer, output)
+
   const factory: ToolImplementer = (contract, ...rest) => {
     const toolOptions = resolveMaybeOptionalOptions(rest)
 
@@ -174,6 +215,7 @@ export function implementToolFactory(_options: ImplementToolFactoryOptions = {})
     return tool({
       ...defaults,
       ...toolOptions,
+      toModelOutput: toolOptions.toModelOutput ?? defaults?.toModelOutput ?? defaultToModelOutput,
       inputSchema: combineSchemas(inputSchemas, true) ?? ANY_SCHEMA,
       outputSchema: combineOutputSchemas(outputSchemas),
     })

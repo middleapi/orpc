@@ -4,6 +4,7 @@
     { "path": "../client" },
     { "path": "../contract" },
     { "path": "../json-schema" },
+    { "path": "../openapi" },
     { "path": "../server" },
     { "path": "../shared" }
   ],

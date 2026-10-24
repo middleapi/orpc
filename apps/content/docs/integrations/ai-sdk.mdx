@@ -206,3 +206,7 @@ const deployProcedure = os
 
 const deployTool = createTool(deployProcedure)
 ```
+
+## Tool Outputs
+
+The model receives outputs serialized like [OpenAPI responses](/docs/openapi/serializer), and each `Blob` or `File`, nested or not, as file content named by its path, such as `report/q3.pdf`. Pass your OpenAPI handler's serializer as the factory's `serializer` option to share [custom types](/docs/openapi/serializer#custom-serializers), or set `toModelOutput` to take over.
