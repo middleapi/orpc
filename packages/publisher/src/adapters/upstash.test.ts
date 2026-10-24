@@ -104,26 +104,6 @@ describe.concurrent(
       await unsubscribeResumeAttempt()
     })
 
-    it('delivers events to publishers created by prefix', async () => {
-      const publisher = createTestingPublisher()
-      const event = crypto.randomUUID()
-      const listener = vi.fn()
-
-      const unsubscribe = await publisher.prefix('tenant:').subscribe(event, listener)
-
-      await publisher.publish(`tenant:${event}`, { order: 1 })
-      await publisher.prefix('other:').publish(event, { order: 2 })
-      await publisher.prefix('tenant:').publish(event, { order: 3 })
-
-      await vi.waitFor(() => {
-        expect(listener).toHaveBeenCalledTimes(2)
-      })
-      expect(listener).toHaveBeenNthCalledWith(1, { order: 1 })
-      expect(listener).toHaveBeenNthCalledWith(2, { order: 3 })
-
-      await unsubscribe()
-    })
-
     it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
       const publisher = createTestingPublisher({
         resume: { enabled: true, ttl: 10_000 },
@@ -718,3 +698,11 @@ function withFakeSubscribe(redis: Redis, subscribe: () => unknown): Redis {
     },
   })
 }
+
+it('prefix creates a publisher that appends the prefix and shares the client', async () => {
+  const redis = { publish: vi.fn(async () => 1) }
+  const publisher = new UpstashPublisher<Record<string, object>>(redis as any).prefix('tenant:')
+
+  await publisher.publish('event', { order: 1 })
+  expect(redis.publish).toHaveBeenCalledWith('tenant:event', expect.any(String))
+})

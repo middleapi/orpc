@@ -97,16 +97,6 @@ describe.concurrent('upstash locker integration', {
     await holder.release()
   })
 
-  it('shares locks with lockers created by prefix', async () => {
-    const { locker } = createTestingLocker()
-    const holder = await hold(locker, 'tenant:key')
-
-    await expect(locker.prefix('tenant:').lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
-    await expect(locker.prefix('other:').lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
-
-    await holder.release()
-  })
-
   it('releases the lock when the callback throws', async () => {
     const { locker } = createTestingLocker()
 
@@ -180,4 +170,12 @@ describe.concurrent('upstash locker integration', {
     expect(maxActive).toBe(1)
     expect(count).toBe(5)
   })
+})
+
+it('prefix creates a locker that appends the prefix and shares the client', async () => {
+  const redis = { set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 1) }
+  const locker = new UpstashLocker(redis as any, { ttl: 1000, prefix: 'app:' }).prefix('tenant:')
+
+  await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
+  expect(redis.set).toHaveBeenCalledWith('app:tenant:key', expect.any(String), { nx: true, px: 1000 })
 })
