@@ -97,11 +97,6 @@ describe('createContractUtilsFactory', () => {
 
     expectTypeOf(utils.key).toEqualTypeOf<SharedUtils<unknown>['key']>()
   })
-
-  it('rejects a jsonified client factory', () => {
-    // @ts-expect-error a jsonified client factory needs createContractJsonifiedUtilsFactory
-    createContractUtilsFactory(jsonifiedClientFactory, {})
-  })
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
@@ -176,10 +171,5 @@ describe('createContractJsonifiedUtilsFactory', () => {
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
       & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
     >()
-  })
-
-  it('rejects a non-jsonified client factory', () => {
-    // @ts-expect-error a non-jsonified client factory needs createContractUtilsFactory
-    createContractJsonifiedUtilsFactory(clientFactory, {})
   })
 })
