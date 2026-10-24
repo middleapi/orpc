@@ -326,7 +326,7 @@ export default {
       getStubByName: (namespace, key) => namespace.getByName(key),
     })
 
-    // Creates a locker with an extra prefix that shares this client, e.g. per tenant
+    // Creates a locker with an extra prefix that shares this namespace, e.g. per tenant
     const tenantLocker = locker.prefix('tenant:123:')
   },
 }

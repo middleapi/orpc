@@ -319,7 +319,7 @@ export default {
       prefix: ''
     })
 
-    // Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+    // Creates a limiter with an extra prefix that shares this binding, e.g. per tenant
     const tenantLimiter = limiter.prefix('tenant:123:')
   }
 }

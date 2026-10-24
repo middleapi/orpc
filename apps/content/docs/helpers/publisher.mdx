@@ -341,7 +341,7 @@ export default {
       getStubByName: (namespace, event) => namespace.getByName(event)
     })
 
-    // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+    // Creates a publisher with an extra prefix that shares this namespace, e.g. per tenant
     const tenantPublisher = publisher.prefix('tenant:123:')
   },
 }
