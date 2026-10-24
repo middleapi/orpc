@@ -75,7 +75,7 @@ See the [RPC Handler](/docs/rpc/handler), [OpenAPI Handler](/docs/openapi/handle
 - **Native types:** `Date`, `BigInt`, `Set`, `Map`, files, and streams arrive as the type you sent ([RPC Serializer](/docs/rpc/serializer), [Binary Data](/docs/binary-data)).
 - **Realtime streams:** an async generator becomes a typed Server-Sent Events stream ([AsyncIteratorObject](/docs/async-iterator-object)).
 - **Contract-first:** define the API as a [contract](/docs/contract-first), then implement it with full type checking.
-- **Integrations:** [TanStack Query](/docs/integrations/tanstack-query), [Next.js](/docs/integrations/next), [AI SDK](/docs/integrations/ai-sdk), [OpenTelemetry](/docs/integrations/opentelemetry), and more.
+- **Integrations:** [TanStack Query](/docs/integrations/tanstack-query), [Next.js](/docs/integrations/next), [AI SDK](/docs/integrations/ai-sdk), [OpenTelemetry](/docs/integrations/opentelemetry), and [more](/docs/integrations).
 
 ## Core Concepts
 
@@ -86,7 +86,7 @@ See the [RPC Handler](/docs/rpc/handler), [OpenAPI Handler](/docs/openapi/handle
 | [Context](/docs/context) | Typed dependencies a procedure needs, like the current user. |
 | [Middleware](/docs/middleware) | Code that runs around a procedure, for example to authenticate. |
 | [Handler](/docs/rpc/handler) | Serves a router over a protocol: `RPCHandler` or `OpenAPIHandler`. |
-| [Adapter](/docs/adapters/fetch-api) | Connects a handler to a runtime or framework. |
+| [Adapter](/docs/adapters) | Connects a handler to a runtime or framework. |
 | [Link](/docs/rpc/link) | The client-side counterpart of a handler: `RPCLink` or `OpenAPILink`. |
 | [Contract](/docs/contract-first) | The API's shape without implementation, built with `oc`. |
 
@@ -123,4 +123,4 @@ Yes. The [OpenAPI Handler](/docs/openapi/handler) serves standard REST endpoints
 
 ### Does oRPC replace my web framework?
 
-No. A handler only answers requests that match a procedure, so oRPC runs inside your existing server or framework through an [adapter](/docs/adapters/fetch-api).
+No. A handler only answers requests that match a procedure, so oRPC runs inside your existing server or framework through an [adapter](/docs/adapters).
