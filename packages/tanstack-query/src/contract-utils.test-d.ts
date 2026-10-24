@@ -19,9 +19,10 @@ const contract = {
   },
 }
 
-describe('createContractUtilsFactory', () => {
-  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
 
+describe('createContractUtilsFactory', () => {
   it('infers interceptor input, output, errors types', () => {
     createContractUtilsFactory(clientFactory, {
       mutationInterceptors: [
@@ -98,18 +99,14 @@ describe('createContractUtilsFactory', () => {
   })
 
   it('rejects a jsonified client factory', () => {
-    const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
-
     // @ts-expect-error a jsonified client factory needs createContractJsonifiedUtilsFactory
     createContractUtilsFactory(jsonifiedClientFactory, {})
   })
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
-  const clientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
-
   it('infers interceptor input, output, errors types', () => {
-    createContractJsonifiedUtilsFactory(clientFactory, {
+    createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
@@ -164,7 +161,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('return jsonified general and procedure utils', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {})
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
@@ -173,7 +170,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('returns jsonified router utils when a router contract is passed', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {})
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
@@ -182,9 +179,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('rejects a non-jsonified client factory', () => {
-    const plainClientFactory = {} as ContractClientFactory<{ cache?: boolean }>
-
     // @ts-expect-error a non-jsonified client factory needs createContractUtilsFactory
-    createContractJsonifiedUtilsFactory(plainClientFactory, {})
+    createContractJsonifiedUtilsFactory(clientFactory, {})
   })
 })

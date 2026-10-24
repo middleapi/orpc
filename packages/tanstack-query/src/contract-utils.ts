@@ -71,6 +71,5 @@ export function createContractJsonifiedUtilsFactory<
   clientFactory: ContractJsonifiedClientFactory<TClientContext>,
   options: ContractJsonifiedUtilsFactoryOptions<TClientContext>,
 ): ContractJsonifiedUtilsFactory<TClientContext> {
-  // Both client factories are the same function at runtime; they differ only in the client type they declare.
   return createContractUtilsFactory(clientFactory as ContractClientFactory<TClientContext>, options) as ContractJsonifiedUtilsFactory<TClientContext>
 }
