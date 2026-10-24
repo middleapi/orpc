@@ -161,12 +161,14 @@ export default defineConfig({
     { from: '/docs/plugins/body-compression', to: '/docs/plugins/response-compression' },
     { from: '/docs/openapi/plugins/openapi-reference', to: '/docs/plugins/openapi-reference' },
     { from: '/docs/openapi/plugins/smart-coercion', to: '/docs/plugins/smart-coercion' },
+    { from: '/docs/openapi/plugins/zod-smart-coercion', to: '/docs/plugins/smart-coercion' },
     { from: '/docs/plugins/hibernation', to: '/docs/integrations/hibernation' },
 
     { from: '/docs/integrations/react-swr', to: '/docs/integrations/swr' },
     { from: '/docs/openapi/integrations/implement-contract-in-nest', to: '/docs/integrations/nest' },
     { from: '/docs/openapi/integrations/trpc', to: '/docs/integrations/trpc' },
     { from: '/docs/server-action', to: '/docs/integrations/next' },
+    { from: '/docs/integrations/tanstack-query-old/:slug*', to: '/docs/integrations/tanstack-query' },
   ],
   export: true,
   integrations: [

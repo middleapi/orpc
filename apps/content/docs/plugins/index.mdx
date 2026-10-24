@@ -1,0 +1,50 @@
+---
+title: "Plugins"
+description: "Add CORS, batching, retries, compression, timeouts, and validation to oRPC with built-in plugins for handlers on the server and links on the client."
+seo:
+  title: "Plugins: CORS, Batching, Retries, and More"
+sidebar:
+  hidden: true
+---
+
+Plugins add reusable behavior through the `plugins` option. Handler plugins (`...HandlerPlugin`) run on the server, in a handler such as the [RPC Handler](/docs/rpc/handler). Link plugins (`...LinkPlugin`) run on the [client](/docs/client), in a link such as the [RPC Link](/docs/rpc/link). Some features need both.
+
+## Security
+
+- [CORS](/docs/plugins/cors) (server): set allowed origins, methods, and headers.
+- [GET Method CSRF Protection](/docs/plugins/get-method-csrf-protection) (server): make `GET` procedures as safe as `POST`.
+- [Request Limit](/docs/plugins/request-limit) (server): cap request body size.
+
+## Performance
+
+- [Batch](/docs/plugins/batch) (both): send several calls in one request.
+- [Batch Response Compression](/docs/plugins/batch-response-compression) (server): compress batch responses.
+- [Dedupe](/docs/plugins/dedupe) (client): merge identical in-flight requests.
+- [Request Compression](/docs/plugins/request-compression) (both): compress request bodies.
+- [Response Compression](/docs/plugins/response-compression) (both): compress response bodies.
+
+## Reliability
+
+- [Retry](/docs/plugins/retry) (client): retry failed calls.
+- [Retry After](/docs/plugins/retry-after) (client): retry when the server sends `Retry-After`.
+- [Timeout](/docs/plugins/timeout) (both): abort calls that take too long.
+- [Signal Sync](/docs/plugins/signal-sync) (server): keep the request signal and streaming responses in sync.
+
+## Headers and HTTP
+
+- [Request Headers](/docs/plugins/request-headers) (server): read headers through `context.reqHeaders`.
+- [Response Headers](/docs/plugins/response-headers) (server): set headers and cookies through `context.resHeaders`.
+- [Method Override](/docs/plugins/method-override) (server): let HTML forms call `PUT`, `PATCH`, and `DELETE`.
+- [Rethrow](/docs/plugins/rethrow) (server): pass errors on to your framework's error handling.
+
+## Validation and Types
+
+- [Request Validation](/docs/plugins/request-validation) (client): validate input before sending.
+- [Response Validation](/docs/plugins/response-validation) (client): validate responses against the contract.
+- [Smart Coercion](/docs/plugins/smart-coercion) (both): coerce values to match your schemas.
+
+## Files and Docs
+
+- [Static File](/docs/plugins/static-file) (server): serve static files next to your procedures.
+- [Tmp File Upload](/docs/plugins/tmp-file-upload) (server): stream large uploads to temporary files.
+- [OpenAPI Reference](/docs/plugins/openapi-reference) (server): serve Scalar or Swagger UI and the OpenAPI document.

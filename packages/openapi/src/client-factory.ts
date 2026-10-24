@@ -20,6 +20,15 @@ export interface ContractJsonifiedClientFactoryOptions<
   contractRef?: RouterContract | undefined
 }
 
+/**
+ * Like `createContractClientFactory`, but the clients it builds are typed as `JsonifiedClient`,
+ * for links that require it, such as OpenAPI Link.
+ *
+ * @remarks
+ * **Warning**: Every procedure contract passed to the factory must define `meta.path` matching its location in the root contract.
+ *
+ * @see {@link https://orpc.dev/docs/contract/client-factory | Contract Client Factory}
+ */
 export function createContractJsonifiedClientFactory<
   TClientContext extends ClientContext,
 >(

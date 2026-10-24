@@ -1,0 +1,16 @@
+---
+title: "Contract"
+description: "Reference for oRPC contracts: describe procedures and routers without logic, implement them with type checking, generate them from OpenAPI, and scale clients."
+seo:
+  title: "Contracts: Define, Implement, and Share an API"
+sidebar:
+  hidden: true
+---
+
+A contract describes your API's input, output, and errors without any logic. The server implements it with full type checking, and clients use it without importing server code. For a walkthrough, start with [Contract-First](/docs/contract-first).
+
+- [Procedure Contract](/docs/contract/procedure): define one procedure with the `oc` builder.
+- [Router Contract](/docs/contract/router): group procedure contracts, or derive a contract from a router.
+- [Contract Implementation](/docs/contract/implementation): implement a contract with `implement`.
+- [Generate from OpenAPI](/docs/contract/generate-from-openapi): create a contract from an existing OpenAPI document.
+- [Contract Client Factory](/docs/contract/client-factory): build clients per procedure to keep large codebases fast.
