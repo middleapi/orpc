@@ -14,7 +14,8 @@ export type {
    */
   InferClientError as InferClientErrorUnion,
 } from './types'
-export * from './utils'
+export { resolveClientRest, safe } from './utils'
+export type { SafeResult } from './utils'
 
 export type {
   AsyncCleanupFn,

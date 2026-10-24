@@ -1,5 +1,5 @@
 import { oc } from '@orpc/contract'
-import { os, withHiddenRouterContract } from '@orpc/server'
+import { implement, os } from '@orpc/server'
 import { findAllRoutes } from 'rou3'
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
@@ -742,7 +742,7 @@ describe('openAPIMatcher', () => {
         ping: oc.meta(openapi({ method: 'DELETE', path: '/contract/{id}' })),
       }
 
-      const matcher = new OpenAPIMatcher(withHiddenRouterContract(implementation, contract))
+      const matcher = new OpenAPIMatcher(implement(contract).router(implementation))
       const firstResult = await matcher.match('DELETE', '/contract/42', undefined)
 
       expect(firstResult).toBeDefined()
@@ -763,11 +763,13 @@ describe('openAPIMatcher', () => {
     })
 
     it('throws when a contract-first implementation is missing', async () => {
-      const matcher = new OpenAPIMatcher(withHiddenRouterContract({
-        ping: os.handler(() => 'pong'),
-      }, {
+      const contract = {
         missing: oc.meta(openapi({ method: 'GET', path: '/missing' })),
-      }))
+      }
+
+      const matcher = new OpenAPIMatcher(implement(contract).router({
+        ping: os.handler(() => 'pong'),
+      } as any))
 
       await expect(matcher.match('GET', '/missing', undefined)).rejects.toThrowError(
         '[Contract-First] Missing or invalid implementation for procedure at path: "missing"',

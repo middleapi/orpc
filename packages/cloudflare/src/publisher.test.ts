@@ -217,7 +217,7 @@ describe('durable publisher', () => {
   it('throws when an event is too large to store for resume', async () => {
     const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON)
 
-    await expect(publisher.publish('message', { text: 'a'.repeat(3_000_000) })).rejects.toThrow(
+    await expect(publisher.publish('message', { text: 'a'.repeat(10_000_000) })).rejects.toThrow(
       /^Failed to publish event: 400 .*SQLITE_TOOBIG/,
     )
   })

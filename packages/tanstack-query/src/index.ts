@@ -1,13 +1,32 @@
 export * from './contract-utils'
-export * from './key'
+export type {
+  OperationKey,
+  OperationKeyBaseOptions,
+  OperationKeyOptions,
+  OperationKeyPrefixOptions,
+} from './key'
 export * from './meta'
-export * from './plugin'
-export * from './procedure-utils'
+export type { RouterUtilsPlugin } from './plugin'
+export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
+export type {
+  ProcedureUtilsInfiniteInterceptor,
+  ProcedureUtilsInfiniteInterceptorOptions,
+  ProcedureUtilsLiveInterceptor,
+  ProcedureUtilsLiveInterceptorOptions,
+  ProcedureUtilsModifier,
+  ProcedureUtilsMutationInterceptor,
+  ProcedureUtilsMutationInterceptorOptions,
+  ProcedureUtilsOptions,
+  ProcedureUtilsQueryInterceptor,
+  ProcedureUtilsQueryInterceptorOptions,
+  ProcedureUtilsStreamedInterceptor,
+  ProcedureUtilsStreamedInterceptorOptions,
+} from './procedure-utils'
 export * from './router-utils'
 export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
-export * from './shared-utils'
+export { SharedUtils } from './shared-utils'
 export * from './ssr'
-export * from './stream-query'
+export type { SerializableStreamedQueryOptions } from './stream-query'
 export * from './structural-sharing'
 export * from './types'
 export {

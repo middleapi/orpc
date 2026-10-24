@@ -200,7 +200,7 @@ export class StandardHandler<T extends Context> {
   }
 }
 
-export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
+class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
   name = '~tracing'
 
   init(options: StandardHandlerOptions<any>): StandardHandlerOptions<any> {

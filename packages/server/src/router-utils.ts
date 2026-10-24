@@ -65,7 +65,7 @@ export type AugmentedRouterWithMiddlewares<
             : never
       }
 
-export interface AugmentRouterOptions<TErrorMap extends ErrorMap> extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
+interface AugmentRouterOptions<TErrorMap extends ErrorMap> extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 
@@ -133,7 +133,7 @@ export function augmentRouter<
   return enhanced as any
 }
 
-export interface AugmentImplementedRouterOptions extends ProcedureConfig {
+interface AugmentImplementedRouterOptions extends ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 

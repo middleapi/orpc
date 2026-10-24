@@ -45,7 +45,7 @@ export interface WithEffectContext<Services> {
    *
    * @example
    * ```ts
-   * import type { WithEffectContext } from '@orpc/experimental-effect'
+   * import type { WithEffectContext } from '@orpc/effect'
    * import { Context, Effect } from 'effect'
    *
    * class Random extends Context.Service<Random, {
@@ -75,7 +75,7 @@ export interface WithEffectContext<Services> {
    *
    * @example
    * ```ts
-   * import type { WithEffectContext } from '@orpc/experimental-effect'
+   * import type { WithEffectContext } from '@orpc/effect'
    * import { ORPCError } from '@orpc/server'
    * import { Context, Data, Effect } from 'effect'
    *
