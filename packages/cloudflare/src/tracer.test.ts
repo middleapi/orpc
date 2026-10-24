@@ -88,7 +88,7 @@ describe('cloudflareTracer', () => {
 
   it('injects a sampled traceparent from the span context', () => {
     const tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
-    const headers: Record<string, string> = { existing: 'value' }
+    const headers = { existing: 'value' }
 
     tracer.inject!(tracer.startSpan('name'), headers)
 

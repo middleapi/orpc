@@ -1,4 +1,4 @@
-import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingHeaders, TracingSpan } from '@orpc/shared'
+import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
 import { setTracer, toSpanAttributeValue } from '@orpc/shared'
 /**
  * A namespace import keeps `@orpc/cloudflare` loadable on runtimes that predate the
@@ -71,7 +71,7 @@ export class experimental_CloudflareTracer implements Tracer {
     this.tracing = options.tracing ?? workers.tracing
 
     if (options.propagationEnabled ?? true) {
-      this.inject = (span: TracingSpan, headers: TracingHeaders) => {
+      this.inject = (span, headers) => {
         const { traceId, spanId } = (span as CloudflareSpan).span.spanContext()
 
         if (traceId === INVALID_TRACE_ID) {
