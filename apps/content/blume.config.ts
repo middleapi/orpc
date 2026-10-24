@@ -115,12 +115,15 @@ export default defineConfig({
   /** v1 URLs Google still indexes, pointed at their v2 counterparts. */
   redirects: [
     { from: '/docs/adapters/http', to: '/docs/adapters/fetch-api' },
+    { from: '/docs/adapters/react-native', to: '/docs/adapters/expo' },
+    { from: '/docs/adapters/remix', to: '/docs/adapters/react-router' },
 
     { from: '/docs/contract-first/define-contract', to: '/docs/contract/procedure' },
     { from: '/docs/contract-first/implement-contract', to: '/docs/contract/implementation' },
     { from: '/docs/contract-first/router-to-contract', to: '/docs/contract/router' },
     { from: '/docs/advanced/scaling-large-projects', to: '/docs/contract/client-factory' },
     { from: '/docs/openapi/openapi-to-contract', to: '/docs/contract/generate-from-openapi' },
+    { from: '/docs/openapi/integrations/hey-api', to: '/docs/contract/generate-from-openapi' },
 
     { from: '/docs/advanced/exceeds-the-maximum-length-problem', to: '/docs/recipes/exceeds-the-maximum-length-problem' },
     { from: '/docs/advanced/publish-client-to-npm', to: '/docs/recipes/publish-client-to-npm' },
@@ -136,6 +139,8 @@ export default defineConfig({
     { from: '/docs/client/rpc-link', to: '/docs/rpc/link' },
     { from: '/docs/advanced/rpc-protocol', to: '/docs/rpc/protocol' },
     { from: '/docs/advanced/rpc-json-serializer', to: '/docs/rpc/serializer' },
+    { from: '/docs/advanced/superjson', to: '/docs/rpc/serializer#custom-serializers' },
+    { from: '/docs/plugins/strict-get-method', to: '/docs/rpc/handler#enabling-the-get-method' },
 
     { from: '/docs/openapi/getting-started', to: '/docs/openapi/routing' },
     { from: '/docs/openapi/openapi-handler', to: '/docs/openapi/handler' },
@@ -161,12 +166,23 @@ export default defineConfig({
     { from: '/docs/plugins/body-compression', to: '/docs/plugins/response-compression' },
     { from: '/docs/openapi/plugins/openapi-reference', to: '/docs/plugins/openapi-reference' },
     { from: '/docs/openapi/plugins/smart-coercion', to: '/docs/plugins/smart-coercion' },
+    { from: '/docs/openapi/plugins/zod-smart-coercion', to: '/docs/plugins/smart-coercion' },
+    { from: '/docs/plugins/simple-csrf-protection', to: '/docs/plugins/get-method-csrf-protection' },
     { from: '/docs/plugins/hibernation', to: '/docs/integrations/hibernation' },
+    { from: '/docs/integrations/durable-iterator', to: '/docs/integrations/hibernation' },
 
     { from: '/docs/integrations/react-swr', to: '/docs/integrations/swr' },
     { from: '/docs/openapi/integrations/implement-contract-in-nest', to: '/docs/integrations/nest' },
     { from: '/docs/openapi/integrations/trpc', to: '/docs/integrations/trpc' },
     { from: '/docs/server-action', to: '/docs/integrations/next' },
+    { from: '/docs/integrations/tanstack-query-old/:slug*', to: '/docs/integrations/tanstack-query' },
+
+    // v1-only pages with no v2 counterpart: send readers to where they still live.
+    { from: '/docs/advanced/building-custom-plugins', to: 'https://v1.orpc.dev/docs/advanced/building-custom-plugins' },
+    { from: '/docs/advanced/extend-body-parser', to: 'https://v1.orpc.dev/docs/advanced/extend-body-parser' },
+    { from: '/docs/examples/openai-streaming', to: 'https://v1.orpc.dev/docs/examples/openai-streaming' },
+    { from: '/docs/integrations/sentry', to: 'https://v1.orpc.dev/docs/integrations/sentry' },
+    { from: '/learn-and-contribute/:slug*', to: 'https://v1.orpc.dev/learn-and-contribute/:slug*' },
   ],
   export: true,
   integrations: [
