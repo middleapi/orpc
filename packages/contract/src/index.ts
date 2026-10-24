@@ -71,8 +71,11 @@ export type {
 } from '@orpc/client'
 
 export type {
-  AsyncIteratorClass,
   PromiseWithError,
   Registry,
   ThrowableError,
+} from '@orpc/shared'
+
+export {
+  AsyncIteratorClass,
 } from '@orpc/shared'

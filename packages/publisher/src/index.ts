@@ -1,5 +1,5 @@
 export * from './publisher'
 
-export type {
+export {
   AsyncIteratorClass,
 } from '@orpc/shared'
