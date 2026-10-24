@@ -1,6 +1,6 @@
 import type { ClientContext } from '@orpc/client'
 import type { ContractClientFactory, RouterContract, RouterContractClient } from '@orpc/contract'
-import type { JsonifiedClient } from '@orpc/openapi'
+import type { ContractJsonifiedClientFactory, JsonifiedClient } from '@orpc/openapi'
 import type { RouterUtils, RouterUtilsOptions } from './router-utils'
 import { resolveBasePathMeta } from '@orpc/contract'
 import { get } from '@orpc/shared'
@@ -56,11 +56,21 @@ export interface ContractJsonifiedUtilsFactoryOptions<
 > extends Omit<RouterUtilsOptions<JsonifiedClient<RouterContractClient<RouterContract, TClientContext>>>, 'path'> {
 }
 
+/**
+ * Like `createContractUtilsFactory`, but for clients whose types are wrapped in `JsonifiedClient`,
+ * such as clients using OpenAPI Link.
+ *
+ * @remarks
+ * Accepts a client factory created by either `createContractJsonifiedClientFactory` or `createContractClientFactory`.
+ *
+ * @see {@link https://orpc.dev/docs/contract/client-factory#tanstack-query-integration | Contract Client Factory - TanStack Query Integration}
+ */
 export function createContractJsonifiedUtilsFactory<
   TClientContext extends ClientContext,
 >(
-  clientFactory: ContractClientFactory<TClientContext>,
+  clientFactory: ContractClientFactory<TClientContext> | ContractJsonifiedClientFactory<TClientContext>,
   options: ContractJsonifiedUtilsFactoryOptions<TClientContext>,
 ): ContractJsonifiedUtilsFactory<TClientContext> {
-  return createContractUtilsFactory(clientFactory, options) as ContractJsonifiedUtilsFactory<TClientContext>
+  // Both factories are the same function at runtime; they differ only in the client type they declare.
+  return createContractUtilsFactory(clientFactory as ContractClientFactory<TClientContext>, options) as ContractJsonifiedUtilsFactory<TClientContext>
 }

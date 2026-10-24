@@ -1,5 +1,6 @@
 import type { ORPCError } from '@orpc/client'
 import type { ContractClientFactory } from '@orpc/contract'
+import type { ContractJsonifiedClientFactory } from '@orpc/openapi'
 import type { PromiseWithError } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
 import type { SharedUtils } from './shared-utils'
@@ -95,6 +96,13 @@ describe('createContractUtilsFactory', () => {
 
     expectTypeOf(utils.key).toEqualTypeOf<SharedUtils<unknown>['key']>()
   })
+
+  it('rejects a jsonified client factory', () => {
+    const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
+
+    // @ts-expect-error a jsonified client factory needs createContractJsonifiedUtilsFactory
+    createContractUtilsFactory(jsonifiedClientFactory, {})
+  })
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
@@ -169,6 +177,27 @@ describe('createContractJsonifiedUtilsFactory', () => {
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+    >()
+  })
+
+  it('accepts a jsonified client factory', () => {
+    const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
+
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {
+      mutationInterceptors: [
+        async ({ context, next }) => {
+          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+
+          return next()
+        },
+      ],
+    })
+
+    expectTypeOf(createUtils(contract.nested.pong)).toEqualTypeOf<
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+    >()
+    expectTypeOf(createUtils(contract).nested.pong).toEqualTypeOf<
       & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
     >()
   })
