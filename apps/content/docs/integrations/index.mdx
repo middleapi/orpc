@@ -1,0 +1,45 @@
+---
+title: "Integrations"
+description: "Use oRPC with the tools around it: Zod, Valibot, ArkType, TanStack Query, SWR, Next.js, NestJS, MCP, the AI SDK, OpenTelemetry, Better Auth, and more."
+seo:
+  title: "Integrations: TanStack Query, Zod, MCP, and More"
+sidebar:
+  hidden: true
+---
+
+Integrations connect oRPC to the libraries you already use. To run oRPC inside a framework or runtime, see [Adapters](/docs/adapters). For community packages, see [Ecosystem](/docs/ecosystem).
+
+## Schema Validation
+
+Any [Standard Schema](/docs/integrations/standard-schema) library works for validation as is. The [Zod](/docs/integrations/zod), [Valibot](/docs/integrations/valibot), and [ArkType](/docs/integrations/arktype) integrations add JSON Schema converters for OpenAPI generation and Smart Coercion.
+
+## Data Fetching
+
+- [TanStack Query](/docs/integrations/tanstack-query): query and mutation options for any TanStack Query framework.
+- [SWR](/docs/integrations/swr): keys, fetchers, and mutators for React.
+- [Pinia Colada](/docs/integrations/pinia-colada): query and mutation options for Vue.
+- [Next.js](/docs/integrations/next): server functions, form actions, and React hooks.
+
+## Frameworks and Libraries
+
+- [NestJS](/docs/integrations/nest): implement oRPC contracts as NestJS controllers.
+- [tRPC](/docs/integrations/trpc): convert tRPC routers into oRPC routers.
+- [Effect](/docs/integrations/effect): write handlers with Effect and call clients as effects.
+- [Better Auth](/docs/integrations/better-auth): Better Auth sessions in context and middleware.
+- [Hibernation](/docs/integrations/hibernation): let servers sleep, as with Cloudflare's WebSocket Hibernation, without dropping connections.
+
+## AI
+
+- [MCP](/docs/integrations/mcp): expose procedures as tools for AI agents.
+- [AI SDK](/docs/integrations/ai-sdk): stream AI SDK responses over oRPC and turn procedures into tools.
+- [TanStack AI](/docs/integrations/tanstack-ai): stream TanStack AI chats over oRPC.
+
+## Observability
+
+- [OpenTelemetry](/docs/integrations/opentelemetry): distributed tracing across client and server.
+- [Cloudflare Traces](/docs/integrations/cloudflare-traces): spans in Cloudflare Workers Traces.
+- [Pino](/docs/integrations/pino) and [Evlog](/docs/integrations/evlog): structured request logging.
+
+## Testing
+
+- [MSW](/docs/integrations/msw): mock procedures at the network level with typed handlers.

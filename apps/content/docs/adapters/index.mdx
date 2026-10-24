@@ -1,0 +1,32 @@
+---
+title: "Adapters"
+description: "Pick the oRPC adapter for your runtime, framework, or messaging channel, from the Fetch API and Node HTTP to Next.js, Hono, WebSocket, and Electron."
+seo:
+  title: "Adapters: Run oRPC on Any Runtime or Framework"
+sidebar:
+  hidden: true
+---
+
+An adapter connects a handler to where your code runs. The router stays the same, so switching hosts only changes the few lines that mount the handler. HTTP adapters serve both the [RPC Handler](/docs/rpc/handler) and the [OpenAPI Handler](/docs/openapi/handler).
+
+## Core
+
+- [Fetch API](/docs/adapters/fetch-api): Bun, Deno, and anything built on `Request` and `Response`.
+- [Node HTTP](/docs/adapters/node-http): Node's `http`, `https`, and `http2` servers.
+- [Fastify](/docs/adapters/fastify): Fastify servers.
+- [AWS Lambda](/docs/adapters/aws-lambda): API Gateway and Function URLs, with response streaming.
+- [WebSocket](/docs/adapters/websocket): ws, crossws, Bun, Deno, Cloudflare, and uWebSockets.
+- [Message Port](/docs/adapters/message-port): iframes, workers, and other contexts linked by a `MessagePort`.
+
+## Frameworks
+
+Built on the Fetch API: [Next.js](/docs/adapters/next), [Nuxt](/docs/adapters/nuxt), [SvelteKit](/docs/adapters/svelte-kit), [TanStack Start](/docs/adapters/tanstack-start), [SolidStart](/docs/adapters/solid-start), [React Router](/docs/adapters/react-router), [Astro](/docs/adapters/astro), [Hono](/docs/adapters/hono), [Elysia](/docs/adapters/elysia), and [H3](/docs/adapters/h3). Built on Node HTTP: [Express.js](/docs/adapters/express).
+
+## Platforms
+
+- [Cloudflare Workers](/docs/adapters/cloudflare-workers): the Fetch API Adapter plus the compatibility flags it needs.
+- [Expo](/docs/adapters/expo): call oRPC from a React Native app.
+
+## Between Contexts
+
+Built on the Message Port Adapter: [Browser](/docs/adapters/browser) (extensions and windows), [Electron](/docs/adapters/electron), [Web Workers](/docs/adapters/web-workers), and [Worker Threads](/docs/adapters/worker-threads).
