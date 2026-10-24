@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.7",
-    "@vitest/coverage-istanbul": "^4.1.11",
+    "@vitest/coverage-istanbul": "^5.0.5",
     "vitest": "^4.1.11",
     "wrangler": "^4.152.0"
   }
