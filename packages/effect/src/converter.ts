@@ -3,15 +3,6 @@ import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } fr
 import { isStandardSchemaOptional } from '@orpc/json-schema'
 import { Schema as EffectSchema } from 'effect'
 
-/**
- * The key `Schema.flip` tags its result with. Effect does not export a guard for it.
- */
-const EFFECT_FLIP_TYPE_ID = '~effect/Schema/flip'
-
-function isFlippedSchema(schema: EffectSchema.Top): boolean {
-  return EFFECT_FLIP_TYPE_ID in schema && schema[EFFECT_FLIP_TYPE_ID] === EFFECT_FLIP_TYPE_ID
-}
-
 export interface EffectSchemaToJsonSchemaConverterOptions extends EffectSchema.ToJsonSchemaOptions {
   /**
    * Caches conversion results in a WeakMap keyed by the Effect schema instance,
@@ -73,11 +64,7 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
 
   private convertEffect(schema: EffectSchema.Top, direction: JsonSchemaConverterDirection): JsonSchema {
     const { schema: jsonSchema, definitions } = EffectSchema.toJsonSchemaDocument(
-      direction === 'input'
-        ? schema
-        // For a flipped schema (as `.output()` creates), flipping back describes the same side as `toType`,
-        // but keeps the identifiers Effect derives for encoded sides (e.g. `PlanetEncoded` of a `Schema.Class`)
-        : isFlippedSchema(schema) ? EffectSchema.flip(schema) : EffectSchema.toType(schema),
+      direction === 'input' ? schema : EffectSchema.toType(schema),
       this.toJsonSchemaOptions,
     )
 

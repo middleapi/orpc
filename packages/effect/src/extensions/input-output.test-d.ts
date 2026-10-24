@@ -28,7 +28,7 @@ it('adds .input<EffectSchema> .output<EffectSchema> into ContractBuilder', async
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithOutput<
-      Schema<number, string>,
+      Schema<string, number>,
       typeof errorMap
     >
   >()
@@ -47,7 +47,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into ProcedureContract
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithInputOutput<
       typeof schema1,
-      Schema<number, string>,
+      Schema<string, number>,
       typeof errorMap
     >
   >()
@@ -66,7 +66,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into ProcedureContract
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithOutput<
-      MergedSchema<Schema<number, string>, typeof schema2>,
+      MergedSchema<Schema<string, number>, typeof schema2>,
       typeof errorMap
     >
   >()
@@ -86,7 +86,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into ProcedureContract
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithInputOutput<
       typeof schema1,
-      MergedSchema<Schema<number, string>, typeof schema2>,
+      MergedSchema<Schema<string, number>, typeof schema2>,
       typeof errorMap
     >
   >()
@@ -108,7 +108,7 @@ it('adds .input<EffectSchema> .output<EffectSchema> into Builder', async () => {
     BuilderWithOutput<
       { auth: boolean },
       object,
-      Schema<number, string>,
+      Schema<string, number>,
       typeof errorMap
     >
   >()
@@ -130,7 +130,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithMiddle
     BuilderWithOutput<
       { auth: boolean },
       { extra: boolean },
-      Schema<number, string>,
+      Schema<string, number>,
       typeof errorMap
     >
   >()
@@ -153,7 +153,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithInput'
       { auth: boolean },
       { extra: boolean },
       typeof schema1,
-      Schema<number, string>,
+      Schema<string, number>,
       typeof errorMap
     >
   >()
@@ -176,7 +176,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithOutput
     BuilderWithOutput<
       { auth: boolean },
       { extra: boolean },
-      MergedSchema<Schema<number, string>, typeof schema2>,
+      MergedSchema<Schema<string, number>, typeof schema2>,
       typeof errorMap
     >
   >()
@@ -200,31 +200,8 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithInputO
       { auth: boolean },
       { extra: boolean },
       typeof schema1,
-      MergedSchema<Schema<number, string>, typeof schema2>,
+      MergedSchema<Schema<string, number>, typeof schema2>,
       typeof errorMap
     >
   >()
-})
-
-describe('.output<EffectSchema> encodes Type into Encoded', () => {
-  const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
-
-  it('handler returns Type', () => {
-    builder.output(NumberFromString).handler(() => 5)
-    // @ts-expect-error handler must return Type, not Encoded
-    builder.output(NumberFromString).handler(() => '5')
-  })
-
-  it('requires output schemas to encode without services', () => {
-    builder.output({} as EffectSchema.Codec<number, string, 'decoding-service', never>)
-    // @ts-expect-error encoding requires a service
-    builder.output({} as EffectSchema.Codec<number, string, never, 'encoding-service'>)
-  })
-
-  it('keeps effect schemas already converted to standard schemas', () => {
-    const converted = EffectSchema.toStandardSchemaV1(NumberFromString)
-
-    expectTypeOf(({} as ContractBuilder<typeof errorMap>).output(converted)).toEqualTypeOf<ProcedureContractBuilderWithOutput<typeof converted, typeof errorMap>>()
-    expectTypeOf(builder.output(converted)).toEqualTypeOf<BuilderWithOutput<{ auth: boolean }, object, typeof converted, typeof errorMap>>()
-  })
 })

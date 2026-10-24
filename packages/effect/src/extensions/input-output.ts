@@ -3,19 +3,12 @@ import type { Context } from '@orpc/server'
 import { ContractBuilder } from '@orpc/contract'
 import { Builder } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
-import { toStandardOutputSchema, toStandardSchema } from '../schema'
+import { toStandardSchema } from '../schema'
 
-/**
- * A plain Effect schema (not yet a Standard Schema) that encodes without services.
- */
-type EffectOutputSchema = EffectSchema.ConstraintEncoder<any> & { readonly '~standard'?: never }
-
-/**
- * Effect schemas already converted into Standard Schemas (e.g. via `Schema.toStandardSchemaV1`)
- * are used as is, so they keep the direction they were converted with.
- */
-function isPlainEffectSchema<T>(schema: AnySchema | T): schema is T {
-  return EffectSchema.isSchema(schema) && !('~standard' in schema)
+function isEffectConstraintDecoder(
+  schema: AnySchema | EffectSchema.ConstraintDecoder<any>,
+): schema is EffectSchema.ConstraintDecoder<any> {
+  return EffectSchema.isSchema(schema)
 }
 
 declare module '@orpc/contract' {
@@ -26,9 +19,9 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInput<Schema<S['Encoded'], S['Type']>, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithOutput<Schema<S['Type'], S['Encoded']>, TErrorMap>
+    ): ProcedureContractBuilderWithOutput<Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
   interface ProcedureContractBuilderWithInput<
@@ -39,9 +32,9 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInput<MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<TInputSchema, Schema<S['Type'], S['Encoded']>, TErrorMap>
+    ): ProcedureContractBuilderWithInputOutput<TInputSchema, Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
   interface ProcedureContractBuilderWithOutput<
@@ -52,9 +45,9 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithOutput<MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
+    ): ProcedureContractBuilderWithOutput<MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
   }
 
   interface ProcedureContractBuilderWithInputOutput<
@@ -66,20 +59,20 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
+    ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
   }
 }
 
 const OriginalContractBuilderInput = ContractBuilder.prototype.input
 ContractBuilder.prototype.input = function input(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalContractBuilderInput.bind(this)(isPlainEffectSchema(schema) ? toStandardSchema(schema) : schema)
+  return OriginalContractBuilderInput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }
 
 const OriginalContractBuilderOutput = ContractBuilder.prototype.output
-ContractBuilder.prototype.output = function output(schema: AnySchema | (EffectSchema.Top & EffectOutputSchema)) {
-  return OriginalContractBuilderOutput.bind(this)(isPlainEffectSchema(schema) ? toStandardOutputSchema(schema) : schema)
+ContractBuilder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
+  return OriginalContractBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }
 
 declare module '@orpc/server' {
@@ -91,9 +84,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInput<TInitialContext, object, Schema<S['Encoded'], S['Type']>, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): BuilderWithOutput<TInitialContext, object, Schema<S['Type'], S['Encoded']>, TErrorMap>
+    ): BuilderWithOutput<TInitialContext, object, Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
   interface BuilderWithMiddlewares<
@@ -105,9 +98,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): BuilderWithOutput<TInitialContext, TInjectedContext, Schema<S['Type'], S['Encoded']>, TErrorMap>
+    ): BuilderWithOutput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
   interface BuilderWithInput<
@@ -120,9 +113,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, Schema<S['Type'], S['Encoded']>, TErrorMap>
+    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
   interface BuilderWithOutput<
@@ -135,9 +128,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): BuilderWithOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
+    ): BuilderWithOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
   }
 
   interface BuilderWithInputOutput<
@@ -151,19 +144,19 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectOutputSchema>(
+    output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
+    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
 
   }
 }
 
 const OriginalBuilderInput = Builder.prototype.input
 Builder.prototype.input = function input(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalBuilderInput.bind(this)(isPlainEffectSchema(schema) ? toStandardSchema(schema) : schema)
+  return OriginalBuilderInput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }
 
 const OriginalBuilderOutput = Builder.prototype.output
-Builder.prototype.output = function output(schema: AnySchema | (EffectSchema.Top & EffectOutputSchema)) {
-  return OriginalBuilderOutput.bind(this)(isPlainEffectSchema(schema) ? toStandardOutputSchema(schema) : schema)
+Builder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
+  return OriginalBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }

@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { z } from 'zod'
 import { EffectSchemaToJsonSchemaConverter } from './converter'
-import { toStandardOutputSchema, toStandardSchema } from './schema'
+import { toStandardSchema } from './schema'
 
 describe('effectSchemaToJsonSchemaConverter', () => {
   const converter = new EffectSchemaToJsonSchemaConverter()
@@ -22,35 +22,6 @@ describe('effectSchemaToJsonSchemaConverter', () => {
     ['output', { anyOf: [{ type: 'number' }, { type: 'string', enum: ['Infinity', '-Infinity', 'NaN'] }] }],
   ] as const)('uses the requested %s direction', (direction, jsonSchema) => {
     expect(converter.convert(toStandardSchema(Schema.NumberFromString), direction)).toEqual([jsonSchema, false])
-  })
-
-  it('converts flipped output schemas from the encoded side, keeping class definitions', () => {
-    class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
-
-    const schema = toStandardOutputSchema(Schema.Struct({
-      count: Schema.NumberFromString,
-      maybe: Schema.OptionFromNullOr(Schema.String),
-      planet: Planet,
-    }))
-
-    expect(converter.convert(schema, 'output')).toEqual([{
-      type: 'object',
-      properties: {
-        count: { type: 'string' },
-        maybe: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-        planet: { $ref: '#/$defs/PlanetEncoded' },
-      },
-      required: ['count', 'maybe', 'planet'],
-      additionalProperties: true,
-      $defs: {
-        PlanetEncoded: {
-          type: 'object',
-          properties: { name: { type: 'string' } },
-          required: ['name'],
-          additionalProperties: true,
-        },
-      },
-    }, false])
   })
 
   it('does not mutate the schema', () => {

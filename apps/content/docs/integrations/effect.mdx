@@ -315,8 +315,6 @@ const procedure = os
   }))
 ```
 
-`Schema.toStandardSchemaV1` always decodes, which suits `.input`. For `.output`, flip the schema so it encodes instead: `.output(Schema.toStandardSchemaV1(Schema.flip(MySchema)))`. Or use the extensions below, which handle this for you.
-
 ### `.input` and `.output` Extensions
 
 Import `@orpc/experimental-effect/extensions/input-output` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This lets you define `.input` and `.output` directly with Effect Schema:
@@ -346,20 +344,17 @@ export const base = os
 You can also use these extensions with the [contract builder](/docs/contract/procedure).
 :::
 
-`.input` decodes: the client sends the schema's `Encoded` form and the handler receives its `Type`. `.output` encodes: the handler returns the schema's `Type` and the client receives its `Encoded` form. This matters for schemas whose two sides differ:
+The extensions convert schemas with `Schema.toStandardSchemaV1`, whose input is the schema's `Encoded` form and whose output is its `Type`. As with any Standard Schema used in `.output`, the handler returns the input and the client receives the output:
 
 ```ts
 const procedure = base
-  .output(Schema.Struct({
-    count: Schema.NumberFromString,
-    nickname: Schema.OptionFromNullOr(Schema.String),
-  }))
-  .handler(() => ({ count: 5, nickname: Option.some('Bob') }))
-// The client receives { count: '5', nickname: 'Bob' }
+  .output(Schema.Struct({ count: Schema.NumberFromString }))
+  .handler(() => ({ count: '5' }))
+// The client receives { count: 5 }
 ```
 
 :::warning
-The extensions only convert plain Effect schemas. A schema that is already a Standard Schema is used as is, so `.output(Schema.toStandardSchemaV1(MySchema))` still decodes.
+Effect values in the `Type`, such as `Option` or `Schema.Class` instances, reach the client as plain objects. Decode them again on the client if you need the real values.
 :::
 
 ### JSON Schema Converter
