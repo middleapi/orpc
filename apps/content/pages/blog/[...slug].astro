@@ -69,10 +69,6 @@ const words = (entry.body ?? '').split(/\s+/).filter(Boolean).length
 const minutes = Math.max(1, Math.round(words / 200))
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' })
 
-// PageLayout skips the generated OG card on dynamic routes, so point at the
-// post's card explicitly.
-const ogImage = config.og.enabled ? `/og${route.path}.png` : undefined
-
 // schema.org JSON-LD, matching what Blume emits for generated blog pages.
 // PageLayout's own graph would describe the post as a second, TechArticle
 // node, so it is turned off below.
@@ -112,9 +108,6 @@ const postJsonLd = {
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   page={{ title: `${entry.data.title} - ${config.title}`, description: entry.data.description, route: route.path }}
-  ogImage={ogImage}
-  ogImageAlt={ogImage ? entry.data.title : undefined}
-  ogImageSize={ogImage ? { width: 1200, height: 630 } : undefined}
   structuredDataEnabled={false}
   x={config.x}
 >
