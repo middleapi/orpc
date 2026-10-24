@@ -315,6 +315,8 @@ const procedure = os
   }))
 ```
 
+`Schema.toStandardSchemaV1` always decodes, which suits `.input`. For `.output`, flip the schema so it encodes instead: `.output(Schema.toStandardSchemaV1(Schema.flip(MySchema)))`. Or use the extensions below, which handle this for you.
+
 ### `.input` and `.output` Extensions
 
 Import `@orpc/experimental-effect/extensions/input-output` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This lets you define `.input` and `.output` directly with Effect Schema:
@@ -344,6 +346,22 @@ export const base = os
 You can also use these extensions with the [contract builder](/docs/contract/procedure).
 :::
 
+`.input` decodes: the client sends the schema's `Encoded` form and the handler receives its `Type`. `.output` encodes: the handler returns the schema's `Type` and the client receives its `Encoded` form. This matters for schemas whose two sides differ:
+
+```ts
+const procedure = base
+  .output(Schema.Struct({
+    count: Schema.NumberFromString,
+    nickname: Schema.OptionFromNullOr(Schema.String),
+  }))
+  .handler(() => ({ count: 5, nickname: Option.some('Bob') }))
+// The client receives { count: '5', nickname: 'Bob' }
+```
+
+:::warning
+The extensions only convert plain Effect schemas. A schema that is already a Standard Schema is used as is, so `.output(Schema.toStandardSchemaV1(MySchema))` still decodes, and the handler has to return the `Encoded` form. Pass `MySchema` directly, or `Schema.toStandardSchemaV1(Schema.flip(MySchema))`.
+:::
+
 ### JSON Schema Converter
 
 This integration also provides `EffectSchemaToJsonSchemaConverter`, which wraps Effect's built-in [Schema.toJsonSchemaDocument](https://effect.website/docs/schema/json-schema/). Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator). It accepts the same options as `Schema.toJsonSchemaDocument`, such as `onExcessProperty`, `generateDescriptions`, `includeAnnotationKey`, and `referencePolicy`:
@@ -361,6 +379,10 @@ const generator = new OpenAPIGenerator({
 ```
 
 Schemas with an `identifier` annotation, including `Schema.Class` and recursive schemas, are preserved in `$defs`, which `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) into `components.schemas`.
+
+:::info
+`.output` schemas describe the encoded side, which for a `Schema.Class` has no identifier of its own, so it is inlined. To keep it in `$defs`, annotate the fields struct: `Schema.Class<Planet>('Planet')(Schema.Struct({ name: Schema.String }).annotate({ identifier: 'PlanetEncoded' }))`.
+:::
 
 :::tip
 Enable the `cache` option to reuse conversion results when the same schema instance is converted repeatedly. When enabled, repeated conversions return the same JSON schema object, so treat the results as immutable.

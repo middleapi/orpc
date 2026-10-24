@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { z } from 'zod'
 import { EffectSchemaToJsonSchemaConverter } from './converter'
-import { toStandardSchema } from './schema'
+import { toStandardOutputSchema, toStandardSchema } from './schema'
 
 describe('effectSchemaToJsonSchemaConverter', () => {
   const converter = new EffectSchemaToJsonSchemaConverter()
@@ -22,6 +22,25 @@ describe('effectSchemaToJsonSchemaConverter', () => {
     ['output', { anyOf: [{ type: 'number' }, { type: 'string', enum: ['Infinity', '-Infinity', 'NaN'] }] }],
   ] as const)('uses the requested %s direction', (direction, jsonSchema) => {
     expect(converter.convert(toStandardSchema(Schema.NumberFromString), direction)).toEqual([jsonSchema, false])
+  })
+
+  it('converts encoding output schemas from the encoded side', () => {
+    const schema = toStandardOutputSchema(Schema.Struct({
+      count: Schema.NumberFromString,
+      maybe: Schema.OptionFromNullOr(Schema.String),
+      at: Schema.DateFromString,
+    }))
+
+    expect(converter.convert(schema, 'output')).toEqual([{
+      type: 'object',
+      properties: {
+        count: { type: 'string' },
+        maybe: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        at: { type: 'string' },
+      },
+      required: ['count', 'maybe', 'at'],
+      additionalProperties: true,
+    }, false])
   })
 
   it('does not mutate the schema', () => {
@@ -45,6 +64,24 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
 
       expect(converter.convert(toStandardSchema(Planet), direction)).toEqual([{
+        $ref: '#/$defs/PlanetEncoded',
+        $defs: {
+          PlanetEncoded: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+            additionalProperties: true,
+          },
+        },
+      }, false])
+    })
+
+    it('keeps class definitions in encoding output schemas when the encoded side has an identifier', () => {
+      class Planet extends Schema.Class<Planet>('Planet')(
+        Schema.Struct({ name: Schema.String }).annotate({ identifier: 'PlanetEncoded' }),
+      ) {}
+
+      expect(converter.convert(toStandardOutputSchema(Planet), 'output')).toEqual([{
         $ref: '#/$defs/PlanetEncoded',
         $defs: {
           PlanetEncoded: {
