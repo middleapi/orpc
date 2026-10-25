@@ -90,6 +90,7 @@ describe('openapiHandler', () => {
     const { response } = await handler.handle(new Request('http://localhost:3000/ping', { method: 'POST' }))
     expect(response!.status).toBe(404)
     expect(response!.headers.get('content-type')).toBe('application/problem+json')
+    expect(response!.headers.has('standard-server')).toBe(false)
     await expect(response!.json()).resolves.toEqual(new ORPCError('NOT_FOUND', { message: 'Missing' }).toJSON())
 
     const client = createORPCClient<any>(new OpenAPILink(router, {

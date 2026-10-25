@@ -150,13 +150,16 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
     const body = this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON())
 
+    if (this.errorResponseContentType === undefined) {
+      return { status, headers: {}, body }
+    }
+
+    // JSON bodies are always sent as `application/json`, a Blob keeps the given content-type.
+    // An empty `standard-server` header stops the Blob from being marked as a file.
     return {
       status,
-      headers: {},
-      // A Blob keeps its own content-type, while JSON bodies are always sent as `application/json`
-      body: this.errorResponseContentType !== undefined
-        ? new Blob([stringifyJSON(body) ?? ''], { type: this.errorResponseContentType })
-        : body,
+      headers: { 'content-type': this.errorResponseContentType, 'standard-server': [] },
+      body: new Blob([stringifyJSON(body) ?? ''], { type: this.errorResponseContentType }),
     }
   }
 
