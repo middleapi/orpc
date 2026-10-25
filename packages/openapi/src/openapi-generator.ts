@@ -86,6 +86,14 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
   > | undefined
 
   /**
+   * The media type error response bodies are documented under,
+   * e.g. `application/problem+json` for RFC 9457 Problem Details.
+   *
+   * @default 'application/json'
+   */
+  errorResponseContentType?: string | undefined
+
+  /**
    * Mapping ORPCError Code -> HTTP Status Code
    * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
@@ -129,6 +137,7 @@ export class OpenAPIGenerator {
       convertSchemas: (schemas, direction) => this.convertSchemas(schemas, direction),
       errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
       customErrorResponseBodySchema: options.customErrorResponseBodySchema,
+      errorResponseContentType: options.errorResponseContentType ?? 'application/json',
     }
 
     const errors: string[] = []

@@ -20,6 +20,7 @@ describe('openAPIGenerator operation builders', () => {
     schemas?: Record<string, any>
     errorStatusMap?: Record<string, number>
     customErrorResponseBodySchema?: OpenAPIOperationContext['customErrorResponseBodySchema']
+    errorResponseContentType?: string
   } = {}) {
     const doc: OpenAPIV3_2.OpenAPIObject = {
       openapi: '3.2.0',
@@ -45,6 +46,7 @@ describe('openAPIGenerator operation builders', () => {
       },
       errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
       customErrorResponseBodySchema: options.customErrorResponseBodySchema,
+      errorResponseContentType: options.errorResponseContentType ?? 'application/json',
     }
 
     const operation: OpenAPIV3_2.OperationObject = {}
@@ -933,6 +935,17 @@ describe('openAPIGenerator operation builders', () => {
       expect((operation.responses?.['404'] as any).content['application/json'].schema).toEqual(
         expect.objectContaining({ oneOf: expect.any(Array) }),
       )
+    })
+
+    it('documents error bodies under the configured content type', () => {
+      const { ctx, operation } = createContext({ errorResponseContentType: 'application/problem+json' })
+
+      buildErrorResponse(ctx, operation, testDef({
+        errors: { BAD_REQUEST: {}, NOT_FOUND: {} },
+      }))
+
+      expect(Object.keys((operation.responses?.['400'] as any).content)).toEqual(['application/problem+json'])
+      expect(Object.keys((operation.responses?.['404'] as any).content)).toEqual(['application/problem+json'])
     })
   })
 })
