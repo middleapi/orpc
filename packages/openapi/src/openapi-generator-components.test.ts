@@ -5,7 +5,7 @@ import { OpenAPIComponentRegistry } from './openapi-generator-components'
 describe('openAPIComponentRegistry', () => {
   function createRegistry(options: {
     schemas?: Record<string, any>
-    customComponentName?: (defName: string, defSchema: JsonSchema) => string | undefined
+    componentName?: (defName: string, defSchema: JsonSchema) => string | undefined
   } = {}) {
     const doc: OpenAPIV3_2.OpenAPIObject = {
       openapi: '3.2.0',
@@ -13,7 +13,7 @@ describe('openAPIComponentRegistry', () => {
       ...(options.schemas ? { components: { schemas: options.schemas } } : {}),
     }
 
-    return { doc, registry: new OpenAPIComponentRegistry(doc, options.customComponentName) }
+    return { doc, registry: new OpenAPIComponentRegistry(doc, options.componentName) }
   }
 
   describe('hoistDefs', () => {
@@ -101,9 +101,9 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('names hoisted defs with customComponentName and rewrites refs to the new names', () => {
-      const customComponentName = vi.fn((defName: string) => `Api${defName}`)
-      const { doc, registry } = createRegistry({ customComponentName })
+    it('names hoisted defs with componentName and rewrites refs to the new names', () => {
+      const componentName = vi.fn((defName: string) => `Api${defName}`)
+      const { doc, registry } = createRegistry({ componentName })
 
       const result = registry.hoistDefs({
         $ref: '#/$defs/Planet',
@@ -120,13 +120,13 @@ describe('openAPIComponentRegistry', () => {
       })
 
       // receives the normalized def schema
-      expect(customComponentName).toHaveBeenCalledTimes(2)
-      expect(customComponentName).toHaveBeenNthCalledWith(2, 'Moon', {})
+      expect(componentName).toHaveBeenCalledTimes(2)
+      expect(componentName).toHaveBeenNthCalledWith(2, 'Moon', {})
     })
 
-    it('keeps the def name when customComponentName returns undefined', () => {
+    it('keeps the def name when componentName returns undefined', () => {
       const { doc, registry } = createRegistry({
-        customComponentName: defName => defName === 'Planet' ? 'World' : undefined,
+        componentName: defName => defName === 'Planet' ? 'World' : undefined,
       })
 
       const result = registry.hoistDefs({
@@ -144,10 +144,10 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('postfixes a customComponentName that conflicts with a different component', () => {
+    it('postfixes a componentName that conflicts with a different component', () => {
       const { doc, registry } = createRegistry({
         schemas: { World: { type: 'string' } },
-        customComponentName: () => 'World',
+        componentName: () => 'World',
       })
 
       const result = registry.hoistDefs({
@@ -162,10 +162,10 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('reuses an equal component under the name customComponentName asks for', () => {
+    it('reuses an equal component under the name componentName asks for', () => {
       const { doc, registry } = createRegistry({
         schemas: { World: { type: 'number' } },
-        customComponentName: () => 'World',
+        componentName: () => 'World',
       })
 
       const result = registry.hoistDefs({
@@ -839,8 +839,8 @@ describe('openAPIComponentRegistry', () => {
       expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Planet', 'toString'])
     })
 
-    it('applies customComponentName to registered schemas', () => {
-      const { doc, registry } = createRegistry({ customComponentName: defName => `Api${defName}` })
+    it('applies componentName to registered schemas', () => {
+      const { doc, registry } = createRegistry({ componentName: defName => `Api${defName}` })
 
       const result = registry.register('Planet', { type: 'object' })
 

@@ -926,9 +926,9 @@ describe('openAPIHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON())
     })
 
-    it('uses customErrorResponseBodyEncoder and falls back on null', () => {
+    it('uses errorResponseBodyEncoder and falls back on null', () => {
       let attempt = 1
-      const customErrorResponseBodyEncoder = vi.fn(() => {
+      const errorResponseBodyEncoder = vi.fn(() => {
         if (attempt++ === 2) {
           return null
         }
@@ -948,7 +948,7 @@ describe('openAPIHandlerCodec', () => {
       const procedure = os.handler(vi.fn())
       const codec = new OpenAPIHandlerCodec(procedure, {
         serializer,
-        customErrorResponseBodyEncoder,
+        errorResponseBodyEncoder,
       })
 
       const firstError = new ORPCError('BAD_GATEWAY', { data: '__data1__' })
@@ -969,9 +969,9 @@ describe('openAPIHandlerCodec', () => {
         body: '__serialized_default__',
       })
 
-      expect(customErrorResponseBodyEncoder).toHaveBeenCalledTimes(2)
-      expect(customErrorResponseBodyEncoder).toHaveBeenNthCalledWith(1, firstError)
-      expect(customErrorResponseBodyEncoder).toHaveBeenNthCalledWith(2, secondError)
+      expect(errorResponseBodyEncoder).toHaveBeenCalledTimes(2)
+      expect(errorResponseBodyEncoder).toHaveBeenNthCalledWith(1, firstError)
+      expect(errorResponseBodyEncoder).toHaveBeenNthCalledWith(2, secondError)
 
       expect(serializer.serialize).toHaveBeenCalledTimes(2)
       expect(serializer.serialize).toHaveBeenNthCalledWith(1, { message: 'custom error body' })

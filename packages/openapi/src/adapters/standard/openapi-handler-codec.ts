@@ -43,18 +43,18 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
    *
    * @default ((e) => e.toJSON())
    */
-  customErrorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
+  errorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
 }
 
 export class OpenAPIHandlerCodecCore<T extends Context> {
   private readonly serializer: Public<OpenAPISerializer>
   private readonly errorStatusMap: Exclude<OpenAPIHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly customErrorResponseBodySerializer: OpenAPIHandlerCodecOptions<T>['customErrorResponseBodyEncoder']
+  private readonly errorResponseBodyEncoder: OpenAPIHandlerCodecOptions<T>['errorResponseBodyEncoder']
 
   constructor(options: OpenAPIHandlerCodecCoreOptions<T> = {}) {
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.customErrorResponseBodySerializer = options.customErrorResponseBodyEncoder
+    this.errorResponseBodyEncoder = options.errorResponseBodyEncoder
   }
 
   async decodeInput(
@@ -141,7 +141,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     return {
       status,
       headers: {},
-      body: this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
+      body: this.serializer.serialize(this.errorResponseBodyEncoder?.(error) ?? error.toJSON()),
     }
   }
 

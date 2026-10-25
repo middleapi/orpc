@@ -43,7 +43,7 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
    * Customize how an error response body is converted into an ORPC error.
    * Return `null` or `undefined` to fall back to the default decoding behavior.
    */
-  customErrorResponseBodyDecoder?: ((
+  errorResponseBodyDecoder?: ((
     deserializedBody: unknown,
     response: StandardLazyResponse,
   ) => AnyORPCError | null | undefined) | undefined
@@ -56,7 +56,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<OpenAPILinkCodecOptions<T>['serializer'], undefined>
-  private readonly customErrorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['customErrorResponseBodyDecoder']
+  private readonly errorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['errorResponseBodyDecoder']
 
   constructor(
     private readonly router: RouterContract,
@@ -65,7 +65,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     this.baseUrl = options.url ?? '/'
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new OpenAPISerializer()
-    this.customErrorResponseBodyDecoder = options.customErrorResponseBodyDecoder
+    this.errorResponseBodyDecoder = options.errorResponseBodyDecoder
   }
 
   async encodeInput(input: unknown, path: string[], options: ClientOptions<T>): Promise<StandardRequest> {
@@ -398,7 +398,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     })()
 
     if (!isOk) {
-      const customError = this.customErrorResponseBodyDecoder?.(deserialized, response)
+      const customError = this.errorResponseBodyDecoder?.(deserialized, response)
 
       if (customError !== undefined && customError !== null) {
         return { kind: 'error', error: customError }

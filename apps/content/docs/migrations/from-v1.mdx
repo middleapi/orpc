@@ -60,7 +60,7 @@ If your [OpenAPI Handler](/docs/openapi/handler) endpoints have external consume
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 
 const handler = new OpenAPIHandler(router, {
-  customErrorResponseBodyEncoder: error => ({
+  errorResponseBodyEncoder: error => ({
     ...error.toJSON(),
     status: COMMON_ERROR_STATUS_MAP[error.code] ?? 400,
   }),
@@ -1061,8 +1061,16 @@ const spec = await generator.generate(router, {
 Three smaller changes in the same area:
 
 - The `oo` helper (`oo.spec`) was removed. To customize the operation object, attach [`openapi({ spec })` metadata](/docs/openapi/specification#customizing-the-operation-object) directly on the procedure or router.
-- The `shouldHoistDef` option was replaced by [`customComponentName`](/docs/openapi/specification#hoisting-defs). Root `$defs` are now always hoisted into `components.schemas`; this option only renames them.
+- The `shouldHoistDef` option was replaced by [`componentName`](/docs/openapi/specification#hoisting-defs). Root `$defs` are now always hoisted into `components.schemas`; this option only renames them.
 - Documents are generated as OpenAPI 3.2.0 by default. The example above passes [`version: '3.1.1'`](/docs/openapi/specification#openapi-version) to keep the v1 behavior.
+
+### Error response options renamed
+
+The error response options dropped their `custom` prefix:
+
+- `customErrorResponseBodySchema` is now [`errorResponseBodySchema`](/docs/openapi/specification#custom-error-response-schemas) in `generator.generate` options.
+- `customErrorResponseBodyEncoder` is now [`errorResponseBodyEncoder`](/docs/openapi/handler#custom-error-response) on `OpenAPIHandler`.
+- `customErrorResponseBodyDecoder` is now [`errorResponseBodyDecoder`](/docs/openapi/link#custom-error-decoding) on `OpenAPILink`.
 
 ### `OpenAPIReferencePlugin` renamed and reshaped
 

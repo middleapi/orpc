@@ -19,7 +19,7 @@ describe('openAPIGenerator operation builders', () => {
   function createContext(options: {
     schemas?: Record<string, any>
     errorStatusMap?: Record<string, number>
-    customErrorResponseBodySchema?: OpenAPIOperationContext['customErrorResponseBodySchema']
+    errorResponseBodySchema?: OpenAPIOperationContext['errorResponseBodySchema']
   } = {}) {
     const doc: OpenAPIV3_2.OpenAPIObject = {
       openapi: '3.2.0',
@@ -44,7 +44,7 @@ describe('openAPIGenerator operation builders', () => {
         ]
       },
       errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
-      customErrorResponseBodySchema: options.customErrorResponseBodySchema,
+      errorResponseBodySchema: options.errorResponseBodySchema,
     }
 
     const operation: OpenAPIV3_2.OperationObject = {}
@@ -899,7 +899,7 @@ describe('openAPIGenerator operation builders', () => {
     })
 
     it('allows overriding the error body schema per status', () => {
-      const customErrorResponseBodySchema = vi.fn((definedErrors, status) => {
+      const errorResponseBodySchema = vi.fn((definedErrors, status) => {
         if (status === 400) {
           return { type: 'object' as const, description: 'custom-400' }
         }
@@ -907,7 +907,7 @@ describe('openAPIGenerator operation builders', () => {
         return undefined
       })
 
-      const { ctx, operation } = createContext({ customErrorResponseBodySchema })
+      const { ctx, operation } = createContext({ errorResponseBodySchema })
 
       buildErrorResponse(ctx, operation, testDef({
         errors: {
@@ -916,8 +916,8 @@ describe('openAPIGenerator operation builders', () => {
         },
       }))
 
-      expect(customErrorResponseBodySchema).toHaveBeenCalledTimes(2)
-      expect(customErrorResponseBodySchema).toHaveBeenCalledWith([
+      expect(errorResponseBodySchema).toHaveBeenCalledTimes(2)
+      expect(errorResponseBodySchema).toHaveBeenCalledWith([
         {
           code: 'BAD_REQUEST',
           defaultMessage: undefined,

@@ -223,13 +223,13 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
     })
   })
 
-  it('names components with customComponentName', async () => {
+  it('names components with componentName', async () => {
     const Planet = z.object({ id: z.string() }).meta({ id: 'Planet' })
 
     const doc = await generator.generate({
       planet: oc.input(z.object({ planet: Planet })),
     }, {
-      customComponentName: defName => `Api${defName}`,
+      componentName: defName => `Api${defName}`,
     })
 
     expect((doc.paths?.['/planet']?.post?.requestBody as any).content['application/json'].schema).toEqual(

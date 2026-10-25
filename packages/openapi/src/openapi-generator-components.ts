@@ -20,7 +20,7 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 export class OpenAPIComponentRegistry {
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
-    private readonly customComponentName: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined,
+    private readonly componentName: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined,
   ) {}
 
   /**
@@ -80,7 +80,7 @@ export class OpenAPIComponentRegistry {
         componentsSchemas,
         new Set(renameMap.values()),
         defName,
-        this.customComponentName?.(defName, cleanSchema) ?? defName,
+        this.componentName?.(defName, cleanSchema) ?? defName,
         defs,
         direction,
       )

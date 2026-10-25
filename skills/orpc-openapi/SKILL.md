@@ -77,7 +77,7 @@ export async function fetch(request: Request): Promise<Response> {
 
 Smart Coercion: query, path, and form values arrive as strings, so add `SmartCoercionHandlerPlugin` whenever input schemas expect non-string types from those sources. It coerces schema-driven, lossless conversions only (`'123'` to `123`, `'true'`/`'on'` to `true`, ISO strings to `Date`, arrays to `Set`/`Map` via `x-native-type`) and leaves ambiguous values untouched. Skip it when you already coerce in the schema or performance is critical; it adds runtime overhead.
 
-Other handler options: `interceptors`/`routingInterceptors`/`clientInterceptors` for logging and error mapping, `filter` to exclude procedures from matching, and `errorStatusMap` plus `customErrorResponseBodyEncoder` to customize error responses (by default `ORPCError` codes map to statuses via `COMMON_ERROR_STATUS_MAP`, for example `NOT_FOUND` to 404).
+Other handler options: `interceptors`/`routingInterceptors`/`clientInterceptors` for logging and error mapping, `filter` to exclude procedures from matching, and `errorStatusMap` plus `errorResponseBodyEncoder` to customize error responses (by default `ORPCError` codes map to statuses via `COMMON_ERROR_STATUS_MAP`, for example `NOT_FOUND` to 404).
 
 ## Calling: OpenAPILink
 

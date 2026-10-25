@@ -165,7 +165,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
         .input(z.object({ id: z.string() })),
     }, {
       errorStatusMap: { PLANET_GONE: 410 },
-      customErrorResponseBodySchema: (definedErrors, status) => {
+      errorResponseBodySchema: (definedErrors, status) => {
         expect(definedErrors).toEqual([
           expect.objectContaining({ code: 'PLANET_GONE', defaultMessage: 'Planet is gone' }),
         ])

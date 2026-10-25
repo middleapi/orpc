@@ -45,7 +45,7 @@ export interface OpenAPIOperationContext {
   registry: OpenAPIComponentRegistry
   convertSchemas: (schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection) => [JsonSchema, boolean]
   errorStatusMap: Record<string, number>
-  customErrorResponseBodySchema: Value<
+  errorResponseBodySchema: Value<
     JsonSchema | undefined | null,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number]
   > | undefined
@@ -527,7 +527,7 @@ export function buildErrorResponse(
   for (const [status, definitions] of definitionsByStatus.entries()) {
     const descriptions = definitions.map(({ defaultMessage }) => defaultMessage).filter(m => m !== undefined)
     const customBodySchema = value(
-      ctx.customErrorResponseBodySchema,
+      ctx.errorResponseBodySchema,
       definitions.map(def => ({ ...def, dataJsonSchema: ctx.registry.hoistDefs(def.dataJsonSchema, 'output') })),
       status,
     )

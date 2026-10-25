@@ -62,7 +62,7 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    *
    * @default defName => defName
    */
-  customComponentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
+  componentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
 
   /**
    * Filter procedures. Return `false` to exclude a procedure from the OpenAPI specification.
@@ -80,7 +80,7 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    * - Return `null | undefined` to use the default error response body shaper.
    * - The schema is an OpenAPI 3.2 Schema Object, it is downgraded with the rest of the document when an older `version` is requested.
    */
-  customErrorResponseBodySchema?: Value<
+  errorResponseBodySchema?: Value<
     JsonSchema | undefined | null,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number]
   > | undefined
@@ -125,10 +125,10 @@ export class OpenAPIGenerator {
     }
 
     const ctx: OpenAPIOperationContext = {
-      registry: new OpenAPIComponentRegistry(doc, options.customComponentName),
+      registry: new OpenAPIComponentRegistry(doc, options.componentName),
       convertSchemas: (schemas, direction) => this.convertSchemas(schemas, direction),
       errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
-      customErrorResponseBodySchema: options.customErrorResponseBodySchema,
+      errorResponseBodySchema: options.errorResponseBodySchema,
     }
 
     const errors: string[] = []
