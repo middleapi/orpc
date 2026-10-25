@@ -257,6 +257,8 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
+With this option, the JSON error body is sent as a file of that media type, so set the same `errorResponseContentType` on [OpenAPILink](/docs/openapi/link#custom-error-decoding) to keep parsing it as JSON.
+
 :::info
 If you use `OpenAPILink` with a custom server-side error format, make sure to configure [Custom Error Decoding](/docs/openapi/link#custom-error-decoding).
 :::

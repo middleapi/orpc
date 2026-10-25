@@ -978,15 +978,18 @@ describe('openAPIHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenNthCalledWith(2, secondError.toJSON())
     })
 
-    it('sets content-type header via errorResponseContentType option', () => {
+    it('encodes the body as a JSON Blob with errorResponseContentType', async () => {
       const procedure = os.handler(vi.fn())
       const codec = new OpenAPIHandlerCodec(procedure, { errorResponseContentType: 'application/problem+json' })
+      const error = new ORPCError('BAD_GATEWAY')
 
-      expect(codec.encodeError(new ORPCError('BAD_GATEWAY'))).toEqual({
-        status: 502,
-        headers: { 'content-type': 'application/problem+json' },
-        body: new ORPCError('BAD_GATEWAY').toJSON(),
-      })
+      const response = await codec.encodeError(error)
+
+      expect(response.status).toBe(502)
+      expect(response.headers).toEqual({})
+      expect(response.body).toBeInstanceOf(Blob)
+      expect((response.body as Blob).type).toBe('application/problem+json')
+      expect(JSON.parse(await (response.body as Blob).text())).toEqual(error.toJSON())
     })
 
     it('does not resolve error codes through Object.prototype', async () => {

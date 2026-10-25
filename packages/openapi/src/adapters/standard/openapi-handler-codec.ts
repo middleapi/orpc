@@ -46,8 +46,8 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   customErrorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
 
   /**
-   * The `content-type` header sent with JSON error responses,
-   * e.g. `application/problem+json` for RFC 9457 Problem Details.
+   * The `content-type` of error responses, e.g. `application/problem+json` for RFC 9457 Problem Details.
+   * Set the same value on `OpenAPILink` so it still parses error bodies as JSON.
    *
    * @default 'application/json'
    */
@@ -148,10 +148,15 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
+    const body = this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON())
+
     return {
       status,
-      headers: this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
-      body: this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
+      headers: {},
+      // A Blob keeps its own content-type, while JSON bodies are always sent as `application/json`
+      body: this.errorResponseContentType !== undefined
+        ? new Blob([stringifyJSON(body) ?? ''], { type: this.errorResponseContentType })
+        : body,
     }
   }
 

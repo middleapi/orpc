@@ -837,6 +837,36 @@ describe('openAPILinkCodec', () => {
       expectORPCErrorResult(result, 'NOT_FOUND')
     })
 
+    it('parses error responses with errorResponseContentType as JSON', async () => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+      }, { serializer, errorResponseContentType: 'application/problem+json' })
+
+      const resolveBody = vi.fn(async () => new ORPCError('NOT_FOUND').toJSON())
+      const result = await codec.decodeResponse({
+        status: 404,
+        headers: { 'content-type': 'application/problem+json' },
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expectORPCErrorResult(result, 'NOT_FOUND')
+      expect(resolveBody).toHaveBeenCalledWith('json')
+
+      await codec.decodeResponse({
+        status: 502,
+        headers: { 'content-type': 'text/html' },
+        resolveBody,
+      }, ['ping'], { context: {} })
+      expect(resolveBody).toHaveBeenLastCalledWith('file')
+
+      await codec.decodeResponse({
+        status: 200,
+        headers: { 'content-type': 'application/problem+json' },
+        resolveBody,
+      }, ['ping'], { context: {} })
+      expect(resolveBody).toHaveBeenLastCalledWith('file')
+    })
+
     it('throws MalformedResponseError on unknown error payloads', async () => {
       const codec = new OpenAPILinkCodec({
         ping: oc.meta(openapi({})),

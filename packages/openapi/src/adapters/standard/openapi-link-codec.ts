@@ -8,7 +8,7 @@ import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError, Respo
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
-import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
+import { flattenStandardHeader, mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
@@ -47,6 +47,14 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
     deserializedBody: unknown,
     response: StandardLazyResponse,
   ) => AnyORPCError | null | undefined) | undefined
+
+  /**
+   * Error responses with this `content-type` are parsed as JSON.
+   * Should match `errorResponseContentType` of the OpenAPI handler.
+   *
+   * @example 'application/problem+json'
+   */
+  errorResponseContentType?: string | undefined
 }
 
 const END_SLASH_REGEX = /\/$/
@@ -57,6 +65,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<OpenAPILinkCodecOptions<T>['serializer'], undefined>
   private readonly customErrorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['customErrorResponseBodyDecoder']
+  private readonly errorResponseContentType: OpenAPILinkCodecOptions<T>['errorResponseContentType']
 
   constructor(
     private readonly router: RouterContract,
@@ -66,6 +75,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.customErrorResponseBodyDecoder = options.customErrorResponseBodyDecoder
+    this.errorResponseContentType = options.errorResponseContentType
   }
 
   async encodeInput(input: unknown, path: string[], options: ClientOptions<T>): Promise<StandardRequest> {
@@ -382,7 +392,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const body = await response.resolveBody(meta?.responseBodyHint)
+    const isCustomErrorContentType = !isOk
+      && this.errorResponseContentType !== undefined
+      && flattenStandardHeader(response.headers['content-type']) === this.errorResponseContentType
+
+    const body = await response.resolveBody(isCustomErrorContentType ? 'json' : meta?.responseBodyHint)
 
     const deserialized = await (async () => {
       try {

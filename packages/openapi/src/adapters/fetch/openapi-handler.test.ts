@@ -1,5 +1,5 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
@@ -76,6 +76,29 @@ describe('openapiHandler', () => {
 
     await expect(client.beta()).resolves.toBe('beta')
     expect(fetch).toHaveBeenCalledWith('http://localhost:3000/api/v1^beta/items', expect.anything(), expect.anything(), ['beta'])
+  })
+
+  it('sends and decodes error responses with errorResponseContentType', async () => {
+    const router = {
+      ping: os.meta(openapi({ path: '/ping' })).handler(() => {
+        throw new ORPCError('NOT_FOUND', { message: 'Missing' })
+      }),
+    }
+
+    const handler = new OpenAPIHandler(router, { errorResponseContentType: 'application/problem+json' })
+
+    const { response } = await handler.handle(new Request('http://localhost:3000/ping', { method: 'POST' }))
+    expect(response!.status).toBe(404)
+    expect(response!.headers.get('content-type')).toBe('application/problem+json')
+    await expect(response!.json()).resolves.toEqual(new ORPCError('NOT_FOUND', { message: 'Missing' }).toJSON())
+
+    const client = createORPCClient<any>(new OpenAPILink(router, {
+      fetch: async (url, init) => (await handler.handle(new Request(url, init))).response!,
+      origin: 'http://localhost:3000',
+      errorResponseContentType: 'application/problem+json',
+    }))
+
+    await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND' && e.message === 'Missing')
   })
 
   it('supports standard handler plugins', async () => {

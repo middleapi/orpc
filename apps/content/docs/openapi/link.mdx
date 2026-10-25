@@ -242,6 +242,14 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
+If the handler sends errors with a custom [`errorResponseContentType`](/docs/openapi/handler#custom-error-response), set the same value on the link so those error bodies are still parsed as JSON:
+
+```ts
+const link = new OpenAPILink(contract, {
+  errorResponseContentType: 'application/problem+json',
+})
+```
+
 ## Error Responses
 
 When the server answers with an error, `OpenAPILink` throws an `ORPCError` whose `cause` is a `ResponseError` carrying the resolved response, so details that are not part of the error itself, such as its status or headers, stay available (errors returned by [`customErrorResponseBodyDecoder`](#custom-error-decoding) are thrown as-is):
