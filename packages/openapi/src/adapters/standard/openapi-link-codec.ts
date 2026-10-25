@@ -49,7 +49,7 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   ) => AnyORPCError | null | undefined) | undefined
 
   /**
-   * Error responses with this `content-type` are parsed as JSON.
+   * Error responses with this `content-type` are parsed as JSON (compared case-insensitively, ignoring parameters like `charset`).
    * Should match `errorResponseContentType` of the OpenAPI handler.
    *
    * @example 'application/problem+json'
@@ -75,7 +75,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.customErrorResponseBodyDecoder = options.customErrorResponseBodyDecoder
-    this.errorResponseContentType = options.errorResponseContentType
+    this.errorResponseContentType = toMediaType(options.errorResponseContentType)
   }
 
   async encodeInput(input: unknown, path: string[], options: ClientOptions<T>): Promise<StandardRequest> {
@@ -394,7 +394,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     const isCustomErrorContentType = !isOk
       && this.errorResponseContentType !== undefined
-      && flattenStandardHeader(response.headers['content-type']) === this.errorResponseContentType
+      && toMediaType(flattenStandardHeader(response.headers['content-type'])) === this.errorResponseContentType
 
     const body = await response.resolveBody(isCustomErrorContentType ? 'json' : meta?.responseBodyHint)
 
@@ -469,6 +469,13 @@ function combineSearch(baseSearch: `?${string}` | undefined, additionalSearch: s
   }
 
   return `${baseSearch}&${additionalSearch}` as `?${string}`
+}
+
+/**
+ * Strips parameters and normalizes case, e.g. `Application/Problem+JSON; charset=utf-8` -> `application/problem+json`.
+ */
+function toMediaType(contentType: string | undefined): string | undefined {
+  return contentType?.split(';')[0]?.trim().toLowerCase()
 }
 
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
