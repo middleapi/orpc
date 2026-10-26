@@ -99,16 +99,14 @@ describe('openapiHandler', () => {
     await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND' && e.message === 'Missing')
   })
 
-  it('decodes errorResponseContentType errors when responseBodyHint is set', async () => {
-    const router = {
-      ping: os.meta(openapi({ path: '/ping', responseBodyHint: 'file' })).handler(() => {
-        throw new ORPCError('NOT_FOUND')
-      }),
-    }
+  it('decodes errorResponseContentType errors without a standard-server header via the link option', async () => {
+    const router = { ping: os.meta(openapi({ path: '/ping' })).handler(() => 'pong') }
 
-    const handler = new OpenAPIHandler(router, { errorResponseContentType: 'application/problem+json' })
     const client = createORPCClient<any>(new OpenAPILink(router, {
-      fetch: async (url, init) => (await handler.handle(new Request(url, init))).response!,
+      fetch: async () => new Response(JSON.stringify(new ORPCError('NOT_FOUND').toJSON()), {
+        status: 404,
+        headers: { 'content-type': 'application/problem+json' },
+      }),
       origin: 'http://localhost:3000',
       errorResponseContentType: 'application/problem+json',
     }))

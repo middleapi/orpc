@@ -242,7 +242,7 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
-Errors sent with a custom [`errorResponseContentType`](/docs/openapi/handler#custom-error-response) are parsed as JSON automatically. If a procedure sets `responseBodyHint`, which applies to error responses too, or the server does not send the `standard-server` header, set the same value on the link:
+Errors sent with a custom [`errorResponseContentType`](/docs/openapi/handler#custom-error-response) are parsed as JSON automatically. If the server does not send the `standard-server` header, for example a server not built with oRPC, set the same value on the link:
 
 ```ts
 const link = new OpenAPILink(contract, {

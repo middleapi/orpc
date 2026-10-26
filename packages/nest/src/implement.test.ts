@@ -1195,6 +1195,37 @@ describe('error handling', () => {
       expect(catchErrorSpy).toHaveBeenCalledTimes(0)
     })
   })
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+  ] as const)('with errorResponseContentType and %s', async (_, adapter) => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [ORPCModule.forRoot({ errorResponseContentType: 'application/problem+json' })],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    await app.init()
+
+    if (adapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    const httpServer = app.getHttpServer()
+
+    it('sends errors with the custom content type', async () => {
+      const error = new ORPCError('NOT_FOUND', { data: 'test data' })
+      handler.mockRejectedValueOnce(error)
+
+      const res = await supertest(httpServer).post('/error')
+
+      expect(res.statusCode).toEqual(404)
+      expect(res.headers['content-type']).toEqual('application/problem+json')
+      expect(res.headers['standard-server']).toEqual('json')
+      expect(res.body).toEqual(error.toJSON())
+    })
+  })
 })
 
 describe('compatibility', () => {
