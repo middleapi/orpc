@@ -3,7 +3,7 @@ import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRout
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { Duplex } from 'node:stream'
 import { constants, createDeflate, createDeflateRaw, createGzip } from 'node:zlib'
-import { BATCH_HEADER, negotiateResponseCompressionEncoding, toCompressedHeaders } from '@orpc/server/plugins'
+import { BATCH_HEADER, negotiateResponseCompressionEncoding, toCompressedHeaders, toSerializedBodyHeaders } from '@orpc/server/plugins'
 import { stringifyJSON, toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 
@@ -113,11 +113,8 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
         }
 
         stream = json.stream()
-        bodyHeaders = {
-          // Serialized here rather than by the adapter, which no longer sees the array
-          'content-type': 'application/json',
-          'standard-server': [],
-        }
+        // Serialized here rather than by the adapter, which no longer sees the array
+        bodyHeaders = toSerializedBodyHeaders(headers, 'json', 'application/json')
       }
       // Every other batch body is the length-prefixed framing, buffered into a blob or streamed
       else if (body instanceof Blob) {
@@ -128,11 +125,11 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
         stream = body.stream()
         bodyHeaders = {
           /**
-           * The blob is gone once it becomes a stream, so the type it carried is stated here. The
-           * batch plugin puts it there rather than in the headers, because it builds the body
-           * itself instead of leaving it to the adapter.
+           * The blob is gone once it becomes a stream, so the type it carried is stated here, unless the
+           * headers set one, which adapters prefer. The batch plugin puts it on the blob rather than in the
+           * headers, because it builds the body itself instead of leaving it to the adapter.
            */
-          'content-type': body.type,
+          'content-type': headers['content-type'] ?? body.type,
           'standard-server': 'octet-stream' satisfies StandardBodyHint,
         }
       }

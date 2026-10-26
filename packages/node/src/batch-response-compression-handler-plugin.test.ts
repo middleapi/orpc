@@ -181,6 +181,31 @@ describe('batchResponseCompressionHandlerPlugin', () => {
     expect(JSON.stringify(decoded)).toContain(largeValue)
   })
 
+  it.each([
+    ['that streams', ['/events', '/ping'], 'octet-stream'],
+    ['with a binary subresponse', ['/blob', '/ping'], 'octet-stream'],
+    // The client would not read this content type as json, so the body says it is
+    ['of json only', ['/ping', '/ping'], 'json'],
+  ])('keeps the content type the batch headers set on a batch %s', async (_case, urls, hint) => {
+    const handler = new RPCHandler(router, {
+      plugins: [
+        new BatchHandlerPlugin({ headers: { 'content-type': 'application/x-custom' } }),
+        new BatchResponseCompressionHandlerPlugin(),
+      ],
+    })
+
+    const { response } = await handler.handle(createBatchRequest(urls))
+    const { response: uncompressed } = await handler.handle(createBatchRequest(urls, { 'accept-encoding': 'identity' }))
+
+    expect(response!.headers.get('content-encoding')).toBe('gzip')
+    expect(response!.headers.get('content-type')).toBe('application/x-custom')
+    expect(response!.headers.get('standard-server')).toBe(hint)
+    // Same content type the adapter sends when the batch is not compressed
+    expect(uncompressed!.headers.get('content-type')).toBe('application/x-custom')
+
+    await expect(decompress(response!, 'gzip')).resolves.toContain(largeValue)
+  })
+
   // Each shape measures its own size, the binary one on the blob and the json one on its bytes
   it.each([
     ['with a binary subresponse', '/blob'],

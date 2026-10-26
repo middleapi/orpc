@@ -901,6 +901,22 @@ describe('batchHandlerPlugin', () => {
       expect(new TextDecoder().decode(image.binary)).toBe('__TEST__')
     })
 
+    it.each([
+      // The client would not read this content type as json, so the body says it is
+      ['json', ['/ping', '/refresh'], 'json'],
+      ['binary', ['/image', '/refresh'], 'file'],
+      ['streaming', ['/events', '/refresh'], 'octet-stream'],
+    ])('keeps the content type the headers option sets on a %s batch response', async (_case, urls, hint) => {
+      const handler = createHandler(new BatchHandlerPlugin({ headers: { 'content-type': 'application/x-custom' } }), headersRouter)
+
+      const { response } = await handler.handle(createBatchRequest({
+        messages: urls.map((url, index) => makePeerRequestMessage(String(index), url)),
+      }))
+
+      expect(response!.headers.get('content-type')).toBe('application/x-custom')
+      expect(response!.headers.get('standard-server')).toBe(hint)
+    })
+
     it('moves cookies and shared headers onto a batch response that streams', async () => {
       const { response } = await createHandler(undefined, headersRouter).handle(createBatchRequest({
         messages: [makePeerRequestMessage('0', '/events'), makePeerRequestMessage('1', '/login')],

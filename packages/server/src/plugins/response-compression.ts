@@ -2,7 +2,7 @@ import type { StandardBodyHint, StandardHeaders, StandardResponse } from '@stand
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
-import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { flattenStandardHeader, generateContentDisposition, resolveStandardBodyHint } from '@standard-server/core'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
 // occasional multi-byte characters increase the average.
@@ -92,10 +92,8 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
             response: {
               ...response,
               body: body.pipeThrough(new CompressionStream(encoding)),
-              headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': 'octet-stream' satisfies StandardBodyHint,
-              },
+              // Still a stream, so the adapter fills in the same body headers as for the uncompressed one
+              headers: toCompressedHeaders(headers, encoding),
             },
           }
         }
@@ -120,7 +118,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               body: body.stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
                 ...toCompressedHeaders(headers, encoding),
-                'standard-server': 'file' satisfies StandardBodyHint,
+                'standard-server': headers['standard-server'] ?? 'file' satisfies StandardBodyHint,
                 'content-type': contentType,
                 'content-disposition': contentDisposition,
               },
@@ -187,8 +185,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
                 ...toCompressedHeaders(headers, encoding),
-                'standard-server': [],
-                'content-type': 'application/x-www-form-urlencoded',
+                ...toSerializedBodyHeaders(headers, 'url-search-params', 'application/x-www-form-urlencoded'),
               },
             },
           }
@@ -205,8 +202,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
                 ...toCompressedHeaders(headers, encoding),
-                'standard-server': [],
-                'content-type': 'application/json',
+                ...toSerializedBodyHeaders(headers, 'json', 'application/json'),
               },
             },
           }
@@ -276,6 +272,28 @@ export function toCompressedHeaders(headers: StandardHeaders, encoding: string):
      */
     'etag': weakenEtag(flattenStandardHeader(headers.etag)),
     'accept-ranges': [],
+  }
+}
+
+/**
+ * The body headers of a response whose `hint` body, such as JSON, is serialized into a compressed stream
+ * instead of by the adapter. They match what the adapter sends for the uncompressed body: a `content-type`
+ * the response sets is kept, falling back to `contentType`, and `hint` is sent only when that content type
+ * would otherwise be read as another body. Shared by the response compression plugins so compressed
+ * responses carry the same headers.
+ */
+export function toSerializedBodyHeaders(headers: StandardHeaders, hint: StandardBodyHint, contentType: string): StandardHeaders {
+  const bodyHeaders: StandardHeaders = {
+    ...headers,
+    'standard-server': undefined,
+    'content-type': headers['content-type'] ?? contentType,
+    'content-length': undefined,
+  }
+
+  return {
+    'content-type': bodyHeaders['content-type'],
+    // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+    'standard-server': resolveStandardBodyHint(bodyHeaders) === hint ? [] : hint,
   }
 }
 
