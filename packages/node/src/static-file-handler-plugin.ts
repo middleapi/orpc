@@ -466,7 +466,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     /**
      * A HEAD response uses an empty stream instead of no body, because
-     * the adapters strip the content headers when the body is `undefined`.
+     * the adapters drop `content-length` when the body is `undefined`.
      */
     const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD'
       ? new ReadableStream({ start: controller => controller.close() })

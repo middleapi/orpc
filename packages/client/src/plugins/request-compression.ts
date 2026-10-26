@@ -1,8 +1,9 @@
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { isAsyncIteratorObject, isCompressibleContentType, stringifyJSON, toArray } from '@orpc/shared'
-import { flattenStandardHeader, generateContentDisposition, resolveStandardBodyHint } from '@standard-server/core'
+import { isAsyncIteratorObject, isCompressibleContentType, toArray } from '@orpc/shared'
+import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { toFetchBody } from '@standard-server/fetch'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
 // occasional multi-byte characters increase the average.
@@ -178,14 +179,18 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         const string = request.body.toString()
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
+          // The headers the adapter would send with the body, so the server reads the compressed one the same way
+          const [, bodyHeaders] = toFetchBody(request.body, request.headers)
+
           return next({
             ...interceptorOptions,
             request: {
               ...interceptorOptions.request,
               body: compressedStream,
               headers: {
-                ...request.headers,
-                ...toSerializedBodyHeaders(request.headers, 'url-search-params', 'application/x-www-form-urlencoded'),
+                ...bodyHeaders,
+                // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+                'standard-server': bodyHeaders['standard-server'] ?? [],
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
@@ -195,7 +200,8 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
       }
 
       else if (request.body !== undefined && !isAsyncIteratorObject(request.body)) {
-        const string = stringifyJSON(request.body)
+        // Serialized as the adapter would, along with the headers it would send
+        const [string, bodyHeaders] = toFetchBody(request.body, request.headers) as [string, StandardHeaders]
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
           return next({
@@ -204,8 +210,8 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               ...interceptorOptions.request,
               body: compressedStream,
               headers: {
-                ...request.headers,
-                ...toSerializedBodyHeaders(request.headers, 'json', 'application/json'),
+                ...bodyHeaders,
+                'standard-server': bodyHeaders['standard-server'] ?? [],
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
@@ -224,26 +230,5 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         transportInterceptor,
       ],
     }
-  }
-}
-
-/**
- * The body headers of a request whose `hint` body, such as JSON, is serialized into a compressed stream
- * instead of by the adapter. They match what the adapter sends for the uncompressed body: a `content-type`
- * the request sets is kept, falling back to `contentType`, and `hint` is sent only when that content type
- * would otherwise be read as another body.
- */
-function toSerializedBodyHeaders(headers: StandardHeaders, hint: StandardBodyHint, contentType: string): StandardHeaders {
-  const bodyHeaders: StandardHeaders = {
-    ...headers,
-    'standard-server': undefined,
-    'content-type': headers['content-type'] ?? contentType,
-    'content-length': undefined,
-  }
-
-  return {
-    'content-type': bodyHeaders['content-type'],
-    // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
-    'standard-server': resolveStandardBodyHint(bodyHeaders) === hint ? [] : hint,
   }
 }

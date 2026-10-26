@@ -184,7 +184,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   it.each([
     ['that streams', ['/events', '/ping'], 'octet-stream'],
     ['with a binary subresponse', ['/blob', '/ping'], 'octet-stream'],
-    // The client would not read this content type as json, so the body says it is
+    // The client would not read this content type as json, so the hint says it is
     ['of json only', ['/ping', '/ping'], 'json'],
   ])('keeps the content type the batch headers set on a batch %s', async (_case, urls, hint) => {
     const handler = new RPCHandler(router, {
