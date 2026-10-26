@@ -18,7 +18,7 @@ import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, toArray, value } from '@orpc/shared'
-import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { flattenStandardHeader, generateContentDisposition, resolveStandardBodyHint } from '@standard-server/core'
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
 
@@ -280,7 +280,7 @@ function toNestHttpBody(
   headers['content-length'] = undefined
 
   if (body === undefined) {
-    headers['content-type'] = undefined
+    headers['standard-server'] = requiredBodyHint('none', headers)
     return [undefined, headers]
   }
 
@@ -291,12 +291,14 @@ function toNestHttpBody(
   }
 
   if (body instanceof URLSearchParams) {
-    headers['content-type'] = 'application/x-www-form-urlencoded'
+    headers['content-type'] ??= 'application/x-www-form-urlencoded'
+    headers['standard-server'] = requiredBodyHint('url-search-params', headers)
     return [body.toString(), headers]
   }
 
   if (isAsyncIteratorObject(body)) {
-    headers['content-type'] = 'text/event-stream'
+    headers['content-type'] ??= 'text/event-stream'
+    headers['standard-server'] = requiredBodyHint('event-stream', headers)
     return [toStreamableFile(toEventStream(body, options?.eventStream), headers, signal), headers]
   }
 
@@ -307,14 +309,30 @@ function toNestHttpBody(
     && body !== null
     && !Array.isArray(body)
   ) {
-    headers['content-type'] = undefined
+    // Without an explicit content-type, leave it to Nest's exception filter, which sends JSON by default
+    if (headers['content-type'] !== undefined) {
+      headers['standard-server'] = requiredBodyHint('json', headers)
+    }
+
     return [new HttpException(body, status), headers]
   }
 
-  headers['content-type'] = 'application/json'
+  headers['content-type'] ??= 'application/json'
+  headers['standard-server'] = requiredBodyHint('json', headers)
   // NestJS treat string as text response, and null as empty response
-  // while it should be treated as JSON response in oRPC
-  return [typeof body === 'string' || body === null ? stringifyJSON(body) : body, headers]
+  // while it should be treated as JSON response in oRPC.
+  // A content-type not read as JSON needs a string too, since Fastify only serializes objects for JSON content types.
+  return [
+    typeof body === 'string' || body === null || headers['standard-server'] !== undefined ? stringifyJSON(body) : body,
+    headers,
+  ]
+}
+
+/**
+ * The `standard-server` header to send, so the body is read as `hint` even when its content-type says otherwise.
+ */
+function requiredBodyHint(hint: StandardBodyHint, headers: StandardHeaders): StandardBodyHint | undefined {
+  return resolveStandardBodyHint(headers) === hint ? undefined : hint
 }
 
 interface NestHandlerCodecMatch {
