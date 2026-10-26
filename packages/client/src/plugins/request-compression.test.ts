@@ -561,6 +561,85 @@ describe('requestCompressionLinkPlugin', () => {
     })
   })
 
+  describe('body headers the request sets', () => {
+    const largeText = 'large content'.repeat(100)
+
+    it.each([
+      {
+        name: 'JSON with a non-JSON content-type',
+        body: () => ({ text: largeText }),
+        headers: { 'content-type': 'application/merge-patch+json' },
+        expected: { 'content-type': 'application/merge-patch+json', 'standard-server': 'json' },
+      },
+      {
+        name: 'JSON with a JSON content-type',
+        body: () => ({ text: largeText }),
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+        expected: { 'content-type': 'application/json; charset=utf-8', 'standard-server': null },
+      },
+      {
+        name: 'JSON with a stale body hint and content-length',
+        body: () => ({ text: largeText }),
+        headers: { 'standard-server': 'file', 'content-length': '5' },
+        expected: { 'content-type': 'application/json', 'standard-server': null },
+      },
+      {
+        name: 'URLSearchParams with a non-form content-type',
+        body: () => new URLSearchParams({ text: largeText }),
+        headers: { 'content-type': 'text/plain' },
+        expected: { 'content-type': 'text/plain', 'standard-server': 'url-search-params' },
+      },
+      {
+        name: 'URLSearchParams with a form content-type',
+        body: () => new URLSearchParams({ text: largeText }),
+        headers: { 'content-type': 'application/x-www-form-urlencoded; charset=utf-8' },
+        expected: { 'content-type': 'application/x-www-form-urlencoded; charset=utf-8', 'standard-server': null },
+      },
+      {
+        name: 'ReadableStream with a body hint',
+        body: () => new Blob([JSON.stringify(largeText)]).stream(),
+        headers: { 'content-type': 'text/plain', 'standard-server': 'json' },
+        expected: { 'content-type': 'text/plain', 'standard-server': 'json' },
+      },
+      {
+        name: 'Blob with a content-type and body hint',
+        body: () => new Blob([largeText], { type: 'image/png' }),
+        headers: { 'content-type': 'text/csv', 'standard-server': 'octet-stream' },
+        expected: { 'content-type': 'text/csv', 'standard-server': 'octet-stream' },
+      },
+    ])('keeps them for $name body', async ({ body, headers, expected }) => {
+      const transportInterceptor: StandardLinkTransportInterceptor<any> = ({ next, ...interceptorOptions }) => next({
+        ...interceptorOptions,
+        request: {
+          ...interceptorOptions.request,
+          headers: { ...interceptorOptions.request.headers, ...headers },
+          body: body(),
+        },
+      })
+
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
+      const { link: uncompressedLink, fetch: uncompressedFetch } = createLink({
+        pluginOptions: { threshold: Infinity, isCompressibleContentType: () => false },
+        transportInterceptors: [transportInterceptor],
+      })
+
+      await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
+      await expect(uncompressedLink.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
+
+      const [, init] = fetch.mock.calls[0]!
+      const [, uncompressedInit] = uncompressedFetch.mock.calls[0]!
+
+      expect(init.headers.get('content-encoding')).toBe('gzip')
+      expect(init.headers.get('content-type')).toBe(expected['content-type'])
+      expect(init.headers.get('standard-server')).toBe(expected['standard-server'])
+
+      expect(uncompressedInit.headers.get('content-encoding')).toBeNull()
+      expect(init.headers.get('content-type')).toBe(uncompressedInit.headers.get('content-type'))
+      expect(init.headers.get('standard-server')).toBe(uncompressedInit.headers.get('standard-server'))
+      await expect(decompressStream(init.body, 'gzip')).resolves.toBe(await new Response(uncompressedInit.body).text())
+    })
+  })
+
   describe('async iterator body', () => {
     it('should not compress async iterator body', async () => {
       const { link, fetch } = createLink({ pluginOptions: { threshold: 100 } })

@@ -4,8 +4,9 @@ import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { Duplex } from 'node:stream'
 import { constants, createDeflate, createDeflateRaw, createGzip } from 'node:zlib'
 import { BATCH_HEADER, negotiateResponseCompressionEncoding, toCompressedHeaders } from '@orpc/server/plugins'
-import { stringifyJSON, toArray } from '@orpc/shared'
+import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
+import { toFetchBody } from '@standard-server/fetch'
 
 export interface BatchResponseCompressionHandlerPluginOptions {
   /**
@@ -106,7 +107,9 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
        * so the array itself is the only thing left to recognise.
        */
       if (Array.isArray(body)) {
-        const json = new Blob([stringifyJSON(body)])
+        // Serialized here rather than by the adapter, which no longer sees the array
+        const [string, jsonHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
+        const json = new Blob([string])
 
         if (json.size < this.threshold) {
           return result
@@ -114,30 +117,18 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
 
         stream = json.stream()
         bodyHeaders = {
-          // Serialized here rather than by the adapter, which no longer sees the array
-          'content-type': 'application/json',
-          'standard-server': [],
+          'content-type': jsonHeaders['content-type'],
+          // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+          'standard-server': jsonHeaders['standard-server'] ?? [],
         }
       }
       // Every other batch body is the length-prefixed framing, buffered into a blob or streamed
-      else if (body instanceof Blob) {
-        if (Number.isFinite(body.size) && body.size < this.threshold) {
+      else if (body instanceof Blob || body instanceof ReadableStream) {
+        if (body instanceof Blob && Number.isFinite(body.size) && body.size < this.threshold) {
           return result
         }
 
-        stream = body.stream()
-        bodyHeaders = {
-          /**
-           * The blob is gone once it becomes a stream, so the type it carried is stated here. The
-           * batch plugin puts it there rather than in the headers, because it builds the body
-           * itself instead of leaving it to the adapter.
-           */
-          'content-type': body.type,
-          'standard-server': 'octet-stream' satisfies StandardBodyHint,
-        }
-      }
-      else if (body instanceof ReadableStream) {
-        stream = body
+        stream = body instanceof Blob ? body.stream() : body
         bodyHeaders = { 'standard-server': 'octet-stream' satisfies StandardBodyHint }
       }
       else {

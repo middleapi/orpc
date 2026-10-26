@@ -1258,6 +1258,87 @@ describe('responseCompressionHandlerPlugin', () => {
     })
   })
 
+  describe('body headers the response sets', () => {
+    const largeText = 'large content'.repeat(100)
+
+    it.each([
+      {
+        name: 'JSON with a non-JSON content-type',
+        body: () => ({ text: largeText }),
+        headers: { 'content-type': 'application/problem+json' },
+        expected: { 'content-type': 'application/problem+json', 'standard-server': 'json' },
+      },
+      {
+        name: 'JSON with a JSON content-type',
+        body: () => ({ text: largeText }),
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+        expected: { 'content-type': 'application/json; charset=utf-8', 'standard-server': null },
+      },
+      {
+        name: 'JSON with a stale body hint and content-length',
+        body: () => ({ text: largeText }),
+        headers: { 'standard-server': 'file', 'content-length': '5' },
+        expected: { 'content-type': 'application/json', 'standard-server': null },
+      },
+      {
+        name: 'URLSearchParams with a non-form content-type',
+        body: () => new URLSearchParams({ text: largeText }),
+        headers: { 'content-type': 'text/plain' },
+        expected: { 'content-type': 'text/plain', 'standard-server': 'url-search-params' },
+      },
+      {
+        name: 'URLSearchParams with a form content-type',
+        body: () => new URLSearchParams({ text: largeText }),
+        headers: { 'content-type': 'application/x-www-form-urlencoded; charset=utf-8' },
+        expected: { 'content-type': 'application/x-www-form-urlencoded; charset=utf-8', 'standard-server': null },
+      },
+      {
+        name: 'ReadableStream with a body hint',
+        body: () => new Blob([JSON.stringify(largeText)]).stream(),
+        headers: { 'content-type': 'text/plain', 'standard-server': 'json' },
+        expected: { 'content-type': 'text/plain', 'standard-server': 'json' },
+      },
+      {
+        name: 'Blob with a body hint',
+        body: () => new Blob([largeText], { type: 'text/plain' }),
+        headers: { 'standard-server': 'octet-stream' },
+        expected: { 'content-type': 'text/plain', 'standard-server': 'octet-stream' },
+      },
+    ])('keeps them for $name body', async ({ body, headers, expected }) => {
+      const handler = new RPCHandler(os.handler(() => 'ok'), {
+        plugins: [new ResponseCompressionHandlerPlugin({ threshold: 100 })],
+        routingInterceptors: [async ({ next }) => {
+          const result = await next()
+
+          return result.matched
+            ? { ...result, response: { ...result.response, headers: { ...result.response.headers, ...headers }, body: body() } }
+            : result
+        }],
+      })
+
+      const handle = (acceptEncoding: string) => handler.handle(new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': acceptEncoding,
+        },
+        body: JSON.stringify({ json: null }),
+      }))
+
+      const { response } = await handle('gzip')
+      const { response: uncompressed } = await handle('identity')
+
+      expect(response!.headers.get('content-encoding')).toBe('gzip')
+      expect(response!.headers.get('content-type')).toBe(expected['content-type'])
+      expect(response!.headers.get('standard-server')).toBe(expected['standard-server'])
+
+      expect(uncompressed!.headers.has('content-encoding')).toBe(false)
+      expect(response!.headers.get('content-type')).toBe(uncompressed!.headers.get('content-type'))
+      expect(response!.headers.get('standard-server')).toBe(uncompressed!.headers.get('standard-server'))
+      await expect(decompressStream(response!.body!, 'gzip')).resolves.toBe(await uncompressed!.text())
+    })
+  })
+
   describe('async iterator body', () => {
     it('should not compress async iterator body', async () => {
       const handler = new RPCHandler(
