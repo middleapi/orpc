@@ -2,7 +2,7 @@ import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable, Public } from '@orpc/shared'
-import type { StandardBodyHint, StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
@@ -47,7 +47,6 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 
   /**
    * The `content-type` of error responses, e.g. `application/problem+json` for RFC 9457 Problem Details.
-   * A `standard-server: json` header is sent along so `OpenAPILink` still parses error bodies as JSON.
    *
    * @default 'application/json'
    */
@@ -148,18 +147,10 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
-    const body = this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON())
-
-    if (this.errorResponseContentType === undefined) {
-      return { status, headers: {}, body }
-    }
-
-    // JSON bodies are always sent as `application/json`, a Blob keeps the given content-type.
-    // The `standard-server` hint stops the Blob from being marked as a file and lets clients parse it as JSON.
     return {
       status,
-      headers: { 'content-type': this.errorResponseContentType, 'standard-server': 'json' satisfies StandardBodyHint },
-      body: new Blob([stringifyJSON(body) ?? ''], { type: this.errorResponseContentType }),
+      headers: this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
+      body: this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
     }
   }
 

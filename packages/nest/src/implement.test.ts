@@ -1238,7 +1238,7 @@ describe('error handling', () => {
       const res = await supertest(httpServer).post('/error')
 
       expect(res.statusCode).toEqual(404)
-      expect(res.headers['content-type']).toEqual('application/problem+json')
+      expect(res.headers['content-type']).toMatch(/^application\/problem\+json(;|$)/)
       expect(res.headers['standard-server']).toEqual('json')
       expect(res.body).toEqual(error.toJSON())
     })
