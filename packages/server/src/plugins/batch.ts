@@ -447,6 +447,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const subrequests = runSubrequests()
       const { batchHeaders, streams } = await lifting
+      const framedHeaders = { ...batchHeaders, 'content-type': batchHeaders['content-type'] ?? BATCH_CONTENT_TYPE }
 
       if (!streams) {
         await subrequests
@@ -459,8 +460,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             matched: true,
             response: {
               status,
-              headers: batchHeaders,
-              body: new Blob(chunks, { type: BATCH_CONTENT_TYPE }),
+              headers: framedHeaders,
+              body: new Blob(chunks),
             },
           }
         }
@@ -504,7 +505,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         matched: true,
         response: {
           status,
-          headers: { ...batchHeaders, 'content-type': BATCH_CONTENT_TYPE },
+          headers: framedHeaders,
           body,
         },
       }

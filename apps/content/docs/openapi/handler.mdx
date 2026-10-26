@@ -249,6 +249,14 @@ const handler = new OpenAPIHandler(router, {
 
 </Expandable>
 
+Error responses are sent as `application/json` by default. Use `errorResponseContentType` to change the media type, such as `application/problem+json` for [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457):
+
+```ts
+const handler = new OpenAPIHandler(router, {
+  errorResponseContentType: 'application/problem+json',
+})
+```
+
 :::info
 If you use `OpenAPILink` with a custom server-side error format, make sure to configure [Custom Error Decoding](/docs/openapi/link#custom-error-decoding).
 :::

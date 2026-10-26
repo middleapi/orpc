@@ -795,6 +795,25 @@ describe('openAPILinkCodec', () => {
       expect(result.error.cause.response).toEqual({ status: 404, headers: { 'x-request-id': 'abc' }, body: error.toJSON() })
     })
 
+    it('ignores responseBodyHint on unsuccessful responses', async () => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+      }, { serializer })
+
+      const error = new ORPCError('NOT_FOUND', { message: 'Missing' })
+      const resolveBody = vi.fn(async () => error.toJSON())
+
+      const result = await codec.decodeResponse({
+        status: 404,
+        headers: {},
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expectORPCErrorResult(result, 'NOT_FOUND', { message: 'Missing' })
+      expect(resolveBody).toHaveBeenCalledTimes(1)
+      expect(resolveBody).toHaveBeenCalledWith(undefined)
+    })
+
     it('uses a custom error decoder when it returns a value', async () => {
       const customError = new ORPCError('BAD_GATEWAY', { data: 'custom' })
       const customErrorResponseBodyDecoder = vi.fn(() => customError)
@@ -835,6 +854,22 @@ describe('openAPILinkCodec', () => {
       }, ['ping'], { context: {} })
 
       expectORPCErrorResult(result, 'NOT_FOUND')
+    })
+
+    it.each([
+      ['a matching error', 404, 'application/problem+json', 'json'],
+      ['an error with different case and parameters', 404, 'Application/Problem+JSON; charset=utf-8', 'json'],
+      ['an error with another type', 502, 'text/html', undefined],
+      ['a successful response', 200, 'application/problem+json', 'file'],
+    ] as const)('resolves the body hint of %s with errorResponseContentType', async (_, status, contentType, hint) => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+      }, { serializer, errorResponseContentType: 'application/problem+json; charset=utf-8' })
+
+      const resolveBody = vi.fn(async () => new ORPCError('NOT_FOUND').toJSON())
+      await codec.decodeResponse({ status, headers: { 'content-type': contentType }, resolveBody }, ['ping'], { context: {} })
+
+      expect(resolveBody).toHaveBeenCalledWith(hint)
     })
 
     it('throws MalformedResponseError on unknown error payloads', async () => {

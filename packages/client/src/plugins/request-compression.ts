@@ -1,8 +1,9 @@
-import type { StandardBodyHint } from '@standard-server/core'
+import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { isAsyncIteratorObject, isCompressibleContentType, stringifyJSON, toArray } from '@orpc/shared'
+import { isAsyncIteratorObject, isCompressibleContentType, toArray } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { toFetchBody } from '@standard-server/fetch'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
 // occasional multi-byte characters increase the average.
@@ -84,7 +85,6 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               body: compressedStream,
               headers: {
                 ...request.headers,
-                'standard-server': 'octet-stream' satisfies StandardBodyHint,
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
@@ -94,9 +94,11 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
       }
 
       else if (request.body instanceof Blob) {
+        const contentType = request.headers['content-type'] ?? request.body.type
+
         if (
           (!Number.isFinite(request.body.size) || request.body.size >= this.threshold)
-          && this.isCompressibleContentType(request.body.type, interceptorOptions)
+          && this.isCompressibleContentType(flattenStandardHeader(contentType), interceptorOptions)
         ) {
           const compressedStream = request.body.stream().pipeThrough(new CompressionStream(this.encoding))
           const contentDisposition = request.headers['content-disposition'] ?? generateContentDisposition(
@@ -110,8 +112,8 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               body: compressedStream,
               headers: {
                 ...request.headers,
-                'standard-server': 'file' satisfies StandardBodyHint,
-                'content-type': request.body.type,
+                'standard-server': request.headers['standard-server'] ?? 'file' satisfies StandardBodyHint,
+                'content-type': contentType,
                 'content-length': [],
                 'content-disposition': contentDisposition,
                 'content-encoding': this.encoding,
@@ -175,15 +177,17 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         const string = request.body.toString()
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
+          const [, bodyHeaders] = toFetchBody(request.body, request.headers)
+
           return next({
             ...interceptorOptions,
             request: {
               ...interceptorOptions.request,
               body: compressedStream,
               headers: {
-                ...request.headers,
-                'standard-server': [],
-                'content-type': 'application/x-www-form-urlencoded',
+                ...bodyHeaders,
+                // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+                'standard-server': bodyHeaders['standard-server'] ?? [],
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
@@ -193,7 +197,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
       }
 
       else if (request.body !== undefined && !isAsyncIteratorObject(request.body)) {
-        const string = stringifyJSON(request.body)
+        const [string, bodyHeaders] = toFetchBody(request.body, request.headers) as [string, StandardHeaders]
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
           return next({
@@ -202,9 +206,8 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               ...interceptorOptions.request,
               body: compressedStream,
               headers: {
-                ...request.headers,
-                'standard-server': [],
-                'content-type': 'application/json',
+                ...bodyHeaders,
+                'standard-server': bodyHeaders['standard-server'] ?? [],
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
