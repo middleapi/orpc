@@ -1,5 +1,6 @@
 import type { ContractBuilder, MergedErrorMap, MergedSchema, ProcedureContractBuilderWithInput, ProcedureContractBuilderWithInputOutput, ProcedureContractBuilderWithOutput } from '@orpc/contract'
 import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, DecoratedProcedure, Schema } from '@orpc/server'
+import { error } from '@orpc/contract'
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
 import './schema'
@@ -16,16 +17,20 @@ const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
 
 const NumberFromString = EffectSchema.NumberFromString
 
+const FactoryError = error('FACTORY')
+
 const effectErrorMap = {
   STANDARD: { message: 'standard', data: schema1 },
   EFFECT: { message: 'effect', data: NumberFromString },
   NO_DATA: { message: 'no data' },
+  FACTORY: FactoryError,
 }
 
 type ExpectedEffectErrorMap = {
   STANDARD: { message: string, data: typeof schema1 }
   EFFECT: { message: string, data: Schema<string, number> }
   NO_DATA: { message: string }
+  FACTORY: typeof FactoryError
 }
 
 it('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ContractBuilder', async () => {

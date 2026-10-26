@@ -11,12 +11,7 @@ import { toStandardSchema } from '../schema'
  *
  * @see {@link https://orpc.dev/docs/integrations/effect#schema-extension | Effect Integration - Schema Extension}
  */
-export interface EffectErrorMapItem {
-  /**
-   * Default message, can be overridden when constructing an error.
-   */
-  message?: string | undefined
-
+export interface EffectErrorMapItem extends Omit<ErrorMapItem, 'data'> {
   /**
    * Standard Schema or Effect Schema used to type and validate the error data.
    */
@@ -57,11 +52,11 @@ function isEffectConstraintDecoder(
 }
 
 function toStandardErrorMap(errors: EffectErrorMap): ErrorMap {
-  let converted = errors
+  const converted: EffectErrorMap = { ...errors }
 
   for (const [code, item] of Object.entries(errors)) {
     if (isEffectConstraintDecoder(item?.data)) {
-      converted = { ...converted, [code]: { ...item, data: toStandardSchema(item.data) } }
+      converted[code] = { ...item, data: toStandardSchema(item.data) }
     }
   }
 
