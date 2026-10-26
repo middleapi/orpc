@@ -3,7 +3,7 @@ import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
-import type { StandardBodyHint, StandardLazyRequest } from '@standard-server/core'
+import type { StandardBodyHint, StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
@@ -17,7 +17,7 @@ import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@o
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
@@ -219,88 +219,102 @@ export class ImplementInterceptor implements NestInterceptor {
           )
         }
 
+        const [nestBody, headers] = toNestHttpBody(result.response, standardRequest.signal, this.config.toNestResponse)
+
         const httpAdapter = this.httpAdapterHost.httpAdapter
 
         httpAdapter.status(res, result.response.status)
 
-        for (const key of Object.keys(result.response.headers)) {
-          const value = result.response.headers[key]
-          if (typeof value === 'string') {
-            httpAdapter.setHeader(res, key, value)
-          }
-          else {
-            value?.forEach((value, index) => {
-              if (index === 0) {
-                httpAdapter.setHeader(res, key, value)
-              }
-              else {
-                httpAdapter.appendHeader(res, key, value)
-              }
-            })
-          }
-        }
-
-        const body = result.response.body
-
-        if (body instanceof ReadableStream) {
-          httpAdapter.setHeader(res, 'standard-server', 'octet-stream' satisfies StandardBodyHint)
-          return toStreamableFile(Readable.fromWeb(body), standardRequest.signal, {
-            type: flattenStandardHeader(result.response.headers['content-type']) ?? 'application/octet-stream',
+        for (const key of Object.keys(headers)) {
+          toArray(headers[key]).forEach((value, index) => {
+            if (index === 0) {
+              httpAdapter.setHeader(res, key, value)
+            }
+            else {
+              httpAdapter.appendHeader(res, key, value)
+            }
           })
         }
 
-        if (isAsyncIteratorObject(body)) {
-          return toStreamableFile(toEventStream(body, this.config.toNestResponse?.eventStream), standardRequest.signal, {
-            type: 'text/event-stream',
-          })
+        if (nestBody instanceof HttpException) {
+          throw nestBody
         }
 
-        if (body instanceof Blob) {
-          httpAdapter.setHeader(res, 'standard-server', 'file' satisfies StandardBodyHint) // A File is also a Blob
-          return toStreamableFile(Readable.fromWeb(body.stream()), standardRequest.signal, {
-            type: body.type,
-            disposition: flattenStandardHeader(result.response.headers['content-disposition']) ?? generateContentDisposition(body instanceof File ? body.name : 'blob'),
-            // BunS3 can use NaN for the size
-            length: Number.isFinite(body.size) ? body.size : undefined,
-          })
-        }
-
-        if (body instanceof FormData) {
-          const response = new Response(body)
-          return toStreamableFile(Readable.fromWeb(response.body!), standardRequest.signal, {
-            type: response.headers.get('content-type')!,
-          })
-        }
-
-        if (body instanceof URLSearchParams) {
-          httpAdapter.setHeader(res, 'content-type', 'application/x-www-form-urlencoded')
-          return body.toString()
-        }
-
-        if (body === undefined) {
-          return body
-        }
-
-        // Prefer throwing an HttpException for more native error handling in NestJS.
-        // In oRPC, the error response body is usually a plain object, so this will throw in most cases.
-        if (
-          result.response.status >= 300
-          && typeof body === 'object'
-          && body !== null
-          && !Array.isArray(body)
-        ) {
-          throw new HttpException(body, result.response.status)
-        }
-
-        httpAdapter.setHeader(res, 'content-type', 'application/json')
-        return typeof body === 'string' || body === null
-          // NestJS treat string as text response, and null as empty response
-          // while it should be treated as JSON response in oRPC
-          ? stringifyJSON(body)
-          : body // NestJS auto stringify JSON later
+        return nestBody
       }),
     )
   }
+}
+
+/**
+ * Mirrors `toNodeHttpBody` from `@standard-server/node`, but returns a body NestJS can respond with.
+ */
+function toNestHttpBody(
+  response: StandardResponse,
+  signal: AbortSignal | undefined,
+  options: ORPCModuleConfig['toNestResponse'],
+): [body: unknown, headers: StandardHeaders] {
+  const { status, body } = response
+  const headers = { ...response.headers }
+
+  if (body instanceof ReadableStream) {
+    headers['standard-server'] ??= 'octet-stream' satisfies StandardBodyHint
+    headers['content-type'] ??= 'application/octet-stream'
+    return [toStreamableFile(Readable.fromWeb(body), headers, signal), headers]
+  }
+
+  if (body instanceof Blob) {
+    headers['standard-server'] ??= 'file' satisfies StandardBodyHint
+    headers['content-type'] ??= body.type
+    headers['content-disposition'] ??= generateContentDisposition(body instanceof File ? body.name : 'blob')
+
+    // BunS3 can use NaN for the size
+    if (Number.isFinite(body.size)) {
+      headers['content-length'] = body.size.toString()
+    }
+
+    return [toStreamableFile(Readable.fromWeb(body.stream()), headers, signal), headers]
+  }
+
+  headers['standard-server'] = undefined
+  headers['content-length'] = undefined
+
+  if (body === undefined) {
+    headers['content-type'] = undefined
+    return [undefined, headers]
+  }
+
+  if (body instanceof FormData) {
+    const response = new Response(body)
+    headers['content-type'] = response.headers.get('content-type')!
+    return [toStreamableFile(Readable.fromWeb(response.body!), headers, signal), headers]
+  }
+
+  if (body instanceof URLSearchParams) {
+    headers['content-type'] = 'application/x-www-form-urlencoded'
+    return [body.toString(), headers]
+  }
+
+  if (isAsyncIteratorObject(body)) {
+    headers['content-type'] = 'text/event-stream'
+    return [toStreamableFile(toEventStream(body, options?.eventStream), headers, signal), headers]
+  }
+
+  // Prefer throwing an HttpException for more native error handling in NestJS.
+  if (
+    status >= 300
+    && typeof body === 'object'
+    && body !== null
+    && !Array.isArray(body)
+  ) {
+    headers['content-type'] = undefined
+    return [new HttpException(body, status), headers]
+  }
+
+  headers['content-type'] = 'application/json'
+  // NestJS treat string as text response, and null as empty response
+  // while it should be treated as JSON response in oRPC
+  return [typeof body === 'string' || body === null ? stringifyJSON(body) : body, headers]
 }
 
 interface NestHandlerCodecMatch {
@@ -339,7 +353,10 @@ class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> imp
  * Destroys the stream once the request is aborted, because Nest's Express adapter only pipes a StreamableFile
  * and never destroys it on client disconnect, which would leave the underlying event iterator or stream uncanceled.
  */
-function toStreamableFile(stream: Readable, signal: AbortSignal | undefined, options: StreamableFile['options']): StreamableFile {
+function toStreamableFile(stream: Readable, headers: StandardHeaders, signal: AbortSignal | undefined): StreamableFile {
+  const type = flattenStandardHeader(headers['content-type'])
+  headers['content-type'] = undefined
+
   if (signal?.aborted) {
     stream.destroy()
   }
@@ -347,7 +364,7 @@ function toStreamableFile(stream: Readable, signal: AbortSignal | undefined, opt
     signal?.addEventListener('abort', () => stream.destroy(), { once: true })
   }
 
-  return new StreamableFile(stream, options)
+  return new StreamableFile(stream, { type })
 }
 
 function flattenParamValue(value: string | string[]): string {
