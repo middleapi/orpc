@@ -382,7 +382,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const body = await response.resolveBody(meta?.responseBodyHint)
+    const body = await response.resolveBody(isOk ? meta?.responseBodyHint : undefined)
 
     const deserialized = await (async () => {
       try {
