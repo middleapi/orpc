@@ -257,7 +257,7 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
-[OpenAPILink](/docs/openapi/link#custom-error-decoding) only detects `application/json` bodies as JSON, so set the same `errorResponseContentType` there too.
+These responses also carry a `standard-server: json` header, so [OpenAPILink](/docs/openapi/link#custom-error-decoding) still parses them as JSON.
 
 :::info
 If you use `OpenAPILink` with a custom server-side error format, make sure to configure [Custom Error Decoding](/docs/openapi/link#custom-error-decoding).

@@ -2,7 +2,7 @@ import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable, Public } from '@orpc/shared'
-import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import type { StandardBodyHint, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
@@ -47,7 +47,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 
   /**
    * The `content-type` of error responses, e.g. `application/problem+json` for RFC 9457 Problem Details.
-   * Set the same value on `OpenAPILink` so it still parses error bodies as JSON.
+   * A `standard-server: json` header is sent along so `OpenAPILink` still parses error bodies as JSON.
    *
    * @default 'application/json'
    */
@@ -155,10 +155,10 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     }
 
     // JSON bodies are always sent as `application/json`, a Blob keeps the given content-type.
-    // An empty `standard-server` header stops the Blob from being marked as a file.
+    // The `standard-server` hint stops the Blob from being marked as a file and lets clients parse it as JSON.
     return {
       status,
-      headers: { 'content-type': this.errorResponseContentType, 'standard-server': [] },
+      headers: { 'content-type': this.errorResponseContentType, 'standard-server': 'json' satisfies StandardBodyHint },
       body: new Blob([stringifyJSON(body) ?? ''], { type: this.errorResponseContentType }),
     }
   }

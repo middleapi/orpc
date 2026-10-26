@@ -986,7 +986,7 @@ describe('openAPIHandlerCodec', () => {
       const response = await codec.encodeError(error)
 
       expect(response.status).toBe(502)
-      expect(response.headers).toEqual({ 'content-type': 'application/problem+json', 'standard-server': [] })
+      expect(response.headers).toEqual({ 'content-type': 'application/problem+json', 'standard-server': 'json' })
       expect(response.body).toBeInstanceOf(Blob)
       expect((response.body as Blob).type).toBe('application/problem+json')
       expect(JSON.parse(await (response.body as Blob).text())).toEqual(error.toJSON())

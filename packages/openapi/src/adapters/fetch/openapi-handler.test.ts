@@ -90,16 +90,30 @@ describe('openapiHandler', () => {
     const { response } = await handler.handle(new Request('http://localhost:3000/ping', { method: 'POST' }))
     expect(response!.status).toBe(404)
     expect(response!.headers.get('content-type')).toBe('application/problem+json')
-    expect(response!.headers.has('standard-server')).toBe(false)
+    expect(response!.headers.get('standard-server')).toBe('json')
     await expect(response!.json()).resolves.toEqual(new ORPCError('NOT_FOUND', { message: 'Missing' }).toJSON())
 
+    const fetch = async (url: string, init: RequestInit) => (await handler.handle(new Request(url, init))).response!
+    const client = createORPCClient<any>(new OpenAPILink(router, { fetch, origin: 'http://localhost:3000' }))
+
+    await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND' && e.message === 'Missing')
+  })
+
+  it('decodes errorResponseContentType errors when responseBodyHint is set', async () => {
+    const router = {
+      ping: os.meta(openapi({ path: '/ping', responseBodyHint: 'file' })).handler(() => {
+        throw new ORPCError('NOT_FOUND')
+      }),
+    }
+
+    const handler = new OpenAPIHandler(router, { errorResponseContentType: 'application/problem+json' })
     const client = createORPCClient<any>(new OpenAPILink(router, {
       fetch: async (url, init) => (await handler.handle(new Request(url, init))).response!,
       origin: 'http://localhost:3000',
       errorResponseContentType: 'application/problem+json',
     }))
 
-    await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND' && e.message === 'Missing')
+    await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND')
   })
 
   it('supports standard handler plugins', async () => {

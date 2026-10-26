@@ -49,8 +49,8 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   ) => AnyORPCError | null | undefined) | undefined
 
   /**
-   * Error responses with this `content-type` are parsed as JSON (compared case-insensitively, ignoring parameters like `charset`).
-   * Should match `errorResponseContentType` of the OpenAPI handler.
+   * Error responses with this `content-type` are parsed as JSON (compared case-insensitively, ignoring parameters like `charset`),
+   * even when `responseBodyHint` is set or the server sends no `standard-server` header.
    *
    * @example 'application/problem+json'
    */
