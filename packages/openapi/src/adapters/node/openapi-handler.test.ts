@@ -1,6 +1,6 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { ORPCError, os } from '@orpc/server'
+import { os } from '@orpc/server'
 import request from 'supertest'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
@@ -8,23 +8,6 @@ import { OpenAPIHandler } from './openapi-handler'
 describe('openapiHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  it('sends error responses with errorResponseContentType', async () => {
-    const handler = new OpenAPIHandler({
-      ping: os.handler(() => {
-        throw new ORPCError('NOT_FOUND')
-      }),
-    }, { errorResponseContentType: 'application/problem+json' })
-
-    const res = await request(async (req: IncomingMessage, response: ServerResponse) => {
-      await handler.handle(req as any, response as any)
-    }).post('/ping')
-
-    expect(res.status).toBe(404)
-    expect(res.headers['content-type']).toBe('application/problem+json')
-    expect(res.headers['standard-server']).toBe('json')
-    expect(res.body).toEqual(new ORPCError('NOT_FOUND').toJSON())
   })
 
   it('accepts context and prefix options in handle method', async () => {

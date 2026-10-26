@@ -50,7 +50,7 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
 
   /**
    * Parse error responses with this `content-type` as JSON, ignoring case and parameters such as `charset`.
-   * Only needed for servers that omit the `standard-server` header; `OpenAPIHandler` always sends it.
+   * Should match the handler's `errorResponseContentType`.
    *
    * @example 'application/problem+json'
    */

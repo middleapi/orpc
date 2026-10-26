@@ -242,7 +242,7 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
-`OpenAPILink` parses errors sent with a custom [`errorResponseContentType`](/docs/openapi/handler#custom-error-response) as JSON automatically. For servers that omit the `standard-server` header, such as non-oRPC servers, set the same value on the link:
+If the handler sets [`errorResponseContentType`](/docs/openapi/handler#custom-error-response), set the same value on the link so those error responses are parsed as JSON:
 
 ```ts
 const link = new OpenAPILink(contract, {
