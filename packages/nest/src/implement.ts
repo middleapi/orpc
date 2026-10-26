@@ -309,7 +309,6 @@ function toNestHttpBody(
     && body !== null
     && !Array.isArray(body)
   ) {
-    // Without an explicit content-type, leave it to Nest's exception filter, which sends JSON by default
     if (headers['content-type'] !== undefined) {
       headers['standard-server'] = requiredBodyHint('json', headers)
     }
@@ -319,18 +318,9 @@ function toNestHttpBody(
 
   headers['content-type'] ??= 'application/json'
   headers['standard-server'] = requiredBodyHint('json', headers)
-  // NestJS treat string as text response, and null as empty response
-  // while it should be treated as JSON response in oRPC.
-  // A content-type not read as JSON needs a string too, since Fastify only serializes objects for JSON content types.
-  return [
-    typeof body === 'string' || body === null || headers['standard-server'] !== undefined ? stringifyJSON(body) : body,
-    headers,
-  ]
+  return [typeof body === 'string' || body === null || headers['standard-server'] !== undefined ? stringifyJSON(body) : body, headers]
 }
 
-/**
- * The `standard-server` header to send, so the body is read as `hint` even when its content-type says otherwise.
- */
 function requiredBodyHint(hint: StandardBodyHint, headers: StandardHeaders): StandardBodyHint | undefined {
   return resolveStandardBodyHint(headers) === hint ? undefined : hint
 }

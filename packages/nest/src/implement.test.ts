@@ -1138,7 +1138,18 @@ describe('error handling', () => {
       expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(expectedError.toJSON(), 500))
     })
 
-    it('should not let response headers override standard-server or content-length of HttpException', async () => {
+    it.each([
+      {
+        name: 'without',
+        headers: {},
+        expected: { 'standard-server': undefined, 'content-type': 'application/json; charset=utf-8' },
+      },
+      {
+        name: 'with',
+        headers: { 'content-type': 'application/problem+json' },
+        expected: { 'standard-server': 'json', 'content-type': 'application/problem+json; charset=utf-8' },
+      },
+    ])('should respect or override response headers of HttpException $name a content-type', async ({ headers, expected }) => {
       routingInterceptor.mockResolvedValueOnce({
         matched: true,
         response: {
@@ -1147,6 +1158,7 @@ describe('error handling', () => {
             'x-custom': 'value',
             'standard-server': 'file',
             'content-length': '999',
+            ...headers,
           },
           body: { code: 'BAD_REQUEST' },
         },
@@ -1156,32 +1168,8 @@ describe('error handling', () => {
 
       expect(res.statusCode).toEqual(400)
       expect(res.headers['x-custom']).toEqual('value')
-      expect(res.headers['standard-server']).toBeUndefined()
-      expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
-      expect(res.headers['content-length']).toEqual('22')
-      expect(res.body).toEqual({ code: 'BAD_REQUEST' })
-
-      expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException({ code: 'BAD_REQUEST' }, 400))
-    })
-
-    it('should keep the response content-type of HttpException and add the matching standard-server header', async () => {
-      routingInterceptor.mockResolvedValueOnce({
-        matched: true,
-        response: {
-          status: 400,
-          headers: {
-            'standard-server': 'file',
-            'content-type': 'application/problem+json',
-          },
-          body: { code: 'BAD_REQUEST' },
-        },
-      })
-
-      const res = await supertest(httpServer).post('/error')
-
-      expect(res.statusCode).toEqual(400)
-      expect(res.headers['standard-server']).toEqual('json')
-      expect(res.headers['content-type']).toEqual('application/problem+json; charset=utf-8')
+      expect(res.headers['standard-server']).toEqual(expected['standard-server'])
+      expect(res.headers['content-type']).toEqual(expected['content-type'])
       expect(res.headers['content-length']).toEqual('22')
       expect(res.body).toEqual({ code: 'BAD_REQUEST' })
 
