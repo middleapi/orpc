@@ -208,6 +208,18 @@ export default [
     "type": "User"
   },
   {
+    "name": "Nicholas",
+    "login": "Nic13Gamer",
+    "avatar": "https://avatars.githubusercontent.com/u/54724556?u=56a7ab430ce7a80d648ab6eba051d454a818ed0b&v=4",
+    "link": "https://github.com/Nic13Gamer?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Sponsor",
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-06-28T20:17:54Z",
+    "type": "User"
+  },
+  {
     "name": "Ellis Driscoll",
     "login": "ellis-driscoll",
     "avatar": "https://avatars.githubusercontent.com/u/70685966?u=c5f95bc33b5991d9744abe00052542e4a2ed3cb9&v=4",
@@ -926,18 +938,6 @@ export default [
     "amount": -1,
     "createdAt": "2026-05-18T11:16:16Z",
     "type": "Organization"
-  },
-  {
-    "name": "Nicholas",
-    "login": "Nic13Gamer",
-    "avatar": "https://avatars.githubusercontent.com/u/54724556?u=56a7ab430ce7a80d648ab6eba051d454a818ed0b&v=4",
-    "link": "https://github.com/Nic13Gamer?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Past Sponsor",
-    "tierLevel": 0,
-    "amount": -1,
-    "createdAt": "2026-06-28T20:17:54Z",
-    "type": "User"
   },
   {
     "name": "Guillermo Rauch",

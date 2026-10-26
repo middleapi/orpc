@@ -201,4 +201,20 @@ describe('openAPIGenerator e2e: typed errors', () => {
     // only the always-available UndefinedError component is registered
     expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['UndefinedError'])
   })
+
+  it('supports a custom error response content type', async () => {
+    const doc = await generator.generate({
+      getPlanet: oc
+        .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+        .errors({ NOT_FOUND: {} })
+        .input(z.object({ id: z.string() }))
+        .output(z.object({ name: z.string() })),
+    }, {
+      errorResponseContentType: 'application/problem+json',
+    })
+
+    const responses = doc.paths?.['/planets/{id}']?.get?.responses as any
+    expect(Object.keys(responses['200'].content)).toEqual(['application/json'])
+    expect(Object.keys(responses['404'].content)).toEqual(['application/problem+json'])
+  })
 })

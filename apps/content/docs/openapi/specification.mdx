@@ -257,3 +257,11 @@ const spec = await generator.generate(router, {
   },
 })
 ```
+
+If the handler sets [`errorResponseContentType`](/docs/openapi/handler#custom-error-response), pass the same value to the generator so error responses are documented under that media type:
+
+```ts
+const spec = await generator.generate(router, {
+  errorResponseContentType: 'application/problem+json',
+})
+```

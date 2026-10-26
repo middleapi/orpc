@@ -1,8 +1,9 @@
 import type { StandardBodyHint, StandardHeaders, StandardResponse } from '@standard-server/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
-import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
+import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, toArray, varyByAcceptEncoding } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { toFetchBody } from '@standard-server/fetch'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
 // occasional multi-byte characters increase the average.
@@ -92,10 +93,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
             response: {
               ...response,
               body: body.pipeThrough(new CompressionStream(encoding)),
-              headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': 'octet-stream' satisfies StandardBodyHint,
-              },
+              headers: toCompressedHeaders(headers, encoding),
             },
           }
         }
@@ -120,7 +118,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               body: body.stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
                 ...toCompressedHeaders(headers, encoding),
-                'standard-server': 'file' satisfies StandardBodyHint,
+                'standard-server': headers['standard-server'] ?? 'file' satisfies StandardBodyHint,
                 'content-type': contentType,
                 'content-disposition': contentDisposition,
               },
@@ -180,15 +178,17 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       else if (body instanceof URLSearchParams) {
         const string = body.toString()
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
+          const [, bodyHeaders] = toFetchBody(body, headers)
+
           return {
             ...result,
             response: {
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': [],
-                'content-type': 'application/x-www-form-urlencoded',
+                ...toCompressedHeaders(bodyHeaders, encoding),
+                // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+                'standard-server': bodyHeaders['standard-server'] ?? [],
               },
             },
           }
@@ -196,7 +196,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       }
 
       else if (body !== undefined && !isAsyncIteratorObject(body)) {
-        const string = stringifyJSON(body)
+        const [string, bodyHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           return {
             ...result,
@@ -204,9 +204,8 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': [],
-                'content-type': 'application/json',
+                ...toCompressedHeaders(bodyHeaders, encoding),
+                'standard-server': bodyHeaders['standard-server'] ?? [],
               },
             },
           }

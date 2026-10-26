@@ -848,24 +848,7 @@ describe('response status, headers and body should follow standard-server', () =
       it('should handle FormData as StreamableFile multipart/form-data', async () => {
         handler.mockResolvedValueOnce({ body: { number: 1, blob: new Blob(['blob']) } })
 
-        const res = await supertest(httpServer)
-          .post('/response')
-          .buffer(true)
-          .parse((res, callback) => {
-            const chunks: Buffer[] = []
-
-            res.on('data', (chunk) => {
-              chunks.push(Buffer.from(chunk))
-            })
-
-            res.on('end', () => {
-              callback(null, Buffer.concat(chunks))
-            })
-
-            res.on('error', (err) => {
-              callback(err, undefined)
-            })
-          })
+        const res = await supertest(httpServer).post('/response').responseType('blob')
 
         expect(res.statusCode).toEqual(200)
         expect(res.headers['standard-server']).toBeUndefined()
@@ -937,24 +920,7 @@ describe('response status, headers and body should follow standard-server', () =
           yield 'chunk3'
         }()) })
 
-        const res = await supertest(httpServer)
-          .post('/response')
-          .buffer(true)
-          .parse((res, callback) => {
-            const chunks: Buffer[] = []
-
-            res.on('data', (chunk) => {
-              chunks.push(Buffer.from(chunk))
-            })
-
-            res.on('end', () => {
-              callback(null, Buffer.concat(chunks))
-            })
-
-            res.on('error', (err) => {
-              callback(err, undefined)
-            })
-          })
+        const res = await supertest(httpServer).post('/response').responseType('blob')
 
         expect(res.statusCode).toEqual(200)
         expect(res.headers['standard-server']).toBeUndefined()
@@ -967,6 +933,83 @@ describe('response status, headers and body should follow standard-server', () =
         expect(res.body.toString()).toContain('chunk3')
 
         expect(returnedValueSPy).toHaveBeenCalledWith(expect.any(StreamableFile))
+      })
+    })
+
+    describe('respects or overrides headers the same way standard-server does', () => {
+      const headers = {
+        'standard-server': 'json',
+        'content-type': 'text/plain',
+        'content-length': '999',
+        'content-disposition': 'inline',
+      }
+
+      it.each([
+        {
+          name: 'ReadableStream',
+          response: () => ({ headers: { ...headers, 'content-length': '6' }, body: new Blob(['chunk1']).stream() }),
+          expected: { 'standard-server': 'json', 'content-type': 'text/plain', 'content-length': '6' },
+          text: 'chunk1',
+        },
+        {
+          name: 'Blob',
+          response: () => ({ headers, body: new Blob(['blob content'], { type: 'application/pdf' }) }),
+          expected: { 'standard-server': 'json', 'content-type': 'text/plain', 'content-length': '12' },
+          text: 'blob content',
+        },
+        {
+          name: 'undefined',
+          response: () => ({ headers, body: undefined }),
+          expected: { 'standard-server': 'none', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '0' },
+          text: '',
+        },
+        {
+          name: 'JSON',
+          response: () => ({ headers, body: { a: 1 } }),
+          expected: { 'standard-server': 'json', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '7' },
+          text: '{"a":1}',
+        },
+        {
+          name: 'JSON with a JSON content-type',
+          response: () => ({ headers: { ...headers, 'content-type': 'application/json' }, body: { a: 1 } }),
+          expected: { 'standard-server': undefined, 'content-type': 'application/json; charset=utf-8', 'content-length': '7' },
+          text: '{"a":1}',
+        },
+        {
+          name: 'URLSearchParams',
+          response: () => ({ headers, body: new URLSearchParams('a=4') }),
+          expected: { 'standard-server': 'url-search-params', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '3' },
+          text: 'a=4',
+        },
+        {
+          name: 'FormData',
+          response: () => {
+            const form = new FormData()
+            form.set('number', '1')
+            return { headers, body: form }
+          },
+          expected: { 'standard-server': undefined, 'content-type': expect.stringMatching(/^multipart\/form-data; /), 'content-length': undefined },
+          text: expect.stringContaining('name="number"'),
+        },
+        {
+          name: 'event stream',
+          response: () => ({ headers, body: (async function* () { yield 'chunk1' }()) }),
+          expected: { 'standard-server': 'event-stream', 'content-type': 'text/plain', 'content-length': undefined },
+          text: expect.stringContaining('chunk1'),
+        },
+      ])('for $name body', async ({ response, expected, text }) => {
+        routingInterceptor.mockResolvedValueOnce({ matched: true, response: { status: 200, ...response() } })
+
+        const res = await supertest(httpServer).post('/response').responseType('blob')
+
+        expect(res.statusCode).toEqual(200)
+        expect({
+          'standard-server': res.headers['standard-server'],
+          'content-type': res.headers['content-type'],
+          'content-length': res.headers['content-length'],
+          'content-disposition': res.headers['content-disposition'],
+        }).toEqual({ ...expected, 'content-disposition': 'inline' })
+        expect(res.body.toString()).toEqual(text)
       })
     })
 
@@ -1093,6 +1136,44 @@ describe('error handling', () => {
 
       expect(catchErrorSpy).toHaveBeenCalledTimes(1)
       expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(expectedError.toJSON(), 500))
+    })
+
+    it.each([
+      {
+        name: 'without',
+        headers: {},
+        expected: { 'standard-server': undefined, 'content-type': 'application/json; charset=utf-8' },
+      },
+      {
+        name: 'with',
+        headers: { 'content-type': 'application/problem+json' },
+        expected: { 'standard-server': 'json', 'content-type': 'application/problem+json; charset=utf-8' },
+      },
+    ])('should respect or override response headers of HttpException $name a content-type', async ({ headers, expected }) => {
+      routingInterceptor.mockResolvedValueOnce({
+        matched: true,
+        response: {
+          status: 400,
+          headers: {
+            'x-custom': 'value',
+            'standard-server': 'file',
+            'content-length': '999',
+            ...headers,
+          },
+          body: { code: 'BAD_REQUEST' },
+        },
+      })
+
+      const res = await supertest(httpServer).post('/error')
+
+      expect(res.statusCode).toEqual(400)
+      expect(res.headers['x-custom']).toEqual('value')
+      expect(res.headers['standard-server']).toEqual(expected['standard-server'])
+      expect(res.headers['content-type']).toEqual(expected['content-type'])
+      expect(res.headers['content-length']).toEqual('22')
+      expect(res.body).toEqual({ code: 'BAD_REQUEST' })
+
+      expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException({ code: 'BAD_REQUEST' }, 400))
     })
 
     it('should not throw for special responses because HttpException only accepts JSON objects', async () => {

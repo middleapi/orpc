@@ -86,6 +86,14 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
   > | undefined
 
   /**
+   * Media type of error responses in the generated document, e.g. `application/problem+json`.
+   * Should match the handler's `errorResponseContentType`.
+   *
+   * @default 'application/json'
+   */
+  errorResponseContentType?: string | undefined
+
+  /**
    * Mapping ORPCError Code -> HTTP Status Code
    * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
@@ -129,6 +137,7 @@ export class OpenAPIGenerator {
       convertSchemas: (schemas, direction) => this.convertSchemas(schemas, direction),
       errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
       errorResponseBodySchema: options.errorResponseBodySchema,
+      errorResponseContentType: options.errorResponseContentType ?? 'application/json',
     }
 
     const errors: string[] = []

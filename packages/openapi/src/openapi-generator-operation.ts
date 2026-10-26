@@ -49,6 +49,7 @@ export interface OpenAPIOperationContext {
     JsonSchema | undefined | null,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number]
   > | undefined
+  errorResponseContentType: string
 }
 
 export function toOpenAPIPath(path: `/${string}`, dynamicPathParams: DynamicPathParam[] | undefined): `/${string}` {
@@ -551,7 +552,7 @@ export function buildErrorResponse(
     operation.responses[toResponseStatusKey(status)] = {
       description: descriptions.length ? descriptions.join(', ') : status.toString(),
       content: {
-        'application/json': {
+        [ctx.errorResponseContentType]: {
           schema: ctx.registry.toOpenAPISchema(responseSchema, 'output'),
         },
       },
