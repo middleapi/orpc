@@ -902,7 +902,6 @@ describe('batchHandlerPlugin', () => {
     })
 
     it.each([
-      // The client would not read this content type as json, so the hint says it is
       ['json', ['/ping', '/refresh'], 'json'],
       ['binary', ['/image', '/refresh'], 'file'],
       ['streaming', ['/events', '/refresh'], 'octet-stream'],

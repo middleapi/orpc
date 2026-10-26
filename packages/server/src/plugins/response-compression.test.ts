@@ -1332,7 +1332,6 @@ describe('responseCompressionHandlerPlugin', () => {
       expect(response!.headers.get('content-type')).toBe(expected['content-type'])
       expect(response!.headers.get('standard-server')).toBe(expected['standard-server'])
 
-      // Same body headers the adapter sends when the response is not compressed, so the client reads the same body
       expect(uncompressed!.headers.has('content-encoding')).toBe(false)
       expect(response!.headers.get('content-type')).toBe(uncompressed!.headers.get('content-type'))
       expect(response!.headers.get('standard-server')).toBe(uncompressed!.headers.get('standard-server'))

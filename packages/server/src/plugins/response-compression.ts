@@ -93,7 +93,6 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
             response: {
               ...response,
               body: body.pipeThrough(new CompressionStream(encoding)),
-              // Still a stream, so the adapter fills in the same body headers as for the uncompressed one
               headers: toCompressedHeaders(headers, encoding),
             },
           }
@@ -179,7 +178,6 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       else if (body instanceof URLSearchParams) {
         const string = body.toString()
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
-          // The headers the adapter would send with the body, so the client reads the compressed one the same way
           const [, bodyHeaders] = toFetchBody(body, headers)
 
           return {
@@ -198,7 +196,6 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       }
 
       else if (body !== undefined && !isAsyncIteratorObject(body)) {
-        // Serialized as the adapter would, along with the headers it would send
         const [string, bodyHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           return {

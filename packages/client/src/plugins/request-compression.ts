@@ -83,7 +83,6 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
             request: {
               ...interceptorOptions.request,
               body: compressedStream,
-              // Still a stream, so the adapter fills in the same body headers as for the uncompressed one
               headers: {
                 ...request.headers,
                 'content-length': [],
@@ -95,7 +94,6 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
       }
 
       else if (request.body instanceof Blob) {
-        // Adapters only fall back to the blob type when no Content-Type header is set
         const contentType = request.headers['content-type'] ?? request.body.type
 
         if (
@@ -179,7 +177,6 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         const string = request.body.toString()
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
-          // The headers the adapter would send with the body, so the server reads the compressed one the same way
           const [, bodyHeaders] = toFetchBody(request.body, request.headers)
 
           return next({
@@ -200,7 +197,6 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
       }
 
       else if (request.body !== undefined && !isAsyncIteratorObject(request.body)) {
-        // Serialized as the adapter would, along with the headers it would send
         const [string, bodyHeaders] = toFetchBody(request.body, request.headers) as [string, StandardHeaders]
         if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
           const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))

@@ -107,7 +107,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
        * so the array itself is the only thing left to recognise.
        */
       if (Array.isArray(body)) {
-        // Serialized here rather than by the adapter, which no longer sees the array, but as it would
+        // Serialized here rather than by the adapter, which no longer sees the array
         const [string, jsonHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
         const json = new Blob([string])
 

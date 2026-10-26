@@ -447,7 +447,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const subrequests = runSubrequests()
       const { batchHeaders, streams } = await lifting
-      // A content type set through the `headers` option wins, as it does for a json batch
       const framedHeaders = { ...batchHeaders, 'content-type': batchHeaders['content-type'] ?? BATCH_CONTENT_TYPE }
 
       if (!streams) {
