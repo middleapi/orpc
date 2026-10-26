@@ -960,19 +960,25 @@ describe('response status, headers and body should follow standard-server', () =
         {
           name: 'undefined',
           response: () => ({ headers, body: undefined }),
-          expected: { 'standard-server': undefined, 'content-type': undefined, 'content-length': '0' },
+          expected: { 'standard-server': 'none', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '0' },
           text: '',
         },
         {
           name: 'JSON',
           response: () => ({ headers, body: { a: 1 } }),
+          expected: { 'standard-server': 'json', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '7' },
+          text: '{"a":1}',
+        },
+        {
+          name: 'JSON with a JSON content-type',
+          response: () => ({ headers: { ...headers, 'content-type': 'application/json' }, body: { a: 1 } }),
           expected: { 'standard-server': undefined, 'content-type': 'application/json; charset=utf-8', 'content-length': '7' },
           text: '{"a":1}',
         },
         {
           name: 'URLSearchParams',
           response: () => ({ headers, body: new URLSearchParams('a=4') }),
-          expected: { 'standard-server': undefined, 'content-type': expect.stringMatching(/^application\/x-www-form-urlencoded/), 'content-length': '3' },
+          expected: { 'standard-server': 'url-search-params', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '3' },
           text: 'a=4',
         },
         {
@@ -988,7 +994,7 @@ describe('response status, headers and body should follow standard-server', () =
         {
           name: 'event stream',
           response: () => ({ headers, body: (async function* () { yield 'chunk1' }()) }),
-          expected: { 'standard-server': undefined, 'content-type': 'text/event-stream', 'content-length': undefined },
+          expected: { 'standard-server': 'event-stream', 'content-type': 'text/plain', 'content-length': undefined },
           text: expect.stringContaining('chunk1'),
         },
       ])('for $name body', async ({ response, expected, text }) => {
@@ -1132,7 +1138,18 @@ describe('error handling', () => {
       expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(expectedError.toJSON(), 500))
     })
 
-    it('should not let response headers override content-type, standard-server or content-length of HttpException', async () => {
+    it.each([
+      {
+        name: 'without',
+        headers: {},
+        expected: { 'standard-server': undefined, 'content-type': 'application/json; charset=utf-8' },
+      },
+      {
+        name: 'with',
+        headers: { 'content-type': 'application/problem+json' },
+        expected: { 'standard-server': 'json', 'content-type': 'application/problem+json; charset=utf-8' },
+      },
+    ])('should respect or override response headers of HttpException $name a content-type', async ({ headers, expected }) => {
       routingInterceptor.mockResolvedValueOnce({
         matched: true,
         response: {
@@ -1140,8 +1157,8 @@ describe('error handling', () => {
           headers: {
             'x-custom': 'value',
             'standard-server': 'file',
-            'content-type': 'text/plain',
             'content-length': '999',
+            ...headers,
           },
           body: { code: 'BAD_REQUEST' },
         },
@@ -1151,8 +1168,8 @@ describe('error handling', () => {
 
       expect(res.statusCode).toEqual(400)
       expect(res.headers['x-custom']).toEqual('value')
-      expect(res.headers['standard-server']).toBeUndefined()
-      expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+      expect(res.headers['standard-server']).toEqual(expected['standard-server'])
+      expect(res.headers['content-type']).toEqual(expected['content-type'])
       expect(res.headers['content-length']).toEqual('22')
       expect(res.body).toEqual({ code: 'BAD_REQUEST' })
 
