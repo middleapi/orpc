@@ -24,7 +24,7 @@
   ],
   "sideEffects": [
     "./dist/extensions/effect.mjs",
-    "./dist/extensions/input-output.mjs"
+    "./dist/extensions/schema.mjs"
   ],
   "publishConfig": {
     "exports": {
@@ -39,10 +39,10 @@
         "import": "./dist/extensions/effect.mjs",
         "default": "./dist/extensions/effect.mjs"
       },
-      "./extensions/input-output": {
-        "types": "./dist/extensions/input-output.d.mts",
-        "import": "./dist/extensions/input-output.mjs",
-        "default": "./dist/extensions/input-output.mjs"
+      "./extensions/schema": {
+        "types": "./dist/extensions/schema.d.mts",
+        "import": "./dist/extensions/schema.mjs",
+        "default": "./dist/extensions/schema.mjs"
       }
     }
   },
@@ -50,7 +50,7 @@
     "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./extensions/effect": "./src/extensions/effect.ts",
-    "./extensions/input-output": "./src/extensions/input-output.ts"
+    "./extensions/schema": "./src/extensions/schema.ts"
   },
   "files": [
     "dist"

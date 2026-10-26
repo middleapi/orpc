@@ -315,23 +315,32 @@ const procedure = os
   }))
 ```
 
-### `.input` and `.output` Extensions
+### Schema Extension
 
-Import `@orpc/effect/extensions/input-output` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This lets you define `.input` and `.output` directly with Effect Schema:
+Import `@orpc/effect/extensions/schema` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This lets you use Effect Schema directly in `.input`, `.output`, and as error `data` in `.errors`:
 
 <CodeGroup>
 
 ```ts usage
 const procedure = base
+  .errors({
+    FORBIDDEN: {
+      data: Schema.Struct({ reason: Schema.String }),
+    },
+  })
   .input(Schema.Struct({ name: Schema.String }))
   .output(Schema.Struct({ greeting: Schema.String }))
-  .handler(handlerGen(function* ({ input, context }) {
+  .handler(handlerGen(function* ({ input, errors }) {
+    if (input.name === 'admin') {
+      return yield* Effect.fail(errors.FORBIDDEN({ data: { reason: 'Reserved name' } }))
+    }
+
     return { greeting: `Hello ${input.name}!` }
   }))
 ```
 
 ```ts setup
-import '@orpc/effect/extensions/input-output'
+import '@orpc/effect/extensions/schema'
 
 import { os } from '@orpc/server'
 
@@ -341,7 +350,7 @@ export const base = os
 </CodeGroup>
 
 :::info
-You can also use these extensions with the [contract builder](/docs/contract/procedure).
+You can also use this extension with the [contract builder](/docs/contract/procedure). It does not cover `.errors` on standalone [middleware](/docs/middleware), so wrap Effect Schemas there with `Schema.toStandardSchemaV1`.
 :::
 
 ### JSON Schema Converter

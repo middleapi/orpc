@@ -1,20 +1,81 @@
-import type { AnySchema, ErrorMap, MergedSchema, Schema } from '@orpc/contract'
+import type { ORPCErrorCode } from '@orpc/client'
+import type { AnySchema, ErrorMap, ErrorMapItem, MergedErrorMap, MergedSchema, Schema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
 import { ContractBuilder } from '@orpc/contract'
-import { Builder } from '@orpc/server'
+import { Builder, DecoratedProcedure } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 import { toStandardSchema } from '../schema'
 
+/**
+ * Like `ErrorMapItem`, but `data` can also be an Effect Schema.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#schema-extension | Effect Integration - Schema Extension}
+ */
+export interface EffectErrorMapItem {
+  /**
+   * Default message, can be overridden when constructing an error.
+   */
+  message?: string | undefined
+
+  /**
+   * Standard Schema or Effect Schema used to type and validate the error data.
+   */
+  data?: AnySchema | EffectSchema.ConstraintDecoder<any> | undefined
+}
+
+/**
+ * Like `ErrorMap`, but error `data` can also be an Effect Schema.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#schema-extension | Effect Integration - Schema Extension}
+ */
+export type EffectErrorMap = {
+  [key in ORPCErrorCode]?: EffectErrorMapItem
+}
+
+/**
+ * Converts the Effect Schemas used as error `data` in an {@link EffectErrorMap}
+ * into Standard Schemas, leaving every other item untouched.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#schema-extension | Effect Integration - Schema Extension}
+ */
+export type ToStandardErrorMap<T extends EffectErrorMap> = T extends ErrorMap
+  ? T
+  : {
+      [K in keyof T]: T[K] extends ErrorMapItem
+        ? T[K]
+        : {
+            [P in keyof T[K]]: P extends 'data'
+              ? T[K][P] extends infer S extends EffectSchema.ConstraintDecoder<any> ? Schema<S['Encoded'], S['Type']> : T[K][P]
+              : T[K][P]
+          }
+    }
+
 function isEffectConstraintDecoder(
-  schema: AnySchema | EffectSchema.ConstraintDecoder<any>,
+  schema: unknown,
 ): schema is EffectSchema.ConstraintDecoder<any> {
   return EffectSchema.isSchema(schema)
+}
+
+function toStandardErrorMap(errors: EffectErrorMap): ErrorMap {
+  let converted = errors
+
+  for (const [code, item] of Object.entries(errors)) {
+    if (isEffectConstraintDecoder(item?.data)) {
+      converted = { ...converted, [code]: { ...item, data: toStandardSchema(item.data) } }
+    }
+  }
+
+  return converted as ErrorMap
 }
 
 declare module '@orpc/contract' {
   interface ContractBuilder<
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): ContractBuilder<MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): ProcedureContractBuilderWithInput<Schema<S['Encoded'], S['Type']>, TErrorMap>
@@ -28,6 +89,10 @@ declare module '@orpc/contract' {
     TInputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): ProcedureContractBuilderWithInput<TInputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): ProcedureContractBuilderWithInput<MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TErrorMap>
@@ -41,6 +106,10 @@ declare module '@orpc/contract' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): ProcedureContractBuilderWithOutput<TOutputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
@@ -55,6 +124,10 @@ declare module '@orpc/contract' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TOutputSchema, TErrorMap>
@@ -63,6 +136,11 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
   }
+}
+
+const OriginalContractBuilderErrors = ContractBuilder.prototype.errors
+ContractBuilder.prototype.errors = function errors(errors: EffectErrorMap) {
+  return OriginalContractBuilderErrors.bind(this)(toStandardErrorMap(errors))
 }
 
 const OriginalContractBuilderInput = ContractBuilder.prototype.input
@@ -80,6 +158,10 @@ declare module '@orpc/server' {
     TInitialContext extends Context,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): Builder<TInitialContext, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): BuilderWithInput<TInitialContext, object, Schema<S['Encoded'], S['Type']>, TErrorMap>
@@ -94,6 +176,10 @@ declare module '@orpc/server' {
     TInjectedContext extends Context,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): BuilderWithMiddlewares<TInitialContext, TInjectedContext, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): BuilderWithInput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TErrorMap>
@@ -109,6 +195,10 @@ declare module '@orpc/server' {
     TInputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): BuilderWithInput<TInitialContext, TInjectedContext, TInputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): BuilderWithInput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TErrorMap>
@@ -124,6 +214,10 @@ declare module '@orpc/server' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): BuilderWithOutput<TInitialContext, TInjectedContext, TOutputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
@@ -140,6 +234,10 @@ declare module '@orpc/server' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TOutputSchema, TErrorMap>
@@ -149,6 +247,23 @@ declare module '@orpc/server' {
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
 
   }
+
+  interface DecoratedProcedure<
+    TInitialContext extends Context,
+    TInjectedContext extends Context,
+    TInputSchema extends AnySchema,
+    TOutputSchema extends AnySchema,
+    TErrorMap extends ErrorMap,
+  > {
+    errors<T extends EffectErrorMap>(
+      errors: T,
+    ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
+  }
+}
+
+const OriginalBuilderErrors = Builder.prototype.errors
+Builder.prototype.errors = function errors(errors: EffectErrorMap) {
+  return OriginalBuilderErrors.bind(this)(toStandardErrorMap(errors))
 }
 
 const OriginalBuilderInput = Builder.prototype.input
@@ -159,4 +274,9 @@ Builder.prototype.input = function input(schema: AnySchema | EffectSchema.Constr
 const OriginalBuilderOutput = Builder.prototype.output
 Builder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
   return OriginalBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
+}
+
+const OriginalDecoratedProcedureErrors = DecoratedProcedure.prototype.errors
+DecoratedProcedure.prototype.errors = function errors(errors: EffectErrorMap) {
+  return OriginalDecoratedProcedureErrors.bind(this)(toStandardErrorMap(errors))
 }
