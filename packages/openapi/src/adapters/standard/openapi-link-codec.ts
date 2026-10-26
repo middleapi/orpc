@@ -392,11 +392,12 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const isCustomErrorContentType = !isOk
-      && this.errorResponseContentType !== undefined
+    const errorBodyHint = this.errorResponseContentType !== undefined
       && toMediaType(flattenStandardHeader(response.headers['content-type'])) === this.errorResponseContentType
+      ? 'json'
+      : undefined
 
-    const body = await response.resolveBody(isCustomErrorContentType ? 'json' : meta?.responseBodyHint)
+    const body = await response.resolveBody(isOk ? meta?.responseBodyHint : errorBodyHint)
 
     const deserialized = await (async () => {
       try {

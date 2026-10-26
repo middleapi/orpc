@@ -795,6 +795,25 @@ describe('openAPILinkCodec', () => {
       expect(result.error.cause.response).toEqual({ status: 404, headers: { 'x-request-id': 'abc' }, body: error.toJSON() })
     })
 
+    it('ignores responseBodyHint on unsuccessful responses', async () => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+      }, { serializer })
+
+      const error = new ORPCError('NOT_FOUND', { message: 'Missing' })
+      const resolveBody = vi.fn(async () => error.toJSON())
+
+      const result = await codec.decodeResponse({
+        status: 404,
+        headers: {},
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expectORPCErrorResult(result, 'NOT_FOUND', { message: 'Missing' })
+      expect(resolveBody).toHaveBeenCalledTimes(1)
+      expect(resolveBody).toHaveBeenCalledWith(undefined)
+    })
+
     it('uses a custom error decoder when it returns a value', async () => {
       const customError = new ORPCError('BAD_GATEWAY', { data: 'custom' })
       const customErrorResponseBodyDecoder = vi.fn(() => customError)
@@ -864,7 +883,7 @@ describe('openAPILinkCodec', () => {
         headers: { 'content-type': 'text/html' },
         resolveBody,
       }, ['ping'], { context: {} })
-      expect(resolveBody).toHaveBeenLastCalledWith('file')
+      expect(resolveBody).toHaveBeenLastCalledWith(undefined)
 
       await codec.decodeResponse({
         status: 200,
