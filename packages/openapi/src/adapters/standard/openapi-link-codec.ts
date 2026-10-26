@@ -49,8 +49,8 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   ) => AnyORPCError | null | undefined) | undefined
 
   /**
-   * Error responses with this `content-type` are parsed as JSON (compared case-insensitively, ignoring parameters like `charset`).
-   * Only needed when the server sends no `standard-server` header, `OpenAPIHandler` already sends one.
+   * Parse error responses with this `content-type` as JSON, ignoring case and parameters such as `charset`.
+   * Only needed for servers that omit the `standard-server` header; `OpenAPIHandler` always sends it.
    *
    * @example 'application/problem+json'
    */
@@ -65,7 +65,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<OpenAPILinkCodecOptions<T>['serializer'], undefined>
   private readonly customErrorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['customErrorResponseBodyDecoder']
-  private readonly errorResponseContentType: OpenAPILinkCodecOptions<T>['errorResponseContentType']
+  private readonly errorResponseMediaType: string | undefined
 
   constructor(
     private readonly router: RouterContract,
@@ -75,7 +75,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.customErrorResponseBodyDecoder = options.customErrorResponseBodyDecoder
-    this.errorResponseContentType = toMediaType(options.errorResponseContentType)
+    this.errorResponseMediaType = toMediaType(options.errorResponseContentType)
   }
 
   async encodeInput(input: unknown, path: string[], options: ClientOptions<T>): Promise<StandardRequest> {
@@ -392,8 +392,9 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const errorBodyHint = this.errorResponseContentType !== undefined
-      && toMediaType(flattenStandardHeader(response.headers['content-type'])) === this.errorResponseContentType
+    const errorBodyHint = !isOk
+      && this.errorResponseMediaType !== undefined
+      && toMediaType(flattenStandardHeader(response.headers['content-type'])) === this.errorResponseMediaType
       ? 'json'
       : undefined
 

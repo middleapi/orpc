@@ -24,7 +24,7 @@ describe('openapiHandler', () => {
     expect(res.status).toBe(404)
     expect(res.headers['content-type']).toBe('application/problem+json')
     expect(res.headers['standard-server']).toBe('json')
-    expect(JSON.parse(res.text)).toEqual(new ORPCError('NOT_FOUND').toJSON())
+    expect(res.body).toEqual(new ORPCError('NOT_FOUND').toJSON())
   })
 
   it('accepts context and prefix options in handle method', async () => {

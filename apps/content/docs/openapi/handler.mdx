@@ -257,8 +257,6 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
-These responses also carry a `standard-server: json` header, so [OpenAPILink](/docs/openapi/link#custom-error-decoding) still parses them as JSON.
-
 :::info
 If you use `OpenAPILink` with a custom server-side error format, make sure to configure [Custom Error Decoding](/docs/openapi/link#custom-error-decoding).
 :::

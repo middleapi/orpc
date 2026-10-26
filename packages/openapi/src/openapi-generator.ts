@@ -86,8 +86,8 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
   > | undefined
 
   /**
-   * The media type error response bodies are documented under,
-   * e.g. `application/problem+json` for RFC 9457 Problem Details.
+   * Media type of error responses in the generated document, e.g. `application/problem+json`.
+   * Should match the handler's `errorResponseContentType`.
    *
    * @default 'application/json'
    */

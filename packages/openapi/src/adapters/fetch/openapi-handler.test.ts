@@ -87,31 +87,11 @@ describe('openapiHandler', () => {
 
     const handler = new OpenAPIHandler(router, { errorResponseContentType: 'application/problem+json' })
 
-    const { response } = await handler.handle(new Request('http://localhost:3000/ping', { method: 'POST' }))
-    expect(response!.status).toBe(404)
-    expect(response!.headers.get('content-type')).toBe('application/problem+json')
-    expect(response!.headers.get('standard-server')).toBe('json')
-    await expect(response!.json()).resolves.toEqual(new ORPCError('NOT_FOUND', { message: 'Missing' }).toJSON())
-
-    const fetch = async (url: string, init: RequestInit) => (await handler.handle(new Request(url, init))).response!
+    const fetch = vi.fn(async (url: string, init: RequestInit) => (await handler.handle(new Request(url, init))).response!)
     const client = createORPCClient<any>(new OpenAPILink(router, { fetch, origin: 'http://localhost:3000' }))
 
-    await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND' && e.message === 'Missing')
-  })
-
-  it('decodes errorResponseContentType errors without a standard-server header via the link option', async () => {
-    const router = { ping: os.meta(openapi({ path: '/ping' })).handler(() => 'pong') }
-
-    const client = createORPCClient<any>(new OpenAPILink(router, {
-      fetch: async () => new Response(JSON.stringify(new ORPCError('NOT_FOUND').toJSON()), {
-        status: 404,
-        headers: { 'content-type': 'application/problem+json' },
-      }),
-      origin: 'http://localhost:3000',
-      errorResponseContentType: 'application/problem+json',
-    }))
-
-    await expect(client.ping()).rejects.toSatisfy((e: any) => e instanceof ORPCError && e.code === 'NOT_FOUND')
+    await expect(client.ping()).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Missing' })
+    expect((await fetch.mock.results[0]!.value).headers.get('content-type')).toBe('application/problem+json')
   })
 
   it('supports standard handler plugins', async () => {

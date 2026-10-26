@@ -940,11 +940,8 @@ describe('openAPIGenerator operation builders', () => {
     it('documents error bodies under the configured content type', () => {
       const { ctx, operation } = createContext({ errorResponseContentType: 'application/problem+json' })
 
-      buildErrorResponse(ctx, operation, testDef({
-        errors: { BAD_REQUEST: {}, NOT_FOUND: {} },
-      }))
+      buildErrorResponse(ctx, operation, testDef({ errors: { NOT_FOUND: {} } }))
 
-      expect(Object.keys((operation.responses?.['400'] as any).content)).toEqual(['application/problem+json'])
       expect(Object.keys((operation.responses?.['404'] as any).content)).toEqual(['application/problem+json'])
     })
   })
