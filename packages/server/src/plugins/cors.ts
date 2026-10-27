@@ -3,7 +3,7 @@ import type { StandardHeaders } from '@standard-server/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { toArray } from '@orpc/shared'
-import { flattenStandardHeader } from '@standard-server/core'
+import { cancelStandardBody, flattenStandardHeader } from '@standard-server/core'
 
 export interface CORSHandlerPluginOptions<T extends Context> {
   /**
@@ -99,8 +99,17 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
       const origin = flattenStandardHeader(interceptorOptions.request.headers.origin)
 
-      const allowOrigin = await this.resolveOrigin(this.options.origin, origin, interceptorOptions)
-      const timingAllowOrigin = await this.resolveOrigin(this.options.timingOrigin, origin, interceptorOptions)
+      let allowOrigin, timingAllowOrigin
+
+      try {
+        allowOrigin = await this.resolveOrigin(this.options.origin, origin, interceptorOptions)
+        timingAllowOrigin = await this.resolveOrigin(this.options.timingOrigin, origin, interceptorOptions)
+      }
+      catch (error) {
+        // The response is dropped, so cancel its body to release a streaming procedure
+        await cancelStandardBody(result.response.body, error).catch(() => {})
+        throw error
+      }
 
       if (allowOrigin.value !== undefined) {
         resHeaders['access-control-allow-origin'] = allowOrigin.value

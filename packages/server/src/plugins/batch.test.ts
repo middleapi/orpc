@@ -2,7 +2,7 @@ import type { StandardResponse } from '@standard-server/core'
 import type { AnyRouter } from '../router'
 import type { ResponseHeadersHandlerPluginContext } from './response-headers'
 import { ORPCError } from '@orpc/client'
-import { promiseWithResolvers, sleep } from '@orpc/shared'
+import { AsyncIteratorClass, promiseWithResolvers, sleep } from '@orpc/shared'
 import { decodePeerMessage } from '@standard-server/peer'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
@@ -348,6 +348,33 @@ describe('batchHandlerPlugin', () => {
       const body = await response!.json() as any
       expect(body[0].json.status).toBe(500)
       expect(body[0].json.body).toBe('Internal server error')
+      expect(rejectSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('cancels a stream sub-response dropped because mapSubresponse throws', async ({ onTestFinished }) => {
+      const rejectSpy = vi.spyOn(Promise, 'reject')
+        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
+
+      onTestFinished(() => {
+        rejectSpy.mockRestore()
+      })
+
+      const cleanup = vi.fn()
+      const handler = createHandler(new BatchHandlerPlugin({
+        mapSubresponse: () => {
+          throw new Error('boom')
+        },
+      }), {
+        stream: os.handler(() => new AsyncIteratorClass(() => new Promise<never>(() => {}), cleanup)),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        messages: [makePeerRequestMessage('0', '/stream')],
+      }))
+
+      const [message] = await readAllMessages(response!)
+      expect(message).toMatchObject({ id: '0', kind: 'response', json: { status: 500, body: 'Internal server error' } })
+      expect(cleanup).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'cancelled' }))
       expect(rejectSpy).toHaveBeenCalledTimes(1)
     })
 

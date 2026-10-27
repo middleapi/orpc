@@ -1,3 +1,4 @@
+import { AsyncIteratorClass } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { CORSHandlerPlugin } from './cors'
@@ -369,6 +370,30 @@ describe('corsHandlerPlugin', () => {
       body: JSON.stringify({ json: null }),
     }))
     expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('cancels a streaming response when the origin function throws', async () => {
+    const cleanup = vi.fn()
+    const handler = new RPCHandler({
+      stream: os.handler(() => new AsyncIteratorClass(() => new Promise<never>(() => {}), cleanup)),
+    }, {
+      plugins: [new CORSHandlerPlugin({
+        origin: () => {
+          throw new Error('origin lookup failed')
+        },
+      })],
+    })
+
+    await expect(handler.handle(new Request('https://example.com/stream', {
+      method: 'POST',
+      headers: {
+        'origin': 'https://allowed.com',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ json: null }),
+    }))).rejects.toThrow('origin lookup failed')
+
+    expect(cleanup).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'cancelled' }))
   })
 
   it('supports an async timingOrigin function resolved per request', async () => {

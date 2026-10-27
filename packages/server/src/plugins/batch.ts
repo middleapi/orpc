@@ -6,7 +6,7 @@ import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
 import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
-import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import { cancelStandardBody, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
 
 /**
@@ -417,6 +417,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           return this.mapSubresponse(response, { status, headers: batchHeaders }, interceptorOptions)
         }
         catch (err) {
+          // The response is dropped, so cancel its body to release a streaming procedure
+          await cancelStandardBody(response.body, err).catch(() => {})
           return internalError(err)
         }
       }
