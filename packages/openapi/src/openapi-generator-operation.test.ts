@@ -233,7 +233,7 @@ describe('openAPIGenerator operation builders', () => {
         { in: 'query', name: 'commaArray', required: true, explode: false, allowEmptyValue: true, allowReserved: true, schema: { type: 'array' } },
         { in: 'query', name: 'pipeObject', required: true, style: 'pipeDelimited', allowEmptyValue: true, allowReserved: true, schema: { type: 'object' } },
         { in: 'query', name: 'spaceArray', required: true, style: 'spaceDelimited', allowEmptyValue: true, allowReserved: true, schema: { type: 'array' } },
-        { in: 'query', name: 'json', required: true, allowEmptyValue: true, allowReserved: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        { in: 'query', name: 'json', required: true, allowEmptyValue: true, content: { 'application/json': { schema: { type: 'object' } } } },
         { in: 'query', name: 'deepObject', required: true, style: 'deepObject', explode: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'object' } },
         { in: 'query', name: 'arrayable', required: true, allowEmptyValue: true, allowReserved: true, schema: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] } },
         { in: 'query', name: 'optional', allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },

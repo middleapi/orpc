@@ -283,6 +283,8 @@ function renderQueryParameters(
         'application/json': { schema: parameter.schema },
       }
       delete parameter.schema
+      // OpenAPI only allows `allowReserved` beside `schema`, not `content`
+      delete parameter.allowReserved
     }
     else if (style === undefined) {
       if (flattenJsonUnionSchema(schema).some(s => !isJsonPrimitiveSchema(s))) {
