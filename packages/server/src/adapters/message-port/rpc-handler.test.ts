@@ -288,6 +288,32 @@ describe('rpcHandler', () => {
     expect(ws.send).not.toHaveBeenCalled()
   })
 
+  it('cancels the request instead of crashing when handling fails via upgrade', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const handler = createHandler()
+    const { clientPort, serverPort } = createPort()
+    onTestFinished(() => clientPort.close())
+
+    handler.upgrade(serverPort, {
+      context: () => {
+        throw new Error('invalid token')
+      },
+    })
+
+    const received = new Promise<any>(resolve => clientPort.addEventListener('message', resolve, { once: true }))
+    clientPort.start()
+    clientPort.postMessage(await createRequestMessage())
+
+    const { data } = await received
+    expect(decodePeerMessage(data)).toEqual({ matched: true, message: { id: '19', kind: 'cancel' } })
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+  })
+
   it('ignore invalid message format', async () => {
     const handler = createHandler()
     const { serverPort } = createPort()

@@ -115,9 +115,11 @@ export class WebSocketHandler<T extends Context> {
 
       // Not awaited: `this.message` runs business logic that may be slow,
       // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
+      // Its errors (e.g. a throwing context function) are already reported to the client as a cancel,
+      // and nothing else can handle them, so they would crash the process as an unhandled rejection.
+      this.message(ws, data, ...rest).catch(() => {})
     }))
-    ws.addEventListener('close', () => this.close(ws))
+    ws.addEventListener('close', () => this.close(ws).catch(() => {}))
 
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
     // so a single malformed frame would crash the process. `close` always follows and handles cleanup.

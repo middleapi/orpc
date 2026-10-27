@@ -213,6 +213,34 @@ describe('rpcHandler', () => {
     expect(code).toBe(1007)
   })
 
+  it('cancels the request instead of crashing when handling fails via upgrade', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const handler = createHandler()
+
+    const wss = new WebSocketServer({ port: 0 })
+    wss.on('connection', ws => handler.upgrade(ws, {
+      context: () => {
+        throw new Error('invalid token')
+      },
+    }))
+    onTestFinished(() => wss.close())
+
+    const client = new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`)
+    onTestFinished(() => client.close())
+    await once(client, 'open')
+
+    client.send(await createRequestMessage())
+
+    const [data] = await once(client, 'message')
+    expect(decodePeerMessage(data.toString())).toEqual({ matched: true, message: { id: '19', kind: 'cancel' } })
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+  })
+
   it('handles Blob messages via upgrade', async () => {
     let onMessage: ((event: { data: Blob }) => void) | undefined
 
