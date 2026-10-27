@@ -100,7 +100,7 @@ export function wrapReadableStream<T, TMapped = T>(
         await finish()
       }
     },
-  })
+  }, { highWaterMark: 0 })
 }
 
 export function traceReadableStream<T>(

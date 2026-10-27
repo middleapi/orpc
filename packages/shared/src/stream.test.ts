@@ -110,7 +110,7 @@ describe('traceReadableStream', () => {
 
     expect(cancel).toHaveBeenCalledTimes(1)
     expect(cancel).toHaveBeenCalledWith('stop')
-    expect(runInSpanContextSpy).toHaveBeenCalledTimes(3)
+    expect(runInSpanContextSpy).toHaveBeenCalledTimes(2)
     expect(recordSpanErrorSpy).not.toHaveBeenCalled()
     expect(span.end).toHaveBeenCalledTimes(1)
   })
@@ -155,7 +155,7 @@ describe('traceReadableStream', () => {
     await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
     await expect(reader.cancel('stop')).rejects.toBe(error)
 
-    expect(runInSpanContextSpy).toHaveBeenCalledTimes(3)
+    expect(runInSpanContextSpy).toHaveBeenCalledTimes(2)
     expect(recordSpanErrorSpy).toHaveBeenCalledTimes(1)
     expect(recordSpanErrorSpy).toHaveBeenCalledWith(span, error)
     expect(span.end).toHaveBeenCalledTimes(1)
@@ -172,6 +172,27 @@ describe('wrapReadableStream', () => {
     })
 
     await expect(readAll(wrapReadableStream(stream, {}))).resolves.toEqual([1])
+  })
+
+  it('reads from the source only on demand', async () => {
+    let value = 0
+    const pull = vi.fn((controller: ReadableStreamDefaultController<number>) => {
+      controller.enqueue(++value)
+    })
+    const stream = new ReadableStream<number>({ pull }, { highWaterMark: 0 })
+
+    const reader = wrapReadableStream(stream, {}).getReader()
+
+    await sleep(0)
+    expect(pull).not.toHaveBeenCalled()
+
+    await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
+    await sleep(0)
+    expect(pull).toHaveBeenCalledTimes(1)
+
+    await expect(reader.read()).resolves.toEqual({ done: false, value: 2 })
+    await sleep(0)
+    expect(pull).toHaveBeenCalledTimes(2)
   })
 
   it('runs reads inside runWith, maps results, skips cancellation after completion, and finishes once', async () => {
