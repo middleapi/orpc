@@ -97,7 +97,7 @@ describe('dedupeLinkPlugin', () => {
     expect((callOptions as any).next).toEqual(expect.any(Function))
 
     expect(allAbortSignalSpy).toHaveBeenCalledTimes(1)
-    expect(allAbortSignalSpy).toHaveBeenCalledWith([signal1, signal2])
+    expect(allAbortSignalSpy).toHaveBeenCalledWith([signal1, signal2], { signal: expect.any(AbortSignal) })
 
     expect(groupCondition).toHaveBeenCalledTimes(2)
     expect(groupCondition).toHaveBeenNthCalledWith(1, expect.objectContaining({
@@ -448,6 +448,35 @@ describe('dedupeLinkPlugin', () => {
     await expect(promise1).rejects.toThrow('FAIL')
     await expect(promise2).rejects.toThrow('FAIL')
     expect(transport.send).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['succeed', false],
+    ['fail', true],
+  ] as const)('leaves no abort listeners on a long-lived caller signal once deduped requests %s', async (_name, fail) => {
+    const controller = new AbortController()
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    if (fail) {
+      vi.mocked(transport.send).mockRejectedValue(new Error('FAIL'))
+    }
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        groups: [{ condition: () => true, context: { group: true } }],
+      })],
+    })
+
+    for (let i = 0; i < 3; i++) {
+      await Promise.allSettled([
+        link.call(['GET', 'planet'], { value: i }, { context: {}, signal: controller.signal }),
+        link.call(['GET', 'planet'], { value: i }, { context: {}, signal: controller.signal }),
+      ])
+    }
+
+    expect(transport.send).toHaveBeenCalledTimes(3)
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
   })
 
   it('rejects only the aborted caller while the shared request continues for the rest', async () => {

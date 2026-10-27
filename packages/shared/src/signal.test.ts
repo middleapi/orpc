@@ -1,3 +1,4 @@
+import { getEventListeners } from 'node:events'
 import { allAbortSignal, anyAbortSignal, runWithSignal } from './signal'
 
 describe('allAbortSignal', () => {
@@ -53,6 +54,26 @@ describe('allAbortSignal', () => {
     controllerLater2.abort()
     expect(batchSignal?.aborted).toBe(true)
     expect(abortSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes listeners from the input signals and stops following them once options.signal aborts', () => {
+    const controller1 = new AbortController()
+    const controller2 = new AbortController()
+    const release = new AbortController()
+
+    const batchSignal = allAbortSignal([controller1.signal, controller2.signal], { signal: release.signal })
+
+    expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(1)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(1)
+
+    release.abort()
+
+    expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(0)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(0)
+
+    controller1.abort()
+    controller2.abort()
+    expect(batchSignal?.aborted).toBe(false)
   })
 })
 

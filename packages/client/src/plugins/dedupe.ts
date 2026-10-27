@@ -157,6 +157,9 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
   ): Promise<void> {
     const first = activeCallers[0]!
     const matchedOptions = activeCallers.map(caller => caller.options)
+    // Detaches the shared signal from the callers' signals once it is no longer needed,
+    // otherwise long-lived caller signals accumulate a listener per deduped request.
+    const release = new AbortController()
 
     try {
       if (!shouldDedupe(matchedOptions)) {
@@ -170,7 +173,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
       const request: StandardRequest = {
         ...first.options.request,
-        signal: allAbortSignal(signals),
+        signal: allAbortSignal(signals, { signal: release.signal }),
       }
 
       const response = await first.options.next({
@@ -180,11 +183,13 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      const replicatedResponses = replicateLazyResponse(response, signals)
+      const replicatedResponses = replicateLazyResponse(response, signals, () => release.abort())
 
       activeCallers.forEach((caller, index) => caller.resolve(replicatedResponses[index]!))
     }
     catch (error) {
+      release.abort()
+
       for (const caller of activeCallers) {
         caller.reject(error)
       }
@@ -223,8 +228,15 @@ function createRequestKey(path: string[], request: StandardRequest): string {
 /**
  * Replicates the response once per signal. Like an unshared response, each replica's body
  * fails and stops streaming once its own signal aborts, without affecting the other replicas.
+ *
+ * `onBodySettled` runs once the shared body is resolved or fails. From then on, each replica
+ * handles its own signal, and the source stream is cancelled once every replica is.
  */
-function replicateLazyResponse(response: StandardLazyResponse, signals: (AbortSignal | undefined)[]): StandardLazyResponse[] {
+function replicateLazyResponse(
+  response: StandardLazyResponse,
+  signals: (AbortSignal | undefined)[],
+  onBodySettled: () => void,
+): StandardLazyResponse[] {
   let bodiesPromise: Promise<StandardBody[]> | undefined
 
   return signals.map((signal, i) => ({
@@ -242,7 +254,7 @@ function replicateLazyResponse(response: StandardLazyResponse, signals: (AbortSi
         }
 
         return signals.map(() => body)
-      })
+      }).finally(onBodySettled)
 
       return (await bodiesPromise)[i]
     }),

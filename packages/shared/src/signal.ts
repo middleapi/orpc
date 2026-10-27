@@ -1,10 +1,22 @@
 import { throwIfAborted } from '@standard-server/shared'
 import { promiseWithResolvers } from './promise'
 
+export interface AllAbortSignalOptions {
+  /**
+   * Once aborted, the listeners added to the provided signals are removed and the returned signal
+   * no longer follows them. Use it when the returned signal is no longer needed, so long-lived
+   * signals don't accumulate listeners.
+   */
+  signal?: AbortSignal | undefined
+}
+
 /**
  * Returns a signal that aborts only after all provided signals are aborted.
  */
-export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): AbortSignal | undefined {
+export function allAbortSignal(
+  signals: readonly (AbortSignal | undefined)[],
+  options: AllAbortSignalOptions = {},
+): AbortSignal | undefined {
   const realSignals = signals.filter(signal => signal !== undefined)
 
   if (realSignals.length === 0 || realSignals.length !== signals.length) {
@@ -21,12 +33,14 @@ export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
 
   abortIfAllAborted()
 
+  const listenerSignal = anyAbortSignal([controller.signal, options.signal])
+
   for (const signal of realSignals) {
     signal.addEventListener('abort', () => {
       abortIfAllAborted()
     }, {
       once: true,
-      signal: controller.signal,
+      signal: listenerSignal,
     })
   }
 
