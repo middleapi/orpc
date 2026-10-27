@@ -658,8 +658,8 @@ importers:
   packages/json-schema:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.3.0
-        version: 0.3.0
+        specifier: ~0.4.0
+        version: 0.4.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -869,11 +869,11 @@ importers:
   packages/openapi:
     dependencies:
       '@openapi-spec/downgrader':
-        specifier: ~0.3.0
-        version: 0.3.0
+        specifier: ~0.4.0
+        version: 0.4.0
       '@openapi-spec/types':
-        specifier: ~0.3.0
-        version: 0.3.0
+        specifier: ~0.4.0
+        version: 0.4.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -1196,8 +1196,8 @@ importers:
   packages/zod:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.3.0
-        version: 0.3.0
+        specifier: ~0.4.0
+        version: 0.4.0
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:../json-schema
@@ -3575,11 +3575,11 @@ packages:
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     resolution: {integrity: sha512-Gj6C0JwCr8arj0sYuslWXUBSP/KnUlEGnPW4qxlXvAl543oaNQgMgIgkQUA6vs5BCCvwTEiL8m/wdWzfl4UvSw==}
 
-  '@openapi-spec/downgrader@0.3.0':
-    resolution: {integrity: sha512-y4+CkV8chSbRKmR64+uGr0IjDjNUOQIdNMpCbSiD2JCc0a0HouUTXvgt+FO8/ktfaMaNz3ypqq4PmVfB3twx3w==}
+  '@openapi-spec/downgrader@0.4.0':
+    resolution: {integrity: sha512-hrOjK64HADGGG56RvmJ8z+CenNqTEAI0Ped1aG1oeY9CNDMZRhILatygmtcCtudVUNfbJU1CmnuzpeXujQH/rg==}
 
-  '@openapi-spec/types@0.3.0':
-    resolution: {integrity: sha512-r9Gufbaw9Cpb/rCiEsFdmdWdj41MzL4/y6dCJjwMQBUvQqj5X76WlbErDSwIHR3UsxCNQI2W20GsQ4eh3YXaMQ==}
+  '@openapi-spec/types@0.4.0':
+    resolution: {integrity: sha512-TkCtxQoIIzPvnqYeKopbBKdVzttj6Mg+D5QSy+h8bbWA0/x97qPw3FKDCcymh+7y4IhCRxFeWuff8T03HQUxVw==}
 
   '@opentelemetry/api-logs@0.223.0':
     resolution: {integrity: sha512-Oepm6etVPFCn0VWB1t833iOTgz1eYBDUPxcrOR/XvwzD1+Ag9VzSPSrrKAFNJ/haatj+8CXbG47pZXvdNQKDJw==}
@@ -14773,11 +14773,11 @@ snapshots:
       fast-deep-equal: 3.1.3
     optional: true
 
-  '@openapi-spec/downgrader@0.3.0':
+  '@openapi-spec/downgrader@0.4.0':
     dependencies:
-      '@openapi-spec/types': 0.3.0
+      '@openapi-spec/types': 0.4.0
 
-  '@openapi-spec/types@0.3.0': {}
+  '@openapi-spec/types@0.4.0': {}
 
   '@opentelemetry/api-logs@0.223.0':
     dependencies:

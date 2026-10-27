@@ -39,6 +39,8 @@ allowBuilds:
 # Entries go inert once the version ages past it, so prune them on the next bump
 # instead of letting versions accumulate.
 minimumReleaseAgeExclude:
+  - '@openapi-spec/downgrader@0.4.0'
+  - '@openapi-spec/types@0.4.0'
   - '@standard-server/aws-lambda@0.13.0'
   - '@standard-server/core@0.13.0'
   - '@standard-server/fastify@0.13.0'
