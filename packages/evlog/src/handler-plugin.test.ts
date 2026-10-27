@@ -1,4 +1,5 @@
 import type { LogLevel } from 'evlog'
+import { runInNewContext } from 'node:vm'
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
@@ -241,6 +242,21 @@ describe('evlogHandlerPlugin', () => {
 
     expect(logger.error).toHaveBeenCalledWith(error)
     expect(finish).toHaveBeenCalledWith()
+  })
+
+  it('logs an error from another realm as an error instead of a string', async () => {
+    const plugin = new EvlogHandlerPlugin()
+    const { routing } = getPluginHooks(plugin)
+    const { logger } = mockIntegration()
+    const error = runInNewContext('new TypeError("internal-error")')
+
+    await expect(routing({
+      next: vi.fn().mockRejectedValue(error),
+      context: {},
+      request: createRequest('/ping'),
+    })).rejects.toBe(error)
+
+    expect(logger.error).toHaveBeenCalledWith(error)
   })
 
   it('wraps matched AsyncIteratorObject and finishes after successful consumption', async () => {

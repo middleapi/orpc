@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import {
   getTracer,
   recordSpanError,
@@ -130,6 +131,12 @@ describe('tracing', () => {
       error.stack = 'stack'
       const exception = toTracingException(error)
       expect(exception).toEqual({ message: 'test', name: 'Error', stack: 'stack' })
+    })
+
+    it('keeps the name and stack of an error from another realm', () => {
+      const error = runInNewContext('new TypeError("test")')
+      const exception = toTracingException(error)
+      expect(exception).toEqual({ message: 'test', name: 'TypeError', stack: error.stack })
     })
 
     it('includes numeric code', () => {

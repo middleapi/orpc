@@ -1,5 +1,23 @@
+import { runInNewContext } from 'node:vm'
 import { AbortError } from '@standard-server/shared'
-import { isAbortError } from './error'
+import { isAbortError, isErrorLike } from './error'
+
+describe('isErrorLike', () => {
+  it('returns true for errors, including ones from another realm', () => {
+    const crossRealmError = runInNewContext('new TypeError("boom")')
+
+    expect(crossRealmError instanceof Error).toBe(false)
+    expect(isErrorLike(crossRealmError)).toBe(true)
+    expect(isErrorLike(new Error('boom'))).toBe(true)
+    expect(isErrorLike(new AbortError('aborted'))).toBe(true)
+  })
+
+  it('returns false for non-error values', () => {
+    expect(isErrorLike(null)).toBe(false)
+    expect(isErrorLike('boom')).toBe(false)
+    expect(isErrorLike({ name: 'Error', message: 'boom' })).toBe(false)
+  })
+})
 
 describe('isAbortError', () => {
   it('returns true for AbortError', () => {
@@ -37,5 +55,14 @@ describe('isAbortError', () => {
     error.name = 'NotReallyAnAbortButContainsAbort'
 
     expect(isAbortError(error)).toBe(true)
+  })
+
+  it('returns true for an AbortError from another realm', () => {
+    expect(isAbortError(runInNewContext('new DOMException("aborted", "AbortError")', { DOMException }))).toBe(true)
+    expect(isAbortError(runInNewContext('Object.assign(new Error("aborted"), { name: "AbortError" })'))).toBe(true)
+  })
+
+  it('returns false for an error-like value without a string name', () => {
+    expect(isAbortError({ [Symbol.toStringTag]: 'Error' })).toBe(false)
   })
 })
