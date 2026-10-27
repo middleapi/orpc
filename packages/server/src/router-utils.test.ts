@@ -1,4 +1,5 @@
 import * as ContractModule from '@orpc/contract'
+import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
@@ -204,6 +205,14 @@ describe('augmentRouter', () => {
     expectAugmentedProcedure(1, 1, augmented.p1, router.nested.p1, options)
   })
 
+  it('keeps a route named `__proto__` as an own route', () => {
+    const augmented = augmentRouter({ ['__proto__']: procedure1, other: procedure2 }, createAugmentOptions()) as any
+
+    expect(Object.getPrototypeOf(augmented)).toBe(Object.prototype)
+    expect(getOwn(augmented, '__proto__')).toBeInstanceOf(Procedure)
+    expect(augmented.other).toBeInstanceOf(Procedure)
+  })
+
   it('returns non-object router values as-is', () => {
     const options = createAugmentOptions()
     const invalid = 'invalid' as any
@@ -291,6 +300,14 @@ describe('augmentImplementedRouter', () => {
     expectImplementedProcedure(augmented.p1, router.nested.p1, options)
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
     expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps a route named `__proto__` as an own route', () => {
+    const augmented = augmentImplementedRouter({ ['__proto__']: procedure1, other: procedure2 }, createImplementedOptions()) as any
+
+    expect(Object.getPrototypeOf(augmented)).toBe(Object.prototype)
+    expect(getOwn(augmented, '__proto__')).toBeInstanceOf(Procedure)
+    expect(augmented.other).toBeInstanceOf(Procedure)
   })
 
   it('returns non-object router values as-is', () => {
@@ -512,6 +529,17 @@ describe('unlazyRouter', () => {
         p2: procedure2,
       },
     })
+  })
+
+  it('keeps a route named `__proto__` as an own route', async () => {
+    const unlazied = await unlazyRouter({
+      ['__proto__']: new Lazy({ loader: async () => ({ default: procedure1 }), meta: {} }),
+      other: procedure2,
+    }) as any
+
+    expect(Object.getPrototypeOf(unlazied)).toBe(Object.prototype)
+    expect(getOwn(unlazied, '__proto__')).toBe(procedure1)
+    expect(unlazied.other).toBe(procedure2)
   })
 
   it('returns procedures and non-object values as-is', async () => {

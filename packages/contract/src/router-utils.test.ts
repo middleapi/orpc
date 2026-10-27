@@ -1,4 +1,5 @@
 import type { AnyMetaPlugin } from './meta'
+import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 import * as ErrorUtilsModule from './error-utils'
 import * as MetaUtilsModule from './meta-utils'
@@ -158,6 +159,14 @@ describe('augmentContractRouter', () => {
     expectAugmentedProcedure(1, augmented.ping, router.nested.ping, options)
   })
 
+  it('keeps a route named `__proto__` as an own route', () => {
+    const augmented = augmentContractRouter({ ['__proto__']: router.ping, other: router.pong }, createAugmentOptions()) as any
+
+    expect(Object.getPrototypeOf(augmented)).toBe(Object.prototype)
+    expect(getOwn(augmented, '__proto__')).toBeInstanceOf(ProcedureContract)
+    expect(augmented.other).toBeInstanceOf(ProcedureContract)
+  })
+
   it('returns non-object router values as-is', () => {
     const options = createAugmentOptions()
     const invalid = 'invalid' as any
@@ -260,6 +269,14 @@ describe('minifyRouterContract', () => {
     expect(minified).not.toBe(functionRouter)
     expectMinifiedProcedure(minified.ping, router.nested.ping)
     expect(minified.invalid).toBe('invalid')
+  })
+
+  it('keeps a route named `__proto__` as an own route', () => {
+    const minified = minifyRouterContract({ ['__proto__']: router.ping, other: router.pong }) as any
+
+    expect(Object.getPrototypeOf(minified)).toBe(Object.prototype)
+    expectMinifiedProcedure(getOwn(minified, '__proto__'), router.ping)
+    expectMinifiedProcedure(minified.other, router.pong)
   })
 
   it('returns non-object router values as-is', () => {

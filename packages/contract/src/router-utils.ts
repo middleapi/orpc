@@ -3,7 +3,7 @@ import type { MergedErrorMap } from './error-utils'
 import type { AnyMetaPlugin, Meta } from './meta'
 import type { AnyProcedureContract } from './procedure'
 import type { RouterContract } from './router'
-import { getOwn, isTypescriptObject } from '@orpc/shared'
+import { getOwn, isTypescriptObject, setOwn } from '@orpc/shared'
 import { mergeErrorMap } from './error-utils'
 import { resolveMetaPlugins } from './meta-utils'
 import { ProcedureContract } from './procedure'
@@ -52,7 +52,7 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
   const enhanced: Record<string, any> = {}
 
   for (const key of Object.keys(router)) {
-    enhanced[key] = augmentContractRouter(router[key]!, options)
+    setOwn(enhanced, key, augmentContractRouter(router[key]!, options))
   }
 
   return enhanced as any
@@ -120,7 +120,7 @@ export function minifyRouterContract(router: RouterContract): RouterContract {
   const json: Record<string, RouterContract> = {}
 
   for (const [key, child] of Object.entries(router)) {
-    json[key] = minifyRouterContract(child)
+    setOwn(json, key, minifyRouterContract(child))
   }
 
   return json

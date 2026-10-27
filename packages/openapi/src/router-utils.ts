@@ -1,6 +1,6 @@
 import type { RouterContract } from '@orpc/contract'
 import { ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
-import { isTypescriptObject, pathToHttpPath, toArray } from '@orpc/shared'
+import { isTypescriptObject, pathToHttpPath, setOwn, toArray } from '@orpc/shared'
 import { getOpenAPIMeta, openapi } from './meta'
 
 export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract>
@@ -56,10 +56,10 @@ export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
   const populated: Record<string, any> = {}
 
   for (const key of Object.keys(router)) {
-    populated[key] = populateRouterContractOpenAPIPaths(
+    setOwn(populated, key, populateRouterContractOpenAPIPaths(
       router[key]!,
       { ...options, path: [...path, key] },
-    )
+    ))
   }
 
   return populated as any

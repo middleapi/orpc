@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { getOwn } from '@orpc/shared'
 import z from 'zod'
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
 import { createRouterImplementer } from './implementer-router'
@@ -231,6 +232,14 @@ describe('createRouterImplementer', () => {
         ...contract.ping['~orpc'],
         orderedMiddlewares: [],
       })
+    })
+
+    it('keeps a route named `__proto__` as an own route', () => {
+      const implementer = createRouterImplementer({ ['__proto__']: contract.ping, other: contract.ping }, config) as any
+
+      expect(getOwn(implementer, '__proto__')).toBeInstanceOf(ProcedureImplementer)
+      expect(implementer.other).toBeInstanceOf(ProcedureImplementer)
+      expect(implementer.router).toBeTypeOf('function')
     })
   })
 })

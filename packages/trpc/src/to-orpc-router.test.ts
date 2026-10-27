@@ -1,7 +1,7 @@
 import type { OpenAPIMeta } from '@orpc/openapi'
 import { getOpenAPIMeta } from '@orpc/openapi'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
-import { isAsyncIteratorObject } from '@orpc/shared'
+import { getOwn, isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
 import { toORPCRouter } from './to-orpc-router'
@@ -65,6 +65,19 @@ describe('toORPCRouter', () => {
     expect(unlazyNestedLazy.default.lazy).toBeInstanceOf(Lazy)
     const unlazyNestedLazyUnlazy = await unlazy(unlazyNestedLazy.default.lazy)
     expect(unlazyNestedLazyUnlazy.default.ping).toBeInstanceOf(Procedure)
+  })
+
+  it('keeps a route named `__proto__` as an own route', async () => {
+    const orpcRouter = toORPCRouter(t.router({
+      api: {
+        ['__proto__']: t.procedure.query(() => 'proto'),
+        other: t.procedure.query(() => 'other'),
+      },
+    })) as any
+
+    expect(Object.getPrototypeOf(orpcRouter.api)).toBe(Object.prototype)
+    await expect(call(getOwn(orpcRouter.api, '__proto__'), undefined, { context: { a: 'a' } })).resolves.toBe('proto')
+    await expect(call(orpcRouter.api.other, undefined, { context: { a: 'a' } })).resolves.toBe('other')
   })
 
   it('with input/output schema and validation happen inside handler only', async () => {

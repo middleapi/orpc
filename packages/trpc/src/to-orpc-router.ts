@@ -2,7 +2,7 @@ import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
-import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
+import { isTypescriptObject, set, setOwn, wrapAsyncIterator } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
@@ -63,10 +63,10 @@ function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
     const item = records[key]
 
     if (typeof item === 'function') {
-      orpcRouter[key] = toORPCProcedure(item)
+      setOwn(orpcRouter, key, toORPCProcedure(item))
     }
     else {
-      orpcRouter[key] = recordToORPCRouterRecord(item)
+      setOwn(orpcRouter, key, recordToORPCRouterRecord(item))
     }
   }
 

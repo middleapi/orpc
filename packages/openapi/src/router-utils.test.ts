@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { getOwn } from '@orpc/shared'
 import z from 'zod'
 import { getOpenAPIMeta, openapi } from './meta'
 import { populateRouterContractOpenAPIPaths } from './router-utils'
@@ -42,5 +43,13 @@ describe('populateRouterContractOpenAPIPaths', () => {
 
     expect(populated.invalid).toEqual('invalid')
     expect(getOpenAPIMeta(populated.procedure)?.path).toBe('/procedure')
+  })
+
+  it('keeps a route named `__proto__` as an own route', () => {
+    const populated = populateRouterContractOpenAPIPaths({ ['__proto__']: oc, other: oc }) as any
+
+    expect(Object.getPrototypeOf(populated)).toBe(Object.prototype)
+    expect(getOpenAPIMeta(getOwn(populated, '__proto__'))?.path).toBe('/__proto__')
+    expect(getOpenAPIMeta(populated.other)?.path).toBe('/other')
   })
 })

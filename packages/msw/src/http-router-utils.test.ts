@@ -4,6 +4,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
+import { getOwn } from '@orpc/shared'
 import { setupServer } from 'msw/node'
 import z from 'zod'
 import { createHTTPUtils } from './http-router-utils'
@@ -22,6 +23,16 @@ it('mirrors the router-contract shape', () => {
   expect(utils.ping.error).toBeTypeOf('function')
   expect(utils.ping.loading).toBeTypeOf('function')
   expect(utils.nested.pong.handler).toBeTypeOf('function')
+})
+
+it('keeps a route named `__proto__` as an own route', () => {
+  const utils: any = createHTTPUtils({ ['__proto__']: contract.ping, other: contract.ping }, {
+    handler: router => new RPCHandler(router),
+  })
+
+  expect(Object.getPrototypeOf(utils)).toBe(Object.prototype)
+  expect(getOwn(utils, '__proto__')?.handler).toBeTypeOf('function')
+  expect(utils.other.handler).toBeTypeOf('function')
 })
 
 it('keeps non-router values as-is', () => {

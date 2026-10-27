@@ -2,7 +2,7 @@ import type { RouterContract } from '@orpc/contract'
 import type { Context } from '@orpc/server'
 import type { HTTPProcedureUtilsOptions } from './http-procedure-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { isTypescriptObject } from '@orpc/shared'
+import { isTypescriptObject, setOwn } from '@orpc/shared'
 import { HTTPProcedureUtils } from './http-procedure-utils'
 
 export type HTTPRouterUtils<T extends RouterContract, TContext extends Context>
@@ -44,7 +44,7 @@ function createHTTPUtilsInternal(
   const utils: Record<string, unknown> = {}
 
   for (const [key, child] of Object.entries(contract)) {
-    utils[key] = createHTTPUtilsInternal(child, options, [...path, key])
+    setOwn(utils, key, createHTTPUtilsInternal(child, options, [...path, key]))
   }
 
   return utils

@@ -7,7 +7,7 @@ import type { ProcedureConfig } from './procedure'
 import type { ContractedRouter } from './router'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { bindMethods } from '@orpc/shared'
+import { bindMethods, setOwn } from '@orpc/shared'
 import { ProcedureImplementer } from './implementer-procedure'
 import { Lazy } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
@@ -233,7 +233,7 @@ function createRouterImplementerInternal<
   const implementer: Record<string, any> = {}
 
   for (const [key, child] of Object.entries(contract)) {
-    implementer[key] = createRouterImplementerInternal(child as RouterContract, config, middlewares)
+    setOwn(implementer, key, createRouterImplementerInternal(child as RouterContract, config, middlewares))
   }
 
   const shared = bindMethods(SharedRouterImplementer.create(contract, config, middlewares))
