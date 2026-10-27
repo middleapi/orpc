@@ -1,0 +1,23 @@
+---
+title: "OpenAPI Adapters"
+description: "The HTTP adapters that run OpenAPI Handler and OpenAPI Link, and where to import each one."
+---
+
+OpenAPI runs over HTTP only. Pick the adapter for your server, then import [OpenAPI Handler](/docs/openapi/handler) from it. For WebSocket or message ports, use [RPC](/docs/rpc/adapters).
+
+## Server Adapters
+
+| Adapter                                 | Import `OpenAPIHandler` from |
+| --------------------------------------- | ---------------------------- |
+| [Fetch API](/docs/adapters/fetch-api)   | `@orpc/openapi/fetch`        |
+| [Node HTTP](/docs/adapters/node-http)   | `@orpc/openapi/node`         |
+| [Fastify](/docs/adapters/fastify)       | `@orpc/openapi/fastify`      |
+| [AWS Lambda](/docs/adapters/aws-lambda) | `@orpc/openapi/aws-lambda`   |
+
+## Client Adapter
+
+[OpenAPI Link](/docs/openapi/link) uses the [Fetch API](/docs/adapters/fetch-api) adapter: import `OpenAPILink` from `@orpc/openapi/fetch`. It calls any server adapter above, or any other OpenAPI-compliant server.
+
+## Frameworks and Platforms
+
+Every framework and platform adapter built on the Fetch API or Node HTTP also serves OpenAPI, such as [Next.js](/docs/adapters/next), [Hono](/docs/adapters/hono), [Express.js](/docs/adapters/express), and [Cloudflare Workers](/docs/adapters/cloudflare-workers). Where an example uses `RPCHandler`, swap in `OpenAPIHandler` from the matching import above. See [Adapters](/docs/adapters) for the full list.

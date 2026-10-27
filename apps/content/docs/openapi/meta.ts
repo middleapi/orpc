@@ -9,6 +9,7 @@ export default defineMeta({
     'serializer',
     'handler',
     'link',
+    'adapters',
     'specification',
     'scalar',
     'expanding-type-support-for-link',

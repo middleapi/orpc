@@ -7,5 +7,6 @@ export default defineMeta({
     'serializer',
     'handler',
     'link',
+    'adapters',
   ],
 })

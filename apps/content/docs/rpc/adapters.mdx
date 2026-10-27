@@ -1,0 +1,29 @@
+---
+title: "RPC Adapters"
+description: "The adapters that run RPC Handler and RPC Link over HTTP, WebSocket, and message ports, and where to import each one."
+---
+
+RPC runs over HTTP, WebSocket, and message ports. Pick the adapter for your transport, then import [RPC Handler](/docs/rpc/handler) or [RPC Link](/docs/rpc/link) from it. The router stays the same.
+
+## Server Adapters
+
+| Adapter                                     | Import `RPCHandler` from                           |
+| ------------------------------------------- | -------------------------------------------------- |
+| [Fetch API](/docs/adapters/fetch-api)       | `@orpc/server/fetch`                               |
+| [Node HTTP](/docs/adapters/node-http)       | `@orpc/server/node`                                |
+| [Fastify](/docs/adapters/fastify)           | `@orpc/server/fastify`                             |
+| [AWS Lambda](/docs/adapters/aws-lambda)     | `@orpc/server/aws-lambda`                          |
+| [WebSocket](/docs/adapters/websocket)       | `@orpc/server/websocket` or `@orpc/server/crossws` |
+| [Message Port](/docs/adapters/message-port) | `@orpc/server/message-port`                        |
+
+## Client Adapters
+
+| Adapter                                     | Import `RPCLink` from       | Calls                     |
+| ------------------------------------------- | --------------------------- | ------------------------- |
+| [Fetch API](/docs/adapters/fetch-api)       | `@orpc/client/fetch`        | Any HTTP server adapter   |
+| [WebSocket](/docs/adapters/websocket)       | `@orpc/client/websocket`    | WebSocket server adapters |
+| [Message Port](/docs/adapters/message-port) | `@orpc/client/message-port` | Message Port adapter      |
+
+## Frameworks and Platforms
+
+Framework and platform adapters build on the ones above, such as [Next.js](/docs/adapters/next) and [Hono](/docs/adapters/hono) on the Fetch API, [Express.js](/docs/adapters/express) on Node HTTP, and [Electron](/docs/adapters/electron) and [Web Workers](/docs/adapters/web-workers) on Message Port. See [Adapters](/docs/adapters) for the full list.
