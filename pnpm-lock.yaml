@@ -217,6 +217,9 @@ importers:
       '@orpc/openapi':
         specifier: workspace:*
         version: link:packages/openapi
+      '@orpc/openrpc':
+        specifier: workspace:*
+        version: link:packages/openrpc
       '@orpc/opentelemetry':
         specifier: workspace:*
         version: link:packages/opentelemetry
@@ -914,6 +917,49 @@ importers:
       swagger-ui:
         specifier: ^5.33.2
         version: 5.33.2(@types/react@19.3.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+
+  packages/openrpc:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/json-schema':
+        specifier: workspace:*
+        version: link:../json-schema
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@standard-server/core':
+        specifier: ~0.13.0
+        version: 0.13.0
+      '@standard-server/fetch':
+        specifier: ~0.13.0
+        version: 0.13.0
+    devDependencies:
+      '@orpc/zod':
+        specifier: workspace:*
+        version: link:../zod
+      '@standard-server/aws-lambda':
+        specifier: ~0.13.0
+        version: 0.13.0
+      fastify:
+        specifier: ^5.12.7
+        version: 5.12.7
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7

@@ -1,5 +1,6 @@
 import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import type { OpenAPIDocument } from '@orpc/openapi'
+import type { OpenRPCDocument } from '@orpc/openrpc'
 import type { RouterClient } from '@orpc/server'
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { createORPCClient } from '@orpc/client'
@@ -20,6 +21,7 @@ import { HibernationHandlerPlugin } from '@orpc/hibernation'
 import { SmartCoercionHandlerPlugin, SmartCoercionLinkPlugin } from '@orpc/json-schema'
 import { BatchResponseCompressionHandlerPlugin, StaticFileHandlerPlugin, TmpFileUploadHandlerPlugin } from '@orpc/node'
 import { OpenAPIReferenceHandlerPlugin } from '@orpc/openapi/plugins'
+import { OpenRPCDiscoveryHandlerPlugin } from '@orpc/openrpc/plugins'
 import { PinoHandlerPlugin } from '@orpc/pino'
 import { RateLimitHandlerPlugin } from '@orpc/ratelimit'
 import { implement } from '@orpc/server'
@@ -67,6 +69,12 @@ const spec: OpenAPIDocument<'3.2.0'> = {
   info: { title: 'All Plugins', version: '1.0.0' },
 }
 
+const openrpcSpec: OpenRPCDocument = {
+  openrpc: '1.3.2',
+  info: { title: 'All Plugins', version: '1.0.0' },
+  methods: [],
+}
+
 const implementer = implement(contract).$context<TestContext>()
 
 const router = implementer.router({
@@ -88,6 +96,7 @@ function createHandlerPlugins() {
     new HibernationHandlerPlugin<TestContext>(),
     new MethodOverrideHandlerPlugin(),
     new OpenAPIReferenceHandlerPlugin<TestContext, 'scalar'>({ spec, docsPath: '/docs', specPath: '/spec.json' }),
+    new OpenRPCDiscoveryHandlerPlugin<TestContext>({ spec: openrpcSpec, specPath: '/openrpc.json' }),
     new PinoHandlerPlugin<TestContext>({ logger: pino({ level: 'silent' }) }),
     new RateLimitHandlerPlugin<TestContext>(),
     new RequestCompressionHandlerPlugin<TestContext>(),
@@ -218,5 +227,17 @@ describe('all plugins on one handler and one link', () => {
 
     expect(response?.status).toEqual(200)
     await expect(response?.json()).resolves.toEqual(spec)
+  })
+
+  it('serves the openrpc document behind the other routing plugins', async () => {
+    const { handler } = createClientServer()
+
+    const { response } = await handler.handle(new Request('http://localhost/rpc/openrpc.json'), {
+      context: {},
+      prefix: '/rpc',
+    })
+
+    expect(response?.status).toEqual(200)
+    await expect(response?.json()).resolves.toEqual(openrpcSpec)
   })
 })
