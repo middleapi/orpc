@@ -35,16 +35,23 @@ export function isJsonRpcErrorObject(value: unknown): value is JsonRpcErrorObjec
 }
 
 /**
- * Whether a value is a JSON-RPC response: exactly one own `result` or valid `error` member, and a valid `id`.
+ * Whether a value has exactly one own `result` or valid `error` member, like a JSON-RPC response.
  */
-export function isJsonRpcResponse(value: unknown): value is JsonRpcResponse {
-  if (!isPlainObject(value) || getOwn(value, 'jsonrpc') !== JSON_RPC_VERSION || !isJsonRpcId(getOwn(value, 'id'))) {
+export function hasJsonRpcResultOrError(value: unknown): value is { result: unknown } | { error: JsonRpcErrorObject } {
+  if (!isPlainObject(value)) {
     return false
   }
 
   const hasResult = Object.hasOwn(value, 'result')
 
   return hasResult !== Object.hasOwn(value, 'error') && (hasResult || isJsonRpcErrorObject(value.error))
+}
+
+/**
+ * Whether a value is a JSON-RPC response: exactly one own `result` or valid `error` member, and a valid `id`.
+ */
+export function isJsonRpcResponse(value: unknown): value is JsonRpcResponse {
+  return hasJsonRpcResultOrError(value) && getOwn(value, 'jsonrpc') === JSON_RPC_VERSION && isJsonRpcId(getOwn(value, 'id'))
 }
 
 /**
@@ -66,7 +73,6 @@ const PROTOCOL_ERROR_ORPC_CODES = new Map<number, ORPCErrorCode>([
   [JSON_RPC_ERROR_CODES.PARSE_ERROR, 'BAD_REQUEST'],
   [JSON_RPC_ERROR_CODES.INVALID_REQUEST, 'BAD_REQUEST'],
   [JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND, 'NOT_FOUND'],
-  [JSON_RPC_ERROR_CODES.INTERNAL_ERROR, 'INTERNAL_SERVER_ERROR'],
 ])
 
 /**

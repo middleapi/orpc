@@ -1,6 +1,6 @@
 import { createORPCErrorFromJson, ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
-import { encodeJsonRpcError, fromJsonRpcErrorCode, isJsonRpcErrorObject, isJsonRpcId, isJsonRpcResponse } from './json-rpc'
+import { encodeJsonRpcError, fromJsonRpcErrorCode, hasJsonRpcResultOrError, isJsonRpcErrorObject, isJsonRpcId, isJsonRpcResponse } from './json-rpc'
 
 describe('isJsonRpcId', () => {
   it.each([
@@ -33,6 +33,19 @@ describe('isJsonRpcErrorObject', () => {
 
   it('reads own properties only', () => {
     expect(isJsonRpcErrorObject(JSON.parse('{ "message": "x", "__proto__": { "code": 1 } }'))).toBe(false)
+  })
+})
+
+describe('hasJsonRpcResultOrError', () => {
+  it.each([
+    [{ result: undefined }, true],
+    [{ error: { code: 1, message: 'x' } }, true],
+    [{}, false],
+    [{ result: 1, error: { code: 1, message: 'x' } }, false],
+    [{ error: { code: 1 } }, false],
+    [[1], false],
+  ])('hasJsonRpcResultOrError(%j) is %s', (value, expected) => {
+    expect(hasJsonRpcResultOrError(value)).toBe(expected)
   })
 })
 

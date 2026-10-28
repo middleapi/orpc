@@ -62,10 +62,10 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
 
   async resolveProcedure(request: StandardLazyRequest): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const method = getJsonRpcCall(request)?.method
-    const path = method?.split('.')
+    const path = method?.split('.') ?? []
 
     // `rpc.*` names are reserved, and an empty segment would alias another path (`a.` -> `/a/` -> `/a`)
-    if (!method || method.startsWith('rpc.') || !path || path.includes('')) {
+    if (!method || method.startsWith('rpc.') || path.includes('')) {
       return undefined
     }
 
@@ -129,9 +129,30 @@ async function decodeParams(params: unknown, procedure: AnyProcedure): Promise<u
     return params
   }
 
-  const [preferred, other] = params === undefined || Array.isArray(params) ? [undefined, {}] : [{}, undefined]
+  const accepts = await acceptsEmptyInputs(procedure)
 
-  return await acceptsInput(procedure, preferred) || !await acceptsInput(procedure, other) ? preferred : other
+  if (params === undefined || Array.isArray(params)) {
+    return accepts.undefined || !accepts.object ? undefined : {}
+  }
+
+  return accepts.object || !accepts.undefined ? {} : undefined
+}
+
+/**
+ * Whether the input schemas accept `undefined` and `{}`, worked out once per procedure since it only depends on its schemas.
+ */
+const emptyInputsAcceptance = new WeakMap<AnyProcedure, Promise<{ undefined: boolean, object: boolean }>>()
+
+function acceptsEmptyInputs(procedure: AnyProcedure): Promise<{ undefined: boolean, object: boolean }> {
+  let accepts = emptyInputsAcceptance.get(procedure)
+
+  if (!accepts) {
+    accepts = Promise.all([acceptsInput(procedure, undefined), acceptsInput(procedure, {})])
+      .then(([acceptsUndefined, acceptsObject]) => ({ undefined: acceptsUndefined, object: acceptsObject }))
+    emptyInputsAcceptance.set(procedure, accepts)
+  }
+
+  return accepts
 }
 
 async function acceptsInput(procedure: AnyProcedure, input: unknown): Promise<boolean> {

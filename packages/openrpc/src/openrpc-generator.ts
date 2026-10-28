@@ -2,6 +2,7 @@ import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/cont
 import type { JsonObjectSchemaEntry, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
+import type { OpenRPCMeta } from './meta'
 import type { OpenRPCContentDescriptorObject, OpenRPCDocument, OpenRPCErrorObject, OpenRPCMethodObject } from './types'
 import { ORPCError } from '@orpc/client'
 import {
@@ -10,6 +11,7 @@ import {
   DelegatingJsonSchemaConverter,
   extractJsonObjectSchemaEntries,
   hoistRecursiveRefToDef,
+  isJsonObjectSchema,
   isUnconstrainedSchema,
   resolveJsonSchemaRootLocalRef,
   StandardJsonSchemaConverter,
@@ -85,6 +87,7 @@ export class OpenRPCGenerator {
     // OpenRPC requires component names to match ^[a-zA-Z0-9.\-_]+$
     const registry = new OpenAPIComponentRegistry(doc, name => name.replace(/[^\w.-]/g, '_') || '_')
     const errors: string[] = []
+    const errorCodeMap = options.errorCodeMap ?? COMMON_JSON_RPC_ERROR_CODE_MAP
 
     await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(options.filter, contract, path) === false || isEventIteratorProcedure(contract)) {
@@ -92,7 +95,7 @@ export class OpenRPCGenerator {
       }
 
       try {
-        doc.methods.push(this.buildMethod(registry, contract, path, options.errorCodeMap))
+        doc.methods.push(this.buildMethod(registry, contract, path, errorCodeMap))
       }
       catch (e) {
         if (!(e instanceof OpenRPCGeneratorError)) {
@@ -114,7 +117,7 @@ export class OpenRPCGenerator {
     registry: OpenAPIComponentRegistry,
     contract: AnyProcedureContract,
     path: string[],
-    errorCodeMap: Record<string, number> = COMMON_JSON_RPC_ERROR_CODE_MAP,
+    errorCodeMap: Record<string, number>,
   ): OpenRPCMethodObject {
     const name = path.join('.')
 
@@ -124,15 +127,16 @@ export class OpenRPCGenerator {
       )
     }
 
-    const spec = getOpenRPCMeta(contract)?.spec
-    const method = typeof spec === 'object' ? spec : this.generateMethod(registry, contract, name, errorCodeMap)
+    const meta = getOpenRPCMeta(contract)
+    const method = typeof meta?.spec === 'object' ? meta.spec : this.generateMethod(registry, contract, meta, name, errorCodeMap)
 
-    return typeof spec === 'function' ? spec(method) : method
+    return typeof meta?.spec === 'function' ? meta.spec(method) : method
   }
 
   private generateMethod(
     registry: OpenAPIComponentRegistry,
     contract: AnyProcedureContract,
+    meta: OpenRPCMeta | undefined,
     name: string,
     errorCodeMap: Record<string, number>,
   ): OpenRPCMethodObject {
@@ -144,8 +148,8 @@ export class OpenRPCGenerator {
       throw new OpenRPCGeneratorError('File/Blob schemas cannot be sent over JSON-RPC.')
     }
 
-    const meta = getOpenRPCMeta(contract)
     const openapiMeta = getOpenAPIMeta(contract)
+    const resultSchema = registry.toOpenAPISchema(outputSchema, 'output')
     const method: OpenRPCMethodObject = {
       name,
       summary: meta?.summary ?? openapiMeta?.summary,
@@ -157,9 +161,7 @@ export class OpenRPCGenerator {
       result: {
         name: 'result',
         // `undefined` is sent as `null`
-        schema: outputOptional && !isUnconstrainedSchema(outputSchema)
-          ? { anyOf: [registry.toOpenAPISchema(outputSchema, 'output'), { type: 'null' }] }
-          : registry.toOpenAPISchema(outputSchema, 'output'),
+        schema: outputOptional && !isUnconstrainedSchema(outputSchema) ? { anyOf: [resultSchema, { type: 'null' }] } : resultSchema,
       },
       errors: buildErrors(def.errorMap, errorCodeMap),
     }
@@ -224,8 +226,7 @@ function toByNameEntries(schema: JsonSchema): JsonObjectSchemaEntry[] | undefine
   const root = resolveJsonSchemaRootLocalRef(schema)
 
   if (
-    typeof root !== 'object'
-    || root.type !== 'object'
+    !isJsonObjectSchema(root)
     || Object.keys(root).some(key => !BY_NAME_ROOT_KEYWORDS.has(key) && !key.startsWith('x-'))
     || !(root.additionalProperties === undefined || typeof root.additionalProperties === 'boolean' || isUnconstrainedSchema(root.additionalProperties))
     || Object.hasOwn(root.properties ?? {}, '')
@@ -241,7 +242,7 @@ function toContentDescriptor(registry: OpenAPIComponentRegistry, name: string, s
     name,
     description: typeof schema === 'object' ? schema.description : undefined,
     required: optional ? undefined : true,
-    schema: registry.toOpenAPISchema(schema, 'input') as JsonSchema,
+    schema: registry.toOpenAPISchema(schema, 'input'),
   }
 }
 

@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import type { JsonRpcErrorObject } from './json-rpc'
 
 /**
  * `x-` specification extensions, allowed on most OpenRPC objects.
@@ -29,11 +30,7 @@ export interface OpenRPCContentDescriptorObject extends OpenRPCExtensions {
   deprecated?: boolean | undefined
 }
 
-export interface OpenRPCErrorObject {
-  code: number
-  message: string
-  data?: unknown
-}
+export type OpenRPCErrorObject = JsonRpcErrorObject
 
 export interface OpenRPCServerObject extends OpenRPCExtensions {
   url: string

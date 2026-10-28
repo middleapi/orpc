@@ -4,6 +4,7 @@ it('exports openrpc meta, OpenRPCGenerator, JSON-RPC helpers and constants', asy
     getOpenRPCMeta: expect.any(Function),
     OpenRPCGenerator: expect.any(Function),
     OpenRPCGeneratorError: expect.any(Function),
+    hasJsonRpcResultOrError: expect.any(Function),
     isJsonRpcResponse: expect.any(Function),
     encodeJsonRpcError: expect.any(Function),
     fromJsonRpcErrorCode: expect.any(Function),

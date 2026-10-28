@@ -1,15 +1,14 @@
 import type { Context, Router } from '@orpc/server'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandlerOptions } from '@orpc/server/standard'
+import type { FriendlyStandardHandlerHandleOptions } from '@orpc/server/standard'
 import type { WebSocketLike } from '@orpc/server/websocket'
 import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
-import type { OpenRPCEnvelopeHandlerPluginOptions, OpenRPCHandlerCodecOptions } from '../standard'
-import { resolveFriendlyStandardHandlerHandleOptions, StandardHandler } from '@orpc/server/standard'
-import { AbortError, loadBytes, resolveMaybeOptionalOptions, sequential, stringifyJSON, toArray, toStringOrBytes } from '@orpc/shared'
-import { OpenRPCEnvelopeHandlerPlugin, OpenRPCHandlerCodec } from '../standard'
+import type { StandardOpenRPCHandlerOptions } from '../standard'
+import { resolveFriendlyStandardHandlerHandleOptions } from '@orpc/server/standard'
+import { AbortError, loadBytes, resolveMaybeOptionalOptions, sequential, stringifyJSON, toStringOrBytes } from '@orpc/shared'
+import { StandardOpenRPCHandler } from '../standard'
 import { parseJsonMessage } from './utils'
 
-export interface OpenRPCHandlerOptions<T extends Context>
-  extends StandardHandlerOptions<T>, OpenRPCHandlerCodecOptions<T>, OpenRPCEnvelopeHandlerPluginOptions<T> {}
+export interface OpenRPCHandlerOptions<T extends Context> extends StandardOpenRPCHandlerOptions<T> {}
 
 /**
  * Serves oRPC procedures as a JSON-RPC 2.0 API over a WebSocket connection: each message is a request or a batch,
@@ -19,7 +18,7 @@ export interface OpenRPCHandlerOptions<T extends Context>
  * @see {@link https://orpc.dev/docs/openrpc/handler#websocket | OpenRPC Handler - WebSocket}
  */
 export class OpenRPCHandler<T extends Context> {
-  private readonly handler: StandardHandler<T>
+  private readonly handler: StandardOpenRPCHandler<T>
 
   /**
    * Aborts the in-flight calls of a socket once it closes.
@@ -27,9 +26,7 @@ export class OpenRPCHandler<T extends Context> {
   private readonly controllers = new WeakMap<WebSocketLike, AbortController>()
 
   constructor(router: Router<T>, options: NoInfer<OpenRPCHandlerOptions<T>> = {}) {
-    const codec = new OpenRPCHandlerCodec(router, options)
-    const plugins = [...toArray(options.plugins), new OpenRPCEnvelopeHandlerPlugin(options)]
-    this.handler = new StandardHandler(codec, { ...options, plugins })
+    this.handler = new StandardOpenRPCHandler(router, options)
   }
 
   /**

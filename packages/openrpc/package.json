@@ -96,11 +96,9 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.13.0",
-    "@standard-server/fetch": "~0.13.0"
+    "@standard-server/core": "~0.13.0"
   },
   "devDependencies": {
-    "@orpc/zod": "workspace:*",
     "@standard-server/aws-lambda": "~0.13.0",
     "fastify": "^5.12.7",
     "ws": "^8.22.0",

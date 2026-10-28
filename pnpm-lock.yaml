@@ -944,13 +944,7 @@ importers:
       '@standard-server/core':
         specifier: ~0.13.0
         version: 0.13.0
-      '@standard-server/fetch':
-        specifier: ~0.13.0
-        version: 0.13.0
     devDependencies:
-      '@orpc/zod':
-        specifier: workspace:*
-        version: link:../zod
       '@standard-server/aws-lambda':
         specifier: ~0.13.0
         version: 0.13.0

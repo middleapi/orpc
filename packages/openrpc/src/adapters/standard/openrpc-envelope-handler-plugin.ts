@@ -12,7 +12,7 @@ import { DEFAULT_ERROR_STATUS } from '@orpc/server'
 import { getOwn, isPlainObject, matchesHttpPath, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
 import { mergeStandardHeaders } from '@standard-server/core'
 import { DEFAULT_JSON_RPC_MAX_BATCH_SIZE, JSON_RPC_ERROR_CODES, JSON_RPC_VERSION } from '../../constants'
-import { encodeJsonRpcError, isJsonRpcErrorObject, isJsonRpcId } from '../../json-rpc'
+import { encodeJsonRpcError, hasJsonRpcResultOrError, isJsonRpcId } from '../../json-rpc'
 import { getJsonRpcCall, isJsonRpcMediaType, JSON_RPC_CALL_SYMBOL } from './utils'
 
 export interface OpenRPCEnvelopeHandlerPluginOptions<T extends Context>
@@ -155,7 +155,6 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
     }
 
     const id = rawId as JsonRpcId | undefined
-    const call: JsonRpcCall = { method, id }
     const request: StandardLazyRequest & { [JSON_RPC_CALL_SYMBOL]: JsonRpcCall } = {
       method: 'POST',
       // only for logs and spans, the codec routes by the call
@@ -163,7 +162,7 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
       headers: { ...options.request.headers, 'content-length': undefined },
       signal: options.request.signal,
       resolveBody: async () => params ?? undefined,
-      [JSON_RPC_CALL_SYMBOL]: call,
+      [JSON_RPC_CALL_SYMBOL]: { method, id },
     }
 
     let result: StandardHandlerHandleResult
@@ -194,13 +193,10 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
 
     const body = result.response.body
 
-    if (isPlainObject(body) && Object.hasOwn(body, 'result') !== Object.hasOwn(body, 'error')) {
-      if (Object.hasOwn(body, 'result')) {
-        return { response: { jsonrpc: JSON_RPC_VERSION, id, result: body.result }, headers }
-      }
-
-      if (isJsonRpcErrorObject(body.error)) {
-        return { response: { jsonrpc: JSON_RPC_VERSION, id, error: body.error }, headers }
+    if (hasJsonRpcResultOrError(body)) {
+      return {
+        response: 'result' in body ? { jsonrpc: JSON_RPC_VERSION, id, result: body.result } : { jsonrpc: JSON_RPC_VERSION, id, error: body.error },
+        headers,
       }
     }
 

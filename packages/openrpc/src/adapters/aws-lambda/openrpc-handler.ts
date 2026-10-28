@@ -1,14 +1,10 @@
 import type { Context, Router } from '@orpc/server'
 import type { AwsLambdaHandlerOptions } from '@orpc/server/aws-lambda'
-import type { StandardHandlerOptions } from '@orpc/server/standard'
-import type { OpenRPCEnvelopeHandlerPluginOptions, OpenRPCHandlerCodecOptions } from '../standard'
+import type { StandardOpenRPCHandlerOptions } from '../standard'
 import { AwsLambdaHandler } from '@orpc/server/aws-lambda'
-import { StandardHandler } from '@orpc/server/standard'
-import { toArray } from '@orpc/shared'
-import { OpenRPCEnvelopeHandlerPlugin, OpenRPCHandlerCodec } from '../standard'
+import { StandardOpenRPCHandler } from '../standard'
 
-export interface OpenRPCHandlerOptions<T extends Context>
-  extends AwsLambdaHandlerOptions<T>, StandardHandlerOptions<T>, OpenRPCHandlerCodecOptions<T>, OpenRPCEnvelopeHandlerPluginOptions<T> {}
+export interface OpenRPCHandlerOptions<T extends Context> extends AwsLambdaHandlerOptions<T>, StandardOpenRPCHandlerOptions<T> {}
 
 /**
  * Serves oRPC procedures as a JSON-RPC 2.0 API over HTTP POST using AWS Lambda.
@@ -20,8 +16,6 @@ export interface OpenRPCHandlerOptions<T extends Context>
  */
 export class OpenRPCHandler<T extends Context> extends AwsLambdaHandler<T> {
   constructor(router: Router<T>, options: NoInfer<OpenRPCHandlerOptions<T>> = {}) {
-    const codec = new OpenRPCHandlerCodec(router, options)
-    const plugins = [...toArray(options.plugins), new OpenRPCEnvelopeHandlerPlugin(options)]
-    super(new StandardHandler(codec, { ...options, plugins }), options)
+    super(new StandardOpenRPCHandler(router, options), options)
   }
 }

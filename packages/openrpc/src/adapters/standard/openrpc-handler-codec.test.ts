@@ -164,6 +164,18 @@ describe('openRPCHandlerCodec', () => {
         it('treats a schema that throws while probing as not accepting the value', async () => {
           await expect(decode('throwing', undefined)).resolves.toEqual({})
         })
+
+        it('probes the input schemas once per procedure', async () => {
+          const validate = vi.fn(async (value: unknown) => value === undefined ? { issues: [{ message: 'required' }] } : { value })
+          const codec = new OpenRPCHandlerCodec({ probed: os.input({ '~standard': { version: 1, vendor: 'test', validate } }).handler(vi.fn()) })
+
+          for (const params of [undefined, [], {}]) {
+            const result = await codec.resolveProcedure(createRequest('probed', params))
+            await expect(result!.decodeInput()).resolves.toEqual({})
+          }
+
+          expect(validate).toHaveBeenCalledTimes(2)
+        })
       })
     })
   })
