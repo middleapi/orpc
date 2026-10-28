@@ -1,6 +1,5 @@
 import { oc } from '@orpc/contract'
 import { implement, os } from '@orpc/server'
-import { findAllRoutes } from 'rou3'
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
 
@@ -250,7 +249,7 @@ describe('openAPIMatcher', () => {
       }
     })
 
-    it('matches path text that requests leave raw but rou3 stores encoded', async () => {
+    it('matches path text that requests may leave raw or percent-encode', async () => {
       const procedure = os.meta(openapi({ method: 'GET', path: '/v1^beta/items:batchGet/{id}' })).handler(() => 'ok')
 
       const matcher = new OpenAPIMatcher({ procedure })
@@ -278,7 +277,7 @@ describe('openAPIMatcher', () => {
 
       const matcher = new OpenAPIMatcher({ beta, version, me, byId })
 
-      // a raw char rou3 stores encoded, as `fetch` sends "^"
+      // a raw char, as `fetch` sends "^"
       for (const pathname of ['/v1^beta/items', '/v1%5Ebeta/items', '/v1%5ebeta/items'] as const) {
         await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
           path: ['beta'],
@@ -287,7 +286,7 @@ describe('openAPIMatcher', () => {
         })
       }
 
-      // a percent-encoded char rou3 stores raw
+      // a percent-encoded unreserved char
       for (const pathname of ['/users/me', '/users/m%65', '/users/%6D%65'] as const) {
         await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
           path: ['me'],
@@ -329,7 +328,6 @@ describe('openAPIMatcher', () => {
     })
 
     it('matches every ASCII char in path text, raw or percent-encoded', async () => {
-      // fails if rou3 starts percent-encoding a char that ROU3_RAW_CHARS treats as raw
       const chars = Array.from({ length: 0x7F - 0x20 }, (_, i) => String.fromCharCode(0x20 + i)).filter(char => char !== '/')
 
       const matcher = new OpenAPIMatcher(Object.fromEntries(chars.map(char => [
@@ -534,7 +532,7 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
       await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
 
-      expect(findAllRoutes((matcher as any).tree, 'GET', '/valid')).toEqual([])
+      expect((matcher as any).tree.match('GET', '/valid')).toBeUndefined()
     })
 
     it('retries a lazy router whose load fails, synchronously or asynchronously', async () => {
@@ -581,7 +579,7 @@ describe('openAPIMatcher', () => {
         user: os.meta(openapi({ prefix: '/users' })).lazy(loader),
       })
 
-      // "%75" is "u": the prefix RegExp only matches the normalized pathname
+      // "%75" is "u": the prefix only matches the decoded pathname
       const result = await matcher.match('GET', '/%75sers/info', undefined)
 
       expect(result).toBeDefined()
@@ -596,7 +594,7 @@ describe('openAPIMatcher', () => {
       expect(loader).toHaveBeenCalledTimes(1)
     })
 
-    it('resolves a prefixed lazy router whose prefix holds a char rou3 stores encoded', async () => {
+    it('resolves a prefixed lazy router whose prefix holds a char requests may leave raw', async () => {
       const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
 
       const loader = vi.fn(async () => ({ default: { info } }))
@@ -608,7 +606,7 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/v1beta/info', undefined)).resolves.toBeUndefined()
       expect(loader).toHaveBeenCalledTimes(0)
 
-      // the prefix RegExp holds "%5E", so the raw "^" only matches it after normalization
+      // `fetch` sends "^" raw
       await expect(matcher.match('GET', '/v1^beta/info', undefined)).resolves.toMatchObject({
         path: ['beta', 'info'],
         params: undefined,

@@ -116,6 +116,7 @@
   },
   "dependencies": {
     "@openapi-spec/downgrader": "~0.4.0",
+    "@openapi-spec/router": "file:vendor/openapi-spec-router-0.4.0.tgz",
     "@openapi-spec/types": "~0.4.0",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
@@ -123,8 +124,7 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@standard-server/core": "~0.13.0",
-    "@standard-server/fetch": "~0.13.0",
-    "rou3": "^1.0.0"
+    "@standard-server/fetch": "~0.13.0"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.74.0",

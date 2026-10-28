@@ -50,4 +50,3 @@ minimumReleaseAgeExclude:
   - '@standard-server/shared@0.13.0'
   - blume@2.2.1
   - effect@4.0.0
-  - rou3@1.0.0

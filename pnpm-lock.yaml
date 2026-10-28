@@ -871,6 +871,9 @@ importers:
       '@openapi-spec/downgrader':
         specifier: ~0.4.0
         version: 0.4.0
+      '@openapi-spec/router':
+        specifier: file:vendor/openapi-spec-router-0.4.0.tgz
+        version: file:packages/openapi/vendor/openapi-spec-router-0.4.0.tgz
       '@openapi-spec/types':
         specifier: ~0.4.0
         version: 0.4.0
@@ -895,9 +898,6 @@ importers:
       '@standard-server/fetch':
         specifier: ~0.13.0
         version: 0.13.0
-      rou3:
-        specifier: ^1.0.0
-        version: 1.0.0
     devDependencies:
       '@scalar/api-reference':
         specifier: ^1.74.0
@@ -3577,6 +3577,10 @@ packages:
 
   '@openapi-spec/downgrader@0.4.0':
     resolution: {integrity: sha512-hrOjK64HADGGG56RvmJ8z+CenNqTEAI0Ped1aG1oeY9CNDMZRhILatygmtcCtudVUNfbJU1CmnuzpeXujQH/rg==}
+
+  '@openapi-spec/router@file:packages/openapi/vendor/openapi-spec-router-0.4.0.tgz':
+    resolution: {integrity: sha512-jvTT/fVY0rbaF8gRsEMVJ47LwxlE0mUmPZUudXXgyHP2elCkembppeywvH8UVYZHlWndcHPX7gAbQ2EiDtC1og==, tarball: file:packages/openapi/vendor/openapi-spec-router-0.4.0.tgz}
+    version: 0.4.0
 
   '@openapi-spec/types@0.4.0':
     resolution: {integrity: sha512-TkCtxQoIIzPvnqYeKopbBKdVzttj6Mg+D5QSy+h8bbWA0/x97qPw3FKDCcymh+7y4IhCRxFeWuff8T03HQUxVw==}
@@ -11112,10 +11116,6 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rou3@1.0.0:
-    resolution: {integrity: sha512-ySeaQkSrua+ut9g+65I7FHqOFBaY8tV0FmccXItoq0q21se32Q3u4YiW7/RqXSosWgYJaaKwRHXy3BST9PeCNQ==}
-    engines: {node: '>=20.19.0'}
-
   roughjs@4.6.6:
     resolution: {integrity: sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==}
 
@@ -14776,6 +14776,8 @@ snapshots:
   '@openapi-spec/downgrader@0.4.0':
     dependencies:
       '@openapi-spec/types': 0.4.0
+
+  '@openapi-spec/router@file:packages/openapi/vendor/openapi-spec-router-0.4.0.tgz': {}
 
   '@openapi-spec/types@0.4.0': {}
 
@@ -23980,8 +23982,6 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.63.0
       '@rollup/rollup-win32-x64-msvc': 4.63.0
       fsevents: 2.3.3
-
-  rou3@1.0.0: {}
 
   roughjs@4.6.6:
     dependencies:
