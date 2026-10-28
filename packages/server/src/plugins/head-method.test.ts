@@ -47,6 +47,24 @@ function getSentHeaders(response: StandardResponse): Record<string, string> {
   return Object.fromEntries(toFetchResponse(response).headers)
 }
 
+/**
+ * Expects the `HEAD` response to send the status and headers of `GET`, plus `extraHeaders`, without a body.
+ */
+async function expectHeadersOfGet(
+  createResponse: () => StandardResponse,
+  extraHeaders: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  const reference = createResponse()
+  const response = await toHeadResponse(createResponse())
+  const headers = getSentHeaders(response)
+
+  expect(response.status).toBe(reference.status)
+  expect(headers).toEqual({ ...getSentHeaders(reference), ...extraHeaders })
+  await expect(toFetchResponse(response).text()).resolves.toBe('')
+
+  return headers
+}
+
 describe('headMethodHandlerPlugin', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -98,6 +116,7 @@ describe('headMethodHandlerPlugin', () => {
       expect(next).toHaveBeenNthCalledWith(2, {
         context,
         prefix: '/api',
+        next,
         request: { method: 'GET', url: '/ping?x=1', headers: { 'x-custom': '1' }, signal },
       })
     })
@@ -126,45 +145,28 @@ describe('headMethodHandlerPlugin', () => {
     })
 
     it.each([
-      ['json', () => ({ name: 'Ελλάδα' })],
-      ['string', () => 'ő'],
-      ['null', () => null],
-      ['url-search-params', () => new URLSearchParams({ name: 'Ελλάδα' })],
-    ])('keeps the headers of a %s body and reports its size', async (_, createBody) => {
-      const response = await toHeadResponse({ status: 201, headers: { 'x-custom': '1' }, body: createBody() })
+      ['json', {}, () => ({ name: 'Ελλάδα' })],
+      ['json with a custom content type', { 'content-type': 'application/vnd.api+json' }, () => ({ a: 1 })],
+      ['string', {}, () => 'ő'],
+      ['null', {}, () => null],
+      ['url-search-params', {}, () => new URLSearchParams({ name: 'Ελλάδα' })],
+    ])('keeps the headers of a %s body and reports its size', async (_, headers, createBody) => {
+      const size = (await toFetchResponse({ status: 200, headers, body: createBody() }).arrayBuffer()).byteLength
 
-      const getResponse = toFetchResponse({ status: 201, headers: { 'x-custom': '1' }, body: createBody() })
-      const size = (await getResponse.arrayBuffer()).byteLength
-
-      expect(response.status).toBe(201)
-      expect(getSentHeaders(response)).toEqual({
-        ...Object.fromEntries(getResponse.headers),
-        'content-length': size.toString(),
-      })
-      await expect(toFetchResponse(response).text()).resolves.toBe('')
-    })
-
-    it('respects a custom content type', async () => {
-      const response = await toHeadResponse({ status: 200, headers: { 'content-type': 'application/vnd.api+json' }, body: { a: 1 } })
-
-      expect(getSentHeaders(response)).toEqual({
-        ...getSentHeaders({ status: 200, headers: { 'content-type': 'application/vnd.api+json' }, body: { a: 1 } }),
-        'content-length': '7',
-      })
-      expect(getSentHeaders(response)['standard-server']).toBe('json')
+      await expectHeadersOfGet(
+        () => ({ status: 201, headers: { ...headers, 'x-custom': '1' }, body: createBody() }),
+        { 'content-length': size.toString() },
+      )
     })
 
     it('keeps the headers of a file body', async () => {
-      const createBody = () => new File(['hello'], 'hello world.txt', { type: 'text/plain' })
-      const response = await toHeadResponse({ status: 200, headers: {}, body: createBody() })
-
-      expect(getSentHeaders(response)).toEqual(getSentHeaders({ status: 200, headers: {}, body: createBody() }))
-      expect(getSentHeaders(response)).toEqual(expect.objectContaining({
-        'content-type': 'text/plain',
-        'content-length': '5',
-        'content-disposition': expect.stringContaining('hello world.txt'),
+      const headers = await expectHeadersOfGet(() => ({
+        status: 200,
+        headers: {},
+        body: new File(['hello'], 'hello world.txt', { type: 'text/plain' }),
       }))
-      await expect(toFetchResponse(response).text()).resolves.toBe('')
+
+      expect(headers).toMatchObject({ 'content-type': 'text/plain', 'content-length': '5' })
     })
 
     it('keeps the headers of a blob body of unknown size and cancels its stream', async () => {
@@ -180,50 +182,43 @@ describe('headMethodHandlerPlugin', () => {
         }
       }
 
-      const response = await toHeadResponse({ status: 200, headers: {}, body: new UnknownSizeBlob([], { type: 'text/plain' }) })
+      const headers = await expectHeadersOfGet(() => ({ status: 200, headers: {}, body: new UnknownSizeBlob([], { type: 'text/plain' }) }))
 
-      expect(getSentHeaders(response)).toEqual(getSentHeaders({ status: 200, headers: {}, body: new UnknownSizeBlob([], { type: 'text/plain' }) }))
-      expect(getSentHeaders(response)).not.toHaveProperty('content-length')
+      expect(headers).not.toHaveProperty('content-length')
       expect(cancel).toHaveBeenCalledOnce()
     })
 
     it('keeps the headers of a stream body and cancels it', async () => {
       const cancel = vi.fn()
-      const pull = vi.fn()
-      const createBody = () => new ReadableStream({ pull, cancel })
-      const headers = { 'content-type': 'video/mp4', 'content-length': '100' }
 
-      const response = await toHeadResponse({ status: 200, headers, body: createBody() })
+      const headers = await expectHeadersOfGet(() => ({
+        status: 200,
+        headers: { 'content-type': 'video/mp4', 'content-length': '100' },
+        body: new ReadableStream({ cancel }),
+      }))
 
-      expect(getSentHeaders(response)).toEqual(getSentHeaders({ status: 200, headers, body: createBody() }))
-      expect(getSentHeaders(response)).toEqual(expect.objectContaining({ 'content-length': '100' }))
-      await expect(toFetchResponse(response).text()).resolves.toBe('')
+      expect(headers['content-length']).toBe('100')
       expect(cancel).toHaveBeenCalledOnce()
     })
 
-    it('keeps the headers of an event iterator body and ends it without starting it', async () => {
-      let started = false
-      async function* createBody() {
-        started = true
-        yield 1
-      }
-
-      const body = createBody()
-      const response = await toHeadResponse({ status: 200, headers: {}, body })
-
-      expect(getSentHeaders(response)).toEqual(getSentHeaders({ status: 200, headers: {}, body: (async function* () {})() }))
-      expect(getSentHeaders(response)).toEqual(expect.objectContaining({ 'content-type': 'text/event-stream' }))
-      await expect(toFetchResponse(response).text()).resolves.toBe('')
-      await expect(body.next()).resolves.toEqual({ done: true, value: undefined })
-      expect(started).toBe(false)
+    it.each([
+      [{}],
+      [{ 'content-type': 'text/plain' }],
+    ])('keeps the headers of an event iterator body with headers %o', async (headers) => {
+      await expectHeadersOfGet(() => ({ status: 200, headers, body: (async function* () {})() }))
     })
 
-    it('keeps the hint of an event iterator body with a custom content type', async () => {
-      const headers = { 'content-type': 'text/plain' }
-      const response = await toHeadResponse({ status: 200, headers, body: (async function* () {})() })
+    it('ends an event iterator body without starting it', async () => {
+      let started = false
+      const body = (async function* () {
+        started = true
+        yield 1
+      })()
 
-      expect(getSentHeaders(response)).toEqual(getSentHeaders({ status: 200, headers, body: (async function* () {})() }))
-      expect(getSentHeaders(response)['standard-server']).toBe('event-stream')
+      await toHeadResponse({ status: 200, headers: {}, body })
+
+      await expect(body.next()).resolves.toEqual({ done: true, value: undefined })
+      expect(started).toBe(false)
     })
 
     it('keeps the headers of a form data body', async () => {

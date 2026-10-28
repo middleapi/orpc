@@ -24,10 +24,9 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
   name = '~head-method'
 
   /**
-   * - Discard the body after response compression, so `HEAD` reports the same `Content-Encoding` as `GET`.
-   * - Fall back to `GET` after static files, so they keep answering `HEAD` themselves and procedures still take precedence over them.
+   * Discard the body after response compression, so `HEAD` reports the same `Content-Encoding` as `GET`.
    */
-  after = ['~response-compression', '~static-file']
+  after = ['~response-compression']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const bodyInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, request }) => {
@@ -47,8 +46,8 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
     /**
      * Placed last, so falling back to `GET` repeats routing rather than the routing interceptors before this one.
      */
-    const fallbackInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
-      const { request } = interceptorOptions
+    const fallbackInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
+      const { next, request } = interceptorOptions
 
       if (request.method !== 'HEAD') {
         return next()
@@ -89,46 +88,33 @@ function toHeadResponse(response: StandardResponse): StandardResponse {
     return response
   }
 
-  let headers: StandardHeaders
-
-  if (body instanceof ReadableStream) {
-    discardBody(body)
-    headers = response.headers // adapters derive the same headers from any stream
-  }
-
-  else if (isAsyncIteratorObject(body)) {
+  if (isAsyncIteratorObject(body)) {
     discardBody(body)
 
     // Encoding it would start iterating, so the headers are derived the way adapters do
-    headers = { ...response.headers, 'content-length': undefined }
+    const headers: StandardHeaders = { ...response.headers, 'content-length': undefined }
     headers['content-type'] ??= 'text/event-stream'
     headers['standard-server'] = getRequiredStandardBodyHint('event-stream', headers) ?? []
+
+    return { ...response, headers, body: createEmptyStream() }
   }
 
-  else if (body instanceof FormData) {
+  const [encoded, headers] = toFetchBody(body, response.headers)
+
+  if (encoded instanceof ReadableStream) {
+    discardBody(encoded) // a stream, or a blob of unknown size
+  }
+  else if (encoded instanceof FormData) {
     // Only encoding it reveals the boundary. The size is left out, since it would require reading every file.
-    const encoded = new Response(body)
-    discardBody(encoded.body)
+    const encodedResponse = new Response(encoded)
+    discardBody(encodedResponse.body)
 
-    headers = {
-      ...response.headers,
-      'standard-server': [],
-      'content-type': encoded.headers.get('content-type')!,
-      'content-length': undefined,
-    }
+    headers['standard-server'] = []
+    headers['content-type'] = encodedResponse.headers.get('content-type')!
   }
-
-  else {
-    const [encoded, encodedHeaders] = toFetchBody(body, response.headers)
-    headers = encodedHeaders
-
-    if (encoded instanceof ReadableStream) {
-      discardBody(encoded) // a blob of unknown size
-    }
-    else if (typeof encoded === 'string' || encoded instanceof URLSearchParams) {
-      headers['standard-server'] ??= []
-      headers['content-length'] = textEncoder.encode(encoded.toString()).byteLength.toString()
-    }
+  else if (typeof encoded === 'string' || encoded instanceof URLSearchParams) {
+    headers['standard-server'] ??= []
+    headers['content-length'] = textEncoder.encode(encoded.toString()).byteLength.toString()
   }
 
   return { ...response, headers, body: createEmptyStream() }

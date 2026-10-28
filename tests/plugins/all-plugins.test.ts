@@ -210,19 +210,21 @@ describe('all plugins on one handler and one link', () => {
     expect(exchanges[0]!.response.headers.get('content-encoding')).toEqual('gzip')
   })
 
-  it('answers HEAD with the headers of GET behind the other routing plugins', async () => {
+  it.each([
+    `/rpc/ping?data=${encodeURIComponent(JSON.stringify({ json: { value: 1 } }))}`,
+    '/rpc/static/all-plugins.test.ts',
+  ])('answers HEAD with the headers of GET behind the other routing plugins: %s', async (path) => {
     const { handler } = createClientServer()
+    const options = { context: {}, prefix: '/rpc' } as const
+    const init = { headers: { 'accept-encoding': 'gzip' } }
 
-    for (const path of [`/rpc/ping?data=${encodeURIComponent(JSON.stringify({ json: { value: 1 } }))}`, '/rpc/static/all-plugins.test.ts']) {
-      const init = { headers: { 'accept-encoding': 'gzip' } }
-      const { response: getResponse } = await handler.handle(new Request(`http://localhost${path}`, init), { context: {}, prefix: '/rpc' })
-      const { response } = await handler.handle(new Request(`http://localhost${path}`, { ...init, method: 'HEAD' }), { context: {}, prefix: '/rpc' })
+    const { response: getResponse } = await handler.handle(new Request(`http://localhost${path}`, init), options)
+    const { response } = await handler.handle(new Request(`http://localhost${path}`, { ...init, method: 'HEAD' }), options)
 
-      expect(getResponse?.status).toEqual(200)
-      expect(response?.status).toEqual(200)
-      expect(Object.fromEntries(response!.headers)).toEqual(Object.fromEntries(getResponse!.headers))
-      await expect(response!.text()).resolves.toEqual('')
-    }
+    expect(getResponse?.status).toEqual(200)
+    expect(response?.status).toEqual(200)
+    expect(Object.fromEntries(response!.headers)).toEqual(Object.fromEntries(getResponse!.headers))
+    await expect(response!.text()).resolves.toEqual('')
   })
 
   it('serves the openapi reference behind the other routing plugins', async () => {
