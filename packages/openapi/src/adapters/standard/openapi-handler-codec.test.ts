@@ -926,22 +926,11 @@ describe('openAPIHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON())
     })
 
-    it('uses errorResponseBodyEncoder and falls back on null', () => {
-      let attempt = 1
-      const errorResponseBodyEncoder = vi.fn(() => {
-        if (attempt++ === 2) {
-          return null
-        }
-
-        return {
-          message: 'custom error body',
-        }
-      })
+    it('uses errorResponseBodyEncoder without falling back on null', () => {
+      const errorResponseBodyEncoder = vi.fn(() => null)
 
       const serializer = {
-        serialize: vi.fn()
-          .mockReturnValueOnce('__serialized_custom__')
-          .mockReturnValueOnce('__serialized_default__'),
+        serialize: vi.fn(() => '__serialized_custom__'),
         deserialize: vi.fn(),
       } as any
 
@@ -951,31 +940,33 @@ describe('openAPIHandlerCodec', () => {
         errorResponseBodyEncoder,
       })
 
-      const firstError = new ORPCError('BAD_GATEWAY', { data: '__data1__' })
-      const firstResponse = codec.encodeError(firstError)
+      const error = new ORPCError('BAD_GATEWAY', { data: '__data__' })
 
-      expect(firstResponse).toEqual({
+      expect(codec.encodeError(error)).toEqual({
         status: 502,
         headers: {},
         body: '__serialized_custom__',
       })
 
-      const secondError = new ORPCError('UNKNOWN_CODE' as any, { data: '__data2__' })
-      const secondResponse = codec.encodeError(secondError)
+      expect(errorResponseBodyEncoder).toHaveBeenCalledOnce()
+      expect(errorResponseBodyEncoder).toHaveBeenCalledWith(error)
 
-      expect(secondResponse).toEqual({
-        status: DEFAULT_ERROR_STATUS,
-        headers: {},
-        body: '__serialized_default__',
+      expect(serializer.serialize).toHaveBeenCalledOnce()
+      expect(serializer.serialize).toHaveBeenCalledWith(null)
+    })
+
+    it('sends an empty body without content-type when errorResponseBodyEncoder returns undefined', () => {
+      const procedure = os.handler(vi.fn())
+      const codec = new OpenAPIHandlerCodec(procedure, {
+        errorResponseBodyEncoder: () => undefined,
+        errorResponseContentType: 'application/problem+json',
       })
 
-      expect(errorResponseBodyEncoder).toHaveBeenCalledTimes(2)
-      expect(errorResponseBodyEncoder).toHaveBeenNthCalledWith(1, firstError)
-      expect(errorResponseBodyEncoder).toHaveBeenNthCalledWith(2, secondError)
-
-      expect(serializer.serialize).toHaveBeenCalledTimes(2)
-      expect(serializer.serialize).toHaveBeenNthCalledWith(1, { message: 'custom error body' })
-      expect(serializer.serialize).toHaveBeenNthCalledWith(2, secondError.toJSON())
+      expect(codec.encodeError(new ORPCError('NOT_FOUND'))).toEqual({
+        status: 404,
+        headers: {},
+        body: undefined,
+      })
     })
 
     it('sets content-type header via errorResponseContentType option', () => {

@@ -39,7 +39,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
    * Use this if your API needs a different error output structure.
    *
    * @remarks
-   * - Return `null | undefined` to fallback to default behavior
+   * - Return `error.toJSON()` to keep the default body, or `undefined` to send an empty body
    *
    * @default ((e) => e.toJSON())
    */
@@ -56,13 +56,13 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 export class OpenAPIHandlerCodecCore<T extends Context> {
   private readonly serializer: Public<OpenAPISerializer>
   private readonly errorStatusMap: Exclude<OpenAPIHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly errorResponseBodyEncoder: OpenAPIHandlerCodecOptions<T>['errorResponseBodyEncoder']
+  private readonly errorResponseBodyEncoder: Exclude<OpenAPIHandlerCodecOptions<T>['errorResponseBodyEncoder'], undefined>
   private readonly errorResponseContentType: OpenAPIHandlerCodecOptions<T>['errorResponseContentType']
 
   constructor(options: OpenAPIHandlerCodecCoreOptions<T> = {}) {
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.errorResponseBodyEncoder = options.errorResponseBodyEncoder
+    this.errorResponseBodyEncoder = options.errorResponseBodyEncoder ?? (e => e.toJSON())
     this.errorResponseContentType = options.errorResponseContentType
   }
 
@@ -146,11 +146,12 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
+    const body = this.serializer.serialize(this.errorResponseBodyEncoder(error))
 
     return {
       status,
-      headers: this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
-      body: this.serializer.serialize(this.errorResponseBodyEncoder?.(error) ?? error.toJSON()),
+      headers: body !== undefined && this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
+      body,
     }
   }
 

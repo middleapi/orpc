@@ -901,15 +901,15 @@ describe('openAPIGenerator operation builders', () => {
     })
 
     it('allows overriding the error body schema per status', () => {
-      const errorResponseBodySchema = vi.fn((definedErrors, status) => {
+      const errorResponseBodySchema = vi.fn((definedErrors, status, defaultSchema) => {
         if (status === 400) {
           return { type: 'object' as const, description: 'custom-400' }
         }
 
-        return undefined
+        return defaultSchema()
       })
 
-      const { ctx, operation } = createContext({ errorResponseBodySchema })
+      const { doc, ctx, operation } = createContext({ errorResponseBodySchema })
 
       buildErrorResponse(ctx, operation, testDef({
         errors: {
@@ -926,7 +926,7 @@ describe('openAPIGenerator operation builders', () => {
           dataOptional: false,
           dataJsonSchema: { type: 'object' },
         },
-      ], 400)
+      ], 400, expect.any(Function))
 
       expect((operation.responses?.['400'] as any).content['application/json'].schema).toEqual({
         type: 'object',
@@ -935,6 +935,16 @@ describe('openAPIGenerator operation builders', () => {
       expect((operation.responses?.['404'] as any).content['application/json'].schema).toEqual(
         expect.objectContaining({ oneOf: expect.any(Array) }),
       )
+      // the default schema of 400 was not used, so its error component is not registered
+      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['NotFound', 'UndefinedError'])
+    })
+
+    it.each([null, undefined])('documents an empty error body when the custom schema is %s', (schema) => {
+      const { ctx, operation } = createContext({ errorResponseBodySchema: () => schema })
+
+      buildErrorResponse(ctx, operation, testDef({ errors: { NOT_FOUND: { message: 'Missing' } } }))
+
+      expect(operation.responses?.['404']).toEqual({ description: 'Missing' })
     })
 
     it('documents error bodies under the configured content type', () => {

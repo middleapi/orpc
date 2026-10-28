@@ -46,8 +46,8 @@ export interface OpenAPIOperationContext {
   convertSchemas: (schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection) => [JsonSchema, boolean]
   errorStatusMap: Record<string, number>
   errorResponseBodySchema: Value<
-    JsonSchema | undefined | null,
-    [definedErrors: OpenAPIErrorBodyDefinition[], status: number]
+    JsonSchema | null | undefined,
+    [definedErrors: OpenAPIErrorBodyDefinition[], status: number, defaultSchema: () => JsonSchema]
   > | undefined
   errorResponseContentType: string
 }
@@ -528,13 +528,11 @@ export function buildErrorResponse(
 
   for (const [status, definitions] of definitionsByStatus.entries()) {
     const descriptions = definitions.map(({ defaultMessage }) => defaultMessage).filter(m => m !== undefined)
-    const customBodySchema = value(
-      ctx.errorResponseBodySchema,
-      definitions.map(def => ({ ...def, dataJsonSchema: ctx.registry.hoistDefs(def.dataJsonSchema, 'output') })),
-      status,
-    )
-    const responseSchema = customBodySchema ?? combineJsonSchemasWithComposition('oneOf', [
-      ...definitions.map(({ code, dataJsonSchema, dataOptional }) => {
+    const definedErrors = definitions.map(def => ({ ...def, dataJsonSchema: ctx.registry.hoistDefs(def.dataJsonSchema, 'output') }))
+
+    // lazy, so per-code error components are only registered when the default schema is actually used
+    const defaultSchema = (): JsonSchema => combineJsonSchemasWithComposition('oneOf', [
+      ...definedErrors.map(({ code, dataJsonSchema, dataOptional }) => {
         return ctx.registry.register(toErrorComponentName(code), {
           title: code,
           ...combineJsonObjectSchemaEntries([
@@ -542,22 +540,31 @@ export function buildErrorResponse(
             ['code', { const: code }, false],
             // avoid using the defaultMessage here to improve component reusability
             ['message', { type: 'string' }, false],
-            ['data', ctx.registry.hoistDefs(dataJsonSchema, 'output'), dataOptional],
+            ['data', dataJsonSchema, dataOptional],
           ]),
         })
       }),
       undefinedErrorSchema,
     ])
 
-    operation.responses ??= {}
-    operation.responses[toResponseStatusKey(status)] = {
+    const responseSchema = ctx.errorResponseBodySchema === undefined
+      ? defaultSchema()
+      : value(ctx.errorResponseBodySchema, definedErrors, status, defaultSchema)
+
+    const responseObject: OpenAPIV3_2.ResponseObject = {
       description: descriptions.length ? descriptions.join(', ') : status.toString(),
-      content: {
+    }
+
+    if (responseSchema !== undefined && responseSchema !== null) {
+      responseObject.content = {
         [ctx.errorResponseContentType]: {
           schema: ctx.registry.toOpenAPISchema(responseSchema, 'output'),
         },
-      },
-    } satisfies OpenAPIV3_2.ResponseObject
+      }
+    }
+
+    operation.responses ??= {}
+    operation.responses[toResponseStatusKey(status)] = responseObject
   }
 }
 
