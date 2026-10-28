@@ -1,4 +1,5 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
@@ -174,7 +175,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
     this.codec = new NestHandlerCodec(this.config)
     this.handler = new StandardHandler(this.codec, this.config)
-    this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
+    this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest | NodeRequest, res: ExpressResponse | FastifyReply | NodeResponse) => {
       const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
         'raw' in req ? req.raw : req,
         'raw' in res ? res.raw : res,
@@ -202,8 +203,8 @@ export class ImplementInterceptor implements NestInterceptor {
           `)
         }
 
-        const req: ExpressRequest | FastifyRequest = ctx.switchToHttp().getRequest()
-        const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
+        const req: ExpressRequest | FastifyRequest | NodeRequest = ctx.switchToHttp().getRequest()
+        const res: ExpressResponse | FastifyReply | NodeResponse = ctx.switchToHttp().getResponse()
 
         const standardRequest = this.toNestStandardLazyRequest(req, res)
 
@@ -384,7 +385,7 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
 
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
-  // express use `path` while fastify use `*` for rest matching
+  // express and node use `path` while fastify uses `*` for rest matching
   const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
 
   for (const [key, value] of Object.entries(params)) {

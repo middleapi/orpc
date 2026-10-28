@@ -32,7 +32,7 @@ export type ORPCModuleConfig
     & {
       /**
        * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.
-       * You might need to define this if you are not using express or fastify adapters.
+       * You might need to define this if you are not using the express, fastify or node adapters.
        */
       toNestStandardLazyRequest?: ((req: any, res: any) => NestStandardLazyRequest) | undefined
 
