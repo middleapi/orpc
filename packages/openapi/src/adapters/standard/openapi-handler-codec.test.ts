@@ -955,11 +955,10 @@ describe('openAPIHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith(null)
     })
 
-    it('sends an empty body without content-type when errorResponseBodyEncoder returns undefined', () => {
+    it('sends an empty body when errorResponseBodyEncoder returns undefined', () => {
       const procedure = os.handler(vi.fn())
       const codec = new OpenAPIHandlerCodec(procedure, {
         errorResponseBodyEncoder: () => undefined,
-        errorResponseContentType: 'application/problem+json',
       })
 
       expect(codec.encodeError(new ORPCError('NOT_FOUND'))).toEqual({

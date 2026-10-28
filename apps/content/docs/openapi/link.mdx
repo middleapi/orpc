@@ -228,6 +228,8 @@ const link = new OpenAPILink(contract, {
 If your server returns error responses that don't match oRPC's expected format, use `errorResponseBodyDecoder` to customize the decoding logic. This works together with [Custom Error Response](/docs/openapi/handler#custom-error-response) on the server.
 
 ```ts
+import { ORPCError } from '@orpc/client'
+
 const link = new OpenAPILink(contract, {
   errorResponseBodyDecoder: (body, response, defaultError) => {
     if (response.status === 422 && typeof body === 'object' && body && 'detail' in body) {

@@ -146,12 +146,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
-    const body = this.serializer.serialize(this.errorResponseBodyEncoder(error))
 
     return {
       status,
-      headers: body !== undefined && this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
-      body,
+      headers: this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
+      body: this.serializer.serialize(this.errorResponseBodyEncoder(error)),
     }
   }
 
