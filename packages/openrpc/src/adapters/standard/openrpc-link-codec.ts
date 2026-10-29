@@ -6,7 +6,7 @@ import type { JsonRpcRequest } from '../../json-rpc'
 import { COMMON_ERROR_STATUS_MAP, createORPCErrorFromJson, MalformedResponseError, ResponseError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { DEFAULT_ERROR_STATUS } from '@orpc/server'
-import { getOwn, isAsyncIteratorObject, isPlainObject, value } from '@orpc/shared'
+import { getOwn, isAsyncIteratorObject, isPlainObject, SequentialIdGenerator, value } from '@orpc/shared'
 import { JSON_RPC_VERSION } from '../../constants'
 import { fromJsonRpcErrorCode, isJsonRpcResponse } from '../../json-rpc'
 
@@ -43,8 +43,12 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
   /**
    * The request id of each call. `StandardLink` passes the same `options` object to `encodeInput` and `decodeResponse`.
    */
-  private readonly ids = new WeakMap<ClientOptions<T>, number>()
-  private lastId = 0
+  private readonly ids = new WeakMap<ClientOptions<T>, string>()
+
+  /**
+   * Base-36 strings of a `BigInt` counter, like `@standard-server/peer`, so ids never lose precision.
+   */
+  private readonly idGenerator = new SequentialIdGenerator()
 
   constructor(options: OpenRPCLinkCodecOptions<T> = {}) {
     this.url = options.url ?? '/'
@@ -59,7 +63,7 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
       throw new TypeError(`[OpenRPCLink] JSON-RPC cannot send streams or binary data in call to procedure (${path.join('.')}).`)
     }
 
-    const id = ++this.lastId
+    const id = this.idGenerator.generate()
     this.ids.set(options, id)
 
     const body: JsonRpcRequest = { jsonrpc: JSON_RPC_VERSION, id, method: path.join('.') }

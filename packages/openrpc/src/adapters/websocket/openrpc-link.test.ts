@@ -49,7 +49,7 @@ describe('openRPCLink', () => {
   }
 
   const getSentRequest = (ws: ReturnType<typeof createWs>) => JSON.parse(ws.send.mock.calls[0]![0])
-  const result = (id: number, value: unknown = 'pong') => ({ jsonrpc: '2.0', id, result: value })
+  const result = (id: string, value: unknown = 'pong') => ({ jsonrpc: '2.0', id, result: value })
   const respond = (ws: ReturnType<typeof createWs>, body: unknown) => ws.receive(JSON.stringify(body))
 
   it.each([
@@ -63,9 +63,9 @@ describe('openRPCLink', () => {
     const promise = orpc.planet.find({ id: 1 })
 
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
-    expect(getSentRequest(ws)).toEqual({ jsonrpc: '2.0', id: 1, method: 'planet.find', params: { id: 1 } })
+    expect(getSentRequest(ws)).toEqual({ jsonrpc: '2.0', id: '1', method: 'planet.find', params: { id: 1 } })
 
-    await ws.receive(toData(JSON.stringify(result(1))))
+    await ws.receive(toData(JSON.stringify(result('1'))))
     await expect(promise).resolves.toBe('pong')
   })
 
@@ -78,12 +78,12 @@ describe('openRPCLink', () => {
 
     const first = orpc.ping('first')
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
-    await respond(ws, result(1, 'pong-1'))
+    await respond(ws, result('1', 'pong-1'))
     await expect(first).resolves.toBe('pong-1')
 
     const second = orpc.ping('second')
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2))
-    await respond(ws, result(2, 'pong-2'))
+    await respond(ws, result('2', 'pong-2'))
     await expect(second).resolves.toBe('pong-2')
 
     expect(connect).toHaveBeenCalledTimes(1)
@@ -101,7 +101,7 @@ describe('openRPCLink', () => {
 
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2))
 
-    for (const message of toMessages([result(2, 'pong-2'), result(1, 'pong-1')])) {
+    for (const message of toMessages([result('2', 'pong-2'), result('1', 'pong-1')])) {
       await respond(ws, message)
     }
 
@@ -117,9 +117,9 @@ describe('openRPCLink', () => {
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
 
     await ws.receive('not json')
-    await respond(ws, result(999, 'unknown'))
+    await respond(ws, result('999', 'unknown'))
     await respond(ws, [null, 'text', { jsonrpc: '2.0', result: 'no id' }])
-    await respond(ws, result(1))
+    await respond(ws, result('1'))
 
     await expect(promise).resolves.toBe('pong')
   })
@@ -135,7 +135,7 @@ describe('openRPCLink', () => {
 
     ws.open()
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
-    await respond(ws, result(1))
+    await respond(ws, result('1'))
     await expect(promise).resolves.toBe('pong')
   })
 
@@ -165,7 +165,7 @@ describe('openRPCLink', () => {
 
     const promise = orpc.ping('second')
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
-    await respond(ws, result(2))
+    await respond(ws, result('2'))
 
     await expect(promise).resolves.toBe('pong')
     expect(connect).toHaveBeenCalledTimes(2)
@@ -185,7 +185,7 @@ describe('openRPCLink', () => {
 
     const promise = orpc.ping('second')
     await vi.waitFor(() => expect(secondWs.send).toHaveBeenCalledTimes(1))
-    await respond(secondWs, result(2))
+    await respond(secondWs, result('2'))
 
     await expect(promise).resolves.toBe('pong')
     expect(connect).toHaveBeenCalledTimes(2)
@@ -224,8 +224,8 @@ describe('openRPCLink', () => {
 
     const promise = orpc.ping('next')
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(2))
-    await respond(ws, result(1, 'late'))
-    await respond(ws, result(2, 'next'))
+    await respond(ws, result('1', 'late'))
+    await respond(ws, result('2', 'next'))
 
     await expect(promise).resolves.toBe('next')
   })
@@ -283,7 +283,7 @@ describe('openRPCLink', () => {
 
     const promise = orpc.ping('input')
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
-    await respond(ws, result(1))
+    await respond(ws, result('1'))
 
     await expect(promise).resolves.toBe('pong')
     expect(serializeJson).toHaveBeenCalledWith('input')

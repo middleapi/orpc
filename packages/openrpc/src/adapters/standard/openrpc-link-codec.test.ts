@@ -41,7 +41,7 @@ describe('openRPCLinkCodec', () => {
         method: 'POST',
         url: '/',
         headers: {},
-        body: { jsonrpc: '2.0', id: 1, method: 'planet.find', params: { id: 1 } },
+        body: { jsonrpc: '2.0', id: '1', method: 'planet.find', params: { id: 1 } },
         signal: undefined,
       })
     })
@@ -57,17 +57,19 @@ describe('openRPCLinkCodec', () => {
       expect(request.signal).toBe(signal)
     })
 
-    it('increments the request id per codec', async () => {
+    it('generates sequential base-36 string ids per codec', async () => {
       const codec = new OpenRPCLinkCodec()
       const other = new OpenRPCLinkCodec()
+      const encodeId = async (codec: OpenRPCLinkCodec<any>) => ((await codec.encodeInput('a', ['ping'], { context: {} })).body as { id: string }).id
 
-      const ids = [
-        (await codec.encodeInput('a', ['ping'], { context: {} })).body,
-        (await codec.encodeInput('b', ['ping'], { context: {} })).body,
-        (await other.encodeInput('c', ['ping'], { context: {} })).body,
-      ].map(body => (body as { id: number }).id)
+      const ids: string[] = []
 
-      expect(ids).toEqual([1, 2, 1])
+      for (let i = 0; i < 36; i++) {
+        ids.push(await encodeId(codec))
+      }
+
+      expect([ids[0], ids[1], ids[9], ids[35]]).toEqual(['1', '2', 'a', '10'])
+      await expect(encodeId(other)).resolves.toBe('1')
     })
 
     describe('params', () => {
@@ -76,7 +78,7 @@ describe('openRPCLinkCodec', () => {
 
         const request = await codec.encodeInput({ id: 1, name: 'earth' }, ['ping'], { context: {} })
 
-        expect(request.body).toEqual({ jsonrpc: '2.0', id: 1, method: 'ping', params: { id: 1, name: 'earth' } })
+        expect(request.body).toEqual({ jsonrpc: '2.0', id: '1', method: 'ping', params: { id: 1, name: 'earth' } })
       })
 
       it.each([
@@ -89,7 +91,7 @@ describe('openRPCLinkCodec', () => {
 
         const request = await codec.encodeInput(input, ['ping'], { context: {} })
 
-        expect(request.body).toEqual({ jsonrpc: '2.0', id: 1, method: 'ping', params })
+        expect(request.body).toEqual({ jsonrpc: '2.0', id: '1', method: 'ping', params })
       })
 
       it('omits params for undefined input', async () => {
@@ -97,7 +99,7 @@ describe('openRPCLinkCodec', () => {
 
         const request = await codec.encodeInput(undefined, ['ping'], { context: {} })
 
-        expect(request.body).toEqual({ jsonrpc: '2.0', id: 1, method: 'ping' })
+        expect(request.body).toEqual({ jsonrpc: '2.0', id: '1', method: 'ping' })
         expect(request.body).not.toHaveProperty('params')
       })
 
@@ -113,7 +115,7 @@ describe('openRPCLinkCodec', () => {
 
         expect(request.body).toEqual({
           jsonrpc: '2.0',
-          id: 1,
+          id: '1',
           method: 'ping',
           params: {
             date: '2024-01-02T03:04:05.000Z',
@@ -138,7 +140,7 @@ describe('openRPCLinkCodec', () => {
       )
 
       const request = await codec.encodeInput('next', ['ping'], { context: {} })
-      expect(request.body).toMatchObject({ id: 1 })
+      expect(request.body).toMatchObject({ id: '1' })
     })
 
     describe('option handling', () => {
@@ -182,7 +184,7 @@ describe('openRPCLinkCodec', () => {
 
   describe('.decodeResponse', () => {
     /**
-     * Encodes a call first, so the codec knows the request id (`1`) the response must answer.
+     * Encodes a call first, so the codec knows the request id (`'1'`) the response must answer.
      */
     async function decode(body: unknown, { status = 200, headers = {} }: { status?: number, headers?: Record<string, string> } = {}) {
       const codec = new OpenRPCLinkCodec()
@@ -198,7 +200,7 @@ describe('openRPCLinkCodec', () => {
     }
 
     it('returns the result as output', async () => {
-      const { result, resolveBody } = await decode({ jsonrpc: '2.0', id: 1, result: { ok: true } })
+      const { result, resolveBody } = await decode({ jsonrpc: '2.0', id: '1', result: { ok: true } })
 
       expect(result).toEqual({ kind: 'output', output: { ok: true } })
       expect(resolveBody).toHaveBeenCalledOnce()
@@ -208,7 +210,7 @@ describe('openRPCLinkCodec', () => {
     it('restores ORPCErrors of oRPC servers, including their defined flag', async () => {
       const body = {
         jsonrpc: '2.0',
-        id: 1,
+        id: '1',
         error: { code: -32004, message: 'Planet not found', data: { code: 'NOT_FOUND', defined: true, data: { id: 2 } } },
       }
 
@@ -222,7 +224,7 @@ describe('openRPCLinkCodec', () => {
     })
 
     it('maps errors of other servers by their JSON-RPC code', async () => {
-      const { result } = await decode({ jsonrpc: '2.0', id: 1, error: { code: -32601, message: 'Method not found', data: '0x' } })
+      const { result } = await decode({ jsonrpc: '2.0', id: '1', error: { code: -32601, message: 'Method not found', data: '0x' } })
 
       expectORPCErrorResult(result, 'NOT_FOUND', { defined: false, message: 'Method not found', data: '0x' })
     })
@@ -230,7 +232,7 @@ describe('openRPCLinkCodec', () => {
     it('keeps data of other servers that only partly looks like an oRPC error', async () => {
       const data = { code: 'NOT_FOUND', data: { id: 2 } }
 
-      const { result } = await decode({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'Failed', data } })
+      const { result } = await decode({ jsonrpc: '2.0', id: '1', error: { code: -32603, message: 'Failed', data } })
 
       expectORPCErrorResult(result, 'INTERNAL_SERVER_ERROR', { defined: false, data })
     })
@@ -241,17 +243,17 @@ describe('openRPCLinkCodec', () => {
       ['the real error status', 503, { code: 'NOT_FOUND', defined: false }, 503],
       ['400 for an unknown code', 200, { code: 'OUT_OF_STOCK', defined: true }, 400],
     ])('gives the error cause %s', async (_, status, data, expected) => {
-      const { result } = await decode({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'Failed', data } }, { status }) as { result: any }
+      const { result } = await decode({ jsonrpc: '2.0', id: '1', error: { code: -32000, message: 'Failed', data } }, { status }) as { result: any }
 
       expect(result.error.cause.response.status).toBe(expected)
     })
 
     describe('request ids', () => {
       it.each([
-        ['another id', { jsonrpc: '2.0', id: 2, result: 1 }],
-        ['the id as a string', { jsonrpc: '2.0', id: '1', result: 1 }],
+        ['another id', { jsonrpc: '2.0', id: '2', result: 1 }],
+        ['the id as a number', { jsonrpc: '2.0', id: 1, result: 1 }],
         ['a null id', { jsonrpc: '2.0', id: null, result: 1 }],
-        ['another id on an error', { jsonrpc: '2.0', id: 2, error: { code: -32603, message: 'Failed' } }],
+        ['another id on an error', { jsonrpc: '2.0', id: '2', error: { code: -32603, message: 'Failed' } }],
       ])('rejects a response with %s', async (_, body) => {
         await expect(decode(body)).rejects.toThrow(new MalformedResponseError({
           message: 'Invalid JSON-RPC response.',
@@ -273,16 +275,16 @@ describe('openRPCLinkCodec', () => {
         await codec.encodeInput('a', ['ping'], first)
         await codec.encodeInput('b', ['ping'], second)
 
-        const respond = (id: number) => ({ status: 200, headers: {}, resolveBody: async () => ({ jsonrpc: '2.0', id, result: id }) })
+        const respond = (id: string) => ({ status: 200, headers: {}, resolveBody: async () => ({ jsonrpc: '2.0', id, result: id }) })
 
-        await expect(codec.decodeResponse(respond(2), ['ping'], second)).resolves.toEqual({ kind: 'output', output: 2 })
-        await expect(codec.decodeResponse(respond(1), ['ping'], first)).resolves.toEqual({ kind: 'output', output: 1 })
-        await expect(codec.decodeResponse(respond(2), ['ping'], first)).rejects.toThrow('Invalid JSON-RPC response.')
+        await expect(codec.decodeResponse(respond('2'), ['ping'], second)).resolves.toEqual({ kind: 'output', output: '2' })
+        await expect(codec.decodeResponse(respond('1'), ['ping'], first)).resolves.toEqual({ kind: 'output', output: '1' })
+        await expect(codec.decodeResponse(respond('2'), ['ping'], first)).rejects.toThrow('Invalid JSON-RPC response.')
       })
     })
 
     it.each([
-      ['a batch', [{ jsonrpc: '2.0', id: 1, result: 1 }]],
+      ['a batch', [{ jsonrpc: '2.0', id: '1', result: 1 }]],
       ['a string', '<html></html>'],
     ])('throws MalformedResponseError on %s', async (_, body) => {
       const error: any = await decode(body, { status: 502 }).then(() => null, e => e)

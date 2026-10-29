@@ -77,7 +77,7 @@ describe('openRPCLink', () => {
       expect.objectContaining({ context: {} }),
       ['planet', 'find'],
     )
-    expect(bodies).toEqual([{ jsonrpc: '2.0', id: 1, method: 'planet.find', params: { id: 1 } }])
+    expect(bodies).toEqual([{ jsonrpc: '2.0', id: '1', method: 'planet.find', params: { id: 1 } }])
   })
 
   it('sends inputs by-name, by-position, or without params', async () => {
@@ -87,10 +87,10 @@ describe('openRPCLink', () => {
     await client.planet.echo(undefined)
 
     expect(bodies).toEqual([
-      { jsonrpc: '2.0', id: 1, method: 'planet.echo', params: { nested: { date: date.toISOString(), arr: [3, date.toISOString()] }, big: '1' } },
-      { jsonrpc: '2.0', id: 2, method: 'planet.echo', params: ['text'] },
-      { jsonrpc: '2.0', id: 3, method: 'planet.echo', params: [[1, 2]] },
-      { jsonrpc: '2.0', id: 4, method: 'planet.echo' },
+      { jsonrpc: '2.0', id: '1', method: 'planet.echo', params: { nested: { date: date.toISOString(), arr: [3, date.toISOString()] }, big: '1' } },
+      { jsonrpc: '2.0', id: '2', method: 'planet.echo', params: ['text'] },
+      { jsonrpc: '2.0', id: '3', method: 'planet.echo', params: [[1, 2]] },
+      { jsonrpc: '2.0', id: '4', method: 'planet.echo' },
     ])
   })
 

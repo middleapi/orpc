@@ -21,7 +21,7 @@ const link = new OpenRPCLink({
 
 const client: JsonifiedClient<RouterClient<typeof router>> = createORPCClient(link)
 
-const planet = await client.planet.find({ id: 1 }) // { "jsonrpc": "2.0", "id": 1, "method": "planet.find", "params": { "id": 1 } }
+const planet = await client.planet.find({ id: 1 }) // { "jsonrpc": "2.0", "id": "1", "method": "planet.find", "params": { "id": 1 } }
 ```
 
 An object input is sent as by-name `params`, any other input as `[input]`, and an `undefined` input without `params`.
