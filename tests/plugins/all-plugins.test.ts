@@ -1,8 +1,8 @@
+import type { HeadersContext } from '@orpc/client'
 import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import type { OpenAPIDocument } from '@orpc/openapi'
 import type { RouterClient } from '@orpc/server'
-import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, getRequestHeaders, getResponseHeaders, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import {
   BatchLinkPlugin,
@@ -31,10 +31,8 @@ import {
   HeadMethodHandlerPlugin,
   MethodOverrideHandlerPlugin,
   RequestCompressionHandlerPlugin,
-  RequestHeadersHandlerPlugin,
   RequestLimitHandlerPlugin,
   ResponseCompressionHandlerPlugin,
-  ResponseHeadersHandlerPlugin,
   RethrowHandlerPlugin,
   SignalSyncHandlerPlugin,
   TimeoutHandlerPlugin,
@@ -50,9 +48,9 @@ import { z } from 'zod'
  * New plugins belong in `createHandlerPlugins` or `createLinkPlugins` below.
  */
 
-interface TestContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
+interface TestContext {}
 
-interface TestClientContext extends RetryLinkPluginContext {}
+interface TestClientContext extends RetryLinkPluginContext, HeadersContext {}
 
 const contract = {
   ping: oc
@@ -61,6 +59,8 @@ const contract = {
   login: oc
     .input(z.object({ user: z.string() }))
     .output(z.object({ user: z.string() })),
+  whoami: oc
+    .output(z.object({ user: z.string().nullable() })),
 }
 
 const spec: OpenAPIDocument<'3.2.0'> = {
@@ -73,9 +73,15 @@ const implementer = implement(contract).$context<TestContext>()
 const router = implementer.router({
   ping: implementer.ping.handler(({ input }) => input),
   login: implementer.login.handler(({ input, context }) => {
-    context.resHeaders?.append('set-cookie', `session=${input.user}; HttpOnly`)
-    context.resHeaders?.set('cache-control', 'no-store')
+    getResponseHeaders(context)?.append('set-cookie', `session=${input.user}; HttpOnly`)
+    getResponseHeaders(context)?.set('cache-control', 'no-store')
     return input
+  }),
+  whoami: implementer.whoami.handler(({ context }) => {
+    const user = getRequestHeaders(context)?.get('x-user') ?? null
+    getResponseHeaders(context)?.set('x-user', user ?? 'anonymous')
+    getResponseHeaders(context)?.set('cache-control', 'no-store')
+    return { user }
   }),
 })
 
@@ -93,10 +99,8 @@ function createHandlerPlugins() {
     new PinoHandlerPlugin<TestContext>({ logger: pino({ level: 'silent' }) }),
     new RateLimitHandlerPlugin<TestContext>(),
     new RequestCompressionHandlerPlugin<TestContext>(),
-    new RequestHeadersHandlerPlugin<TestContext>(),
     new RequestLimitHandlerPlugin<TestContext>({ maxBodySize: 10 * 1024 * 1024 }),
     new ResponseCompressionHandlerPlugin<TestContext>({ threshold: 0 }),
-    new ResponseHeadersHandlerPlugin<TestContext>(),
     new RethrowHandlerPlugin<TestContext>({ filter: () => false }),
     new SignalSyncHandlerPlugin<TestContext>(),
     new SmartCoercionHandlerPlugin(),
@@ -198,6 +202,35 @@ describe('all plugins on one handler and one link', () => {
       'session=bob; HttpOnly',
     ])
     expect(exchanges[0]!.response.headers.get('cache-control')).toEqual('no-store')
+  })
+
+  it('carries the headers of batched calls through the context in both directions', async () => {
+    const { client, exchanges } = createClientServer()
+    const aliceHeaders = new Headers()
+    const anonymousHeaders = new Headers()
+
+    await expect(Promise.all([
+      client.whoami(undefined, {
+        context: {
+          [REQUEST_HEADERS_CONTEXT_SYMBOL]: new Headers({ 'x-user': 'alice' }),
+          [RESPONSE_HEADERS_CONTEXT_SYMBOL]: aliceHeaders,
+        },
+      }),
+      client.whoami(undefined, {
+        context: { [RESPONSE_HEADERS_CONTEXT_SYMBOL]: anonymousHeaders },
+      }),
+    ])).resolves.toEqual([
+      { user: 'alice' },
+      { user: null },
+    ])
+
+    expect(exchanges).toHaveLength(1)
+    expect(aliceHeaders.get('x-user')).toEqual('alice')
+    expect(anonymousHeaders.get('x-user')).toEqual('anonymous')
+    // a header every batched call shares travels on the batch response, and comes back to each call
+    expect(exchanges[0]!.response.headers.get('cache-control')).toEqual('no-store')
+    expect(aliceHeaders.get('cache-control')).toEqual('no-store')
+    expect(anonymousHeaders.get('cache-control')).toEqual('no-store')
   })
 
   it('compresses a standalone call in both directions through every plugin', async () => {

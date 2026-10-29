@@ -189,7 +189,7 @@ describe('retryAfterLinkPlugin', () => {
     expect(transport.send).toHaveBeenCalledTimes(2)
     expect(maxAttempts).toHaveBeenCalledWith(
       expect.objectContaining({ status: 429 }),
-      expect.objectContaining({ context: { context: true } }),
+      expect.objectContaining({ context: expect.objectContaining({ context: true }) }),
     )
   })
 
@@ -217,7 +217,7 @@ describe('retryAfterLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
       expect(timeoutFn).toHaveBeenCalledWith(
         expect.objectContaining({ status: 429 }),
-        expect.objectContaining({ context: {} }),
+        expect.objectContaining({ context: expect.any(Object) }),
       )
     })
 
@@ -255,7 +255,7 @@ describe('retryAfterLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
       expect(condition).toHaveBeenCalledWith(
         expect.objectContaining({ status: 400 }),
-        expect.objectContaining({ context: {} }),
+        expect.objectContaining({ context: expect.any(Object) }),
       )
     })
   })

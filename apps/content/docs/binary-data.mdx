@@ -45,21 +45,16 @@ const example = os
 
 ## `ReadableStream<Uint8Array>`
 
-Procedures can return `ReadableStream<Uint8Array>` to stream binary responses. The example below uses the [Response Headers Plugin](/docs/plugins/response-headers) to set the appropriate `Content-Type` header.
+Procedures can return `ReadableStream<Uint8Array>` to stream binary responses. The example below sets the appropriate `Content-Type` [response header](/docs/headers).
 
 ```ts twoslash
-import { os } from '@orpc/server'
-import { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+import { getResponseHeaders, os } from '@orpc/server'
 import * as z from 'zod'
-
-interface ServerContext extends ResponseHeadersHandlerPluginContext {}
-
-const base = os.$context<ServerContext>()
 // ---cut---
-const example = base
+const example = os
   .output(z.instanceof(ReadableStream))
   .handler(async ({ context }) => {
-    context.resHeaders?.set('Content-Type', 'text/plain')
+    getResponseHeaders(context)?.set('Content-Type', 'text/plain')
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {

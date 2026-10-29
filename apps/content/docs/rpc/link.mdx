@@ -363,13 +363,15 @@ sequenceDiagram
   participant Server
 
   Caller ->> L: path, input, signal, lastEventId, ...
+  L ->> L: inject request and response headers into context
   Note over L: interceptors
-  L ->> L: encode request
+  L ->> L: encode request, merge request headers from context
   Note over L: transportInterceptors
   L ->> Transport: standard request
   Transport ->> Server: request
   Server ->> Transport: response
   Transport ->> L: standard response
+  L ->> L: fill response headers in context
   L ->> L: decode response
   L ->> Caller: output or error
 ```

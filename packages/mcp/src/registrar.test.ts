@@ -1,14 +1,12 @@
 import type { ServerContext } from '@modelcontextprotocol/server'
 import type { JsonSchemaConverter } from '@orpc/json-schema'
-import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { createMcpHandler } from '@modelcontextprotocol/server'
-import { ORPCError } from '@orpc/client'
+import { getResponseHeaders, ORPCError } from '@orpc/client'
 import { asyncIteratorObject, oc, type } from '@orpc/contract'
 import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
 import { openapi, OpenAPISerializer } from '@orpc/openapi'
 import { implement, os } from '@orpc/server'
-import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { z } from 'zod'
 import { createTestClient, createTestServer, PROTOCOL_ERAS } from './__tests__/utils'
@@ -622,11 +620,11 @@ describe('mcpRegistrar', () => {
 
     it('types stream outputs with the content-type response header', async () => {
       const client = await createTestClient('legacy', new McpRegistrar({
-        image: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
-          context.resHeaders?.set('content-type', 'image/png')
+        image: os.handler(({ context }) => {
+          getResponseHeaders(context)?.set('content-type', 'image/png')
           return new Blob([new Uint8Array([1, 2, 3])]).stream()
         }),
-      }, { plugins: [new ResponseHeadersHandlerPlugin()] }))
+      }))
 
       expect((await client.callTool({ name: 'image' })).content)
         .toEqual([{ type: 'image', data: 'AQID', mimeType: 'image/png' }])

@@ -5,9 +5,10 @@ import type { Context } from '../../context'
 import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
-import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
-import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import { ORPCError, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL, toORPCError } from '@orpc/client'
+import { appendHeaders, getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
+import { ErrorEvent, flattenStandardHeader, mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
+import { toStandardHeaders } from '@standard-server/fetch'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
 
@@ -125,8 +126,25 @@ export class StandardHandler<T extends Context> {
         span?.setAttribute('rpc.system', ORPC_NAME)
         span?.setAttribute('rpc.method', path.join('.'))
 
+        /**
+         * Inject the request and response headers, so interceptors, middlewares, and procedures can access them.
+         * Both are created for each request, never taken from the initial context, so requests sharing it,
+         * such as the subrequests of a batch or calls of a link that forwards its context, never share them.
+         */
+        const requestHeaders = new Headers()
+        appendHeaders(requestHeaders, request.headers)
+        const responseHeaders = new Headers()
+
+        context = {
+          ...context,
+          [REQUEST_HEADERS_CONTEXT_SYMBOL]: requestHeaders,
+          [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders,
+        }
+
+        let response: StandardResponse
+
         try {
-          const response = await intercept(
+          response = await intercept(
             this.interceptors,
             { context, prefix, request, path, procedure, decodeInput },
 
@@ -172,8 +190,6 @@ export class StandardHandler<T extends Context> {
               return response
             },
           )
-
-          return { matched: true, response }
         }
         catch (e) {
           /**
@@ -191,10 +207,15 @@ export class StandardHandler<T extends Context> {
               })
             : toORPCError(e)
 
-          const response = await this.codec.encodeError(error, procedure, path, { context, prefix })
-
-          return { matched: true, response }
+          response = await this.codec.encodeError(error, procedure, path, { context, prefix })
         }
+
+        // Leave the response as is when no header was set
+        if (!responseHeaders.keys().next().done) {
+          response = { ...response, headers: mergeStandardHeaders(response.headers, toStandardHeaders(responseHeaders)) }
+        }
+
+        return { matched: true, response }
       },
     )
   }

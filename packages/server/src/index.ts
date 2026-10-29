@@ -48,6 +48,7 @@ export type {
   ClientOptions,
   ClientRest,
   FriendlyClientOptions,
+  HeadersContext,
   ORPCErrorCode,
   ORPCErrorJSON,
   ORPCErrorOptions,
@@ -62,8 +63,12 @@ export type {
 
 export {
   COMMON_ERROR_STATUS_MAP,
+  getRequestHeaders,
+  getResponseHeaders,
   isDefinedError,
   ORPCError,
+  REQUEST_HEADERS_CONTEXT_SYMBOL,
+  RESPONSE_HEADERS_CONTEXT_SYMBOL,
   RPCJsonSerializer,
   RPCSerializer,
   safe,

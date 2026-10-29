@@ -163,6 +163,8 @@ export default defineConfig({
     { from: '/docs/openapi/plugins/smart-coercion', to: '/docs/plugins/smart-coercion' },
     { from: '/docs/openapi/plugins/zod-smart-coercion', to: '/docs/plugins/smart-coercion' },
     { from: '/docs/plugins/hibernation', to: '/docs/integrations/hibernation' },
+    { from: '/docs/plugins/request-headers', to: '/docs/headers' },
+    { from: '/docs/plugins/response-headers', to: '/docs/headers' },
 
     { from: '/docs/integrations/react-swr', to: '/docs/integrations/swr' },
     { from: '/docs/openapi/integrations/implement-contract-in-nest', to: '/docs/integrations/nest' },

@@ -50,7 +50,7 @@ describe('rpcLink', () => {
         redirect: 'manual',
       }),
       expect.objectContaining({
-        context: {},
+        context: expect.any(Object),
       }),
       ['ping'],
     )
@@ -80,7 +80,7 @@ describe('rpcLink', () => {
         body: JSON.stringify({ json: 'input' }),
         method: 'QUERY',
       }),
-      expect.objectContaining({ context: {} }),
+      expect.objectContaining({ context: expect.any(Object) }),
       ['ping'],
     )
   })
@@ -114,7 +114,7 @@ describe('rpcLink', () => {
         headers: expect.toSatisfy((h: Headers) => h.get('x-custom-header') === 'value'),
       }),
       expect.objectContaining({
-        context: {},
+        context: expect.any(Object),
       }),
       ['ping'],
     )
@@ -233,7 +233,7 @@ describe('rpcLink', () => {
         method: 'POST',
         redirect: 'manual',
       }),
-      expect.objectContaining({ context: {} }),
+      expect.objectContaining({ context: expect.any(Object) }),
       ['ping'],
     )
     expect(toFetchBody).toHaveBeenCalledWith({ json: 'input' }, {}, toFetchRequestOptions)
@@ -263,7 +263,7 @@ describe('rpcLink', () => {
         redirect: 'manual',
       }),
       expect.objectContaining({
-        context: {},
+        context: expect.any(Object),
       }),
       ['ping'],
     )
@@ -296,7 +296,7 @@ describe('rpcLink', () => {
         duplex: 'half',
       }),
       expect.objectContaining({
-        context: {},
+        context: expect.any(Object),
       }),
       ['ping'],
     )

@@ -68,7 +68,7 @@ describe('openapiLink', () => {
         method: 'GET',
         redirect: 'manual',
       }),
-      expect.objectContaining({ context: {} }),
+      expect.objectContaining({ context: expect.any(Object) }),
       ['get'],
     )
   })
@@ -136,7 +136,7 @@ describe('openapiLink', () => {
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost:3000/api/query',
       expect.objectContaining({ method: 'QUERY' }),
-      expect.objectContaining({ context: {} }),
+      expect.objectContaining({ context: expect.any(Object) }),
       ['query'],
     )
   })

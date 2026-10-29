@@ -4,7 +4,10 @@ import type { ClientContext, ClientLink, ClientOptions } from '../../types'
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkPlugin } from './plugin'
 import type { StandardLinkTransport } from './transport'
-import { getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
+import { appendHeaders, getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
+import { mergeStandardHeaders } from '@standard-server/core'
+import { toStandardHeaders } from '@standard-server/fetch'
+import { getRequestHeaders, getResponseHeaders, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '../../headers'
 import { CompositeStandardLinkPlugin } from './plugin'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
@@ -54,6 +57,23 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
    * @throws ORPCError, MalformedResponseError, transport-level errors (network failures, timeouts, etc.)
    */
   call(path: string[], input: unknown, options: ClientOptions<T>): Promise<unknown> {
+    /**
+     * Inject the request and response headers, so interceptors and plugins can access them.
+     * The request headers are copied, so changes made during the call never reach the caller's instance,
+     * while the response headers fill the caller's instance, so the caller can read them after the call.
+     */
+    const requestHeaders = new Headers(getRequestHeaders(options.context))
+    const responseHeaders = getResponseHeaders(options.context) ?? new Headers()
+
+    options = {
+      ...options,
+      context: {
+        ...options.context,
+        [REQUEST_HEADERS_CONTEXT_SYMBOL]: requestHeaders,
+        [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders,
+      },
+    }
+
     return runWithSpan(`${ORPC_NAME}.${path.join('/')}`, (span) => {
       /**
        * [Semantic conventions for RPC spans](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
@@ -90,6 +110,11 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
           () => this.codec.encodeInput(input, path, options),
         )
 
+        // Leave the request as is when no header was set
+        if (!requestHeaders.keys().next().done) {
+          request = { ...request, headers: mergeStandardHeaders(request.headers, toStandardHeaders(requestHeaders)) }
+        }
+
         if (activeSpan && tracer?.inject) {
           const headers = { ...request.headers }
           tracer.inject(activeSpan, headers)
@@ -112,6 +137,13 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
             )
           },
         )
+
+        // Keep only the headers of the latest response, such as the last attempt of a retry
+        for (const name of [...responseHeaders.keys()]) {
+          responseHeaders.delete(name)
+        }
+
+        appendHeaders(responseHeaders, response.headers)
 
         const decodedResult = await runWithSpan(
           { name: 'decode_response', parent: activeSpan },

@@ -105,7 +105,7 @@ describe('timeoutLinkPlugin', () => {
     expect(timeout).toHaveBeenCalledWith(expect.objectContaining({
       path: ['test'],
       input: 'input',
-      context: { timeout: 1000 },
+      context: expect.objectContaining({ timeout: 1000 }),
     }))
   })
 

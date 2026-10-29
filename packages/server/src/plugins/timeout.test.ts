@@ -112,7 +112,7 @@ describe('timeoutHandlerPlugin', () => {
     expect(timeout).toHaveBeenCalledWith(expect.objectContaining({
       path: [],
       procedure,
-      context: { timeout: 1000 },
+      context: expect.objectContaining({ timeout: 1000 }),
     }))
   })
 
@@ -248,7 +248,7 @@ describe('timeoutHandlerPlugin', () => {
 
     expect(streamingTimeout).toHaveBeenCalledTimes(1)
     expect(streamingTimeout).toHaveBeenCalledWith(expect.objectContaining({
-      context: { streamingTimeout: 2000 },
+      context: expect.objectContaining({ streamingTimeout: 2000 }),
     }))
   })
 

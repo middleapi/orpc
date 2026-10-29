@@ -13,6 +13,7 @@ export default defineMeta({
     'router',
     'middleware',
     'context',
+    'headers',
     'error-handling',
     'binary-data',
     'async-iterator-object',

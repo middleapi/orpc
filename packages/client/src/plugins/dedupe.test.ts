@@ -103,12 +103,12 @@ describe('dedupeLinkPlugin', () => {
     expect(groupCondition).toHaveBeenNthCalledWith(1, expect.objectContaining({
       path: ['GET', 'planet'],
       request: await vi.mocked(codec.encodeInput).mock.results[0]!.value,
-      context: { tag: 'first' },
+      context: expect.objectContaining({ tag: 'first' }),
     }))
     expect(groupCondition).toHaveBeenNthCalledWith(2, expect.objectContaining({
       path: ['GET', 'planet'],
       request: await vi.mocked(codec.encodeInput).mock.results[1]!.value,
-      context: { tag: 'second' },
+      context: expect.objectContaining({ tag: 'second' }),
     }))
   })
 
@@ -196,8 +196,8 @@ describe('dedupeLinkPlugin', () => {
 
     expect(context).toHaveBeenCalledTimes(1)
     expect(context).toHaveBeenCalledWith([
-      expect.objectContaining({ context: { tag: 'first' } }),
-      expect.objectContaining({ context: { tag: 'second' } }),
+      expect.objectContaining({ context: expect.objectContaining({ tag: 'first' }) }),
+      expect.objectContaining({ context: expect.objectContaining({ tag: 'second' }) }),
     ])
 
     const [, , callOptions] = vi.mocked(transport.send).mock.calls[0]!

@@ -255,7 +255,7 @@ const link = new RPCLink({
 
   /**
    * Optional headers to attach to each per-call request.
-   * These can be accessed in the server context or via the Request Headers Plugin.
+   * These can be accessed in the server through `getRequestHeaders(context)`.
    */
   headers: () => ({})
 })

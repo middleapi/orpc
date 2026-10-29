@@ -1,13 +1,11 @@
 import type { RouterContractClient } from '@orpc/contract'
 import type { AnyRouter } from '@orpc/server'
-import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { AddressInfo } from 'node:net'
 import { createServer } from 'node:http'
-import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
+import { createORPCClient, getResponseHeaders, isDefinedError, ORPCError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import { RPCHandler } from '@orpc/server/fetch'
-import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
@@ -203,8 +201,8 @@ describe('handler', () => {
     expect(Object.keys(factory.mock.calls[0]![0])).toEqual(['planet'])
   })
 
-  it('supports controlling the handler context, e.g. for response headers', async () => {
-    interface MockServerContext extends ResponseHeadersHandlerPluginContext {
+  it('supports controlling the handler context', async () => {
+    interface MockServerContext {
       request: Request
     }
 
@@ -212,14 +210,12 @@ describe('handler', () => {
       origin: 'http://localhost:3000',
       prefix: '/rpc',
       context: (info): MockServerContext => ({ request: info.request }),
-      handler: router => new RPCHandler(router, {
-        plugins: [new ResponseHeadersHandlerPlugin()],
-      }),
+      handler: router => new RPCHandler(router),
     })
 
     server.use(contextORPC.planet.list.handler(({ context }) => {
       expect(context.request).toBeInstanceOf(Request)
-      context.resHeaders?.set('x-mocked-context', '1')
+      getResponseHeaders(context)?.set('x-mocked-context', '1')
       return []
     }))
 

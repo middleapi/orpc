@@ -97,7 +97,7 @@ describe('requestValidationLinkPlugin', () => {
     const output = await link.call(['chainedProcedure'], 1, { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith(1, ['chainedProcedure'], { context: {} })
+    expect(codec.encodeInput).toHaveBeenCalledWith(1, ['chainedProcedure'], { context: expect.any(Object) })
     expect(interceptor).toHaveBeenCalledTimes(1)
   })
 
@@ -118,7 +118,7 @@ describe('requestValidationLinkPlugin', () => {
     const output = await linkUsingValidatedInput.call(['chainedProcedure'], 1, { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith(2, ['chainedProcedure'], { context: {} })
+    expect(codec.encodeInput).toHaveBeenCalledWith(2, ['chainedProcedure'], { context: expect.any(Object) })
   })
 
   it('merges what every stacked object schema validates', async () => {
@@ -142,7 +142,7 @@ describe('requestValidationLinkPlugin', () => {
     expect(codec.encodeInput).toHaveBeenCalledWith(
       { parent: 'parent__PARENT', child: 'CHILD' },
       ['stackedObjectProcedure'],
-      { context: {} },
+      { context: expect.any(Object) },
     )
   })
 
@@ -167,7 +167,7 @@ describe('requestValidationLinkPlugin', () => {
     expect(codec.encodeInput).toHaveBeenCalledWith(
       { params: { id: 'ID', slug: 'SLUG' }, query: { page: 1 } },
       ['nestedObjectProcedure'],
-      { context: {} },
+      { context: expect.any(Object) },
     )
   })
 
@@ -188,7 +188,7 @@ describe('requestValidationLinkPlugin', () => {
     const output = await link.call(['withoutInputSchema'], 'anything', { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith('anything', ['withoutInputSchema'], { context: {} })
+    expect(codec.encodeInput).toHaveBeenCalledWith('anything', ['withoutInputSchema'], { context: expect.any(Object) })
   })
 
   it('throws a BAD_REQUEST error when any validation step fails', async () => {

@@ -325,6 +325,7 @@ sequenceDiagram
   Note over Handler: routingInterceptors
   Handler ->> Handler: find matching procedure
   Handler -->> Adapter: if not matched
+  Handler ->> Handler: inject request and response headers into context
   Note over Handler: interceptors
   Handler ->> Handler: decode input
   Handler ->> Procedure: input, signal, lastEventId, ...
@@ -332,6 +333,7 @@ sequenceDiagram
   Procedure ->> Procedure: execute procedure
   Procedure ->> Handler: output or error
   Handler ->> Handler: encode output or error
+  Handler ->> Handler: merge response headers from context
   Handler ->> Adapter: standard response
   Adapter ->> Client: response
 ```
