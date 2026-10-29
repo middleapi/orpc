@@ -91,7 +91,6 @@ function toHeadResponse(response: StandardResponse): StandardResponse {
   if (isAsyncIteratorObject(body)) {
     discardBody(body)
 
-    // Encoding it would start iterating, so the headers are derived the way adapters do
     const headers: StandardHeaders = { ...response.headers, 'content-length': undefined }
     headers['content-type'] ??= 'text/event-stream'
     headers['standard-server'] = getRequiredStandardBodyHint('event-stream', headers) ?? []
@@ -102,14 +101,10 @@ function toHeadResponse(response: StandardResponse): StandardResponse {
   const [encoded, headers] = toFetchBody(body, response.headers)
 
   if (encoded instanceof ReadableStream) {
-    discardBody(encoded) // a stream, or a blob of unknown size
+    discardBody(encoded)
   }
   else if (encoded instanceof FormData) {
-    /**
-     * Only encoding it reveals the boundary. The encoded body is left unread, so no part is serialized,
-     * and uncancelled, since undici rejects unhandled when it is cancelled mid-serialization.
-     * The size is left out, since it would require reading every file.
-     */
+    // The encoded body is never cancelled, since undici rejects unhandled when cancelled mid-serialization
     headers['standard-server'] = []
     headers['content-type'] = new Response(encoded).headers.get('content-type')!
   }

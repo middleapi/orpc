@@ -25,9 +25,6 @@ function getInterceptors() {
   }
 }
 
-/**
- * Runs a response through the plugin as the answer to a `HEAD` request.
- */
 async function toHeadResponse(response: StandardResponse): Promise<StandardResponse> {
   const { bodyInterceptor } = getInterceptors()
 
@@ -47,9 +44,6 @@ function getSentHeaders(response: StandardResponse): Record<string, string> {
   return Object.fromEntries(toFetchResponse(response).headers)
 }
 
-/**
- * Expects the `HEAD` response to send the status and headers of `GET`, plus `extraHeaders`, without a body.
- */
 async function expectHeadersOfGet(
   createResponse: () => StandardResponse,
   extraHeaders: Record<string, string> = {},
@@ -342,7 +336,7 @@ describe('headMethodHandlerPlugin', () => {
 
         stream: os.handler(async function* () {
           started = true
-          await new Promise(() => {}) // never settles
+          await new Promise(() => {})
         }),
       }, {
         allowMethods: ['GET'],
