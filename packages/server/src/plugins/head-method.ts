@@ -105,12 +105,13 @@ function toHeadResponse(response: StandardResponse): StandardResponse {
     discardBody(encoded) // a stream, or a blob of unknown size
   }
   else if (encoded instanceof FormData) {
-    // Only encoding it reveals the boundary. The size is left out, since it would require reading every file.
-    const encodedResponse = new Response(encoded)
-    discardBody(encodedResponse.body)
-
+    /**
+     * Only encoding it reveals the boundary. The encoded body is left unread, so no part is serialized,
+     * and uncancelled, since undici rejects unhandled when it is cancelled mid-serialization.
+     * The size is left out, since it would require reading every file.
+     */
     headers['standard-server'] = []
-    headers['content-type'] = encodedResponse.headers.get('content-type')!
+    headers['content-type'] = new Response(encoded).headers.get('content-type')!
   }
   else if (typeof encoded === 'string' || encoded instanceof URLSearchParams) {
     headers['standard-server'] ??= []
