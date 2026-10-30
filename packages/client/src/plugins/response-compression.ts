@@ -33,7 +33,7 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
   /**
    * Decompression should wrap the final batch response instead of sub-responses.
    */
-  after = ['~batch']
+  after: string[] = ['~batch']
 
   private readonly encodings: Exclude<ResponseCompressionLinkPluginOptions<T>['encodings'], undefined>
 

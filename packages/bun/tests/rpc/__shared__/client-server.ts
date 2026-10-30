@@ -20,7 +20,7 @@ export class Person {
   ) {}
 }
 
-export const defaultSerializer = new RPCSerializer({
+export const defaultSerializer: RPCSerializer = new RPCSerializer({
   handlers: {
     person: {
       condition: value => value instanceof Person,

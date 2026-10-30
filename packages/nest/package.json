@@ -43,7 +43,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -71,6 +71,7 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
+    "@oxc-project/runtime": "^0.155.0",
     "@standard-server/core": "~0.13.0",
     "@standard-server/node": "~0.13.0"
   },

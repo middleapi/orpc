@@ -6,8 +6,8 @@ import { Buffer } from 'node:buffer'
  */
 const MAX_PART_HEADER_SIZE = 16 * 1024
 
-const CRLF = Buffer.from('\r\n')
-const HEADER_BLOCK_END = Buffer.from('\r\n\r\n')
+const CRLF = /* @__PURE__ */ Buffer.from('\r\n')
+const HEADER_BLOCK_END = /* @__PURE__ */ Buffer.from('\r\n\r\n')
 
 export interface MultipartPart {
   /**

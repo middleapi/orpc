@@ -24,7 +24,7 @@ export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkP
   /**
    * Should abort if the total retry time exceeds the configured timeout
    */
-  after = ['~retry']
+  after: string[] = ['~retry']
 
   constructor(options: NoInfer<TimeoutLinkPluginOptions<T>>) {
     this.timeout = options.timeout

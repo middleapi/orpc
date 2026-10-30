@@ -1,6 +1,6 @@
 import type { RequestLogger } from 'evlog'
 
-export const LOGGER_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_EVLOG_LOGGER_CONTEXT')
+export const LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_EVLOG_LOGGER_CONTEXT')
 
 /**
  * Context shape that carries the Evlog request logger injected by `EvlogHandlerPlugin`.

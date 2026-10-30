@@ -18,7 +18,7 @@ export interface ValibotToJsonSchemaConverterOptions extends Omit<ConversionConf
   cache?: boolean | undefined
 }
 
-const NESTED_CONVERSION_SENTINEL = any()
+const NESTED_CONVERSION_SENTINEL = /* @__PURE__ */ any()
 
 /**
  * Converts Valibot schemas into JSON Schema using Valibot's built-in `toJsonSchema`,

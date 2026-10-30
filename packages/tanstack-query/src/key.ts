@@ -49,7 +49,7 @@ export type OperationKey<TType extends OperationType, TInput>
   = | [path: string[], options: OperationKeyContent<TType, TInput>]
     | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
 
-const defaultSerializer = new RPCJsonSerializer()
+const defaultSerializer = /* @__PURE__ */ new RPCJsonSerializer()
 
 /**
  * Generate a TanStack Query key for a procedure.

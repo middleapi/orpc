@@ -5,7 +5,7 @@ import { isAsyncIteratorObject, toArray } from '@orpc/shared'
 import { cancelStandardBody, getRequiredStandardBodyHint } from '@standard-server/core'
 import { toFetchBody } from '@standard-server/fetch'
 
-const textEncoder = new TextEncoder()
+const textEncoder = /* @__PURE__ */ new TextEncoder()
 
 /**
  * Answers `HEAD` requests with the headers of the matching `GET` procedure, like Fastify's
@@ -26,7 +26,7 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
   /**
    * Discard the body after response compression, so `HEAD` reports the same `Content-Encoding` as `GET`.
    */
-  after = ['~response-compression']
+  after: string[] = ['~response-compression']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const bodyInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, request }) => {

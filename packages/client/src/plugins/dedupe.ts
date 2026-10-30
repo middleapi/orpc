@@ -56,7 +56,7 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
  */
 export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
   name = '~dedupe'
-  before = ['~batch']
+  before: string[] = ['~batch']
 
   private readonly groups: DedupeLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<DedupeLinkPluginOptions<T>['filter'], undefined>

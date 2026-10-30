@@ -46,7 +46,7 @@
   ],
   "scripts": {
     "prepare": "wrangler types",
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "wrangler types && tsc -b",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"

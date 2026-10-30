@@ -31,7 +31,7 @@ interface NativeType {
   afterTypeCheck?: boolean
 }
 
-const NATIVE_TYPES = new Map<unknown, NativeType>([
+const NATIVE_TYPES = /* @__PURE__ */ new Map<unknown, NativeType>([
   [JsonSchemaXNativeType.Date, {
     types: ['string'],
     is: value => value instanceof Date,

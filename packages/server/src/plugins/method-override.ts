@@ -36,7 +36,7 @@ export class MethodOverrideHandlerPlugin<T extends Context> implements StandardH
   /**
    * Should override batch sub-request methods, not the original batch request.
    */
-  before = ['~batch']
+  before: string[] = ['~batch']
 
   private readonly param: string
   private readonly methods: ReadonlySet<string>

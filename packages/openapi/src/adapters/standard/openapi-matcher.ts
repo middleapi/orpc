@@ -22,8 +22,8 @@ export interface OpenAPIMatcherOptions {
 // we also encode `%` and `/`, so a decoded "%25" or "%2F" keeps its meaning
 const ROU3_RAW_CHARS = String.raw`\w!$&'()*+,\-.:;=@[\\\]|~`
 // `%` or a char rou3 stores encoded, meaning normalization may change the pathname
-const NORMALIZABLE_PATHNAME_REGEX = new RegExp(`[^${ROU3_RAW_CHARS}/]`)
-const ROU3_ENCODED_SEGMENT_TEXT_REGEX = new RegExp(`[^${ROU3_RAW_CHARS}]+`, 'g')
+const NORMALIZABLE_PATHNAME_REGEX = /* @__PURE__ */ new RegExp(`[^${ROU3_RAW_CHARS}/]`)
+const ROU3_ENCODED_SEGMENT_TEXT_REGEX = /* @__PURE__ */ new RegExp(`[^${ROU3_RAW_CHARS}]+`, 'g')
 
 interface TreeEntry {
   path: string[]
