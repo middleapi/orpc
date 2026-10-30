@@ -24,7 +24,7 @@ oRPC's core abstractions are written against the JavaScript language and standar
 
 Browsers update themselves, so there is nothing to recommend beyond the minimum. Edge and Chrome on Android match Chrome, Samsung Internet needs 17.0, and Safari on iOS matches iOS WebView. Cloudflare Workers tracks current V8 and ships every Web API oRPC uses; use the [Cloudflare Workers Adapter](/docs/adapters/cloudflare-workers) there. [React Native](#react-native) is not a web view and needs a polyfill.
 
-Some optional features need more: compression needs Deno 1.19, Bun 1.3.3, and Firefox 113; [AsyncIteratorObject](/docs/async-iterator-object) needs Firefox 105 and Bun 1.1.23; `Blob` or `File` payloads need Node.js 20; and the [Encryption](/docs/helpers/encryption), [Signing](/docs/helpers/signing), and [Pino](/docs/integrations/pino) integrations need Node.js 19 for a bare `crypto` global.
+Some optional features need more: compression needs Deno 1.19, Bun 1.3.3, and Firefox 113; [AsyncIteratorObject](/docs/async-iterator-object) needs Firefox 105 and Bun 1.1.23; `Blob` or `File` payloads need Node.js 20; the [Encryption](/docs/helpers/encryption), [Signing](/docs/helpers/signing), and [Pino](/docs/integrations/pino) integrations need Node.js 19 for a bare `crypto` global; and the [OpenTelemetry](/docs/integrations/opentelemetry) integration needs Node.js 18.20+ or 20.10+ for JSON import attributes.
 
 ## Language Level
 
@@ -39,6 +39,18 @@ These numbers cover the ES2022 features oRPC actually uses. Full ES2022 support 
 :::warning
 If you build for anything older than ES2022, your bundler has to compile `@orpc/*` along with your own code. Most bundlers skip `node_modules` by default.
 :::
+
+## Bundlers
+
+oRPC packages declare their entry points only through the `exports` field. Parcel ignores that field unless you enable it in your app's `package.json`:
+
+```json
+{
+  "@parcel/resolver-default": {
+    "packageExports": true
+  }
+}
+```
 
 ## Web APIs
 
