@@ -18,12 +18,13 @@ export interface OpenAPIMatcherOptions {
   filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 }
 
-// chars normalized text keeps raw: rou3 encodes the WHATWG path percent-encode set in literal text, and
-// we also encode `%` and `/`, so a decoded "%25" or "%2F" keeps its meaning
-const ROU3_RAW_CHARS = String.raw`\w!$&'()*+,\-.:;=@[\\\]|~`
+// both regexes share the chars normalized text keeps raw (`\w!$&'()*+,\-.:;=@[\\\]|~`): rou3 encodes the WHATWG
+// path percent-encode set in literal text, and we also encode `%` and `/`, so a decoded "%25" or "%2F" keeps its meaning.
+// Regex literals (not `new RegExp`) leave no module-level code that bundlers can't prove side-effect free.
+
 // `%` or a char rou3 stores encoded, meaning normalization may change the pathname
-const NORMALIZABLE_PATHNAME_REGEX = /* @__PURE__ */ new RegExp(`[^${ROU3_RAW_CHARS}/]`)
-const ROU3_ENCODED_SEGMENT_TEXT_REGEX = /* @__PURE__ */ new RegExp(`[^${ROU3_RAW_CHARS}]+`, 'g')
+const NORMALIZABLE_PATHNAME_REGEX = /[^\w!$&'()*+,\-.:;=@[\\\]|~/]/
+const ROU3_ENCODED_SEGMENT_TEXT_REGEX = /[^\w!$&'()*+,\-.:;=@[\\\]|~]+/g
 
 interface TreeEntry {
   path: string[]

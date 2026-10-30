@@ -31,7 +31,8 @@ interface NativeType {
   afterTypeCheck?: boolean
 }
 
-const NATIVE_TYPES = /* @__PURE__ */ new Map<unknown, NativeType>([
+// IIFE so bundlers can drop the enum reads in the entries too, not just the `new Map` call
+const NATIVE_TYPES = /* @__PURE__ */ (() => new Map<unknown, NativeType>([
   [JsonSchemaXNativeType.Date, {
     types: ['string'],
     is: value => value instanceof Date,
@@ -61,7 +62,7 @@ const NATIVE_TYPES = /* @__PURE__ */ new Map<unknown, NativeType>([
     coerce: value => Array.isArray(value) ? arrayToMap(value) : value,
     afterTypeCheck: true,
   }],
-])
+]))()
 
 function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
