@@ -1082,9 +1082,6 @@ importers:
       '@standard-server/shared':
         specifier: ~0.13.0
         version: 0.13.0
-      radash:
-        specifier: ^12.1.1
-        version: 12.1.1
       type-fest:
         specifier: ^5.10.0
         version: 5.10.0
@@ -10795,10 +10792,6 @@ packages:
   quote-js-string@0.1.0:
     resolution: {integrity: sha512-Y3NoRtprEEZQD8RfxMCfS0ZTqc4e+i18OrXEXAvpM6TfC/3y+0L5rNbZiSnbBBEkDfFzbpd8o+cE8q3/anjMGA==}
     engines: {node: '>=22'}
-
-  radash@12.1.1:
-    resolution: {integrity: sha512-h36JMxKRqrAxVD8201FrCpyeNuUY9Y5zZwujr20fFO77tpUtGa6EZzfKw/3WaiBX95fq7+MpsuMLNdSnORAwSA==}
-    engines: {node: '>=14.18.0'}
 
   radix-vue@1.9.17:
     resolution: {integrity: sha512-mVCu7I2vXt1L2IUYHTt0sZMz7s1K2ZtqKeTIxG3yC5mMFfLBG4FtE1FDeRMpDd+Hhg/ybi9+iXmAP1ISREndoQ==}
@@ -23643,8 +23636,6 @@ snapshots:
   quick-format-unescaped@4.0.4: {}
 
   quote-js-string@0.1.0: {}
-
-  radash@12.1.1: {}
 
   radix-vue@1.9.17(vue@3.5.44(typescript@6.0.3)):
     dependencies:
