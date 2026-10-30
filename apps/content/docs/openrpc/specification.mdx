@@ -70,19 +70,17 @@ When `openrpc` is applied multiple times, fields are overridden by the most rece
 
 ## Service Discovery
 
-`OpenRPCDiscoveryHandlerPlugin` answers the `rpc.discover` method with the document, as the [OpenRPC Service Discovery](https://spec.open-rpc.org/#service-discovery-method) method, and also serves it over `GET` at `/openrpc.json`, relative to the prefix:
+The `discovery` option of [OpenRPC Handler](/docs/openrpc/handler) answers the `rpc.discover` method with the document, as the [OpenRPC Service Discovery](https://spec.open-rpc.org/#service-discovery-method) method, and also serves it over `GET` at `/openrpc.json`, relative to the prefix:
 
 ```ts
-import { OpenRPCDiscoveryHandlerPlugin } from '@orpc/openrpc/plugins'
-
 const handler = new OpenRPCHandler(router, {
-  plugins: [
-    new OpenRPCDiscoveryHandlerPlugin({
-      spec: () => generator.generate(router), // memoize it for production
-      specPath: '/openrpc.json', // or false to disable the GET endpoint
-    }),
-  ],
+  discovery: {
+    spec: () => generator.generate(router), // memoize it for production
+    specPath: '/openrpc.json', // or false to disable the GET endpoint
+  },
 })
 ```
+
+Throw an `ORPCError` from `spec` to refuse the document, such as to callers who are not signed in.
 
 Tools such as the [OpenRPC Playground](https://playground.open-rpc.org) can then load the document from `http://localhost:3000/rpc/openrpc.json`.

@@ -1,6 +1,7 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
+import { ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
 import { AbortError, promiseWithResolvers } from '@orpc/shared'
 import WebSocket, { WebSocketServer } from 'ws'
@@ -98,7 +99,7 @@ describe('openRPCHandler', () => {
     expect(getSentMessages(ws)).toEqual([{ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }])
   })
 
-  it('passes options to the codec and the envelope plugin', async () => {
+  it('passes the handler options through', async () => {
     const handler = createHandler({ filter: (_, path) => path[0] !== 'echo', maxBatchSize: 1 })
     const ws = createWs()
 
@@ -111,16 +112,20 @@ describe('openRPCHandler', () => {
     ])
   })
 
-  it('runs plugins and interceptors once per call', async () => {
+  it('runs routing interceptors once per message, and the other interceptors once per call', async () => {
+    const routingInterceptor = vi.fn(({ next }) => next())
     const interceptor = vi.fn(({ next }) => next())
     const pluginInterceptor = vi.fn(({ next }) => next())
     const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
       init: options => ({ ...options, interceptors: [...options.interceptors ?? [], pluginInterceptor] }),
     }
-    const handler = createHandler({ interceptors: [interceptor], plugins: [plugin] })
+    const handler = createHandler({ routingInterceptors: [routingInterceptor], interceptors: [interceptor], plugins: [plugin] })
 
-    await handler.message(createWs(), JSON.stringify([call('ping', 1), call('echo')]))
+    await handler.message(createWs(), JSON.stringify([call('ping', 1), call('echo')]), { prefix: '/api' })
+
+    expect(routingInterceptor).toHaveBeenCalledOnce()
+    expect(routingInterceptor).toHaveBeenCalledWith(expect.objectContaining({ prefix: '/api', request: expect.objectContaining({ url: '/api', headers: {} }) }))
 
     for (const spy of [interceptor, pluginInterceptor]) {
       expect(spy.mock.calls.map(([{ request }]) => getJsonRpcCall(request))).toEqual([
@@ -128,6 +133,24 @@ describe('openRPCHandler', () => {
         { method: 'echo', id: undefined },
       ])
     }
+  })
+
+  it('answers the errors of plugins that read the message, such as a size limit', async () => {
+    const handler = createHandler({
+      routingInterceptors: [({ next, ...options }) => next({
+        ...options,
+        request: {
+          ...options.request,
+          resolveBody: async () => {
+            throw new ORPCError('PAYLOAD_TOO_LARGE')
+          },
+        },
+      })],
+    })
+    const ws = createWs()
+
+    await expect(handler.message(ws, request)).resolves.toEqual({ matched: true })
+    expect(getSentMessages(ws)).toMatchObject([{ jsonrpc: '2.0', id: null, error: { code: -32013, data: { code: 'PAYLOAD_TOO_LARGE' } } }])
   })
 
   it('aborts the in-flight calls of a closed socket only', async () => {

@@ -50,17 +50,10 @@ export class OpenRPCHandler<T extends Context> {
     const signal = controller.signal
     const options = resolveFriendlyStandardHandlerHandleOptions(resolveMaybeOptionalOptions(rest))
     // parsed before the first `await`, since some servers, like uWebSockets, detach the message buffer once the listener returns.
-    // invalid JSON resolves to `undefined`, which the envelope answers with "Parse error"
-    const body = parseJsonMessage(toStringOrBytes(data))
+    // invalid JSON resolves to `undefined`, which the handler answers with "Parse error"
+    const message = parseJsonMessage(toStringOrBytes(data))
 
-    const { matched, response } = await this.handler.handle({
-      method: 'POST',
-      // `StandardHandler` and the envelope only accept requests sent to the prefix itself
-      url: options.prefix ?? '/',
-      headers: { 'content-type': 'application/json' },
-      signal,
-      resolveBody: async () => body,
-    }, options)
+    const { matched, response } = await this.handler.handleMessage(message, { ...options, signal })
 
     if (response?.body !== undefined && !signal.aborted) {
       await ws.send(stringifyJSON(response.body)!)

@@ -16,14 +16,14 @@ export interface JsonRpcCall {
 }
 
 /**
- * Marks the sub-requests the envelope plugin creates, one per JSON-RPC call. The codec only resolves marked
+ * Marks the sub-requests `StandardOpenRPCHandler` creates, one per JSON-RPC call. The codec only resolves marked
  * requests, so a raw HTTP request (whose body or headers cannot carry a symbol) never routes to a procedure.
  */
 export const JSON_RPC_CALL_SYMBOL: unique symbol = Symbol.for('ORPC_JSON_RPC_CALL')
 
 /**
  * Returns the JSON-RPC call a sub-request represents, or `undefined` for any other request,
- * such as the raw HTTP request seen by plugins outside the envelope.
+ * such as the HTTP request routing interceptors see.
  *
  * @see {@link https://orpc.dev/docs/openrpc/handler#interceptors | OpenRPC Handler - Interceptors}
  */

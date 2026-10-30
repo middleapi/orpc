@@ -41,8 +41,7 @@ export interface OpenRPCHandlerCodecOptions<_T extends Context> {
 }
 
 /**
- * The codec of `OpenRPCHandler`. It only resolves the per-call sub-requests created by `OpenRPCEnvelopeHandlerPlugin`,
- * so use the two together.
+ * The codec `StandardOpenRPCHandler` runs each call with. It only resolves the per-call sub-requests the handler creates.
  */
 export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
@@ -100,7 +99,7 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
 
   encodeError(error: AnyORPCError): StandardResponse {
     return {
-      // the status the per-call plugins (such as rate limiting) see, the HTTP status of JSON-RPC errors is always 200
+      // the status per-call plugins (such as tracing) see, the HTTP status of JSON-RPC errors is always 200
       status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
       headers: {},
       body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) },

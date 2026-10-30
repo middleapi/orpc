@@ -34,11 +34,6 @@
         "import": "./dist/index.mjs",
         "default": "./dist/index.mjs"
       },
-      "./plugins": {
-        "types": "./dist/plugins/index.d.mts",
-        "import": "./dist/plugins/index.mjs",
-        "default": "./dist/plugins/index.mjs"
-      },
       "./standard": {
         "types": "./dist/adapters/standard/index.d.mts",
         "import": "./dist/adapters/standard/index.mjs",
@@ -74,7 +69,6 @@
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
-    "./plugins": "./src/plugins/index.ts",
     "./standard": "./src/adapters/standard/index.ts",
     "./fetch": "./src/adapters/fetch/index.ts",
     "./node": "./src/adapters/node/index.ts",

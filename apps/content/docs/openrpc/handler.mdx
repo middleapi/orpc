@@ -131,7 +131,7 @@ const ws = crossws({
 
 ## Interceptors
 
-[Interceptors](/docs/rpc/handler#interceptors) and plugins run once per JSON-RPC call, and see a sub-request per call. Use `getJsonRpcCall` to read the call:
+Each JSON-RPC call runs as its own sub-request: [interceptors](/docs/rpc/handler#interceptors) and client interceptors, including those of plugins, run once per call, and each call gets its own tracing span. Use `getJsonRpcCall` to read the call:
 
 ```ts
 import { getJsonRpcCall } from '@orpc/openrpc/standard'
@@ -146,4 +146,4 @@ const handler = new OpenRPCHandler(router, {
 })
 ```
 
-Plugins that work on the HTTP request itself, such as [CORS](/docs/plugins/cors), [Request Limit](/docs/plugins/request-limit), and [Response Headers](/docs/plugins/response-headers), run once per HTTP request. The response headers of the calls in a batch are merged. The [Batch Plugin](/docs/plugins/batch) is not needed, since JSON-RPC batches requests natively.
+Routing interceptors run once per HTTP request (or WebSocket message), around all the calls of a batch, and can answer the whole request, such as to require authentication. Plugins built on them apply to the HTTP request itself, such as [CORS](/docs/plugins/cors), [Request Limit](/docs/plugins/request-limit), and [Response Headers](/docs/plugins/response-headers), and logging plugins such as [Pino](/docs/integrations/pino) log once per HTTP request. The response headers of the calls in a batch are merged. The [Batch Plugin](/docs/plugins/batch) is not needed, since JSON-RPC batches requests natively.

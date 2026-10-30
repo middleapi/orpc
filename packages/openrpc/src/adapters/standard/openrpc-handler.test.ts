@@ -61,7 +61,7 @@ function batchOf(size: number) {
   return Array.from({ length: size }, (_, id) => ({ jsonrpc: '2.0', method: 'notify_hello', params: [id], id }))
 }
 
-describe('openRPCEnvelopeHandlerPlugin', () => {
+describe('standardOpenRPCHandler', () => {
   // https://www.jsonrpc.org/specification#examples
   // positional params are wrapped in one array, since a procedure takes a single input
   it.each([
@@ -278,49 +278,73 @@ describe('openRPCEnvelopeHandlerPlugin', () => {
       await expect(response!.json()).resolves.toEqual({ jsonrpc: '2.0', id: 1, result: ['hello', 5] })
     })
 
-    it('passes through sub-requests that are already marked as a call', async () => {
+    it('reads the calls from the body, even of a request a routing interceptor marks as a call', async () => {
       const handler = createHandler({
-        plugins: [{
-          name: 'mark',
-          after: ['~openrpc'],
-          init: options => ({
-            ...options,
-            routingInterceptors: [({ next, ...rest }) => next({
-              ...rest,
-              request: { ...rest.request, resolveBody: async () => undefined, [JSON_RPC_CALL_SYMBOL]: { method: 'get_data', id: 1 } } as typeof rest.request,
-            }), ...options.routingInterceptors ?? []],
-          }),
-        }],
+        routingInterceptors: [({ next, ...rest }) => next({
+          ...rest,
+          request: { ...rest.request, [JSON_RPC_CALL_SYMBOL]: { method: 'get_data', id: 1 } } as typeof rest.request,
+        })],
       })
 
-      // the codec answer, not wrapped in a JSON-RPC response
-      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.list', id: 2 })).resolves.toEqual({ status: 200, json: { result: ['hello', 5] } })
+      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.list', id: 2 })).resolves.toEqual({ status: 200, json: { jsonrpc: '2.0', id: 2, result: {} } })
     })
   })
 
   describe('plugins and interceptors', () => {
-    it('runs plugins inside the envelope once per call, and outside it once per request', async () => {
+    it('runs routing interceptors once per request, and the other interceptors once per call', async () => {
       const calls: unknown[] = []
-      const plugin = (name: string, order: Pick<StandardHandlerPlugin<any>, 'before' | 'after'>): StandardHandlerPlugin<any> => ({
-        name,
-        ...order,
+      const plugin: StandardHandlerPlugin<any> = {
+        name: 'record',
         init: options => ({
           ...options,
           routingInterceptors: [({ request, next }) => {
-            calls.push([name, request.url, getJsonRpcCall(request)])
+            calls.push(['plugin routing', request.url, getJsonRpcCall(request)])
             return next()
           }, ...options.routingInterceptors ?? []],
+          interceptors: [({ request, next }) => {
+            calls.push(['plugin interceptor', request.url, getJsonRpcCall(request)])
+            return next()
+          }, ...options.interceptors ?? []],
         }),
+      }
+
+      const handler = createHandler({
+        plugins: [plugin],
+        routingInterceptors: [({ request, next }) => {
+          calls.push(['routing', request.url, getJsonRpcCall(request)])
+          return next()
+        }],
+        clientInterceptors: [({ path, next }) => {
+          calls.push(['client', path.join('.')])
+          return next()
+        }],
       })
 
-      const handler = createHandler({ plugins: [plugin('outer', { after: ['~openrpc'] }), plugin('inner', { before: ['~openrpc'] })] })
       await post(handler, [{ jsonrpc: '2.0', method: 'get_data', id: 1 }, { jsonrpc: '2.0', method: 'notify_hello', params: [1] }])
 
       expect(calls).toEqual([
-        ['outer', '/rpc', undefined],
-        ['inner', '/rpc/get_data', { method: 'get_data', id: 1 }],
-        ['inner', '/rpc/notify_hello', { method: 'notify_hello', id: undefined }],
+        ['plugin routing', '/rpc', undefined],
+        ['routing', '/rpc', undefined],
+        ['plugin interceptor', '/rpc/get_data', { method: 'get_data', id: 1 }],
+        ['plugin interceptor', '/rpc/notify_hello', { method: 'notify_hello', id: undefined }],
+        ['client', 'get_data'],
+        ['client', 'notify_hello'],
       ])
+    })
+
+    it('lets routing interceptors answer, or change the context of, the whole request', async () => {
+      const handler = new OpenRPCHandler({
+        whoami: os.$context<{ user?: string }>().handler(({ context }) => context.user),
+      }, {
+        routingInterceptors: [async ({ next, ...options }) => options.request.headers.authorization
+          ? next({ ...options, context: { ...options.context, user: 'u1' } })
+          : { matched: true, response: { status: 401, headers: {}, body: undefined } }],
+      })
+
+      await expect(post(handler, [{ jsonrpc: '2.0', method: 'whoami', id: 1 }])).resolves.toEqual({ status: 401, json: undefined })
+      await expect(post(handler, [{ jsonrpc: '2.0', method: 'whoami', id: 1 }, { jsonrpc: '2.0', method: 'whoami', id: 2 }], { headers: { authorization: 'Bearer token' } }))
+        .resolves
+        .toEqual({ status: 200, json: [{ jsonrpc: '2.0', id: 1, result: 'u1' }, { jsonrpc: '2.0', id: 2, result: 'u1' }] })
     })
 
     it('passes the HTTP request headers to each call, without its content-length', async () => {
@@ -411,19 +435,37 @@ describe('openRPCEnvelopeHandlerPlugin', () => {
       expect(names.filter(name => name.startsWith('POST'))).toEqual(['POST /rpc/get_data', 'POST /rpc/notify_hello'])
     })
 
-    it('rethrows errors of a single call, but answers the other calls of a batch with -32603', async ({ onTestFinished }) => {
+    it('rethrows the errors the rethrow plugin catches, once every call of the request has run', async () => {
+      const handled = vi.fn()
+      const handler = new OpenRPCHandler({
+        ...router,
+        get_data: os.handler(handled),
+      }, { plugins: [new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) })] })
+
+      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.fail', id: 1 })).rejects.toThrow('secret')
+      await expect(post(handler, [{ jsonrpc: '2.0', method: 'planet.fail', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).rejects.toThrow('secret')
+      expect(handled).toHaveBeenCalledOnce()
+    })
+
+    it('rethrows unexpected errors of a single call, but answers the other calls of a batch with -32603', async ({ onTestFinished }) => {
       const rejectSpy = vi.spyOn(Promise, 'reject').mockImplementation(() => new Promise(() => {}) as Promise<never>)
 
       onTestFinished(() => {
         rejectSpy.mockRestore()
       })
 
-      const handler = createHandler({ plugins: [new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) })] })
+      // a lazy router that fails to load fails the call outside of the interceptors
+      const handler = new OpenRPCHandler({
+        ...router,
+        broken: os.lazy(async () => {
+          throw new Error('secret')
+        }),
+      })
 
-      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.fail', id: 1 })).rejects.toThrow('secret')
+      await expect(post(handler, { jsonrpc: '2.0', method: 'broken.ping', id: 1 })).rejects.toThrow('secret')
       expect(rejectSpy).not.toHaveBeenCalled()
 
-      expect((await post(handler, [{ jsonrpc: '2.0', method: 'planet.fail', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).json).toEqual([
+      expect((await post(handler, [{ jsonrpc: '2.0', method: 'broken.ping', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).json).toEqual([
         { jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'Internal error' } },
         { jsonrpc: '2.0', id: 2, result: ['hello', 5] },
       ])
