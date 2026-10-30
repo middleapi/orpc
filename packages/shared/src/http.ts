@@ -1,4 +1,4 @@
-import { safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@standard-server/shared'
+import { safeDecodeURIComponent, safeEncodeURIComponent } from '@standard-server/shared'
 
 export function pathToHttpPath(path: readonly string[]): `/${string}` {
   return `/${path.map(safeEncodeURIComponent).join('/')}`
@@ -138,25 +138,4 @@ export function isCompressibleContentType(contentType: string | null | undefined
   }
 
   return COMPRESSIBLE_CONTENT_TYPE_REGEX.test(contentType)
-}
-
-/**
- * Appends headers to a `Headers` instance, skipping pseudo-headers (such as `:status`) and the names
- * or values it rejects, which headers decoded from untrusted payloads, such as peer messages, may contain.
- */
-export function appendHeaders(target: Headers, headers: Record<string, string | readonly string[] | undefined>): void {
-  for (const name of Object.keys(headers)) {
-    if (name.startsWith(':')) {
-      continue
-    }
-
-    for (const value of toArray(headers[name])) {
-      try {
-        target.append(name, value)
-      }
-      catch {
-        // Skip the invalid name or value
-      }
-    }
-  }
 }

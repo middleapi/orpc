@@ -136,8 +136,13 @@ const mock = createHTTPUtils(contract, {
 
 const handlers = [
   mock.planet.list.handler(({ context }) => {
-    const locale = getRequestHeaders(context)?.get('accept-language') ?? 'en'
-    getResponseHeaders(context)?.set('content-language', locale)
+    const locale = getRequestHeaders(context)?.['accept-language'] ?? 'en'
+
+    const responseHeaders = getResponseHeaders(context)
+    if (responseHeaders) {
+      responseHeaders['content-language'] = locale
+    }
+
     return []
   }),
 ]

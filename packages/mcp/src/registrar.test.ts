@@ -621,7 +621,7 @@ describe('mcpRegistrar', () => {
     it('types stream outputs with the content-type response header', async () => {
       const client = await createTestClient('legacy', new McpRegistrar({
         image: os.handler(({ context }) => {
-          getResponseHeaders(context)?.set('content-type', 'image/png')
+          getResponseHeaders(context)!['content-type'] = 'image/png'
           return new Blob([new Uint8Array([1, 2, 3])]).stream()
         }),
       }))

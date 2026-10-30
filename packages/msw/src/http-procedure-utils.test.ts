@@ -215,7 +215,7 @@ describe('handler', () => {
 
     server.use(contextORPC.planet.list.handler(({ context }) => {
       expect(context.request).toBeInstanceOf(Request)
-      getResponseHeaders(context)?.set('x-mocked-context', '1')
+      getResponseHeaders(context)!['x-mocked-context'] = '1'
       return []
     }))
 

@@ -1,5 +1,7 @@
+import type { StandardHeaders } from '@standard-server/core'
+
 /**
- * Context symbol under which oRPC stores the request headers as a `Headers` instance.
+ * Context symbol under which oRPC stores the request headers as `StandardHeaders`.
  *
  * - In handlers, it holds the headers of the incoming request.
  * - In links, its headers are added to the outgoing request.
@@ -9,7 +11,7 @@
 export const REQUEST_HEADERS_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_REQUEST_HEADERS_CONTEXT')
 
 /**
- * Context symbol under which oRPC stores the response headers as a `Headers` instance.
+ * Context symbol under which oRPC stores the response headers as `StandardHeaders`.
  *
  * - In handlers, its headers are added to the outgoing response.
  * - In links, it receives the headers of the incoming response.
@@ -24,8 +26,8 @@ export const RESPONSE_HEADERS_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_R
  * @see {@link https://orpc.dev/docs/headers | Headers}
  */
 export interface HeadersContext {
-  [REQUEST_HEADERS_CONTEXT_SYMBOL]?: Headers | undefined
-  [RESPONSE_HEADERS_CONTEXT_SYMBOL]?: Headers | undefined
+  [REQUEST_HEADERS_CONTEXT_SYMBOL]?: StandardHeaders | undefined
+  [RESPONSE_HEADERS_CONTEXT_SYMBOL]?: StandardHeaders | undefined
 }
 
 /**
@@ -36,7 +38,7 @@ export interface HeadersContext {
  *
  * @see {@link https://orpc.dev/docs/headers | Headers}
  */
-export function getRequestHeaders(context: object): Headers | undefined {
+export function getRequestHeaders(context: object): StandardHeaders | undefined {
   return (context as HeadersContext)[REQUEST_HEADERS_CONTEXT_SYMBOL]
 }
 
@@ -48,6 +50,6 @@ export function getRequestHeaders(context: object): Headers | undefined {
  *
  * @see {@link https://orpc.dev/docs/headers | Headers}
  */
-export function getResponseHeaders(context: object): Headers | undefined {
+export function getResponseHeaders(context: object): StandardHeaders | undefined {
   return (context as HeadersContext)[RESPONSE_HEADERS_CONTEXT_SYMBOL]
 }

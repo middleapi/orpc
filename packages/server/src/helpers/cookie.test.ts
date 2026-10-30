@@ -145,3 +145,30 @@ describe('deleteCookie', () => {
     expect(() => deleteCookie(undefined, 'test')).not.toThrow()
   })
 })
+
+describe('standardHeaders', () => {
+  it('setCookie appends to the set-cookie header', () => {
+    const headers: Record<string, string | string[] | undefined> = { 'set-cookie': 'existing=1' }
+
+    setCookie(headers, 'first', 'value1')
+    setCookie(headers, 'second', 'value2', { httpOnly: true })
+
+    expect(headers['set-cookie']).toEqual(['existing=1', 'first=value1; Path=/', 'second=value2; Path=/; HttpOnly'])
+  })
+
+  it('getCookie reads the cookie header', () => {
+    expect(getCookie({ cookie: 'sessionId=abc123; theme=dark' }, 'theme')).toBe('dark')
+    expect(getCookie({ cookie: ['sessionId=abc123', 'theme=dark'] }, 'theme')).toBe('dark')
+    expect(getCookie({ cookie: ['sessionId=abc123', 'theme=dark'] }, 'sessionId')).toBe('abc123')
+    expect(getCookie({}, 'theme')).toBeUndefined()
+    expect(getCookie({ cookie: undefined }, 'theme')).toBeUndefined()
+  })
+
+  it('deleteCookie expires the cookie', () => {
+    const headers: Record<string, string | string[] | undefined> = {}
+
+    deleteCookie(headers, 'sessionId')
+
+    expect(headers['set-cookie']).toEqual(['sessionId=; Max-Age=0; Path=/'])
+  })
+})

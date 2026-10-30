@@ -151,6 +151,12 @@ export type {
   EventMeta,
   StandardBody,
   StandardBodyHint,
+  /**
+   * Headers as a plain object keyed by lowercase names, whose values are a string,
+   * an array of strings for a repeated header, or `undefined`.
+   *
+   * @see {@link https://orpc.dev/docs/headers | Headers}
+   */
   StandardHeaders,
   StandardLazyRequest,
   StandardLazyResponse,

@@ -1,4 +1,6 @@
+import type { StandardHeaders } from '@standard-server/core'
 import type { ParseOptions, SetCookie, StringifyOptions } from 'cookie'
+import { toArray } from '@orpc/shared'
 import { parseCookie, stringifySetCookie } from 'cookie'
 
 export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, StringifyOptions {
@@ -11,7 +13,15 @@ export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, Str
 }
 
 /**
- * Sets a cookie in the response headers.
+ * Whether the headers are a `Headers` instance rather than `StandardHeaders`.
+ * Checks for a method instead of using `instanceof`, since the `Headers` class might not be available.
+ */
+function isFetchHeaders(headers: Headers | StandardHeaders): headers is Headers {
+  return typeof headers.append === 'function'
+}
+
+/**
+ * Sets a cookie in the response headers, either `Headers` or `StandardHeaders`.
  *
  * Does nothing if `headers` is `undefined`.
  *
@@ -27,7 +37,7 @@ export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, Str
  * @see {@link https://orpc.dev/docs/helpers/cookie | Cookie Helpers}
  */
 export function setCookie(
-  headers: Headers | undefined,
+  headers: Headers | StandardHeaders | undefined,
   name: string,
   value: string,
   options: SetCookieOptions = {},
@@ -46,13 +56,18 @@ export function setCookie(
     value, // prioritize
   }, options)
 
-  headers.append('Set-Cookie', cookieString)
+  if (isFetchHeaders(headers)) {
+    headers.append('Set-Cookie', cookieString)
+  }
+  else {
+    headers['set-cookie'] = [...toArray(headers['set-cookie']), cookieString]
+  }
 }
 
 export interface GetCookieOptions extends ParseOptions {}
 
 /**
- * Gets a cookie value from request headers
+ * Gets a cookie value from the request headers, either `Headers` or `StandardHeaders`.
  *
  * Returns `undefined` if the cookie is not found or headers are `undefined`.
  *
@@ -68,7 +83,7 @@ export interface GetCookieOptions extends ParseOptions {}
  * @see {@link https://orpc.dev/docs/helpers/cookie | Cookie Helpers}
  */
 export function getCookie(
-  headers: Headers | undefined,
+  headers: Headers | StandardHeaders | undefined,
   name: string,
   options: GetCookieOptions = {},
 ): string | undefined {
@@ -76,7 +91,12 @@ export function getCookie(
     return undefined
   }
 
-  const cookieHeader = headers.get('cookie')
+  /**
+   * HTTP/2 may split the cookie header into several fields, which are joined with `; `.
+   */
+  const cookieHeader = isFetchHeaders(headers)
+    ? headers.get('cookie')
+    : toArray(headers.cookie).join('; ') || null
 
   if (cookieHeader === null) {
     return undefined
@@ -91,7 +111,7 @@ export function getCookie(
  * @see {@link https://orpc.dev/docs/helpers/cookie | Cookie Helpers}
  */
 export function deleteCookie(
-  headers: Headers | undefined,
+  headers: Headers | StandardHeaders | undefined,
   name: string,
   options: Omit<SetCookieOptions, 'maxAge'> = {},
 ): void {

@@ -34,8 +34,8 @@ function makeCodec() {
 function withHeaders(context: object) {
   return {
     ...context,
-    [REQUEST_HEADERS_CONTEXT_SYMBOL]: expect.any(Headers),
-    [RESPONSE_HEADERS_CONTEXT_SYMBOL]: expect.any(Headers),
+    [REQUEST_HEADERS_CONTEXT_SYMBOL]: expect.any(Object),
+    [RESPONSE_HEADERS_CONTEXT_SYMBOL]: expect.any(Object),
   }
 }
 
@@ -409,31 +409,29 @@ describe('standardHandler', () => {
   })
 
   describe('headers', () => {
-    it('injects the request headers after routing', async () => {
+    it('injects a copy of the request headers after routing', async () => {
       const routingInterceptor = vi.fn(({ next }) => next())
       const interceptor = vi.fn(({ next }) => next())
 
       handler = new StandardHandler(codec as any, { routingInterceptors: [routingInterceptor], interceptors: [interceptor] })
       setupHappyPath()
 
-      await handler.handle(makeRequest({ headers: { 'x-custom': ['a', 'b'], 'authorization': 'Bearer token' } }), OPTIONS)
+      const request = makeRequest({ headers: { 'x-custom': ['a', 'b'], 'authorization': 'Bearer token' } })
+      await handler.handle(request, OPTIONS)
 
       expect(getRequestHeaders(routingInterceptor.mock.calls[0]![0].context)).toBeUndefined()
 
       const requestHeaders = getRequestHeaders(interceptor.mock.calls[0]![0].context)
-      expect(requestHeaders).toBeInstanceOf(Headers)
-      expect(requestHeaders?.get('x-custom')).toBe('a, b')
-      expect(requestHeaders?.get('authorization')).toBe('Bearer token')
+      expect(requestHeaders).toEqual({ 'x-custom': ['a', 'b'], 'authorization': 'Bearer token' })
+      expect(requestHeaders).not.toBe(request.headers)
 
-      const context = procedureClientContext()
-      expect(getRequestHeaders(context)).toBe(requestHeaders)
+      expect(getRequestHeaders(procedureClientContext())).toBe(requestHeaders)
     })
 
     it('ignores the headers in the initial context', async () => {
-      const initialRequestHeaders = new Headers({ 'x-custom': 'context' })
-      const initialResponseHeaders = new Headers({ 'x-custom': 'context' })
+      const initialResponseHeaders = { 'x-custom': 'context' }
       const interceptor = vi.fn(({ context, next }) => {
-        getResponseHeaders(context)?.set('x-added', 'value')
+        getResponseHeaders(context)!['x-added'] = 'value'
         return next()
       })
 
@@ -443,36 +441,22 @@ describe('standardHandler', () => {
       const result = await handler.handle(makeRequest({ headers: { 'x-custom': 'request' } }), {
         ...OPTIONS,
         context: {
-          [REQUEST_HEADERS_CONTEXT_SYMBOL]: initialRequestHeaders,
+          [REQUEST_HEADERS_CONTEXT_SYMBOL]: { 'x-custom': 'context' },
           [RESPONSE_HEADERS_CONTEXT_SYMBOL]: initialResponseHeaders,
         },
       })
 
       const { context } = interceptor.mock.calls[0]![0]
-      expect(getRequestHeaders(context)?.get('x-custom')).toBe('request')
+      expect(getRequestHeaders(context)).toEqual({ 'x-custom': 'request' })
       expect(getResponseHeaders(context)).not.toBe(initialResponseHeaders)
       expect(result.response?.headers).toEqual({ 'x-added': 'value' })
-      expect([...initialResponseHeaders]).toEqual([['x-custom', 'context']])
-    })
-
-    it('skips the request headers Headers rejects', async () => {
-      const interceptor = vi.fn(({ next }) => next())
-
-      handler = new StandardHandler(codec as any, { interceptors: [interceptor] })
-      setupHappyPath()
-
-      const result = await handler.handle(makeRequest({
-        headers: { 'invalid name': 'value', 'x-invalid-value': 'a\nb', ':authority': 'example.com', 'x-valid': 'value' },
-      }), OPTIONS)
-
-      expect(result).toEqual({ matched: true, response: OK_RESPONSE })
-      expect([...getRequestHeaders(interceptor.mock.calls[0]![0].context)!]).toEqual([['x-valid', 'value']])
+      expect(initialResponseHeaders).toEqual({ 'x-custom': 'context' })
     })
 
     it('merges the response headers into the response', async () => {
       handler = new StandardHandler(codec as any, {
         interceptors: [({ context, next }) => {
-          getResponseHeaders(context)?.append('set-cookie', 'a=1')
+          getResponseHeaders(context)!['set-cookie'] = ['a=1']
           return next()
         }],
       })
@@ -480,9 +464,9 @@ describe('standardHandler', () => {
       codec.resolveProcedure.mockResolvedValue(makeResolved())
       codec.encodeOutput.mockResolvedValue({ status: 200, headers: { 'x-custom': 'codec', 'set-cookie': 'b=2' }, body: 'ok' })
       client.mockImplementation(async () => {
-        const context = procedureClientContext()
-        getResponseHeaders(context)?.set('x-custom', 'procedure')
-        getResponseHeaders(context)?.append('set-cookie', 'c=3')
+        const responseHeaders = getResponseHeaders(procedureClientContext())!
+        responseHeaders['x-custom'] = 'procedure'
+        responseHeaders['set-cookie'] = [...responseHeaders['set-cookie']!, 'c=3']
         return '__output__'
       })
 
@@ -502,8 +486,7 @@ describe('standardHandler', () => {
       codec.resolveProcedure.mockResolvedValue(makeResolved())
       codec.encodeError.mockResolvedValue({ status: 401, headers: {}, body: 'unauthorized' })
       client.mockImplementation(async () => {
-        const context = procedureClientContext()
-        getResponseHeaders(context)?.append('set-cookie', 'session=; Max-Age=0')
+        getResponseHeaders(procedureClientContext())!['set-cookie'] = 'session=; Max-Age=0'
         throw new ORPCError('UNAUTHORIZED')
       })
 

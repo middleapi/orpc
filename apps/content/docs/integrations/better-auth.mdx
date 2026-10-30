@@ -13,15 +13,21 @@ You may need to forward Better Auth's [response headers](https://better-auth.com
 
 ## Resolve the Session in Middleware
 
-Handlers expose the [request headers](/docs/headers) through `getRequestHeaders(context)`. The middleware loads the session from them and rejects unauthenticated calls. Public procedures use `os` directly. Each protected call performs its own lookup, including every sub-request of a [batch](/docs/plugins/batch).
+Handlers expose the [request headers](/docs/headers) through `getRequestHeaders(context)`. The middleware converts them to `Headers` for Better Auth, loads the session, and rejects unauthenticated calls. Public procedures use `os` directly. Each protected call performs its own lookup, including every sub-request of a [batch](/docs/plugins/batch).
 
 ```ts
 import { getRequestHeaders, ORPCError, os } from '@orpc/server'
 
 const requireSession = os.middleware(async ({ context, next }) => {
-  const session = await auth.api.getSession({
-    headers: getRequestHeaders(context) ?? new Headers(),
-  })
+  const headers = new Headers()
+
+  for (const [name, value] of Object.entries(getRequestHeaders(context) ?? {})) {
+    for (const v of [value ?? []].flat()) {
+      headers.append(name, v)
+    }
+  }
+
+  const session = await auth.api.getSession({ headers })
 
   if (!session) {
     throw new ORPCError('UNAUTHORIZED')
@@ -45,7 +51,7 @@ const router = {
 
 Only a missing session becomes `UNAUTHORIZED`. Other errors from `getSession` propagate to oRPC's [error handling](/docs/error-handling).
 
-The request headers are `undefined` outside handlers, such as in [server-side calls](/docs/client/server-side). The empty `Headers` fallback carries no session cookie, so `getSession` returns `null` and protected calls return `UNAUTHORIZED`. [Provide the request headers](/docs/headers#providing-headers) in the initial context to authenticate such calls.
+The request headers are `undefined` outside handlers, such as in [server-side calls](/docs/client/server-side). The empty `Headers` then carry no session cookie, so `getSession` returns `null` and protected calls return `UNAUTHORIZED`. [Provide the request headers](/docs/headers#providing-headers) in the initial context to authenticate such calls.
 
 ## Lazily Load and Share the Session
 

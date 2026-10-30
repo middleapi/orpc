@@ -73,15 +73,13 @@ const implementer = implement(contract).$context<TestContext>()
 const router = implementer.router({
   ping: implementer.ping.handler(({ input }) => input),
   login: implementer.login.handler(({ input, context }) => {
-    getResponseHeaders(context)?.append('set-cookie', `session=${input.user}; HttpOnly`)
-    getResponseHeaders(context)?.set('cache-control', 'no-store')
+    Object.assign(getResponseHeaders(context)!, { 'set-cookie': `session=${input.user}; HttpOnly`, 'cache-control': 'no-store' })
     return input
   }),
   whoami: implementer.whoami.handler(({ context }) => {
-    const user = getRequestHeaders(context)?.get('x-user') ?? null
-    getResponseHeaders(context)?.set('x-user', user ?? 'anonymous')
-    getResponseHeaders(context)?.set('cache-control', 'no-store')
-    return { user }
+    const user = getRequestHeaders(context)?.['x-user']
+    Object.assign(getResponseHeaders(context)!, { 'x-user': user ?? 'anonymous', 'cache-control': 'no-store' })
+    return { user: typeof user === 'string' ? user : null }
   }),
 })
 
@@ -206,13 +204,13 @@ describe('all plugins on one handler and one link', () => {
 
   it('carries the headers of batched calls through the context in both directions', async () => {
     const { client, exchanges } = createClientServer()
-    const aliceHeaders = new Headers()
-    const anonymousHeaders = new Headers()
+    const aliceHeaders = {}
+    const anonymousHeaders = {}
 
     await expect(Promise.all([
       client.whoami(undefined, {
         context: {
-          [REQUEST_HEADERS_CONTEXT_SYMBOL]: new Headers({ 'x-user': 'alice' }),
+          [REQUEST_HEADERS_CONTEXT_SYMBOL]: { 'x-user': 'alice' },
           [RESPONSE_HEADERS_CONTEXT_SYMBOL]: aliceHeaders,
         },
       }),
@@ -225,12 +223,12 @@ describe('all plugins on one handler and one link', () => {
     ])
 
     expect(exchanges).toHaveLength(1)
-    expect(aliceHeaders.get('x-user')).toEqual('alice')
-    expect(anonymousHeaders.get('x-user')).toEqual('anonymous')
+    expect(aliceHeaders).toMatchObject({ 'x-user': 'alice' })
+    expect(anonymousHeaders).toMatchObject({ 'x-user': 'anonymous' })
     // a header every batched call shares travels on the batch response, and comes back to each call
     expect(exchanges[0]!.response.headers.get('cache-control')).toEqual('no-store')
-    expect(aliceHeaders.get('cache-control')).toEqual('no-store')
-    expect(anonymousHeaders.get('cache-control')).toEqual('no-store')
+    expect(aliceHeaders).toMatchObject({ 'cache-control': 'no-store' })
+    expect(anonymousHeaders).toMatchObject({ 'cache-control': 'no-store' })
   })
 
   it('compresses a standalone call in both directions through every plugin', async () => {

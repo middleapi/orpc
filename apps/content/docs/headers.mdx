@@ -3,7 +3,9 @@ title: "Headers"
 description: "Read request headers and set response headers from procedures, middleware, interceptors, plugins, and clients through the built-in headers in oRPC context."
 ---
 
-Handlers and links inject the request and response headers into the [context](/docs/context), as `Headers` instances. Read them with `getRequestHeaders` and `getResponseHeaders` wherever the context is available, such as in middleware, procedures, interceptors, and plugins. No plugin is needed.
+Handlers and links inject the request and response headers into the [context](/docs/context). Read them with `getRequestHeaders` and `getResponseHeaders` wherever the context is available, such as in middleware, procedures, interceptors, and plugins. No plugin is needed.
+
+Both are `StandardHeaders`: plain objects keyed by lowercase header names, whose values are a string, an array of strings for a repeated header, or `undefined`.
 
 ## Server
 
@@ -14,12 +16,16 @@ import { getCookie, setCookie } from '@orpc/server/helpers'
 const procedure = os
   .use(({ context, next }) => {
     const sessionId = getCookie(getRequestHeaders(context), 'session_id')
-    getResponseHeaders(context)?.set('x-request-id', crypto.randomUUID())
 
     return next()
   })
   .handler(({ context }) => {
-    const userAgent = getRequestHeaders(context)?.get('user-agent')
+    const userAgent = getRequestHeaders(context)?.['user-agent']
+
+    const responseHeaders = getResponseHeaders(context)
+    if (responseHeaders) {
+      responseHeaders['cache-control'] = 'no-store'
+    }
 
     setCookie(getResponseHeaders(context), 'session_id', 'abc123', {
       secure: true,
@@ -42,7 +48,7 @@ Only handlers and links inject them. In [server-side calls](/docs/client/server-
 :::
 
 :::tip
-Combine with [Cookie Helpers](/docs/helpers/cookie), which accept `undefined` headers, for streamlined cookie management.
+Combine with [Cookie Helpers](/docs/helpers/cookie), which accept `StandardHeaders` and `undefined`, for streamlined cookie management.
 :::
 
 ### Providing Headers
@@ -55,19 +61,24 @@ import { call, getResponseHeaders, os, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_
 declare const request: Request
 
 const procedure = os.handler(({ context }) => {
-  getResponseHeaders(context)?.set('cache-control', 'no-store')
+  const responseHeaders = getResponseHeaders(context)
+  if (responseHeaders) {
+    responseHeaders['cache-control'] = 'no-store'
+  }
 })
 // ---cut---
-const responseHeaders = new Headers()
+import type { StandardHeaders } from '@orpc/server'
+
+const responseHeaders: StandardHeaders = {}
 
 await call(procedure, undefined, {
   context: {
-    [REQUEST_HEADERS_CONTEXT_SYMBOL]: request.headers,
+    [REQUEST_HEADERS_CONTEXT_SYMBOL]: Object.fromEntries(request.headers),
     [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders,
   },
 })
 
-console.log(responseHeaders.get('cache-control')) // 'no-store'
+console.log(responseHeaders['cache-control']) // 'no-store'
 ```
 
 Handlers ignore the headers in their initial context: they take the request headers from the request, and start the response headers empty.
@@ -91,19 +102,21 @@ declare const client: RouterClient<typeof router>
 // ---cut---
 import { REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/client'
 
-const responseHeaders = new Headers()
+import type { StandardHeaders } from '@orpc/client'
+
+const responseHeaders: StandardHeaders = {}
 
 const planet = await client.planet.find(undefined, {
   context: {
-    [REQUEST_HEADERS_CONTEXT_SYMBOL]: new Headers({ 'x-tenant-id': 'acme' }),
+    [REQUEST_HEADERS_CONTEXT_SYMBOL]: { 'x-tenant-id': 'acme' },
     [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders,
   },
 })
 
-const remaining = responseHeaders.get('x-ratelimit-remaining')
+const remaining = responseHeaders['x-ratelimit-remaining']
 ```
 
-The link copies the request headers you provide, so changes made during the call never reach your instance, and fills the response headers you provide. Each call keeps its own headers, even when the [Batch Plugin](/docs/plugins/batch) sends it with others.
+The link copies the request headers you provide, so changes made during the call never reach your object, and fills the response headers you provide. Each call keeps its own headers, even when the [Batch Plugin](/docs/plugins/batch) sends it with others.
 
 If you type your [client context](/docs/client/client-side#client-context), extend `HeadersContext` to accept these keys:
 
@@ -115,7 +128,7 @@ interface ClientContext extends HeadersContext {
 }
 ```
 
-Link interceptors and plugins use the same helpers:
+Link interceptors and plugins use the same helpers. Links always inject the headers before them:
 
 ```ts twoslash
 import { getRequestHeaders, getResponseHeaders } from '@orpc/client'
@@ -126,11 +139,11 @@ const link = new RPCLink({
   url: '/rpc',
   interceptors: [
     async ({ context, next }) => {
-      getRequestHeaders(context)?.set('x-request-id', crypto.randomUUID())
+      getRequestHeaders(context)!['x-request-id'] = crypto.randomUUID()
 
       const output = await next()
 
-      console.log(getResponseHeaders(context)?.get('x-request-id'))
+      console.log(getResponseHeaders(context)!['x-request-id'])
 
       return output
     },

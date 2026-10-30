@@ -81,8 +81,8 @@ describe('standardLink', () => {
 
     const context = {
       context: true,
-      [REQUEST_HEADERS_CONTEXT_SYMBOL]: expect.any(Headers),
-      [RESPONSE_HEADERS_CONTEXT_SYMBOL]: expect.any(Headers),
+      [REQUEST_HEADERS_CONTEXT_SYMBOL]: {},
+      [RESPONSE_HEADERS_CONTEXT_SYMBOL]: {},
     }
     const signal = AbortSignal.timeout(100)
     const lastEventId = '__lastEventId__'
@@ -285,19 +285,18 @@ describe('standardLink', () => {
       await link.call(['test'], 'input', { context: {} })
 
       const { context } = interceptor.mock.calls[0]![0]
-      expect(getRequestHeaders(context)).toBeInstanceOf(Headers)
-      expect(getResponseHeaders(context)).toBeInstanceOf(Headers)
+      expect(getRequestHeaders(context)).toEqual({})
+      expect(getResponseHeaders(context)).toEqual({})
       expect(vi.mocked(transport.send).mock.calls[0]![2].context).toBe(context)
     })
 
     it('merges the request headers into the request', async () => {
-      const callerHeaders = new Headers({ 'x-caller': 'value' })
+      const callerHeaders = { 'x-caller': 'value' }
       const codec = makeCodec()
       const transport = makeTransport()
       const link = new StandardLink(codec, transport, {
         interceptors: [({ context, next }) => {
-          getRequestHeaders(context)?.set('x-interceptor', 'value')
-          getRequestHeaders(context)?.set('x-codec', 'interceptor')
+          Object.assign(getRequestHeaders(context)!, { 'x-interceptor': 'value', 'x-codec': 'interceptor' })
           return next()
         }],
       })
@@ -311,15 +310,15 @@ describe('standardLink', () => {
         'x-interceptor': 'value',
       })
       expect(request.headers).toEqual({ 'x-codec': 'codec' }) // the encoded request is not mutated
-      expect([...callerHeaders]).toEqual([['x-caller', 'value']]) // the caller's instance is not mutated
+      expect(callerHeaders).toEqual({ 'x-caller': 'value' }) // the caller's object is not mutated
     })
 
     it('fills the response headers with the response headers', async () => {
-      const responseHeaders = new Headers({ 'x-stale': 'value' })
+      const responseHeaders: Record<string, string | string[] | undefined> = { 'x-stale': 'value' }
       const interceptor = vi.fn(async ({ context, next }) => {
         const output = await next()
         expect(getResponseHeaders(context)).toBe(responseHeaders)
-        expect([...getResponseHeaders(context)!]).toEqual([['set-cookie', 'a=1'], ['set-cookie', 'b=2'], ['x-custom', 'value']])
+        expect(getResponseHeaders(context)).toEqual({ 'x-custom': 'value', 'set-cookie': ['a=1', 'b=2'] })
         return output
       })
 
@@ -330,7 +329,7 @@ describe('standardLink', () => {
       vi.mocked(codec.encodeInput).mockResolvedValueOnce({ method: 'POST', url: '/test', headers: {}, body: undefined })
       vi.mocked(transport.send).mockResolvedValueOnce({
         status: 404,
-        headers: { 'x-custom': 'value', 'set-cookie': ['a=1', 'b=2'], ':status': '404', 'invalid name': 'value' },
+        headers: { 'x-custom': 'value', 'set-cookie': ['a=1', 'b=2'] },
         resolveBody: () => Promise.resolve(undefined),
       })
       vi.mocked(codec.decodeResponse).mockResolvedValueOnce({ kind: 'error', error: new ORPCError('NOT_FOUND') })
@@ -340,11 +339,11 @@ describe('standardLink', () => {
       ).rejects.toThrow(ORPCError)
 
       expect(interceptor).toHaveBeenCalledOnce()
-      expect([...responseHeaders]).toEqual([['set-cookie', 'a=1'], ['set-cookie', 'b=2'], ['x-custom', 'value']])
+      expect(responseHeaders).toEqual({ 'x-custom': 'value', 'set-cookie': ['a=1', 'b=2'] })
     })
 
     it('keeps only the headers of the latest response when the call repeats', async () => {
-      const responseHeaders = new Headers()
+      const responseHeaders = {}
       const codec = makeCodec()
       const transport = makeTransport()
       const link = new StandardLink(codec, transport, {
@@ -362,7 +361,7 @@ describe('standardLink', () => {
 
       await link.call(['test'], 'input', { context: { [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders } })
 
-      expect([...responseHeaders]).toEqual([['x-second', 'value']])
+      expect(responseHeaders).toEqual({ 'x-second': 'value' })
     })
   })
 

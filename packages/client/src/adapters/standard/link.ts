@@ -1,12 +1,11 @@
 import type { Interceptor } from '@orpc/shared'
-import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
+import type { StandardHeaders, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { ClientContext, ClientLink, ClientOptions } from '../../types'
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkPlugin } from './plugin'
 import type { StandardLinkTransport } from './transport'
-import { appendHeaders, getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
 import { mergeStandardHeaders } from '@standard-server/core'
-import { toStandardHeaders } from '@standard-server/fetch'
 import { getRequestHeaders, getResponseHeaders, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '../../headers'
 import { CompositeStandardLinkPlugin } from './plugin'
 
@@ -59,11 +58,11 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
   call(path: string[], input: unknown, options: ClientOptions<T>): Promise<unknown> {
     /**
      * Inject the request and response headers, so interceptors and plugins can access them.
-     * The request headers are copied, so changes made during the call never reach the caller's instance,
-     * while the response headers fill the caller's instance, so the caller can read them after the call.
+     * The request headers are copied, so changes made during the call never reach the caller's object,
+     * while the response headers fill the caller's object, so the caller can read them after the call.
      */
-    const requestHeaders = new Headers(getRequestHeaders(options.context))
-    const responseHeaders = getResponseHeaders(options.context) ?? new Headers()
+    const requestHeaders: StandardHeaders = { ...getRequestHeaders(options.context) }
+    const responseHeaders: StandardHeaders = getResponseHeaders(options.context) ?? {}
 
     options = {
       ...options,
@@ -111,8 +110,8 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
         )
 
         // Leave the request as is when no header was set
-        if (!requestHeaders.keys().next().done) {
-          request = { ...request, headers: mergeStandardHeaders(request.headers, toStandardHeaders(requestHeaders)) }
+        if (Object.keys(requestHeaders).length > 0) {
+          request = { ...request, headers: mergeStandardHeaders(request.headers, requestHeaders) }
         }
 
         if (activeSpan && tracer?.inject) {
@@ -139,11 +138,11 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
         )
 
         // Keep only the headers of the latest response, such as the last attempt of a retry
-        for (const name of [...responseHeaders.keys()]) {
-          responseHeaders.delete(name)
+        for (const name of Object.keys(responseHeaders)) {
+          delete responseHeaders[name]
         }
 
-        appendHeaders(responseHeaders, response.headers)
+        Object.assign(responseHeaders, response.headers)
 
         const decodedResult = await runWithSpan(
           { name: 'decode_response', parent: activeSpan },

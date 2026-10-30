@@ -1,5 +1,4 @@
 import {
-  appendHeaders,
   isAcceptableEncoding,
   isCompressibleContentType,
   isNoTransformCacheControl,
@@ -264,28 +263,5 @@ describe('isNoTransformCacheControl', () => {
 
   it('does not match a directive that merely contains the token', () => {
     expect(isNoTransformCacheControl('no-transform-extension')).toBe(false)
-  })
-})
-
-describe('appendHeaders', () => {
-  it('appends every value, keeping the existing headers', () => {
-    const headers = new Headers({ 'x-existing': 'value', 'x-custom': 'a' })
-
-    appendHeaders(headers, { 'x-custom': ['b', 'c'], 'set-cookie': ['a=1', 'b=2'], 'x-undefined': undefined })
-
-    expect([...headers]).toEqual([
-      ['set-cookie', 'a=1'],
-      ['set-cookie', 'b=2'],
-      ['x-custom', 'a, b, c'],
-      ['x-existing', 'value'],
-    ])
-  })
-
-  it('skips pseudo-headers and the names or values Headers rejects', () => {
-    const headers = new Headers()
-
-    appendHeaders(headers, { ':status': '200', 'invalid name': 'value', 'x-invalid-value': ['a\nb', 'valid'], 'x-valid': 'value' })
-
-    expect([...headers]).toEqual([['x-invalid-value', 'valid'], ['x-valid', 'value']])
   })
 })

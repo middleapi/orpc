@@ -693,30 +693,32 @@ describe('batchHandlerPlugin', () => {
     const headersRouter = {
       ping: base.handler(() => 'pong'),
       login: base.handler(({ context }) => {
-        getResponseHeaders(context)?.append('set-cookie', 'session=abc; HttpOnly')
-        getResponseHeaders(context)?.append('set-cookie', 'theme=dark')
-        getResponseHeaders(context)?.set('cache-control', 'max-age=60')
-        getResponseHeaders(context)?.set('content-language', 'en')
-        getResponseHeaders(context)?.set('x-only', 'login')
+        Object.assign(getResponseHeaders(context)!, {
+          'set-cookie': ['session=abc; HttpOnly', 'theme=dark'],
+          'cache-control': 'max-age=60',
+          'content-language': 'en',
+          'x-only': 'login',
+        })
         return 'ok'
       }),
       refresh: base.handler(({ context }) => {
-        getResponseHeaders(context)?.append('set-cookie', 'token=xyz; HttpOnly')
-        getResponseHeaders(context)?.set('cache-control', 'max-age=60')
-        getResponseHeaders(context)?.set('content-language', 'en')
+        Object.assign(getResponseHeaders(context)!, {
+          'set-cookie': 'token=xyz; HttpOnly',
+          'cache-control': 'max-age=60',
+          'content-language': 'en',
+        })
         return 'ok'
       }),
       uncached: base.handler(({ context }) => {
-        getResponseHeaders(context)?.set('cache-control', 'no-store')
+        getResponseHeaders(context)!['cache-control'] = 'no-store'
         return 'ok'
       }),
       image: base.handler(({ context }) => {
-        getResponseHeaders(context)?.append('set-cookie', 'download=1')
-        getResponseHeaders(context)?.set('cache-control', 'max-age=60')
+        Object.assign(getResponseHeaders(context)!, { 'set-cookie': 'download=1', 'cache-control': 'max-age=60' })
         return new Blob(['__TEST__'], { type: 'image/png' })
       }),
       events: base.handler(({ context }) => {
-        getResponseHeaders(context)?.set('cache-control', 'max-age=60')
+        getResponseHeaders(context)!['cache-control'] = 'max-age=60'
         return (async function* () {
           yield 'event'
         })()
@@ -826,17 +828,15 @@ describe('batchHandlerPlugin', () => {
     it('merges every sub-response\'s vary fields onto the batch response', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ headers: { vary: 'Origin' } }), {
         localized: os.handler(({ context }) => {
-          getResponseHeaders(context)?.set('cache-control', 'public, max-age=60')
-          getResponseHeaders(context)?.set('vary', 'Accept-Language, origin')
+          Object.assign(getResponseHeaders(context)!, { 'cache-control': 'public, max-age=60', 'vary': 'Accept-Language, origin' })
           return 'ok'
         }),
         personal: os.handler(({ context }) => {
-          getResponseHeaders(context)?.set('cache-control', 'public, max-age=60')
-          getResponseHeaders(context)?.set('vary', 'Cookie')
+          Object.assign(getResponseHeaders(context)!, { 'cache-control': 'public, max-age=60', 'vary': 'Cookie' })
           return 'ok'
         }),
         shared: os.handler(({ context }) => {
-          getResponseHeaders(context)?.set('cache-control', 'public, max-age=60')
+          getResponseHeaders(context)!['cache-control'] = 'public, max-age=60'
           return 'ok'
         }),
       })
@@ -856,11 +856,11 @@ describe('batchHandlerPlugin', () => {
     it('varies the batch response on everything when a sub-response varies on everything', async () => {
       const handler = createHandler(new BatchHandlerPlugin(), {
         any: os.handler(({ context }) => {
-          getResponseHeaders(context)?.set('vary', '*')
+          getResponseHeaders(context)!.vary = '*'
           return 'ok'
         }),
         localized: os.handler(({ context }) => {
-          getResponseHeaders(context)?.set('vary', 'Accept-Language')
+          getResponseHeaders(context)!.vary = 'Accept-Language'
           return 'ok'
         }),
       })

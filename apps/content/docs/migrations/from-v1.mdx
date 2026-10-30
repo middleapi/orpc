@@ -799,7 +799,7 @@ const handler = new RPCHandler(router, {
 
 ### Request and Response Headers Plugins removed
 
-Handlers and links now inject the request and response headers into the context themselves, so `RequestHeadersPlugin` and `ResponseHeadersPlugin` were removed. Remove them from your handler, and read the headers with `getRequestHeaders` and `getResponseHeaders` instead of `context.reqHeaders` and `context.resHeaders`. See [Headers](/docs/headers).
+Handlers and links now inject the request and response headers into the context themselves, so `RequestHeadersPlugin` and `ResponseHeadersPlugin` were removed. Remove them from your handler, and read the headers with `getRequestHeaders` and `getResponseHeaders` instead of `context.reqHeaders` and `context.resHeaders`. They are `StandardHeaders` objects keyed by lowercase names, not `Headers` instances. See [Headers](/docs/headers).
 
 <CodeGroup>
 
@@ -807,8 +807,12 @@ Handlers and links now inject the request and response headers into the context 
 import { getRequestHeaders, getResponseHeaders, os } from '@orpc/server'
 
 const procedure = os.handler(({ context }) => {
-  const userAgent = getRequestHeaders(context)?.get('user-agent')
-  getResponseHeaders(context)?.set('cache-control', 'no-store')
+  const userAgent = getRequestHeaders(context)?.['user-agent']
+
+  const responseHeaders = getResponseHeaders(context)
+  if (responseHeaders) {
+    responseHeaders['cache-control'] = 'no-store'
+  }
 })
 
 const handler = new RPCHandler(router)
@@ -832,7 +836,7 @@ const handler = new RPCHandler(router, {
 
 </CodeGroup>
 
-To provide headers in the initial context, such as in [server-side calls](/docs/client/server-side), put them under `REQUEST_HEADERS_CONTEXT_SYMBOL` and `RESPONSE_HEADERS_CONTEXT_SYMBOL` instead of `reqHeaders` and `resHeaders`. Handlers now ignore them: they take the request headers from the request, and start the response headers empty. See [Providing Headers](/docs/headers#providing-headers).
+To provide headers in the initial context, such as in [server-side calls](/docs/client/server-side), put them as `StandardHeaders` under `REQUEST_HEADERS_CONTEXT_SYMBOL` and `RESPONSE_HEADERS_CONTEXT_SYMBOL` instead of `reqHeaders` and `resHeaders`. Handlers now ignore them: they take the request headers from the request, and start the response headers empty. See [Providing Headers](/docs/headers#providing-headers).
 
 ## Client
 

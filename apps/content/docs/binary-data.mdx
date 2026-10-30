@@ -54,7 +54,10 @@ import * as z from 'zod'
 const example = os
   .output(z.instanceof(ReadableStream))
   .handler(async ({ context }) => {
-    getResponseHeaders(context)?.set('Content-Type', 'text/plain')
+    const responseHeaders = getResponseHeaders(context)
+    if (responseHeaders) {
+      responseHeaders['content-type'] = 'text/plain'
+    }
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
