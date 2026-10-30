@@ -1,71 +1,44 @@
 ---
 title: "Headers"
-description: "Read request headers and set response headers from procedures, middleware, interceptors, plugins, and clients through the built-in headers in oRPC context."
+description: "Read request headers and set response headers through oRPC context, on the server and the client."
 ---
 
-Handlers and links inject the request and response headers into the [context](/docs/context). Read them with `getRequestHeaders` and `getResponseHeaders` wherever the context is available, such as in middleware, procedures, interceptors, and plugins. No plugin is needed.
-
-Both are `StandardHeaders`: plain objects keyed by lowercase header names, whose values are a string, an array of strings for a repeated header, or `undefined`.
+Handlers and links put the request and response headers in the [context](/docs/context) as `StandardHeaders`: plain objects with lowercase keys.
 
 ## Server
 
 ```ts twoslash
 import { getRequestHeaders, getResponseHeaders, os } from '@orpc/server'
-import { getCookie, setCookie } from '@orpc/server/helpers'
-
-const procedure = os
-  .use(({ context, next }) => {
-    const sessionId = getCookie(getRequestHeaders(context), 'session_id')
-
-    return next()
-  })
-  .handler(({ context }) => {
-    const userAgent = getRequestHeaders(context)?.['user-agent']
-
-    const responseHeaders = getResponseHeaders(context)
-    if (responseHeaders) {
-      responseHeaders['cache-control'] = 'no-store'
-    }
-
-    setCookie(responseHeaders, 'session_id', 'abc123', {
-      secure: true,
-      maxAge: 3600,
-    })
-
-    return { userAgent }
-  })
-```
-
-Once a handler matches a procedure, and before its [interceptors](/docs/rpc/handler#interceptors) run, it injects:
-
-- **Request headers**: a copy of the headers of the request, or of the subrequest in a [batch](/docs/plugins/batch).
-- **Response headers**: empty at first, then merged into the response, error responses included. Duplicate names keep both values.
-
-[Routing interceptors](/docs/rpc/handler#routing-interceptors) run before matching, so they use the headers of `request` and of the returned response instead.
-
-:::info[Why can the headers be `undefined`?]
-Only handlers and links inject them. In [server-side calls](/docs/client/server-side), they are `undefined` unless you [provide them](#providing-headers).
-:::
-
-:::tip
-Combine with [Cookie Helpers](/docs/helpers/cookie), which accept `StandardHeaders` and `undefined`, for streamlined cookie management.
-:::
-
-### Providing Headers
-
-Provide the headers in the initial context under `REQUEST_HEADERS_CONTEXT_SYMBOL` and `RESPONSE_HEADERS_CONTEXT_SYMBOL`, for example to forward the headers of your framework in [server-side calls](/docs/client/server-side):
-
-```ts twoslash
-import { call, getResponseHeaders, os, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/server'
-
-declare const request: Request
+import { setCookie } from '@orpc/server/helpers'
 
 const procedure = os.handler(({ context }) => {
+  const userAgent = getRequestHeaders(context)?.['user-agent']
+
   const responseHeaders = getResponseHeaders(context)
   if (responseHeaders) {
     responseHeaders['cache-control'] = 'no-store'
   }
+
+  setCookie(responseHeaders, 'session_id', 'abc123')
+
+  return { userAgent }
 })
+```
+
+:::tip
+[Cookie Helpers](/docs/helpers/cookie) accept these headers directly.
+:::
+
+### Providing Headers
+
+Headers are `undefined` in [server-side calls](/docs/client/server-side) unless you provide them:
+
+```ts twoslash
+import { call, os, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/server'
+
+declare const request: Request
+
+const procedure = os.handler(() => {})
 // ---cut---
 import type { StandardHeaders } from '@orpc/server'
 
@@ -77,20 +50,9 @@ await call(procedure, undefined, {
     [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders,
   },
 })
-
-console.log(responseHeaders['cache-control']) // 'no-store'
 ```
 
-Handlers ignore the headers in their initial context: they take the request headers from the request, and start the response headers empty.
-
 ## Client
-
-Links inject the headers before their [interceptors](/docs/rpc/link#interceptors) run:
-
-- **Request headers**: their headers are merged into the request, after the link's [`headers` option](/docs/rpc/link#url-and-header-options). Duplicate names keep both values.
-- **Response headers**: filled with the headers of the response, replacing those of an earlier attempt, such as a [retried](/docs/plugins/retry) one.
-
-Provide them in the client context to set request headers and read response headers per call:
 
 ```ts twoslash
 import type { RouterClient } from '@orpc/server'
@@ -100,13 +62,12 @@ const router = { planet: { find: os.handler(() => ({ name: 'Earth' })) } }
 
 declare const client: RouterClient<typeof router>
 // ---cut---
-import { REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/client'
-
 import type { StandardHeaders } from '@orpc/client'
+import { REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/client'
 
 const responseHeaders: StandardHeaders = {}
 
-const planet = await client.planet.find(undefined, {
+await client.planet.find(undefined, {
   context: {
     [REQUEST_HEADERS_CONTEXT_SYMBOL]: { 'x-tenant-id': 'acme' },
     [RESPONSE_HEADERS_CONTEXT_SYMBOL]: responseHeaders,
@@ -116,9 +77,7 @@ const planet = await client.planet.find(undefined, {
 const remaining = responseHeaders['x-ratelimit-remaining']
 ```
 
-The link copies the request headers you provide, so changes made during the call never reach your object, and fills the response headers you provide. Each call keeps its own headers, even when the [Batch Plugin](/docs/plugins/batch) sends it with others.
-
-If you type your [client context](/docs/client/client-side#client-context), extend `HeadersContext` to accept these keys:
+Link interceptors and plugins can use `getRequestHeaders` and `getResponseHeaders` too. For a typed client context, extend `HeadersContext`:
 
 ```ts twoslash
 import type { HeadersContext } from '@orpc/client'
@@ -128,29 +87,6 @@ interface ClientContext extends HeadersContext {
 }
 ```
 
-Link interceptors and plugins use the same helpers. Links always inject the headers before them:
-
-```ts twoslash
-import { getRequestHeaders, getResponseHeaders } from '@orpc/client'
-import { RPCLink } from '@orpc/client/fetch'
-// ---cut---
-const link = new RPCLink({
-  origin: 'http://localhost:3000',
-  url: '/rpc',
-  interceptors: [
-    async ({ context, next }) => {
-      getRequestHeaders(context)!['x-request-id'] = crypto.randomUUID()
-
-      const output = await next()
-
-      console.log(getResponseHeaders(context)!['x-request-id'])
-
-      return output
-    },
-  ],
-})
-```
-
 :::warning
-Browsers hide most headers of cross-origin responses from JavaScript, and `set-cookie` from any response. To read others, list them in the `exposeHeaders` option of the [CORS Plugin](/docs/plugins/cors).
+Browsers only expose cross-origin response headers listed in the [CORS Plugin](/docs/plugins/cors)'s `exposeHeaders`.
 :::

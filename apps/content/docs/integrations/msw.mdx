@@ -120,7 +120,7 @@ const mock = createHTTPUtils(contract, {
 })
 ```
 
-Mock handlers receive the [context](/docs/context) of the created handler as `context`, so they can read the request headers and set the response headers through it, like procedures [do](/docs/headers):
+Mock handlers read and set [headers](/docs/headers) like procedures:
 
 ```ts
 import { getRequestHeaders, getResponseHeaders } from '@orpc/server'

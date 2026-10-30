@@ -8,12 +8,12 @@ sidebar:
 Use your [Better Auth](https://better-auth.com/) instance with oRPC's [context](/docs/context) and [middleware](/docs/middleware). No extra package is needed.
 
 :::tip
-You may need to forward Better Auth's [response headers](https://better-auth.com/docs/concepts/api#getting-headers), such as a refreshed session cookie. Append them to the [response headers in context](/docs/headers).
+You may need to forward Better Auth's [response headers](https://better-auth.com/docs/concepts/api#getting-headers), such as a refreshed session cookie. Add them to the [response headers](/docs/headers).
 :::
 
 ## Resolve the Session in Middleware
 
-Handlers expose the [request headers](/docs/headers) through `getRequestHeaders(context)`. The middleware converts them to `Headers` for Better Auth, loads the session, and rejects unauthenticated calls. Public procedures use `os` directly. Each protected call performs its own lookup, including every sub-request of a [batch](/docs/plugins/batch).
+The middleware loads the session from the [request headers](/docs/headers) and rejects unauthenticated calls. Each protected call performs its own lookup, including every sub-request of a [batch](/docs/plugins/batch).
 
 ```ts
 import { getRequestHeaders, ORPCError, os } from '@orpc/server'
@@ -46,7 +46,7 @@ const router = {
 
 Only a missing session becomes `UNAUTHORIZED`. Other errors from `getSession` propagate to oRPC's [error handling](/docs/error-handling).
 
-The request headers are `undefined` outside handlers, such as in [server-side calls](/docs/client/server-side). The empty `Headers` then carry no session cookie, so `getSession` returns `null` and protected calls return `UNAUTHORIZED`. [Provide the request headers](/docs/headers#providing-headers) in the initial context to authenticate such calls.
+In [server-side calls](/docs/client/server-side), [provide the request headers](/docs/headers#providing-headers), otherwise protected calls return `UNAUTHORIZED`.
 
 ## Lazily Load and Share the Session
 
