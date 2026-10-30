@@ -1,0 +1,45 @@
+---
+title: "Cookies Management Plugin"
+description: "Send and store cookies on clients without a built-in cookie jar, such as React Native, Expo, Node.js, or server-side rendering."
+sidebar:
+  label: "Cookies Management"
+---
+
+Browsers store and send cookies automatically. Other clients, such as React Native, Expo, Node.js scripts, or a client running during server-side rendering, have no cookie jar. The `CookiesManagementLinkPlugin` reads the `cookie` header for each request from your store and reports the cookies the server sets.
+
+:::info
+In browsers you do not need this plugin. For cross-origin requests, include credentials in a custom `fetch` instead, see [RPC Link](/docs/rpc/link).
+:::
+
+## Setup
+
+```ts
+import { CookiesManagementLinkPlugin } from '@orpc/client/plugins'
+
+const link = new RPCLink({
+  plugins: [
+    new CookiesManagementLinkPlugin({
+      getCookie: () => cookieStore.get(), // <- the `cookie` header value to send
+      setCookie: cookies => cookieStore.set(cookies), // <- optional, the `set-cookie` values of a response
+    }),
+  ],
+})
+```
+
+:::info
+The `link` can be any supported oRPC link that sends HTTP requests, such as [RPCLink](/docs/rpc/link) or [OpenAPILink](/docs/openapi/link).
+:::
+
+- `getCookie` can be a string or a function, optionally async, that receives the procedure `path` and the [client context](/docs/client/client-side#client-context). Return `undefined` or an empty string to send no cookies.
+- `setCookie` receives every `set-cookie` value of a response, unparsed, and only runs when the response sets cookies. The call resolves after `setCookie` settles, so the next request already sees the stored cookies.
+- A `cookie` header set elsewhere on the request, such as through the link's `headers` option, is kept and `getCookie` is not called.
+
+With the [Batch Plugin](/docs/plugins/batch), cookies are read and stored once per batch request rather than once per call.
+
+:::warning
+React Native's `fetch` may combine several `set-cookie` headers into one value or hide them, so `setCookie` is best effort there.
+:::
+
+## Learn More
+
+The [Better Auth Integration](/docs/integrations/better-auth#expo) shows the plugin with Expo. For implementation details, see the [CookiesManagementLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookies-management.ts).
