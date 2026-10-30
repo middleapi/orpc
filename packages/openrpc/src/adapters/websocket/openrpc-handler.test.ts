@@ -155,12 +155,18 @@ describe('openRPCHandler', () => {
     expect(getSentMessages(ws)).toMatchObject([{ jsonrpc: '2.0', id: 1, error: { code: -32013, data: { code: 'PAYLOAD_TOO_LARGE' } } }])
   })
 
+  const unauthorized = { matched: true, response: { status: 401, headers: {}, body: undefined } } as const
+
   it.each([
     // the error of the response status, or "Method not found"
-    ['answered by a routing interceptor', { matched: true, response: { status: 401, headers: {}, body: undefined } }, -32001],
-    ['declined by a routing interceptor', { matched: false }, -32601],
-  ] as const)('answers each call of a message %s', async (_, result, code) => {
-    const handler = createHandler({ routingInterceptors: [async () => result] })
+    ['answered by a routing interceptor', async () => unauthorized, -32001],
+    ['answered by a routing interceptor after its calls ran', async ({ next }: any) => {
+      await next()
+      return unauthorized
+    }, -32001],
+    ['declined by a routing interceptor', async () => ({ matched: false } as const), -32601],
+  ] as const)('answers each call of a message %s', async (_, interceptor, code) => {
+    const handler = createHandler({ routingInterceptors: [interceptor] })
     const ws = createWs()
 
     await handler.message(ws, JSON.stringify([call('ping', 1), call('ping'), call('ping', 'b')]))

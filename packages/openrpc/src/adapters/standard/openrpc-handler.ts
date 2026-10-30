@@ -8,20 +8,18 @@ import type {
   StandardHandlerRoutingInterceptor,
   StandardHandlerRoutingInterceptorOptions,
 } from '@orpc/server/standard'
-import type { Promisable, Public, Value } from '@orpc/shared'
+import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardUrl } from '@standard-server/core'
 import type { JsonRpcErrorObject, JsonRpcId, JsonRpcResponse } from '../../json-rpc'
 import type { OpenRPCDocument } from '../../types'
 import type { OpenRPCHandlerCodecOptions } from './openrpc-handler-codec'
 import type { JsonRpcCall } from './utils'
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
-import { OpenAPIJsonSerializer } from '@orpc/openapi'
-import { DEFAULT_ERROR_STATUS } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { getOwn, intercept, isPlainObject, matchesHttpPath, matchesHttpPathPrefix, mergeHttpPath, pathToHttpPath, sortPlugins, toArray, value } from '@orpc/shared'
 import { mergeStandardHeaders } from '@standard-server/core'
 import { DEFAULT_JSON_RPC_MAX_BATCH_SIZE, JSON_RPC_ERROR_CODES, JSON_RPC_VERSION } from '../../constants'
-import { encodeJsonRpcError, hasJsonRpcResultOrError, isJsonRpcId } from '../../json-rpc'
+import { hasJsonRpcResultOrError, isJsonRpcId } from '../../json-rpc'
 import { OpenRPCHandlerCodec } from './openrpc-handler-codec'
 import { isJsonRpcMediaType, JSON_RPC_CALL_SYMBOL } from './utils'
 
@@ -71,7 +69,7 @@ const PROTOCOL_ERROR_MESSAGES = {
   [JSON_RPC_ERROR_CODES.INTERNAL_ERROR]: 'Internal error',
 }
 
-function protocolError(id: JsonRpcId, code: keyof typeof PROTOCOL_ERROR_MESSAGES): JsonRpcResponse {
+function protocolError(id: JsonRpcId, code: keyof typeof PROTOCOL_ERROR_MESSAGES): Extract<JsonRpcResponse, { error: unknown }> {
   return { jsonrpc: JSON_RPC_VERSION, id, error: { code, message: PROTOCOL_ERROR_MESSAGES[code] } }
 }
 
@@ -92,8 +90,7 @@ function reply(body: JsonRpcResponse | JsonRpcResponse[] | undefined, headers: S
  */
 export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T> {
   private readonly requestInterceptors: StandardHandlerRoutingInterceptor<T>[] | undefined
-  private readonly serializer: Public<OpenAPIJsonSerializer>
-  private readonly errorCodeMap: StandardOpenRPCHandlerOptions<T>['errorCodeMap']
+  private readonly openrpcCodec: OpenRPCHandlerCodec<T>
   private readonly maxBatchSize: Exclude<StandardOpenRPCHandlerOptions<T>['maxBatchSize'], undefined>
   private readonly discovery: StandardOpenRPCHandlerOptions<T>['discovery']
 
@@ -105,15 +102,16 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
       initialized = plugin.init?.(initialized) ?? initialized
     }
 
+    const codec = new OpenRPCHandlerCodec(router, options)
+
     // the plugins are already initialized, the routing interceptors run in `.handle`
-    super(new OpenRPCHandlerCodec(router, options), {
+    super(codec, {
       interceptors: initialized.interceptors,
       clientInterceptors: initialized.clientInterceptors,
     })
 
     this.requestInterceptors = initialized.routingInterceptors
-    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
-    this.errorCodeMap = options.errorCodeMap
+    this.openrpcCodec = codec
     this.maxBatchSize = options.maxBatchSize ?? DEFAULT_JSON_RPC_MAX_BATCH_SIZE
     this.discovery = options.discovery
   }
@@ -158,35 +156,27 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     const { prefix, signal } = options
     const request: StandardLazyRequest = { method: 'POST', url: prefix ?? '/', headers: {}, signal, resolveBody: async () => message }
     const context = await value(options.context, request) as T
+    const result = await intercept(this.requestInterceptors, { context, prefix, request }, routed => this.dispatch(routed))
 
-    // a WebSocket client matches responses by `id`, so a refusal of the whole message answers each of its calls
-    const refuse = (error: JsonRpcErrorObject) => this.answerEachCall(message, error)
-
-    let dispatched = false
-
-    const result = await intercept(this.requestInterceptors, { context, prefix, request }, (routed) => {
-      dispatched = true
-      return this.dispatch(routed, error => refuse(encodeJsonRpcError(error, this.serializer, this.errorCodeMap)))
-    })
-
-    if (dispatched) {
-      return result
-    }
-
-    // a routing interceptor answered the message itself, such as an authentication guard
+    // a WebSocket client matches responses by `id`, so a refusal of the whole message, by the handler (such as a batch
+    // too large) or by a routing interceptor (such as an authentication guard), answers each of its calls instead
     if (!result.matched) {
-      return refuse({ code: JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND, message: PROTOCOL_ERROR_MESSAGES[JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND] })
+      return this.answerEachCall(message, protocolError(null, JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND).error)
     }
 
     const { status, body } = result.response
 
+    if (status < 400) {
+      return result
+    }
+
     if (hasJsonRpcResultOrError(body) && 'error' in body) {
-      return refuse(body.error)
+      return this.answerEachCall(message, body.error)
     }
 
     const code = Object.keys(COMMON_ERROR_STATUS_MAP).find(code => getOwn(COMMON_ERROR_STATUS_MAP, code) === status) ?? 'INTERNAL_SERVER_ERROR'
 
-    return refuse(encodeJsonRpcError(new ORPCError(code), this.serializer, this.errorCodeMap))
+    return this.answerEachCall(message, this.openrpcCodec.encodeError(new ORPCError(code)).body.error)
   }
 
   /**
@@ -208,10 +198,7 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     return reply(responses.length ? responses : undefined)
   }
 
-  private async dispatch(
-    options: StandardHandlerRoutingInterceptorOptions<T>,
-    reject = (error: AnyORPCError) => this.reject(error),
-  ): Promise<StandardHandlerHandleResult> {
+  private async dispatch(options: StandardHandlerRoutingInterceptorOptions<T>): Promise<StandardHandlerHandleResult> {
     let payload: unknown
 
     try {
@@ -220,7 +207,7 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     catch (error) {
       // errors of plugins, such as the request limit plugin
       if (error instanceof ORPCError) {
-        return reject(error)
+        return this.reject(error)
       }
     }
 
@@ -240,7 +227,7 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     const maxBatchSize = await value(this.maxBatchSize, options)
 
     if (payload.length > maxBatchSize) {
-      return reject(new ORPCError('PAYLOAD_TOO_LARGE', { message: `Batch size exceeds the maximum of ${maxBatchSize}.` }))
+      return this.reject(new ORPCError('PAYLOAD_TOO_LARGE', { message: `Batch size exceeds the maximum of ${maxBatchSize}.` }))
     }
 
     const results = await Promise.all(payload.map(item => this.call(options, item, true)))
@@ -274,22 +261,26 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     }
 
     const id = rawId as JsonRpcId | undefined
-    const request: StandardLazyRequest & { [JSON_RPC_CALL_SYMBOL]: JsonRpcCall } = {
-      method: 'POST',
-      // only for logs and spans, the codec routes by the call
-      url: mergeHttpPath(options.prefix ?? '/', pathToHttpPath(method.split('.'))),
-      headers: { ...options.request.headers, 'content-length': undefined },
-      signal: options.request.signal,
-      resolveBody: async () => params ?? undefined,
-      [JSON_RPC_CALL_SYMBOL]: { method, id },
-    }
 
     let result: StandardHandlerHandleResult
 
     try {
-      result = method === 'rpc.discover' && this.discovery
-        ? await this.discover(options)
-        : await super.handle(request, { prefix: options.prefix, context: options.context })
+      if (method === 'rpc.discover' && this.discovery) {
+        result = await this.discover(options)
+      }
+      else {
+        const request: StandardLazyRequest & { [JSON_RPC_CALL_SYMBOL]: JsonRpcCall } = {
+          method: 'POST',
+          // only for logs and spans, the codec routes by the call
+          url: mergeHttpPath(options.prefix ?? '/', pathToHttpPath(method.split('.'))),
+          headers: { ...options.request.headers, 'content-length': undefined },
+          signal: options.request.signal,
+          resolveBody: async () => params ?? undefined,
+          [JSON_RPC_CALL_SYMBOL]: { method, id },
+        }
+
+        result = await super.handle(request, { prefix: options.prefix, context: options.context })
+      }
     }
     catch (error) {
       if (!batch) {
@@ -324,36 +315,40 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     return { response: protocolError(id, JSON_RPC_ERROR_CODES.INTERNAL_ERROR), headers }
   }
 
-  /**
-   * Answers `rpc.discover` with the document, or with the `ORPCError` `spec` throws. Other errors are unexpected, see `.call`.
-   */
   private async discover(options: StandardHandlerRoutingInterceptorOptions<T>): Promise<StandardHandlerHandleResult> {
-    try {
-      return { matched: true, response: { status: 200, headers: {}, body: { result: await value(this.discovery!.spec, options) } } }
-    }
-    catch (error) {
-      if (!(error instanceof ORPCError)) {
-        throw error
-      }
+    const spec = await this.resolveSpec(options)
 
-      return { matched: true, response: { status: 200, headers: {}, body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) } } }
-    }
+    return { matched: true, response: spec instanceof ORPCError ? this.openrpcCodec.encodeError(spec) : { status: 200, headers: {}, body: { result: spec } } }
   }
 
   private async serveSpec(options: StandardHandlerRoutingInterceptorOptions<T>): Promise<StandardHandlerHandleResult> {
     const { request, prefix } = options
-    const specPath = this.discovery?.specPath ?? '/openrpc.json'
 
-    if (!this.discovery || specPath === false || !matchesHttpPath(request.url, prefix ? mergeHttpPath(prefix, specPath) : specPath)) {
+    if (!this.discovery) {
       return { matched: false }
     }
 
+    const specPath = this.discovery.specPath ?? '/openrpc.json'
+
+    if (specPath === false || !matchesHttpPath(request.url, prefix ? mergeHttpPath(prefix, specPath) : specPath)) {
+      return { matched: false }
+    }
+
+    const spec = await this.resolveSpec(options)
+
+    return spec instanceof ORPCError ? this.reject(spec) : { matched: true, response: { status: 200, headers: {}, body: spec } }
+  }
+
+  /**
+   * The document, or the `ORPCError` `spec` throws to refuse it. Other errors are unexpected, see `.call`.
+   */
+  private async resolveSpec(options: StandardHandlerRoutingInterceptorOptions<T>): Promise<OpenRPCDocument | AnyORPCError> {
     try {
-      return { matched: true, response: { status: 200, headers: {}, body: await value(this.discovery.spec, options) } }
+      return await value(this.discovery!.spec, options)
     }
     catch (error) {
       if (error instanceof ORPCError) {
-        return this.reject(error)
+        return error
       }
 
       throw error
@@ -364,13 +359,8 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
    * Rejects the whole HTTP request (wrong content type, body or batch too large) with the status of the error.
    */
   private reject(error: AnyORPCError): StandardHandlerHandleResult {
-    return {
-      matched: true,
-      response: {
-        status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
-        headers: {},
-        body: { jsonrpc: JSON_RPC_VERSION, id: null, error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) },
-      },
-    }
+    const { status, body } = this.openrpcCodec.encodeError(error)
+
+    return { matched: true, response: { status, headers: {}, body: { jsonrpc: JSON_RPC_VERSION, id: null, ...body } } }
   }
 }

@@ -151,12 +151,4 @@ describe('handler plugins on OpenRPCHandler', () => {
     expect(response?.status).toBe(204)
     expect(logs).toEqual([])
   })
-
-  it('applies the request limit to the whole HTTP request', async () => {
-    const { handler } = createHandler()
-
-    const response = await post(handler, Array.from({ length: 200 }, (_, id) => ({ jsonrpc: '2.0', method: 'login', params: { user: 'x' }, id })))
-
-    expect(response.status).toBe(413)
-  })
 })

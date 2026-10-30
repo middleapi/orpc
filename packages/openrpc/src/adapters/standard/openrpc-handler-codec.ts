@@ -4,6 +4,7 @@ import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Public, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import type { JsonRpcErrorObject } from '../../json-rpc'
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { DEFAULT_ERROR_STATUS } from '@orpc/server'
@@ -97,9 +98,9 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
     return { status: 200, headers: {}, body: { result: json } }
   }
 
-  encodeError(error: AnyORPCError): StandardResponse {
+  encodeError(error: AnyORPCError): StandardResponse & { body: { error: JsonRpcErrorObject } } {
     return {
-      // `StandardOpenRPCHandler` keeps only the body and headers, the HTTP status of JSON-RPC errors is always 200
+      // the HTTP status of JSON-RPC errors is always 200, except for whole requests `StandardOpenRPCHandler` rejects
       status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
       headers: {},
       body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) },

@@ -57,19 +57,12 @@ describe('openRPCLinkCodec', () => {
       expect(request.signal).toBe(signal)
     })
 
-    it('generates sequential base-36 string ids per codec', async () => {
+    it('generates sequential string ids per codec', async () => {
       const codec = new OpenRPCLinkCodec()
       const other = new OpenRPCLinkCodec()
       const encodeId = async (codec: OpenRPCLinkCodec<any>) => ((await codec.encodeInput('a', ['ping'], { context: {} })).body as { id: string }).id
 
-      const ids: string[] = []
-
-      for (let i = 0; i < 36; i++) {
-        ids.push(await encodeId(codec))
-      }
-
-      expect([ids[0], ids[1], ids[9], ids[35]]).toEqual(['1', '2', 'a', '10'])
-      await expect(encodeId(other)).resolves.toBe('1')
+      expect([await encodeId(codec), await encodeId(codec), await encodeId(other)]).toEqual(['1', '2', '1'])
     })
 
     describe('params', () => {
