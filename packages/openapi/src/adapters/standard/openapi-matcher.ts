@@ -18,8 +18,8 @@ export interface OpenAPIMatcherOptions {
   filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 }
 
-// both regexes share the chars normalized text keeps raw (`\w!$&'()*+,\-.:;=@[\\\]|~`): rou3 encodes the WHATWG
-// path percent-encode set in literal text, and we also encode `%` and `/`, so a decoded "%25" or "%2F" keeps its meaning.
+// both regexes share the class of chars normalized text keeps raw: rou3 encodes the WHATWG path percent-encode set
+// in literal text, and we also encode `%` and `/`, so a decoded "%25" or "%2F" keeps its meaning.
 // Regex literals (not `new RegExp`) leave no module-level code that bundlers can't prove side-effect free.
 
 // `%` or a char rou3 stores encoded, meaning normalization may change the pathname

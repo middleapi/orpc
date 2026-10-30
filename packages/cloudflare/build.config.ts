@@ -11,6 +11,6 @@ export default defineBuildConfig({
     },
   ],
   hooks: {
-    end: ctx => verifyDist(ctx, { externals: ['cloudflare:workers'] }),
+    end: ctx => verifyDist(ctx, ['cloudflare:workers']),
   },
 })

@@ -11,6 +11,6 @@ export default defineBuildConfig({
     },
   ],
   hooks: {
-    end: ctx => verifyDist(ctx, { externals: ['bun'] }),
+    end: ctx => verifyDist(ctx, ['bun']),
   },
 })
