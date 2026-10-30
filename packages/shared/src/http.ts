@@ -139,3 +139,11 @@ export function isCompressibleContentType(contentType: string | null | undefined
 
   return COMPRESSIBLE_CONTENT_TYPE_REGEX.test(contentType)
 }
+
+/**
+ * Whether the headers are a `Headers` instance rather than a plain headers object.
+ * Checks for a method instead of using `instanceof`, since the `Headers` class might not be available in some environments.
+ */
+export function isFetchHeaders<T extends object>(headers: Headers | T): headers is Headers {
+  return typeof (headers as Headers).forEach === 'function'
+}

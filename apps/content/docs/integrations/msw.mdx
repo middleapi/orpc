@@ -120,11 +120,23 @@ const mock = createHTTPUtils(contract, {
 })
 ```
 
-Mock handlers receive the [context](/docs/context) of the created handler as `context`, so they can read the request headers and set the response headers through it, like procedures [do](/docs/headers). The `context` option controls the initial context passed to the created handler on each request.
+Mock handlers receive the [context](/docs/context) of the created handler as `context`, so they can read the request headers and set the response headers through it, like procedures [do](/docs/headers):
 
 ```ts
 import { getRequestHeaders, getResponseHeaders } from '@orpc/server'
 
+const handlers = [
+  mock.planet.list.handler(({ context }) => {
+    const locale = getRequestHeaders(context)!['accept-language'] ?? 'en'
+    getResponseHeaders(context)!['content-language'] = locale
+    return []
+  }),
+]
+```
+
+The `context` option controls the initial context passed to the created handler on each request:
+
+```ts
 interface MockServerContext {
   request: Request
 }
@@ -136,13 +148,7 @@ const mock = createHTTPUtils(contract, {
 
 const handlers = [
   mock.planet.list.handler(({ context }) => {
-    const locale = getRequestHeaders(context)?.['accept-language'] ?? 'en'
-
-    const responseHeaders = getResponseHeaders(context)
-    if (responseHeaders) {
-      responseHeaders['content-language'] = locale
-    }
-
+    console.log(context.request.url)
     return []
   }),
 ]

@@ -2,6 +2,7 @@ import type { StandardLazyResponse, StandardRequest } from '@standard-server/cor
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkTransport } from './transport'
 import { getTracer, isAsyncIteratorObject, setTracer } from '@orpc/shared'
+import { withHeaders } from '../../../../../tests/__shared__/headers'
 import { ORPCError } from '../../error'
 import { getRequestHeaders, getResponseHeaders, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '../../headers'
 import { StandardLink } from './link'
@@ -79,15 +80,12 @@ describe('standardLink', () => {
     vi.mocked(transport.send).mockResolvedValueOnce(__standardResponse)
     vi.mocked(codec.decodeResponse).mockResolvedValueOnce({ kind: 'output', output: '__output__' })
 
-    const context = {
-      context: true,
-      [REQUEST_HEADERS_CONTEXT_SYMBOL]: {},
-      [RESPONSE_HEADERS_CONTEXT_SYMBOL]: {},
-    }
+    const callerContext = { context: true }
+    const context = withHeaders(callerContext)
     const signal = AbortSignal.timeout(100)
     const lastEventId = '__lastEventId__'
 
-    const output = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { context: true }, signal, lastEventId })
+    const output = await link.call(['planet', 'create'], { name: 'Earth' }, { context: callerContext, signal, lastEventId })
 
     expect(output).toEqual('__output__')
 

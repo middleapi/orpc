@@ -48,8 +48,6 @@ import { z } from 'zod'
  * New plugins belong in `createHandlerPlugins` or `createLinkPlugins` below.
  */
 
-interface TestContext {}
-
 interface TestClientContext extends RetryLinkPluginContext, HeadersContext {}
 
 const contract = {
@@ -68,7 +66,7 @@ const spec: OpenAPIDocument<'3.2.0'> = {
   info: { title: 'All Plugins', version: '1.0.0' },
 }
 
-const implementer = implement(contract).$context<TestContext>()
+const implementer = implement(contract)
 
 const router = implementer.router({
   ping: implementer.ping.handler(({ input }) => input),
@@ -85,26 +83,26 @@ const router = implementer.router({
 
 function createHandlerPlugins() {
   return [
-    new BatchHandlerPlugin<TestContext>(),
-    new BatchResponseCompressionHandlerPlugin<TestContext>({ threshold: 0 }),
-    new CORSHandlerPlugin<TestContext>(),
-    new EvlogHandlerPlugin<TestContext>(),
-    new GetMethodCsrfProtectionHandlerPlugin<TestContext>(),
-    new HeadMethodHandlerPlugin<TestContext>(),
-    new HibernationHandlerPlugin<TestContext>(),
+    new BatchHandlerPlugin(),
+    new BatchResponseCompressionHandlerPlugin({ threshold: 0 }),
+    new CORSHandlerPlugin(),
+    new EvlogHandlerPlugin(),
+    new GetMethodCsrfProtectionHandlerPlugin(),
+    new HeadMethodHandlerPlugin(),
+    new HibernationHandlerPlugin(),
     new MethodOverrideHandlerPlugin(),
-    new OpenAPIReferenceHandlerPlugin<TestContext, 'scalar'>({ spec, docsPath: '/docs', specPath: '/spec.json' }),
-    new PinoHandlerPlugin<TestContext>({ logger: pino({ level: 'silent' }) }),
-    new RateLimitHandlerPlugin<TestContext>(),
-    new RequestCompressionHandlerPlugin<TestContext>(),
-    new RequestLimitHandlerPlugin<TestContext>({ maxBodySize: 10 * 1024 * 1024 }),
-    new ResponseCompressionHandlerPlugin<TestContext>({ threshold: 0 }),
-    new RethrowHandlerPlugin<TestContext>({ filter: () => false }),
-    new SignalSyncHandlerPlugin<TestContext>(),
+    new OpenAPIReferenceHandlerPlugin({ spec, docsPath: '/docs', specPath: '/spec.json' }),
+    new PinoHandlerPlugin({ logger: pino({ level: 'silent' }) }),
+    new RateLimitHandlerPlugin(),
+    new RequestCompressionHandlerPlugin(),
+    new RequestLimitHandlerPlugin({ maxBodySize: 10 * 1024 * 1024 }),
+    new ResponseCompressionHandlerPlugin({ threshold: 0 }),
+    new RethrowHandlerPlugin({ filter: () => false }),
+    new SignalSyncHandlerPlugin(),
     new SmartCoercionHandlerPlugin(),
-    new StaticFileHandlerPlugin<TestContext>({ rootDir: import.meta.dirname, path: '/static' }),
-    new TimeoutHandlerPlugin<TestContext>({ timeout: 5000 }),
-    new TmpFileUploadHandlerPlugin<TestContext>({
+    new StaticFileHandlerPlugin({ rootDir: import.meta.dirname, path: '/static' }),
+    new TimeoutHandlerPlugin({ timeout: 5000 }),
+    new TmpFileUploadHandlerPlugin({
       maxBodySize: {
         memory: 10 * 1024 * 1024,
         file: 10 * 1024 * 1024,

@@ -2,7 +2,7 @@ import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard'
-import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, isFetchHeaders, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import { MalformedResponseError, ResponseError } from '../../error'
@@ -158,14 +158,5 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 }
 
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
-  /**
-   * Headers class might not be available in some environments,
-   * so we check for the existence of `forEach` and `get`
-   * methods to determine if it's a Headers instance.
-   */
-  if (typeof headers.forEach === 'function') {
-    return toStandardHeaders(headers as Headers)
-  }
-
-  return headers as StandardHeaders
+  return isFetchHeaders(headers) ? toStandardHeaders(headers) : headers
 }

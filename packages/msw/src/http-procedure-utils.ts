@@ -41,8 +41,7 @@ export type HTTPProcedureUtilsOptions<TContext extends Context>
     /**
      * The context passed to the created handler for each request, resolved
      * with the MSW resolver information. Mock handlers receive it as
-     * `context`, enabling context-driven behaviors such as the Response
-     * Headers Plugin.
+     * `context`, enabling context-driven behaviors.
      *
      * Optional when an empty object can satisfy the context type,
      * required otherwise.
@@ -54,8 +53,7 @@ export type HTTPProcedureUtilsOptions<TContext extends Context>
     /**
      * The context passed to the created handler for each request, resolved
      * with the MSW resolver information. Mock handlers receive it as
-     * `context`, enabling context-driven behaviors such as the Response
-     * Headers Plugin.
+     * `context`, enabling context-driven behaviors.
      *
      * Optional when an empty object can satisfy the context type,
      * required otherwise.

@@ -1,6 +1,7 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
 import { AbortError } from '@orpc/shared'
+import { withHeaders } from '../../../../tests/__shared__/headers'
 import { StandardLink } from '../adapters/standard'
 import { TimeoutLinkPlugin } from './timeout'
 
@@ -105,7 +106,7 @@ describe('timeoutLinkPlugin', () => {
     expect(timeout).toHaveBeenCalledWith(expect.objectContaining({
       path: ['test'],
       input: 'input',
-      context: expect.objectContaining({ timeout: 1000 }),
+      context: withHeaders({ timeout: 1000 }),
     }))
   })
 

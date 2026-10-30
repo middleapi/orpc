@@ -1,4 +1,5 @@
 import { toFetchBody } from '@standard-server/fetch'
+import { withHeaders } from '../../../../../tests/__shared__/headers'
 import { createORPCClient } from '../../client'
 import { RPCLink } from './rpc-link'
 
@@ -50,7 +51,7 @@ describe('rpcLink', () => {
         redirect: 'manual',
       }),
       expect.objectContaining({
-        context: expect.any(Object),
+        context: withHeaders({}),
       }),
       ['ping'],
     )
@@ -80,7 +81,7 @@ describe('rpcLink', () => {
         body: JSON.stringify({ json: 'input' }),
         method: 'QUERY',
       }),
-      expect.objectContaining({ context: expect.any(Object) }),
+      expect.objectContaining({ context: withHeaders({}) }),
       ['ping'],
     )
   })
@@ -114,7 +115,7 @@ describe('rpcLink', () => {
         headers: expect.toSatisfy((h: Headers) => h.get('x-custom-header') === 'value'),
       }),
       expect.objectContaining({
-        context: expect.any(Object),
+        context: withHeaders({}),
       }),
       ['ping'],
     )
@@ -233,7 +234,7 @@ describe('rpcLink', () => {
         method: 'POST',
         redirect: 'manual',
       }),
-      expect.objectContaining({ context: expect.any(Object) }),
+      expect.objectContaining({ context: withHeaders({}) }),
       ['ping'],
     )
     expect(toFetchBody).toHaveBeenCalledWith({ json: 'input' }, {}, toFetchRequestOptions)
@@ -263,7 +264,7 @@ describe('rpcLink', () => {
         redirect: 'manual',
       }),
       expect.objectContaining({
-        context: expect.any(Object),
+        context: withHeaders({}),
       }),
       ['ping'],
     )
@@ -296,7 +297,7 @@ describe('rpcLink', () => {
         duplex: 'half',
       }),
       expect.objectContaining({
-        context: expect.any(Object),
+        context: withHeaders({}),
       }),
       ['ping'],
     )

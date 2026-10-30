@@ -1,6 +1,7 @@
 import type { StandardLinkPlugin } from '@orpc/client/standard'
 import { createORPCClient } from '@orpc/client'
 import { os } from '@orpc/server'
+import { withHeaders } from '../../../../../tests/__shared__/headers'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 import { OpenAPILink } from './openapi-link'
@@ -68,7 +69,7 @@ describe('openapiLink', () => {
         method: 'GET',
         redirect: 'manual',
       }),
-      expect.objectContaining({ context: expect.any(Object) }),
+      expect.objectContaining({ context: withHeaders({}) }),
       ['get'],
     )
   })
@@ -136,7 +137,7 @@ describe('openapiLink', () => {
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost:3000/api/query',
       expect.objectContaining({ method: 'QUERY' }),
-      expect.objectContaining({ context: expect.any(Object) }),
+      expect.objectContaining({ context: withHeaders({}) }),
       ['query'],
     )
   })

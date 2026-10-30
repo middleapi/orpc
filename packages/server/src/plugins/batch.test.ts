@@ -688,11 +688,9 @@ describe('batchHandlerPlugin', () => {
   })
 
   describe('response headers', () => {
-    const base = os
-
     const headersRouter = {
-      ping: base.handler(() => 'pong'),
-      login: base.handler(({ context }) => {
+      ping: os.handler(() => 'pong'),
+      login: os.handler(({ context }) => {
         Object.assign(getResponseHeaders(context)!, {
           'set-cookie': ['session=abc; HttpOnly', 'theme=dark'],
           'cache-control': 'max-age=60',
@@ -701,7 +699,7 @@ describe('batchHandlerPlugin', () => {
         })
         return 'ok'
       }),
-      refresh: base.handler(({ context }) => {
+      refresh: os.handler(({ context }) => {
         Object.assign(getResponseHeaders(context)!, {
           'set-cookie': 'token=xyz; HttpOnly',
           'cache-control': 'max-age=60',
@@ -709,15 +707,15 @@ describe('batchHandlerPlugin', () => {
         })
         return 'ok'
       }),
-      uncached: base.handler(({ context }) => {
+      uncached: os.handler(({ context }) => {
         getResponseHeaders(context)!['cache-control'] = 'no-store'
         return 'ok'
       }),
-      image: base.handler(({ context }) => {
+      image: os.handler(({ context }) => {
         Object.assign(getResponseHeaders(context)!, { 'set-cookie': 'download=1', 'cache-control': 'max-age=60' })
         return new Blob(['__TEST__'], { type: 'image/png' })
       }),
-      events: base.handler(({ context }) => {
+      events: os.handler(({ context }) => {
         getResponseHeaders(context)!['cache-control'] = 'max-age=60'
         return (async function* () {
           yield 'event'

@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { getEventListeners } from 'node:events'
 import * as SharedExperimentalV2Module from '@orpc/shared'
 import { AsyncIteratorClass, asyncIteratorToStream, promiseWithResolvers, sleep } from '@orpc/shared'
+import { withHeaders } from '../../../../tests/__shared__/headers'
 import { StandardLink } from '../adapters/standard'
 import { DedupeLinkPlugin } from './dedupe'
 
@@ -103,12 +104,12 @@ describe('dedupeLinkPlugin', () => {
     expect(groupCondition).toHaveBeenNthCalledWith(1, expect.objectContaining({
       path: ['GET', 'planet'],
       request: await vi.mocked(codec.encodeInput).mock.results[0]!.value,
-      context: expect.objectContaining({ tag: 'first' }),
+      context: withHeaders({ tag: 'first' }),
     }))
     expect(groupCondition).toHaveBeenNthCalledWith(2, expect.objectContaining({
       path: ['GET', 'planet'],
       request: await vi.mocked(codec.encodeInput).mock.results[1]!.value,
-      context: expect.objectContaining({ tag: 'second' }),
+      context: withHeaders({ tag: 'second' }),
     }))
   })
 
@@ -196,8 +197,8 @@ describe('dedupeLinkPlugin', () => {
 
     expect(context).toHaveBeenCalledTimes(1)
     expect(context).toHaveBeenCalledWith([
-      expect.objectContaining({ context: expect.objectContaining({ tag: 'first' }) }),
-      expect.objectContaining({ context: expect.objectContaining({ tag: 'second' }) }),
+      expect.objectContaining({ context: withHeaders({ tag: 'first' }) }),
+      expect.objectContaining({ context: withHeaders({ tag: 'second' }) }),
     ])
 
     const [, , callOptions] = vi.mocked(transport.send).mock.calls[0]!

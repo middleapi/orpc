@@ -1,6 +1,7 @@
 import { ORPCError } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import * as z from 'zod'
+import { withHeaders } from '../../../../tests/__shared__/headers'
 import { ValidationError } from '../error'
 import { ProcedureContract } from '../procedure'
 import { RequestValidationLinkPlugin } from './request-validation'
@@ -97,7 +98,7 @@ describe('requestValidationLinkPlugin', () => {
     const output = await link.call(['chainedProcedure'], 1, { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith(1, ['chainedProcedure'], { context: expect.any(Object) })
+    expect(codec.encodeInput).toHaveBeenCalledWith(1, ['chainedProcedure'], { context: withHeaders({}) })
     expect(interceptor).toHaveBeenCalledTimes(1)
   })
 
@@ -118,7 +119,7 @@ describe('requestValidationLinkPlugin', () => {
     const output = await linkUsingValidatedInput.call(['chainedProcedure'], 1, { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith(2, ['chainedProcedure'], { context: expect.any(Object) })
+    expect(codec.encodeInput).toHaveBeenCalledWith(2, ['chainedProcedure'], { context: withHeaders({}) })
   })
 
   it('merges what every stacked object schema validates', async () => {
@@ -142,7 +143,7 @@ describe('requestValidationLinkPlugin', () => {
     expect(codec.encodeInput).toHaveBeenCalledWith(
       { parent: 'parent__PARENT', child: 'CHILD' },
       ['stackedObjectProcedure'],
-      { context: expect.any(Object) },
+      { context: withHeaders({}) },
     )
   })
 
@@ -167,7 +168,7 @@ describe('requestValidationLinkPlugin', () => {
     expect(codec.encodeInput).toHaveBeenCalledWith(
       { params: { id: 'ID', slug: 'SLUG' }, query: { page: 1 } },
       ['nestedObjectProcedure'],
-      { context: expect.any(Object) },
+      { context: withHeaders({}) },
     )
   })
 
@@ -188,7 +189,7 @@ describe('requestValidationLinkPlugin', () => {
     const output = await link.call(['withoutInputSchema'], 'anything', { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith('anything', ['withoutInputSchema'], { context: expect.any(Object) })
+    expect(codec.encodeInput).toHaveBeenCalledWith('anything', ['withoutInputSchema'], { context: withHeaders({}) })
   })
 
   it('throws a BAD_REQUEST error when any validation step fails', async () => {

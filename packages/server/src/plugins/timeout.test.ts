@@ -1,6 +1,7 @@
 import type { TimeoutHandlerPluginOptions } from './timeout'
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { AbortError } from '@orpc/shared'
+import { withHeaders } from '../../../../tests/__shared__/headers'
 import { RPCHandler } from '../adapters/fetch'
 import { os } from '../builder'
 import { TimeoutHandlerPlugin } from './timeout'
@@ -112,7 +113,7 @@ describe('timeoutHandlerPlugin', () => {
     expect(timeout).toHaveBeenCalledWith(expect.objectContaining({
       path: [],
       procedure,
-      context: expect.objectContaining({ timeout: 1000 }),
+      context: withHeaders({ timeout: 1000 }),
     }))
   })
 
@@ -248,7 +249,7 @@ describe('timeoutHandlerPlugin', () => {
 
     expect(streamingTimeout).toHaveBeenCalledTimes(1)
     expect(streamingTimeout).toHaveBeenCalledWith(expect.objectContaining({
-      context: expect.objectContaining({ streamingTimeout: 2000 }),
+      context: withHeaders({ streamingTimeout: 2000 }),
     }))
   })
 

@@ -130,8 +130,13 @@ export class StandardHandler<T extends Context> {
          * Both are created for each request, never taken from the initial context, so requests sharing it,
          * such as the subrequests of a batch or calls of a link that forwards its context, never share them.
          */
-        const requestHeaders: StandardHeaders = { ...request.headers }
+        const requestHeaders: StandardHeaders = {}
         const responseHeaders: StandardHeaders = {}
+
+        // A keyed copy is much faster than a spread for the null-prototype headers adapters produce
+        for (const name of Object.keys(request.headers)) {
+          requestHeaders[name] = request.headers[name]
+        }
 
         context = {
           ...context,
@@ -183,9 +188,7 @@ export class StandardHandler<T extends Context> {
               })
               step = undefined
 
-              const response = await this.codec.encodeOutput(output, procedure, path, { context, prefix })
-
-              return response
+              return this.codec.encodeOutput(output, procedure, path, { context, prefix })
             },
           )
         }

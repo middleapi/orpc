@@ -27,7 +27,7 @@ const procedure = os
       responseHeaders['cache-control'] = 'no-store'
     }
 
-    setCookie(getResponseHeaders(context), 'session_id', 'abc123', {
+    setCookie(responseHeaders, 'session_id', 'abc123', {
       secure: true,
       maxAge: 3600,
     })

@@ -1,5 +1,6 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import { withHeaders } from '../../../../tests/__shared__/headers'
 import { StandardLink } from '../adapters/standard'
 import { RetryAfterLinkPlugin } from './retry-after'
 
@@ -189,7 +190,7 @@ describe('retryAfterLinkPlugin', () => {
     expect(transport.send).toHaveBeenCalledTimes(2)
     expect(maxAttempts).toHaveBeenCalledWith(
       expect.objectContaining({ status: 429 }),
-      expect.objectContaining({ context: expect.objectContaining({ context: true }) }),
+      expect.objectContaining({ context: withHeaders({ context: true }) }),
     )
   })
 
@@ -217,7 +218,7 @@ describe('retryAfterLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
       expect(timeoutFn).toHaveBeenCalledWith(
         expect.objectContaining({ status: 429 }),
-        expect.objectContaining({ context: expect.any(Object) }),
+        expect.objectContaining({ context: withHeaders({}) }),
       )
     })
 
@@ -255,7 +256,7 @@ describe('retryAfterLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
       expect(condition).toHaveBeenCalledWith(
         expect.objectContaining({ status: 400 }),
-        expect.objectContaining({ context: expect.any(Object) }),
+        expect.objectContaining({ context: withHeaders({}) }),
       )
     })
   })

@@ -1,6 +1,7 @@
 import { getRequestHeaders, getResponseHeaders, ORPCError, REQUEST_HEADERS_CONTEXT_SYMBOL, RESPONSE_HEADERS_CONTEXT_SYMBOL } from '@orpc/client'
 import * as sharedExperimental from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
+import { withHeaders } from '../../../../../tests/__shared__/headers'
 import { createProcedureClient } from '../../procedure-client'
 import { StandardHandler } from './handler'
 
@@ -29,17 +30,6 @@ function makeCodec() {
 }
 
 /**
- * The context the handler passes on after routing, with the request and response headers injected.
- */
-function withHeaders(context: object) {
-  return {
-    ...context,
-    [REQUEST_HEADERS_CONTEXT_SYMBOL]: expect.any(Object),
-    [RESPONSE_HEADERS_CONTEXT_SYMBOL]: expect.any(Object),
-  }
-}
-
-/**
  * The context the handler created the procedure client with.
  */
 function procedureClientContext(): object {
@@ -57,6 +47,10 @@ function makeResolved(overrides: Record<string, unknown> = {}) {
 
 describe('standardHandler', () => {
   const OPTIONS = { context: {}, prefix: '/api/v1' } as const
+  /**
+   * The options the handler passes on after routing, with the request and response headers injected.
+   */
+  const ROUTED_OPTIONS = { ...OPTIONS, context: withHeaders(OPTIONS.context) }
 
   let codec: ReturnType<typeof makeCodec>
   let client: ReturnType<typeof vi.fn>
@@ -109,7 +103,7 @@ describe('standardHandler', () => {
 
     expect(createProcedureClient).toHaveBeenCalledTimes(1)
     expect(createProcedureClient).toHaveBeenCalledWith(resolved.procedure, {
-      context: withHeaders(OPTIONS.context),
+      context: ROUTED_OPTIONS.context,
       path: ['ping'],
       interceptors: [clientInterceptor],
     })
@@ -121,7 +115,7 @@ describe('standardHandler', () => {
     })
 
     expect(codec.encodeOutput).toHaveBeenCalledTimes(1)
-    expect(codec.encodeOutput).toHaveBeenCalledWith('__output__', resolved.procedure, ['ping'], { ...OPTIONS, context: withHeaders(OPTIONS.context) })
+    expect(codec.encodeOutput).toHaveBeenCalledWith('__output__', resolved.procedure, ['ping'], ROUTED_OPTIONS)
 
     expect(codec.encodeError).not.toHaveBeenCalled()
 
@@ -141,7 +135,7 @@ describe('standardHandler', () => {
       path: ['ping'],
       procedure: resolved.procedure,
       decodeInput: resolved.decodeInput,
-      context: withHeaders(OPTIONS.context),
+      context: ROUTED_OPTIONS.context,
       prefix: OPTIONS.prefix,
     })
     await expect(interceptor.mock.results[0]!.value).resolves.toEqual(OK_RESPONSE)
@@ -256,7 +250,7 @@ describe('standardHandler', () => {
       expect(result).toEqual({ matched: true, response: OK_RESPONSE })
       expect(resolved.decodeInput).toHaveBeenCalledOnce()
       expect(client).toHaveBeenCalledWith('__input__', expect.objectContaining({ signal: request.signal }))
-      expect(codec.encodeOutput).toHaveBeenCalledWith('__output__', resolved.procedure, ['ping'], { ...OPTIONS, context: withHeaders(OPTIONS.context) })
+      expect(codec.encodeOutput).toHaveBeenCalledWith('__output__', resolved.procedure, ['ping'], ROUTED_OPTIONS)
       expect(codec.encodeError).not.toHaveBeenCalled()
     })
 
@@ -268,7 +262,7 @@ describe('standardHandler', () => {
       await handler.handle(makeRequest(), OPTIONS)
 
       expect(createProcedureClient).toHaveBeenCalledWith(expect.anything(), {
-        context: withHeaders(OPTIONS.context),
+        context: ROUTED_OPTIONS.context,
         path: ['ping'],
         interceptors: [clientInterceptor],
       })
@@ -391,7 +385,7 @@ describe('standardHandler', () => {
       const result = await handler.handle(makeRequest(), OPTIONS)
 
       expect(result).toEqual({ matched: true, response: { status: 502, headers: {}, body: 'bad gateway' } })
-      expect(codec.encodeError).toHaveBeenCalledWith(procedureError, expect.anything(), ['ping'], { ...OPTIONS, context: withHeaders(OPTIONS.context) })
+      expect(codec.encodeError).toHaveBeenCalledWith(procedureError, expect.anything(), ['ping'], ROUTED_OPTIONS)
     })
 
     it('wraps non-ORPCError from procedure call as INTERNAL_SERVER_ERROR', async () => {

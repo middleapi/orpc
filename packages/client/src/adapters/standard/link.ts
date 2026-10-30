@@ -142,7 +142,11 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
           delete responseHeaders[name]
         }
 
-        Object.assign(responseHeaders, response.headers)
+        // A keyed copy is much faster than `Object.assign` for the null-prototype headers adapters produce
+        const headers = response.headers
+        for (const name of Object.keys(headers)) {
+          responseHeaders[name] = headers[name]
+        }
 
         const decodedResult = await runWithSpan(
           { name: 'decode_response', parent: activeSpan },

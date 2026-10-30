@@ -7,7 +7,7 @@ import type { OpenAPIMeta } from '../../meta'
 import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError, ResponseError } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
-import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
+import { isFetchHeaders, isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import {
@@ -481,16 +481,7 @@ function toMediaType(contentType: string | undefined): string | undefined {
 }
 
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
-  /**
-   * Headers class might not be available in some environments,
-   * so we check for the existence of `forEach` and `get`
-   * methods to determine if it's a Headers instance.
-   */
-  if (typeof headers.forEach === 'function') {
-    return toStandardHeaders(headers as Headers)
-  }
-
-  return headers as StandardHeaders
+  return isFetchHeaders(headers) ? toStandardHeaders(headers) : headers
 }
 
 function isValidDetailedInput(

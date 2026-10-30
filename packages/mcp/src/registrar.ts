@@ -387,7 +387,7 @@ function toText(json: unknown): string | undefined {
 
 /**
  * A stream has no type of its own, so it takes the content type of the response,
- * such as one a procedure sets with the Response Headers Plugin.
+ * such as one a procedure sets through `getResponseHeaders(context)`.
  */
 async function toCallToolResult(serialized: unknown, contentType?: string): Promise<CallToolResult> {
   if (serialized instanceof ReadableStream) {

@@ -17,17 +17,12 @@ Handlers expose the [request headers](/docs/headers) through `getRequestHeaders(
 
 ```ts
 import { getRequestHeaders, ORPCError, os } from '@orpc/server'
+import { toFetchHeaders } from '@standard-server/fetch'
 
 const requireSession = os.middleware(async ({ context, next }) => {
-  const headers = new Headers()
-
-  for (const [name, value] of Object.entries(getRequestHeaders(context) ?? {})) {
-    for (const v of [value ?? []].flat()) {
-      headers.append(name, v)
-    }
-  }
-
-  const session = await auth.api.getSession({ headers })
+  const session = await auth.api.getSession({
+    headers: toFetchHeaders(getRequestHeaders(context) ?? {}),
+  })
 
   if (!session) {
     throw new ORPCError('UNAUTHORIZED')

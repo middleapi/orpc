@@ -1,6 +1,6 @@
 import type { StandardHeaders } from '@standard-server/core'
 import type { ParseOptions, SetCookie, StringifyOptions } from 'cookie'
-import { toArray } from '@orpc/shared'
+import { isFetchHeaders, toArray } from '@orpc/shared'
 import { parseCookie, stringifySetCookie } from 'cookie'
 
 export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, StringifyOptions {
@@ -10,14 +10,6 @@ export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, Str
    * @default '/'
    */
   path?: string
-}
-
-/**
- * Whether the headers are a `Headers` instance rather than `StandardHeaders`.
- * Checks for a method instead of using `instanceof`, since the `Headers` class might not be available.
- */
-function isFetchHeaders(headers: Headers | StandardHeaders): headers is Headers {
-  return typeof headers.append === 'function'
 }
 
 /**
@@ -96,9 +88,9 @@ export function getCookie(
    */
   const cookieHeader = isFetchHeaders(headers)
     ? headers.get('cookie')
-    : toArray(headers.cookie).join('; ') || null
+    : toArray(headers.cookie).join('; ')
 
-  if (cookieHeader === null) {
+  if (!cookieHeader) {
     return undefined
   }
 

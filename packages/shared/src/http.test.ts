@@ -1,6 +1,7 @@
 import {
   isAcceptableEncoding,
   isCompressibleContentType,
+  isFetchHeaders,
   isNoTransformCacheControl,
   matchesHttpPath,
   matchesHttpPathPrefix,
@@ -264,4 +265,10 @@ describe('isNoTransformCacheControl', () => {
   it('does not match a directive that merely contains the token', () => {
     expect(isNoTransformCacheControl('no-transform-extension')).toBe(false)
   })
+})
+
+it('isFetchHeaders', () => {
+  expect(isFetchHeaders(new Headers({ 'x-custom': 'value' }))).toBe(true)
+  expect(isFetchHeaders({ 'x-custom': 'value' })).toBe(false)
+  expect(isFetchHeaders({ forEach: 'value' })).toBe(false)
 })
