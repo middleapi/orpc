@@ -99,7 +99,7 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
 
   encodeError(error: AnyORPCError): StandardResponse {
     return {
-      // the status per-call plugins (such as tracing) see, the HTTP status of JSON-RPC errors is always 200
+      // `StandardOpenRPCHandler` keeps only the body and headers, the HTTP status of JSON-RPC errors is always 200
       status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
       headers: {},
       body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) },

@@ -47,7 +47,7 @@ describe('openRPCHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
-  it('passes options to the codec and the envelope plugin', async () => {
+  it('passes the handler options through', async () => {
     const handler = new OpenRPCHandler({
       ping: os.handler(() => 'pong'),
       hidden: os.handler(() => 'hidden'),
@@ -67,7 +67,7 @@ describe('openRPCHandler', () => {
 
     await expect(call({ jsonrpc: '2.0', method: 'hidden', id: 1 })).resolves.toMatchObject({ status: 200, json: { error: { code: -32601 } } })
     await expect(call({ jsonrpc: '2.0', method: 'find', id: 1 })).resolves.toMatchObject({ status: 200, json: { error: { code: 404 } } })
-    // the error code map replaces the common one, for the errors of the envelope too
+    // the error code map replaces the common one, also for the errors the handler raises itself (here maxBatchSize)
     await expect(call([{ jsonrpc: '2.0', method: 'ping', id: 1 }, { jsonrpc: '2.0', method: 'ping', id: 2 }]))
       .resolves
       .toMatchObject({ status: 413, json: { error: { code: -32000, data: { code: 'PAYLOAD_TOO_LARGE' } } } })

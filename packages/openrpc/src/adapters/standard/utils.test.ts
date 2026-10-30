@@ -5,7 +5,7 @@ describe('getJsonRpcCall', () => {
   const request: StandardLazyRequest = { method: 'POST', url: '/rpc', headers: {}, resolveBody: vi.fn() }
   const call = { method: 'planet.find', id: 1 }
 
-  it('returns the call of a sub-request marked by the envelope', () => {
+  it('returns the call of a sub-request marked by StandardOpenRPCHandler', () => {
     expect(getJsonRpcCall({ ...request, [JSON_RPC_CALL_SYMBOL]: call } as StandardLazyRequest)).toBe(call)
   })
 

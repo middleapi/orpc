@@ -1,12 +1,13 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
-import { ORPCError } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
 import { AbortError, promiseWithResolvers } from '@orpc/shared'
 import WebSocket, { WebSocketServer } from 'ws'
 import { getJsonRpcCall } from '../standard'
 import { OpenRPCHandler } from './openrpc-handler'
+import { OpenRPCLink } from './openrpc-link'
 
 describe('openRPCHandler', () => {
   beforeEach(() => {
@@ -108,7 +109,8 @@ describe('openRPCHandler', () => {
 
     expect(getSentMessages(ws)).toMatchObject([
       { id: 1, error: { code: -32601 } },
-      { id: null, error: { code: -32013, data: { code: 'PAYLOAD_TOO_LARGE' } } },
+      // a WebSocket client matches responses by id, so each call of a refused message is answered
+      [{ id: 1, error: { code: -32013, data: { code: 'PAYLOAD_TOO_LARGE' } } }, { id: 2, error: { code: -32013 } }],
     ])
   })
 
@@ -150,7 +152,40 @@ describe('openRPCHandler', () => {
     const ws = createWs()
 
     await expect(handler.message(ws, request)).resolves.toEqual({ matched: true })
-    expect(getSentMessages(ws)).toMatchObject([{ jsonrpc: '2.0', id: null, error: { code: -32013, data: { code: 'PAYLOAD_TOO_LARGE' } } }])
+    expect(getSentMessages(ws)).toMatchObject([{ jsonrpc: '2.0', id: 1, error: { code: -32013, data: { code: 'PAYLOAD_TOO_LARGE' } } }])
+  })
+
+  it.each([
+    // the error of the response status, or "Method not found"
+    ['answered by a routing interceptor', { matched: true, response: { status: 401, headers: {}, body: undefined } }, -32001],
+    ['declined by a routing interceptor', { matched: false }, -32601],
+  ] as const)('answers each call of a message %s', async (_, result, code) => {
+    const handler = createHandler({ routingInterceptors: [async () => result] })
+    const ws = createWs()
+
+    await handler.message(ws, JSON.stringify([call('ping', 1), call('ping'), call('ping', 'b')]))
+    await handler.message(ws, JSON.stringify(call('ping')))
+    await handler.message(ws, '[]')
+
+    expect(getSentMessages(ws)).toMatchObject([
+      [{ id: 1, error: { code } }, { id: 'b', error: { code } }],
+      { id: null, error: { code } },
+    ])
+  })
+
+  it('answers the calls of a refused message for the OpenRPC link', async () => {
+    const handler = createHandler({
+      routingInterceptors: [async ({ next, ...options }) => options.context.userId
+        ? next()
+        : { matched: true, response: { status: 401, headers: {}, body: undefined } }],
+    })
+    const wss = new WebSocketServer({ port: 0 })
+    wss.on('connection', ws => handler.upgrade(ws, { context: {} }))
+    onTestFinished(() => wss.close())
+
+    const client = createORPCClient<any>(new OpenRPCLink({ connect: () => new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`) }))
+
+    await expect(client.ping()).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
   })
 
   it('aborts the in-flight calls of a closed socket only', async () => {

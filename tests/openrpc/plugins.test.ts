@@ -134,6 +134,24 @@ describe('handler plugins on OpenRPCHandler', () => {
     expect(['login', 'limited']).toContain(events[0]!.rpc.method)
   })
 
+  it('keeps the order core gives plugins around tracing, so CORS answers preflights before logging plugins see them', async () => {
+    const logs: Record<string, any>[] = []
+    const handler = new OpenRPCHandler<TestContext>(router, {
+      plugins: [
+        new CORSHandlerPlugin(),
+        new PinoHandlerPlugin({ logger: pino({ level: 'info' }, { write: line => logs.push(JSON.parse(line)) }), logLifecycle: true }),
+      ],
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost/rpc', {
+      method: 'OPTIONS',
+      headers: { 'origin': 'https://example.com', 'access-control-request-method': 'POST' },
+    }), { prefix: '/rpc', context: {} })
+
+    expect(response?.status).toBe(204)
+    expect(logs).toEqual([])
+  })
+
   it('applies the request limit to the whole HTTP request', async () => {
     const { handler } = createHandler()
 

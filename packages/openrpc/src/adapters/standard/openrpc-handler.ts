@@ -4,16 +4,17 @@ import type {
   StandardHandlerHandleOptions,
   StandardHandlerHandleResult,
   StandardHandlerOptions,
+  StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
   StandardHandlerRoutingInterceptorOptions,
 } from '@orpc/server/standard'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardUrl } from '@standard-server/core'
-import type { JsonRpcId, JsonRpcResponse } from '../../json-rpc'
+import type { JsonRpcErrorObject, JsonRpcId, JsonRpcResponse } from '../../json-rpc'
 import type { OpenRPCDocument } from '../../types'
 import type { OpenRPCHandlerCodecOptions } from './openrpc-handler-codec'
 import type { JsonRpcCall } from './utils'
-import { COMMON_ERROR_STATUS_MAP, ORPCError, toORPCError } from '@orpc/client'
+import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { DEFAULT_ERROR_STATUS } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
@@ -85,6 +86,7 @@ function reply(body: JsonRpcResponse | JsonRpcResponse[] | undefined, headers: S
  * Plugins hook in at two levels: `routingInterceptors` run once per HTTP request (or message), such as CORS
  * or the request limit, while each call runs through `StandardHandler` as its own sub-request, with its own
  * tracing span, `interceptors`, and `clientInterceptors`. Interceptors read the call with `getJsonRpcCall`.
+ * `rpc.discover`, answered by the `discovery` option, only runs inside the routing interceptors.
  *
  * @see {@link https://orpc.dev/docs/openrpc/handler#interceptors | OpenRPC Handler - Interceptors}
  */
@@ -98,7 +100,8 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
   constructor(router: Router<T>, options: NoInfer<StandardOpenRPCHandlerOptions<T>> = {}) {
     let initialized: StandardHandlerOptions<T> = options
 
-    for (const plugin of sortPlugins(toArray(options.plugins))) {
+    // core's per-call tracing plugin is not initialized here, but takes part in the sort, so plugins ordered around it keep their order
+    for (const plugin of sortPlugins<StandardHandlerPlugin<T>>([...toArray(options.plugins), { name: '~tracing' }])) {
       initialized = plugin.init?.(initialized) ?? initialized
     }
 
@@ -156,10 +159,59 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     const request: StandardLazyRequest = { method: 'POST', url: prefix ?? '/', headers: {}, signal, resolveBody: async () => message }
     const context = await value(options.context, request) as T
 
-    return intercept(this.requestInterceptors, { context, prefix, request }, routed => this.dispatch(routed))
+    // a WebSocket client matches responses by `id`, so a refusal of the whole message answers each of its calls
+    const refuse = (error: JsonRpcErrorObject) => this.answerEachCall(message, error)
+
+    let dispatched = false
+
+    const result = await intercept(this.requestInterceptors, { context, prefix, request }, (routed) => {
+      dispatched = true
+      return this.dispatch(routed, error => refuse(encodeJsonRpcError(error, this.serializer, this.errorCodeMap)))
+    })
+
+    if (dispatched) {
+      return result
+    }
+
+    // a routing interceptor answered the message itself, such as an authentication guard
+    if (!result.matched) {
+      return refuse({ code: JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND, message: PROTOCOL_ERROR_MESSAGES[JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND] })
+    }
+
+    const { status, body } = result.response
+
+    if (hasJsonRpcResultOrError(body) && 'error' in body) {
+      return refuse(body.error)
+    }
+
+    const code = Object.keys(COMMON_ERROR_STATUS_MAP).find(code => getOwn(COMMON_ERROR_STATUS_MAP, code) === status) ?? 'INTERNAL_SERVER_ERROR'
+
+    return refuse(encodeJsonRpcError(new ORPCError(code), this.serializer, this.errorCodeMap))
   }
 
-  private async dispatch(options: StandardHandlerRoutingInterceptorOptions<T>): Promise<StandardHandlerHandleResult> {
+  /**
+   * Answers each call of a message with the same error. Notifications are never answered,
+   * and a message without readable calls is answered with a `null` id.
+   */
+  private answerEachCall(message: unknown, error: JsonRpcErrorObject): StandardHandlerHandleResult {
+    const answer = (item: unknown): JsonRpcResponse | undefined => {
+      const id = isPlainObject(item) ? getOwn(item, 'id') : null
+      return id === undefined ? undefined : { jsonrpc: JSON_RPC_VERSION, id: isJsonRpcId(id) ? id : null, error }
+    }
+
+    if (!Array.isArray(message) || message.length === 0) {
+      return reply(answer(Array.isArray(message) ? null : message))
+    }
+
+    const responses = message.flatMap(item => answer(item) ?? [])
+
+    return reply(responses.length ? responses : undefined)
+  }
+
+  private async dispatch(
+    options: StandardHandlerRoutingInterceptorOptions<T>,
+    reject = (error: AnyORPCError) => this.reject(error),
+  ): Promise<StandardHandlerHandleResult> {
     let payload: unknown
 
     try {
@@ -168,7 +220,7 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     catch (error) {
       // errors of plugins, such as the request limit plugin
       if (error instanceof ORPCError) {
-        return this.reject(error)
+        return reject(error)
       }
     }
 
@@ -188,7 +240,7 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
     const maxBatchSize = await value(this.maxBatchSize, options)
 
     if (payload.length > maxBatchSize) {
-      return this.reject(new ORPCError('PAYLOAD_TOO_LARGE', { message: `Batch size exceeds the maximum of ${maxBatchSize}.` }))
+      return reject(new ORPCError('PAYLOAD_TOO_LARGE', { message: `Batch size exceeds the maximum of ${maxBatchSize}.` }))
     }
 
     const results = await Promise.all(payload.map(item => this.call(options, item, true)))
@@ -273,14 +325,18 @@ export class StandardOpenRPCHandler<T extends Context> extends StandardHandler<T
   }
 
   /**
-   * Answers `rpc.discover` with the document, or with the error `spec` throws.
+   * Answers `rpc.discover` with the document, or with the `ORPCError` `spec` throws. Other errors are unexpected, see `.call`.
    */
   private async discover(options: StandardHandlerRoutingInterceptorOptions<T>): Promise<StandardHandlerHandleResult> {
     try {
       return { matched: true, response: { status: 200, headers: {}, body: { result: await value(this.discovery!.spec, options) } } }
     }
     catch (error) {
-      return { matched: true, response: { status: 200, headers: {}, body: { error: encodeJsonRpcError(toORPCError(error), this.serializer, this.errorCodeMap) } } }
+      if (!(error instanceof ORPCError)) {
+        throw error
+      }
+
+      return { matched: true, response: { status: 200, headers: {}, body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) } } }
     }
   }
 

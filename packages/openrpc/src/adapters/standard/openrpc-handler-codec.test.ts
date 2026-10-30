@@ -12,7 +12,7 @@ beforeEach(() => {
 
 describe('openRPCHandlerCodec', () => {
   /**
-   * A sub-request the envelope plugin creates for a JSON-RPC call, or a raw HTTP request when `method` is undefined.
+   * A sub-request `StandardOpenRPCHandler` creates for a JSON-RPC call, or a raw HTTP request when `method` is undefined.
    */
   function createRequest(method: string | undefined, params?: unknown, overrides: Partial<StandardLazyRequest> = {}): StandardLazyRequest {
     return {

@@ -83,6 +83,31 @@ describe('standardOpenRPCHandler discovery', () => {
     })
   })
 
+  it('rethrows unexpected spec errors for a single call, and answers -32603 in a batch', async ({ onTestFinished }) => {
+    const rejectSpy = vi.spyOn(Promise, 'reject').mockImplementation(() => new Promise(() => {}) as Promise<never>)
+
+    onTestFinished(() => {
+      rejectSpy.mockRestore()
+    })
+
+    const handler = createHandler({
+      discovery: {
+        spec: () => {
+          throw new TypeError('generator bug')
+        },
+      },
+    })
+
+    await expect(post(handler, { jsonrpc: '2.0', method: 'rpc.discover', id: 1 })).rejects.toThrow('generator bug')
+    expect(rejectSpy).not.toHaveBeenCalled()
+
+    expect((await post(handler, [{ jsonrpc: '2.0', method: 'rpc.discover', id: 1 }, { jsonrpc: '2.0', method: 'planet.find', id: 2 }])).json).toEqual([
+      { jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'Internal error' } },
+      { jsonrpc: '2.0', id: 2, result: 'Earth' },
+    ])
+    expect(rejectSpy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ message: 'generator bug' }))
+  })
+
   it('answers the GET of a document spec refuses with the status of the error', async () => {
     const handler = createHandler({
       discovery: {
