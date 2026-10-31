@@ -7,102 +7,13 @@ sidebar:
 
 Use [Better Auth](https://better-auth.com/) with oRPC [middleware](/docs/middleware). No extra package is needed.
 
-## Full-Stack Frameworks
-
-In Next.js, TanStack Start, or SvelteKit, prefer Better Auth's integration for your framework. Its cookie plugin sets cookies for you, and the framework provides the request headers, so no oRPC plugins are needed.
-
-<CodeGroup>
-
-```ts title="Next.js"
-import { ORPCError, os } from '@orpc/server'
-import { betterAuth } from 'better-auth'
-import { nextCookies } from 'better-auth/next-js'
-import { headers } from 'next/headers'
-
-export const auth = betterAuth({
-  // ...
-  plugins: [
-    // ...other plugins
-    nextCookies(), // must be the last plugin
-  ],
-})
-
-export const requireSession = os.middleware(async ({ next }) => {
-  const session = await auth.api.getSession({ headers: await headers() })
-
-  if (!session) {
-    throw new ORPCError('UNAUTHORIZED')
-  }
-
-  return next({ context: { session } })
-})
-```
-
-```ts title="TanStack Start"
-import { ORPCError, os } from '@orpc/server'
-import { getRequestHeaders } from '@tanstack/react-start/server'
-import { betterAuth } from 'better-auth'
-import { tanstackStartCookies } from 'better-auth/tanstack-start'
-
-export const auth = betterAuth({
-  // ...
-  plugins: [
-    // ...other plugins
-    tanstackStartCookies(), // must be the last plugin
-  ],
-})
-
-export const requireSession = os.middleware(async ({ next }) => {
-  const session = await auth.api.getSession({ headers: getRequestHeaders() })
-
-  if (!session) {
-    throw new ORPCError('UNAUTHORIZED')
-  }
-
-  return next({ context: { session } })
-})
-```
-
-```ts title="SvelteKit"
-import { getRequestEvent } from '$app/server'
-import { ORPCError, os } from '@orpc/server'
-import { betterAuth } from 'better-auth'
-import { sveltekitCookies } from 'better-auth/svelte-kit'
-
-export const auth = betterAuth({
-  // ...
-  plugins: [
-    // ...other plugins
-    sveltekitCookies(getRequestEvent), // must be the last plugin
-  ],
-})
-
-export const requireSession = os.middleware(async ({ next }) => {
-  const session = await auth.api.getSession({ headers: getRequestEvent().request.headers })
-
-  if (!session) {
-    throw new ORPCError('UNAUTHORIZED')
-  }
-
-  return next({ context: { session } })
-})
-```
-
-</CodeGroup>
-
-```ts
-const router = {
-  me: os.use(requireSession).handler(({ context }) => context.session.user),
-}
-```
-
-:::info
-For TanStack Start with Solid, import from `better-auth/tanstack-start/solid` and `@tanstack/solid-start/server`.
+:::tip
+In a full-stack framework, such as [Next.js](https://better-auth.com/docs/integrations/next), [TanStack Start](https://better-auth.com/docs/integrations/tanstack), or [SvelteKit](https://better-auth.com/docs/integrations/svelte-kit), prefer Better Auth's official integration. It reads request headers and sets cookies through the framework, so the plugins below are not needed.
 :::
 
-## Header Plugins
+## Session Middleware
 
-For other servers, use the [Request Headers Plugin](/docs/plugins/request-headers) to read the session and the [Response Headers Plugin](/docs/plugins/response-headers) to forward Better Auth's cookies.
+Use the [Request Headers Plugin](/docs/plugins/request-headers) to read the session and the [Response Headers Plugin](/docs/plugins/response-headers) to forward Better Auth's cookies.
 
 ```ts
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
@@ -187,7 +98,7 @@ function requirePermission(permissions: Record<string, string[]>) {
 }
 
 const router = {
-  listUsers: os
+  listUsers: base
     .use(requireSession)
     .use(requirePermission({ user: ['list'] }))
     .handler(async () => {
