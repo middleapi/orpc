@@ -72,41 +72,6 @@ const user = await call(router.me, undefined, {
 })
 ```
 
-## Permissions
-
-Check [access control](https://better-auth.com/docs/plugins/admin#access-control) permissions after `requireSession`:
-
-```ts
-import { ORPCError, os } from '@orpc/server'
-
-type Session = typeof auth.$Infer.Session
-
-function requirePermission(permissions: Record<string, string[]>) {
-  return os
-    .$context<{ session: Session }>()
-    .middleware(async ({ context, next }) => {
-      const { success } = await auth.api.userHasPermission({
-        body: { userId: context.session.user.id, permissions },
-      })
-
-      if (!success) {
-        throw new ORPCError('FORBIDDEN')
-      }
-
-      return next()
-    })
-}
-
-const router = {
-  listUsers: base
-    .use(requireSession)
-    .use(requirePermission({ user: ['list'] }))
-    .handler(async () => {
-      // ...
-    }),
-}
-```
-
 ## Deduplication
 
 To avoid repeated lookups when the middleware runs more than once in a call, see the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
