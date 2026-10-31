@@ -1,6 +1,6 @@
 ---
 title: "Better Auth Integration"
-description: "Use Better Auth sessions in oRPC context and protect procedures with typed middleware, with an option to load the session lazily once per request."
+description: "Protect oRPC procedures with typed Better Auth sessions, using your framework's Better Auth integration or the request and response headers plugins."
 sidebar:
   label: "Better Auth"
 ---
@@ -8,25 +8,133 @@ sidebar:
 Use your [Better Auth](https://better-auth.com/) instance with oRPC's [context](/docs/context) and [middleware](/docs/middleware). No extra package is needed.
 
 :::tip
-You may need to forward Better Auth's [response headers](https://better-auth.com/docs/concepts/api#getting-headers), such as a refreshed session cookie. The [Response Headers Plugin](/docs/plugins/response-headers) can help.
+If oRPC runs inside a full-stack framework that Better Auth supports, such as Next.js, TanStack Start, or SvelteKit, use [Better Auth's integration for that framework](#full-stack-frameworks). It is more direct and simpler than oRPC's [header plugins](#header-plugins).
 :::
 
-## Resolve the Session in Middleware
+## Full-Stack Frameworks
 
-The [Request Headers Plugin](/docs/plugins/request-headers) exposes request headers as `context.reqHeaders`. The middleware loads the session from them and rejects unauthenticated calls. Public procedures use the base directly. Each protected call performs its own lookup, including every sub-request of a [batch](/docs/plugins/batch).
+Better Auth's cookie plugin for your framework writes the cookies that `auth.api` calls return through the framework's cookie API. The framework also exposes the request headers anywhere while it handles a request. So the session middleware needs no oRPC plugins and no initial context:
+
+- It works the same in the oRPC handler, in [server-side clients](/docs/client/server-side) during SSR, and in [server functions](/docs/integrations/next#server-functions).
+- Refreshed session cookies are set automatically, and so are the cookies of other `auth.api` calls in your procedures, such as `signInEmail` or `signOut`.
+
+<CodeGroup>
+
+```ts title="Next.js"
+import { ORPCError, os } from '@orpc/server'
+import { betterAuth } from 'better-auth'
+import { nextCookies } from 'better-auth/next-js'
+import { headers } from 'next/headers'
+
+export const auth = betterAuth({
+  // ...
+  plugins: [
+    // ...other plugins
+    nextCookies(), // must be the last plugin
+  ],
+})
+
+export const requireSession = os.middleware(async ({ next }) => {
+  const session = await auth.api.getSession({ headers: await headers() })
+
+  if (!session) {
+    throw new ORPCError('UNAUTHORIZED')
+  }
+
+  return next({ context: { session } })
+})
+```
+
+```ts title="TanStack Start"
+import { ORPCError, os } from '@orpc/server'
+import { getRequestHeaders } from '@tanstack/react-start/server'
+import { betterAuth } from 'better-auth'
+import { tanstackStartCookies } from 'better-auth/tanstack-start'
+
+export const auth = betterAuth({
+  // ...
+  plugins: [
+    // ...other plugins
+    tanstackStartCookies(), // must be the last plugin
+  ],
+})
+
+export const requireSession = os.middleware(async ({ next }) => {
+  const session = await auth.api.getSession({ headers: getRequestHeaders() })
+
+  if (!session) {
+    throw new ORPCError('UNAUTHORIZED')
+  }
+
+  return next({ context: { session } })
+})
+```
+
+```ts title="SvelteKit"
+import { getRequestEvent } from '$app/server'
+import { ORPCError, os } from '@orpc/server'
+import { betterAuth } from 'better-auth'
+import { sveltekitCookies } from 'better-auth/svelte-kit'
+
+export const auth = betterAuth({
+  // ...
+  plugins: [
+    // ...other plugins
+    sveltekitCookies(getRequestEvent), // must be the last plugin
+  ],
+})
+
+export const requireSession = os.middleware(async ({ next }) => {
+  const session = await auth.api.getSession({ headers: getRequestEvent().request.headers })
+
+  if (!session) {
+    throw new ORPCError('UNAUTHORIZED')
+  }
+
+  return next({ context: { session } })
+})
+```
+
+</CodeGroup>
 
 ```ts
-import type { RequestHeadersHandlerPluginContext } from '@orpc/server/plugins'
-import { ORPCError, os } from '@orpc/server'
+const router = {
+  ping: os.handler(() => ({ message: 'pong' })),
+  me: os.use(requireSession).handler(({ context }) => context.session.user),
+}
+```
 
-interface ServerContext extends RequestHeadersHandlerPluginContext {}
+- With TanStack Start for Solid, import `tanstackStartCookies` from `better-auth/tanstack-start/solid` and `getRequestHeaders` from `@tanstack/solid-start/server`.
+- In Next.js, Server Components cannot set cookies, so `nextCookies` skips the session refresh there. The session is refreshed by a later call that can set cookies, such as one through the route handler or a server function.
+- The framework helpers read the request the framework is handling, so they only work while it handles one.
+
+:::info
+For a framework without a Better Auth cookie plugin, such as SolidStart, Nuxt, or Astro, use the [header plugins](#header-plugins).
+:::
+
+## Header Plugins
+
+Outside a full-stack framework, the [Request Headers Plugin](/docs/plugins/request-headers) exposes the request headers as `context.reqHeaders`, and the [Response Headers Plugin](/docs/plugins/response-headers) merges `context.resHeaders` into the response. The middleware loads the session from the request headers and forwards the cookies Better Auth returns:
+
+```ts
+import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+import { ORPCError, os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
+import { RequestHeadersHandlerPlugin, ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
+
+interface ServerContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
 
 const base = os.$context<ServerContext>()
 
 const requireSession = base.middleware(async ({ context, next }) => {
-  const session = await auth.api.getSession({
+  const { headers, response: session } = await auth.api.getSession({
     headers: context.reqHeaders ?? new Headers(),
+    returnHeaders: true,
   })
+
+  for (const cookie of headers.getSetCookie()) {
+    context.resHeaders?.append('set-cookie', cookie)
+  }
 
   if (!session) {
     throw new ORPCError('UNAUTHORIZED')
@@ -35,32 +143,95 @@ const requireSession = base.middleware(async ({ context, next }) => {
   return next({ context: { session } })
 })
 
-const protectedProcedure = base.use(requireSession)
-
 const router = {
   ping: base.handler(() => ({ message: 'pong' })),
-  me: protectedProcedure.handler(({ context }) => ({
-    id: context.session.user.id,
-    name: context.session.user.name,
-  })),
+  me: base.use(requireSession).handler(({ context }) => context.session.user),
 }
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new RequestHeadersHandlerPlugin(),
+    new ResponseHeadersHandlerPlugin(),
+  ],
+})
 ```
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
+:::
 
 `context.session` is Better Auth's full result with `user` and `session`. Its type is inferred from your auth instance, so additional fields stay available.
 
 Only a missing session becomes `UNAUTHORIZED`. Other errors from `getSession` propagate to oRPC's [error handling](/docs/error-handling).
 
-`reqHeaders` is `undefined` without the plugin, such as in [server-side calls](/docs/client/server-side). The empty `Headers` fallback carries no session cookie, so `getSession` returns `null` and protected calls return `UNAUTHORIZED`. Pass `reqHeaders` in the initial context to authenticate such calls.
+With `returnHeaders: true`, `getSession` also returns the `set-cookie` headers of a refreshed session or the cookie cache. Forward them the same way for other `auth.api` calls that set cookies, such as `signInEmail`.
 
-## Lazily Load and Share the Session
+Each protected call performs its own lookup, including every sub-request of a [batch](/docs/plugins/batch). The batch response carries the cookies of its sub-responses, see [Response Headers](/docs/plugins/batch#response-headers).
 
-If your server resolves the session itself, pass a lazy getter into the initial context instead of the session. The lookup runs at most once per request and only when a procedure asks for it. This includes [batch](/docs/plugins/batch) requests, where every sub-request shares the getter. The same getter can also serve the rest of your request handling.
+### Server-Side Calls
+
+`reqHeaders` and `resHeaders` are `undefined` in [server-side calls](/docs/client/server-side), because no handler runs. The empty `Headers` fallback carries no session cookie, so `getSession` returns `null` and protected calls throw `UNAUTHORIZED`. Pass the request headers as `reqHeaders`, and optionally `resHeaders` to receive Better Auth's cookies:
+
+```ts
+import { call } from '@orpc/server'
+
+const resHeaders = new Headers()
+
+const user = await call(router.me, undefined, {
+  context: { reqHeaders: request.headers, resHeaders },
+})
+```
+
+## Permissions
+
+Check [access control](https://better-auth.com/docs/plugins/admin#access-control) permissions in a middleware that runs after `requireSession`:
+
+```ts
+import { ORPCError, os } from '@orpc/server'
+
+type Session = typeof auth.$Infer.Session
+
+function requirePermission(permissions: Record<string, string[]>) {
+  return os
+    .$context<{ session: Session }>()
+    .middleware(async ({ context, next }) => {
+      const { success } = await auth.api.userHasPermission({
+        body: { userId: context.session.user.id, permissions },
+      })
+
+      if (!success) {
+        throw new ORPCError('FORBIDDEN')
+      }
+
+      return next()
+    })
+}
+
+const router = {
+  listUsers: os
+    .use(requireSession)
+    .use(requirePermission({ user: ['list'] }))
+    .handler(async () => {
+      // ...
+    }),
+}
+```
+
+The [organization plugin](https://better-auth.com/docs/plugins/organization)'s `auth.api.hasPermission` reads the active organization from the request, so pass it the request headers too, the same way `requireSession` passes them to `getSession`.
+
+## Deduplication
+
+The session middleware looks up the session every time it runs. If it can run more than once in a call, such as when a procedure [calls](/docs/client/server-side) another procedure with the same context, reuse the session already in the context, as shown in the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
+
+### Share One Lookup per Request
+
+To share one lookup across a whole request, including every sub-request of a [batch](/docs/plugins/batch), resolve the session in your server and pass a lazy getter as the initial context. The lookup runs at most once, and only when a procedure asks for it. The same getter can also serve the rest of your request handling.
 
 ```ts
 import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 
-type Session = Awaited<ReturnType<typeof auth.api.getSession>>
+type Session = typeof auth.$Infer.Session
 
 function once<T>(fn: () => Promise<T>): () => Promise<T> {
   let promise: Promise<T> | undefined
@@ -71,7 +242,7 @@ function once<T>(fn: () => Promise<T>): () => Promise<T> {
   }
 }
 
-const base = os.$context<{ getSession: () => Promise<Session> }>()
+const base = os.$context<{ getSession: () => Promise<Session | null> }>()
 
 const requireSession = base.middleware(async ({ context, next }) => {
   const session = await context.getSession()
@@ -83,30 +254,46 @@ const requireSession = base.middleware(async ({ context, next }) => {
   return next({ context: { session } })
 })
 
-const protectedProcedure = base.use(requireSession)
-
 const router = {
   greeting: base.handler(async ({ context }) => {
     const session = await context.getSession()
 
     return { message: `Hello, ${session?.user.name ?? 'guest'}` }
   }),
-  me: protectedProcedure.handler(({ context }) => ({
-    id: context.session.user.id,
-    name: context.session.user.name,
-  })),
+  me: base.use(requireSession).handler(({ context }) => context.session.user),
 }
 
 const handler = new RPCHandler(router)
 
 export async function fetch(request: Request): Promise<Response> {
-  const getSession = once(() => auth.api.getSession({ headers: request.headers }))
+  const setCookies: string[] = []
+
+  const getSession = once(async () => {
+    const { headers, response } = await auth.api.getSession({
+      headers: request.headers,
+      returnHeaders: true,
+    })
+
+    setCookies.push(...headers.getSetCookie())
+
+    return response
+  })
 
   const { matched, response } = await handler.handle(request, {
     prefix: '/rpc',
     context: { getSession },
   })
 
-  return matched ? response : new Response('Not Found', { status: 404 })
+  if (!matched) {
+    return new Response('Not Found', { status: 404 })
+  }
+
+  for (const cookie of setCookies) {
+    response.headers.append('set-cookie', cookie)
+  }
+
+  return response
 }
 ```
+
+Inside a full-stack framework with a Better Auth cookie plugin, the getter can call `auth.api.getSession` without `returnHeaders`, because the plugin sets the cookies.
