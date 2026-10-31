@@ -84,10 +84,10 @@ describe('optionalSession', () => {
   })
 })
 
-describe('decorated middleware', () => {
-  it('can be extended with .use and keeps its name', async () => {
+describe('os.middleware', () => {
+  it('can wrap the middlewares to extend them with .use', async () => {
     const auth = createAuth()
-    const middleware = requireSession({ auth }).use(({ context, next }) => next({ context: { name: context.session.user.name } }))
+    const middleware = os.middleware(requireSession({ auth })).use(({ context, next }) => next({ context: { name: context.session.user.name } }))
     const procedure = os.use(middleware).handler(({ context }) => context.name)
 
     expect(requireSession({ auth }).name).toBe('requireSession')

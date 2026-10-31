@@ -52,8 +52,8 @@ describe('requireSession', () => {
       })
   })
 
-  it('returns a decorated middleware whose .use sees the session', () => {
-    const middleware = requireSession({ auth }).use(({ context, next }) => {
+  it('can be extended with os.middleware(...).use, which sees the session', () => {
+    const middleware = os.middleware(requireSession({ auth })).use(({ context, next }) => {
       expectTypeOf(context.session).toEqualTypeOf<Session>()
 
       return next({ context: { role: context.session.user.role } })

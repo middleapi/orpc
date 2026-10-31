@@ -1,7 +1,7 @@
-import type { AnyMiddleware, Context, DecoratedMiddleware, Middleware, MiddlewareOptions } from '@orpc/server'
+import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { Promisable, Value } from '@orpc/shared'
-import { ORPCError, os } from '@orpc/server'
+import { ORPCError } from '@orpc/server'
 import { stringifyJSON, value } from '@orpc/shared'
 
 /**
@@ -62,8 +62,8 @@ export function requireSession<
   TAuth extends BetterAuthInstance,
 >(
   { dedupe = true, ...options }: SessionMiddlewareOptions<TInContext, TInput, TAuth>,
-): DecoratedMiddleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> {
-  const middleware: Middleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> = async function requireSession(middlewareOptions, input) {
+): Middleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> {
+  return async function requireSession(middlewareOptions, input) {
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
 
@@ -73,8 +73,6 @@ export function requireSession<
 
     return middlewareOptions.next({ context: { session } })
   }
-
-  return decorate(middleware)
 }
 
 /**
@@ -89,24 +87,13 @@ export function optionalSession<
   TAuth extends BetterAuthInstance,
 >(
   { dedupe = true, ...options }: SessionMiddlewareOptions<TInContext, TInput, TAuth>,
-): DecoratedMiddleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> {
-  const middleware: Middleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> = async function optionalSession(middlewareOptions, input) {
+): Middleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> {
+  return async function optionalSession(middlewareOptions, input) {
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
 
     return middlewareOptions.next({ context: { session } })
   }
-
-  return decorate(middleware)
-}
-
-/**
- * Decorates a middleware the same way `os.middleware` does, adding `.use`, `.errors`, and `.adaptInput`.
- */
-function decorate<TInContext extends Context, TOutContext extends Context, TInput>(
-  middleware: Middleware<TInContext, TOutContext, TInput, any, Record<never, never>>,
-): DecoratedMiddleware<TInContext, TOutContext, TInput, any, Record<never, never>> {
-  return os.middleware(middleware as AnyMiddleware) as DecoratedMiddleware<TInContext, TOutContext, TInput, any, Record<never, never>>
 }
 
 const SESSION_CACHE_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CACHE')

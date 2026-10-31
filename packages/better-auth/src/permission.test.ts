@@ -1,5 +1,5 @@
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
-import { call, defineMeta, ORPCError, os } from '@orpc/server'
+import { call, ORPCError, os } from '@orpc/server'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { admin } from 'better-auth/plugins/admin'
@@ -21,37 +21,29 @@ interface ServerContext extends RequestHeadersHandlerPluginContext, ResponseHead
 
 const base = os.$context<ServerContext>()
 
-type Permissions = Record<string, string[]>
+function requirePermission(permissions: Record<string, string[]>) {
+  return os
+    .middleware(requireSession({ auth }))
+    .use(async ({ context, next }) => {
+      const { success } = await auth.api.userHasPermission({
+        body: { userId: context.session.user.id, permissions },
+      })
 
-const [permissionMeta, getPermissionMeta] = defineMeta(
-  'permission',
-  (incoming: Permissions, current) => ({ ...current, ...incoming }),
-)
+      if (!success) {
+        throw new ORPCError('FORBIDDEN')
+      }
 
-const requirePermission = requireSession({ auth }).use(async ({ context, procedure, next }) => {
-  const permissions = getPermissionMeta(procedure)
-
-  if (permissions) {
-    const { success } = await auth.api.userHasPermission({
-      body: { userId: context.session.user.id, permissions },
+      return next()
     })
-
-    if (!success) {
-      throw new ORPCError('FORBIDDEN')
-    }
-  }
-
-  return next()
-})
+}
 
 const router = {
   listUsers: base
-    .use(requirePermission)
-    .meta(permissionMeta({ user: ['list'] }))
+    .use(requirePermission({ user: ['list'] }))
     .handler(() => 'users'),
 
   me: base
-    .use(requirePermission)
+    .use(requireSession({ auth }))
     .handler(({ context }) => context.session.user.email),
 }
 
@@ -66,8 +58,8 @@ async function signUp(email: string) {
   return { cookie, userId: response.user.id }
 }
 
-describe('permissions with meta and requireSession().use()', () => {
-  it('checks the permissions in the procedure meta', async () => {
+describe('requirePermission example', () => {
+  it('checks the permissions of the session user', async () => {
     const { cookie, userId } = await signUp('permission@example.com')
     const context = () => ({ reqHeaders: new Headers({ cookie }) })
 

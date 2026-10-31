@@ -73,47 +73,39 @@ const procedure = os
 
 ## Permissions
 
-Both middlewares are [decorated middleware](/docs/middleware), so you can extend them with `.use`. The extension runs after the session is resolved and sees `context.session`. Combined with [metadata](/docs/metadata), this checks the permissions of Better Auth's [access control](https://better-auth.com/docs/plugins/admin#access-control) per procedure:
+To check the permissions of Better Auth's [access control](https://better-auth.com/docs/plugins/admin#access-control), wrap `requireSession` with `os.middleware` and extend it with `.use`. The extension runs after the session is resolved and sees `context.session`:
 
 ```ts
 import { requireSession } from '@orpc/better-auth'
-import { defineMeta, ORPCError } from '@orpc/server'
+import { ORPCError, os } from '@orpc/server'
 import { auth } from './auth'
 
-type Permissions = Record<string, string[]>
+function requirePermission(permissions: Record<string, string[]>) {
+  return os
+    .middleware(requireSession({ auth }))
+    .use(async ({ context, next }) => {
+      const { success } = await auth.api.userHasPermission({
+        body: { userId: context.session.user.id, permissions },
+      })
 
-const [permissionMeta, getPermissionMeta] = defineMeta(
-  'permission',
-  (incoming: Permissions, current) => ({ ...current, ...incoming }),
-)
+      if (!success) {
+        throw new ORPCError('FORBIDDEN')
+      }
 
-const requirePermission = requireSession({ auth }).use(async ({ context, procedure, next }) => {
-  const permissions = getPermissionMeta(procedure)
-
-  if (permissions) {
-    const { success } = await auth.api.userHasPermission({
-      body: { userId: context.session.user.id, permissions },
+      return next()
     })
-
-    if (!success) {
-      throw new ORPCError('FORBIDDEN')
-    }
-  }
-
-  return next()
-})
+}
 
 const router = {
   listUsers: base
-    .use(requirePermission)
-    .meta(permissionMeta({ user: ['list'] }))
+    .use(requirePermission({ user: ['list'] }))
     .handler(async () => {
       // ...
     }),
 }
 ```
 
-Unauthenticated calls get `UNAUTHORIZED` before any permission check. `userHasPermission` comes from the [admin plugin](https://better-auth.com/docs/plugins/admin). With the [organization plugin](https://better-auth.com/docs/plugins/organization), call `auth.api.hasPermission({ headers: context.reqHeaders, body: { permissions } })` instead, which checks the member's role in the active organization.
+Unauthenticated calls get `UNAUTHORIZED` before any permission check. `userHasPermission` comes from the [admin plugin](https://better-auth.com/docs/plugins/admin). With the [organization plugin](https://better-auth.com/docs/plugins/organization), call `auth.api.hasPermission({ headers: context.reqHeaders, body: { permissions } })` instead, which checks the member's role in the active organization. Create the middleware with `base.middleware` instead of `os.middleware` so `context.reqHeaders` is typed.
 
 ## Deduplication
 
