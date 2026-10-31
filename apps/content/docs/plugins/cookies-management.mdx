@@ -1,0 +1,126 @@
+---
+title: "Cookies Management Plugin"
+description: "Store the cookies servers set and send them back on later requests, like a browser does, for server-side clients, scripts, and tests."
+sidebar:
+  label: "Cookies Management"
+---
+
+Browsers store the cookies a server sets and send them back on later requests. Clients running outside a browser, such as during server-side rendering, in scripts, or in tests, have no cookie store, so a session cookie set by a sign-in call is lost. The `CookiesManagementLinkPlugin` adds a browser-like cookie store to a link.
+
+:::info
+Browsers already manage cookies, so the plugin has no effect there. For cross-origin requests, include credentials in a custom `fetch` instead, see [RPC Link](/docs/rpc/link).
+:::
+
+## Setup
+
+```ts
+import { CookiesManagementLinkPlugin } from '@orpc/client/plugins'
+
+const link = new RPCLink({
+  origin: 'https://api.example.com',
+  plugins: [
+    new CookiesManagementLinkPlugin({
+      origin: 'https://api.example.com', // <- optional, same as the link's origin
+    }),
+  ],
+})
+
+const client = createORPCClient(link)
+
+await client.auth.signIn({ email, password }) // <- stores the session cookie the server sets
+await client.me() // <- sends the session cookie
+```
+
+:::info
+The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
+:::
+
+Like a browser, the plugin:
+
+- Stores every `Set-Cookie` of a response, error responses included, before the call resolves.
+- Replaces a cookie with the same name, domain, and path, and removes it once it expires through `Max-Age` or `Expires`.
+- Sends a cookie only to the paths its `Path` attribute covers. Without `Path`, a cookie is scoped to the directory of the request that set it, so prefer setting `Path=/`, which the [Cookie Helpers](/docs/helpers/cookie) do by default.
+- Sends a cookie only to its domain, and to subdomains when it has a `Domain` attribute. `Secure` cookies are sent over `https` and to `localhost` only.
+- Rejects cookies a browser would reject, such as a `Domain` the server does not belong to, or `__Secure-` and `__Host-` prefixed cookies without the required attributes.
+
+`origin` accepts the same value as the link's `origin` option. Without it, every request counts as going to the same secure site: the `Domain` attribute is not checked and `Secure` cookies are always sent.
+
+:::warning
+The cookies belong to the link, like a browser profile belongs to one user. On a server that handles requests from many users, do not share one link between them, or one user's cookies are sent with another user's calls. Create a client per incoming request instead, or pick a [jar per request](#per-request-jar).
+:::
+
+## Cookie Jar
+
+Cookies live in a `CookieJar`. Each plugin creates its own, or you can pass one to read, seed, or clear cookies, or to share them between links:
+
+```ts
+import { CookieJar, CookiesManagementLinkPlugin } from '@orpc/client/plugins'
+
+const jar = new CookieJar()
+
+const link = new RPCLink({
+  origin: 'https://api.example.com',
+  plugins: [
+    new CookiesManagementLinkPlugin({ jar, origin: 'https://api.example.com' }),
+  ],
+})
+
+jar.setCookie('locale=en; Path=/', 'https://api.example.com') // <- seed a cookie, as if the server set it
+jar.getCookies('https://api.example.com/rpc') // <- the cookies a request to this URL sends
+jar.getCookies() // <- every cookie that has not expired
+jar.clear()
+```
+
+:::tip
+When a jar is shared between links with different origins, set `origin` on each plugin so cookies only go back to the site that set them.
+:::
+
+## Per-Request Jar
+
+`jar` also accepts a function that receives the procedure `path`, the request, and the [client context](/docs/client/client-side#client-context), so a single link can keep one jar per user:
+
+```ts
+interface ClientContext {
+  jar: CookieJar
+}
+
+const link = new RPCLink<ClientContext>({
+  plugins: [
+    new CookiesManagementLinkPlugin({
+      jar: ({ context }) => context.jar,
+    }),
+  ],
+})
+```
+
+:::warning
+With the [Batch Plugin](/docs/plugins/batch), the function receives the batch request, whose context comes from the batch group, and only requests with the same `scope` are batched together. Make sure both keep each user's jar apart.
+:::
+
+## Forward Incoming Cookies
+
+A `cookie` header set elsewhere, such as through the link's `headers` option, is kept, and the jar cookies are appended to it. Cookies in that header win over jar cookies with the same name. This lets a client created during server-side rendering forward the browser's cookies, and still send the ones the API sets during the render:
+
+```ts
+function createServerClient(request: Request) {
+  const link = new RPCLink({
+    origin: 'https://api.example.com',
+    headers: {
+      cookie: request.headers.get('cookie') ?? undefined,
+    },
+    plugins: [
+      new CookiesManagementLinkPlugin({ origin: 'https://api.example.com' }),
+    ],
+  })
+
+  return createORPCClient(link)
+}
+```
+
+## Batch Requests
+
+The plugin runs after the [Batch Plugin](/docs/plugins/batch), on the actual HTTP request, so it reads and stores cookies once per batch request, like a browser. The batch response carries the cookies of its subresponses.
+
+## Learn More
+
+For implementation details, see the [CookiesManagementLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookies-management.ts) or the [CookieJar source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookie-jar.ts).
