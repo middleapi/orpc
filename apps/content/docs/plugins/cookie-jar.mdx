@@ -1,11 +1,11 @@
 ---
-title: "Cookies Management Plugin"
+title: "Cookie Jar Plugin"
 description: "Store the cookies servers set and send them back on later requests, like a browser does, for server-side clients, scripts, and tests."
 sidebar:
-  label: "Cookies Management"
+  label: "Cookie Jar"
 ---
 
-Browsers store the cookies a server sets and send them back on later requests. Clients running outside a browser, such as during server-side rendering, in scripts, or in tests, have no cookie store, so a session cookie set by a sign-in call is lost. The `CookiesManagementLinkPlugin` adds a browser-like cookie store to a link.
+Browsers store the cookies a server sets and send them back on later requests. Clients running outside a browser, such as during server-side rendering, in scripts, or in tests, have no cookie store, so a session cookie set by a sign-in call is lost. The `CookieJarLinkPlugin` adds a browser-like cookie store, a cookie jar, to a link.
 
 :::info
 Browsers already manage cookies, so the plugin has no effect there. For cross-origin requests, include credentials in a custom `fetch` instead, see [RPC Link](/docs/rpc/link).
@@ -14,12 +14,12 @@ Browsers already manage cookies, so the plugin has no effect there. For cross-or
 ## Setup
 
 ```ts
-import { CookiesManagementLinkPlugin } from '@orpc/client/plugins'
+import { CookieJarLinkPlugin } from '@orpc/client/plugins'
 
 const link = new RPCLink({
   origin: 'https://api.example.com',
   plugins: [
-    new CookiesManagementLinkPlugin({
+    new CookieJarLinkPlugin({
       origin: 'https://api.example.com', // <- optional, same as the link's origin
     }),
   ],
@@ -49,19 +49,19 @@ Like a browser, the plugin:
 The cookies belong to the link, like a browser profile belongs to one user. On a server that handles requests from many users, do not share one link between them, or one user's cookies are sent with another user's calls. Create a client per incoming request instead, or pick a [jar per request](#per-request-jar).
 :::
 
-## Cookie Jar
+## Custom Jar
 
 Cookies live in a `CookieJar`. Each plugin creates its own, or you can pass one to read, seed, or clear cookies, or to share them between links:
 
 ```ts
-import { CookieJar, CookiesManagementLinkPlugin } from '@orpc/client/plugins'
+import { CookieJar, CookieJarLinkPlugin } from '@orpc/client/plugins'
 
 const jar = new CookieJar()
 
 const link = new RPCLink({
   origin: 'https://api.example.com',
   plugins: [
-    new CookiesManagementLinkPlugin({ jar, origin: 'https://api.example.com' }),
+    new CookieJarLinkPlugin({ jar, origin: 'https://api.example.com' }),
   ],
 })
 
@@ -86,7 +86,7 @@ interface ClientContext {
 
 const link = new RPCLink<ClientContext>({
   plugins: [
-    new CookiesManagementLinkPlugin({
+    new CookieJarLinkPlugin({
       jar: ({ context }) => context.jar,
     }),
   ],
@@ -109,7 +109,7 @@ function createServerClient(request: Request) {
       cookie: request.headers.get('cookie') ?? undefined,
     },
     plugins: [
-      new CookiesManagementLinkPlugin({ origin: 'https://api.example.com' }),
+      new CookieJarLinkPlugin({ origin: 'https://api.example.com' }),
     ],
   })
 
@@ -123,4 +123,4 @@ The plugin runs after the [Batch Plugin](/docs/plugins/batch), on the actual HTT
 
 ## Learn More
 
-For implementation details, see the [CookiesManagementLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookies-management.ts) or the [CookieJar source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookie-jar.ts).
+For implementation details, see the [CookieJarLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookie-jar.ts).

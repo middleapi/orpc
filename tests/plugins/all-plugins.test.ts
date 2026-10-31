@@ -6,7 +6,7 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import {
   BatchLinkPlugin,
-  CookiesManagementLinkPlugin,
+  CookieJarLinkPlugin,
   DedupeLinkPlugin,
   RequestCompressionLinkPlugin,
   ResponseCompressionLinkPlugin,
@@ -116,7 +116,7 @@ function createHandlerPlugins() {
 function createLinkPlugins() {
   return [
     new BatchLinkPlugin<TestClientContext>({ groups: [{ condition: () => true, context: {} }] }),
-    new CookiesManagementLinkPlugin<TestClientContext>({ origin: 'http://localhost' }),
+    new CookieJarLinkPlugin<TestClientContext>({ origin: 'http://localhost' }),
     new DedupeLinkPlugin<TestClientContext>({ groups: [{ condition: () => true, context: {} }] }),
     new RequestCompressionLinkPlugin<TestClientContext>({ threshold: 0 }),
     new RequestValidationLinkPlugin<TestClientContext>(contract),
