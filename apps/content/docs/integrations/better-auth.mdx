@@ -71,7 +71,7 @@ const procedure = os
 
 ## Session Caching
 
-The session lookup is cached on `context.reqHeaders`, per auth instance. Every middleware that receives the same `reqHeaders` shares one `getSession` call. Each sub-request of a [batch](/docs/plugins/batch) has its own `reqHeaders`, so it looks up the session on its own.
+Middlewares that run together, such as `optionalSession` and `requireSession` on the same procedure, share one `getSession` call. The lookup is cached on `context.reqHeaders` and reused for only 10 milliseconds after it finishes, so a long-lived `reqHeaders` never serves a stale session. Each sub-request of a [batch](/docs/plugins/batch) has its own `reqHeaders`, so it looks up the session on its own.
 
 ## Server-Side Calls
 
@@ -87,7 +87,7 @@ const user = await call(router.me, undefined, {
 })
 ```
 
-Without `reqHeaders`, the middlewares throw an error instead of treating the request as signed out.
+Without `reqHeaders`, the request is treated as signed out.
 
 ## Learn More
 

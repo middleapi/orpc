@@ -51,11 +51,11 @@ describe('requireSession', () => {
     await expect(call(procedure, undefined, { context: { reqHeaders: new Headers() } })).rejects.toBe(error)
   })
 
-  it('throws a descriptive error without reqHeaders', async () => {
+  it('throws UNAUTHORIZED without reqHeaders', async () => {
     const auth = createAuth()
     const procedure = os.use(requireSession({ auth })).handler(() => 'ok')
 
-    await expect(call(procedure, undefined, { context: {} })).rejects.toThrow(/RequestHeadersHandlerPlugin/)
+    await expect(call(procedure, undefined, { context: {} })).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
     expect(auth.api.getSession).not.toHaveBeenCalled()
   })
 })
@@ -75,15 +75,20 @@ describe('optionalSession', () => {
     expect(await call(procedure, undefined, { context: { reqHeaders: new Headers() } })).toBeNull()
   })
 
-  it('throws a descriptive error without reqHeaders', async () => {
+  it('adds null to context without reqHeaders', async () => {
     const auth = createAuth()
-    const procedure = os.use(optionalSession({ auth })).handler(() => 'ok')
+    const procedure = os.use(optionalSession({ auth })).handler(({ context }) => context.session)
 
-    await expect(call(procedure, undefined, { context: {} })).rejects.toThrow(/RequestHeadersHandlerPlugin/)
+    expect(await call(procedure, undefined, { context: {} })).toBeNull()
+    expect(auth.api.getSession).not.toHaveBeenCalled()
   })
 })
 
 describe('session lookup', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('resolves auth from a function receiving middleware options and input', async () => {
     const auth = createAuth()
     const authFn = vi.fn(async () => auth)
@@ -144,6 +149,24 @@ describe('session lookup', () => {
     expect(authA.api.getSession).toHaveBeenCalledTimes(1)
     expect(authB.api.getSession).toHaveBeenCalledTimes(1)
     expect(resHeaders.getSetCookie()).toEqual(['a=1', 'b=1'])
+  })
+
+  it('reuses a finished lookup for 10ms only', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const auth = createAuth()
+    const reqHeaders = new Headers({ cookie: 'session=abc' })
+    const procedure = os.use(requireSession({ auth })).handler(() => 'ok')
+
+    await call(procedure, undefined, { context: { reqHeaders } })
+    now.mockReturnValue(1009)
+    await call(procedure, undefined, { context: { reqHeaders } })
+
+    expect(auth.api.getSession).toHaveBeenCalledTimes(1)
+
+    now.mockReturnValue(1010)
+    await call(procedure, undefined, { context: { reqHeaders } })
+
+    expect(auth.api.getSession).toHaveBeenCalledTimes(2)
   })
 
   it('runs again for new reqHeaders', async () => {

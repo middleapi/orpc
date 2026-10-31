@@ -97,12 +97,29 @@ export function optionalSession<
 
 const SESSION_CACHE_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CACHE')
 
+/**
+ * How long, in milliseconds, a finished lookup stays cached on `reqHeaders`.
+ * Short on purpose: it only dedupes lookups that run together, such as chained middlewares,
+ * and a long-lived `reqHeaders` never serves a stale session.
+ */
+const SESSION_CACHE_TTL = 10
+
+interface SessionCache {
+  auth: BetterAuthInstance
+  promise: Promise<unknown>
+  /**
+   * When the lookup finished, `undefined` while it is pending.
+   */
+  settledAt: number | undefined
+}
+
 interface SessionCachedHeaders extends Headers {
-  [SESSION_CACHE_SYMBOL]?: WeakMap<BetterAuthInstance, Promise<unknown>>
+  [SESSION_CACHE_SYMBOL]?: SessionCache | undefined
 }
 
 /**
- * Looks up the session once per `reqHeaders` and auth instance, caching the lookup on `reqHeaders`.
+ * Looks up the session, caching the lookup on `reqHeaders`: a pending lookup is shared,
+ * and a finished one is reused for `SESSION_CACHE_TTL` milliseconds.
  * The `set-cookie` headers Better Auth returns (refreshed session, cookie cache) are appended to `resHeaders`.
  */
 function getSession<TAuth extends BetterAuthInstance>(
@@ -111,27 +128,39 @@ function getSession<TAuth extends BetterAuthInstance>(
 ): Promise<InferBetterAuthSession<TAuth> | null> {
   const reqHeaders: SessionCachedHeaders | undefined = context.reqHeaders
 
+  /**
+   * Without request headers there is no cookie or token to read, so the request is not authenticated.
+   */
   if (!reqHeaders) {
-    throw new Error(
-      '[@orpc/better-auth] `reqHeaders` is missing from the context. '
-      + 'Add `RequestHeadersHandlerPlugin` to your handler, or pass `reqHeaders` in the context of server-side calls.',
-    )
+    return Promise.resolve(null)
   }
 
-  const cache = reqHeaders[SESSION_CACHE_SYMBOL] ??= new WeakMap()
-  let session = cache.get(auth)
+  const cached = reqHeaders[SESSION_CACHE_SYMBOL]
 
-  if (!session) {
-    session = auth.api.getSession({ headers: reqHeaders, returnHeaders: true }).then(({ headers, response }) => {
-      for (const cookie of headers.getSetCookie()) {
-        context.resHeaders?.append('set-cookie', cookie)
-      }
-
-      return response
-    })
-
-    cache.set(auth, session)
+  if (
+    cached?.auth === auth
+    && (cached.settledAt === undefined || Date.now() - cached.settledAt < SESSION_CACHE_TTL)
+  ) {
+    return cached.promise as Promise<InferBetterAuthSession<TAuth> | null>
   }
 
-  return session as Promise<InferBetterAuthSession<TAuth> | null>
+  const cache: SessionCache = {
+    auth,
+    settledAt: undefined,
+    promise: auth.api.getSession({ headers: reqHeaders, returnHeaders: true })
+      .then(({ headers, response }) => {
+        for (const cookie of headers.getSetCookie()) {
+          context.resHeaders?.append('set-cookie', cookie)
+        }
+
+        return response
+      })
+      .finally(() => {
+        cache.settledAt = Date.now()
+      }),
+  }
+
+  reqHeaders[SESSION_CACHE_SYMBOL] = cache
+
+  return cache.promise as Promise<InferBetterAuthSession<TAuth> | null>
 }
