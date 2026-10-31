@@ -3,6 +3,8 @@ it('exports plugins', async () => {
     BatchLinkPlugin: expect.any(Function),
     BATCH_HEADER: 'orpc-batch',
     DEFAULT_BATCH_MAX_SIZE: 10,
+    CookieJar: expect.any(Function),
+    CookieJarLinkPlugin: expect.any(Function),
     DedupeLinkPlugin: expect.any(Function),
     RetryLinkPlugin: expect.any(Function),
     RetryAfterLinkPlugin: expect.any(Function),

@@ -1,0 +1,75 @@
+---
+title: "Cookie Jar Plugin"
+description: "Store the cookies servers set and send them back on later requests, like a browser, for server-side clients."
+sidebar:
+  label: "Cookie Jar"
+---
+
+Clients outside a browser, such as during server-side rendering, in scripts, or in tests, do not keep cookies. `CookieJarLinkPlugin` stores the cookies servers set and sends them back on later requests, following the browser rules of [RFC 6265](https://datatracker.ietf.org/doc/html/rfc6265) except the public suffix list.
+
+## Setup
+
+```ts
+import { CookieJarLinkPlugin } from '@orpc/client/plugins'
+
+const origin = 'https://api.example.com'
+
+const link = new RPCLink({
+  origin,
+  plugins: [
+    new CookieJarLinkPlugin({ origin }), // <- same origin as the link
+  ],
+})
+```
+
+When `origin` resolves to `undefined`, such as in a browser that handles cookies itself, the plugin does nothing. A `cookie` header you set yourself, for example through the link's `headers` option, is kept and wins over jar cookies with the same name. With the [Batch Plugin](/docs/plugins/batch), cookies are matched against the batch request URL, so give them `Path=/`.
+
+:::info
+The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
+:::
+
+:::warning
+On a server, do not share a link between users, or one user's cookies are sent with another's calls. Create a client per request, or use a [per-request jar](#per-request-jar).
+:::
+
+## Custom Jar
+
+Pass your own `CookieJar` to read, clear, or share cookies between links. Without the public suffix list, a site could set a cookie for all of `.com`, so only share a jar between sites you trust:
+
+```ts
+import { CookieJar, CookieJarLinkPlugin } from '@orpc/client/plugins'
+
+const jar = new CookieJar()
+
+const link = new RPCLink({
+  origin,
+  plugins: [new CookieJarLinkPlugin({ origin, jar })],
+})
+
+jar.getCookies() // <- stored cookies
+jar.clear()
+```
+
+## Per-Request Jar
+
+`jar` also accepts a function, so one link can keep a jar per user:
+
+```ts
+const link = new RPCLink<{ jar: CookieJar }>({
+  origin,
+  plugins: [
+    new CookieJarLinkPlugin({
+      origin,
+      jar: ({ context }) => context.jar,
+    }),
+  ],
+})
+```
+
+:::warning
+With the [Batch Plugin](/docs/plugins/batch), the function receives the batch group's context, so keep users in separate batches with [`scope`](/docs/plugins/batch#scope) and forward their context from the group.
+:::
+
+## Learn More
+
+For implementation details, see the [CookieJarLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/cookie-jar.ts).

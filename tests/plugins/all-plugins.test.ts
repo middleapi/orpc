@@ -6,6 +6,7 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import {
   BatchLinkPlugin,
+  CookieJarLinkPlugin,
   DedupeLinkPlugin,
   RequestCompressionLinkPlugin,
   ResponseCompressionLinkPlugin,
@@ -115,6 +116,7 @@ function createHandlerPlugins() {
 function createLinkPlugins() {
   return [
     new BatchLinkPlugin<TestClientContext>({ groups: [{ condition: () => true, context: {} }] }),
+    new CookieJarLinkPlugin<TestClientContext>({ origin: 'http://localhost' }),
     new DedupeLinkPlugin<TestClientContext>({ groups: [{ condition: () => true, context: {} }] }),
     new RequestCompressionLinkPlugin<TestClientContext>({ threshold: 0 }),
     new RequestValidationLinkPlugin<TestClientContext>(contract),
@@ -198,6 +200,24 @@ describe('all plugins on one handler and one link', () => {
       'session=bob; HttpOnly',
     ])
     expect(exchanges[0]!.response.headers.get('cache-control')).toEqual('no-store')
+  })
+
+  it('sends the cookies a call set on later calls, once per batch request', async () => {
+    const { client, exchanges } = createClientServer()
+
+    await expect(client.login({ user: 'alice' })).resolves.toEqual({ user: 'alice' })
+    await expect(Promise.all([
+      client.ping({ value: 1 }),
+      client.ping({ value: 2 }),
+    ])).resolves.toEqual([
+      { value: 1 },
+      { value: 2 },
+    ])
+
+    expect(exchanges).toHaveLength(2)
+    expect(exchanges[0]!.request.headers.get('cookie')).toBeNull()
+    expect(exchanges[1]!.request.headers.get('orpc-batch')).toEqual('1')
+    expect(exchanges[1]!.request.headers.get('cookie')).toEqual('session=alice')
   })
 
   it('compresses a standalone call in both directions through every plugin', async () => {
