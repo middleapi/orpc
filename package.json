@@ -23,7 +23,7 @@
     "sponsors:sync": "node scripts/sync-sponsors.ts && eslint --fix **/README.md"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^9.5.1",
+    "@antfu/eslint-config": "^10.0.0",
     "@codspeed/vitest-plugin": "^6.1.0",
     "@hono/node-server": "^2.1.5",
     "@opentelemetry/api": "^1.10.0",
@@ -66,7 +66,7 @@
     "bumpp": "^12.3.0",
     "changelogithub": "^15.0.4",
     "crossws": "^0.4.17",
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^2.0.1",
     "github-slugger": "^2.0.0",
