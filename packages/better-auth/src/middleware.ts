@@ -2,7 +2,7 @@ import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { Promisable, Value } from '@orpc/shared'
 import { ORPCError } from '@orpc/server'
-import { value } from '@orpc/shared'
+import { stringifyJSON, value } from '@orpc/shared'
 
 /**
  * The part of a Better Auth instance (the return value of `betterAuth()`) the session middlewares use.
@@ -98,8 +98,17 @@ export function optionalSession<
 
 const SESSION_CACHE_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CACHE')
 
+interface SessionCache {
+  auth: BetterAuthInstance
+  /**
+   * Snapshot of `reqHeaders` at lookup time.
+   */
+  headers: string
+  promise: Promise<unknown>
+}
+
 interface SessionCachedHeaders extends Headers {
-  [SESSION_CACHE_SYMBOL]?: { auth: BetterAuthInstance, promise: Promise<unknown> } | undefined
+  [SESSION_CACHE_SYMBOL]?: SessionCache | undefined
 }
 
 /**
@@ -120,21 +129,26 @@ function getSession<TAuth extends BetterAuthInstance>(
     return Promise.resolve(null)
   }
 
+  /**
+   * Better Auth reads the session from headers such as `cookie`, `authorization`, or an API key header,
+   * so a lookup is only reused while the headers are unchanged.
+   */
+  const headers = stringifyJSON([...reqHeaders])
   const cached = reqHeaders[SESSION_CACHE_SYMBOL]
 
-  if (dedupe && cached?.auth === auth) {
+  if (dedupe && cached?.auth === auth && cached.headers === headers) {
     return cached.promise as Promise<InferBetterAuthSession<TAuth> | null>
   }
 
-  const promise = auth.api.getSession({ headers: reqHeaders, returnHeaders: true }).then(({ headers, response }) => {
-    for (const cookie of headers.getSetCookie()) {
+  const promise = auth.api.getSession({ headers: reqHeaders, returnHeaders: true }).then((result) => {
+    for (const cookie of result.headers.getSetCookie()) {
       context.resHeaders?.append('set-cookie', cookie)
     }
 
-    return response
+    return result.response
   })
 
-  reqHeaders[SESSION_CACHE_SYMBOL] = { auth, promise }
+  reqHeaders[SESSION_CACHE_SYMBOL] = { auth, headers, promise }
 
   return promise as Promise<InferBetterAuthSession<TAuth> | null>
 }

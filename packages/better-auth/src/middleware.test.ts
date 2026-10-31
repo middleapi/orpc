@@ -159,6 +159,22 @@ describe('session lookup', () => {
     expect(auth.api.getSession).toHaveBeenCalledTimes(1)
   })
 
+  it('looks up again when the headers change', async () => {
+    const auth = createAuth()
+    const reqHeaders = new Headers({ cookie: 'session=abc' })
+    const procedure = os.use(optionalSession({ auth })).handler(({ context }) => context.session)
+
+    expect(await call(procedure, undefined, { context: { reqHeaders } })).toEqual(session)
+
+    reqHeaders.delete('cookie')
+    expect(await call(procedure, undefined, { context: { reqHeaders } })).toBeNull()
+
+    reqHeaders.set('authorization', 'Bearer token')
+    await call(procedure, undefined, { context: { reqHeaders } })
+
+    expect(auth.api.getSession).toHaveBeenCalledTimes(3)
+  })
+
   it('looks up again with dedupe: false', async () => {
     const auth = createAuth()
     const reqHeaders = new Headers({ cookie: 'session=abc' })
