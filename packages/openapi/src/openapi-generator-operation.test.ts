@@ -150,6 +150,42 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    it('keeps additionalProperties on the body left after extracting path params', () => {
+      const { ctx, operation } = createContext()
+      const path = '/planets/{id}' as const
+
+      buildRequest(ctx, operation, testDef({
+        inputs: [testSchema({
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+          },
+          required: ['id', 'name'],
+          additionalProperties: false,
+        })],
+      }), { method: 'POST', path }, getDynamicPathParams(path))
+
+      expect(operation.parameters).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+      ])
+      expect(operation.requestBody).toEqual({
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+              },
+              required: ['name'],
+              additionalProperties: false,
+            },
+          },
+        },
+      })
+    })
+
     it('applies params styles to path parameters', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}/{tags}/{filters}' as const

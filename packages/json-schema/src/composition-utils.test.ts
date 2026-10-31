@@ -4,6 +4,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   deduplicateJsonSchemas,
+  extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
   isJsonObjectLikeSchema,
@@ -623,6 +624,68 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 })
 
+describe('extractJsonObjectSchemaAdditionalProperties', () => {
+  it('returns undefined when the root declares no additionalProperties', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties(true)).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties(false)).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', properties: { a: { type: 'string' } } })).toBeUndefined()
+  })
+
+  it('returns the root additionalProperties', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: false })).toBe(false)
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: { type: 'number' } })).toEqual({ type: 'number' })
+  })
+
+  it('ignores additionalProperties declared only by composition branches', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false },
+        { type: 'object', properties: { b: { type: 'string' } } },
+      ],
+    })).toBeUndefined()
+  })
+
+  it('resolves local refs and preserves root $defs', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      $ref: '#/$defs/Thing',
+      $defs: {
+        Thing: { $ref: '#/$defs/Strict' },
+        Strict: { type: 'object', additionalProperties: { $ref: '#/$defs/Value' } },
+        Value: { type: 'number' },
+      },
+    })).toEqual({
+      $ref: '#/$defs/Value',
+      $defs: {
+        Thing: { $ref: '#/$defs/Strict' },
+        Strict: { type: 'object', additionalProperties: { $ref: '#/$defs/Value' } },
+        Value: { type: 'number' },
+      },
+    })
+  })
+
+  it('uses hoisted defs for recursive root refs', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      type: 'object',
+      additionalProperties: { $ref: '#' },
+    })).toEqual({
+      $ref: '#/$defs/__schema0',
+      $defs: {
+        __schema0: {
+          type: 'object',
+          additionalProperties: { $ref: '#/$defs/__schema0' },
+        },
+      },
+    })
+  })
+
+  it('stops on cyclic alias refs', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      $ref: '#/$defs/A',
+      $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } },
+    })).toBeUndefined()
+  })
+})
+
 describe('combineJsonObjectSchemaEntries', () => {
   it('combines entries into a single object schema', () => {
     expect(combineJsonObjectSchemaEntries([
@@ -719,12 +782,62 @@ describe('combineJsonObjectSchemaEntries', () => {
         optionalNever: false,
       },
       required: ['requiredRef'],
+      additionalProperties: { $ref: '#/$defs/Shared' },
       $defs: {
         Shared: { type: 'string' },
       },
     }
 
-    expect(combineJsonObjectSchemaEntries(extractJsonObjectSchemaEntries(schema)!)).toEqual(schema)
+    expect(combineJsonObjectSchemaEntries(
+      extractJsonObjectSchemaEntries(schema)!,
+      extractJsonObjectSchemaAdditionalProperties(schema),
+    )).toEqual(schema)
+  })
+
+  it('sets additionalProperties when given', () => {
+    expect(combineJsonObjectSchemaEntries([['name', { type: 'string' }, false]], false)).toEqual({
+      type: 'object',
+      properties: { name: { type: 'string' } },
+      required: ['name'],
+      additionalProperties: false,
+    })
+
+    expect(combineJsonObjectSchemaEntries([], true)).toEqual({
+      type: 'object',
+      properties: {},
+      additionalProperties: true,
+    })
+  })
+
+  it('promotes additionalProperties defs and rebases its root pointers', () => {
+    expect(combineJsonObjectSchemaEntries([
+      ['name', {
+        $ref: '#/$defs/Shared',
+        $defs: { Shared: { type: 'string' } },
+      }, false],
+    ], {
+      anyOf: [
+        { $ref: '#/$defs/Shared' },
+        { type: 'array', items: { $ref: '#' } },
+      ],
+      $defs: { Shared: { type: 'number' } },
+    })).toEqual({
+      type: 'object',
+      properties: {
+        name: { $ref: '#/$defs/Shared' },
+      },
+      required: ['name'],
+      additionalProperties: {
+        anyOf: [
+          { $ref: '#/$defs/Shared2' },
+          { type: 'array', items: { $ref: '#/additionalProperties' } },
+        ],
+      },
+      $defs: {
+        Shared: { type: 'string' },
+        Shared2: { type: 'number' },
+      },
+    })
   })
 
   it('keeps unknown refs untouched while deduplicating and renaming promoted defs', () => {

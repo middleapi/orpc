@@ -10,6 +10,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   containsJsonFileSchema,
+  extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
   isJsonFileSchema,
@@ -158,7 +159,7 @@ function extractCompactRequestParts(
     : !dynamicParams?.length
         ? schema
         : restEntries
-          ? combineJsonObjectSchemaEntries(restEntries)
+          ? combineJsonObjectSchemaEntries(restEntries, extractJsonObjectSchemaAdditionalProperties(schema))
           : undefined
 
   return {
