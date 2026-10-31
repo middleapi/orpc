@@ -13,7 +13,7 @@ export type OperationType = 'query' | 'streamed' | 'live' | 'infinite' | 'mutati
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#client-context | TanStack Query Integration - Client Context}
  */
-export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_TANSTACK_QUERY_OPERATION_CONTEXT') as any
+export const OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_TANSTACK_QUERY_OPERATION_CONTEXT') as any
 
 /**
  * A client context automatically populated by TanStack Query utils,

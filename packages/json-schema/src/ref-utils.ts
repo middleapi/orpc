@@ -33,7 +33,7 @@ export function visitJsonSchemaRefs(
   value: JsonSchema,
   visit: (ref: string) => void,
   schemaLevel = true,
-  seen = new Set<object>(),
+  seen: Set<object> = new Set(),
 ): void {
   if (!value || typeof value !== 'object' || seen.has(value)) {
     return

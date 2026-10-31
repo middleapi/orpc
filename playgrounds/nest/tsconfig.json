@@ -6,7 +6,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "rootDir": "src",
-    "module": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "resolvePackageJsonExports": true,
     "types": ["node"],

@@ -127,6 +127,7 @@ describe('openAPIGenerator operation builders', () => {
             note: { type: 'string' },
           },
           required: ['id', 'name'],
+          additionalProperties: false,
         })],
       }), { method: 'POST', path }, getDynamicPathParams(path))
 
@@ -144,6 +145,7 @@ describe('openAPIGenerator operation builders', () => {
                 note: { type: 'string' },
               },
               required: ['name'],
+              additionalProperties: false,
             },
           },
         },

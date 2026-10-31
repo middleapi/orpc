@@ -199,6 +199,9 @@ export interface RPCJsonSerializerOptions {
    * handlers: { url: undefined }
    * ```
    *
+   * During deserialization, values whose type has no handler are left in their serialized form,
+   * so a client and server with different handlers can still communicate.
+   *
    * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
@@ -454,11 +457,10 @@ export class RPCJsonSerializer {
       let chainDepth = 0
 
       for (const item of meta) {
-        const type = item[0]
-        const handler = this.handlers[type]
+        const handler = this.handlers[item[0]]
 
         if (handler === undefined) {
-          throw invalidSerializedData(`type "${type}" is not supported.`)
+          continue
         }
 
         const depth = item.length - 1

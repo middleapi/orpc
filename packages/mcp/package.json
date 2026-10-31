@@ -44,7 +44,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -60,8 +60,8 @@
     "@standard-server/core": "~0.13.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.3.1",
-    "@modelcontextprotocol/server": "^2.3.1",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@orpc/zod": "workspace:*",
     "zod": "^4.6.7"
   }

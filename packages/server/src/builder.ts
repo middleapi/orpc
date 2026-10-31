@@ -324,4 +324,4 @@ export class Builder<
  *
  * @see {@link https://orpc.dev/docs/procedure | Procedure}
  */
-export const os = Builder.create()
+export const os: Builder<DefaultInitialContext & object, Record<never, never>> = /* @__PURE__ */ Builder.create()

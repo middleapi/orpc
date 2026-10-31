@@ -64,7 +64,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
    * - Logging interceptors should run after batch interceptors
    *   so they log each individual request instead of the batch request.
    */
-  before = ['~tracing', '~batch', '~hibernation']
+  before: string[] = ['~tracing', '~batch', '~hibernation']
 
   private readonly logger: Exclude<PinoHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateRequestId: Exclude<PinoHandlerPluginOptions<T>['generateRequestId'], undefined>

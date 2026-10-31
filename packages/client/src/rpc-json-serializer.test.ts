@@ -380,6 +380,24 @@ describe('rpcJsonSerializer: custom handlers', () => {
   })
 })
 
+describe('rpcJsonSerializer: unknown types', () => {
+  const serializer = new RPCJsonSerializer({ handlers: { url: undefined } })
+
+  it('leaves their values in serialized form, still restoring known values inside', () => {
+    expect(serializer.deserializeJson({
+      json: { person: { name: 'dinwwwh', date: '2023-01-01T00:00:00.000Z' }, url: 'https://orpc.dev/' },
+      meta: [['date', 'person', 'date'], ['person', 'person'], ['url', 'url']],
+    })).toEqual({ person: { name: 'dinwwwh', date: new Date('2023-01-01') }, url: 'https://orpc.dev/' })
+  })
+
+  it('skips their entries without walking the path', () => {
+    expect(serializer.deserializeJson({
+      json: { a: { b: { x: '1', y: '2', z: '3' } }, v: '4' },
+      meta: [['bigint', 'a', 'b', 'x'], ['unknown', 'a', 'b', 'y'], ['bigint', 'a', 'b', 'z'], ['unknown', 'missing', 'deep'], ['bigint', 'v'], ['unknown', 'v', 'x']],
+    })).toEqual({ a: { b: { x: 1n, y: '2', z: 3n } }, v: 4n })
+  })
+})
+
 describe('rpcJsonSerializer: deserialize', () => {
   const serializer = new RPCJsonSerializer()
 
@@ -455,8 +473,7 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it.each(['nonexistent', '__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty', 'valueOf'])('never resolves the meta type "%s" through the prototype chain', (type) => {
-    expect(() => serializer.deserializeJson({ json: 1, meta: [[type]] }))
-      .toThrow(`Invalid RPC serialized data: type "${type}" is not supported.`)
+    expect(serializer.deserializeJson({ json: 1, meta: [[type]] })).toBe(1)
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {

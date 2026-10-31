@@ -4,9 +4,9 @@ import { describe, it } from 'vitest'
 import { z } from 'zod'
 import { Implement } from './implement'
 
-export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 
-export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
 
 describe('@Implement', () => {
   it('require return an implemented procedure that satisfy default initial context', () => {

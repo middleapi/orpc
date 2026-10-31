@@ -1,7 +1,7 @@
 import type { Promisable } from 'type-fest'
 import { isAbortError } from './error'
 
-const TRACER_SYMBOL = Symbol.for('ORPC_TRACER')
+const TRACER_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_TRACER')
 
 export type TracingAttributeValue = string | number | boolean | string[] | number[] | boolean[]
 

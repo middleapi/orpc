@@ -46,7 +46,7 @@
   ],
   "scripts": {
     "prepare": "wrangler types",
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "wrangler types && tsc -b",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
@@ -60,9 +60,9 @@
     "@standard-server/core": "~0.13.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.7",
+    "@cloudflare/vitest-plugin": "^1.4.11",
     "@vitest/coverage-istanbul": "^4.1.11",
     "vitest": "^4.1.11",
-    "wrangler": "^4.152.0"
+    "wrangler": "^4.156.0"
   }
 }

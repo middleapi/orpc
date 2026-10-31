@@ -52,9 +52,15 @@ describe('standardJsonSchemaConverter', () => {
       false,
     ])
 
-    expect(converter.convert(arktype.type('string | undefined'), 'input')).toEqual([{}, true])
+    expect(converter.convert(arktype.type('string | undefined'), 'input')).toEqual([
+      expect.objectContaining({ anyOf: [{ type: 'string' }, {}] }),
+      true,
+    ])
 
-    expect(converter.convert(arktype.type('string | undefined'), 'output')).toEqual([{}, true])
+    expect(converter.convert(arktype.type('string | undefined'), 'output')).toEqual([
+      expect.objectContaining({ anyOf: [{ type: 'string' }, {}] }),
+      true,
+    ])
   })
 
   it('keeps converting when standard validation is async or throws', () => {

@@ -36,16 +36,15 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "tsc -b"
   },
   "dependencies": {
     "@standard-server/shared": "~0.13.0",
-    "radash": "^12.1.1",
     "type-fest": "^5.10.0"
   },
   "devDependencies": {
-    "arktype": "^2.2.8",
+    "arktype": "^2.2.9",
     "valibot": "^1.5.0",
     "zod": "^4.6.7"
   }
