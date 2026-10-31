@@ -1,0 +1,54 @@
+---
+title: "OpenRPC Link"
+description: "Use OpenRPCLink to call OpenRPCHandler, or any other JSON-RPC 2.0 server, from a typesafe oRPC client that restores typed errors."
+---
+
+## Overview
+
+`OpenRPCLink` sends each call as a JSON-RPC 2.0 request over HTTP `POST`, whose `method` is the procedure path joined by `.`. It needs no contract, so it can call [OpenRPC Handler](/docs/openrpc/handler) or any other JSON-RPC server.
+
+```ts
+import type { JsonifiedClient } from '@orpc/openapi'
+import type { RouterClient } from '@orpc/server'
+import { createORPCClient } from '@orpc/client'
+import { OpenRPCLink } from '@orpc/openrpc/fetch'
+
+const link = new OpenRPCLink({
+  url: '/rpc',
+  origin: 'http://localhost:3000',
+  headers: () => ({ authorization: 'Bearer token' }),
+})
+
+const client: JsonifiedClient<RouterClient<typeof router>> = createORPCClient(link)
+
+const planet = await client.planet.find({ id: 1 }) // { "jsonrpc": "2.0", "id": "1", "method": "planet.find", "params": { "id": 1 } }
+```
+
+An object input is sent as by-name `params`, any other input as `[input]`, and an `undefined` input without `params`.
+
+:::info
+Results are plain JSON, so use `JsonifiedClient` from `@orpc/openapi` to type them, such as a `Date` as a string. An `undefined` output arrives as `null`, although `JsonifiedClient` still types it as `undefined`, so check it with `== null`. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) can restore native types instead.
+:::
+
+## Error Handling
+
+Errors from oRPC servers are restored as the original `ORPCError`, so [typesafe errors](/docs/client/error-handling) work as usual. Errors from other servers become an `ORPCError` with the code that matches their JSON-RPC error code (`INTERNAL_SERVER_ERROR` when none does), their message, and their `data`.
+
+Since JSON-RPC errors arrive with HTTP status `200`, the error's `cause` gets the HTTP status of its code, so the [Retry Plugin](/docs/plugins/retry) retries server errors but not client errors. A response that is not a JSON-RPC response for the request throws a `MalformedResponseError`.
+
+## WebSocket
+
+`OpenRPCLink` from `@orpc/openrpc/websocket` sends the calls as messages on a WebSocket connection, such as to an [OpenRPC Handler over WebSocket](/docs/openrpc/handler#websocket), and matches the responses by `id`:
+
+```ts
+import { createORPCClient } from '@orpc/client'
+import { OpenRPCLink } from '@orpc/openrpc/websocket'
+
+const link = new OpenRPCLink({
+  connect: () => new WebSocket('ws://localhost:8080'),
+})
+
+const client: JsonifiedClient<RouterClient<typeof router>> = createORPCClient(link)
+```
+
+`connect` is called on the first call. When the socket closes, its pending calls fail, and the next call connects again. Aborting a call stops waiting for its response, but JSON-RPC cannot cancel it on the server.
