@@ -69,7 +69,7 @@ export function encodeJsonRpcError(
   }
 }
 
-const PROTOCOL_ERROR_ORPC_CODES = new Map<number, ORPCErrorCode>([
+const PROTOCOL_ERROR_ORPC_CODES = /* @__PURE__ */ new Map<number, ORPCErrorCode>([
   [JSON_RPC_ERROR_CODES.PARSE_ERROR, 'BAD_REQUEST'],
   [JSON_RPC_ERROR_CODES.INVALID_REQUEST, 'BAD_REQUEST'],
   [JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND, 'NOT_FOUND'],

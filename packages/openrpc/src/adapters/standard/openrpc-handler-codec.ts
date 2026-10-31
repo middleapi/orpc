@@ -141,7 +141,7 @@ async function decodeParams(params: unknown, procedure: AnyProcedure): Promise<u
 /**
  * Whether the input schemas accept `undefined` and `{}`, worked out once per procedure since it only depends on its schemas.
  */
-const emptyInputsAcceptance = new WeakMap<AnyProcedure, Promise<{ undefined: boolean, object: boolean }>>()
+const emptyInputsAcceptance = /* @__PURE__ */ new WeakMap<AnyProcedure, Promise<{ undefined: boolean, object: boolean }>>()
 
 function acceptsEmptyInputs(procedure: AnyProcedure): Promise<{ undefined: boolean, object: boolean }> {
   let accepts = emptyInputsAcceptance.get(procedure)

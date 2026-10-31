@@ -19,7 +19,7 @@ export const JSON_RPC_ERROR_CODES = {
  *
  * @see {@link https://orpc.dev/docs/openrpc/handler#error-codes | OpenRPC Handler - Error Codes}
  */
-export const COMMON_JSON_RPC_ERROR_CODE_MAP = {
+export const COMMON_JSON_RPC_ERROR_CODE_MAP: Record<keyof typeof COMMON_ERROR_STATUS_MAP, number> = {
   BAD_REQUEST: JSON_RPC_ERROR_CODES.INVALID_PARAMS,
   UNAUTHORIZED: -32001,
   PAYMENT_REQUIRED: -32002,
@@ -43,7 +43,7 @@ export const COMMON_JSON_RPC_ERROR_CODE_MAP = {
   BAD_GATEWAY: JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
   SERVICE_UNAVAILABLE: JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
   GATEWAY_TIMEOUT: JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
-} satisfies Record<keyof typeof COMMON_ERROR_STATUS_MAP, number>
+}
 
 /**
  * The JSON-RPC error code of ORPCError codes missing from the error code map (an implementation-defined server error).

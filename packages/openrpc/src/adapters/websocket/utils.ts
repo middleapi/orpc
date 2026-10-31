@@ -1,6 +1,6 @@
 import { tryOrUndefined } from '@orpc/shared'
 
-const textDecoder = new TextDecoder()
+const textDecoder = /* @__PURE__ */ new TextDecoder()
 
 /**
  * Parses a WebSocket message as JSON, or returns `undefined` when it is not valid JSON.

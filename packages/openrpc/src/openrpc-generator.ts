@@ -58,7 +58,7 @@ export interface OpenRPCGeneratorGenerateOptions {
 /**
  * Root keywords of an object input that by-name params can express, so splitting it into one param per property loses nothing.
  */
-const BY_NAME_ROOT_KEYWORDS = new Set(['type', 'properties', 'required', 'additionalProperties', 'title', 'description', '$defs', '$comment', 'examples', 'default'])
+const BY_NAME_ROOT_KEYWORDS = /* @__PURE__ */ new Set(['type', 'properties', 'required', 'additionalProperties', 'title', 'description', '$defs', '$comment', 'examples', 'default'])
 
 /**
  * Generates an OpenRPC 1.3 document from a contract or router: each procedure becomes a method
