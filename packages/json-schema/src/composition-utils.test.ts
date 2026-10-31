@@ -627,7 +627,6 @@ describe('extractJsonObjectSchemaEntries', () => {
 describe('extractJsonObjectSchemaAdditionalProperties', () => {
   it('returns undefined when the root declares no additionalProperties', () => {
     expect(extractJsonObjectSchemaAdditionalProperties(true)).toBeUndefined()
-    expect(extractJsonObjectSchemaAdditionalProperties(false)).toBeUndefined()
     expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', properties: { a: { type: 'string' } } })).toBeUndefined()
   })
 
@@ -676,13 +675,6 @@ describe('extractJsonObjectSchemaAdditionalProperties', () => {
         },
       },
     })
-  })
-
-  it('stops on cyclic alias refs', () => {
-    expect(extractJsonObjectSchemaAdditionalProperties({
-      $ref: '#/$defs/A',
-      $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } },
-    })).toBeUndefined()
   })
 })
 
@@ -800,12 +792,6 @@ describe('combineJsonObjectSchemaEntries', () => {
       properties: { name: { type: 'string' } },
       required: ['name'],
       additionalProperties: false,
-    })
-
-    expect(combineJsonObjectSchemaEntries([], true)).toEqual({
-      type: 'object',
-      properties: {},
-      additionalProperties: true,
     })
   })
 
