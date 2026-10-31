@@ -286,7 +286,7 @@ export class AppModule {}
 
 ### `toNestStandardLazyRequest` option
 
-By default, `@orpc/nest` supports the Express and Fastify adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request (including additional params). For details, see [Standard Server](https://github.com/middleapi/standard-server#request-and-response-types).
+By default, `@orpc/nest` supports the Express, Fastify, and Node (`@nestjs/platform-node`, NestJS v12.3+) adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request (including additional params). For details, see [Standard Server](https://github.com/middleapi/standard-server#request-and-response-types).
 
 ```ts
 import { NestStandardLazyRequest } from '@orpc/nest'

@@ -18,7 +18,7 @@ import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer }
  */
 export const BATCH_CONTENT_TYPE = 'application/vnd.orpc.batch'
 
-const textEncoder = new TextEncoder()
+const textEncoder = /* @__PURE__ */ new TextEncoder()
 
 function encodeLengthPrefix(length: number): Uint8Array<ArrayBuffer> {
   const prefix = new Uint8Array(4)
@@ -211,7 +211,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
    * Run batch interceptors inside the tracing interceptors
    * so each subrequest gets its own span instead of sharing one batch-level span.
    */
-  after = ['~tracing']
+  after: string[] = ['~tracing']
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>

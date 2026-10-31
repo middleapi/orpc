@@ -9,6 +9,7 @@ import FastifyCookie from '@fastify/cookie'
 import { Controller, HttpException, Req, Res, SetMetadata, StreamableFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
+import { NodeAdapter } from '@nestjs/platform-node'
 import { Test } from '@nestjs/testing'
 import { meta, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
@@ -82,7 +83,10 @@ describe('requirements', () => {
     }
   })
 
-  it('should support the QUERY HTTP method when QueryMethod is available (NestJS 11.2+)', async () => {
+  it.each([
+    ['express adapter', undefined],
+    ['node adapter', new NodeAdapter()],
+  ] as const)('should support the QUERY HTTP method when QueryMethod is available (NestJS 11.2+) with %s', async (_, adapter) => {
     const contract = oc
       .meta(openapi({
         path: '/query-route',
@@ -102,7 +106,7 @@ describe('requirements', () => {
       controllers: [QueryController],
     }).compile()
 
-    const app = moduleRef.createNestApplication()
+    const app = moduleRef.createNestApplication(adapter as any)
     await app.init()
     await app.listen(0)
 
@@ -374,6 +378,7 @@ describe('routing', () => {
     describe.each([
       ['express adapter', undefined],
       ['fastify adapter', new FastifyAdapter()],
+      ['node adapter', new NodeAdapter()],
     ] as const)('with %s', async (_, adapter) => {
       const moduleRef = await Test.createTestingModule({
         controllers: [Controller],
@@ -382,7 +387,7 @@ describe('routing', () => {
       const app = moduleRef.createNestApplication(adapter as any)
       await app.init()
 
-      if (adapter) {
+      if (adapter instanceof FastifyAdapter) {
         await app.getHttpAdapter().getInstance().ready()
       }
 
@@ -455,6 +460,7 @@ describe('routing', () => {
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
   ] as const)('params edge cases with %s', async (_, adapter) => {
     const contract = {
       staticPath: oc.meta(openapi({
@@ -528,7 +534,7 @@ describe('routing', () => {
     const app = moduleRef.createNestApplication(adapter as any)
     await app.init()
 
-    if (adapter) {
+    if (adapter instanceof FastifyAdapter) {
       await app.getHttpAdapter().getInstance().ready()
     }
 
@@ -604,6 +610,7 @@ describe('response status, headers and body should follow standard-server', () =
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
   ] as const)('with %s', async (_, adapter) => {
     const routingInterceptor = vi.fn(({ next }) => next())
     const moduleRef = await Test.createTestingModule({
@@ -629,6 +636,9 @@ describe('response status, headers and body should follow standard-server', () =
     })
 
     const httpServer = app.getHttpServer()
+
+    // express and fastify append a charset to a content-type set by the response, the node adapter sends it as is
+    const charset = adapter instanceof NodeAdapter ? '' : '; charset=utf-8'
 
     it('should response with output status', async () => {
       handler
@@ -685,7 +695,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('"string"')
 
           return true
@@ -695,7 +705,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('null')
 
           return true
@@ -705,7 +715,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('true')
 
           // do not stringify if possible
@@ -718,7 +728,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('123')
 
           // do not stringify if possible
@@ -731,7 +741,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('[1,2,3]')
 
           // do not stringify if possible
@@ -744,7 +754,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('{"a":1,"b":2}')
 
           // do not stringify if possible
@@ -972,7 +982,7 @@ describe('response status, headers and body should follow standard-server', () =
         {
           name: 'JSON with a JSON content-type',
           response: () => ({ headers: { ...headers, 'content-type': 'application/json' }, body: { a: 1 } }),
-          expected: { 'standard-server': undefined, 'content-type': 'application/json; charset=utf-8', 'content-length': '7' },
+          expected: { 'standard-server': undefined, 'content-type': `application/json${charset}`, 'content-length': '7' },
           text: '{"a":1}',
         },
         {
@@ -1081,6 +1091,7 @@ describe('error handling', () => {
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
   ] as const)('with %s', async (_, adapter) => {
     const routingInterceptor = vi.fn(({ next }) => next())
     const moduleRef = await Test.createTestingModule({
@@ -1105,11 +1116,14 @@ describe('error handling', () => {
     }())
     await app.init()
 
-    if (adapter) {
+    if (adapter instanceof FastifyAdapter) {
       await app.getHttpAdapter().getInstance().ready()
     }
 
     const httpServer = app.getHttpServer()
+
+    // express and fastify append a charset to a content-type set by the response, the node adapter sends it as is
+    const charset = adapter instanceof NodeAdapter ? '' : '; charset=utf-8'
 
     it('should throw HttpException for regular errors', async () => {
       const error = new ORPCError('NOT_FOUND', { data: 'test data' })
@@ -1147,7 +1161,7 @@ describe('error handling', () => {
       {
         name: 'with',
         headers: { 'content-type': 'application/problem+json' },
-        expected: { 'standard-server': 'json', 'content-type': 'application/problem+json; charset=utf-8' },
+        expected: { 'standard-server': 'json', 'content-type': `application/problem+json${charset}` },
       },
     ])('should respect or override response headers of HttpException $name a content-type', async ({ headers, expected }) => {
       routingInterceptor.mockResolvedValueOnce({
@@ -1204,7 +1218,7 @@ describe('error handling', () => {
       await expect(supertest(httpServer).post('/error')).resolves.toSatisfy((res) => {
         expect(res.statusCode).toEqual(502)
         expect(res.text).toEqual('"text"')
-        expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+        expect(res.headers['content-type']).toEqual(`application/json${charset}`)
 
         return true
       })
@@ -1789,6 +1803,7 @@ describe('compatibility', () => {
     describe.each([
       ['express adapter', undefined],
       ['fastify adapter', new FastifyAdapter()],
+      ['node adapter', new NodeAdapter()],
     ] as const)('with %s', async (_, adapter) => {
       const moduleRef = await Test.createTestingModule({
         controllers: [ImplController],
@@ -1802,7 +1817,7 @@ describe('compatibility', () => {
       const app = moduleRef.createNestApplication(adapter as any)
       await app.init()
 
-      if (adapter) {
+      if (adapter instanceof FastifyAdapter) {
         await app.getHttpAdapter().getInstance().ready()
       }
 

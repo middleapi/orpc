@@ -6,7 +6,7 @@
     "lib": ["ES2022"],
     "moduleDetection": "force",
     "useDefineForClassFields": true,
-    "module": "ES2022",
+    "module": "ESNext",
 
     "moduleResolution": "bundler",
     "resolveJsonModule": true,

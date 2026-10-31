@@ -49,7 +49,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
    * Compression should be done after batching, to compress the assembled batch response
    * rather than each subresponse inside it.
    */
-  after = ['~batch']
+  after: string[] = ['~batch']
 
   private readonly encodings: Exclude<BatchResponseCompressionHandlerPluginOptions['encodings'], undefined>
   private readonly threshold: Exclude<BatchResponseCompressionHandlerPluginOptions['threshold'], undefined>

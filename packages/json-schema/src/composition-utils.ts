@@ -125,8 +125,9 @@ export type JsonObjectSchemaEntry = [name: string, schema: JsonSchema, optional:
 
 /**
  * Combines object property entries back into a single object schema.
+ * When given, `additionalProperties` constrains every property the entries do not name.
  */
-export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[]): JsonObjectSchema {
+export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[], additionalProperties?: JsonSchema): JsonObjectSchema {
   const properties = new Map<string, JsonSchema>()
   const required: string[] = []
   const mergedDefs = new Map<string, JsonSchema>()
@@ -148,6 +149,12 @@ export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[])
 
   if (required.length > 0) {
     schema.required = required
+  }
+
+  if (additionalProperties !== undefined) {
+    schema.additionalProperties = typeof additionalProperties === 'boolean'
+      ? additionalProperties
+      : promoteJsonSchemaDefs(additionalProperties, mergedDefs, '#/additionalProperties')
   }
 
   if (mergedDefs.size > 0) {
@@ -173,6 +180,26 @@ export function extractJsonObjectSchemaEntries(schema: JsonSchema): JsonObjectSc
   }
 
   return result.entries.map(([n, s, ...r]) => [n, withRootDefs(s, schema.$defs), ...r])
+}
+
+/**
+ * Returns the `additionalProperties` an object schema declares at its root, following root-local refs,
+ * with the root `$defs` attached so it can be passed to {@link combineJsonObjectSchemaEntries}.
+ * Composition branches are not inspected, since their keyword only constrains that branch.
+ */
+export function extractJsonObjectSchemaAdditionalProperties(schema: JsonSchema): JsonSchema | undefined {
+  schema = hoistRecursiveRefToDef(schema)
+  if (typeof schema !== 'object') {
+    return undefined
+  }
+
+  const resolved = resolveJsonSchemaRootLocalRef(schema)
+
+  if (typeof resolved !== 'object' || resolved.additionalProperties === undefined) {
+    return undefined
+  }
+
+  return withRootDefs(resolved.additionalProperties, schema.$defs)
 }
 
 const JSON_SCHEMA_OBJECT_KEYWORDS = ['properties', 'patternProperties', 'additionalProperties', 'required', 'propertyNames', 'minProperties', 'maxProperties']

@@ -14,7 +14,7 @@ export type OperationType = 'fetcher' | 'mutator' | 'subscriber' | 'liveSubscrib
  *
  * @see {@link https://orpc.dev/docs/integrations/swr#operation-context | SWR Integration - Operation Context}
  */
-export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_SWR_OPERATION_CONTEXT')
+export const OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_SWR_OPERATION_CONTEXT')
 
 /**
  * A client context automatically populated by SWR utils,

@@ -26,12 +26,12 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
   /**
    * Should limit the original batch request body instead of sub-requests.
    */
-  after = ['~batch']
+  after: string[] = ['~batch']
 
   /**
    * Should limit the final body size instead of the compressed one.
    */
-  before = ['~request-compression']
+  before: string[] = ['~request-compression']
 
   private readonly maxBodySize: number
 

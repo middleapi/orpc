@@ -6,9 +6,8 @@ import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import type { ToEventStreamOptions } from '@standard-server/node'
 import { Module } from '@nestjs/common'
+import { ORPC_MODULE_CONFIG_SYMBOL } from './constants'
 import { ImplementInterceptor } from './implement'
-
-export const ORPC_MODULE_CONFIG_SYMBOL = Symbol.for('ORPC_NEST_MODULE_CONFIG')
 
 /**
  * A standard lazy request extended with NestJS route parameters,
@@ -32,7 +31,7 @@ export type ORPCModuleConfig
     & {
       /**
        * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.
-       * You might need to define this if you are not using express or fastify adapters.
+       * You might need to define this if you are not using the express, fastify or node adapters.
        */
       toNestStandardLazyRequest?: ((req: any, res: any) => NestStandardLazyRequest) | undefined
 

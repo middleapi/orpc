@@ -27,7 +27,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
   /**
    * Output and error values should be coerced before validation.
    */
-  after = ['~response-validation']
+  after: string[] = ['~response-validation']
 
   private readonly converter: DelegatingJsonSchemaConverter
   private readonly coercer: JsonSchemaCoercer

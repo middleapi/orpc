@@ -1,0 +1,40 @@
+---
+title: "HEAD Method Plugin"
+description: "Use HeadMethodHandlerPlugin to answer HEAD requests with the status and headers of the matching GET procedure, without sending its body."
+sidebar:
+  label: "HEAD Method"
+---
+
+## How It Works
+
+A [`HEAD`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/HEAD) request asks for the headers a `GET` request would receive, without the body, so clients, caches, and link checkers can learn whether a resource exists, its type, and its size without downloading it. Like Fastify's [`exposeHeadRoutes`](https://fastify.dev/docs/latest/Reference/Server/#exposeheadroutes), the plugin answers a `HEAD` request that matches no procedure with the matching `GET` procedure:
+
+- The response keeps the status and headers of `GET`, such as `Content-Type`, `Content-Encoding`, and `ETag`, plus `Content-Length` when the size is known without reading a stream.
+- The body is discarded: streams are cancelled and [event iterators](/docs/async-iterator-object) end before they start.
+- A procedure routed as `HEAD` takes precedence over the `GET` one.
+- The request reaches the procedure as `GET`, so plugins guarding `GET`, such as the [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection), guard `HEAD` too.
+
+## Setup
+
+```ts
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { HeadMethodHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new OpenAPIHandler(router, {
+  plugins: [
+    new HeadMethodHandlerPlugin(),
+  ],
+})
+```
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one. `RPCHandler` only answers `HEAD` for procedures it allows `GET` for, see [Enabling the GET Method](/docs/rpc/handler#enabling-the-get-method).
+:::
+
+:::tip
+The `GET` procedure runs in full to produce the headers. When that is expensive, route a cheaper procedure as `HEAD` on the same path, for example one that only looks up the `ETag`.
+:::
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/head-method.ts).

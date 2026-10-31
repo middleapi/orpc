@@ -6,7 +6,7 @@ import { ORPCError } from '@orpc/server'
 import { toArray, value } from '@orpc/shared'
 import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
-export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_RATELIMIT_MIDDLEWARE_CONTEXT')
+export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_RATELIMIT_MIDDLEWARE_CONTEXT')
 
 export interface RateLimitMiddlewareContext {
   [RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]?: {

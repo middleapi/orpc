@@ -160,4 +160,4 @@ export class ContractBuilder<
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export const oc = ContractBuilder.create()
+export const oc: ContractBuilder<Record<never, never>> = /* @__PURE__ */ ContractBuilder.create()

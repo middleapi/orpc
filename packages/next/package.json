@@ -58,7 +58,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -72,7 +72,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "next": "^16.4.1",
+    "next": "^16.4.3",
     "react": "^19.3.1"
   }
 }

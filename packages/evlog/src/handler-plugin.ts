@@ -48,7 +48,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
    * - Logging interceptors should run after batch interceptors
    *   so they log each individual request instead of the batch request.
    */
-  before = ['~tracing', '~batch', '~hibernation']
+  before: string[] = ['~tracing', '~batch', '~hibernation']
 
   private readonly logAbort: Exclude<EvlogHandlerPluginOptions<T>['logAbort'], undefined>
   private readonly procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<T>['procedureErrorLevel'], undefined>

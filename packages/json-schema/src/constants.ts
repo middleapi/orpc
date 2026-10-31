@@ -1,6 +1,6 @@
 import type { JsonSchemaKeywords } from './types'
 
-export const JSON_SCHEMA_LOGIC_KEYWORDS = new Set<JsonSchemaKeywords | string & {}>([
+export const JSON_SCHEMA_LOGIC_KEYWORDS: Set<JsonSchemaKeywords | string & {}> = /* @__PURE__ */ new Set([
   '$dynamicRef',
   '$ref',
   'additionalItems',
@@ -48,6 +48,6 @@ export const JSON_SCHEMA_LOGIC_KEYWORDS = new Set<JsonSchemaKeywords | string & 
   'uniqueItems',
 ])
 
-export const JSON_SCHEMA_PRIMITIVE_TYPES = new Set<string>(['string', 'number', 'integer', 'boolean', 'null'])
+export const JSON_SCHEMA_PRIMITIVE_TYPES: Set<string> = /* @__PURE__ */ new Set(['string', 'number', 'integer', 'boolean', 'null'])
 
-export const JSON_SCHEMA_RECORD_KEYWORDS = new Set(['properties', 'patternProperties', 'dependentSchemas', 'dependencies', '$defs'])
+export const JSON_SCHEMA_RECORD_KEYWORDS: Set<string> = /* @__PURE__ */ new Set(['properties', 'patternProperties', 'dependentSchemas', 'dependencies', '$defs'])

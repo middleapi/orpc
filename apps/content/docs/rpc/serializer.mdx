@@ -94,6 +94,10 @@ const link = new RPCLink({
 
 :::
 
+:::info[Handlers out of sync]
+Client and server can run different versions, so one side may receive a handler key it doesn't know. The value is then left in its serialized form instead of failing the whole payload, and values nested inside it are still restored. Configure the same handlers on both sides to get the original types back.
+:::
+
 ## BigInt Digit Limit
 
 The built-in `bigint` handler only accepts decimal strings of up to 4300 digits, since parsing longer ones can block the event loop. To allow longer values, override it on both sides:

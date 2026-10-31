@@ -73,7 +73,7 @@ export const catchORPCError: {
     self: Effect.Effect<A, E, R>,
     f: (error: ORPCErrorsOf<E>) => Effect.Effect<A2, E2, R2>,
   ): Effect.Effect<A | A2, E2 | Exclude<E, AnyORPCError>, R | R2>
-} = Function.dual(
+} = /* @__PURE__ */ Function.dual(
   2,
   (
     self: AnyEffect,
@@ -117,7 +117,7 @@ export const catchORPCErrorCode: {
     code: TCode,
     f: (error: ORPCErrorWithCode<E, TCode>) => Effect.Effect<A2, E2, R2>,
   ): Effect.Effect<A | A2, E2 | ExcludeORPCErrorCode<E, LiteralORPCErrorCode<TCode>>, R | R2>
-} = Function.dual(
+} = /* @__PURE__ */ Function.dual(
   3,
   (
     self: AnyEffect,
@@ -163,7 +163,7 @@ export const catchORPCErrorCodes: {
     self: Effect.Effect<A, E, R>,
     cases: Cases,
   ): CatchORPCErrorCodesEffect<A, E, R, Cases>
-} = Function.dual(
+} = /* @__PURE__ */ Function.dual(
   2,
   (
     self: AnyEffect,

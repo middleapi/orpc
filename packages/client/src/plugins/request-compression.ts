@@ -48,7 +48,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
   /**
    * Compression should be done after batching, to compress the final request
    */
-  after = ['~batch']
+  after: string[] = ['~batch']
 
   private readonly encoding: Exclude<RequestCompressionLinkPluginOptions<T>['encoding'], undefined>
   private readonly threshold: Exclude<RequestCompressionLinkPluginOptions<T>['threshold'], undefined>

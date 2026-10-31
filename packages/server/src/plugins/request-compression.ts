@@ -23,7 +23,7 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
   /**
    * Should decompress the original batch request body instead of sub-requests.
    */
-  after = ['~batch']
+  after: string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {

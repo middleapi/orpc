@@ -18,7 +18,7 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
  * The `onError` callbacks of the subscriptions on each subscriber, so publishers sharing
  * a subscriber, such as those created by `prefix`, add a single `error` listener to it.
  */
-const subscriberOnErrors = new WeakMap<object, Array<(error: ThrowableError) => void>>()
+const subscriberOnErrors = /* @__PURE__ */ new WeakMap<object, Array<(error: ThrowableError) => void>>()
 
 /**
  * Publisher adapter for Redis. Distributes events across processes via

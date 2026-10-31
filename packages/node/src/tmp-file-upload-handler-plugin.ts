@@ -137,13 +137,13 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
   /**
    * Should parse the original request body instead of batched sub-requests.
    */
-  after = ['~batch']
+  after: string[] = ['~batch']
 
   /**
    * Should run inside the limit and compression plugins, so spooling receives
    * the size-checked, decompressed bytes.
    */
-  before = ['~request-limit', '~request-compression']
+  before: string[] = ['~request-limit', '~request-compression']
 
   private readonly tmpDir: string
   private readonly maxBodySize: Exclude<TmpFileUploadHandlerPluginOptions<T>['maxBodySize'], undefined>

@@ -68,7 +68,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "unbuild",
+    "prepack": "obuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -89,7 +89,7 @@
     "@standard-server/core": "~0.13.0"
   },
   "devDependencies": {
-    "@upstash/redis": "^1.39.0",
-    "redis": "^6.3.0"
+    "@upstash/redis": "^1.40.0",
+    "redis": "^6.3.1"
   }
 }

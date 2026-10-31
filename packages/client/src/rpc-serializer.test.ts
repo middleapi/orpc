@@ -381,10 +381,5 @@ describe('rpcSerializer', () => {
       // only a Blob can land there, and the spec rejects it as an array length
       expect(() => serializer.deserialize(form)).toThrow(RangeError)
     })
-
-    it('rejects unknown meta types instead of resolving them on the prototype chain', () => {
-      expect(() => serializer.deserialize({ json: 1, meta: [['constructor']] })).toThrow()
-      expect(() => serializer.deserialize({ json: 1, meta: [['__proto__']] })).toThrow()
-    })
   })
 })

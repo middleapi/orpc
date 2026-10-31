@@ -131,7 +131,13 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /**
    * Ensure the request span is available when the interceptor renames it.
    */
-  after = ['~tracing']
+  after: string[] = ['~tracing']
+
+  /**
+   * Should run outside the HEAD method plugin's `GET` fallback, so files keep answering `HEAD`
+   * themselves and procedures routed as `GET` still take precedence over them.
+   */
+  before: string[] = ['~head-method']
 
   private readonly rootDir: string
   /** `rootDir` with a trailing separator, precomputed for the lexical containment check. */
