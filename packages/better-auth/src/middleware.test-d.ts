@@ -52,6 +52,19 @@ describe('requireSession', () => {
       })
   })
 
+  it('returns a decorated middleware whose .use sees the session', () => {
+    const middleware = requireSession({ auth }).use(({ context, next }) => {
+      expectTypeOf(context.session).toEqualTypeOf<Session>()
+
+      return next({ context: { role: context.session.user.role } })
+    })
+
+    os.use(middleware).handler(({ context }) => {
+      expectTypeOf(context.session).toEqualTypeOf<Session>()
+      expectTypeOf(context.role).toBeString()
+    })
+  })
+
   it('rejects a context with incompatible reqHeaders or resHeaders', () => {
     // @ts-expect-error reqHeaders must be Headers
     os.$context<{ reqHeaders: string }>().use(requireSession({ auth }))

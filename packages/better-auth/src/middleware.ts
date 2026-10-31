@@ -1,7 +1,7 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
+import type { AnyMiddleware, Context, DecoratedMiddleware, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { Promisable, Value } from '@orpc/shared'
-import { ORPCError } from '@orpc/server'
+import { ORPCError, os } from '@orpc/server'
 import { stringifyJSON, value } from '@orpc/shared'
 
 /**
@@ -43,7 +43,7 @@ export interface SessionMiddlewareOptions<
   /**
    * If the session middlewares run more than once for the same request,
    * such as chained middlewares or a procedure that calls another one with the same context,
-   * this option ensures the session is looked up only once per request and auth instance.
+   * this option reuses the last session lookup while the request headers and auth instance stay the same.
    *
    * @default true
    */
@@ -62,8 +62,8 @@ export function requireSession<
   TAuth extends BetterAuthInstance,
 >(
   { dedupe = true, ...options }: SessionMiddlewareOptions<TInContext, TInput, TAuth>,
-): Middleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> {
-  return async function requireSession(middlewareOptions, input) {
+): DecoratedMiddleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> {
+  const middleware: Middleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> = async function requireSession(middlewareOptions, input) {
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
 
@@ -73,6 +73,8 @@ export function requireSession<
 
     return middlewareOptions.next({ context: { session } })
   }
+
+  return decorate(middleware)
 }
 
 /**
@@ -87,13 +89,24 @@ export function optionalSession<
   TAuth extends BetterAuthInstance,
 >(
   { dedupe = true, ...options }: SessionMiddlewareOptions<TInContext, TInput, TAuth>,
-): Middleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> {
-  return async function optionalSession(middlewareOptions, input) {
+): DecoratedMiddleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> {
+  const middleware: Middleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> = async function optionalSession(middlewareOptions, input) {
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
 
     return middlewareOptions.next({ context: { session } })
   }
+
+  return decorate(middleware)
+}
+
+/**
+ * Decorates a middleware the same way `os.middleware` does, adding `.use`, `.errors`, and `.adaptInput`.
+ */
+function decorate<TInContext extends Context, TOutContext extends Context, TInput>(
+  middleware: Middleware<TInContext, TOutContext, TInput, any, Record<never, never>>,
+): DecoratedMiddleware<TInContext, TOutContext, TInput, any, Record<never, never>> {
+  return os.middleware(middleware as AnyMiddleware) as DecoratedMiddleware<TInContext, TOutContext, TInput, any, Record<never, never>>
 }
 
 const SESSION_CACHE_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CACHE')
@@ -148,7 +161,17 @@ function getSession<TAuth extends BetterAuthInstance>(
     return result.response
   })
 
-  reqHeaders[SESSION_CACHE_SYMBOL] = { auth, headers, promise }
+  const cache: SessionCache = { auth, headers, promise }
+  reqHeaders[SESSION_CACHE_SYMBOL] = cache
+
+  /**
+   * A failed lookup is not reused, so a later middleware can try again.
+   */
+  promise.catch(() => {
+    if (reqHeaders[SESSION_CACHE_SYMBOL] === cache) {
+      reqHeaders[SESSION_CACHE_SYMBOL] = undefined
+    }
+  })
 
   return promise as Promise<InferBetterAuthSession<TAuth> | null>
 }

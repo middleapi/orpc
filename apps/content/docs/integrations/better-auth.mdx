@@ -71,11 +71,55 @@ const procedure = os
   .use(requireSession({ auth: ({ context }) => context.auth }))
 ```
 
+## Permissions
+
+Both middlewares are [decorated middleware](/docs/middleware), so you can extend them with `.use`. The extension runs after the session is resolved and sees `context.session`. Combined with [metadata](/docs/metadata), this checks the permissions of Better Auth's [access control](https://better-auth.com/docs/plugins/admin#access-control) per procedure:
+
+```ts
+import { requireSession } from '@orpc/better-auth'
+import { defineMeta, ORPCError } from '@orpc/server'
+import { auth } from './auth'
+
+type Permissions = Record<string, string[]>
+
+const [permissionMeta, getPermissionMeta] = defineMeta(
+  'permission',
+  (incoming: Permissions, current) => ({ ...current, ...incoming }),
+)
+
+const requirePermission = requireSession({ auth }).use(async ({ context, procedure, next }) => {
+  const permissions = getPermissionMeta(procedure)
+
+  if (permissions) {
+    const { success } = await auth.api.userHasPermission({
+      body: { userId: context.session.user.id, permissions },
+    })
+
+    if (!success) {
+      throw new ORPCError('FORBIDDEN')
+    }
+  }
+
+  return next()
+})
+
+const router = {
+  listUsers: base
+    .use(requirePermission)
+    .meta(permissionMeta({ user: ['list'] }))
+    .handler(async () => {
+      // ...
+    }),
+}
+```
+
+Unauthenticated calls get `UNAUTHORIZED` before any permission check. `userHasPermission` comes from the [admin plugin](https://better-auth.com/docs/plugins/admin). With the [organization plugin](https://better-auth.com/docs/plugins/organization), call `auth.api.hasPermission({ headers: context.reqHeaders, body: { permissions } })` instead, which checks the member's role in the active organization.
+
 ## Deduplication
 
-When the session middlewares run more than once for the same request, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once. The lookup is stored on `context.reqHeaders` and reused while its values stay the same, so each sub-request of a [batch](/docs/plugins/batch), which has its own `reqHeaders`, looks up the session on its own.
+When the session middlewares run more than once for the same request, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once. The lookup is stored on `context.reqHeaders` and reused while its values stay the same, so each sub-request of a [batch](/docs/plugins/batch), which has its own `reqHeaders`, looks up the session on its own. A failed lookup is not reused.
 
-To always look up a fresh session, for example in a long-running [async iterator](/docs/async-iterator-object), set `dedupe: false`:
+Set `dedupe: false` to look up the session on every call. Use it when one `reqHeaders` lives much longer than a request, for example when you pass the headers of a [WebSocket](/docs/adapters/websocket) upgrade request as the initial context, so a sign-out or an expired session is noticed on the next call:
 
 ```ts
 const procedure = base.use(requireSession({ auth, dedupe: false }))

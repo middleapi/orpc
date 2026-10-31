@@ -84,6 +84,18 @@ describe('optionalSession', () => {
   })
 })
 
+describe('decorated middleware', () => {
+  it('can be extended with .use and keeps its name', async () => {
+    const auth = createAuth()
+    const middleware = requireSession({ auth }).use(({ context, next }) => next({ context: { name: context.session.user.name } }))
+    const procedure = os.use(middleware).handler(({ context }) => context.name)
+
+    expect(requireSession({ auth }).name).toBe('requireSession')
+    expect(optionalSession({ auth }).name).toBe('optionalSession')
+    expect(await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })).toBe('Ada')
+  })
+})
+
 describe('session lookup', () => {
   it('resolves auth from a function receiving middleware options and input', async () => {
     const auth = createAuth()
@@ -103,6 +115,25 @@ describe('session lookup', () => {
     )
   })
 
+  it('works without resHeaders when Better Auth returns set-cookie headers', async () => {
+    const auth = createAuth(['session=refreshed'])
+    const procedure = os.use(requireSession({ auth })).handler(({ context }) => context.session)
+
+    expect(await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })).toEqual(session)
+  })
+
+  it('does not reuse a failed lookup', async () => {
+    const auth = createAuth()
+    const error = new Error('database is down')
+    auth.api.getSession.mockRejectedValueOnce(error)
+    const reqHeaders = new Headers({ cookie: 'session=abc' })
+    const procedure = os.use(requireSession({ auth })).handler(({ context }) => context.session)
+
+    await expect(call(procedure, undefined, { context: { reqHeaders } })).rejects.toBe(error)
+    expect(await call(procedure, undefined, { context: { reqHeaders } })).toEqual(session)
+    expect(auth.api.getSession).toHaveBeenCalledTimes(2)
+  })
+
   it('appends set-cookie headers to resHeaders', async () => {
     const auth = createAuth(['session=refreshed', 'session_data=cached'])
     const resHeaders = new Headers()
@@ -113,7 +144,7 @@ describe('session lookup', () => {
     expect(resHeaders.getSetCookie()).toEqual(['session=refreshed', 'session_data=cached'])
   })
 
-  it('runs once per reqHeaders and auth instance', async () => {
+  it('shares one lookup between concurrent calls and chained middlewares', async () => {
     const auth = createAuth(['session=refreshed'])
     const reqHeaders = new Headers({ cookie: 'session=abc' })
     const resHeaders = new Headers()
@@ -131,7 +162,7 @@ describe('session lookup', () => {
     expect(resHeaders.getSetCookie()).toEqual(['session=refreshed'])
   })
 
-  it('runs once per auth instance', async () => {
+  it('looks up again for a different auth instance', async () => {
     const authA = createAuth(['a=1'])
     const authB = createAuth(['b=1'])
     const resHeaders = new Headers()
