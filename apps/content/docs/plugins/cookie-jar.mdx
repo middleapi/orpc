@@ -5,7 +5,7 @@ sidebar:
   label: "Cookie Jar"
 ---
 
-Clients outside a browser, such as during server-side rendering, in scripts, or in tests, do not keep cookies. `CookieJarLinkPlugin` stores the cookies servers set and sends them back on later requests, following the same rules as a browser.
+Clients outside a browser, such as during server-side rendering, in scripts, or in tests, do not keep cookies. `CookieJarLinkPlugin` stores the cookies servers set and sends them back on later requests, following the browser rules of [RFC 6265](https://datatracker.ietf.org/doc/html/rfc6265) except the public suffix list.
 
 ## Setup
 
@@ -22,7 +22,7 @@ const link = new RPCLink({
 })
 ```
 
-When `origin` resolves to `undefined`, such as in a browser that handles cookies itself, the plugin does nothing. A `cookie` header you set yourself, for example through the link's `headers` option, is kept and wins over jar cookies with the same name.
+When `origin` resolves to `undefined`, such as in a browser that handles cookies itself, the plugin does nothing. A `cookie` header you set yourself, for example through the link's `headers` option, is kept and wins over jar cookies with the same name. With the [Batch Plugin](/docs/plugins/batch), cookies are matched against the batch request URL, so give them `Path=/`.
 
 :::info
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
@@ -34,7 +34,7 @@ On a server, do not share a link between users, or one user's cookies are sent w
 
 ## Custom Jar
 
-Pass your own `CookieJar` to read, clear, or share cookies between links:
+Pass your own `CookieJar` to read, clear, or share cookies between links. Without the public suffix list, a site could set a cookie for all of `.com`, so only share a jar between sites you trust:
 
 ```ts
 import { CookieJar, CookieJarLinkPlugin } from '@orpc/client/plugins'

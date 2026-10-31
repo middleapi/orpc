@@ -232,7 +232,9 @@ interface ParsedSetCookie {
 }
 
 /**
- * Parses a `Set-Cookie` header value following [RFC 6265 Section 5.2](https://datatracker.ietf.org/doc/html/rfc6265#section-5.2).
+ * Parses a `Set-Cookie` header value following [RFC 6265 Section 5.2](https://datatracker.ietf.org/doc/html/rfc6265#section-5.2),
+ * except that a pair without `=` is kept as a cookie with an empty name instead of being ignored,
+ * like browsers and [RFC 6265bis](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/) do.
  */
 function parseSetCookie(setCookie: string): ParsedSetCookie | undefined {
   const [pair = '', ...attributes] = setCookie.split(';')
