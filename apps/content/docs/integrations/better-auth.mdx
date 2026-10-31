@@ -19,10 +19,16 @@ npm install @orpc/better-auth@beta better-auth
 
 ## Setup
 
-The middlewares read the request headers from `context.reqHeaders`, and append the cookies Better Auth sets while reading the session, such as a refreshed session cookie or the [cookie cache](https://better-auth.com/docs/concepts/session-management#cookie-cache), to `context.resHeaders`. Add the [Request Headers Plugin](/docs/plugins/request-headers) and the [Response Headers Plugin](/docs/plugins/response-headers) to your handler:
+The integration requires the [Request Headers Plugin](/docs/plugins/request-headers) and the [Response Headers Plugin](/docs/plugins/response-headers). The middlewares read the request headers from `context.reqHeaders`, and append the cookies Better Auth sets while reading the session, such as a refreshed session cookie or the [cookie cache](https://better-auth.com/docs/concepts/session-management#cookie-cache), to `context.resHeaders`.
 
 ```ts
+import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+import { os } from '@orpc/server'
 import { RequestHeadersHandlerPlugin, ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
+
+interface ServerContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
+
+const base = os.$context<ServerContext>()
 
 const handler = new RPCHandler(router, {
   plugins: [
@@ -41,12 +47,8 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 `requireSession` adds the session to the context, or throws an `UNAUTHORIZED` error when the request has none. `optionalSession` adds the session, or `null`:
 
 ```ts
-import type { BetterAuthContext } from '@orpc/better-auth'
 import { optionalSession, requireSession } from '@orpc/better-auth'
-import { os } from '@orpc/server'
 import { auth } from './auth'
-
-const base = os.$context<BetterAuthContext>()
 
 const router = {
   me: base
@@ -65,7 +67,7 @@ const router = {
 
 ```ts
 const procedure = os
-  .$context<BetterAuthContext & { auth: typeof auth }>()
+  .$context<ServerContext & { auth: typeof auth }>()
   .use(requireSession({ auth: ({ context }) => context.auth }))
 ```
 

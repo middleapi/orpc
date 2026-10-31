@@ -26,14 +26,6 @@ export interface BetterAuthInstance {
 export type InferBetterAuthSession<TAuth extends BetterAuthInstance> = TAuth['$Infer']['Session']
 
 /**
- * The context the session middlewares read:
- * `reqHeaders` from the Request Headers Plugin, and `resHeaders` from the Response Headers Plugin.
- *
- * @see {@link https://orpc.dev/docs/integrations/better-auth | Better Auth Integration}
- */
-export interface BetterAuthContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
-
-/**
  * Options of `requireSession` and `optionalSession`.
  *
  * @see {@link https://orpc.dev/docs/integrations/better-auth | Better Auth Integration}
@@ -56,7 +48,7 @@ export interface SessionMiddlewareOptions<
  * @see {@link https://orpc.dev/docs/integrations/better-auth | Better Auth Integration}
  */
 export function requireSession<
-  TInContext extends Context,
+  TInContext extends Context & RequestHeadersHandlerPluginContext & ResponseHeadersHandlerPluginContext,
   TInput,
   TAuth extends BetterAuthInstance,
 >(
@@ -81,7 +73,7 @@ export function requireSession<
  * @see {@link https://orpc.dev/docs/integrations/better-auth | Better Auth Integration}
  */
 export function optionalSession<
-  TInContext extends Context,
+  TInContext extends Context & RequestHeadersHandlerPluginContext & ResponseHeadersHandlerPluginContext,
   TInput,
   TAuth extends BetterAuthInstance,
 >(
@@ -124,7 +116,7 @@ interface SessionCachedHeaders extends Headers {
  */
 function getSession<TAuth extends BetterAuthInstance>(
   auth: TAuth,
-  context: BetterAuthContext,
+  context: RequestHeadersHandlerPluginContext & ResponseHeadersHandlerPluginContext,
 ): Promise<InferBetterAuthSession<TAuth> | null> {
   const reqHeaders: SessionCachedHeaders | undefined = context.reqHeaders
 

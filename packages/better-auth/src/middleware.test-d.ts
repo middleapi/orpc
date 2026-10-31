@@ -1,4 +1,4 @@
-import type { BetterAuthContext } from './middleware'
+import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { os, type } from '@orpc/server'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
@@ -41,15 +41,22 @@ describe('requireSession', () => {
       })
   })
 
-  it('works with BetterAuthContext', () => {
+  it('works with the request and response headers plugin contexts', () => {
     os
-      .$context<BetterAuthContext & { auth: typeof auth }>()
+      .$context<RequestHeadersHandlerPluginContext & ResponseHeadersHandlerPluginContext & { auth: typeof auth }>()
       .use(requireSession({ auth: ({ context }) => context.auth }))
       .handler(({ context }) => {
         expectTypeOf(context.session).toEqualTypeOf<Session>()
         expectTypeOf(context.reqHeaders).toEqualTypeOf<Headers | undefined>()
         expectTypeOf(context.resHeaders).toEqualTypeOf<Headers | undefined>()
       })
+  })
+
+  it('rejects a context with incompatible reqHeaders or resHeaders', () => {
+    // @ts-expect-error reqHeaders must be Headers
+    os.$context<{ reqHeaders: string }>().use(requireSession({ auth }))
+    // @ts-expect-error resHeaders must be Headers
+    os.$context<{ resHeaders: Record<string, string> }>().use(optionalSession({ auth }))
   })
 
   it('rejects values that are not Better Auth instances', () => {
