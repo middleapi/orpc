@@ -19,13 +19,6 @@ export interface BetterAuthInstance {
 }
 
 /**
- * Session type of a Better Auth instance, `typeof auth.$Infer.Session`.
- *
- * @see {@link https://orpc.dev/docs/integrations/better-auth | Better Auth Integration}
- */
-export type InferBetterAuthSession<TAuth extends BetterAuthInstance> = TAuth['$Infer']['Session']
-
-/**
  * Options of `requireSession` and `optionalSession`.
  *
  * @see {@link https://orpc.dev/docs/integrations/better-auth | Better Auth Integration}
@@ -62,7 +55,7 @@ export function requireSession<
   TAuth extends BetterAuthInstance,
 >(
   { dedupe = true, ...options }: SessionMiddlewareOptions<TInContext, TInput, TAuth>,
-): Middleware<TInContext, { session: InferBetterAuthSession<TAuth> }, TInput, any, Record<never, never>> {
+): Middleware<TInContext, { session: TAuth['$Infer']['Session'] }, TInput, any, Record<never, never>> {
   return async function requireSession(middlewareOptions, input) {
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
@@ -87,7 +80,7 @@ export function optionalSession<
   TAuth extends BetterAuthInstance,
 >(
   { dedupe = true, ...options }: SessionMiddlewareOptions<TInContext, TInput, TAuth>,
-): Middleware<TInContext, { session: InferBetterAuthSession<TAuth> | null }, TInput, any, Record<never, never>> {
+): Middleware<TInContext, { session: TAuth['$Infer']['Session'] | null }, TInput, any, Record<never, never>> {
   return async function optionalSession(middlewareOptions, input) {
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
@@ -98,35 +91,26 @@ export function optionalSession<
 
 const SESSION_CACHE_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CACHE')
 
-interface SessionCache {
-  auth: BetterAuthInstance
-  /**
-   * Snapshot of `reqHeaders` at lookup time.
-   */
-  headers: string
-  promise: Promise<unknown>
-}
-
 interface SessionCachedHeaders extends Headers {
-  [SESSION_CACHE_SYMBOL]?: SessionCache | undefined
+  [SESSION_CACHE_SYMBOL]?: { auth: BetterAuthInstance, headers: string, promise: Promise<unknown> } | undefined
 }
 
 /**
  * Looks up the session and stores the lookup on `reqHeaders`, so other lookups of the same request can reuse it.
  * The `set-cookie` headers Better Auth returns (refreshed session, cookie cache) are appended to `resHeaders`.
  */
-function getSession<TAuth extends BetterAuthInstance>(
+async function getSession<TAuth extends BetterAuthInstance>(
   auth: TAuth,
   context: RequestHeadersHandlerPluginContext & ResponseHeadersHandlerPluginContext,
   dedupe: boolean,
-): Promise<InferBetterAuthSession<TAuth> | null> {
+): Promise<TAuth['$Infer']['Session'] | null> {
   const reqHeaders: SessionCachedHeaders | undefined = context.reqHeaders
 
   /**
    * Without request headers there is no cookie or token to read, so the request is not authenticated.
    */
   if (!reqHeaders) {
-    return Promise.resolve(null)
+    return null
   }
 
   /**
@@ -137,7 +121,7 @@ function getSession<TAuth extends BetterAuthInstance>(
   const cached = reqHeaders[SESSION_CACHE_SYMBOL]
 
   if (dedupe && cached?.auth === auth && cached.headers === headers) {
-    return cached.promise as Promise<InferBetterAuthSession<TAuth> | null>
+    return cached.promise as Promise<TAuth['$Infer']['Session'] | null>
   }
 
   const promise = auth.api.getSession({ headers: reqHeaders, returnHeaders: true }).then((result) => {
@@ -148,7 +132,7 @@ function getSession<TAuth extends BetterAuthInstance>(
     return result.response
   })
 
-  const cache: SessionCache = { auth, headers, promise }
+  const cache = { auth, headers, promise }
   reqHeaders[SESSION_CACHE_SYMBOL] = cache
 
   /**
@@ -160,5 +144,5 @@ function getSession<TAuth extends BetterAuthInstance>(
     }
   })
 
-  return promise as Promise<InferBetterAuthSession<TAuth> | null>
+  return promise as Promise<TAuth['$Infer']['Session'] | null>
 }

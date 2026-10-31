@@ -19,7 +19,7 @@ npm install @orpc/better-auth@beta better-auth
 
 ## Setup
 
-The integration requires the [Request Headers Plugin](/docs/plugins/request-headers) and the [Response Headers Plugin](/docs/plugins/response-headers). The middlewares read the request headers from `context.reqHeaders`, and append the cookies Better Auth sets while reading the session, such as a refreshed session cookie or the [cookie cache](https://better-auth.com/docs/concepts/session-management#cookie-cache), to `context.resHeaders`.
+The integration requires the [Request Headers Plugin](/docs/plugins/request-headers) and the [Response Headers Plugin](/docs/plugins/response-headers). The middlewares read the session from `context.reqHeaders` and append the cookies Better Auth sets, such as a refreshed session cookie or the [cookie cache](https://better-auth.com/docs/concepts/session-management#cookie-cache), to `context.resHeaders`.
 
 ```ts
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
@@ -73,7 +73,7 @@ const procedure = os
 
 ## Permissions
 
-To check the permissions of Better Auth's [access control](https://better-auth.com/docs/plugins/admin#access-control), wrap `requireSession` with `os.middleware` and extend it with `.use`. The extension runs after the session is resolved and sees `context.session`:
+To check the permissions of Better Auth's [access control](https://better-auth.com/docs/plugins/admin#access-control), wrap `requireSession` with `os.middleware` and extend it with `.use`, which sees `context.session`:
 
 ```ts
 import { requireSession } from '@orpc/better-auth'
@@ -109,9 +109,9 @@ Unauthenticated calls get `UNAUTHORIZED` before any permission check. `userHasPe
 
 ## Deduplication
 
-When the session middlewares run more than once for the same request, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once. The lookup is stored on `context.reqHeaders` and reused while its values stay the same, so each sub-request of a [batch](/docs/plugins/batch), which has its own `reqHeaders`, looks up the session on its own. A failed lookup is not reused.
+When the session middlewares run more than once for the same request, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once (see [Dedupe Middleware](/docs/recipes/dedupe-middleware)). The lookup is stored on `context.reqHeaders` and reused while its values stay the same. A failed lookup is not reused. Each [batch](/docs/plugins/batch) sub-request has its own `reqHeaders`, so it looks up the session on its own.
 
-Set `dedupe: false` to look up the session on every call. Use it when one `reqHeaders` lives much longer than a request, for example when you pass the headers of a [WebSocket](/docs/adapters/websocket) upgrade request as the initial context, so a sign-out or an expired session is noticed on the next call:
+Set `dedupe: false` to look up the session on every call, so a sign-out or an expired session is noticed on the next call. Use it when one `reqHeaders` outlives a request, such as the headers of a [WebSocket](/docs/adapters/websocket) upgrade request passed as the initial context:
 
 ```ts
 const procedure = base.use(requireSession({ auth, dedupe: false }))
