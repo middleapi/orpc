@@ -6,7 +6,7 @@ import type { Logger } from 'pino'
  *
  * @see {@link https://orpc.dev/docs/integrations/pino#providing-custom-logger-per-request | Pino Integration - Providing Custom Logger per Request}
  */
-export const LOGGER_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINO_LOGGER_CONTEXT')
+export const LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_PINO_LOGGER_CONTEXT')
 
 /**
  * Context shape that carries the Pino logger injected by `PinoHandlerPlugin`.

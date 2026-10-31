@@ -23,7 +23,7 @@ import { flattenStandardHeader, generateContentDisposition, getRequiredStandardB
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
 
-import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
+import { ORPC_MODULE_CONFIG_SYMBOL } from './constants'
 
 // Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
 const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined

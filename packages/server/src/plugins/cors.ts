@@ -73,7 +73,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
    * - Run CORS interceptors before batch interceptors so headers are applied to
    *  the actual response rather than sub-responses.
    */
-  after = ['~tracing', '~batch']
+  after: string[] = ['~tracing', '~batch']
 
   constructor(options: CORSHandlerPluginOptions<T> = {}) {
     const defaults: CORSHandlerPluginOptions<T> = {

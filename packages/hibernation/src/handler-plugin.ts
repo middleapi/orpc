@@ -13,7 +13,7 @@ import { HibernationAsyncIteratorClass } from '@standard-server/peer'
 export class HibernationHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   name = '~hibernation'
 
-  before = ['~batch']
+  before: string[] = ['~batch']
 
   private readonly CONTEXT_SYMBOL = Symbol('ORPC_HIBERNATION_HANDLER_PLUGIN_CONTEXT')
 

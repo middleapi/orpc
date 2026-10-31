@@ -4,7 +4,7 @@ import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAsyncIteratorObject, ORPC_NAME } from '@orpc/shared'
 import { ValidationError } from './error'
 
-const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = Symbol.for('ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS')
+const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS')
 
 export interface AsyncIteratorObjectSchemaDetails {
   yieldSchema: AnySchema

@@ -5,7 +5,7 @@ import { ORPCError } from '@orpc/server'
 import { toArray, value } from '@orpc/shared'
 import { LockTimeoutError } from './error'
 
-export const LOCK_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_LOCK_MIDDLEWARE_CONTEXT')
+export const LOCK_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_LOCK_MIDDLEWARE_CONTEXT')
 
 export interface LockMiddlewareContext {
   [LOCK_MIDDLEWARE_CONTEXT_SYMBOL]?: {

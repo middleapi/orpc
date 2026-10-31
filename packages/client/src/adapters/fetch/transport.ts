@@ -6,7 +6,7 @@ import type { StandardLinkTransport } from '../standard'
 import { once, value } from '@orpc/shared'
 import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standard-server/fetch'
 
-const GET_SUPPORTED_DUPLEX_MODE = once(() => {
+const GET_SUPPORTED_DUPLEX_MODE = /* @__PURE__ */ once(() => {
   // TODO: Try `duplex: 'full'` when it is widely supported.
   try {
     let duplex: 'half' | undefined

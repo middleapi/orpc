@@ -1,5 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import type { $input, $output } from 'zod/v4/core'
+import type { $input, $output, $ZodRegistry } from 'zod/v4/core'
 import { registry } from 'zod/v4/core'
 
 /**
@@ -21,7 +21,7 @@ import { registry } from 'zod/v4/core'
  *
  * @see {@link https://orpc.dev/docs/integrations/zod | Zod Integration}
  */
-export const JSON_SCHEMA_REGISTRY = registry<Exclude<JsonSchema<$input | $output>, boolean>>()
+export const JSON_SCHEMA_REGISTRY: $ZodRegistry<Exclude<JsonSchema<$input | $output>, boolean>> = /* @__PURE__ */ registry()
 
 /**
  * Zod registry for customizing generated JSON schema, only useful for .input
@@ -42,7 +42,7 @@ export const JSON_SCHEMA_REGISTRY = registry<Exclude<JsonSchema<$input | $output
  *
  * @see {@link https://orpc.dev/docs/integrations/zod | Zod Integration}
  */
-export const JSON_SCHEMA_INPUT_REGISTRY = registry<Exclude<JsonSchema<$input>, boolean>>()
+export const JSON_SCHEMA_INPUT_REGISTRY: $ZodRegistry<Exclude<JsonSchema<$input>, boolean>> = /* @__PURE__ */ registry()
 
 /**
  * Zod registry for customizing generated JSON schema, only useful for .output
@@ -63,4 +63,4 @@ export const JSON_SCHEMA_INPUT_REGISTRY = registry<Exclude<JsonSchema<$input>, b
  *
  * @see {@link https://orpc.dev/docs/integrations/zod | Zod Integration}
  */
-export const JSON_SCHEMA_OUTPUT_REGISTRY = registry<Exclude<JsonSchema<$output>, boolean>>()
+export const JSON_SCHEMA_OUTPUT_REGISTRY: $ZodRegistry<Exclude<JsonSchema<$output>, boolean>> = /* @__PURE__ */ registry()

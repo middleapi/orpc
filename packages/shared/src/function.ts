@@ -1,6 +1,6 @@
 export type AnyFunction = (...args: any[]) => any
 
-const AsyncGeneratorFunction = Object.getPrototypeOf(async function* () {}).constructor
+const AsyncGeneratorFunction = /* @__PURE__ */ (() => Object.getPrototypeOf(async function* () {}).constructor)()
 
 /**
  * Checks whether a value is an async generator function (`async function*`).

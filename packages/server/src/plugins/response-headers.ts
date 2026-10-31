@@ -27,7 +27,7 @@ export class ResponseHeadersHandlerPlugin<T extends ResponseHeadersHandlerPlugin
   /**
    * Interceptors should run after batch interceptors so headers are applied to each sub-response.
    */
-  before = ['~batch']
+  before: string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     return {

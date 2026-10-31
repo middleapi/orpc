@@ -60,7 +60,7 @@ export interface MetaPlugin<
  */
 export type AnyMetaPlugin = MetaPlugin<any, any, any>
 
-const HIDDEN_META_PLUGINS_SYMBOL = Symbol.for('ORPC_HIDDEN_META_PLUGINS')
+const HIDDEN_META_PLUGINS_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_META_PLUGINS')
 
 export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | undefined {
   if (!isTypescriptObject(container)) {
@@ -70,6 +70,6 @@ export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | unde
   return container[HIDDEN_META_PLUGINS_SYMBOL] as AnyMetaPlugin[] | undefined
 }
 
-export function setHiddenMetaPlugins<T extends object>(container: T, metaPlugins: AnyMetaPlugin[]) {
+export function setHiddenMetaPlugins<T extends object>(container: T, metaPlugins: AnyMetaPlugin[]): void {
   (container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
 }
