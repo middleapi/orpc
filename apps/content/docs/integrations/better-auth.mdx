@@ -9,7 +9,7 @@ sidebar:
 This guide assumes familiarity with [Better Auth](https://better-auth.com/). Review the official documentation if needed.
 :::
 
-The integration provides middlewares that resolve the Better Auth session and add it to the context, typed from your auth instance.
+Resolve the Better Auth session in middleware, typed from your auth instance.
 
 ## Installation
 
@@ -19,7 +19,7 @@ npm install @orpc/better-auth@beta better-auth
 
 ## Setup
 
-The integration requires the [Request Headers Plugin](/docs/plugins/request-headers) and the [Response Headers Plugin](/docs/plugins/response-headers). The middlewares read the session from `context.reqHeaders` and append the cookies Better Auth sets, such as a refreshed session cookie or the [cookie cache](https://better-auth.com/docs/concepts/session-management#cookie-cache), to `context.resHeaders`.
+Add the [Request Headers Plugin](/docs/plugins/request-headers) and the [Response Headers Plugin](/docs/plugins/response-headers). The middlewares read the session from `reqHeaders` and forward Better Auth's cookies to `resHeaders`.
 
 ```ts
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
@@ -44,7 +44,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Protected Procedures
 
-`requireSession` adds the session to the context, or throws an `UNAUTHORIZED` error when the request has none. `optionalSession` adds the session, or `null`:
+`requireSession` throws `UNAUTHORIZED` without a session. `optionalSession` gives `null`:
 
 ```ts
 import { optionalSession, requireSession } from '@orpc/better-auth'
@@ -61,9 +61,7 @@ const router = {
 }
 ```
 
-`context.session` is `typeof auth.$Infer.Session`, so fields added by plugins or `additionalFields` are typed too. Only a missing session becomes `UNAUTHORIZED`; other errors from `getSession` propagate to oRPC's [error handling](/docs/error-handling).
-
-`auth` also accepts a function, sync or async, that receives the middleware options and input. Use it when the instance lives in the context:
+`auth` can also be a function that returns the instance:
 
 ```ts
 const procedure = os
@@ -73,7 +71,7 @@ const procedure = os
 
 ## Permissions
 
-To check the permissions of Better Auth's [access control](https://better-auth.com/docs/plugins/admin#access-control), wrap `requireSession` with `os.middleware` and extend it with `.use`, which sees `context.session`:
+Extend `requireSession` with `.use` to check [access control](https://better-auth.com/docs/plugins/admin#access-control) permissions:
 
 ```ts
 import { requireSession } from '@orpc/better-auth'
@@ -105,13 +103,11 @@ const router = {
 }
 ```
 
-Unauthenticated calls get `UNAUTHORIZED` before any permission check. `userHasPermission` comes from the [admin plugin](https://better-auth.com/docs/plugins/admin). With the [organization plugin](https://better-auth.com/docs/plugins/organization), call `auth.api.hasPermission({ headers: context.reqHeaders, body: { permissions } })` instead, which checks the member's role in the active organization. Create the middleware with `base.middleware` instead of `os.middleware` so `context.reqHeaders` is typed.
+For the [organization plugin](https://better-auth.com/docs/plugins/organization), call `auth.api.hasPermission({ headers: context.reqHeaders, body: { permissions } })` in a `base.middleware`.
 
 ## Deduplication
 
-When the session middlewares run more than once for the same request, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once (see [Dedupe Middleware](/docs/recipes/dedupe-middleware)). The lookup is stored on `context.reqHeaders` and reused while its values stay the same. A failed lookup is not reused. Each [batch](/docs/plugins/batch) sub-request has its own `reqHeaders`, so it looks up the session on its own.
-
-Set `dedupe: false` to look up the session on every call, so a sign-out or an expired session is noticed on the next call. Use it when one `reqHeaders` outlives a request, such as the headers of a [WebSocket](/docs/adapters/websocket) upgrade request passed as the initial context:
+The session is looked up once per request, even when the middlewares run more than once (see [Dedupe Middleware](/docs/recipes/dedupe-middleware)). Set `dedupe: false` to look it up on every call, for example when one `reqHeaders` serves a long-lived [WebSocket](/docs/adapters/websocket) connection:
 
 ```ts
 const procedure = base.use(requireSession({ auth, dedupe: false }))
@@ -119,7 +115,7 @@ const procedure = base.use(requireSession({ auth, dedupe: false }))
 
 ## Server-Side Calls
 
-In [server-side calls](/docs/client/server-side), pass the incoming request headers as `reqHeaders`. Pass `resHeaders` too if you want to forward the cookies Better Auth sets:
+In [server-side calls](/docs/client/server-side), pass the request headers as `reqHeaders`, and optionally `resHeaders` to receive Better Auth's cookies:
 
 ```ts
 import { call } from '@orpc/server'
@@ -130,8 +126,6 @@ const user = await call(router.me, undefined, {
   context: { reqHeaders: request.headers, resHeaders },
 })
 ```
-
-Without `reqHeaders`, the request is treated as signed out.
 
 ## Learn More
 
