@@ -71,9 +71,15 @@ const procedure = os
   .use(requireSession({ auth: ({ context }) => context.auth }))
 ```
 
-## Session Caching
+## Deduplication
 
-Middlewares that run together, such as `optionalSession` and `requireSession` on the same procedure, share one `getSession` call. The lookup is cached on `context.reqHeaders` and reused for only 10 milliseconds after it finishes, so a long-lived `reqHeaders` never serves a stale session. Each sub-request of a [batch](/docs/plugins/batch) has its own `reqHeaders`, so it looks up the session on its own.
+When the session middlewares run more than once for the same request, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once. The lookup is stored on `context.reqHeaders`, so each sub-request of a [batch](/docs/plugins/batch), which has its own `reqHeaders`, looks up the session on its own.
+
+To always look up a fresh session, for example in a long-running [async iterator](/docs/async-iterator-object), set `dedupe: false`:
+
+```ts
+const procedure = base.use(requireSession({ auth, dedupe: false }))
+```
 
 ## Server-Side Calls
 

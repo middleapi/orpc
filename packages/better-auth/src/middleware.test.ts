@@ -85,10 +85,6 @@ describe('optionalSession', () => {
 })
 
 describe('session lookup', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('resolves auth from a function receiving middleware options and input', async () => {
     const auth = createAuth()
     const authFn = vi.fn(async () => auth)
@@ -151,19 +147,27 @@ describe('session lookup', () => {
     expect(resHeaders.getSetCookie()).toEqual(['a=1', 'b=1'])
   })
 
-  it('reuses a finished lookup for 10ms only', async () => {
-    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+  it('reuses the lookup for the whole request', async () => {
     const auth = createAuth()
     const reqHeaders = new Headers({ cookie: 'session=abc' })
     const procedure = os.use(requireSession({ auth })).handler(() => 'ok')
 
     await call(procedure, undefined, { context: { reqHeaders } })
-    now.mockReturnValue(1009)
+    await new Promise(resolve => setTimeout(resolve, 20))
     await call(procedure, undefined, { context: { reqHeaders } })
 
     expect(auth.api.getSession).toHaveBeenCalledTimes(1)
+  })
 
-    now.mockReturnValue(1010)
+  it('looks up again with dedupe: false', async () => {
+    const auth = createAuth()
+    const reqHeaders = new Headers({ cookie: 'session=abc' })
+    const procedure = os
+      .use(optionalSession({ auth }))
+      .use(requireSession({ auth, dedupe: false }))
+      .use(requireSession({ auth }))
+      .handler(() => 'ok')
+
     await call(procedure, undefined, { context: { reqHeaders } })
 
     expect(auth.api.getSession).toHaveBeenCalledTimes(2)
