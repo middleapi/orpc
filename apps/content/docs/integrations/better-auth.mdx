@@ -107,11 +107,7 @@ For the [organization plugin](https://better-auth.com/docs/plugins/organization)
 
 ## Deduplication
 
-The session is looked up once per request, even when the middlewares run more than once (see [Dedupe Middleware](/docs/recipes/dedupe-middleware)). Set `dedupe: false` to look it up on every call, for example when one `reqHeaders` serves a long-lived [WebSocket](/docs/adapters/websocket) connection:
-
-```ts
-const procedure = base.use(requireSession({ auth, dedupe: false }))
-```
+When the session middlewares run more than once in a call, such as chained middlewares or a procedure that [calls](/docs/client/server-side) another one with the same context, the session is looked up only once. This follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable it, set `dedupe: false`.
 
 ## Server-Side Calls
 

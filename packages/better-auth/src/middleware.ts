@@ -2,7 +2,7 @@ import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { Promisable, Value } from '@orpc/shared'
 import { ORPCError } from '@orpc/server'
-import { stringifyJSON, value } from '@orpc/shared'
+import { value } from '@orpc/shared'
 
 /**
  * The part of a Better Auth instance (the return value of `betterAuth()`) the session middlewares use.
@@ -16,6 +16,15 @@ export interface BetterAuthInstance {
   $Infer: {
     Session: unknown
   }
+}
+
+const SESSION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CONTEXT')
+
+interface SessionContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {
+  /**
+   * The session an earlier session middleware of this call looked up, for deduplication.
+   */
+  [SESSION_CONTEXT_SYMBOL]?: { auth: BetterAuthInstance, session: unknown } | undefined
 }
 
 /**
@@ -34,9 +43,10 @@ export interface SessionMiddlewareOptions<
   auth: Value<Promisable<TAuth>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * If the session middlewares run more than once for the same request,
-   * such as chained middlewares or a procedure that calls another one with the same context,
-   * this option reuses the last session lookup while the request headers and auth instance stay the same.
+   * If the session middlewares are used multiple times
+   * or you invoke a procedure inside another procedure (shared the same context) that also has
+   * session middlewares **with the same auth instance**, this option
+   * will ensure that the session is only looked up once per call.
    *
    * @default true
    */
@@ -64,7 +74,8 @@ export function requireSession<
       throw new ORPCError('UNAUTHORIZED')
     }
 
-    return middlewareOptions.next({ context: { session } })
+    const context = { session, [SESSION_CONTEXT_SYMBOL]: { auth, session } }
+    return middlewareOptions.next({ context })
   }
 }
 
@@ -85,64 +96,38 @@ export function optionalSession<
     const auth = await value(options.auth, middlewareOptions, input)
     const session = await getSession(auth, middlewareOptions.context, dedupe)
 
-    return middlewareOptions.next({ context: { session } })
+    const context = { session, [SESSION_CONTEXT_SYMBOL]: { auth, session } }
+    return middlewareOptions.next({ context })
   }
 }
 
-const SESSION_CACHE_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_BETTER_AUTH_SESSION_CACHE')
-
-interface SessionCachedHeaders extends Headers {
-  [SESSION_CACHE_SYMBOL]?: { auth: BetterAuthInstance, headers: string, promise: Promise<unknown> } | undefined
-}
-
 /**
- * Looks up the session and stores the lookup on `reqHeaders`, so other lookups of the same request can reuse it.
+ * Looks up the session, or reuses the one an earlier session middleware of this call looked up.
  * The `set-cookie` headers Better Auth returns (refreshed session, cookie cache) are appended to `resHeaders`.
  */
 async function getSession<TAuth extends BetterAuthInstance>(
   auth: TAuth,
-  context: RequestHeadersHandlerPluginContext & ResponseHeadersHandlerPluginContext,
+  context: SessionContext,
   dedupe: boolean,
 ): Promise<TAuth['$Infer']['Session'] | null> {
-  const reqHeaders: SessionCachedHeaders | undefined = context.reqHeaders
+  const previous = context[SESSION_CONTEXT_SYMBOL]
+
+  if (dedupe && previous?.auth === auth) {
+    return previous.session
+  }
 
   /**
    * Without request headers there is no cookie or token to read, so the request is not authenticated.
    */
-  if (!reqHeaders) {
+  if (!context.reqHeaders) {
     return null
   }
 
-  /**
-   * Better Auth reads the session from headers such as `cookie`, `authorization`, or an API key header,
-   * so a lookup is only reused while the headers are unchanged.
-   */
-  const headers = stringifyJSON([...reqHeaders])
-  const cached = reqHeaders[SESSION_CACHE_SYMBOL]
+  const { headers, response } = await auth.api.getSession({ headers: context.reqHeaders, returnHeaders: true })
 
-  if (dedupe && cached?.auth === auth && cached.headers === headers) {
-    return cached.promise as Promise<TAuth['$Infer']['Session'] | null>
+  for (const cookie of headers.getSetCookie()) {
+    context.resHeaders?.append('set-cookie', cookie)
   }
 
-  const promise = auth.api.getSession({ headers: reqHeaders, returnHeaders: true }).then((result) => {
-    for (const cookie of result.headers.getSetCookie()) {
-      context.resHeaders?.append('set-cookie', cookie)
-    }
-
-    return result.response
-  })
-
-  const cache = { auth, headers, promise }
-  reqHeaders[SESSION_CACHE_SYMBOL] = cache
-
-  /**
-   * A failed lookup is not reused, so a later middleware can try again.
-   */
-  promise.catch(() => {
-    if (reqHeaders[SESSION_CACHE_SYMBOL] === cache) {
-      reqHeaders[SESSION_CACHE_SYMBOL] = undefined
-    }
-  })
-
-  return promise as Promise<TAuth['$Infer']['Session'] | null>
+  return response
 }

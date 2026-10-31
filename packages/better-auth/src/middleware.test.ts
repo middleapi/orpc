@@ -101,16 +101,13 @@ describe('session lookup', () => {
     expect(await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })).toEqual(session)
   })
 
-  it('does not reuse a failed lookup', async () => {
+  it('lets errors from getSession propagate', async () => {
     const auth = createAuth()
     const error = new Error('database is down')
     auth.api.getSession.mockRejectedValueOnce(error)
-    const reqHeaders = new Headers({ cookie: 'session=abc' })
-    const procedure = os.use(requireSession({ auth })).handler(({ context }) => context.session)
+    const procedure = os.use(requireSession({ auth })).handler(() => 'ok')
 
-    await expect(call(procedure, undefined, { context: { reqHeaders } })).rejects.toBe(error)
-    expect(await call(procedure, undefined, { context: { reqHeaders } })).toEqual(session)
-    expect(auth.api.getSession).toHaveBeenCalledTimes(2)
+    await expect(call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })).rejects.toBe(error)
   })
 
   it('appends set-cookie headers to resHeaders', async () => {
@@ -123,22 +120,37 @@ describe('session lookup', () => {
     expect(resHeaders.getSetCookie()).toEqual(['session=refreshed', 'session_data=cached'])
   })
 
-  it('shares one lookup between concurrent calls and chained middlewares', async () => {
+  it('looks up the session once for chained middlewares', async () => {
     const auth = createAuth(['session=refreshed'])
-    const reqHeaders = new Headers({ cookie: 'session=abc' })
     const resHeaders = new Headers()
     const procedure = os
       .use(optionalSession({ auth }))
       .use(requireSession({ auth }))
       .handler(({ context }) => context.session)
 
-    await Promise.all([
-      call(procedure, undefined, { context: { reqHeaders, resHeaders } }),
-      call(procedure, undefined, { context: { reqHeaders, resHeaders } }),
-    ])
-
+    expect(await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }), resHeaders } })).toEqual(session)
     expect(auth.api.getSession).toHaveBeenCalledTimes(1)
     expect(resHeaders.getSetCookie()).toEqual(['session=refreshed'])
+  })
+
+  it('reuses a missing session, so requireSession after optionalSession throws without a new lookup', async () => {
+    const auth = createAuth()
+    const procedure = os
+      .use(optionalSession({ auth }))
+      .use(requireSession({ auth }))
+      .handler(() => 'ok')
+
+    await expect(call(procedure, undefined, { context: { reqHeaders: new Headers() } })).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
+    expect(auth.api.getSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('looks up the session once for a procedure called inside another with the same context', async () => {
+    const auth = createAuth()
+    const inner = os.use(requireSession({ auth })).handler(({ context }) => context.session)
+    const outer = os.use(requireSession({ auth })).handler(({ context }) => call(inner, undefined, { context }))
+
+    expect(await call(outer, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })).toEqual(session)
+    expect(auth.api.getSession).toHaveBeenCalledTimes(1)
   })
 
   it('looks up again for a different auth instance', async () => {
@@ -157,42 +169,26 @@ describe('session lookup', () => {
     expect(resHeaders.getSetCookie()).toEqual(['a=1', 'b=1'])
   })
 
-  it('looks up again when the headers change', async () => {
-    const auth = createAuth()
-    const reqHeaders = new Headers({ cookie: 'session=abc' })
-    const procedure = os.use(optionalSession({ auth })).handler(({ context }) => context.session)
-
-    expect(await call(procedure, undefined, { context: { reqHeaders } })).toEqual(session)
-
-    reqHeaders.delete('cookie')
-    expect(await call(procedure, undefined, { context: { reqHeaders } })).toBeNull()
-
-    reqHeaders.set('authorization', 'Bearer token')
-    await call(procedure, undefined, { context: { reqHeaders } })
-
-    expect(auth.api.getSession).toHaveBeenCalledTimes(3)
-  })
-
   it('looks up again with dedupe: false', async () => {
     const auth = createAuth()
-    const reqHeaders = new Headers({ cookie: 'session=abc' })
     const procedure = os
       .use(optionalSession({ auth }))
       .use(requireSession({ auth, dedupe: false }))
       .use(requireSession({ auth }))
       .handler(() => 'ok')
 
-    await call(procedure, undefined, { context: { reqHeaders } })
+    await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })
 
     expect(auth.api.getSession).toHaveBeenCalledTimes(2)
   })
 
-  it('looks up again for new reqHeaders', async () => {
+  it('looks up again for each call, even with the same reqHeaders', async () => {
     const auth = createAuth()
+    const reqHeaders = new Headers({ cookie: 'session=abc' })
     const procedure = os.use(requireSession({ auth })).handler(() => 'ok')
 
-    await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })
-    await call(procedure, undefined, { context: { reqHeaders: new Headers({ cookie: 'session=abc' }) } })
+    await call(procedure, undefined, { context: { reqHeaders } })
+    await call(procedure, undefined, { context: { reqHeaders } })
 
     expect(auth.api.getSession).toHaveBeenCalledTimes(2)
   })
