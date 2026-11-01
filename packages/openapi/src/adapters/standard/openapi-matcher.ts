@@ -23,7 +23,7 @@ interface TreeEntry {
 }
 
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
-  matcher: ReturnType<typeof createPrefixMatcher>
+  matcher?: ReturnType<typeof createPrefixMatcher> | undefined
   /**
    * in-flight load, shared so concurrent matches never load or re-index the same router twice.
    * Keeps its rejection when indexing fails, which would fail the same way on every attempt.
@@ -63,10 +63,11 @@ export class OpenAPIMatcher {
     }, path)
 
     for (const result of lazyResults) {
+      const prefix = getOpenAPIMeta(result.router)?.prefix
+
       this.pendingLazyRouters.add({
         ...result,
-        // a prefix of "/" matches every pathname
-        matcher: createPrefixMatcher(getOpenAPIMeta(result.router)?.prefix ?? '/'),
+        matcher: prefix ? createPrefixMatcher(prefix) : undefined,
       })
     }
   }
@@ -120,7 +121,7 @@ export class OpenAPIMatcher {
 
   private resolvePendingLazyRouters(pathname: `/${string}`): Promise<void> | void {
     for (const pending of this.pendingLazyRouters) {
-      if (pending.matcher(pathname)) {
+      if (pending.matcher === undefined || pending.matcher(pathname)) {
         return this.loadPendingLazyRouters(pathname)
       }
     }
@@ -128,7 +129,7 @@ export class OpenAPIMatcher {
 
   private async loadPendingLazyRouters(pathname: `/${string}`): Promise<void> {
     for (const pending of this.pendingLazyRouters) {
-      if (pending.matcher(pathname)) {
+      if (pending.matcher === undefined || pending.matcher(pathname)) {
         await this.loadPendingLazyRouter(pending)
       }
     }
