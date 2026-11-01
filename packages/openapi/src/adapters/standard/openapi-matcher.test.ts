@@ -533,21 +533,19 @@ describe('openAPIMatcher', () => {
       expect(catchAllLoader).toHaveBeenCalledTimes(1)
     })
 
-    it('keeps rejecting a lazy router with an invalid path without loading or indexing it again', async () => {
+    it('retries a lazy router whose indexing fails on every match', async () => {
       const valid = os.meta(openapi({ method: 'GET', path: '/valid' })).handler(() => 'valid')
       const invalid = os.meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' })).handler(() => 'invalid')
 
       const loader = vi.fn(async () => ({ default: { valid, invalid } }))
-      const filter = vi.fn(() => true)
 
-      const matcher = new OpenAPIMatcher({ lazy: os.lazy(loader) }, { filter })
+      const matcher = new OpenAPIMatcher({ lazy: os.lazy(loader) })
 
       for (let i = 0; i < 3; i++) {
         await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
       }
 
-      expect(loader).toHaveBeenCalledTimes(1)
-      expect(filter).toHaveBeenCalledTimes(2)
+      expect(loader).toHaveBeenCalledTimes(3)
     })
 
     it('retries a lazy router whose load fails, synchronously or asynchronously', async () => {

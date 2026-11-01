@@ -133,21 +133,24 @@ export class OpenAPIMatcher {
   }
 
   private loadPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
-    pending.loading ??= unlazy(pending.router).then(
-      ({ default: router }) => {
-        this.index(router, pending.path)
-
-        // removed only once indexed, so a concurrent match never observes this router as
-        // neither pending nor indexed
-        this.pendingLazyRouters.delete(pending)
-      },
-      (error) => {
+    if (pending.loading === undefined) {
+      pending.loading = this.indexPendingLazyRouter(pending).catch((error) => {
         pending.loading = undefined
         throw error
-      },
-    )
+      })
+    }
 
     return pending.loading
+  }
+
+  private async indexPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
+    const { default: router } = await unlazy(pending.router)
+
+    this.index(router, pending.path)
+
+    // removed only once indexed, so a concurrent match never observes this router as
+    // neither pending nor indexed
+    this.pendingLazyRouters.delete(pending)
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
