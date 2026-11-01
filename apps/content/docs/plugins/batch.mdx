@@ -88,7 +88,7 @@ const link = new RPCLink({
 
 By default, the plugin uses `buffered` mode. The server starts the batch response once every procedure has responded, so it can carry their [headers](#response-headers). The response streams if one of them returned an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). If your client cannot read streamed responses, keep these procedures out of the batch with [`filter`](#filtering-requests).
 
-In `buffered` mode, one slow procedure holds back the rest of the batch. Switch to `streaming` mode to have the server start the response right away and send each response as soon as it is ready:
+In `buffered` mode, one slow procedure holds back the rest of the batch. Switch to `streaming` mode to have the server start the response as soon as the first procedure responds, then send each other response as soon as it is ready:
 
 ```ts
 const link = new RPCLink({
@@ -108,7 +108,7 @@ const link = new RPCLink({
 ```
 
 :::warning
-A `streaming` batch response starts before any procedure responds, so it carries none of their headers. Each procedure's headers still reach the client on its own response, except the cookies it sets, which are lost: the server strips them from that response, since only the batch response's cookies take effect. Send procedures that set cookies outside the batch with [`filter`](#filtering-requests).
+A `streaming` batch response starts before the other procedures respond, so it carries only the cookies of the first one. Each procedure's other headers still reach the client on its own response, but the cookies the others set are lost: the server strips them from that response, since only the batch response's cookies take effect. Cookies every procedure sets alike, such as a session refreshed in middleware, still arrive. Send procedures that set their own cookies, such as a login, outside the batch with [`filter`](#filtering-requests).
 
 Every `streaming` batch response streams, so make sure your client, and anything between it and the server, such as a proxy, supports streamed responses.
 :::
@@ -276,7 +276,7 @@ Per-request data passed through the link's [`headers` option](/docs/rpc/link#url
 
 In `buffered` mode, the batch response carries the cookies and `Vary` fields of its subresponses, and the headers they all share. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.
 
-In `streaming` mode, every header stays on its subresponse and cookies are lost, as described in [Response Modes](#response-modes).
+In `streaming` mode, the batch response carries only the cookies of the first subresponse, and every other header stays on its subresponse, as described in [Response Modes](#response-modes).
 
 ## Learn More
 

@@ -21,8 +21,9 @@ export interface ResponseHeadersHandlerPluginContext {
  * It injects a resHeaders instance into the context, enabling you to modify response headers easily.
  *
  * @remarks
- * **Warning**: A batch in `streaming` mode starts its response before any procedure in it responds, so the headers
- * set here stay on the procedure's own sub-response, and its cookies are lost.
+ * **Warning**: A batch in `streaming` mode starts its response once its first procedure responds, so only that
+ * procedure's cookies reach the batch response. The headers set here otherwise stay on each procedure's own
+ * sub-response, and the cookies of the other procedures are lost.
  *
  * @see {@link https://orpc.dev/docs/plugins/response-headers | Response Headers Plugin}
  */

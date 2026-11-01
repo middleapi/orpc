@@ -92,9 +92,9 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * - `buffered`: the server starts the response once every subrequest has responded, so it carries their
    *   cookies and shared headers. It streams only when a procedure returns a stream.
-   * - `streaming`: the server starts the response right away and sends each response as soon as it is ready,
-   *   so a slow procedure does not hold back the rest. The batch response carries none of their headers,
-   *   and the cookies they set are lost.
+   * - `streaming`: the server starts the response once the first subrequest has responded, then sends each
+   *   response as soon as it is ready, so a slow procedure does not hold back the rest. The batch response
+   *   carries only the cookies of that first response: the cookies the others set are lost.
    *
    * @default 'buffered'
    * @see {@link https://orpc.dev/docs/plugins/batch#response-modes | Batch Plugin - Response Modes}

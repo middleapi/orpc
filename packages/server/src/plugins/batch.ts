@@ -72,6 +72,28 @@ interface SubresponseHead {
 }
 
 /**
+ * Resolves with the first subresponse head, or with `undefined` once every subresponse turns out to have none.
+ */
+function firstSubresponseHead(heads: Promise<SubresponseHead | undefined>[]): Promise<SubresponseHead | undefined> {
+  return new Promise((resolve) => {
+    for (const promise of heads) {
+      void promise.then(head => head && resolve(head))
+    }
+
+    void Promise.all(heads).then(() => resolve(undefined))
+  })
+}
+
+/**
+ * Sets the distinct cookies of every source on the headers.
+ */
+function liftCookies(headers: StandardHeaders, sources: StandardHeaders[]): StandardHeaders {
+  const cookies = new Set(sources.flatMap(source => toArray(source['set-cookie'])))
+
+  return cookies.size > 0 ? { ...headers, 'set-cookie': [...cookies] } : headers
+}
+
+/**
  * Builds the batch response headers: the headers the subresponses all have with the same value, as
  * the client does with the headers every subrequest shares, then the batch headers, which win, and
  * the distinct cookies and `vary` fields of both. A cache must vary on whatever any subresponse varies on.
@@ -95,13 +117,7 @@ function liftSubresponseHeaders(
     }
   }
 
-  const headers: StandardHeaders = { ...shared, ...batchHeaders }
-  const cookies = new Set([batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other['set-cookie'])))
-
-  if (cookies.size > 0) {
-    headers['set-cookie'] = [...cookies]
-  }
-
+  const headers = liftCookies({ ...shared, ...batchHeaders }, [batchHeaders, ...subresponseHeaders])
   const varies = new Map<string, string>()
 
   for (const value of [batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other.vary))) {
@@ -163,6 +179,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * Success batch response headers.
    *
    * In `buffered` mode, the batch response also gets the cookies its sub-responses set, and the headers they all share.
+   * In `streaming` mode, it gets only the cookies of the first sub-response to be ready.
    * Headers set here win, and setting one to `undefined` keeps it off, except `set-cookie` and `vary`, which merge.
    *
    * @default {}
@@ -201,7 +218,8 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * The client Batch Link Plugin picks the response mode of each batch. In `buffered` mode, the default, the batch
  * starts the response once every sub-response is ready, so it carries the cookies sub-requests set and the headers
  * every sub-response shares. It streams when a sub-response is a stream. In `streaming` mode, the batch starts
- * the response right away and streams each sub-response as soon as it is ready, without lifting their headers.
+ * the response once the first sub-response is ready, carrying only its cookies, then streams each of the others
+ * as soon as it is ready.
  *
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
@@ -349,11 +367,14 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       /**
        * In buffered mode, every subresponse waits here until all of them are ready, so the batch response carries their headers.
-       * In streaming mode, the batch response streams before any of them is ready, so it carries none of their headers.
+       * In streaming mode, they wait only for the first one, so the batch response streams with just that one's cookies.
        */
       const ready = messages.map(() => promiseWithResolvers<SubresponseHead | undefined>())
       const lifting = mode === 'streaming'
-        ? Promise.resolve({ batchHeaders: headers, streams: true })
+        ? firstSubresponseHead(ready.map(({ promise }) => promise)).then(head => ({
+            batchHeaders: liftCookies(headers, [headers, ...(head ? [head.headers] : [])]),
+            streams: true,
+          }))
         : Promise.all(ready.map(({ promise }) => promise)).then((all) => {
             const heads = all.filter(head => head !== undefined)
 
