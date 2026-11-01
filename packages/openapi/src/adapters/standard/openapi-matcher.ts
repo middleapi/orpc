@@ -6,7 +6,6 @@ import { Procedure, resolveContractProcedure, unlazy, walkProcedureContractsSync
 import { mergeHttpPath, pathToHttpPath, value } from '@orpc/shared'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
-import { getDynamicPathParams } from '../../utils'
 
 export interface OpenAPIMatcherOptions {
   /**
@@ -24,7 +23,7 @@ interface TreeEntry {
 }
 
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
-  matcher?: ReturnType<typeof createPrefixMatcher> | undefined
+  matcher: ReturnType<typeof createPrefixMatcher>
   /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
   loading?: Promise<void> | undefined
 }
@@ -43,6 +42,9 @@ export class OpenAPIMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
+    // Router.add throws for an invalid path before adding it, so adding every route to a throwaway
+    // router first indexes none of this router's routes when any of its paths is invalid
+    const staging = new Router<TreeEntry>()
     const routes: { method: string, httpPath: `/${string}`, entry: TreeEntry }[] = []
 
     const lazyResults = walkProcedureContractsSync(router, (contract, path) => {
@@ -55,35 +57,26 @@ export class OpenAPIMatcher {
       const postHttpPath = meta?.path ?? pathToHttpPath(path)
       const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
 
-      assertSingleCatchAll(httpPath)
+      const entry: TreeEntry = {
+        path,
+        contract,
+        procedure: contract instanceof Procedure ? contract : undefined,
+      }
 
-      routes.push({
-        method,
-        httpPath,
-        entry: {
-          path,
-          contract,
-          procedure: contract instanceof Procedure ? contract : undefined,
-        },
-      })
+      staging.add(method, httpPath, entry)
+      routes.push({ method, httpPath, entry })
     }, path)
 
-    const pendingLazyRouters = lazyResults.map((result): PendingLazyRouter => {
-      const prefix = getOpenAPIMeta(result.router)?.prefix
-
-      return {
-        ...result,
-        matcher: prefix ? createPrefixMatcher(prefix) : undefined,
-      }
-    })
-
-    // added only once every path is known to be valid, so an invalid one indexes none of the router's routes
     for (const { method, httpPath, entry } of routes) {
       this.tree.add(method, httpPath, entry)
     }
 
-    for (const pending of pendingLazyRouters) {
-      this.pendingLazyRouters.add(pending)
+    for (const result of lazyResults) {
+      this.pendingLazyRouters.add({
+        ...result,
+        // a prefix of "/" matches every pathname
+        matcher: createPrefixMatcher(getOpenAPIMeta(result.router)?.prefix ?? '/'),
+      })
     }
   }
 
@@ -92,11 +85,6 @@ export class OpenAPIMatcher {
     pathname: `/${string}`,
     prefix: `/${string}` | undefined,
   ): Promise<{ path: string[], procedure: AnyProcedure, params?: Record<string, string> | undefined } | undefined> {
-    // the router ignores one trailing slash, in routes and requests
-    // if (pathname.length > 1 && pathname.endsWith('/')) {
-    //   pathname = pathname.slice(0, -1) as `/${string}`
-    // }
-
     if (prefix) {
       if (!pathname.startsWith(prefix)) {
         return undefined
@@ -117,9 +105,6 @@ export class OpenAPIMatcher {
         return undefined
       }
     }
-
-    // The router and prefix matchers compare path text however the route or the request
-    // percent-encodes it ("a%62c" vs "abc", "a^b" vs "a%5Eb"), so the pathname is passed as is.
 
     // most requests `await undefined` so conditionally await it to save a microtask turn
     const loading = this.resolvePendingLazyRouters(pathname)
@@ -144,7 +129,7 @@ export class OpenAPIMatcher {
 
   private resolvePendingLazyRouters(pathname: `/${string}`): Promise<void> | void {
     for (const pending of this.pendingLazyRouters) {
-      if (pending.matcher === undefined || pending.matcher(pathname)) {
+      if (pending.matcher(pathname)) {
         return this.loadPendingLazyRouters(pathname)
       }
     }
@@ -152,7 +137,7 @@ export class OpenAPIMatcher {
 
   private async loadPendingLazyRouters(pathname: `/${string}`): Promise<void> {
     for (const pending of this.pendingLazyRouters) {
-      if (pending.matcher === undefined || pending.matcher(pathname)) {
+      if (pending.matcher(pathname)) {
         await this.loadPendingLazyRouter(pending)
       }
     }
@@ -183,21 +168,5 @@ export class OpenAPIMatcher {
     entry.procedure = await resolveContractProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
-  }
-}
-
-/**
- * Throws the router's own error for a path with more than one catch-all param, before any
- * route is added, which the router alone can only do for one path at a time.
- */
-function assertSingleCatchAll(path: `/${string}`): void {
-  const first = path.indexOf('{+')
-
-  if (
-    first !== -1
-    && path.includes('{+', first + 2)
-    && (getDynamicPathParams(path)?.filter(param => param.allowsSlash).length ?? 0) > 1
-  ) {
-    throw new TypeError(`OpenAPI path "${path}" has more than one catch-all param ({+name}), but only one is supported per path.`)
   }
 }

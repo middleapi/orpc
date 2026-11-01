@@ -269,7 +269,7 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/v1beta/items:batchGet/a^b', undefined)).resolves.toBeUndefined()
     })
 
-    it('prefers a static route over a dynamic sibling when the request path needs normalization', async () => {
+    it('prefers a static route over a dynamic sibling however the request path is percent-encoded', async () => {
       const beta = os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta')
       const version = os.meta(openapi({ method: 'GET', path: '/{version}/items' })).handler(() => 'version')
       const me = os.meta(openapi({ method: 'GET', path: '/users/me' })).handler(() => 'me')
@@ -277,7 +277,6 @@ describe('openAPIMatcher', () => {
 
       const matcher = new OpenAPIMatcher({ beta, version, me, byId })
 
-      // a char the route holds raw, which `fetch` sends raw too
       for (const pathname of ['/v1^beta/items', '/v1%5Ebeta/items', '/v1%5ebeta/items'] as const) {
         await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
           path: ['beta'],
@@ -286,7 +285,6 @@ describe('openAPIMatcher', () => {
         })
       }
 
-      // a char the route holds raw, percent-encoded by the request
       for (const pathname of ['/users/me', '/users/m%65', '/users/%6D%65'] as const) {
         await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
           path: ['me'],
@@ -608,28 +606,29 @@ describe('openAPIMatcher', () => {
       expect(loader).toHaveBeenCalledTimes(1)
     })
 
-    it('resolves a prefixed lazy router whose prefix holds a char the request may percent-encode', async () => {
+    it.each([
+      '/v1^beta/info',
+      '/v1%5Ebeta/info',
+      '/v1%5ebeta/info',
+    ] as const)('resolves a prefixed lazy router whose prefix holds a char the request may percent-encode: %s', async (pathname) => {
       const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+      const loader = vi.fn(async () => ({ default: { info } }))
 
-      for (const pathname of ['/v1^beta/info', '/v1%5Ebeta/info', '/v1%5ebeta/info'] as const) {
-        const loader = vi.fn(async () => ({ default: { info } }))
+      const matcher = new OpenAPIMatcher({
+        beta: os.meta(openapi({ prefix: '/v1^beta' })).lazy(loader),
+      })
 
-        const matcher = new OpenAPIMatcher({
-          beta: os.meta(openapi({ prefix: '/v1^beta' })).lazy(loader),
-        })
+      await expect(matcher.match('GET', '/v1beta/info', undefined)).resolves.toBeUndefined()
+      expect(loader).toHaveBeenCalledTimes(0)
 
-        await expect(matcher.match('GET', '/v1beta/info', undefined)).resolves.toBeUndefined()
-        expect(loader).toHaveBeenCalledTimes(0)
-
-        await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({
-          path: ['beta', 'info'],
-          params: undefined,
-        })
-        expect(loader).toHaveBeenCalledTimes(1)
-      }
+      await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({
+        path: ['beta', 'info'],
+        params: undefined,
+      })
+      expect(loader).toHaveBeenCalledTimes(1)
     })
 
-    it('resolves a prefixed lazy router before a dynamic sibling can catch a path that needs normalization', async () => {
+    it('resolves a prefixed lazy router before a dynamic sibling can catch a percent-encoded path', async () => {
       const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
       const version = os.meta(openapi({ method: 'GET', path: '/{version}/info' })).handler(() => 'version')
 
