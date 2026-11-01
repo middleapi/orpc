@@ -11,7 +11,7 @@ import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer }
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
- * which they do when any sub-response contains binary or is a stream.
+ * which they do in `streaming` mode, or when any sub-response contains binary or is a stream.
  *
  * Decoding is driven by the `standard-server` body hint, not this header,
  * so it only serves to describe the payload to logs, proxies, and dev tools.
@@ -71,6 +71,28 @@ interface SubresponseHead {
 }
 
 /**
+ * Resolves with the first subresponse head, or `undefined` if none has one.
+ */
+function firstSubresponseHead(heads: Promise<SubresponseHead | undefined>[]): Promise<SubresponseHead | undefined> {
+  return new Promise((resolve) => {
+    for (const promise of heads) {
+      void promise.then(head => head && resolve(head))
+    }
+
+    void Promise.all(heads).then(() => resolve(undefined))
+  })
+}
+
+/**
+ * Sets the distinct cookies of every source on the headers.
+ */
+function liftCookies(headers: StandardHeaders, sources: StandardHeaders[]): StandardHeaders {
+  const cookies = new Set(sources.flatMap(source => toArray(source['set-cookie'])))
+
+  return cookies.size > 0 ? { ...headers, 'set-cookie': [...cookies] } : headers
+}
+
+/**
  * Builds the batch response headers: the headers the subresponses all have with the same value, as
  * the client does with the headers every subrequest shares, then the batch headers, which win, and
  * the distinct cookies and `vary` fields of both. A cache must vary on whatever any subresponse varies on.
@@ -94,13 +116,7 @@ function liftSubresponseHeaders(
     }
   }
 
-  const headers: StandardHeaders = { ...shared, ...batchHeaders }
-  const cookies = new Set([batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other['set-cookie'])))
-
-  if (cookies.size > 0) {
-    headers['set-cookie'] = [...cookies]
-  }
-
+  const headers = liftCookies({ ...shared, ...batchHeaders }, [batchHeaders, ...subresponseHeaders])
   const varies = new Map<string, string>()
 
   for (const value of [batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other.vary))) {
@@ -161,7 +177,8 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * Success batch response headers.
    *
-   * The batch response also gets the cookies its sub-responses set, and the headers they all share.
+   * In `buffered` mode, the batch response also gets the cookies its sub-responses set, and the headers they all share.
+   * In `streaming` mode, it gets only the cookies of the first sub-response to be ready.
    * Headers set here win, and setting one to `undefined` keeps it off, except `set-cookie` and `vary`, which merge.
    *
    * @default {}
@@ -197,8 +214,9 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and sending their responses back together.
  *
  * @remarks
- * The batch starts the response once every sub-response is ready, so it carries the cookies sub-requests
- * set and the headers every sub-response shares. It streams when a sub-response is a stream.
+ * The client Batch Link Plugin's `mode` picks how each batch responds: `buffered` (default) waits for every
+ * sub-response and carries their cookies and shared headers; `streaming` starts once the first is ready and
+ * carries only its cookies.
  *
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
@@ -258,9 +276,13 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
-      if (flattenStandardHeader(interceptorOptions.request.headers[BATCH_HEADER]) === undefined) {
+      const batchHeader = flattenStandardHeader(interceptorOptions.request.headers[BATCH_HEADER])
+
+      if (batchHeader === undefined) {
         return interceptorOptions.next()
       }
+
+      const streaming = batchHeader === 'streaming'
 
       let messages: ClientPeerSendMessage[]
 
@@ -340,16 +362,22 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
       let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 
-      // Every subresponse waits here until all of them are ready, so the batch response carries their headers
+      // Subresponses wait here for the batch headers: lifted from all of them, or only the first in streaming mode
       const ready = messages.map(() => promiseWithResolvers<SubresponseHead | undefined>())
-      const lifting = Promise.all(ready.map(({ promise }) => promise)).then((all) => {
-        const heads = all.filter(head => head !== undefined)
+      const heads = ready.map(({ promise }) => promise)
+      const lifting = streaming
+        ? firstSubresponseHead(heads).then(head => ({
+            batchHeaders: liftCookies(headers, [headers, head?.headers ?? {}]),
+            streams: true,
+          }))
+        : Promise.all(heads).then((all) => {
+            const present = all.filter(head => head !== undefined)
 
-        return {
-          batchHeaders: liftSubresponseHeaders(headers, heads.map(head => head.headers)),
-          streams: heads.some(head => head.stream),
-        }
-      })
+            return {
+              batchHeaders: liftSubresponseHeaders(headers, present.map(head => head.headers)),
+              streams: present.some(head => head.stream),
+            }
+          })
 
       const clearKeepAlive = () => {
         if (keepAliveTimer !== undefined) {
@@ -472,10 +500,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      /**
-       * A stream is meant to be read as it arrives and might never end, so the batch answers with
-       * the length-prefixed stream that every message is written to, starting with those buffered so far.
-       */
+      // Answer with a length-prefixed stream of every message, starting with those buffered so far
       const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {
           streamController = controller

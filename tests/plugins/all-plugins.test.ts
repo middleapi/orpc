@@ -176,7 +176,7 @@ describe('all plugins on one handler and one link', () => {
     ])
 
     expect(exchanges).toHaveLength(1) // both calls travelled in a single batch request
-    expect(exchanges[0]!.request.headers.get('orpc-batch')).toEqual('1')
+    expect(exchanges[0]!.request.headers.get('orpc-batch')).toEqual('buffered')
     // the batch request is compressed as a whole, and decompressed before it is split
     expect(exchanges[0]!.request.headers.get('content-encoding')).toEqual('gzip')
     // the batch response is compressed as a whole, and decompressed before it is decoded
@@ -216,7 +216,7 @@ describe('all plugins on one handler and one link', () => {
 
     expect(exchanges).toHaveLength(2)
     expect(exchanges[0]!.request.headers.get('cookie')).toBeNull()
-    expect(exchanges[1]!.request.headers.get('orpc-batch')).toEqual('1')
+    expect(exchanges[1]!.request.headers.get('orpc-batch')).toEqual('buffered')
     expect(exchanges[1]!.request.headers.get('cookie')).toEqual('session=alice')
   })
 

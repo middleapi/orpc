@@ -144,6 +144,34 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
+  it('resolves each call as soon as it responds in streaming mode', async () => {
+    const release = promiseWithResolvers<void>()
+
+    const router = {
+      fast: os.handler(() => 'fast'),
+      slow: os.handler(async () => {
+        await release.promise
+        return 'slow'
+      }),
+      events: os.handler(async function* () {
+        yield 'event'
+      }),
+    }
+
+    const { client, fetchSpy } = createClientServer(router, { mode: 'streaming' })
+
+    const slow = client.slow()
+    const events = client.events() as Promise<AsyncIteratorObject<unknown>>
+
+    // A buffered batch would hold this call until the slow one responds
+    await expect(client.fast()).resolves.toBe('fast')
+    await expect((await events).next()).resolves.toEqual({ value: 'event', done: false })
+
+    release.resolve()
+    await expect(slow).resolves.toBe('slow')
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
+  })
+
   it('sends file uploads outside the batch', async () => {
     const router = {
       upload: os.input(z.object({ file: z.file() })).handler(({ input }) => input.file.text()),
