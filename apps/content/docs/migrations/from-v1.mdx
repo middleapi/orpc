@@ -1064,13 +1064,15 @@ Three smaller changes in the same area:
 - The `shouldHoistDef` option was replaced by [`componentName`](/docs/openapi/specification#hoisting-defs). Root `$defs` are now always hoisted into `components.schemas`; this option only renames them.
 - Documents are generated as OpenAPI 3.2.0 by default. The example above passes [`version: '3.1.1'`](/docs/openapi/specification#openapi-version) to keep the v1 behavior.
 
-### Error response options renamed
+### Error response options changed
 
 The error response options dropped their `custom` prefix:
 
 - `customErrorResponseBodySchema` is now [`errorResponseBodySchema`](/docs/openapi/specification#custom-error-response-schemas) in `generator.generate` options.
 - `customErrorResponseBodyEncoder` is now [`errorResponseBodyEncoder`](/docs/openapi/handler#custom-error-response) on `OpenAPIHandler`.
 - `customErrorResponseBodyDecoder` is now [`errorResponseBodyDecoder`](/docs/openapi/link#custom-error-decoding) on `OpenAPILink`.
+
+They also no longer fall back to the default when returning `null` or `undefined`. Return `error.toJSON()`, `defaultSchema()` or `defaultError()` instead; the latter two are new third arguments.
 
 ### `OpenAPIReferencePlugin` renamed and reshaped
 

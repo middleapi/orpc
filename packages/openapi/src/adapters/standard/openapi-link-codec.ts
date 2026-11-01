@@ -1,4 +1,4 @@
-import type { AnyORPCError, ClientContext, ClientOptions } from '@orpc/client'
+import type { ClientContext, ClientOptions } from '@orpc/client'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '@orpc/client/standard'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Public, Value } from '@orpc/shared'
@@ -40,13 +40,18 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   serializer?: Public<OpenAPISerializer> | undefined
 
   /**
-   * Customize how an error response body is converted into an ORPC error.
-   * Return `null` or `undefined` to fall back to the default decoding behavior.
+   * Customize how an error response body is converted into the error thrown by the client.
+   *
+   * @remarks
+   * - Return `defaultError()` to keep the default decoding (a `MalformedResponseError` for bodies that are not ORPC errors)
+   *
+   * @default ((body, response, defaultError) => defaultError())
    */
   errorResponseBodyDecoder?: ((
     deserializedBody: unknown,
     response: StandardLazyResponse,
-  ) => AnyORPCError | null | undefined) | undefined
+    defaultError: () => Error,
+  ) => Error) | undefined
 
   /**
    * Parse error responses with this `content-type` as JSON, ignoring case and parameters such as `charset`.
@@ -64,7 +69,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<OpenAPILinkCodecOptions<T>['serializer'], undefined>
-  private readonly errorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['errorResponseBodyDecoder']
+  private readonly errorResponseBodyDecoder: Exclude<OpenAPILinkCodecOptions<T>['errorResponseBodyDecoder'], undefined>
   private readonly errorResponseMediaType: string | undefined
 
   constructor(
@@ -74,7 +79,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     this.baseUrl = options.url ?? '/'
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new OpenAPISerializer()
-    this.errorResponseBodyDecoder = options.errorResponseBodyDecoder
+    this.errorResponseBodyDecoder = options.errorResponseBodyDecoder ?? ((_body, _response, defaultError) => defaultError())
     this.errorResponseMediaType = toMediaType(options.errorResponseContentType)
   }
 
@@ -414,22 +419,17 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     })()
 
     if (!isOk) {
-      const customError = this.errorResponseBodyDecoder?.(deserialized, response)
-
-      if (customError !== undefined && customError !== null) {
-        return { kind: 'error', error: customError }
-      }
-
-      if (isORPCErrorJson(deserialized)) {
-        return {
-          kind: 'error',
-          error: createORPCErrorFromJson(deserialized, {
+      const defaultError = (): Error => {
+        if (isORPCErrorJson(deserialized)) {
+          return createORPCErrorFromJson(deserialized, {
             cause: new ResponseError({ response: { status: response.status, headers: response.headers, body } }),
-          }),
+          })
         }
+
+        return new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
       }
 
-      throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
+      return { kind: 'error', error: this.errorResponseBodyDecoder(deserialized, response, defaultError) }
     }
 
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE

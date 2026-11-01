@@ -814,7 +814,7 @@ describe('openAPILinkCodec', () => {
       expect(resolveBody).toHaveBeenCalledWith(undefined)
     })
 
-    it('uses a custom error decoder when it returns a value', async () => {
+    it('uses a custom error decoder', async () => {
       const customError = new ORPCError('BAD_GATEWAY', { data: 'custom' })
       const errorResponseBodyDecoder = vi.fn(() => customError)
       const codec = new OpenAPILinkCodec({
@@ -824,36 +824,44 @@ describe('openAPILinkCodec', () => {
         errorResponseBodyDecoder,
       })
 
+      // an ORPC error body, to check the default decoding is not used as a fallback
       const response = {
         status: 502,
         headers: { 'x-trace': '1' },
-        resolveBody: async () => ({ detail: 'bad gateway' }),
+        resolveBody: async () => new ORPCError('NOT_FOUND').toJSON(),
       }
 
       const result = await codec.decodeResponse(response, ['ping'], { context: {} })
 
       expect(result).toEqual({ kind: 'error', error: customError })
       expect(errorResponseBodyDecoder).toHaveBeenCalledOnce()
-      expect(errorResponseBodyDecoder).toHaveBeenCalledWith({ detail: 'bad gateway' }, response)
+      expect(errorResponseBodyDecoder).toHaveBeenCalledWith(new ORPCError('NOT_FOUND').toJSON(), response, expect.any(Function))
     })
 
-    it('falls back to standard ORPC error decoding when the custom decoder returns null', async () => {
+    it('passes the default decoding to a custom error decoder as defaultError', async () => {
       const codec = new OpenAPILinkCodec({
         ping: oc.meta(openapi({})),
       }, {
         serializer,
-        errorResponseBodyDecoder: () => null,
+        errorResponseBodyDecoder: (_body, _response, defaultError) => defaultError(),
       })
 
-      const error = new ORPCError('NOT_FOUND', { message: 'Not found' })
-
-      const result = await codec.decodeResponse({
+      const result: any = await codec.decodeResponse({
         status: 404,
         headers: {},
-        resolveBody: async () => error.toJSON(),
+        resolveBody: async () => new ORPCError('NOT_FOUND').toJSON(),
       }, ['ping'], { context: {} })
 
       expectORPCErrorResult(result, 'NOT_FOUND')
+      expect(result.error.cause).toBeInstanceOf(ResponseError)
+
+      const malformed: any = await codec.decodeResponse({
+        status: 503,
+        headers: {},
+        resolveBody: async () => ({ detail: 'service unavailable' }),
+      }, ['ping'], { context: {} })
+
+      expect(malformed.error).toBeInstanceOf(MalformedResponseError)
     })
 
     it.each([
@@ -872,17 +880,19 @@ describe('openAPILinkCodec', () => {
       expect(resolveBody).toHaveBeenCalledWith(hint)
     })
 
-    it('throws MalformedResponseError on unknown error payloads', async () => {
+    it('returns MalformedResponseError on unknown error payloads', async () => {
       const codec = new OpenAPILinkCodec({
         ping: oc.meta(openapi({})),
       }, { serializer })
 
-      const error: any = await codec.decodeResponse({
+      const result: any = await codec.decodeResponse({
         status: 503,
         headers: {},
         resolveBody: async () => ({ detail: 'service unavailable' }),
-      }, ['ping'], { context: {} }).then(() => null, e => e)
+      }, ['ping'], { context: {} })
 
+      expect(result.kind).toBe('error')
+      const error = result.error
       expect(error).toBeInstanceOf(MalformedResponseError)
       expect(error.message).toBe('Service Unavailable')
       expect(error.response).toEqual({ status: 503, headers: {}, body: { detail: 'service unavailable' } })

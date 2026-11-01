@@ -213,8 +213,7 @@ const handler = new OpenAPIHandler(router, {
       }
     }
 
-    // fallback to default by returning null or undefined
-    return null
+    return error.toJSON()
   },
 })
 ```
