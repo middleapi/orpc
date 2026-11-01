@@ -30,17 +30,4 @@ describe('openAPIGenerator.generate', () => {
     // @ts-expect-error the openapi field is derived from version
     generator.generate({}, { base: { openapi: '3.2.0' } })
   })
-
-  it('requires errorResponseBodySchema to return a schema or null', () => {
-    generator.generate({}, { errorResponseBodySchema: () => null })
-    generator.generate({}, { errorResponseBodySchema: (_errors, _status, defaultSchema) => defaultSchema() })
-    // @ts-expect-error undefined is not allowed, return null for an empty body
-    generator.generate({}, { errorResponseBodySchema: () => undefined })
-    // @ts-expect-error a missing return is not allowed
-    generator.generate({}, { errorResponseBodySchema: (_errors, status) => {
-      if (status === 404) {
-        return null
-      }
-    } })
-  })
 })

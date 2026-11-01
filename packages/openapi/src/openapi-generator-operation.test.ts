@@ -941,8 +941,8 @@ describe('openAPIGenerator operation builders', () => {
       expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['NotFound', 'UndefinedError'])
     })
 
-    it('documents an empty error body when the custom schema is null', () => {
-      const { ctx, operation } = createContext({ errorResponseBodySchema: () => null })
+    it.each([null, undefined])('documents an empty error body when the custom schema is %s', (schema) => {
+      const { ctx, operation } = createContext({ errorResponseBodySchema: () => schema })
 
       buildErrorResponse(ctx, operation, testDef({ errors: { NOT_FOUND: { message: 'Missing' } } }))
 

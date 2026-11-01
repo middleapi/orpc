@@ -47,7 +47,7 @@ export interface OpenAPIOperationContext {
   convertSchemas: (schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection) => [JsonSchema, boolean]
   errorStatusMap: Record<string, number>
   errorResponseBodySchema: Value<
-    JsonSchema | null,
+    JsonSchema | null | undefined,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number, defaultSchema: () => JsonSchema]
   > | undefined
   errorResponseContentType: string
@@ -556,7 +556,7 @@ export function buildErrorResponse(
       description: descriptions.length ? descriptions.join(', ') : status.toString(),
     }
 
-    if (responseSchema !== null) {
+    if (responseSchema !== undefined && responseSchema !== null) {
       responseObject.content = {
         [ctx.errorResponseContentType]: {
           schema: ctx.registry.toOpenAPISchema(responseSchema, 'output'),
