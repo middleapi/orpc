@@ -1,7 +1,7 @@
 {
   "name": "@orpc/msw",
   "type": "module",
-  "version": "2.0.0-beta.47",
+  "version": "2.0.0-beta.48",
   "description": "MSW integration for oRPC: mock procedures at the network level with typed MSW request handlers",
   "license": "MIT",
   "funding": [

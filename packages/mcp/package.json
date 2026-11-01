@@ -1,7 +1,7 @@
 {
   "name": "@orpc/mcp",
   "type": "module",
-  "version": "2.0.0-beta.47",
+  "version": "2.0.0-beta.48",
   "description": "MCP integration for oRPC: expose procedures as typesafe Model Context Protocol tools",
   "license": "MIT",
   "funding": [

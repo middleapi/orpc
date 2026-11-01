@@ -1,7 +1,7 @@
 {
   "name": "@orpc/publisher",
   "type": "module",
-  "version": "2.0.0-beta.47",
+  "version": "2.0.0-beta.48",
   "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, and Upstash adapters",
   "license": "MIT",
   "funding": [
