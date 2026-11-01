@@ -108,7 +108,7 @@ const link = new RPCLink({
 ```
 
 :::warning
-A `streaming` batch response starts before any procedure responds, so it carries none of their headers. Each procedure's headers still reach the client on its own response, but the cookies it sets are lost, because the browser only stores cookies from the batch response itself. Send procedures that set cookies outside the batch with [`filter`](#filtering-requests).
+A `streaming` batch response starts before any procedure responds, so it carries none of their headers. Each procedure's headers still reach the client on its own response, except the cookies it sets, which are lost: the server strips them from that response, since only the batch response's cookies take effect. Send procedures that set cookies outside the batch with [`filter`](#filtering-requests).
 
 Every `streaming` batch response streams, so make sure your client, and anything between it and the server, such as a proxy, supports streamed responses.
 :::
