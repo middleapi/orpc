@@ -77,11 +77,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    * response standards or conventions.
    *
    * @remarks
-   * - Return `defaultSchema()` to keep the default schema, or `null | undefined` to document an empty body, matching an `errorResponseBodyEncoder` that returns `undefined`.
+   * - Return `defaultSchema()` to keep the default schema, or `null` to document an empty body, matching an `errorResponseBodyEncoder` that returns `undefined`.
    * - The schema is an OpenAPI 3.2 Schema Object, it is downgraded with the rest of the document when an older `version` is requested.
    */
   errorResponseBodySchema?: Value<
-    JsonSchema | null | undefined,
+    JsonSchema | null,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number, defaultSchema: () => JsonSchema]
   > | undefined
 
