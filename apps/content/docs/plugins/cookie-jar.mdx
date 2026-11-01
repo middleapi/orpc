@@ -22,7 +22,7 @@ const link = new RPCLink({
 })
 ```
 
-When `origin` resolves to `undefined`, such as in a browser that handles cookies itself, the plugin does nothing. A `cookie` header you set yourself, for example through the link's `headers` option, is kept and wins over jar cookies with the same name. With the [Batch Plugin](/docs/plugins/batch), cookies are matched against the batch request URL, so give them `Path=/`.
+When `origin` resolves to `undefined`, such as in a browser that handles cookies itself, the plugin does nothing. A `cookie` header you set yourself, for example through the link's `headers` option, is kept and wins over jar cookies with the same name.
 
 :::info
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
@@ -67,7 +67,7 @@ const link = new RPCLink<{ jar: CookieJar }>({
 ```
 
 :::warning
-With the [Batch Plugin](/docs/plugins/batch), the function receives the batch group's context, so keep users in separate batches with [`scope`](/docs/plugins/batch#scope) and forward their context from the group.
+With the [Batch Plugin](/docs/plugins/batch), a batch response carries the cookies of all its calls, so keep users in separate batches with [`scope`](/docs/plugins/batch#scope).
 :::
 
 ## Learn More

@@ -38,9 +38,10 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
   name = '~cookie-jar'
 
   /**
-   * Handle cookies after batching, once per actual HTTP request
+   * Handle cookies per call, before batching, so each call gets the cookies it would get on its own.
+   * The batch then lifts a `cookie` header all its calls share onto the batch request.
    */
-  after: string[] = ['~batch']
+  before: string[] = ['~batch']
 
   constructor(options: NoInfer<CookieJarLinkPluginOptions<T>>) {
     this.origin = options.origin
@@ -258,12 +259,7 @@ function parseSetCookie(setCookie: string): ParsedSetCookie | undefined {
 
     switch (attributeName) {
       case 'expires': {
-        const time = Date.parse(attributeValue)
-
-        if (!Number.isNaN(time)) {
-          expires = time
-        }
-
+        expires = parseCookieDate(attributeValue) ?? expires
         break
       }
 
@@ -294,6 +290,54 @@ function parseSetCookie(setCookie: string): ParsedSetCookie | undefined {
 
   // Max-Age takes precedence over Expires
   return { name, value, domain, path, secure, expires: maxAgeExpires ?? expires }
+}
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/**
+ * Parses a cookie date following [RFC 6265 Section 5.1.1](https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.1),
+ * always in UTC. Returns `undefined` when a part is missing or out of range, so the attribute is ignored.
+ */
+function parseCookieDate(value: string): number | undefined {
+  let time: [hour: number, minute: number, second: number] | undefined
+  let day: number | undefined
+  let month: number | undefined
+  let year: number | undefined
+
+  for (const token of value.split(/[\t\x20-\x2F\x3B-\x40\x5B-\x60\x7B-\x7E]+/)) {
+    const digits = /^\d*/.exec(token)![0]
+    const timeMatch = /^(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\D|$)/.exec(token)
+    const monthIndex = MONTHS.indexOf(token.slice(0, 3).toLowerCase())
+
+    if (time === undefined && timeMatch) {
+      time = [Number(timeMatch[1]), Number(timeMatch[2]), Number(timeMatch[3])]
+    }
+    else if (day === undefined && digits.length >= 1 && digits.length <= 2) {
+      day = Number(digits)
+    }
+    else if (month === undefined && monthIndex !== -1) {
+      month = monthIndex
+    }
+    else if (year === undefined && digits.length >= 2 && digits.length <= 4) {
+      year = Number(digits)
+      year += year < 70 ? 2000 : year < 100 ? 1900 : 0
+    }
+  }
+
+  if (time === undefined || day === undefined || month === undefined || year === undefined) {
+    return undefined
+  }
+
+  const [hour, minute, second] = time
+
+  if (day < 1 || day > 31 || year < 1601 || hour > 23 || minute > 59 || second > 59) {
+    return undefined
+  }
+
+  const date = Date.UTC(year, month, day, hour, minute, second)
+
+  // Rejects days the month does not have, such as 31 Feb
+  return new Date(date).getUTCDate() === day ? date : undefined
 }
 
 /**

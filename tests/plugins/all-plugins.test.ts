@@ -202,7 +202,7 @@ describe('all plugins on one handler and one link', () => {
     expect(exchanges[0]!.response.headers.get('cache-control')).toEqual('no-store')
   })
 
-  it('sends the cookies a call set on later calls, once per batch request', async () => {
+  it('sends the cookies a call set on later batched calls', async () => {
     const { client, exchanges } = createClientServer()
 
     await expect(client.login({ user: 'alice' })).resolves.toEqual({ user: 'alice' })

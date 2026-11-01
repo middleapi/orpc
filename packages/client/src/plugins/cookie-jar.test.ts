@@ -131,43 +131,81 @@ describe('cookieJarLinkPlugin', () => {
     expect(pairs(jars.bob)).toEqual(['session=bob', 'seen=1'])
   })
 
-  it('handles cookies once per batch request', async () => {
-    const jar = new CookieJar()
-    jar.setCookie('session=abc; Path=/', origin)
-    const setCookie = vi.spyOn(jar, 'setCookie')
-    const getCookies = vi.spyOn(jar, 'getCookies')
+  describe('with batching', () => {
+    function createBatchClient(jar: CookieJar) {
+      const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+        const messages = JSON.parse(init.body as string) as { id: string }[]
+        const headers = new Headers({ 'content-type': 'application/json' })
+        headers.append('set-cookie', 'session=def; Path=/')
+        headers.append('set-cookie', 'theme=dark; Path=/')
 
-    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
-      const messages = JSON.parse(init.body as string) as { id: string }[]
-      const headers = new Headers({ 'content-type': 'application/json' })
-      headers.append('set-cookie', 'session=def; Path=/')
-      headers.append('set-cookie', 'theme=dark; Path=/')
+        return new Response(JSON.stringify(messages.map(({ id }) => ({
+          id,
+          kind: 'response',
+          json: { status: 200, body: { json: 'pong' } },
+        }))), { status: 200, headers })
+      })
 
-      return new Response(JSON.stringify(messages.map(({ id }) => ({
-        id,
-        kind: 'response',
-        json: { status: 200, body: { json: 'pong' } },
-      }))), { status: 200, headers })
+      const client = createORPCClient<any>(new RPCLink<{ cookie?: string }>({
+        fetch,
+        url: '/rpc',
+        origin,
+        headers: ({ context }) => context.cookie === undefined ? {} : { cookie: context.cookie },
+        plugins: [
+          new CookieJarLinkPlugin({ jar, origin }),
+          new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
+        ],
+      }))
+
+      const sent = () => {
+        expect(fetch).toHaveBeenCalledTimes(1)
+        const [, init] = fetch.mock.calls[0]!
+        const subrequests = JSON.parse(init.body as string) as { json: { url: string, headers?: Record<string, string> } }[]
+
+        return {
+          cookie: new Headers(init.headers).get('cookie'),
+          subrequestCookies: subrequests.map(({ json }) => [json.url, json.headers?.cookie]),
+        }
+      }
+
+      return { client, sent }
+    }
+
+    it('lifts the cookie header all batched calls share onto the batch request', async () => {
+      const jar = new CookieJar()
+      jar.setCookie('session=abc; Path=/', origin)
+      const { client, sent } = createBatchClient(jar)
+
+      await expect(Promise.all([client.a(), client.b()])).resolves.toEqual(['pong', 'pong'])
+
+      expect(sent()).toEqual({
+        cookie: 'session=abc',
+        subrequestCookies: [['/rpc/a', undefined], ['/rpc/b', undefined]],
+      })
+      expect(pairs(jar)).toEqual(['session=def', 'theme=dark'])
     })
 
-    const client = createORPCClient<any>(new RPCLink({
-      fetch,
-      url: '/rpc',
-      origin,
-      plugins: [
-        new CookieJarLinkPlugin({ jar, origin }),
-        new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
-      ],
-    }))
+    it('keeps the cookies of each batched call', async () => {
+      const jar = new CookieJar()
+      jar.setCookie('session=abc; Path=/', origin)
+      jar.setCookie('admin=1; Path=/rpc/admin', origin)
+      const { client, sent } = createBatchClient(jar)
 
-    await expect(Promise.all([client.a(), client.b(), client.c()])).resolves.toEqual(['pong', 'pong', 'pong'])
+      await Promise.all([
+        client.a(undefined, { context: { cookie: 'lang=en' } }),
+        client.b(undefined, { context: { cookie: 'lang=vi' } }),
+        client.admin.c(),
+      ])
 
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(new Headers(fetch.mock.calls[0]![1].headers).get('cookie')).toBe('session=abc')
-    expect(getCookies).toHaveBeenCalledTimes(1)
-    expect(getCookies).toHaveBeenCalledWith('https://api.example.com/rpc/a/__batch__')
-    expect(setCookie).toHaveBeenCalledTimes(2)
-    expect(pairs(jar)).toEqual(['session=def', 'theme=dark'])
+      expect(sent()).toEqual({
+        cookie: null,
+        subrequestCookies: [
+          ['/rpc/a', 'lang=en; session=abc'],
+          ['/rpc/b', 'lang=vi; session=abc'],
+          ['/rpc/admin/c', 'admin=1; session=abc'],
+        ],
+      })
+    })
   })
 })
 
@@ -383,12 +421,31 @@ describe('cookieJar', () => {
     })
 
     it.each([
+      ['Thu, 01 Jan 2026 00:01:00 GMT', Date.UTC(2026, 0, 1, 0, 1, 0)],
+      ['Thursday, 01-Jan-26 00:01:00 GMT', Date.UTC(2026, 0, 1, 0, 1, 0)],
+      ['Thu Jan  1 00:01:00 2026', Date.UTC(2026, 0, 1, 0, 1, 0)],
+      ['Mon, 01-Jan-55 00:00:00 GMT', Date.UTC(2055, 0, 1)],
+      ['1 dec 2099 23:59:59', Date.UTC(2099, 11, 1, 23, 59, 59)],
+    ])('parses the cookie date %s in UTC', (date, expires) => {
+      jar.setCookie(`a=1; Expires=${date}`, site)
+
+      expect(jar.getCookies()).toMatchObject([{ expires }])
+    })
+
+    it.each([
       'Max-Age=soon',
       'Max-Age=1.5',
       'Max-Age=+5',
       'Max-Age=',
       'Max-Age=1e3',
       'Expires=never',
+      'Expires=0',
+      'Expires=2026',
+      'Expires=2026-12-01T00:00',
+      'Expires=31 Feb 2026 00:00:00',
+      'Expires=32 Jan 2026 00:00:00',
+      'Expires=01 Jan 1600 00:00:00',
+      'Expires=01 Jan 2026 24:00:00',
     ])('ignores an invalid %s', (attribute) => {
       jar.setCookie(`a=1; ${attribute}`, site)
 
