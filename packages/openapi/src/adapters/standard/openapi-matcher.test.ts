@@ -533,18 +533,22 @@ describe('openAPIMatcher', () => {
       expect(catchAllLoader).toHaveBeenCalledTimes(1)
     })
 
-    it('leaves a lazy router pending without indexing any of its routes when one path is invalid', async () => {
+    it('keeps rejecting a lazy router with an invalid path without loading or indexing it again', async () => {
       const valid = os.meta(openapi({ method: 'GET', path: '/valid' })).handler(() => 'valid')
       const invalid = os.meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' })).handler(() => 'invalid')
 
-      const matcher = new OpenAPIMatcher({
-        lazy: os.lazy(async () => ({ default: { valid, invalid } })),
-      })
+      const loader = vi.fn(async () => ({ default: { valid, invalid } }))
+      const filter = vi.fn(() => true)
 
-      await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
-      await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
+      const matcher = new OpenAPIMatcher({ lazy: os.lazy(loader) }, { filter })
 
-      expect((matcher as any).tree.match('GET', '/valid')).toBeUndefined()
+      for (let i = 0; i < 3; i++) {
+        await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
+      }
+
+      // the route indexed before the failure stays unreachable behind the rejection
+      expect(loader).toHaveBeenCalledTimes(1)
+      expect(filter).toHaveBeenCalledTimes(2)
     })
 
     it('retries a lazy router whose load fails, synchronously or asynchronously', async () => {

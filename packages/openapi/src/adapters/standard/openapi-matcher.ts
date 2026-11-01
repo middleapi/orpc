@@ -24,7 +24,10 @@ interface TreeEntry {
 
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
   matcher: ReturnType<typeof createPrefixMatcher>
-  /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
+  /**
+   * in-flight load, shared so concurrent matches never load or re-index the same router twice.
+   * Keeps its rejection when indexing fails, which would fail the same way on every attempt.
+   */
   loading?: Promise<void> | undefined
 }
 
@@ -42,11 +45,6 @@ export class OpenAPIMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
-    // Router.add throws for an invalid path before adding it, so adding every route to a throwaway
-    // router first indexes none of this router's routes when any of its paths is invalid
-    const staging = new Router<TreeEntry>()
-    const routes: { method: string, httpPath: `/${string}`, entry: TreeEntry }[] = []
-
     const lazyResults = walkProcedureContractsSync(router, (contract, path) => {
       if (!value(this.filter, contract, path)) {
         return
@@ -57,19 +55,12 @@ export class OpenAPIMatcher {
       const postHttpPath = meta?.path ?? pathToHttpPath(path)
       const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
 
-      const entry: TreeEntry = {
+      this.tree.add(method, httpPath, {
         path,
         contract,
         procedure: contract instanceof Procedure ? contract : undefined,
-      }
-
-      staging.add(method, httpPath, entry)
-      routes.push({ method, httpPath, entry })
+      })
     }, path)
-
-    for (const { method, httpPath, entry } of routes) {
-      this.tree.add(method, httpPath, entry)
-    }
 
     for (const result of lazyResults) {
       this.pendingLazyRouters.add({
@@ -144,24 +135,25 @@ export class OpenAPIMatcher {
   }
 
   private loadPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
-    if (pending.loading === undefined) {
-      pending.loading = this.indexPendingLazyRouter(pending).catch((error) => {
+    // a loader that throws synchronously leaves `loading` unset, so the next match retries it
+    pending.loading ??= unlazy(pending.router).then(
+      ({ default: router }) => {
+        // a throw here stays in `loading`, so later matches rethrow it instead of
+        // adding the routes indexed before the failure again
+        this.index(router, pending.path)
+
+        // removed only once indexed, so a concurrent match never observes this router as
+        // neither pending nor indexed
+        this.pendingLazyRouters.delete(pending)
+      },
+      (error) => {
+        // a failed load may succeed later, so the next match retries it
         pending.loading = undefined
         throw error
-      })
-    }
+      },
+    )
 
     return pending.loading
-  }
-
-  private async indexPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
-    const { default: router } = await unlazy(pending.router)
-
-    this.index(router, pending.path)
-
-    // removed only once indexed, so a concurrent match never observes this router as
-    // neither pending nor indexed
-    this.pendingLazyRouters.delete(pending)
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
