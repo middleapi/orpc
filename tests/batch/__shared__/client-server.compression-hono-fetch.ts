@@ -19,6 +19,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     context = defaultBatchClientServerOptions.context,
     method = 'GET',
     serializer = defaultBatchClientServerOptions.serializer,
+    mode,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
@@ -68,7 +69,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     serializer,
     fetch: fetchSpy,
     plugins: [
-      new BatchLinkPlugin({ groups: [defaultBatchGroup] }),
+      new BatchLinkPlugin({ mode, groups: [defaultBatchGroup] }),
       // fetch already automatically decompresses response
       // new ResponseCompressionLinkPlugin(),
     ],

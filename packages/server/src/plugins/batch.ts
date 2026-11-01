@@ -1,3 +1,4 @@
+import type { BatchLinkPluginMode } from '@orpc/client/plugins'
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
@@ -11,7 +12,7 @@ import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer }
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
- * which they do when any sub-response contains binary or is a stream.
+ * which they do in `streaming` mode, or when any sub-response contains binary or is a stream.
  *
  * Decoding is driven by the `standard-server` body hint, not this header,
  * so it only serves to describe the payload to logs, proxies, and dev tools.
@@ -161,7 +162,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * Success batch response headers.
    *
-   * The batch response also gets the cookies its sub-responses set, and the headers they all share.
+   * In `buffered` mode, the batch response also gets the cookies its sub-responses set, and the headers they all share.
    * Headers set here win, and setting one to `undefined` keeps it off, except `set-cookie` and `vary`, which merge.
    *
    * @default {}
@@ -197,8 +198,10 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and sending their responses back together.
  *
  * @remarks
- * The batch starts the response once every sub-response is ready, so it carries the cookies sub-requests
- * set and the headers every sub-response shares. It streams when a sub-response is a stream.
+ * The client Batch Link Plugin picks the response mode of each batch. In `buffered` mode, the default, the batch
+ * starts the response once every sub-response is ready, so it carries the cookies sub-requests set and the headers
+ * every sub-response shares. It streams when a sub-response is a stream. In `streaming` mode, the batch starts
+ * the response right away and streams each sub-response as soon as it is ready, without lifting their headers.
  *
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
@@ -258,9 +261,13 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
-      if (flattenStandardHeader(interceptorOptions.request.headers[BATCH_HEADER]) === undefined) {
+      const batchHeader = flattenStandardHeader(interceptorOptions.request.headers[BATCH_HEADER])
+
+      if (batchHeader === undefined) {
         return interceptorOptions.next()
       }
+
+      const mode: BatchLinkPluginMode = batchHeader === 'streaming' ? 'streaming' : 'buffered'
 
       let messages: ClientPeerSendMessage[]
 
@@ -340,16 +347,21 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
       let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 
-      // Every subresponse waits here until all of them are ready, so the batch response carries their headers
+      /**
+       * In buffered mode, every subresponse waits here until all of them are ready, so the batch response carries their headers.
+       * In streaming mode, the batch response streams before any of them is ready, so it carries none of their headers.
+       */
       const ready = messages.map(() => promiseWithResolvers<SubresponseHead | undefined>())
-      const lifting = Promise.all(ready.map(({ promise }) => promise)).then((all) => {
-        const heads = all.filter(head => head !== undefined)
+      const lifting = mode === 'streaming'
+        ? Promise.resolve({ batchHeaders: headers, streams: true })
+        : Promise.all(ready.map(({ promise }) => promise)).then((all) => {
+            const heads = all.filter(head => head !== undefined)
 
-        return {
-          batchHeaders: liftSubresponseHeaders(headers, heads.map(head => head.headers)),
-          streams: heads.some(head => head.stream),
-        }
-      })
+            return {
+              batchHeaders: liftSubresponseHeaders(headers, heads.map(head => head.headers)),
+              streams: heads.some(head => head.stream),
+            }
+          })
 
       const clearKeepAlive = () => {
         if (keepAliveTimer !== undefined) {
@@ -473,8 +485,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       /**
-       * A stream is meant to be read as it arrives and might never end, so the batch answers with
-       * the length-prefixed stream that every message is written to, starting with those buffered so far.
+       * A stream is meant to be read as it arrives and might never end, and a streaming batch sends each
+       * sub-response as soon as it is ready, so the batch answers with the length-prefixed stream that
+       * every message is written to, starting with those buffered so far.
        */
       const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {

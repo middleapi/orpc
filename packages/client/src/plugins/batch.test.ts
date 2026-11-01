@@ -361,7 +361,33 @@ describe('batchLinkPlugin', () => {
 
       expect(transport.send).toHaveBeenCalledTimes(1)
       const sentRequest = vi.mocked(transport.send).mock.calls[0]![0]
-      expect(sentRequest.headers['orpc-batch']).toBe('1')
+      expect(sentRequest.headers['orpc-batch']).toBe('buffered')
+    })
+
+    it('asks the server for the mode option in the batch header', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const mode = vi.fn(async () => 'streaming' as const)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode,
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['ping'], { n: 1 }, { context: { tag: 'a' } })).resolves.toBe('result-0'),
+        expect(link.call(['ping'], { n: 2 }, { context: { tag: 'b' } })).resolves.toBe('result-1'),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(transport.send).mock.calls[0]![0].headers['orpc-batch']).toBe('streaming')
+      expect(mode).toHaveBeenCalledTimes(1)
+      expect(mode).toHaveBeenCalledWith([
+        expect.objectContaining({ path: ['ping'], context: { tag: 'a' } }),
+        expect.objectContaining({ path: ['ping'], context: { tag: 'b' } }),
+      ])
     })
 
     it('splits batches when exceeding maxSize', async () => {
@@ -1649,8 +1675,8 @@ describe('batchLinkPlugin', () => {
 
       expect(transport.send).toHaveBeenCalledTimes(2)
       expect(vi.mocked(transport.send).mock.calls.map(([request]) => request.headers)).toEqual([
-        { 'x-user': 'alice', 'orpc-batch': '1' },
-        { 'x-user': 'bob', 'orpc-batch': '1' },
+        { 'x-user': 'alice', 'orpc-batch': 'buffered' },
+        { 'x-user': 'bob', 'orpc-batch': 'buffered' },
       ])
     })
 

@@ -22,6 +22,13 @@ export const BATCH_HEADER = 'orpc-batch'
  */
 export const DEFAULT_BATCH_MAX_SIZE = 10
 
+/**
+ * How the server sends a batch response, which the Batch Link Plugin asks for in the `orpc-batch` header.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/batch#response-modes | Batch Plugin - Response Modes}
+ */
+export type BatchLinkPluginMode = 'buffered' | 'streaming'
+
 export interface BatchLinkPluginGroup<T extends ClientContext> {
   /**
    * Determines whether a request should be included in this batch group.
@@ -81,6 +88,20 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
   wait?: number | undefined
 
   /**
+   * How the server sends the batch response.
+   *
+   * - `buffered`: the server starts the response once every subrequest has responded, so it carries their
+   *   cookies and shared headers. It streams only when a procedure returns a stream.
+   * - `streaming`: the server starts the response right away and sends each response as soon as it is ready,
+   *   so a slow procedure does not hold back the rest. The batch response carries none of their headers,
+   *   and the cookies they set are lost.
+   *
+   * @default 'buffered'
+   * @see {@link https://orpc.dev/docs/plugins/batch#response-modes | Batch Plugin - Response Modes}
+   */
+  mode?: Value<Promisable<BatchLinkPluginMode>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+
+  /**
    * URL for the batch request.
    *
    * @default URL of the first subrequest in the batch + '/__batch__'
@@ -136,6 +157,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
   private readonly scope: Exclude<BatchLinkPluginOptions<T>['scope'], undefined>
   private readonly maxSize: Exclude<BatchLinkPluginOptions<T>['maxSize'], undefined>
   private readonly wait: Exclude<BatchLinkPluginOptions<T>['wait'], undefined>
+  private readonly mode: Exclude<BatchLinkPluginOptions<T>['mode'], undefined>
   private readonly batchUrl: Exclude<BatchLinkPluginOptions<T>['url'], undefined>
   private readonly maxUrlLength: Exclude<BatchLinkPluginOptions<T>['maxUrlLength'], undefined>
   private readonly batchHeaders: Exclude<BatchLinkPluginOptions<T>['headers'], undefined>
@@ -150,6 +172,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     this.scope = options.scope ?? (() => undefined)
     this.maxSize = options.maxSize ?? DEFAULT_BATCH_MAX_SIZE
     this.wait = options.wait ?? 0
+    this.mode = options.mode ?? 'buffered'
     this.batchUrl = options.url ?? ((options) => {
       const [pathname] = parseStandardUrl(options[0].request.url)
       return `${pathname}/__batch__`
@@ -306,6 +329,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
       const url = await value(this.batchUrl, subOptionsList)
       const headers = await value(this.batchHeaders, subOptionsList)
+      const mode = await value(this.mode, subOptionsList)
       let suppressErrorFromCurrentBatch = false
 
       const controller = new AbortController()
@@ -374,7 +398,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         const request: StandardRequest = {
           url,
           method,
-          headers: { ...headers, [BATCH_HEADER]: '1' },
+          headers: { ...headers, [BATCH_HEADER]: mode },
           signal: controller.signal,
         }
 

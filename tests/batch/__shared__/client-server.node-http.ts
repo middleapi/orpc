@@ -14,6 +14,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
     context = defaultBatchClientServerOptions.context,
     method = 'POST',
     serializer = defaultBatchClientServerOptions.serializer,
+    mode,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
@@ -44,7 +45,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
     method,
     serializer,
     fetch: fetchSpy,
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup] })],
+    plugins: [new BatchLinkPlugin({ mode, groups: [defaultBatchGroup] })],
   })
 
   return {

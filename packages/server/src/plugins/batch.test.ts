@@ -43,20 +43,23 @@ function createBatchRequest(options: {
   method?: 'POST' | 'GET' | 'QUERY'
   data?: string
   signal?: AbortSignal
+  mode?: string
 }) {
+  const mode = options.mode ?? 'buffered'
+
   if (options.method === 'GET') {
     const search = options.data === undefined ? '' : `?data=${options.data}`
 
     return new Request(`https://example.com/__batch__${search}`, {
       method: 'GET',
-      headers: { 'orpc-batch': '1' },
+      headers: { 'orpc-batch': mode },
       signal: options.signal,
     })
   }
 
   return new Request('https://example.com/__batch__', {
     method: options.method ?? 'POST',
-    headers: { 'orpc-batch': '1', 'content-type': 'application/json' },
+    headers: { 'orpc-batch': mode, 'content-type': 'application/json' },
     body: JSON.stringify(options.messages),
     signal: options.signal,
   })
@@ -100,6 +103,18 @@ async function readAllMessages(response: Response) {
 async function skipMessage(reader: ReadableStreamDefaultReader<Uint8Array>) {
   await reader.read()
   await reader.read()
+}
+
+/**
+ * Reads one message, which is enqueued as two chunks: its length prefix, then its payload.
+ */
+async function readMessage(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  await reader.read()
+  const { value } = await reader.read()
+  const result = decodePeerMessage(value!.slice())
+  expect(result.matched).toBe(true)
+
+  return result.matched ? result.message as any : undefined
 }
 
 function waitForAbort(signal: AbortSignal) {
@@ -422,6 +437,61 @@ describe('batchHandlerPlugin', () => {
         expect(new TextDecoder().decode(messages.find(m => m.id === '1').binary)).toBe('__FILE__')
       })
     })
+
+    describe('in streaming mode', () => {
+      /**
+       * A router whose `slow` procedure responds only once the gate is released.
+       */
+      const createSlowRouter = (gate: Promise<void>) => ({
+        fast: os.handler(() => 'fast'),
+        slow: os.handler(async () => {
+          await gate
+          return 'slow'
+        }),
+      })
+
+      it('streams each sub-response as soon as it is ready', async () => {
+        const gate = promiseWithResolvers<void>()
+        const handler = createHandler(new BatchHandlerPlugin(), createSlowRouter(gate.promise))
+
+        // Answers while `slow` still waits for the gate
+        const { response } = await handler.handle(createBatchRequest({
+          mode: 'streaming',
+          messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/fast')],
+        }))
+
+        expect(response!.status).toBe(207)
+        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
+        expect(response!.headers.get('content-type')).toEqual('application/vnd.orpc.batch')
+
+        const reader = response!.body!.getReader()
+        await expect(readMessage(reader)).resolves.toMatchObject({ kind: 'response', id: '1', json: { body: { json: 'fast' } } })
+
+        gate.resolve()
+        await expect(readMessage(reader)).resolves.toMatchObject({ kind: 'response', id: '0', json: { body: { json: 'slow' } } })
+        await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
+      })
+
+      it.each(['buffered', '1'])('waits for every sub-response when the batch header is %s', async (mode) => {
+        const gate = promiseWithResolvers<void>()
+        const handler = createHandler(new BatchHandlerPlugin(), createSlowRouter(gate.promise))
+
+        let settled = false
+        const result = handler.handle(createBatchRequest({
+          mode,
+          messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/fast')],
+        })).finally(() => {
+          settled = true
+        })
+
+        await sleep(10)
+        expect(settled).toBe(false)
+
+        gate.resolve()
+        const { response } = await result
+        await expect(response!.json()).resolves.toHaveLength(2)
+      })
+    })
   })
 
   describe('batch request abort', () => {
@@ -476,6 +546,18 @@ describe('batchHandlerPlugin', () => {
       await response!.body!.cancel()
 
       expect(stopped.mock.calls).toEqual([[true], [true]])
+    })
+
+    it('aborts sub-requests when the response stream of a streaming batch is cancelled before they respond', async () => {
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage('0', '/wait'), makePeerRequestMessage('1', '/wait')],
+      }))
+
+      await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
+      await response!.body!.cancel()
+
+      await vi.waitFor(() => expect(stopped.mock.calls).toEqual([[true], [true]]))
     })
 
     it('aborts sub-requests when the batch request is already aborted', async () => {
@@ -931,6 +1013,66 @@ describe('batchHandlerPlugin', () => {
     })
   })
 
+  describe('response headers in streaming mode', () => {
+    const base = os.$context<ResponseHeadersHandlerPluginContext>()
+
+    const headersRouter = {
+      login: base.handler(({ context }) => {
+        context.resHeaders?.append('set-cookie', 'session=abc; HttpOnly')
+        context.resHeaders?.set('cache-control', 'max-age=60')
+        context.resHeaders?.set('x-only', 'login')
+        return 'ok'
+      }),
+      refresh: base.handler(({ context }) => {
+        context.resHeaders?.append('set-cookie', 'token=xyz; HttpOnly')
+        context.resHeaders?.set('cache-control', 'max-age=60')
+        return 'ok'
+      }),
+    }
+
+    it('keeps sub-response headers off the batch response and drops their cookies', async () => {
+      const { response } = await createHandler(undefined, headersRouter).handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
+      }))
+
+      expect(response!.headers.get('content-type')).toBe('application/vnd.orpc.batch')
+      expect(response!.headers.getSetCookie()).toEqual([])
+      expect(response!.headers.get('cache-control')).toBe(null)
+
+      const received = await readAllMessages(response!)
+      expect(JSON.stringify(received)).not.toContain('set-cookie')
+      expect(received.find(m => m.id === '0').json.headers).toEqual({ 'cache-control': 'max-age=60', 'x-only': 'login' })
+      expect(received.find(m => m.id === '1').json.headers).toEqual({ 'cache-control': 'max-age=60' })
+    })
+
+    it('sets only the headers option on the batch response, and passes it to mapSubresponse', async () => {
+      const mapSubresponse = vi.fn((subresponse: StandardResponse) => subresponse)
+      const handler = createHandler(new BatchHandlerPlugin({
+        headers: { 'set-cookie': 'batch=1', 'cache-control': 'no-cache' },
+        mapSubresponse,
+      }), headersRouter)
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
+      }))
+
+      expect(response!.headers.getSetCookie()).toEqual(['batch=1'])
+      expect(response!.headers.get('cache-control')).toBe('no-cache')
+
+      const received = await readAllMessages(response!)
+      expect(received.find(m => m.id === '1').json.headers).toEqual({ 'set-cookie': 'token=xyz; HttpOnly', 'cache-control': 'max-age=60' })
+
+      expect(mapSubresponse).toHaveBeenCalledTimes(2)
+      expect(mapSubresponse).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 200 }),
+        { status: 207, headers: { 'set-cookie': 'batch=1', 'cache-control': 'no-cache' } },
+        expect.objectContaining({ request: expect.objectContaining({ url: '/__batch__' }) }),
+      )
+    })
+  })
+
   describe('configuration options', () => {
     it('supports custom successStatus', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ successStatus: 200 }))
@@ -991,6 +1133,36 @@ describe('batchHandlerPlugin', () => {
       while (!(await reader.read()).done) {
         // keep reading until closed
       }
+
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('sends keep-alive frames in streaming mode before any sub-response is ready', async () => {
+      const gate = promiseWithResolvers<void>()
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: true, interval: 100 },
+      }), {
+        slow: os.handler(async () => {
+          await gate.promise
+          return 'slow'
+        }),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage('0', '/slow')],
+      }))
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+
+      const keepAlive = reader.read()
+      await vi.advanceTimersByTimeAsync(100)
+      await expect(keepAlive).resolves.toEqual({ done: false, value: new Uint8Array([0, 0, 0, 0]) })
+
+      gate.resolve()
+      await expect(readMessage(reader)).resolves.toMatchObject({ kind: 'response', id: '0' })
+      await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
 
       expect(vi.getTimerCount()).toBe(0)
     })

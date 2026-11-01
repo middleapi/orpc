@@ -14,6 +14,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
     context = defaultBatchClientServerOptions.context,
     method = 'GET',
     serializer = defaultBatchClientServerOptions.serializer,
+    mode,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
@@ -47,7 +48,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
     fetch: fetchSpy,
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup] })],
+    plugins: [new BatchLinkPlugin({ mode, groups: [defaultBatchGroup] })],
   })
 
   return {
