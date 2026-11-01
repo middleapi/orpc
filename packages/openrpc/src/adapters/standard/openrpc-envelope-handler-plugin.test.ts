@@ -1,6 +1,5 @@
 import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import type { OpenRPCDocument } from '../../types'
 import type { OpenRPCHandlerOptions } from '../fetch'
 import { ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
@@ -8,14 +7,13 @@ import { CORSHandlerPlugin, RequestLimitHandlerPlugin, ResponseHeadersHandlerPlu
 import { getTracer, promiseWithResolvers, setTracer } from '@orpc/shared'
 import { z } from 'zod'
 import { OpenRPCHandler } from '../fetch'
-import { getJsonRpcCall } from './utils'
+import { getJsonRpcCall, JSON_RPC_CALL_SYMBOL } from './utils'
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 const notify = vi.fn()
-const discover = vi.fn()
 
 const router = {
   subtract: os
@@ -26,7 +24,6 @@ const router = {
   notify_sum: os.input(z.array(z.number())).handler(({ input }) => notify('notify_sum', input)),
   notify_hello: os.input(z.number()).handler(({ input }) => notify('notify_hello', input)),
   get_data: os.handler(() => ['hello', 5]),
-  rpc: { discover: os.handler(discover) },
   planet: {
     list: os.input(z.object({ limit: z.number().optional() })).handler(({ input }) => input),
     find: os
@@ -64,7 +61,7 @@ function batchOf(size: number) {
   return Array.from({ length: size }, (_, id) => ({ jsonrpc: '2.0', method: 'notify_hello', params: [id], id }))
 }
 
-describe('standardOpenRPCHandler', () => {
+describe('openRPCEnvelopeHandlerPlugin', () => {
   // https://www.jsonrpc.org/specification#examples
   // positional params are wrapped in one array, since a procedure takes a single input
   it.each([
@@ -249,6 +246,32 @@ describe('standardOpenRPCHandler', () => {
       expect(notify).not.toHaveBeenCalled()
     })
 
+    it('rejects the whole request with the error of a plugin that reads the body, and 400 for a custom code', async () => {
+      const handler = createHandler({
+        plugins: [{
+          name: 'body-guard',
+          after: ['~openrpc'],
+          init: options => ({
+            ...options,
+            routingInterceptors: [({ next, ...rest }) => next({
+              ...rest,
+              request: {
+                ...rest.request,
+                resolveBody: async () => {
+                  throw new ORPCError('BODY_REFUSED')
+                },
+              },
+            }), ...options.routingInterceptors ?? []],
+          }),
+        }],
+      })
+
+      await expect(post(handler, { jsonrpc: '2.0', method: 'get_data', id: 1 })).resolves.toMatchObject({
+        status: 400,
+        json: { jsonrpc: '2.0', id: null, error: { code: -32000, data: { code: 'BODY_REFUSED', defined: false } } },
+      })
+    })
+
     it('parses the body as JSON for every JSON-RPC media type', async () => {
       await expect(post(createHandler(), { jsonrpc: '2.0', method: 'get_data', id: 1 }, { headers: { 'content-type': 'application/json-rpc' } }))
         .resolves
@@ -280,63 +303,50 @@ describe('standardOpenRPCHandler', () => {
       expect(matched).toBe(true)
       await expect(response!.json()).resolves.toEqual({ jsonrpc: '2.0', id: 1, result: ['hello', 5] })
     })
+
+    it('passes through sub-requests that are already marked as a call', async () => {
+      const handler = createHandler({
+        plugins: [{
+          name: 'mark',
+          after: ['~openrpc'],
+          init: options => ({
+            ...options,
+            routingInterceptors: [({ next, ...rest }) => next({
+              ...rest,
+              request: { ...rest.request, resolveBody: async () => undefined, [JSON_RPC_CALL_SYMBOL]: { method: 'get_data', id: 1 } } as typeof rest.request,
+            }), ...options.routingInterceptors ?? []],
+          }),
+        }],
+      })
+
+      // the codec answer, not wrapped in a JSON-RPC response
+      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.list', id: 2 })).resolves.toEqual({ status: 200, json: { result: ['hello', 5] } })
+    })
   })
 
   describe('plugins and interceptors', () => {
-    it('runs routing interceptors once per request, and the other interceptors once per call', async () => {
+    it('runs plugins inside the envelope once per call, and outside it once per request', async () => {
       const calls: unknown[] = []
-      const plugin: StandardHandlerPlugin<any> = {
-        name: 'record',
+      const plugin = (name: string, order: Pick<StandardHandlerPlugin<any>, 'before' | 'after'>): StandardHandlerPlugin<any> => ({
+        name,
+        ...order,
         init: options => ({
           ...options,
           routingInterceptors: [({ request, next }) => {
-            calls.push(['plugin routing', request.url, getJsonRpcCall(request)])
+            calls.push([name, request.url, getJsonRpcCall(request)])
             return next()
           }, ...options.routingInterceptors ?? []],
-          interceptors: [({ request, next }) => {
-            calls.push(['plugin interceptor', request.url, getJsonRpcCall(request)])
-            return next()
-          }, ...options.interceptors ?? []],
         }),
-      }
-
-      const handler = createHandler({
-        plugins: [plugin],
-        routingInterceptors: [({ request, next }) => {
-          calls.push(['routing', request.url, getJsonRpcCall(request)])
-          return next()
-        }],
-        clientInterceptors: [({ path, next }) => {
-          calls.push(['client', path.join('.')])
-          return next()
-        }],
       })
 
+      const handler = createHandler({ plugins: [plugin('outer', { after: ['~openrpc'] }), plugin('inner', { before: ['~openrpc'] })] })
       await post(handler, [{ jsonrpc: '2.0', method: 'get_data', id: 1 }, { jsonrpc: '2.0', method: 'notify_hello', params: [1] }])
 
       expect(calls).toEqual([
-        ['plugin routing', '/rpc', undefined],
-        ['routing', '/rpc', undefined],
-        ['plugin interceptor', '/rpc/get_data', { method: 'get_data', id: 1 }],
-        ['plugin interceptor', '/rpc/notify_hello', { method: 'notify_hello', id: undefined }],
-        ['client', 'get_data'],
-        ['client', 'notify_hello'],
+        ['outer', '/rpc', undefined],
+        ['inner', '/rpc/get_data', { method: 'get_data', id: 1 }],
+        ['inner', '/rpc/notify_hello', { method: 'notify_hello', id: undefined }],
       ])
-    })
-
-    it('lets routing interceptors answer, or change the context of, the whole request', async () => {
-      const handler = new OpenRPCHandler({
-        whoami: os.$context<{ user?: string }>().handler(({ context }) => context.user),
-      }, {
-        routingInterceptors: [async ({ next, ...options }) => options.request.headers.authorization
-          ? next({ ...options, context: { ...options.context, user: 'u1' } })
-          : { matched: true, response: { status: 401, headers: {}, body: undefined } }],
-      })
-
-      await expect(post(handler, [{ jsonrpc: '2.0', method: 'whoami', id: 1 }])).resolves.toEqual({ status: 401, json: undefined })
-      await expect(post(handler, [{ jsonrpc: '2.0', method: 'whoami', id: 1 }, { jsonrpc: '2.0', method: 'whoami', id: 2 }], { headers: { authorization: 'Bearer token' } }))
-        .resolves
-        .toEqual({ status: 200, json: [{ jsonrpc: '2.0', id: 1, result: 'u1' }, { jsonrpc: '2.0', id: 2, result: 'u1' }] })
     })
 
     it('passes the HTTP request headers to each call, without its content-length', async () => {
@@ -427,189 +437,24 @@ describe('standardOpenRPCHandler', () => {
       expect(names.filter(name => name.startsWith('POST'))).toEqual(['POST /rpc/get_data', 'POST /rpc/notify_hello'])
     })
 
-    it('rethrows the errors the rethrow plugin catches, once every call of the request has run', async () => {
-      const handled = vi.fn()
-      const handler = new OpenRPCHandler({
-        ...router,
-        get_data: os.handler(handled),
-      }, { plugins: [new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) })] })
-
-      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.fail', id: 1 })).rejects.toThrow('secret')
-      await expect(post(handler, [{ jsonrpc: '2.0', method: 'planet.fail', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).rejects.toThrow('secret')
-      expect(handled).toHaveBeenCalledOnce()
-    })
-
-    it('rethrows unexpected errors of a single call, but answers the other calls of a batch with -32603', async ({ onTestFinished }) => {
+    it('rethrows errors of a single call, but answers the other calls of a batch with -32603', async ({ onTestFinished }) => {
       const rejectSpy = vi.spyOn(Promise, 'reject').mockImplementation(() => new Promise(() => {}) as Promise<never>)
 
       onTestFinished(() => {
         rejectSpy.mockRestore()
       })
 
-      // a lazy router that fails to load fails the call outside of the interceptors
-      const handler = new OpenRPCHandler({
-        ...router,
-        broken: os.lazy(async () => {
-          throw new Error('secret')
-        }),
-      })
+      const handler = createHandler({ plugins: [new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) })] })
 
-      await expect(post(handler, { jsonrpc: '2.0', method: 'broken.ping', id: 1 })).rejects.toThrow('secret')
+      await expect(post(handler, { jsonrpc: '2.0', method: 'planet.fail', id: 1 })).rejects.toThrow('secret')
       expect(rejectSpy).not.toHaveBeenCalled()
 
-      expect((await post(handler, [{ jsonrpc: '2.0', method: 'broken.ping', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).json).toEqual([
+      expect((await post(handler, [{ jsonrpc: '2.0', method: 'planet.fail', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).json).toEqual([
         { jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'Internal error' } },
         { jsonrpc: '2.0', id: 2, result: ['hello', 5] },
       ])
       expect(rejectSpy).toHaveBeenCalledOnce()
       expect(rejectSpy).toHaveBeenCalledWith(expect.objectContaining({ message: 'secret' }))
-    })
-  })
-
-  describe('discovery', () => {
-    function createSpec(title = 'Planets'): OpenRPCDocument {
-      return { openrpc: '1.3.2', info: { title, version: '1.0.0' }, methods: [] }
-    }
-
-    it('answers rpc.discover in single, batch and notification requests, never calling a user rpc.discover procedure', async () => {
-      const spec = createSpec()
-      const handler = createHandler({ discovery: { spec: () => spec } })
-
-      await expect(post(handler, { jsonrpc: '2.0', method: 'rpc.discover', id: 1 })).resolves.toEqual({
-        status: 200,
-        json: { jsonrpc: '2.0', id: 1, result: spec },
-      })
-      await expect(post(handler, [{ jsonrpc: '2.0', method: 'rpc.discover', id: 1 }, { jsonrpc: '2.0', method: 'get_data', id: 2 }])).resolves.toEqual({
-        status: 200,
-        json: [{ jsonrpc: '2.0', id: 1, result: spec }, { jsonrpc: '2.0', id: 2, result: ['hello', 5] }],
-      })
-      await expect(post(handler, { jsonrpc: '2.0', method: 'rpc.discover' })).resolves.toEqual({ status: 204, json: undefined })
-      expect(discover).not.toHaveBeenCalled()
-    })
-
-    it('passes the routed context, prefix and request to spec', async () => {
-      const spec = vi.fn(() => createSpec())
-      const handler = createHandler({ discovery: { spec } })
-
-      await post(handler, { jsonrpc: '2.0', method: 'rpc.discover', id: 1 }, { context: { user: 'alice' } })
-
-      expect(spec).toHaveBeenCalledExactlyOnceWith({ context: { user: 'alice' }, prefix: '/rpc', request: expect.objectContaining({ url: '/rpc' }) })
-    })
-
-    it('answers rpc.discover with -32601 without the discovery option', async () => {
-      await expect(post(createHandler(), { jsonrpc: '2.0', method: 'rpc.discover', id: 1 })).resolves.toEqual({
-        status: 200,
-        json: { jsonrpc: '2.0', id: 1, error: { code: -32601, message: 'Method not found' } },
-      })
-      expect(discover).not.toHaveBeenCalled()
-    })
-
-    it('answers the errors thrown by spec, so spec can guard the document', async () => {
-      const handler = createHandler({
-        discovery: {
-          spec: ({ context }) => {
-            if (context.user !== 'admin') {
-              throw new ORPCError('FORBIDDEN')
-            }
-
-            return createSpec()
-          },
-        },
-      })
-
-      expect((await post(handler, { jsonrpc: '2.0', method: 'rpc.discover', id: 1 })).json).toEqual({
-        jsonrpc: '2.0',
-        id: 1,
-        error: { code: -32003, message: 'Forbidden', data: { code: 'FORBIDDEN', defined: false } },
-      })
-    })
-
-    it('rethrows unexpected spec errors, like those of any other call', async () => {
-      const handler = createHandler({
-        discovery: {
-          spec: () => {
-            throw new TypeError('generator bug')
-          },
-        },
-      })
-
-      await expect(post(handler, { jsonrpc: '2.0', method: 'rpc.discover', id: 1 })).rejects.toThrow('generator bug')
-    })
-
-    it('answers the GET of a document spec refuses with the status of the error', async () => {
-      const handler = createHandler({
-        discovery: {
-          spec: () => {
-            throw new ORPCError('FORBIDDEN')
-          },
-        },
-      })
-
-      const { response } = await handler.handle(new Request('http://localhost/rpc/openrpc.json'), { prefix: '/rpc' })
-
-      expect(response?.status).toBe(403)
-      await expect(response?.json()).resolves.toMatchObject({ id: null, error: { code: -32003, data: { code: 'FORBIDDEN' } } })
-    })
-
-    it('serves the document over GET at /openrpc.json under the prefix', async () => {
-      const spec = createSpec()
-      const handler = createHandler({ discovery: { spec } })
-
-      const { response } = await handler.handle(new Request('http://localhost/rpc/openrpc.json?pretty'), { prefix: '/rpc' })
-
-      expect(response?.status).toBe(200)
-      expect(response?.headers.get('content-type')).toContain('application/json')
-      await expect(response?.json()).resolves.toEqual(spec)
-
-      // without a prefix
-      await expect((await createHandler({ discovery: { spec } }).handle(new Request('http://localhost/openrpc.json'))).response?.json()).resolves.toEqual(spec)
-    })
-
-    it('serves the document from a custom spec path relative to the prefix', async () => {
-      const spec = vi.fn(async () => createSpec('Custom'))
-      const handler = createHandler({ discovery: { spec, specPath: '/spec.json' } })
-
-      const { response } = await handler.handle(new Request('http://localhost/rpc/spec.json'), { prefix: '/rpc', context: { user: 'alice' } })
-
-      await expect(response?.json()).resolves.toEqual(createSpec('Custom'))
-      expect(spec).toHaveBeenCalledExactlyOnceWith({ context: { user: 'alice' }, prefix: '/rpc', request: expect.objectContaining({ url: '/rpc/spec.json' }) })
-
-      for (const url of ['http://localhost/spec.json', 'http://localhost/rpc/openrpc.json']) {
-        expect((await handler.handle(new Request(url), { prefix: '/rpc' })).matched).toBe(false)
-      }
-    })
-
-    it('disables the GET endpoint with specPath false but still answers rpc.discover', async () => {
-      const handler = createHandler({ discovery: { spec: createSpec(), specPath: false } })
-
-      expect((await handler.handle(new Request('http://localhost/rpc/openrpc.json'), { prefix: '/rpc' })).matched).toBe(false)
-      expect((await post(handler, { jsonrpc: '2.0', method: 'rpc.discover', id: 1 })).json).toMatchObject({ result: createSpec() })
-    })
-
-    it.each([
-      ['POST', 'http://localhost/rpc/openrpc.json'],
-      ['GET', 'http://localhost/rpc/other.json'],
-      ['GET', 'http://localhost/rpc'],
-    ])('does not serve %s %s', async (method, url) => {
-      const spec = vi.fn(() => createSpec())
-      const handler = createHandler({ discovery: { spec } })
-
-      expect((await handler.handle(new Request(url, { method }), { prefix: '/rpc' })).matched).toBe(false)
-      expect(spec).not.toHaveBeenCalled()
-    })
-
-    it('runs inside the routing interceptors, which can guard the whole request', async () => {
-      const spec = createSpec()
-      const handler = createHandler({
-        routingInterceptors: [async ({ next, request }) => request.headers.authorization ? next() : { matched: false }],
-        discovery: { spec },
-      })
-
-      expect((await handler.handle(new Request('http://localhost/openrpc.json'))).matched).toBe(false)
-
-      const { response } = await handler.handle(new Request('http://localhost/openrpc.json', { headers: { authorization: 'token' } }))
-
-      await expect(response?.json()).resolves.toEqual(spec)
     })
   })
 })

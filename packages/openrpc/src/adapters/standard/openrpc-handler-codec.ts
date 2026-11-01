@@ -4,7 +4,6 @@ import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Public, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { JsonRpcErrorObject } from '../../json-rpc'
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { DEFAULT_ERROR_STATUS } from '@orpc/server'
@@ -42,7 +41,8 @@ export interface OpenRPCHandlerCodecOptions<_T extends Context> {
 }
 
 /**
- * The codec `StandardOpenRPCHandler` runs each call with. It only resolves the per-call sub-requests the handler creates.
+ * The codec of `OpenRPCHandler`. It only resolves the per-call sub-requests created by `OpenRPCEnvelopeHandlerPlugin`,
+ * so use the two together.
  */
 export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
@@ -98,9 +98,9 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
     return { status: 200, headers: {}, body: { result: json } }
   }
 
-  encodeError(error: AnyORPCError): StandardResponse & { body: { error: JsonRpcErrorObject } } {
+  encodeError(error: AnyORPCError): StandardResponse {
     return {
-      // the HTTP status of JSON-RPC errors is always 200, except for whole requests `StandardOpenRPCHandler` rejects
+      // the status the per-call plugins (such as rate limiting) see, the HTTP status of JSON-RPC errors is always 200
       status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
       headers: {},
       body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) },
