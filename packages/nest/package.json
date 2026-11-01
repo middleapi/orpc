@@ -72,8 +72,8 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@oxc-project/runtime": "^0.155.0",
-    "@standard-server/core": "~0.13.0",
-    "@standard-server/node": "~0.13.0"
+    "@standard-server/core": "~0.14.0",
+    "@standard-server/node": "~0.14.0"
   },
   "devDependencies": {
     "@fastify/cookie": "^11.1.5",

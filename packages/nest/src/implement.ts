@@ -281,7 +281,7 @@ function toNestHttpBody(
   headers['content-length'] = undefined
 
   if (body === undefined) {
-    headers['standard-server'] = getRequiredStandardBodyHint('none', headers)
+    headers['content-type'] = undefined
     return [undefined, headers]
   }
 
