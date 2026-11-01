@@ -658,8 +658,8 @@ importers:
   packages/json-schema:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.4.0
-        version: 0.4.0
+        specifier: ~0.6.0
+        version: 0.6.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -875,11 +875,14 @@ importers:
   packages/openapi:
     dependencies:
       '@openapi-spec/downgrader':
-        specifier: ~0.4.0
-        version: 0.4.0
+        specifier: ~0.6.0
+        version: 0.6.0
+      '@openapi-spec/router':
+        specifier: ~0.6.0
+        version: 0.6.0
       '@openapi-spec/types':
-        specifier: ~0.4.0
-        version: 0.4.0
+        specifier: ~0.6.0
+        version: 0.6.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -901,9 +904,6 @@ importers:
       '@standard-server/fetch':
         specifier: ~0.13.0
         version: 0.13.0
-      rou3:
-        specifier: ^1.0.0
-        version: 1.0.0
     devDependencies:
       '@scalar/api-reference':
         specifier: ^1.76.3
@@ -1199,8 +1199,8 @@ importers:
   packages/zod:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.4.0
-        version: 0.4.0
+        specifier: ~0.6.0
+        version: 0.6.0
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:../json-schema
@@ -3439,11 +3439,14 @@ packages:
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     resolution: {integrity: sha512-Gj6C0JwCr8arj0sYuslWXUBSP/KnUlEGnPW4qxlXvAl543oaNQgMgIgkQUA6vs5BCCvwTEiL8m/wdWzfl4UvSw==}
 
-  '@openapi-spec/downgrader@0.4.0':
-    resolution: {integrity: sha512-hrOjK64HADGGG56RvmJ8z+CenNqTEAI0Ped1aG1oeY9CNDMZRhILatygmtcCtudVUNfbJU1CmnuzpeXujQH/rg==}
+  '@openapi-spec/downgrader@0.6.0':
+    resolution: {integrity: sha512-RopoTfFmNsQHKxbgNSBBjvo+ne19Cx4MI2fJqo0fcy7YGvMADo1A47s05HqAs/rcDsOzfclf6FJachSEPCwyVA==}
 
-  '@openapi-spec/types@0.4.0':
-    resolution: {integrity: sha512-TkCtxQoIIzPvnqYeKopbBKdVzttj6Mg+D5QSy+h8bbWA0/x97qPw3FKDCcymh+7y4IhCRxFeWuff8T03HQUxVw==}
+  '@openapi-spec/router@0.6.0':
+    resolution: {integrity: sha512-CioJ7X0ROAc7uLCKPNMDdtZZaOPwG6faK1yJNVFP6CBoc63KzNZYjwFcRqfX7sO/mmtfSDvBgyUt4Z3c2dXPuQ==}
+
+  '@openapi-spec/types@0.6.0':
+    resolution: {integrity: sha512-c1qKqy0RFyvGOw6VmD6z8e9y+6H4LdKn5D+YcyRydnwM1biDrYysc4ttnU4drd6LTCv/I+H+LWaBM5ijagimRg==}
 
   '@opentelemetry/api-logs@0.223.0':
     resolution: {integrity: sha512-Oepm6etVPFCn0VWB1t833iOTgz1eYBDUPxcrOR/XvwzD1+Ag9VzSPSrrKAFNJ/haatj+8CXbG47pZXvdNQKDJw==}
@@ -11106,10 +11109,6 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rou3@1.0.0:
-    resolution: {integrity: sha512-ySeaQkSrua+ut9g+65I7FHqOFBaY8tV0FmccXItoq0q21se32Q3u4YiW7/RqXSosWgYJaaKwRHXy3BST9PeCNQ==}
-    engines: {node: '>=20.19.0'}
-
   roughjs@4.6.6:
     resolution: {integrity: sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==}
 
@@ -14831,11 +14830,13 @@ snapshots:
       fast-deep-equal: 3.1.3
     optional: true
 
-  '@openapi-spec/downgrader@0.4.0':
+  '@openapi-spec/downgrader@0.6.0':
     dependencies:
-      '@openapi-spec/types': 0.4.0
+      '@openapi-spec/types': 0.6.0
 
-  '@openapi-spec/types@0.4.0': {}
+  '@openapi-spec/router@0.6.0': {}
+
+  '@openapi-spec/types@0.6.0': {}
 
   '@opentelemetry/api-logs@0.223.0':
     dependencies:
@@ -24420,8 +24421,6 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.63.0
       fsevents: 2.3.3
     optional: true
-
-  rou3@1.0.0: {}
 
   roughjs@4.6.6:
     dependencies:
