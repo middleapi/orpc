@@ -8,7 +8,7 @@ import { matchesHttpPathPrefix, toArray, value } from '@orpc/shared'
 export interface CookieJarLinkPluginOptions<T extends ClientContext> {
   /**
    * The link's `origin`, used to scope cookies by host and scheme like a browser.
-   * When it resolves to `undefined`, such as in a browser, the plugin does nothing.
+   * When it resolves to `undefined` or a relative origin such as `''`, as in a browser, the plugin does nothing.
    *
    * @example 'https://api.example.com'
    */
@@ -53,7 +53,8 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
       const { path, request } = interceptorOptions
       const origin = await value(this.origin, interceptorOptions, path)
 
-      if (origin === undefined) {
+      // Without an absolute origin, as in a browser, the runtime manages cookies itself
+      if (origin === undefined || !/^[a-z][\d+\-.a-z]*:/i.test(origin)) {
         return next()
       }
 
@@ -130,13 +131,14 @@ export class CookieJar {
     }
 
     const target = new URL(url)
+    const secureUrl = isSecureUrl(target)
     const hostOnly = parsed.domain === undefined
     const lowerName = parsed.name.toLowerCase()
 
     if (
       (parsed.domain !== undefined && !domainMatch(target.hostname, parsed.domain))
       // Insecure origins cannot set cookies meant for secure connections only
-      || (parsed.secure && !isSecureUrl(target))
+      || (parsed.secure && !secureUrl)
       || (lowerName.startsWith('__secure-') && !parsed.secure)
       || (lowerName.startsWith('__host-') && (!parsed.secure || !hostOnly || parsed.path !== '/'))
     ) {
@@ -146,6 +148,16 @@ export class CookieJar {
     const domain = parsed.domain ?? target.hostname
     const path = parsed.path ?? defaultPath(target.pathname)
     const key = `${domain};${path};${parsed.name}`
+
+    // Nor can they overwrite or delete a secure cookie, see "leave secure cookies alone" in RFC 6265bis
+    if (!secureUrl && [...this.cookies.values()].some(cookie =>
+      cookie.secure
+      && cookie.name === parsed.name
+      && (domainMatch(domain, cookie.domain) || domainMatch(cookie.domain, domain))
+      && matchesHttpPathPrefix(path as `/${string}`, cookie.path as `/${string}`),
+    )) {
+      return
+    }
 
     if (parsed.expires !== undefined && parsed.expires <= Date.now()) {
       this.cookies.delete(key)
@@ -238,6 +250,12 @@ interface ParsedSetCookie {
  * like browsers and [RFC 6265bis](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/) do.
  */
 function parseSetCookie(setCookie: string): ParsedSetCookie | undefined {
+  // Control characters other than tab make the whole cookie invalid, as in RFC 6265bis
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x08\x0A-\x1F\x7F]/.test(setCookie)) {
+    return undefined
+  }
+
   const [pair = '', ...attributes] = setCookie.split(';')
   const [name, value] = splitCookiePair(pair)
 

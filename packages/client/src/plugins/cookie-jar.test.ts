@@ -84,12 +84,12 @@ describe('cookieJarLinkPlugin', () => {
     expect(sentCookie(transport, 4)).toBeUndefined()
   })
 
-  it('does nothing when the origin resolves to undefined', async () => {
+  it.each([undefined, '', '/api'])('does nothing when the origin resolves to %j', async (relativeOrigin) => {
     const jar = new CookieJar()
     jar.setCookie('session=abc; Path=/', origin)
     const transport = createTransport({ headers: { 'set-cookie': 'theme=dark; Path=/' } })
 
-    await createLink({ jar, origin: undefined }, transport).call(['ping'], 'input', { context: {} })
+    await createLink({ jar, origin: relativeOrigin }, transport).call(['ping'], 'input', { context: {} })
 
     expect(sentCookie(transport, 0)).toBeUndefined()
     expect(pairs(jar)).toEqual(['session=abc'])
@@ -254,6 +254,12 @@ describe('cookieJar', () => {
     expect(jar.getCookies()).toEqual([])
   })
 
+  it.each(['a=b\u0001c', 'a=b\nc', 'a=b\rc', 'a\u007F=b', 'a=b; Path=/\u0000'])('ignores a cookie with control characters: %j', (setCookie) => {
+    jar.setCookie(setCookie, site)
+
+    expect(jar.getCookies()).toEqual([])
+  })
+
   it('replaces a cookie with the same name, domain, and path in place', () => {
     jar.setCookie('a=1; Path=/', site)
     jar.setCookie('b=1; Path=/', site)
@@ -362,6 +368,26 @@ describe('cookieJar', () => {
       jar.setCookie('a=1; Secure', 'http://example.com/')
 
       expect(jar.getCookies()).toEqual([])
+    })
+
+    it.each([
+      ['session=evil; Path=/', 'http://example.com/'],
+      ['session=; Max-Age=0; Path=/', 'http://example.com/'],
+      ['session=evil; Path=/docs', 'http://example.com/'],
+      ['session=evil; Path=/', 'http://api.example.com/'],
+    ])('does not let an insecure origin overwrite a secure cookie with %s from %s', (setCookie, url) => {
+      jar.setCookie('session=good; Secure; Domain=example.com; Path=/', site)
+      jar.setCookie(setCookie, url)
+
+      expect(pairs(jar)).toEqual(['session=good'])
+    })
+
+    it('lets an insecure origin set other cookies next to a secure one', () => {
+      jar.setCookie('session=good; Secure; Path=/docs', site)
+      jar.setCookie('session=other; Path=/', 'http://example.com/')
+      jar.setCookie('theme=dark; Path=/', 'http://example.com/')
+
+      expect(pairs(jar)).toEqual(['session=good', 'session=other', 'theme=dark'])
     })
 
     it.each([
