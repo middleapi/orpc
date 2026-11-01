@@ -102,7 +102,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
       let bodyHeaders: StandardHeaders
 
       /**
-       * A batch with no binary or stream subresponse stays a plain array of messages, serialized
+       * A buffered batch with no binary or stream subresponse stays a plain array of messages, serialized
        * as json by the adapter. The header and status above already say this is a batch envelope,
        * so the array itself is the only thing left to recognise.
        */

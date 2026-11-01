@@ -20,6 +20,9 @@ export interface ResponseHeadersHandlerPluginContext {
  * The Response Headers Plugin allows you to set response headers in oRPC.
  * It injects a resHeaders instance into the context, enabling you to modify response headers easily.
  *
+ * @remarks
+ * **Warning**: In a `streaming` batch, only the cookies of the first procedure to respond reach the client.
+ *
  * @see {@link https://orpc.dev/docs/plugins/response-headers | Response Headers Plugin}
  */
 export class ResponseHeadersHandlerPlugin<T extends ResponseHeadersHandlerPluginContext> implements StandardHandlerPlugin<T> {

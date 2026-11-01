@@ -54,6 +54,10 @@ const handler = new RPCHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
+:::warning
+In a [`streaming` batch](/docs/plugins/batch#response-modes), only the cookies of the first procedure to respond reach the client. Keep procedures that set cookies out of it with [`filter`](/docs/plugins/batch#filtering-requests).
+:::
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/response-headers.ts).
