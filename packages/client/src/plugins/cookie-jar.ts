@@ -7,8 +7,8 @@ import { matchesHttpPathPrefix, toArray, value } from '@orpc/shared'
 
 export interface CookieJarLinkPluginOptions<T extends ClientContext> {
   /**
-   * The link's `origin`, used to scope cookies by host and scheme like a browser.
-   * When it resolves to `undefined` or a relative origin such as `''`, as in a browser, the plugin does nothing.
+   * The link's `origin`, used to match cookies by host and scheme.
+   * The plugin does nothing when it resolves to `undefined` or a relative origin, as in a browser.
    *
    * @example 'https://api.example.com'
    */
@@ -24,7 +24,7 @@ export interface CookieJarLinkPluginOptions<T extends ClientContext> {
 
 /**
  * Stores the cookies servers set and sends them back on later requests, like a browser,
- * for clients outside a browser such as server-side rendering, scripts, and tests.
+ * for server-side rendering, scripts, and tests.
  *
  * @remarks
  * **Warning**: On a server, do not share one link between users: create a client per request, or pick a jar per request.
@@ -38,8 +38,7 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
   name = '~cookie-jar'
 
   /**
-   * Handle cookies per call, before batching, so each call gets the cookies it would get on its own.
-   * The batch then lifts a `cookie` header all its calls share onto the batch request.
+   * Runs per call, before batching, so each call gets the cookies it would get on its own.
    */
   before: string[] = ['~batch']
 
@@ -53,13 +52,13 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
       const { path, request } = interceptorOptions
       const origin = await value(this.origin, interceptorOptions, path)
 
-      // Without an absolute origin, as in a browser, the runtime manages cookies itself
+      // No absolute origin, as in a browser
       if (origin === undefined || !/^[a-z][\d+\-.a-z]*:/i.test(origin)) {
         return next()
       }
 
       const jar = value(this.jar, interceptorOptions)
-      const url = `${origin.endsWith('/') ? origin.slice(0, -1) : origin}${request.url}`
+      const url = `${origin.replace(/\/$/, '')}${request.url}`
       const cookie = mergeCookieHeader(request.headers.cookie, jar.getCookies(url))
 
       const response = await next(
@@ -133,33 +132,27 @@ export class CookieJar {
     const target = new URL(url)
     const secureUrl = isSecureUrl(target)
     const hostOnly = parsed.domain === undefined
-    const lowerName = parsed.name.toLowerCase()
+    const domain = parsed.domain ?? target.hostname
+    const path = parsed.path ?? defaultPath(target.pathname)
 
     if (
-      (parsed.domain !== undefined && !domainMatch(target.hostname, parsed.domain))
-      // Insecure origins cannot set cookies meant for secure connections only
-      || (parsed.secure && !secureUrl)
-      || (lowerName.startsWith('__secure-') && !parsed.secure)
-      || (lowerName.startsWith('__host-') && (!parsed.secure || !hostOnly || parsed.path !== '/'))
+      !domainMatch(target.hostname, domain)
+      || (/^__(?:secure|host)-/i.test(parsed.name) && !parsed.secure)
+      || (/^__host-/i.test(parsed.name) && (!hostOnly || parsed.path !== '/'))
+      // Insecure origins can neither set nor overwrite secure cookies, see "leave secure cookies alone" in RFC 6265bis
+      || (!secureUrl && (parsed.secure || [...this.cookies.values()].some(cookie =>
+        cookie.secure
+        && cookie.name === parsed.name
+        && (domainMatch(domain, cookie.domain) || domainMatch(cookie.domain, domain))
+        && matchesHttpPathPrefix(path as `/${string}`, cookie.path as `/${string}`),
+      )))
     ) {
       return
     }
 
-    const domain = parsed.domain ?? target.hostname
-    const path = parsed.path ?? defaultPath(target.pathname)
     const key = `${domain};${path};${parsed.name}`
 
-    // Nor can they overwrite or delete a secure cookie, see "leave secure cookies alone" in RFC 6265bis
-    if (!secureUrl && [...this.cookies.values()].some(cookie =>
-      cookie.secure
-      && cookie.name === parsed.name
-      && (domainMatch(domain, cookie.domain) || domainMatch(cookie.domain, domain))
-      && matchesHttpPathPrefix(path as `/${string}`, cookie.path as `/${string}`),
-    )) {
-      return
-    }
-
-    if (parsed.expires !== undefined && parsed.expires <= Date.now()) {
+    if ((parsed.expires ?? Number.POSITIVE_INFINITY) <= Date.now()) {
       this.cookies.delete(key)
       return
     }
@@ -175,7 +168,7 @@ export class CookieJar {
     const now = Date.now()
 
     for (const [key, cookie] of this.cookies) {
-      if (cookie.expires !== undefined && cookie.expires <= now) {
+      if ((cookie.expires ?? Number.POSITIVE_INFINITY) <= now) {
         this.cookies.delete(key)
       }
     }
@@ -187,13 +180,13 @@ export class CookieJar {
     }
 
     const target = new URL(url)
-    const secure = isSecureUrl(target)
+    const secureUrl = isSecureUrl(target)
 
     return cookies
       .filter(cookie =>
         (cookie.hostOnly ? target.hostname === cookie.domain : domainMatch(target.hostname, cookie.domain))
         && matchesHttpPathPrefix(target.pathname as `/${string}`, cookie.path as `/${string}`)
-        && (!cookie.secure || secure),
+        && (!cookie.secure || secureUrl),
       )
       .sort((a, b) => b.path.length - a.path.length)
   }
@@ -207,50 +200,34 @@ export class CookieJar {
 }
 
 /**
- * Appends the jar cookies to a `cookie` header set elsewhere, such as through the link's `headers` option.
- * Cookies already in that header win over jar cookies with the same name.
- *
- * Returns `undefined` when the jar has nothing to add.
+ * Appends jar cookies to an existing `cookie` header, skipping names it already has.
+ * Returns `undefined` when the jar adds nothing.
  */
 function mergeCookieHeader(header: StandardHeaders[string], cookies: StoredCookie[]): string | undefined {
-  const explicit = toArray(header).map(value => value.trim()).filter(Boolean).join('; ')
-  const explicitNames = new Set(explicit ? explicit.split(';').map(pair => splitCookiePair(pair)[0]) : [])
+  const explicit = toArray(header).flatMap(value => value.split(';')).map(pair => pair.trim()).filter(Boolean)
+  const explicitNames = new Set(explicit.map(pair => splitCookiePair(pair)[0]))
 
   const pairs = cookies
     .filter(cookie => !explicitNames.has(cookie.name))
     .map(cookie => cookie.name ? `${cookie.name}=${cookie.value}` : cookie.value)
 
-  if (!pairs.length) {
-    return undefined
-  }
-
-  return [explicit, ...pairs].filter(Boolean).join('; ')
+  return pairs.length ? [...explicit, ...pairs].join('; ') : undefined
 }
 
 /**
- * Splits a cookie pair at the first `=`. A pair without `=` has an empty name, as in browsers.
+ * Splits a cookie pair at the first `=`. A pair without `=` has an empty name, as in browsers and RFC 6265bis.
  */
 function splitCookiePair(pair: string): [name: string, value: string] {
   const index = pair.indexOf('=')
   return [index === -1 ? '' : pair.slice(0, index).trim(), pair.slice(index + 1).trim()]
 }
 
-interface ParsedSetCookie {
-  name: string
-  value: string
-  domain: string | undefined
-  path: string | undefined
-  secure: boolean
-  expires: number | undefined
-}
-
 /**
  * Parses a `Set-Cookie` header value following [RFC 6265 Section 5.2](https://datatracker.ietf.org/doc/html/rfc6265#section-5.2),
- * except that a pair without `=` is kept as a cookie with an empty name instead of being ignored,
- * like browsers and [RFC 6265bis](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/) do.
+ * with the [RFC 6265bis](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/) changes browsers use, noted inline.
  */
-function parseSetCookie(setCookie: string): ParsedSetCookie | undefined {
-  // Control characters other than tab make the whole cookie invalid, as in RFC 6265bis
+function parseSetCookie(setCookie: string) {
+  // Control characters other than tab make the whole cookie invalid
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0A-\x1F\x7F]/.test(setCookie)) {
     return undefined
@@ -348,13 +325,13 @@ function parseCookieDate(value: string): number | undefined {
 
   const [hour, minute, second] = time
 
-  if (day < 1 || day > 31 || year < 1601 || hour > 23 || minute > 59 || second > 59) {
+  if (year < 1601 || hour > 23 || minute > 59 || second > 59) {
     return undefined
   }
 
   const date = Date.UTC(year, month, day, hour, minute, second)
 
-  // Rejects days the month does not have, such as 31 Feb
+  // Rejects days the month does not have, such as 0 or 31 Feb
   return new Date(date).getUTCDate() === day ? date : undefined
 }
 
@@ -376,8 +353,8 @@ function isSecureUrl(url: URL): boolean {
  * [RFC 6265 Section 5.1.3](https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.3)
  */
 function domainMatch(host: string, domain: string): boolean {
-  const isIPAddress = host.startsWith('[') || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
-  return host === domain || (host.endsWith(`.${domain}`) && !isIPAddress)
+  // IPv6 hosts have no dots, so only IPv4 addresses need excluding
+  return host === domain || (host.endsWith(`.${domain}`) && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host))
 }
 
 /**
