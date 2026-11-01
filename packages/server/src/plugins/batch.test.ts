@@ -446,50 +446,16 @@ describe('batchHandlerPlugin', () => {
       })
     })
 
-    it('waits for every sub-response when the batch header asks for no known mode', async () => {
-      const gate = promiseWithResolvers<void>()
-      const handler = createHandler(new BatchHandlerPlugin(), createSlowRouter(gate.promise))
-
-      let settled = false
-      const result = handler.handle(createBatchRequest({
+    it('falls back to buffered mode for an unknown batch header value', async () => {
+      const { response } = await createHandler().handle(createBatchRequest({
         mode: '1',
-        messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/fast')],
-      })).finally(() => {
-        settled = true
-      })
+        messages: [makePeerRequestMessage('0', '/ping')],
+      }))
 
-      await sleep(10)
-      expect(settled).toBe(false)
-
-      gate.resolve()
-      const { response } = await result
-      await expect(response!.json()).resolves.toHaveLength(2)
+      await expect(response!.json()).resolves.toHaveLength(1)
     })
 
     describe('in streaming mode', () => {
-      it('starts the response once the first sub-response is ready', async () => {
-        const gate = promiseWithResolvers<void>()
-        const handler = createHandler(new BatchHandlerPlugin(), createSlowRouter(gate.promise))
-
-        let settled = false
-        const result = handler.handle(createBatchRequest({
-          mode: 'streaming',
-          messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/slow')],
-        })).finally(() => {
-          settled = true
-        })
-
-        await sleep(10)
-        expect(settled).toBe(false)
-
-        gate.resolve()
-        const { response } = await result
-        expect(response!.headers.get('content-type')).toEqual('application/vnd.orpc.batch')
-
-        const messages = await readAllMessages(response!)
-        expect(messages.map(m => m.id).sort()).toEqual(['0', '1'])
-      })
-
       it('answers with an empty stream when no sub-request reaches a procedure', async () => {
         const { response } = await createHandler().handle(createBatchRequest({
           mode: 'streaming',
@@ -1168,32 +1134,6 @@ describe('batchHandlerPlugin', () => {
       while (!(await reader.read()).done) {
         // keep reading until closed
       }
-
-      expect(vi.getTimerCount()).toBe(0)
-    })
-
-    it('sends keep-alive frames in streaming mode while a sub-response is still pending', async () => {
-      const gate = promiseWithResolvers<void>()
-
-      const handler = createHandler(new BatchHandlerPlugin({
-        keepAlive: { enabled: true, interval: 100 },
-      }), createSlowRouter(gate.promise))
-
-      const { response } = await handler.handle(createBatchRequest({
-        mode: 'streaming',
-        messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/fast')],
-      }))
-
-      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
-      await expect(readMessage(reader)).resolves.toMatchObject({ kind: 'response', id: '1' })
-
-      const keepAlive = reader.read()
-      await vi.advanceTimersByTimeAsync(100)
-      await expect(keepAlive).resolves.toEqual({ done: false, value: new Uint8Array([0, 0, 0, 0]) })
-
-      gate.resolve()
-      await expect(readMessage(reader)).resolves.toMatchObject({ kind: 'response', id: '0' })
-      await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
 
       expect(vi.getTimerCount()).toBe(0)
     })

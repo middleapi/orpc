@@ -942,7 +942,7 @@ const batchPlugin = new BatchLinkPlugin({
 
 </CodeGroup>
 
-The `mode` option now defaults to `buffered` instead of `streaming`. The server starts the batch response once every procedure has responded, so it can carry their [headers](/docs/plugins/batch#response-headers), and streams only when a procedure returns a stream. Set `mode: 'streaming'` to keep the v1 behavior, with the limits described in [Response Modes](/docs/plugins/batch#response-modes).
+The `mode` option now defaults to `buffered` instead of `streaming`, so the batch response can carry the procedures' [headers](/docs/plugins/batch#response-headers). Set `mode: 'streaming'` to keep the v1 behavior, with the limits described in [Response Modes](/docs/plugins/batch#response-modes).
 
 :::warning
 Some cases still need to skip batching, for example procedures that rely on [Hibernation](/docs/integrations/hibernation), which cannot work through batched responses. For those, use `filter`. Its meaning is inverted compared to `exclude`: `exclude` returned `true` to skip batching, while `filter` returns `false` to skip batching. Negate your predicate when migrating.

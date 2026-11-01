@@ -55,7 +55,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 :::
 
 :::warning
-A [batch](/docs/plugins/batch) in [`streaming` mode](/docs/plugins/batch#response-modes) starts its response once its first procedure responds, so only that procedure's cookies reach the batch response. Other headers set through `resHeaders` stay on each procedure's own response, and the cookies of the other procedures are lost. Send procedures that set their own cookies outside such batches with the [`filter`](/docs/plugins/batch#filtering-requests) option, or keep the default `buffered` mode.
+In a [`streaming` batch](/docs/plugins/batch#response-modes), only the cookies of the first procedure to respond reach the client. Keep procedures that set cookies out of it with [`filter`](/docs/plugins/batch#filtering-requests).
 :::
 
 ## Learn More
