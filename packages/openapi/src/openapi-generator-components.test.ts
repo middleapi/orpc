@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import type { OpenAPIComponentRegistryDocument } from './openapi-generator-components'
 import type { OpenAPIV3_2 } from './types'
 import { OpenAPIComponentRegistry } from './openapi-generator-components'
 
@@ -866,5 +867,13 @@ describe('openAPIComponentRegistry', () => {
       })
       expect(doc.components?.schemas).toEqual({ Planet: { type: 'string' } })
     })
+  })
+
+  it('collects components into a non-OpenAPI document', () => {
+    const doc: OpenAPIComponentRegistryDocument & { openrpc: string } = { openrpc: '1.3.2' }
+    const registry = new OpenAPIComponentRegistry(doc, undefined)
+
+    expect(registry.register('Planet', { type: 'string' })).toEqual({ $ref: '#/components/schemas/Planet' })
+    expect(doc).toEqual({ openrpc: '1.3.2', components: { schemas: { Planet: { type: 'string' } } } })
   })
 })

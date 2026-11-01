@@ -1,0 +1,86 @@
+---
+title: "OpenRPC Specification"
+description: "Generate OpenRPC documents from oRPC contracts and routers with OpenRPCGenerator and openrpc metadata, and serve them with service discovery."
+---
+
+## OpenRPC Generator
+
+`OpenRPCGenerator` describes a contract or router as an [OpenRPC](https://spec.open-rpc.org) 1.3 document, with JSON Schemas from your [schema converters](/docs/openapi/specification#openapi-generator):
+
+```ts
+import { OpenRPCGenerator } from '@orpc/openrpc'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+const generator = new OpenRPCGenerator({
+  converters: [new ZodToJsonSchemaConverter()],
+})
+
+const spec = await generator.generate(router, {
+  base: {
+    info: { title: 'Planets', version: '1.0.0' },
+    servers: [{ url: 'https://example.com/rpc' }],
+  },
+  filter: (procedure, path) => !path.includes('internal'),
+})
+```
+
+Each procedure becomes a method, in the same way [OpenRPC Handler](/docs/openrpc/handler#methods-and-params) maps them:
+
+- **Params**: an object input is described as one by-name param per property, any other input as a single by-position `input` param, and a method without input has no params.
+- **Result**: the output schema, which also allows `null` when the output is optional.
+- **Errors**: the [typesafe errors](/docs/error-handling) with their JSON-RPC codes. Pass the handler's `errorCodeMap` to the generator too.
+- **Metadata**: from [`openrpc` metadata](#metadata).
+
+Procedures with an [event iterator](/docs/async-iterator-object) are skipped, as the handler does not serve them. Reusable schemas, such as Zod schemas with `.meta({ id: 'Planet' })`, are placed in `components.schemas`.
+
+## Metadata
+
+Use `openrpc` metadata to describe a procedure's method. Fields left undefined fall back to its [`openapi` metadata](/docs/openapi/specification#metadata), so procedures already documented for OpenAPI need no extra metadata.
+
+```ts
+import { openrpc } from '@orpc/openrpc'
+
+const findPlanet = os
+  .meta(openrpc({
+    summary: 'Find a planet',
+    description: 'Returns a single planet.',
+    tags: ['planets'],
+    deprecated: false,
+    externalDocs: { url: 'https://example.com/planets' },
+    examples: [
+      { name: 'Earth', input: { id: 1 }, output: { id: 1, name: 'Earth' } },
+    ],
+  }))
+  .input(z.object({ id: z.number() }))
+  .handler(({ input }) => getPlanet(input.id))
+```
+
+Example inputs are described as params the same way the method's params are, here `[{ "name": "id", "value": 1 }]`. As on the wire, `undefined` params are left out and an `undefined` output is shown as `null`.
+
+Use `spec` to customize the generated Method Object: an object replaces it, and a function receives and returns it:
+
+```ts
+const findPlanet = os
+  .meta(openrpc({
+    spec: method => ({ ...method, 'x-rate-limit': 100 }),
+  }))
+```
+
+When `openrpc` is applied multiple times, fields are overridden by the most recent call, except `tags`, which are concatenated, and `spec`, which is combined: two functions are chained, a function combined with an object is applied to that object, and between two objects the most recent one wins.
+
+## Service Discovery
+
+The `discovery` option of [OpenRPC Handler](/docs/openrpc/handler) answers the `rpc.discover` method with the document, as the [OpenRPC Service Discovery](https://spec.open-rpc.org/#service-discovery-method) method, and also serves it over `GET` at `/openrpc.json`, relative to the prefix:
+
+```ts
+const handler = new OpenRPCHandler(router, {
+  discovery: {
+    spec: () => generator.generate(router), // memoize it for production
+    specPath: '/openrpc.json', // or false to disable the GET endpoint
+  },
+})
+```
+
+Throw an `ORPCError` from `spec` to refuse the document, such as to callers who are not signed in.
+
+Tools such as the [OpenRPC Playground](https://playground.open-rpc.org) can then load the document from `http://localhost:3000/rpc/openrpc.json`.

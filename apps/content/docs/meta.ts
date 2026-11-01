@@ -19,6 +19,7 @@ export default defineMeta({
     'metadata',
     'rpc',
     'openapi',
+    'openrpc',
     'contract',
     'client',
     'adapters',

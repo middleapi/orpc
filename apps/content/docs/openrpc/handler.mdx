@@ -1,0 +1,149 @@
+---
+title: "OpenRPC Handler"
+description: "Use OpenRPCHandler to serve oRPC procedures as a JSON-RPC 2.0 API, for OpenRPC Link or any other JSON-RPC client."
+---
+
+## Overview
+
+`OpenRPCHandler` serves your [router](/docs/router) as a [JSON-RPC 2.0](https://www.jsonrpc.org/specification) API over HTTP `POST`, for [OpenRPC Link](/docs/openrpc/link) or any other JSON-RPC client. Pair it with the [OpenRPC Generator](/docs/openrpc/specification) to describe the API in an OpenRPC document.
+
+```package-install
+npm install @orpc/openrpc@beta
+```
+
+```ts
+import { OpenRPCHandler } from '@orpc/openrpc/fetch' // or '@orpc/openrpc/node', '@orpc/openrpc/fastify', '@orpc/openrpc/aws-lambda'
+
+const handler = new OpenRPCHandler(router)
+
+export async function fetch(request: Request) {
+  const { matched, response } = await handler.handle(request, {
+    prefix: '/rpc',
+    context: {}, // Provide initial context if needed
+  })
+
+  if (matched) {
+    return response
+  }
+
+  return new Response('Not Found', { status: 404 })
+}
+```
+
+The handler answers `POST` requests to the `prefix` path itself, here `/rpc`, so mount it on a route that matches that path in your [adapter](/docs/openrpc/adapters). Other requests are not matched, so other handlers or plugins can serve them. Requests must use `Content-Type: application/json` (or `application/json-rpc`), otherwise they are rejected with `415`, which also protects the endpoint from CSRF.
+
+```bash
+curl -X POST http://localhost:3000/rpc \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc": "2.0", "method": "planet.find", "params": {"id": 1}, "id": 1}'
+```
+
+:::warning
+JSON-RPC over HTTP is request/response only: procedures with an [event iterator](/docs/async-iterator-object) input or output are not exposed, and inputs or outputs containing files or streams cannot be sent. Server-sent notifications are not supported.
+:::
+
+## Methods and Params
+
+Each procedure is a method named after its path joined by `.`, such as `planet.find`. Names starting with `rpc.` are reserved by JSON-RPC.
+
+| `params`               | Procedure input                                                  |
+| ---------------------- | ---------------------------------------------------------------- |
+| `{ "id": 1 }`          | `{ id: 1 }` (by-name)                                            |
+| `[x]`                  | `x` (by-position), for inputs that are not objects               |
+| absent, `[]`, or `{}`  | `undefined` or `{}`, whichever the input schema accepts          |
+| `[x, y]`               | rejected with `-32602`, since a procedure takes a single input   |
+
+Results and error data are serialized like [OpenAPI responses](/docs/openapi/serializer), so a `Date` becomes an ISO string, and an `undefined` result is sent as `null`. Use the [Smart Coercion Plugin](/docs/plugins/smart-coercion) to restore native types from params.
+
+## Error Codes
+
+An `ORPCError` is answered with a JSON-RPC error whose `data` carries the oRPC error, so [OpenRPC Link](/docs/openrpc/link) restores it, including [typesafe errors](/docs/error-handling):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32004,
+    "message": "Planet not found",
+    "data": { "code": "NOT_FOUND", "defined": true, "data": { "id": 2 } }
+  }
+}
+```
+
+Error codes come from `COMMON_JSON_RPC_ERROR_CODE_MAP`: `BAD_REQUEST`, including input validation errors, is `-32602` "Invalid params", other `4xx` errors are `-32000 - (status - 400)`, such as `-32004` for `NOT_FOUND`, `5xx` errors are `-32603` "Internal error", and codes missing from the map are `-32000`. Use `errorCodeMap` to change it, and pass the same map to the [OpenRPC Generator](/docs/openrpc/specification):
+
+```ts
+import { COMMON_JSON_RPC_ERROR_CODE_MAP } from '@orpc/openrpc'
+
+const handler = new OpenRPCHandler(router, {
+  errorCodeMap: { ...COMMON_JSON_RPC_ERROR_CODE_MAP, OUT_OF_STOCK: 1001 },
+})
+```
+
+Requests that are not valid JSON-RPC are answered with the protocol errors `-32700` "Parse error", `-32600` "Invalid Request", or `-32601` "Method not found". JSON-RPC errors use HTTP status `200`.
+
+## Batch Requests and Notifications
+
+A JSON array of requests is a batch: its calls run concurrently and the responses keep the request order. A request without `id` is a notification: it runs to completion, but is never answered, and a request with only notifications is answered with `204`. Batches are limited to `maxBatchSize` requests (default `100`), larger ones are rejected with `413`.
+
+```ts
+const handler = new OpenRPCHandler(router, {
+  maxBatchSize: 20,
+})
+```
+
+## WebSocket
+
+`OpenRPCHandler` from `@orpc/openrpc/websocket` serves the same API over a WebSocket connection, for the same WebSocket implementations as the [WebSocket Adapters](/docs/adapters/websocket). Each message is a request or a batch, answered with a message on the same socket, and notifications are not answered:
+
+```ts
+import { WebSocketServer } from 'ws'
+import { OpenRPCHandler } from '@orpc/openrpc/websocket'
+
+const handler = new OpenRPCHandler(router)
+
+const wss = new WebSocketServer({ port: 8080 })
+
+wss.on('connection', (ws) => {
+  handler.upgrade(ws, {
+    context: {}, // Provide initial context if needed, resolved for each message
+  })
+})
+```
+
+Responses to concurrent calls can arrive in any order, matched to their requests by `id`. When the socket closes, the `signal` of its in-flight calls is aborted. Use `.message(ws, data)` and `.close(ws)` instead of `upgrade` when your server hands you the messages, such as with Bun, Cloudflare Hibernation WebSocket, or [crossws](https://github.com/h3js/crossws):
+
+```ts
+import crossws from 'crossws/adapters/node' // any crossws adapter is supported
+
+const ws = crossws({
+  hooks: {
+    message: async (peer, message) => {
+      await handler.message(peer, message.text())
+    },
+    close: (peer) => {
+      handler.close(peer)
+    },
+  },
+})
+```
+
+## Interceptors
+
+Each JSON-RPC call runs as its own sub-request: [interceptors](/docs/rpc/handler#interceptors) and client interceptors, including those of plugins, run once per call, and each call gets its own tracing span. Use `getJsonRpcCall` to read the call:
+
+```ts
+import { getJsonRpcCall } from '@orpc/openrpc/standard'
+
+const handler = new OpenRPCHandler(router, {
+  interceptors: [
+    async ({ next, request }) => {
+      const call = getJsonRpcCall(request) // { method: 'planet.find', id: 1 }
+      return next()
+    },
+  ],
+})
+```
+
+Routing interceptors run once per HTTP request (or WebSocket message), around all the calls of a batch, and can answer the whole request, such as to require authentication. Over WebSocket, such an answer is sent as an error for each call of the message. `rpc.discover`, answered by the [discovery option](/docs/openrpc/specification#service-discovery), only runs inside routing interceptors. Plugins built on them apply to the HTTP request itself, such as [CORS](/docs/plugins/cors), [Request Limit](/docs/plugins/request-limit), and [Response Headers](/docs/plugins/response-headers), and logging plugins such as [Pino](/docs/integrations/pino) log once per HTTP request. The response headers of the calls in a batch are merged. The [Batch Plugin](/docs/plugins/batch) is not needed, since JSON-RPC batches requests natively.

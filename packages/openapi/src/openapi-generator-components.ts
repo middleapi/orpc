@@ -12,6 +12,18 @@ const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 
 /**
+ * The part of a document {@link OpenAPIComponentRegistry} reads and writes: `components.schemas`.
+ *
+ * Any document that keeps reusable schemas under `#/components/schemas/`, such as an OpenAPI
+ * or OpenRPC document, satisfies it.
+ */
+export interface OpenAPIComponentRegistryDocument {
+  components?: {
+    schemas?: Record<string, JsonSchema> | undefined
+  } | undefined
+}
+
+/**
  * Collects reusable schemas into `doc.components.schemas`.
  *
  * Equivalent schemas (including recursive ones) reuse a single component, and different
@@ -19,7 +31,7 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
  */
 export class OpenAPIComponentRegistry {
   constructor(
-    private readonly doc: OpenAPIV3_2.OpenAPIObject,
+    private readonly doc: OpenAPIComponentRegistryDocument,
     private readonly componentName: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined,
   ) {}
 

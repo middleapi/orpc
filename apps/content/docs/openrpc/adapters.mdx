@@ -1,0 +1,31 @@
+---
+title: "OpenRPC Adapters"
+description: "The HTTP and WebSocket adapters that run OpenRPC Handler and OpenRPC Link for JSON-RPC 2.0, and where to import each one."
+---
+
+OpenRPC runs over HTTP and WebSocket. Pick the adapter for your transport, then import [OpenRPC Handler](/docs/openrpc/handler) or [OpenRPC Link](/docs/openrpc/link) from it. For message ports, use [RPC](/docs/rpc/adapters).
+
+## Server Adapters
+
+| Adapter                                 | Import `OpenRPCHandler` from |
+| --------------------------------------- | ---------------------------- |
+| [Fetch API](/docs/adapters/fetch-api)   | `@orpc/openrpc/fetch`        |
+| [Node HTTP](/docs/adapters/node-http)   | `@orpc/openrpc/node`         |
+| [Fastify](/docs/adapters/fastify)       | `@orpc/openrpc/fastify`      |
+| [AWS Lambda](/docs/adapters/aws-lambda) | `@orpc/openrpc/aws-lambda`   |
+| [WebSocket](/docs/adapters/websocket)   | `@orpc/openrpc/websocket`    |
+
+The HTTP adapters answer `POST` requests to the `prefix` path itself, such as `/rpc`, so mount the handler on a route that matches it. In Fastify, use `app.all('/rpc', ...)`: `/rpc/*` does not match `/rpc`, and a `POST`-only route would keep [CORS](/docs/plugins/cors) preflight requests from reaching the handler. The WebSocket adapter answers each message on its socket, also from crossws hooks, see [OpenRPC Handler over WebSocket](/docs/openrpc/handler#websocket).
+
+## Client Adapters
+
+| Adapter                               | Import `OpenRPCLink` from | Calls                    |
+| ------------------------------------- | ------------------------- | ------------------------ |
+| [Fetch API](/docs/adapters/fetch-api) | `@orpc/openrpc/fetch`     | Any HTTP server adapter  |
+| [WebSocket](/docs/adapters/websocket) | `@orpc/openrpc/websocket` | WebSocket server adapter |
+
+Both also call any other JSON-RPC 2.0 server over the same transport.
+
+## Frameworks and Platforms
+
+Every framework and platform adapter built on the Fetch API or Node HTTP also serves OpenRPC, such as [Next.js](/docs/adapters/next), [Hono](/docs/adapters/hono), [Express.js](/docs/adapters/express), and [Cloudflare Workers](/docs/adapters/cloudflare-workers). Where an example uses `RPCHandler`, swap in `OpenRPCHandler` from the matching import above. See [Adapters](/docs/adapters) for the full list.
