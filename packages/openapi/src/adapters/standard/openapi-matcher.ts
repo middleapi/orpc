@@ -24,10 +24,7 @@ interface TreeEntry {
 
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
   matcher?: ReturnType<typeof createPrefixMatcher> | undefined
-  /**
-   * in-flight load, shared so concurrent matches never load or re-index the same router twice.
-   * Keeps its rejection when indexing fails, which would fail the same way on every attempt.
-   */
+  /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
   loading?: Promise<void> | undefined
 }
 
@@ -136,11 +133,8 @@ export class OpenAPIMatcher {
   }
 
   private loadPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
-    // a loader that throws synchronously leaves `loading` unset, so the next match retries it
     pending.loading ??= unlazy(pending.router).then(
       ({ default: router }) => {
-        // a throw here stays in `loading`, so later matches rethrow it instead of
-        // adding the routes indexed before the failure again
         this.index(router, pending.path)
 
         // removed only once indexed, so a concurrent match never observes this router as
@@ -148,7 +142,6 @@ export class OpenAPIMatcher {
         this.pendingLazyRouters.delete(pending)
       },
       (error) => {
-        // a failed load may succeed later, so the next match retries it
         pending.loading = undefined
         throw error
       },

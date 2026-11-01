@@ -546,7 +546,6 @@ describe('openAPIMatcher', () => {
         await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
       }
 
-      // the route indexed before the failure stays unreachable behind the rejection
       expect(loader).toHaveBeenCalledTimes(1)
       expect(filter).toHaveBeenCalledTimes(2)
     })
@@ -595,7 +594,7 @@ describe('openAPIMatcher', () => {
         user: os.meta(openapi({ prefix: '/users' })).lazy(loader),
       })
 
-      // "%75" is "u": the prefix only matches the pathname once decoded
+      // "%75" is "u"
       const result = await matcher.match('GET', '/%75sers/info', undefined)
 
       expect(result).toBeDefined()
