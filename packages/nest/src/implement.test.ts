@@ -970,7 +970,7 @@ describe('response status, headers and body should follow standard-server', () =
         {
           name: 'undefined',
           response: () => ({ headers, body: undefined }),
-          expected: { 'standard-server': 'none', 'content-type': expect.stringMatching(/^text\/plain/), 'content-length': '0' },
+          expected: { 'standard-server': undefined, 'content-type': undefined, 'content-length': '0' },
           text: '',
         },
         {

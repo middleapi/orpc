@@ -78,7 +78,7 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
 
 /**
  * Replaces the body with an empty stream, keeping the headers adapters derive from it.
- * An empty stream rather than no body, because adapters drop `Content-Length` when the body is `undefined`,
+ * An empty stream rather than no body, because adapters drop `Content-Type` and `Content-Length` when the body is `undefined`,
  * and an empty `Standard-Server` hint rather than none, so they do not hint the stream as `octet-stream`.
  */
 function toHeadResponse(response: StandardResponse): StandardResponse {
