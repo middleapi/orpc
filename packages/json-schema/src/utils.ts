@@ -4,8 +4,8 @@
  */
 
 import type { JsonSchema } from './types'
-import { findDeepMatches, isPlainObject } from '@orpc/shared'
-import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES } from './constants'
+import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
+import { resolveJsonSchemaLocalPointer } from './ref-utils'
 
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
   if (typeof schema === 'boolean') {
@@ -37,10 +37,46 @@ export function isJsonFileSchema(schema: JsonSchema): schema is JsonFileSchema {
 }
 
 /**
- * Returns true when a file schema appears anywhere in the schema, such as in a property, a composition, or a def.
+ * Returns true when a file schema is reachable from the schema, such as through a property, a composition, or a local `$ref`.
  */
 export function containsJsonFileSchema(schema: JsonSchema): boolean {
-  return findDeepMatches(v => isPlainObject(v) && isJsonFileSchema(v as JsonSchema), schema).values.length > 0
+  const seen = new Set<object>()
+
+  const visit = (value: unknown, schemaLevel: boolean): boolean => {
+    if (!value || typeof value !== 'object' || seen.has(value)) {
+      return false
+    }
+
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      return value.some(item => visit(item, schemaLevel))
+    }
+
+    const record = value as Record<string, unknown>
+
+    if (schemaLevel && isJsonFileSchema(record as JsonSchema)) {
+      return true
+    }
+
+    return Object.keys(record).some((key) => {
+      const val = record[key]
+
+      if (key === '$ref' && typeof val === 'string') {
+        return visit(resolveJsonSchemaLocalPointer(schema, val), true)
+      }
+
+      if (!schemaLevel) {
+        return visit(val, true)
+      }
+
+      return key !== '$defs'
+        && (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key))
+        && visit(val, !JSON_SCHEMA_RECORD_KEYWORDS.has(key))
+    })
+  }
+
+  return visit(schema, true)
 }
 
 export type JsonObjectSchema = JsonSchema & object & { type: 'object' }

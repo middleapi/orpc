@@ -17,6 +17,7 @@ import {
   isJsonPrimitiveSchema,
   isUnconstrainedSchema,
   matchArrayableJsonSchema,
+  resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import { stringifyJSON, value } from '@orpc/shared'
@@ -287,10 +288,12 @@ function renderQueryParameters(
       delete parameter.allowReserved
     }
     else if (style === undefined) {
-      if (flattenJsonUnionSchema(schema).some(s => !isJsonPrimitiveSchema(s))) {
+      const isPrimitive = (s: JsonSchema) => isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(s))
+
+      if (!flattenJsonUnionSchema(schema).every(isPrimitive)) {
         const arrayable = matchArrayableJsonSchema(schema)
 
-        if (!arrayable || flattenJsonUnionSchema(arrayable[0]).some(s => !isJsonPrimitiveSchema(s))) {
+        if (!arrayable || !flattenJsonUnionSchema(arrayable[0]).every(isPrimitive)) {
           parameter.style = 'deepObject'
           parameter.explode = true
         }
@@ -627,11 +630,12 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
   const fileSchemasByMediaType = new Map<string, JsonSchema[]>()
 
   const rest = flattenJsonUnionSchema(schema).filter((s) => {
-    if (!isJsonFileSchema(s)) {
+    const resolved = resolveJsonSchemaRootLocalRef(s)
+    if (!isJsonFileSchema(resolved)) {
       return !isUnconstrainedSchema(s)
     }
 
-    const contentMediaType = s.contentMediaType ?? '*/*'
+    const contentMediaType = resolved.contentMediaType ?? '*/*'
     const schemas = fileSchemasByMediaType.get(contentMediaType)
     if (schemas) {
       schemas.push(s)

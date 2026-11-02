@@ -1,6 +1,6 @@
 import type { JsonSchema } from './types'
-import { DEFAULT_MAX_BIGINT_DIGITS, get, getOwn, isPlainObject, isTypescriptObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
-import { decodeJsonPointerSegment } from './ref-utils'
+import { DEFAULT_MAX_BIGINT_DIGITS, getOwn, isPlainObject, isTypescriptObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
+import { resolveJsonSchemaLocalPointer } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
 /**
@@ -184,12 +184,7 @@ export class JsonSchemaCoercer {
     let satisfied: Satisfaction = SATISFIED
 
     if (typeof schema.$ref === 'string') {
-      const resolved
-        = schema.$ref.startsWith('#/')
-          ? get(context.rootSchema, schema.$ref.slice('#/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
-          : schema.$ref === '#'
-            ? context.rootSchema
-            : undefined
+      const resolved = resolveJsonSchemaLocalPointer(context.rootSchema, schema.$ref)
 
       if (resolved !== undefined && !appliedRefs?.has(resolved)) {
         if (schema.type === 'object' || schema.type === 'array') {

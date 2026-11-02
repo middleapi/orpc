@@ -406,6 +406,42 @@ describe('openAPIGenerator basic & options', () => {
     expect((doc.paths?.['/planet']?.post?.requestBody as any).required).toBeUndefined()
   })
 
+  it('resolves $ref schemas when choosing query styles and body content types', async () => {
+    const Status = z.enum(['a', 'b']).meta({ id: 'Status' })
+
+    const doc = await generator.generate({
+      list: oc
+        .meta(openapi({ method: 'GET', path: '/list' }))
+        .input(z.object({ status: Status, statuses: z.union([Status, z.array(Status)]) })),
+      download: oc
+        .meta(openapi({ method: 'GET', path: '/download', outputStructure: 'detailed' }))
+        .output(z.union([
+          z.object({ status: z.literal(200), body: z.file().meta({ id: 'Download' }) }),
+          z.object({ status: z.literal(201), body: z.object({ id: z.string() }) }),
+        ])),
+    })
+
+    expect(doc.paths?.['/list']?.get?.parameters).toEqual([
+      { in: 'query', name: 'status', required: true, allowEmptyValue: true, allowReserved: true, schema: { $ref: '#/components/schemas/Status' } },
+      {
+        in: 'query',
+        name: 'statuses',
+        required: true,
+        allowEmptyValue: true,
+        allowReserved: true,
+        schema: { anyOf: [{ $ref: '#/components/schemas/Status' }, { type: 'array', items: { $ref: '#/components/schemas/Status' } }] },
+      },
+    ])
+
+    expect(doc.paths?.['/download']?.get?.responses).toEqual({
+      200: { description: 'OK', content: { '*/*': { schema: { $ref: '#/components/schemas/Download' } } } },
+      201: {
+        description: 'OK',
+        content: { 'application/json': { schema: expect.objectContaining({ properties: { id: { type: 'string' } } }) } },
+      },
+    })
+  })
+
   it('treats boolean schemas as unconstrained', async () => {
     const generator = new OpenAPIGenerator({ converters: [testSchemaConverter] })
 

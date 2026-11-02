@@ -26,6 +26,22 @@ export function decodeJsonPointerSegment(segment: string): string {
 }
 
 /**
+ * Resolves a local JSON pointer ref (`#` or `#/...`) against the root schema.
+ * Returns `undefined` for non-local refs and missing targets.
+ */
+export function resolveJsonSchemaLocalPointer(root: JsonSchema, ref: string): JsonSchema | undefined {
+  if (ref === '#') {
+    return root
+  }
+
+  if (!ref.startsWith('#/')) {
+    return undefined
+  }
+
+  return get(root, ref.slice(2).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+}
+
+/**
  * Visits every `$ref` in a schema, traversing the same keywords as {@link mapJsonSchemaRefs}.
  * Shared or cyclic object instances are visited once.
  */
@@ -105,7 +121,7 @@ export function hoistRecursiveRefToDef(schema: JsonSchema): JsonSchema {
   }
 
   const isRootRef = (ref: string) => ref === '#'
-    || (ref.startsWith('#/') && !ref.startsWith('#/$defs/') && get(schema, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined)
+    || (!ref.startsWith('#/$defs/') && resolveJsonSchemaLocalPointer(schema, ref) !== undefined)
 
   // most schemas have no root ref, so detect one without copying the schema
   let hasRootRef = false
