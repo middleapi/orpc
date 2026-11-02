@@ -10,21 +10,8 @@ import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
 
-/**
- * Decoded segments that are refused: `..`, so the joined path can never leave `rootDir`;
- * null bytes; and encoded separators, so the path joined matches the one a proxy in front sees.
- * Any segment of only dots and spaces is refused, since Win32 strips trailing dots and spaces
- * from a name, so `.. ` or `...` can still mean `..` there.
- */
 const UNSAFE_SEGMENT_REGEX = /^[. ]+$|[\0/\\]/
 
-/**
- * Like {@link UNSAFE_SEGMENT_REGEX}, plus names starting with a dot, and 8.3 short names like
- * `ENV~1` or `GIT~1`, which NTFS and FAT resolve to dotfiles. A generated alias ends a base of
- * at most eight characters with a `~` numeric tail, so only that prefix is matched.
- *
- * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names
- */
 const UNSAFE_OR_DOTFILE_SEGMENT_REGEX = /^[. ]+$|^\.|^[^.]{0,6}~\d|[\0/\\]/
 
 const PRECOMPRESSED_ENCODINGS = [
@@ -109,15 +96,8 @@ export interface StaticFileHandlerPluginOptions {
 export class StaticFileHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   name = '~static-file'
 
-  /**
-   * Ensure the request span is available when the interceptor renames it.
-   */
   after: string[] = ['~tracing']
 
-  /**
-   * Should run outside the HEAD method plugin's `GET` fallback, so files keep answering `HEAD`
-   * themselves and procedures routed as `GET` still take precedence over them.
-   */
   before: string[] = ['~head-method']
 
   private readonly rootDir: string
@@ -137,7 +117,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     this.cacheControl = options.cacheControl ?? 'public, max-age=0'
     this.unsafeSegmentRegex = options.dotfiles ? UNSAFE_SEGMENT_REGEX : UNSAFE_OR_DOTFILE_SEGMENT_REGEX
     this.precompressed = options.precompressed ?? false
-    // A null prototype prevents extensions like "constructor" from resolving through the prototype chain
     this.mimeTypes = Object.assign(Object.create(null) as Record<string, string>, options.mimeTypes)
   }
 
@@ -156,7 +135,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
         return result
       }
 
-      // Named after the base path rather than the url, so span names keep a low cardinality
       getTracer()?.getActiveSpan()?.updateName(`${request.method} ${base === '/' ? '' : base}/* (static file)`)
 
       return { matched: true, response }
@@ -164,7 +142,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     return {
       ...options,
-      // Run after user-provided routing interceptors so they can capture file responses
       routingInterceptors: [...toArray(options.routingInterceptors), routingInterceptor],
     }
   }
@@ -177,14 +154,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     const segments: string[] = []
-    // A url ending in a slash, or a dot segment, denotes a directory, so only its index file can be served
     let isDirectoryUrl = false
 
-    // Decoded per segment, so one malformed escape cannot prevent the others from decoding
     for (const rawSegment of pathname.slice(base.length).split('/')) {
       const segment = safeDecodeURIComponent(rawSegment)
 
-      // A single dot denotes the current directory, so like an empty segment it is skipped
       isDirectoryUrl = segment === '' || segment === '.'
 
       if (isDirectoryUrl) {
@@ -224,7 +198,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let contentEncoding: string | undefined
 
     if (this.precompressed && isCompressibleContentType(contentType)) {
-      // Sent even for the identity variant, so caches key on the encoding
       headers.vary = 'accept-encoding'
 
       const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
@@ -247,7 +220,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     const size = stats.size
     const etag = `"${size.toString(16)}-${stats.mtime.getTime().toString(16)}"`
-    // Truncated to seconds, matching the precision of http dates
     const lastModifiedTime = Math.floor(stats.mtime.getTime() / 1000) * 1000
 
     headers.etag = etag
@@ -282,7 +254,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       }
     }
 
-    // Representation metadata is kept off the 304 and 416, neither of which carries the representation
     if (contentEncoding !== undefined) {
       headers['content-encoding'] = contentEncoding
     }
@@ -290,10 +261,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     headers['content-type'] = contentType
     headers['content-length'] = `${end - start + 1}`
 
-    /**
-     * A HEAD response uses an empty stream instead of no body, because
-     * the adapters drop `content-type` and `content-length` when the body is `undefined`.
-     */
     const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD'
       ? new ReadableStream({ start: controller => controller.close() })
       : toWebReadableStream(createReadStream(filePath, status === 206 ? { start, end } : undefined))
@@ -315,7 +282,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return 'application/octet-stream'
     }
 
-    // Http defines no default charset, so text is pinned to utf-8 instead of left to browser sniffing
     return contentType.startsWith('text/') ? `${contentType}; charset=utf-8` : contentType
   }
 }
@@ -328,11 +294,6 @@ function stripTrailingSlash(path: `/${string}`): `/${string}` {
   return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) as `/${string}` : path
 }
 
-/**
- * If-None-Match takes precedence over If-Modified-Since and uses the weak comparison function.
- * A request `Cache-Control: no-cache` is deliberately ignored: a `304` is a successful
- * revalidation, and `fetch` sends it alongside its conditional headers.
- */
 function isNotModified(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number): boolean {
   const ifNoneMatch = flattenStandardHeader(requestHeaders['if-none-match'])
 
@@ -345,14 +306,9 @@ function isNotModified(requestHeaders: StandardHeaders, etag: string, lastModifi
 
   const ifModifiedSince = flattenStandardHeader(requestHeaders['if-modified-since'])
 
-  // An unparsable date is NaN, which never compares true
   return ifModifiedSince !== undefined && lastModifiedTime <= Date.parse(ifModifiedSince)
 }
 
-/**
- * An entity tag uses the strong comparison function, so a weak tag never matches. Only other
- * values are parsed as dates, since the lenient date parser accepts some tags like `"1-2"`.
- */
 function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number): boolean {
   const ifRange = flattenStandardHeader(requestHeaders['if-range'])
 
@@ -365,10 +321,6 @@ function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastMo
     : Date.parse(ifRange) === lastModifiedTime
 }
 
-/**
- * Supports a single `bytes` range. Malformed and multi-range headers return `undefined`,
- * so the full file is served instead.
- */
 function parseByteRange(range: string, size: number): [start: number, end: number] | 'unsatisfiable' | undefined {
   const match = range.match(/^bytes=\s*(\d*)-(\d*)$/i)
 
