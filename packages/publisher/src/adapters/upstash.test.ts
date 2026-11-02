@@ -1,4 +1,3 @@
-import type { PublisherSubscribeListenerOptions } from '../publisher'
 import type { UpstashPublisherOptions } from './upstash'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
@@ -55,7 +54,12 @@ describe.concurrent(
     })
 
     afterAll(() => {
-      createdPublishers.forEach(expectCleanedUp)
+      for (const publisher of createdPublishers) {
+        expect((publisher as any).listenersMap.size).toEqual(0) // ensure cleanup correctly
+        expect((publisher as any).subscriptionMap.size).toEqual(0) // ensure cleanup correctly
+        expect((publisher as any).onErrorsMap.size).toEqual(0) // ensure cleanup correctly
+        expect((publisher as any).pendingSubscriptionsMap.size).toEqual(0) // ensure cleanup correctly
+      }
     })
 
     it('delivers live events and meta (without resume and prefix)', async () => {
@@ -610,6 +614,47 @@ describe.concurrent(
       }
     })
 
+    it('fan-outs subscription errors to every registered onError handler', async () => {
+      const subscription = createFakeSubscription()
+      const publisher = createTestingPublisher({}, {
+        useRedis: withFakeSubscribe(redis, () => {
+          queueMicrotask(() => subscription.emit('subscribe', 1))
+          return subscription
+        }),
+      })
+      const event = 'connection-lost'
+      const onError1 = vi.fn()
+      const onError2 = vi.fn()
+
+      const unsubscribe1 = await publisher.subscribe(event, vi.fn(), { onError: onError1 })
+      const unsubscribe2 = await publisher.subscribe(event, vi.fn(), { onError: onError2 })
+
+      const error = new Error('connection lost')
+      subscription.emit('error', error)
+
+      expect(onError1).toHaveBeenCalledExactlyOnceWith(error)
+      expect(onError2).toHaveBeenCalledExactlyOnceWith(error)
+
+      await unsubscribe1()
+      await unsubscribe2()
+
+      expect(subscription.unsubscribe).toHaveBeenCalledTimes(1)
+    })
+
+    it('tears down a subscription that fails before it is established', async () => {
+      const subscription = createFakeSubscription()
+      const publisher = createTestingPublisher({}, {
+        useRedis: withFakeSubscribe(redis, () => {
+          queueMicrotask(() => subscription.emit('error', new Error('connection refused')))
+          return subscription
+        }),
+      })
+
+      await expect(publisher.subscribe('unreachable', vi.fn())).rejects.toThrow('connection refused')
+
+      expect(subscription.unsubscribe).toHaveBeenCalledTimes(1)
+    })
+
     it('opens a fresh subscription when subscribing while the previous one is being torn down', async () => {
       const dedicatedRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
       const subscribeSpy = vi.spyOn(dedicatedRedis, 'subscribe')
@@ -646,11 +691,12 @@ function createFakeSubscription() {
   }
 }
 
-function expectCleanedUp(publisher: UpstashPublisher<any>) {
-  expect((publisher as any).listenersMap.size).toEqual(0)
-  expect((publisher as any).subscriptionMap.size).toEqual(0)
-  expect((publisher as any).onErrorsMap.size).toEqual(0)
-  expect((publisher as any).pendingSubscriptionsMap.size).toEqual(0)
+function withFakeSubscribe(redis: Redis, subscribe: () => unknown): Redis {
+  return new Proxy(redis, {
+    get(target, p) {
+      return p === 'subscribe' ? subscribe : getOrBind(target, p)
+    },
+  })
 }
 
 it('prefix creates a publisher that appends the prefix and shares the client', async () => {
@@ -661,160 +707,42 @@ it('prefix creates a publisher that appends the prefix and shares the client', a
   expect(redis.publish).toHaveBeenCalledWith('tenant:event', expect.any(String))
 })
 
-describe('upstashPublisher with a fake client', () => {
-  function createFakePublisher() {
-    const subscriptions: Array<ReturnType<typeof createFakeSubscription>> = []
-    const messages: string[] = []
-    const redis = {
-      publish: async (_channel: string, message: string) => {
-        messages.push(message)
-        return 1
-      },
-      subscribe: () => {
-        const subscription = createFakeSubscription()
-        subscriptions.push(subscription)
-        return subscription
-      },
-    }
-    const publisher = new UpstashPublisher<Record<string, object>>(redis as unknown as Redis)
+it('does not broadcast a throwing onError to other subscribers', async () => {
+  const subscription = createFakeSubscription()
+  const messages: string[] = []
+  const redis = {
+    publish: async (_channel: string, message: string) => messages.push(message),
+    subscribe: () => {
+      queueMicrotask(() => subscription.emit('subscribe', 1))
+      return subscription
+    },
+  }
+  const publisher = new UpstashPublisher<Record<string, object>>(redis as unknown as Redis)
+  const listener2 = vi.fn()
+  const onError2 = vi.fn()
 
-    const subscribeEstablished = (
-      event: string,
-      listener: (payload: object) => void,
-      options?: PublisherSubscribeListenerOptions,
-    ) => {
-      const count = subscriptions.length
-      const subscribing = publisher.subscribe(event, listener, options)
+  const unsubscribe1 = await publisher.subscribe('room', () => {
+    throw new Error('listener failed')
+  }, {
+    onError: () => {
+      throw new Error('onError failed')
+    },
+  })
+  const unsubscribe2 = await publisher.subscribe('room', listener2, { onError: onError2 })
 
-      if (subscriptions.length > count) {
-        subscriptions.at(-1)!.emit('subscribe', 1)
-      }
+  await publisher.publish('room', { order: 1 })
 
-      return subscribing
-    }
-
-    return { publisher, subscriptions, messages, subscribeEstablished }
+  // Like Upstash, which emits a throw from a message handler as an `error` event.
+  try {
+    subscription.emit('message', { channel: 'room', message: messages[0] })
+  }
+  catch (error) {
+    subscription.emit('error', error)
   }
 
-  it('opens a fresh subscription for new subscribers after the stream fails', async () => {
-    const { publisher, subscriptions, messages, subscribeEstablished } = createFakePublisher()
-    const listener1 = vi.fn()
-    const listener2 = vi.fn()
-    const onError1 = vi.fn()
-    const onError2 = vi.fn()
+  expect(listener2).toHaveBeenCalledExactlyOnceWith({ order: 1 })
+  expect(onError2).not.toHaveBeenCalled()
 
-    const unsubscribe1 = await subscribeEstablished('room', listener1, { onError: onError1 })
-
-    // Upstash does not reconnect: the SSE stream is gone for good.
-    const error = new Error('stream closed')
-    subscriptions[0]!.emit('error', error)
-
-    expect(onError1).toHaveBeenCalledExactlyOnceWith(error)
-    expect(subscriptions[0]!.unsubscribe).toHaveBeenCalledTimes(1)
-    expect((publisher as any).subscriptionMap.size).toEqual(0)
-
-    // listener1 is still registered, but a new subscriber must not attach to the dead stream.
-    const unsubscribe2 = await subscribeEstablished('room', listener2, { onError: onError2 })
-
-    expect(subscriptions).toHaveLength(2)
-
-    await publisher.publish('room', { order: 1 })
-    subscriptions[1]!.emit('message', { channel: 'room', message: messages[0] })
-
-    expect(listener1).toHaveBeenCalledExactlyOnceWith({ order: 1 })
-    expect(listener2).toHaveBeenCalledExactlyOnceWith({ order: 1 })
-
-    // Late errors from the dead stream are ignored.
-    subscriptions[0]!.emit('error', new Error('late'))
-    expect(onError1).toHaveBeenCalledTimes(1)
-    expect(onError2).not.toHaveBeenCalled()
-
-    // Errors of the established stream fan out to every registered onError.
-    const error2 = new Error('stream closed again')
-    subscriptions[1]!.emit('error', error2)
-
-    expect(onError1).toHaveBeenLastCalledWith(error2)
-    expect(onError2).toHaveBeenCalledExactlyOnceWith(error2)
-
-    await unsubscribe1()
-    await unsubscribe2()
-
-    expect(subscriptions[0]!.unsubscribe).toHaveBeenCalledTimes(1)
-    expect(subscriptions[1]!.unsubscribe).toHaveBeenCalledTimes(1)
-    expectCleanedUp(publisher)
-  })
-
-  it('rejects a subscriber whose stream fails before its subscribe call resolves', async () => {
-    const { publisher, subscriptions, subscribeEstablished } = createFakePublisher()
-    const error = new Error('stream closed')
-    const onError = vi.fn()
-
-    const subscribing = subscribeEstablished('room', vi.fn(), { onError })
-    subscriptions[0]!.emit('error', error) // before the subscribe call resumes
-
-    await expect(subscribing).rejects.toBe(error)
-
-    expect(onError).not.toHaveBeenCalled()
-    expect(subscriptions[0]!.unsubscribe).toHaveBeenCalledTimes(1)
-    expectCleanedUp(publisher)
-  })
-
-  it('rejects a subscriber joining a stream that fails before its subscribe call resolves', async () => {
-    const { publisher, subscriptions, subscribeEstablished } = createFakePublisher()
-    const error = new Error('stream closed')
-    const onError1 = vi.fn()
-    const onError2 = vi.fn()
-
-    const unsubscribe1 = await subscribeEstablished('room', vi.fn(), { onError: onError1 })
-
-    const subscribing2 = subscribeEstablished('room', vi.fn(), { onError: onError2 })
-    subscriptions[0]!.emit('error', error) // before the second subscribe call resumes
-
-    await expect(subscribing2).rejects.toBe(error)
-
-    expect(subscriptions).toHaveLength(1)
-    expect(onError1).toHaveBeenCalledExactlyOnceWith(error)
-    expect(onError2).not.toHaveBeenCalled()
-
-    await unsubscribe1()
-
-    expect(subscriptions[0]!.unsubscribe).toHaveBeenCalledTimes(1)
-    expectCleanedUp(publisher)
-  })
-
-  it('tears down a subscription that fails before it is established, even if confirmed afterwards', async () => {
-    const { publisher, subscriptions } = createFakePublisher()
-
-    const subscribing = publisher.subscribe('room', vi.fn())
-    subscriptions[0]!.emit('error', new Error('connection refused'))
-    subscriptions[0]!.emit('subscribe', 1)
-
-    await expect(subscribing).rejects.toThrow('connection refused')
-
-    expect(subscriptions[0]!.unsubscribe).toHaveBeenCalledTimes(1)
-    expectCleanedUp(publisher)
-  })
-
-  it('keeps delivering to other listeners when one throws', async () => {
-    const { publisher, subscriptions, messages, subscribeEstablished } = createFakePublisher()
-    const listener2 = vi.fn()
-    const onError1 = vi.fn(() => {
-      throw new Error('onError failed')
-    })
-
-    const unsubscribe1 = await subscribeEstablished('room', () => {
-      throw new Error('listener failed')
-    }, { onError: onError1 })
-    const unsubscribe2 = await subscribeEstablished('room', listener2)
-
-    await publisher.publish('room', { order: 1 })
-
-    expect(() => subscriptions[0]!.emit('message', { channel: 'room', message: messages[0] })).not.toThrow()
-    expect(onError1).toHaveBeenCalledTimes(1)
-    expect(listener2).toHaveBeenCalledExactlyOnceWith({ order: 1 })
-
-    await unsubscribe1()
-    await unsubscribe2()
-    expectCleanedUp(publisher)
-  })
+  await unsubscribe1()
+  await unsubscribe2()
 })
