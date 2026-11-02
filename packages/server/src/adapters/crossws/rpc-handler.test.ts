@@ -201,6 +201,5 @@ describe('rpcHandler', () => {
     expect(result.matched).toBe(true)
     expect(procedure).not.toHaveBeenCalled()
     expect(peer.send).not.toHaveBeenCalled()
-    expect((handler as any).peers.has(peer)).toBe(false)
   })
 })

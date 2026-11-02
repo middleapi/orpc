@@ -27,8 +27,10 @@ export interface WebSocketHandlerOptions<_T extends Context> {
 }
 
 export class WebSocketHandler<T extends Context> {
-  private readonly peers = new WeakMap<WebSocketLike, ServerPeer>()
-  private readonly closed = new WeakSet<WebSocketLike>()
+  /**
+   * `null` marks a closed socket, so late messages never create a new peer.
+   */
+  private readonly peers = new WeakMap<WebSocketLike, ServerPeer | null>()
   private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
 
@@ -64,13 +66,12 @@ export class WebSocketHandler<T extends Context> {
     const encoded = toStringOrBytes(data)
     const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
 
-    // A message can arrive after close (e.g. a Blob that finished loading after the socket closed).
-    // Creating a peer here would leak it and run a procedure that is never aborted.
-    if (this.closed.has(ws)) {
+    let peer = this.peers.get(ws)
+
+    // Closed (e.g. a Blob finished loading after close): a new peer here would leak and never be aborted.
+    if (peer === null) {
       return result
     }
-
-    let peer = this.peers.get(ws)
 
     if (!peer) {
       this.peers.set(ws, peer = new ServerPeer(async (message) => {
@@ -96,15 +97,9 @@ export class WebSocketHandler<T extends Context> {
    * @param ws The same WebSocket instance passed to `.message()`.
    */
   async close(ws: WebSocketLike): Promise<void> {
-    this.closed.add(ws)
-
     const peer = this.peers.get(ws)
-
-    if (peer) {
-      // delete before close to avoid potential race conditions
-      this.peers.delete(ws)
-      await peer.close()
-    }
+    this.peers.set(ws, null)
+    await peer?.close()
   }
 
   /**

@@ -23,8 +23,10 @@ export interface experimental_CrosswsHandlerOptions<_T extends Context> {
 }
 
 export class experimental_CrosswsHandler<T extends Context> {
-  private readonly peers: WeakMap<CrosswsPeerLike, ServerPeer> = new WeakMap()
-  private readonly closed: WeakSet<CrosswsPeerLike> = new WeakSet()
+  /**
+   * `null` marks a closed peer, so late messages never create a new server peer.
+   */
+  private readonly peers: WeakMap<CrosswsPeerLike, ServerPeer | null> = new WeakMap()
   private readonly encodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['decodePeerMessage']
 
@@ -56,12 +58,12 @@ export class experimental_CrosswsHandler<T extends Context> {
     const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
     const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
 
-    // Creating a peer after close would leak it and run a procedure that is never aborted.
-    if (this.closed.has(ws)) {
+    let peer = this.peers.get(ws)
+
+    // Closed: a new peer here would leak and its requests would never be aborted.
+    if (peer === null) {
       return result
     }
-
-    let peer = this.peers.get(ws)
 
     if (!peer) {
       this.peers.set(ws, peer = new ServerPeer(async (message) => {
@@ -86,14 +88,8 @@ export class experimental_CrosswsHandler<T extends Context> {
    * @param ws The same crossws peer instance passed to `.message()`.
    */
   async close(ws: CrosswsPeerLike): Promise<void> {
-    this.closed.add(ws)
-
     const peer = this.peers.get(ws)
-
-    if (peer) {
-      // delete before close to avoid potential race conditions
-      this.peers.delete(ws)
-      await peer.close()
-    }
+    this.peers.set(ws, null)
+    await peer?.close()
   }
 }

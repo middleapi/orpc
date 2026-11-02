@@ -21,10 +21,17 @@ describe('rpcHandler', () => {
     }, options)
   }
 
-  const createWs = () => ({
-    addEventListener: vi.fn(),
-    send: vi.fn(() => undefined),
-  })
+  const createWs = () => {
+    const listeners: Record<string, (event?: any) => void> = {}
+
+    return {
+      listeners,
+      addEventListener: vi.fn((event: string, callback: (event?: any) => void) => {
+        listeners[event] = callback
+      }),
+      send: vi.fn(() => undefined),
+    }
+  }
 
   const createRequestMessage = async ({
     prefix,
@@ -244,38 +251,26 @@ describe('rpcHandler', () => {
   })
 
   it('ignores Blob messages that finish loading after close via upgrade', async () => {
-    let onMessage: ((event: { data: Blob }) => void) | undefined
-    let onClose: (() => void) | undefined
     const procedure = vi.fn(() => 'pong')
-
     const handler = new RPCHandler({
       ping: os.handler(procedure),
     })
+    const messageSpy = vi.spyOn(handler, 'message')
 
-    const ws = {
-      addEventListener: vi.fn((event: string, callback: any) => {
-        if (event === 'message') {
-          onMessage = callback
-        }
-
-        if (event === 'close') {
-          onClose = callback
-        }
-      }),
-      send: vi.fn(() => undefined),
-    }
-
+    const ws = createWs()
     handler.upgrade(ws as any)
 
     const request = await createRequestMessage()
-    onMessage?.({ data: new Blob([request as string]) })
-    onClose?.() // closes before the Blob finishes loading
+    ws.listeners.message!({ data: new Blob([request as string]) })
+    ws.listeners.close!() // closes before the Blob finishes loading
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await vi.waitFor(() => {
+      expect(messageSpy).toHaveBeenCalledTimes(1)
+    })
+    await expect(messageSpy.mock.results[0]!.value).resolves.toMatchObject({ matched: true })
 
     expect(procedure).not.toHaveBeenCalled()
     expect(ws.send).not.toHaveBeenCalled()
-    expect((handler as any).peers.has(ws)).toBe(false)
   })
 
   it('ignores messages received after close', async () => {
@@ -292,6 +287,5 @@ describe('rpcHandler', () => {
     expect(result.matched).toBe(true)
     expect(procedure).not.toHaveBeenCalled()
     expect(ws.send).not.toHaveBeenCalled()
-    expect((handler as any).peers.has(ws)).toBe(false)
   })
 })
