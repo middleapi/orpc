@@ -242,4 +242,56 @@ describe('rpcHandler', () => {
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
   })
+
+  it('ignores Blob messages that finish loading after close via upgrade', async () => {
+    let onMessage: ((event: { data: Blob }) => void) | undefined
+    let onClose: (() => void) | undefined
+    const procedure = vi.fn(() => 'pong')
+
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const ws = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+
+        if (event === 'close') {
+          onClose = callback
+        }
+      }),
+      send: vi.fn(() => undefined),
+    }
+
+    handler.upgrade(ws as any)
+
+    const request = await createRequestMessage()
+    onMessage?.({ data: new Blob([request as string]) })
+    onClose?.() // closes before the Blob finishes loading
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
+    expect((handler as any).peers.has(ws)).toBe(false)
+  })
+
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const ws = createWs()
+    await handler.close(ws as any)
+
+    const result = await handler.message(ws as any, await createRequestMessage())
+
+    expect(result.matched).toBe(true)
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
+    expect((handler as any).peers.has(ws)).toBe(false)
+  })
 })

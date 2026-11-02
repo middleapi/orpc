@@ -186,4 +186,21 @@ describe('rpcHandler', () => {
 
     expect(peer.send).not.toHaveBeenCalled()
   })
+
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const peer = createPeer()
+    await handler.close(peer as any)
+
+    const result = await handler.message(peer as any, await createMessage() as any)
+
+    expect(result.matched).toBe(true)
+    expect(procedure).not.toHaveBeenCalled()
+    expect(peer.send).not.toHaveBeenCalled()
+    expect((handler as any).peers.has(peer)).toBe(false)
+  })
 })

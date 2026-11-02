@@ -28,6 +28,7 @@ export interface WebSocketHandlerOptions<_T extends Context> {
 
 export class WebSocketHandler<T extends Context> {
   private readonly peers = new WeakMap<WebSocketLike, ServerPeer>()
+  private readonly closed = new WeakSet<WebSocketLike>()
   private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
 
@@ -56,6 +57,19 @@ export class WebSocketHandler<T extends Context> {
     data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
+    const encoded = toStringOrBytes(data)
+    const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
+
+    // A message can arrive after close (e.g. a Blob that finished loading after the socket closed).
+    // Creating a peer here would leak it and run a procedure that is never aborted.
+    if (this.closed.has(ws)) {
+      return result
+    }
+
     let peer = this.peers.get(ws)
 
     if (!peer) {
@@ -65,12 +79,6 @@ export class WebSocketHandler<T extends Context> {
       }))
     }
 
-    /**
-     * Message order is important: loading -> decode -> .message.
-     * This flow must stay synchronous, or we need to use `sequential` helper
-     */
-    const encoded = toStringOrBytes(data)
-    const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
       await peer.message(
         result.message,
@@ -83,10 +91,13 @@ export class WebSocketHandler<T extends Context> {
 
   /**
    * Cleans up peer state for a closed WebSocket.
+   * Messages passed to `.message()` for this WebSocket afterwards are ignored.
    *
    * @param ws The same WebSocket instance passed to `.message()`.
    */
   async close(ws: WebSocketLike): Promise<void> {
+    this.closed.add(ws)
+
     const peer = this.peers.get(ws)
 
     if (peer) {
