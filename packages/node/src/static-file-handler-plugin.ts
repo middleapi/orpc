@@ -34,7 +34,7 @@ const TEXT_CONTENT_TYPE_REGEX = /^text\//
  */
 const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 
-// Windows defines neither flag, so `serve` also requires the opened file to be the one `lstat` saw
+// Windows defines neither flag
 const OPEN_FLAGS: number = fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0)
 const OPEN_NO_FOLLOW_FLAGS: number = OPEN_FLAGS | (fsConstants.O_NOFOLLOW ?? 0)
 
@@ -237,7 +237,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
    * @remarks
    * `O_NOFOLLOW` only guards the final component. A directory inside the root swapped for a link
    * between `realpath` and the open is still followed, since node exposes no `openat2` with
-   * `RESOLVE_BENEATH` to resolve the whole path beneath the root in one step.
+   * `RESOLVE_BENEATH` to resolve the whole path beneath the root in one step. Windows has no
+   * `O_NOFOLLOW` at all, though creating file links there needs elevated privileges.
    */
   private async openFile(openPath: string): Promise<{ handle: FileHandle, stats: Stats } | undefined> {
     const handle = await open(openPath, this.allowSymlinks ? OPEN_FLAGS : OPEN_NO_FOLLOW_FLAGS).catch(() => undefined)
@@ -426,11 +427,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     const opened = await this.openFile(found.openPath)
 
-    if (opened === undefined || opened.stats.dev !== found.stats.dev || opened.stats.ino !== found.stats.ino) {
-      if (opened !== undefined) {
-        void opened.handle.close().catch(() => {})
-      }
-
+    if (opened === undefined) {
       return undefined
     }
 

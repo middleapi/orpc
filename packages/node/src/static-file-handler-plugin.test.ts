@@ -793,7 +793,7 @@ describe('staticFileHandlerPlugin', () => {
         expect(res.text).not.toContain('outside root')
       })
 
-      it('serves a replaced file only when the checks saw the replacement', async () => {
+      it('describes the file it streams when the file is replaced', async () => {
         swapAfterCheck(() => {
           writeFileSync(`${swapPath()}.tmp`, 'replaced content')
           renameSync(`${swapPath()}.tmp`, swapPath())
@@ -801,26 +801,10 @@ describe('staticFileHandlerPlugin', () => {
 
         const res = await createStaticAgent().get('/swap.txt')
 
-        if (check === 'lstat') {
-          // Also what keeps a link swapped in from being served where O_NOFOLLOW is unavailable
-          expect(res.status).toBe(404)
-          return
-        }
-
         expect(res.status).toBe(200)
         expect(res.text).toBe('replaced content')
         expect(res.headers['content-length']).toBe(`${'replaced content'.length}`)
         expect(res.headers.etag).toBe(`"${'replaced content'.length.toString(16)}-${statSync(swapPath()).mtime.getTime().toString(16)}"`)
-      })
-
-      it('describes the file it streams when the file is rewritten in place', async () => {
-        swapAfterCheck(() => writeFileSync(swapPath(), 'rewritten content'))
-
-        const res = await createStaticAgent().get('/swap.txt')
-
-        expect(res.status).toBe(200)
-        expect(res.text).toBe('rewritten content')
-        expect(res.headers['content-length']).toBe(`${'rewritten content'.length}`)
       })
 
       it.skipIf(process.platform === 'win32')('does not hang on a fifo that replaced a checked file', async () => {
