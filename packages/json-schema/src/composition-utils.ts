@@ -388,8 +388,6 @@ function extractJsonObjectSchemaEntriesInternal(
 
 /**
  * Flattens `anyOf` and `oneOf` unions when they are the only active constraints.
- * Root-local `$ref`s are followed into unions; a `$ref` to a non-union schema is kept as-is,
- * so resolve members with {@link resolveJsonSchemaRootLocalRef} before inspecting them.
  */
 export function flattenJsonUnionSchema(schema: JsonSchema): JsonSchema[] {
   return deduplicateJsonSchemas(flattenJsonUnionSchemaInternal(schema, new Set()))

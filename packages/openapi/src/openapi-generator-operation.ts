@@ -630,7 +630,6 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
   const fileSchemasByMediaType = new Map<string, JsonSchema[]>()
 
   const rest = flattenJsonUnionSchema(schema).filter((s) => {
-    // classify by the ref target, but keep `s` itself so component refs are preserved
     const resolved = resolveJsonSchemaRootLocalRef(s)
     if (!isJsonFileSchema(resolved)) {
       return !isUnconstrainedSchema(s)

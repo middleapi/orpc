@@ -7,10 +7,6 @@ import type { JsonSchema } from './types'
 import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
 import { resolveJsonSchemaLocalPointer } from './ref-utils'
 
-/**
- * Returns true when the schema describes a primitive value (a primitive `type`, `const`, or `enum`).
- * `$ref`s are not followed: resolve them first, e.g. with `resolveJsonSchemaRootLocalRef`.
- */
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
   if (typeof schema === 'boolean') {
     return false
@@ -35,7 +31,6 @@ export type JsonFileSchema = JsonSchema & object & { type: 'string', contentMedi
 
 /**
  * Returns true when the schema is a file-like string schema.
- * `$ref`s are not followed: resolve them first, e.g. with `resolveJsonSchemaRootLocalRef`.
  */
 export function isJsonFileSchema(schema: JsonSchema): schema is JsonFileSchema {
   return typeof schema !== 'boolean' && schema.type === 'string' && (typeof schema.contentMediaType === 'string' || schema.format === 'binary' || schema.contentEncoding === 'binary')
@@ -43,10 +38,8 @@ export function isJsonFileSchema(schema: JsonSchema): schema is JsonFileSchema {
 
 /**
  * Returns true when a file schema is reachable from the schema, such as through a property, a composition, or a local `$ref`.
- * Definitions are only inspected when a `$ref` reaches them, so unused `$defs` entries are ignored.
  */
 export function containsJsonFileSchema(schema: JsonSchema): boolean {
-  // shared targets and recursive refs resolve to already seen objects, which ends the walk
   const seen = new Set<object>()
 
   const visit = (value: unknown, schemaLevel: boolean): boolean => {
@@ -77,7 +70,6 @@ export function containsJsonFileSchema(schema: JsonSchema): boolean {
         return visit(val, true)
       }
 
-      // definitions are only reachable through refs
       return key !== '$defs'
         && (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key))
         && visit(val, !JSON_SCHEMA_RECORD_KEYWORDS.has(key))

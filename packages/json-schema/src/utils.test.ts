@@ -45,23 +45,18 @@ it('containsJsonFileSchema follows only reachable refs', () => {
     TreeWithFile: { type: 'object', properties: { file: { $ref: '#/$defs/File' }, children: { type: 'array', items: { $ref: '#/$defs/TreeWithFile' } } } },
   }
 
-  // unused defs are ignored
   expect(containsJsonFileSchema({ type: 'object', properties: { id: { type: 'string' } }, $defs })).toBe(false)
   expect(containsJsonFileSchema({ $ref: '#/$defs/Tree', $defs })).toBe(false)
 
-  // chained and nested refs are followed
   expect(containsJsonFileSchema({ type: 'object', properties: { nested: { $ref: '#/$defs/WithFile' } }, $defs })).toBe(true)
   expect(containsJsonFileSchema({ anyOf: [{ $ref: '#/$defs/Tree' }, { $ref: '#/$defs/TreeWithFile' }], $defs })).toBe(true)
   expect(containsJsonFileSchema({ type: 'object', properties: { file: { $ref: '#/$defs/WithFile/properties/file' } }, $defs })).toBe(true)
 
-  // recursive root refs terminate
   expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' } } })).toBe(false)
   expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' }, file: { type: 'string', format: 'binary' } } })).toBe(true)
 
-  // unresolvable refs are ignored
   expect(containsJsonFileSchema({ $ref: '#/$defs/Missing', $defs })).toBe(false)
 
-  // values of non-schema keywords are not schemas
   expect(containsJsonFileSchema({ type: 'object', default: { type: 'string', format: 'binary' } })).toBe(false)
 })
 
