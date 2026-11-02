@@ -816,6 +816,23 @@ describe('staticFileHandlerPlugin', () => {
 
         expect((await createStaticAgent().get('/swap.txt')).status).toBe(404)
       })
+
+      it('answers from the replacement when it no longer satisfies the range', async () => {
+        swapAfterCheck(() => {
+          writeFileSync(`${swapPath()}.tmp`, 'x')
+          renameSync(`${swapPath()}.tmp`, swapPath())
+        })
+
+        const res = await createStaticAgent().get('/swap.txt').set('range', 'bytes=3-')
+
+        expect(res.status).toBe(416)
+        expect(res.headers['content-range']).toBe('bytes */1')
+        await vi.waitFor(() => {
+          for (const handle of fsHooks.openedHandles) {
+            expect(handle.fd).toBe(-1)
+          }
+        })
+      })
     })
 
     it('closes every file it opens', async () => {
