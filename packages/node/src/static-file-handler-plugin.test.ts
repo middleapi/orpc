@@ -19,8 +19,8 @@ import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
 
 const fsHooks = vi.hoisted(() => ({
-  /** Runs once `realpath` resolves, the moment the containment check has passed. */
-  afterRealpath: undefined as ((path: string) => void) | undefined,
+  /** Runs once a check resolves: `realpath` for containment, then `lstat` for the file type. */
+  afterCheck: undefined as ((check: 'realpath' | 'lstat', path: string) => void) | undefined,
   openedHandles: [] as FileHandle[],
 }))
 
@@ -31,8 +31,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     ...original,
     realpath: async (...args: Parameters<typeof original.realpath>) => {
       const resolved = await original.realpath(...args)
-      fsHooks.afterRealpath?.(String(args[0]))
+      fsHooks.afterCheck?.('realpath', String(args[0]))
       return resolved
+    },
+    lstat: async (...args: Parameters<typeof original.lstat>) => {
+      const stats = await original.lstat(...args)
+      fsHooks.afterCheck?.('lstat', String(args[0]))
+      return stats
     },
     open: async (...args: Parameters<typeof original.open>) => {
       const handle = await original.open(...args)
@@ -86,7 +91,7 @@ describe('staticFileHandlerPlugin', () => {
   })
 
   afterEach(() => {
-    fsHooks.afterRealpath = undefined
+    fsHooks.afterCheck = undefined
     fsHooks.openedHandles.length = 0
   })
 
@@ -756,7 +761,7 @@ describe('staticFileHandlerPlugin', () => {
       expect((await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1')).status).toBe(200)
     })
 
-    describe('entries swapped after the containment check', () => {
+    describe.each(['realpath', 'lstat'] as const)('entries swapped after %s', (check) => {
       const swapPath = (): string => path.join(rootDir, 'swap.txt')
 
       beforeEach(() => {
@@ -768,9 +773,10 @@ describe('staticFileHandlerPlugin', () => {
       })
 
       function swapAfterCheck(swap: () => void): void {
-        fsHooks.afterRealpath = (filePath) => {
-          if (filePath === swapPath()) {
-            fsHooks.afterRealpath = undefined
+        fsHooks.afterCheck = (calledCheck, filePath) => {
+          // lstat receives the resolved path, which differs from rootDir where tmpdir is a link
+          if (calledCheck === check && path.basename(filePath) === 'swap.txt') {
+            fsHooks.afterCheck = undefined
             swap()
           }
         }
@@ -816,15 +822,18 @@ describe('staticFileHandlerPlugin', () => {
       const agent = createStaticAgent({ precompressed: true })
 
       await agent.get('/hello.txt')
+      await agent.get('/hello.txt').set('range', 'bytes=0-1')
+      // Only the chosen sidecar is opened
+      await agent.get('/compressed.txt').set('accept-encoding', 'gzip, br')
+      expect(fsHooks.openedHandles).toHaveLength(3)
+
+      // Responses without a body never open the file
       await agent.head('/hello.txt')
       await agent.get('/hello.txt').set('if-none-match', helloEtag)
       await agent.get('/hello.txt').set('if-match', '"other"')
       await agent.get('/hello.txt').set('range', 'bytes=100-')
-      await agent.get('/hello.txt').set('range', 'bytes=0-1')
-      // The main file is opened, then closed for the preferred sidecar, and the other sidecar is never opened
-      await agent.get('/compressed.txt').set('accept-encoding', 'gzip, br')
+      expect(fsHooks.openedHandles).toHaveLength(3)
 
-      expect(fsHooks.openedHandles).toHaveLength(8)
       await vi.waitFor(() => {
         for (const handle of fsHooks.openedHandles) {
           expect(handle.fd).toBe(-1)
