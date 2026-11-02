@@ -1,6 +1,6 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import { createORPCClient } from '@orpc/client'
-import { os } from '@orpc/server'
+import { createORPCClient, ORPCError } from '@orpc/client'
+import { implement, os } from '@orpc/server'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 import { OpenAPILink } from './openapi-link'
@@ -99,5 +99,60 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
+  })
+
+  describe('implementing a normal router as the contract', () => {
+    const real = {
+      ping: os
+        .meta(openapi({ method: 'GET', path: '/ping' }))
+        .handler(() => 'REAL'),
+      nested: {
+        pong: os.handler(() => 'REAL'),
+      },
+    }
+
+    it('serves the implementation instead of the contract', async () => {
+      const impl = implement(real)
+      const mock = impl.router({
+        ping: impl.ping.handler(() => 'MOCK'),
+        nested: {
+          pong: impl.nested.pong.handler(() => 'MOCK'),
+        },
+      })
+
+      const handler = new OpenAPIHandler(mock)
+
+      const ping = await handler.handle(new Request('https://example.com/ping'))
+      expect(ping.matched).toBe(true)
+      await expect(ping.response!.json()).resolves.toBe('MOCK')
+
+      const pong = await handler.handle(new Request('https://example.com/nested/pong', { method: 'POST' }))
+      expect(pong.matched).toBe(true)
+      await expect(pong.response!.json()).resolves.toBe('MOCK')
+    })
+
+    it('runs middlewares applied through the implementer', async () => {
+      const requireAuth = vi.fn(() => {
+        throw new ORPCError('UNAUTHORIZED')
+      })
+
+      const impl = implement(real)
+      const mock = impl.use(requireAuth).router({
+        ping: impl.ping.handler(() => 'MOCK'),
+        nested: {
+          pong: impl.nested.pong.handler(() => 'MOCK'),
+        },
+      })
+
+      const handler = new OpenAPIHandler(mock)
+
+      const ping = await handler.handle(new Request('https://example.com/ping'))
+      expect(ping.response!.status).toBe(401)
+
+      const pong = await handler.handle(new Request('https://example.com/nested/pong', { method: 'POST' }))
+      expect(pong.response!.status).toBe(401)
+
+      expect(requireAuth).toHaveBeenCalledTimes(2)
+    })
   })
 })

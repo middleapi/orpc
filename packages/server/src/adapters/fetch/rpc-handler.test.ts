@@ -1,5 +1,7 @@
 import type { StandardHandlerPlugin } from '../standard'
+import { ORPCError } from '@orpc/client'
 import { os } from '../../builder'
+import { implement } from '../../implementer'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -187,5 +189,66 @@ describe('rpcHandler lazy router prefix scan', () => {
     const ok = await handler.handle(new Request('http://localhost/rpc/planet/find', { method: 'POST' }), { prefix: '/rpc' })
     expect(ok.matched).toBe(true)
     expect(loader).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('rpcHandler with a normal router implemented as the contract', () => {
+  const real = {
+    ping: os.handler(() => 'REAL'),
+    nested: {
+      pong: os.handler(() => 'REAL'),
+    },
+  }
+
+  function post(handler: RPCHandler<any>, path: string) {
+    return handler.handle(new Request(`https://example.com${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json: null }),
+    }))
+  }
+
+  it('serves the implementation instead of the contract', async () => {
+    const impl = implement(real)
+    const mock = impl.router({
+      ping: impl.ping.handler(() => 'MOCK'),
+      nested: {
+        pong: impl.nested.pong.handler(() => 'MOCK'),
+      },
+    })
+
+    const handler = new RPCHandler(mock)
+
+    const ping = await post(handler, '/ping')
+    expect(ping.matched).toBe(true)
+    await expect(ping.response!.json()).resolves.toEqual({ json: 'MOCK' })
+
+    const pong = await post(handler, '/nested/pong')
+    expect(pong.matched).toBe(true)
+    await expect(pong.response!.json()).resolves.toEqual({ json: 'MOCK' })
+  })
+
+  it('runs middlewares applied through the implementer', async () => {
+    const requireAuth = vi.fn(() => {
+      throw new ORPCError('UNAUTHORIZED')
+    })
+
+    const impl = implement(real)
+    const mock = impl.use(requireAuth).router({
+      ping: impl.ping.handler(() => 'MOCK'),
+      nested: impl.nested.router({
+        pong: impl.nested.pong.handler(() => 'MOCK'),
+      }),
+    })
+
+    const handler = new RPCHandler(mock)
+
+    const ping = await post(handler, '/ping')
+    expect(ping.response!.status).toBe(401)
+
+    const pong = await post(handler, '/nested/pong')
+    expect(pong.response!.status).toBe(401)
+
+    expect(requireAuth).toHaveBeenCalledTimes(2)
   })
 })

@@ -17,3 +17,10 @@ it('withHiddenRouterContract & getHiddenRouterContract', () => {
   expect(applied).toEqual(router)
   expect(getHiddenRouterContract(applied)).toEqual(contract)
 })
+
+it('getHiddenRouterContract returns undefined for non-object values', () => {
+  expect(getHiddenRouterContract(undefined)).toBeUndefined()
+  expect(getHiddenRouterContract(null as any)).toBeUndefined()
+  expect(getHiddenRouterContract('invalid' as any)).toBeUndefined()
+  expect(getHiddenRouterContract(router)).toBeUndefined()
+})
