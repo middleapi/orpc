@@ -821,7 +821,7 @@ describe('staticFileHandlerPlugin', () => {
       await agent.get('/hello.txt').set('if-match', '"other"')
       await agent.get('/hello.txt').set('range', 'bytes=100-')
       await agent.get('/hello.txt').set('range', 'bytes=0-1')
-      // Both sidecars are opened, and only the preferred one is streamed
+      // The main file is opened, then closed for the preferred sidecar, and the other sidecar is never opened
       await agent.get('/compressed.txt').set('accept-encoding', 'gzip, br')
 
       expect(fsHooks.openedHandles).toHaveLength(8)
