@@ -4,7 +4,7 @@ import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler, PeerRegistry } from '../standard-peer'
 
 /**
  * Supports standard WebSocket instances, Bun ServerWebSocket, "ws" ServerWebSocket,
@@ -27,7 +27,7 @@ export interface WebSocketHandlerOptions<_T extends Context> {
 }
 
 export class WebSocketHandler<T extends Context> {
-  private readonly peers = new WeakMap<WebSocketLike, ServerPeer>()
+  private readonly peers: PeerRegistry<WebSocketLike> = new PeerRegistry()
   private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
 
@@ -56,15 +56,6 @@ export class WebSocketHandler<T extends Context> {
     data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let peer = this.peers.get(ws)
-
-    if (!peer) {
-      this.peers.set(ws, peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
-        await ws.send(encoded)
-      }))
-    }
-
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
@@ -72,6 +63,16 @@ export class WebSocketHandler<T extends Context> {
     const encoded = toStringOrBytes(data)
     const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
+      const peer = this.peers.getOrCreate(ws, () => new ServerPeer(async (message) => {
+        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
+        await ws.send(encoded)
+      }))
+
+      // `ws` has been closed, ignore the message
+      if (!peer) {
+        return result
+      }
+
       await peer.message(
         result.message,
         createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
@@ -87,13 +88,7 @@ export class WebSocketHandler<T extends Context> {
    * @param ws The same WebSocket instance passed to `.message()`.
    */
   async close(ws: WebSocketLike): Promise<void> {
-    const peer = this.peers.get(ws)
-
-    if (peer) {
-      // delete before close to avoid potential race conditions
-      this.peers.delete(ws)
-      await peer.close()
-    }
+    await this.peers.close(ws)
   }
 
   /**

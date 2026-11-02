@@ -242,4 +242,60 @@ describe('rpcHandler', () => {
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
   })
+
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const ws = createWs()
+
+    await handler.close(ws as any)
+
+    const result = await handler.message(ws as any, await createRequestMessage())
+
+    expect(result.matched).toBe(true)
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  it('ignores Blob messages that finish loading after close via upgrade', async () => {
+    let onMessage: ((event: { data: Blob }) => void) | undefined
+    let onClose: (() => void) | undefined
+
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const message = vi.spyOn(handler, 'message')
+
+    const ws = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+
+        if (event === 'close') {
+          onClose = callback
+        }
+      }),
+      send: vi.fn(() => undefined),
+    }
+
+    handler.upgrade(ws as any)
+
+    const request = await createRequestMessage()
+    onMessage?.({ data: new Blob([request as string]) })
+    onClose?.() // closes while the Blob is still loading
+
+    await vi.waitFor(() => {
+      expect(message).toHaveBeenCalledTimes(1)
+    })
+
+    await expect(message.mock.results[0]!.value).resolves.toEqual(expect.objectContaining({ matched: true }))
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
+  })
 })

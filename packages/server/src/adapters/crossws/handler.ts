@@ -5,7 +5,7 @@ import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler, PeerRegistry } from '../standard-peer'
 
 export type CrosswsPeerLike = Pick<Peer, 'send'>
 export type CrosswsMessageLike = Pick<Message, 'rawData' | 'uint8Array'>
@@ -23,7 +23,7 @@ export interface experimental_CrosswsHandlerOptions<_T extends Context> {
 }
 
 export class experimental_CrosswsHandler<T extends Context> {
-  private readonly peers: WeakMap<CrosswsPeerLike, ServerPeer> = new WeakMap()
+  private readonly peers: PeerRegistry<CrosswsPeerLike> = new PeerRegistry()
   private readonly encodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['decodePeerMessage']
 
@@ -48,14 +48,6 @@ export class experimental_CrosswsHandler<T extends Context> {
     message: CrosswsMessageLike,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let peer = this.peers.get(ws)
-
-    if (!peer) {
-      this.peers.set(ws, peer = new ServerPeer(async (message) => {
-        ws.send(await encodePeerMessage(message, this.encodePeerMessageOptions))
-      }))
-    }
-
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
@@ -63,6 +55,15 @@ export class experimental_CrosswsHandler<T extends Context> {
     const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
     const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
+      const peer = this.peers.getOrCreate(ws, () => new ServerPeer(async (message) => {
+        ws.send(await encodePeerMessage(message, this.encodePeerMessageOptions))
+      }))
+
+      // `ws` has been closed, ignore the message
+      if (!peer) {
+        return result
+      }
+
       await peer.message(
         result.message,
         createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
@@ -78,11 +79,6 @@ export class experimental_CrosswsHandler<T extends Context> {
    * @param ws The same crossws peer instance passed to `.message()`.
    */
   async close(ws: CrosswsPeerLike): Promise<void> {
-    const server = this.peers.get(ws)
-
-    if (server) {
-      await server.close()
-      this.peers.delete(ws)
-    }
+    await this.peers.close(ws)
   }
 }

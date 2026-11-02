@@ -6,7 +6,7 @@ import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../s
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler, PeerRegistry } from '../standard-peer'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (message: infer TMessage) => unknown
   ? TMessage
@@ -37,7 +37,7 @@ export interface MessagePortHandlerOptions<_T extends Context> {
 }
 
 export class MessagePortHandler<T extends Context> {
-  private readonly peers = new WeakMap<SupportedMessagePort, ServerPeer>()
+  private readonly peers: PeerRegistry<SupportedMessagePort> = new PeerRegistry()
   private readonly transfer: MessagePortHandlerOptions<T>['experimental_transfer']
   private readonly encodePeerMessageOptions: MessagePortHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: MessagePortHandlerOptions<T>['decodePeerMessage']
@@ -78,21 +78,6 @@ export class MessagePortHandler<T extends Context> {
     data: unknown,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let peer = this.peers.get(port)
-
-    if (!peer) {
-      this.peers.set(port, peer = new ServerPeer(async (message) => {
-        const transfer = await value(this.transfer, message, port)
-
-        if (transfer) {
-          postMessagePortMessage(port, message, transfer)
-        }
-        else {
-          postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
-        }
-      }))
-    }
-
     let peerMessage: ClientPeerSendMessage | undefined
 
     if (typeof data === 'string' || data instanceof Uint8Array) {
@@ -111,6 +96,22 @@ export class MessagePortHandler<T extends Context> {
       return { matched: false }
     }
 
+    const peer = this.peers.getOrCreate(port, () => new ServerPeer(async (message) => {
+      const transfer = await value(this.transfer, message, port)
+
+      if (transfer) {
+        postMessagePortMessage(port, message, transfer)
+      }
+      else {
+        postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
+      }
+    }))
+
+    // `port` has been closed, ignore the message
+    if (!peer) {
+      return { matched: true }
+    }
+
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
@@ -125,12 +126,6 @@ export class MessagePortHandler<T extends Context> {
    * @param port The same message port instance passed to `.message()`.
    */
   async close(port: SupportedMessagePort): Promise<void> {
-    const peer = this.peers.get(port)
-
-    if (peer) {
-      // delete before close to avoid potential race conditions
-      this.peers.delete(port)
-      await peer.close()
-    }
+    await this.peers.close(port)
   }
 }

@@ -294,4 +294,29 @@ describe('rpcHandler', () => {
     const result = await handler.message(serverPort as any, { invalid: true })
     expect(result.matched).toBe(false)
   })
+
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const { serverPort } = createPort()
+    const postMessage = vi.spyOn(serverPort, 'postMessage').mockImplementation(() => {
+      // noop
+    })
+
+    await handler.close(serverPort as any)
+
+    const result = await handler.message(serverPort as any, await createRequestMessage())
+
+    expect(result).toEqual({ matched: true })
+    expect(procedure).not.toHaveBeenCalled()
+    expect(postMessage).not.toHaveBeenCalled()
+
+    const unmatched = await handler.message(serverPort as any, { invalid: true })
+
+    expect(unmatched).toEqual({ matched: false })
+    expect(postMessage).not.toHaveBeenCalled()
+  })
 })
