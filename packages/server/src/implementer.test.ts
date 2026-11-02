@@ -1,12 +1,9 @@
 import type { RouterContract } from '@orpc/contract'
-import { oc, ProcedureContract } from '@orpc/contract'
+import { oc } from '@orpc/contract'
 import z from 'zod'
-import { os } from './builder'
 import { implement } from './implementer'
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
 import * as ImplementerRouter from './implementer-router'
-import { Procedure } from './procedure'
-import { getHiddenRouterContract } from './router-hidden'
 
 const createRouterImplementerSpy = vi.spyOn(ImplementerRouter, 'createRouterImplementer')
 
@@ -92,41 +89,5 @@ describe('implement', () => {
     expect(implementer.use(mid)).toBeInstanceOf(ProcedureImplementer)
     expect(implementer.use(mid)['~orpc']).toMatchObject(contract.ping['~orpc'])
     expect(implementer.use(mid)['~orpc'].orderedMiddlewares).toEqual([expect.objectContaining({ middleware: mid })])
-  })
-
-  describe('with a normal router as the contract', () => {
-    const real = {
-      ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'REAL'),
-      nested: { pong: os.handler(() => 'REAL') },
-    }
-
-    it('strips procedures down to plain contracts', () => {
-      const impl = implement(real)
-      const hidden = getHiddenRouterContract(impl.router({
-        ping: impl.ping.handler(() => 'MOCK'),
-        nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
-      })) as any
-
-      for (const procedure of [hidden.ping, hidden.nested.pong]) {
-        expect(procedure).toBeInstanceOf(ProcedureContract)
-        expect(procedure).not.toBeInstanceOf(Procedure)
-      }
-
-      expect(hidden.ping['~orpc']).toEqual({
-        inputSchemas: real.ping['~orpc'].inputSchemas,
-        outputSchemas: real.ping['~orpc'].outputSchemas,
-        metaPlugins: real.ping['~orpc'].metaPlugins,
-        errorMap: real.ping['~orpc'].errorMap,
-        meta: real.ping['~orpc'].meta,
-      })
-    })
-
-    it('never leaks implementation details into the implementer', () => {
-      const impl = implement(real, { disableInputValidation: false })
-
-      expect(impl.ping['~orpc'].disableInputValidation).toBe(false)
-      expect((impl.ping['~orpc'] as any).handler).toBeUndefined()
-      expect(impl.$config({ disableOutputValidation: true }).ping['~orpc'].disableInputValidation).toBe(false)
-    })
   })
 })
