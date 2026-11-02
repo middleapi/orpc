@@ -1,5 +1,6 @@
 import * as ContractModule from '@orpc/contract'
 import { z } from 'zod'
+import { os } from './builder'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { withHiddenRouterContract } from './router-hidden'
@@ -115,7 +116,7 @@ describe('augmentRouter', () => {
       resolveCallIndex,
       options.meta,
       options.metaPlugins,
-      original['~orpc'].metaPlugins,
+      original['~orpc'].metaPlugins ?? [],
     )
     expect(actual['~orpc']).toEqual({
       disableOutputValidation: true,
@@ -144,7 +145,7 @@ describe('augmentRouter', () => {
       resolveCallIndex,
       options.meta,
       options.metaPlugins,
-      original['~orpc'].metaPlugins,
+      original['~orpc'].metaPlugins ?? [],
     )
     expect(actual['~orpc']).toEqual({
       ...original['~orpc'],
@@ -202,6 +203,66 @@ describe('augmentRouter', () => {
     expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
 
     expectAugmentedProcedure(1, 1, augmented.p1, router.nested.p1, options)
+  })
+
+  it('does not re-initialize or re-apply plugins the procedure already carries', async () => {
+    const [prefix, getPrefix] = ContractModule.defineMeta('prefix', (incoming: string, current) => (current ?? '') + incoming)
+
+    const base = os.meta(prefix('/users'))
+    const p = base.handler(() => 'x')
+    const router = base.router({
+      p,
+      nested: { p: base.meta(prefix('/nested')).handler(() => 'x') },
+      other: os.meta(prefix('/other')).handler(() => 'x'),
+      l: base.lazy(async () => ({ default: { p } })),
+    })
+
+    expect(getPrefix(p)).toBe('/users')
+    expect(getPrefix(router.p)).toBe('/users')
+    expect(getPrefix(router.nested.p)).toBe('/users/nested')
+    expect(getPrefix(router.other)).toBe('/users/other')
+    expect(getPrefix(router.l)).toBe('/users')
+
+    expect(router.p['~orpc'].metaPlugins).toEqual(p['~orpc'].metaPlugins)
+    expect(router.l['~orpc'].metaPlugins).toEqual(p['~orpc'].metaPlugins)
+
+    const unlazied = await unlazyDefault(router.l)
+    expect(getPrefix(unlazied.p)).toBe('/users')
+    expect(unlazied.p['~orpc'].metaPlugins).toEqual(p['~orpc'].metaPlugins)
+
+    // augmenting again with the same builder is idempotent, including lazy routers
+    const again = base.router(router)
+    expect(getPrefix(again.p)).toBe('/users')
+    expect(getPrefix(again.nested.p)).toBe('/users/nested')
+    expect(getPrefix(again.l)).toBe('/users')
+    expect(getPrefix((await unlazyDefault(again.l)).p)).toBe('/users')
+  })
+
+  it('calls init and apply of shared plugins once per resolution', async () => {
+    const plugin = {
+      name: 'shared',
+      init: vi.fn((meta: any) => ({ ...meta, count: (meta.count ?? 0) + 1 })),
+      apply: vi.fn((meta: any) => ({ ...meta, applied: (meta.applied ?? 0) + 1 })),
+    } satisfies ContractModule.AnyMetaPlugin
+
+    const base = os.meta(plugin)
+    const p = base.handler(() => 'x')
+    const l = base.lazy(async () => ({ default: { p } }))
+    plugin.init.mockClear()
+    plugin.apply.mockClear()
+
+    const router = base.router({ p, l })
+
+    expect(plugin.init).not.toHaveBeenCalled()
+    expect(plugin.apply).toHaveBeenCalledTimes(2) // once for `p`, once for `l`
+    expect(router.p['~orpc'].meta).toEqual({ count: 1, applied: 2 })
+    expect(router.l['~orpc'].meta).toEqual({ count: 1, applied: 2 })
+
+    const unlazied = await unlazyDefault(router.l)
+
+    expect(plugin.init).not.toHaveBeenCalled()
+    expect(unlazied.p['~orpc'].meta).toEqual({ count: 1, applied: 2 })
+    expect(unlazied.p['~orpc'].metaPlugins).toEqual([plugin])
   })
 
   it('returns non-object router values as-is', () => {

@@ -1,7 +1,9 @@
 import type { AnyMetaPlugin } from './meta'
 import { z } from 'zod'
+import { oc } from './builder'
 import * as ErrorUtilsModule from './error-utils'
 import * as MetaUtilsModule from './meta-utils'
+import { defineMeta } from './meta-utils'
 import { ProcedureContract } from './procedure'
 import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils'
 
@@ -107,7 +109,7 @@ describe('augmentContractRouter', () => {
       callIndex,
       options.meta,
       options.metaPlugins,
-      original['~orpc'].metaPlugins,
+      original['~orpc'].metaPlugins ?? [],
     )
     expect(actual['~orpc']).toEqual({
       ...original['~orpc'],
@@ -156,6 +158,50 @@ describe('augmentContractRouter', () => {
     expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
 
     expectAugmentedProcedure(1, augmented.ping, router.nested.ping, options)
+  })
+
+  it('does not re-initialize or re-apply plugins the procedure already carries', () => {
+    const [prefix, getPrefix] = defineMeta('prefix', (incoming: string, current) => (current ?? '') + incoming)
+
+    const base = oc.meta(prefix('/users'))
+    const router = base.router({
+      ping: base,
+      nested: { ping: base.meta(prefix('/ping')) },
+      other: oc.meta(prefix('/other')),
+    })
+
+    expect(getPrefix(base)).toBe('/users')
+    expect(getPrefix(router.ping)).toBe('/users')
+    expect(getPrefix(router.nested.ping)).toBe('/users/ping')
+    expect(getPrefix(router.other)).toBe('/users/other')
+
+    expect(router.ping['~orpc'].metaPlugins).toEqual(base['~orpc'].metaPlugins)
+    expect(router.nested.ping['~orpc'].metaPlugins).toHaveLength(2)
+
+    // augmenting again with the same builder is idempotent
+    const again = base.router(router)
+    expect(getPrefix(again.ping)).toBe('/users')
+    expect(getPrefix(again.nested.ping)).toBe('/users/ping')
+    expect(getPrefix(again.other)).toBe('/users/other')
+  })
+
+  it('calls init and apply of shared plugins once per resolution', () => {
+    const plugin = {
+      name: 'shared',
+      init: vi.fn((meta: any) => ({ ...meta, count: (meta.count ?? 0) + 1 })),
+      apply: vi.fn((meta: any) => ({ ...meta, applied: (meta.applied ?? 0) + 1 })),
+    } satisfies AnyMetaPlugin
+
+    const base = oc.meta(plugin)
+    plugin.init.mockClear()
+    plugin.apply.mockClear()
+
+    const router = base.router({ ping: base })
+
+    expect(plugin.init).not.toHaveBeenCalled()
+    expect(plugin.apply).toHaveBeenCalledTimes(1)
+    expect(router.ping['~orpc'].meta).toEqual({ count: 1, applied: 2 })
+    expect(router.ping['~orpc'].metaPlugins).toEqual([plugin])
   })
 
   it('returns non-object router values as-is', () => {

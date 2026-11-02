@@ -34,6 +34,31 @@ export function resolveMetaPlugins<
 }
 
 /**
+ * Returns `plugins` without the plugins (matched by identity) that are also in `excluded`.
+ * Each plugin in `excluded` removes at most one matching occurrence, so intentional duplicates are kept.
+ *
+ * Useful when combining plugins that were already resolved from a shared source,
+ * e.g. a procedure built from the same builder that augments its router,
+ * so the shared plugins are not initialized or applied twice.
+ */
+export function excludeMetaPlugins<T extends AnyMetaPlugin>(
+  plugins: readonly T[] | undefined,
+  excluded: readonly AnyMetaPlugin[] | undefined,
+): T[] {
+  const remaining = [...toArray(plugins)]
+
+  for (const plugin of toArray(excluded)) {
+    const index = remaining.indexOf(plugin as T)
+
+    if (index !== -1) {
+      remaining.splice(index, 1)
+    }
+  }
+
+  return remaining
+}
+
+/**
  * Quickly defines a meta plugin factory and reader.
  *
  * @example Mark a procedure as requiring authentication and read it in middleware.

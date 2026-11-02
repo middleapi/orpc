@@ -1,6 +1,6 @@
 import type { AnyMetaPlugin } from './meta'
 import { oc } from './builder'
-import { defineMeta, resolveMetaPlugins } from './meta-utils'
+import { defineMeta, excludeMetaPlugins, resolveMetaPlugins } from './meta-utils'
 
 it('resolveMetaPlugins', () => {
   const baseMeta = { mode: 'base' }
@@ -56,6 +56,28 @@ it('resolveMetaPlugins', () => {
   expect(plugin2.init).toHaveBeenCalledBefore(plugin3.init)
   expect(plugin1.apply).toHaveBeenCalledBefore(plugin2.apply)
   expect(plugin2.apply).toHaveBeenCalledBefore(plugin3.apply)
+})
+
+it('excludeMetaPlugins', () => {
+  const plugin1 = { name: 'plugin1' } satisfies AnyMetaPlugin
+  const plugin2 = { name: 'plugin2' } satisfies AnyMetaPlugin
+  const plugin3 = { name: 'plugin3' } satisfies AnyMetaPlugin
+
+  const plugins = [plugin1, plugin2, plugin3]
+  const excluded = excludeMetaPlugins(plugins, [plugin1, plugin3])
+
+  expect(excluded).toEqual([plugin2])
+  expect(plugins).toEqual([plugin1, plugin2, plugin3]) // not mutated
+
+  // matched by identity, not by shape
+  expect(excludeMetaPlugins([plugin1], [{ name: 'plugin1' }])).toEqual([plugin1])
+
+  // each excluded plugin removes at most one occurrence
+  expect(excludeMetaPlugins([plugin1, plugin2, plugin1], [plugin1])).toEqual([plugin2, plugin1])
+
+  expect(excludeMetaPlugins(undefined, [plugin1])).toEqual([])
+  expect(excludeMetaPlugins(plugins, undefined)).toEqual(plugins)
+  expect(excludeMetaPlugins(plugins, undefined)).not.toBe(plugins)
 })
 
 it('defineMeta', () => {
