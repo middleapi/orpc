@@ -76,10 +76,14 @@ function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
 function toORPCProcedure(procedure: AnyProcedure) {
   const inputSchema = toStandardSchema(procedure._def.inputs.at(-1))
   const outputSchema = toStandardSchema((procedure._def as any).output)
+  const meta = (procedure._def.meta ?? {}) as ORPC.Meta
 
   return new ORPC.Procedure({
     errorMap: {},
-    meta: (procedure._def.meta ?? {}) as ORPC.Meta,
+    meta,
+    // `.router` (and similar) rebuilds meta from its own meta + the procedure's meta plugins,
+    // so the tRPC meta must be a plugin too, otherwise it would be dropped.
+    metaPlugins: [toTRPCMetaPlugin(meta)],
     orderedMiddlewares: [],
     inputSchemas: inputSchema ? [inputSchema] : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,
@@ -133,6 +137,16 @@ function toORPCProcedure(procedure: AnyProcedure) {
       }
     },
   })
+}
+
+/**
+ * Re-applies tRPC meta on top of the incoming meta, shallow merged like tRPC `.meta` calls.
+ */
+function toTRPCMetaPlugin(trpcMeta: ORPC.Meta): ORPC.AnyMetaPlugin {
+  return {
+    name: '~trpc',
+    init: meta => ({ ...meta, ...trpcMeta }),
+  }
 }
 
 function toORPCError<T>(error: T): T | ORPC.ORPCError<string, undefined> {
