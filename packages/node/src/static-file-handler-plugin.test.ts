@@ -89,6 +89,12 @@ describe('staticFileHandlerPlugin', () => {
     helloLastModified = res.headers['last-modified']!
   })
 
+  function expectHandlesClosed(): Promise<void> {
+    return vi.waitFor(() => {
+      expect(fsHooks.openedHandles.every(handle => handle.fd === -1)).toBe(true)
+    })
+  }
+
   afterEach(() => {
     fsHooks.afterCheck = undefined
     fsHooks.openedHandles.length = 0
@@ -823,11 +829,7 @@ describe('staticFileHandlerPlugin', () => {
 
         expect(res.status).toBe(416)
         expect(res.headers['content-range']).toBe('bytes */1')
-        await vi.waitFor(() => {
-          for (const handle of fsHooks.openedHandles) {
-            expect(handle.fd).toBe(-1)
-          }
-        })
+        await expectHandlesClosed()
       })
     })
 
@@ -845,11 +847,7 @@ describe('staticFileHandlerPlugin', () => {
       await agent.get('/hello.txt').set('range', 'bytes=100-')
       expect(fsHooks.openedHandles).toHaveLength(3)
 
-      await vi.waitFor(() => {
-        for (const handle of fsHooks.openedHandles) {
-          expect(handle.fd).toBe(-1)
-        }
-      })
+      await expectHandlesClosed()
     })
 
     it('follows rootDir when the symlink it sits behind is repointed', async ({ onTestFinished }) => {

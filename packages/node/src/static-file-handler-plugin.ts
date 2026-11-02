@@ -217,20 +217,25 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /**
    * Resolves symbolic links and confirms the target is still inside the root,
    * which the lexical `resolveWithinRoot` check cannot see.
-   * The root is resolved too, so a symlinked `rootDir` keeps working when repointed and
-   * platform links like the macOS `/var` to `/private/var` do not reject every file.
+   *
+   * A real path under `rootDir` as written proves `rootDir` had no links when it was resolved.
+   * Otherwise the root is resolved afresh rather than cached, so a symlinked `rootDir` keeps working
+   * when repointed and platform links like the macOS `/var` to `/private/var` do not reject every file.
    */
   private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
     if (this.allowSymlinks) {
       return filePath
     }
 
-    const [realPath, rootDirReal] = await Promise.all([
-      realpath(filePath).catch(() => undefined),
-      realpath(this.rootDir).catch(() => this.rootDir),
-    ])
+    const realPath = await realpath(filePath).catch(() => undefined)
 
-    return realPath !== undefined && isWithin(rootDirReal, realPath) ? realPath : undefined
+    if (realPath === undefined || isWithin(this.rootDir, realPath)) {
+      return realPath
+    }
+
+    const rootDirReal = await realpath(this.rootDir).catch(() => this.rootDir)
+
+    return isWithin(rootDirReal, realPath) ? realPath : undefined
   }
 
   /**
@@ -277,10 +282,10 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
    * Resolves segments under `rootDir` and stats the result, rejecting anything that
    * escapes the root either lexically or by following a symbolic link.
    */
-  private lookup(segments: string[]): Promise<Entry | undefined> {
+  private async lookup(segments: string[]): Promise<Entry | undefined> {
     const filePath = this.resolveWithinRoot(segments)
 
-    return filePath === undefined ? Promise.resolve(undefined) : this.lookupPath(filePath)
+    return filePath === undefined ? undefined : this.lookupPath(filePath)
   }
 
   private async lookupPath(filePath: string): Promise<Entry | undefined> {
@@ -419,7 +424,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       }
     }
 
-    const checked = this.respond(request, found.stats, contentType, negotiatesEncoding, contentEncoding)
+    const respond = (stats: Stats) => this.respond(request, stats, contentType, negotiatesEncoding, contentEncoding)
+    const checked = respond(found.stats)
 
     if (checked.read === undefined) {
       return checked.response
@@ -431,7 +437,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    const { response, read } = this.respond(request, opened.stats, contentType, negotiatesEncoding, contentEncoding)
+    const { response, read } = respond(opened.stats)
 
     if (read === undefined) {
       void opened.handle.close().catch(() => {})
