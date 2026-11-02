@@ -101,58 +101,37 @@ describe('openapiHandler', () => {
     return expect(response!.text()).resolves.toBe('"intercepted"')
   })
 
-  describe('implementing a normal router as the contract', () => {
+  it('serves the implementation and its middlewares when a normal router is implemented as the contract', async () => {
     const real = {
-      ping: os
-        .meta(openapi({ method: 'GET', path: '/ping' }))
-        .handler(() => 'REAL'),
-      nested: {
-        pong: os.handler(() => 'REAL'),
-      },
+      ping: os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'REAL'),
+      nested: { pong: os.handler(() => 'REAL') },
     }
 
-    it('serves the implementation instead of the contract', async () => {
-      const impl = implement(real)
-      const mock = impl.router({
-        ping: impl.ping.handler(() => 'MOCK'),
-        nested: {
-          pong: impl.nested.pong.handler(() => 'MOCK'),
-        },
-      })
-
-      const handler = new OpenAPIHandler(mock)
-
-      const ping = await handler.handle(new Request('https://example.com/ping'))
-      expect(ping.matched).toBe(true)
-      await expect(ping.response!.json()).resolves.toBe('MOCK')
-
-      const pong = await handler.handle(new Request('https://example.com/nested/pong', { method: 'POST' }))
-      expect(pong.matched).toBe(true)
-      await expect(pong.response!.json()).resolves.toBe('MOCK')
+    const impl = implement(real)
+    const requireAuth = vi.fn(() => {
+      throw new ORPCError('UNAUTHORIZED')
     })
 
-    it('runs middlewares applied through the implementer', async () => {
-      const requireAuth = vi.fn(() => {
-        throw new ORPCError('UNAUTHORIZED')
-      })
+    const mock = new OpenAPIHandler(impl.router({
+      ping: impl.ping.handler(() => 'MOCK'),
+      nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
+    }))
 
-      const impl = implement(real)
-      const mock = impl.use(requireAuth).router({
-        ping: impl.ping.handler(() => 'MOCK'),
-        nested: {
-          pong: impl.nested.pong.handler(() => 'MOCK'),
-        },
-      })
+    const secured = new OpenAPIHandler(impl.use(requireAuth).router({
+      ping: impl.ping.handler(() => 'MOCK'),
+      nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
+    }))
 
-      const handler = new OpenAPIHandler(mock)
+    for (const [method, path] of [['GET', '/ping'], ['POST', '/nested/pong']] as const) {
+      const request = () => new Request(`https://example.com${path}`, { method })
 
-      const ping = await handler.handle(new Request('https://example.com/ping'))
-      expect(ping.response!.status).toBe(401)
+      const { response } = await mock.handle(request())
+      await expect(response!.json()).resolves.toBe('MOCK')
 
-      const pong = await handler.handle(new Request('https://example.com/nested/pong', { method: 'POST' }))
-      expect(pong.response!.status).toBe(401)
+      const { response: securedResponse } = await secured.handle(request())
+      expect(securedResponse!.status).toBe(401)
+    }
 
-      expect(requireAuth).toHaveBeenCalledTimes(2)
-    })
+    expect(requireAuth).toHaveBeenCalledTimes(2)
   })
 })

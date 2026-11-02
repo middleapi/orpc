@@ -10,7 +10,7 @@ import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { createContractProcedure } from './procedure-utils'
-import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden'
+import { getHiddenRouterContract } from './router-hidden'
 
 export type AugmentedRouter<
   T extends AnyRouter,
@@ -257,49 +257,6 @@ export interface WalkProcedureContractsLazyResult {
   path: string[]
 }
 
-/**
- * Converts a procedure found inside a hidden contract into a plain {@link ProcedureContract}.
- *
- * A normal router can be passed to `implement()` as a contract, so a hidden contract
- * may contain procedures. Those are contracts only: their handlers and middlewares must never
- * be served in place of the implementation, which is resolved by path instead.
- */
-function toPlainProcedureContract(contract: AnyProcedureContract): AnyProcedureContract {
-  if (!(contract instanceof Procedure)) {
-    return contract
-  }
-
-  const { inputSchemas, outputSchemas, metaPlugins, errorMap, meta } = contract['~orpc']
-
-  return new ProcedureContract({ inputSchemas, outputSchemas, metaPlugins, errorMap, meta })
-}
-
-/**
- * Wraps a lazy router found inside a hidden contract, so walking it later still treats it as a contract.
- */
-function toLazyHiddenContract(lazy: Lazy<AnyRouter>): Lazy<AnyRouter> {
-  return new Lazy({
-    ...lazy['~orpc'],
-    async loader() {
-      const { default: contract } = await unlazy(lazy)
-
-      return {
-        default: isTypescriptObject(contract)
-          ? withHiddenRouterContract(contract, contract as RouterContract)
-          : contract,
-      }
-    },
-  })
-}
-
-/**
- * Walks the procedure contracts of a router, preferring its hidden contract when present.
- *
- * Procedures are passed to the callback as is only when they come from the router itself, so
- * `instanceof Procedure` means the callback received the implementation. Procedures inside a hidden
- * contract are passed as plain {@link ProcedureContract}s, use {@link resolveContractProcedure}
- * to resolve their implementation.
- */
 export function walkProcedureContractsSync(
   router: RouterContract | AnyRouter,
   callback: (contract: AnyProcedureContract | AnyProcedure, path: string[]) => void,
@@ -307,7 +264,7 @@ export function walkProcedureContractsSync(
 ): WalkProcedureContractsLazyResult[] {
   const lazyResults: WalkProcedureContractsLazyResult[] = []
 
-  walkProcedureContractsSyncInternal(router, callback, path.slice(), lazyResults, false)
+  walkProcedureContractsSyncInternal(router, callback, path.slice(), lazyResults)
 
   return lazyResults
 }
@@ -317,16 +274,14 @@ function walkProcedureContractsSyncInternal(
   callback: (contract: AnyProcedureContract | AnyProcedure, path: string[]) => void,
   path: string[],
   lazyResults: WalkProcedureContractsLazyResult[],
-  isContract: boolean,
 ): void {
   const hiddenContract = getHiddenRouterContract(router)
   if (hiddenContract !== undefined) {
     router = hiddenContract
-    isContract = true
   }
 
   if (router instanceof ProcedureContract) {
-    callback(isContract ? toPlainProcedureContract(router) : router, path.slice())
+    callback(router, path.slice())
     return
   }
 
@@ -338,47 +293,28 @@ function walkProcedureContractsSyncInternal(
     path.push(key)
 
     if (value instanceof Lazy) {
-      lazyResults.push({ router: isContract ? toLazyHiddenContract(value) : value, path: path.slice() })
+      lazyResults.push({ router: value, path: path.slice() })
     }
     else {
-      walkProcedureContractsSyncInternal(value, callback, path, lazyResults, isContract)
+      walkProcedureContractsSyncInternal(value, callback, path, lazyResults)
     }
 
     path.pop()
   }
 }
 
-/**
- * Asynchronously walks the procedure contracts of a router, including lazy ones,
- * preferring its hidden contract when present.
- *
- * Procedures are passed to the callback as is only when they come from the router itself, so
- * `instanceof Procedure` means the callback received the implementation. Procedures inside a hidden
- * contract are passed as plain {@link ProcedureContract}s, use {@link resolveContractProcedure}
- * to resolve their implementation.
- */
 export async function walkProcedureContractsAsync(
   router: RouterContract | AnyRouter,
   callback: (contract: AnyProcedureContract | AnyProcedure, path: string[]) => Promisable<void>,
   path: string[] = [],
 ): Promise<void> {
-  await walkProcedureContractsAsyncInternal(router, callback, path, false)
-}
-
-async function walkProcedureContractsAsyncInternal(
-  router: RouterContract | AnyRouter,
-  callback: (contract: AnyProcedureContract | AnyProcedure, path: string[]) => Promisable<void>,
-  path: string[],
-  isContract: boolean,
-): Promise<void> {
   const hiddenContract = getHiddenRouterContract(router)
   if (hiddenContract !== undefined) {
     router = hiddenContract
-    isContract = true
   }
 
   if (router instanceof ProcedureContract) {
-    await callback(isContract ? toPlainProcedureContract(router) : router, path)
+    await callback(router, path)
     return
   }
 
@@ -389,10 +325,10 @@ async function walkProcedureContractsAsyncInternal(
   for (const [key, value] of Object.entries(router)) {
     if (value instanceof Lazy) {
       const { default: router } = await unlazy(value)
-      await walkProcedureContractsAsyncInternal(router, callback, [...path, key], isContract)
+      await walkProcedureContractsAsync(router, callback, [...path, key])
     }
     else {
-      await walkProcedureContractsAsyncInternal(value, callback, [...path, key], isContract)
+      await walkProcedureContractsAsync(value, callback, [...path, key])
     }
   }
 }

@@ -83,21 +83,6 @@ async function unlazyDefault<T>(value: T): Promise<T extends Lazy<infer U> ? U :
   return (await unlazy(value)).default
 }
 
-/**
- * A contract made of procedures, as produced by passing a normal router to `implement()`.
- */
-function expectPlainContractOf(actual: unknown, procedure: Procedure<any, any, any, any, any>) {
-  expect(actual).toBeInstanceOf(ContractModule.ProcedureContract)
-  expect(actual).not.toBeInstanceOf(Procedure)
-  expect((actual as any)['~orpc']).toEqual({
-    inputSchemas: procedure['~orpc'].inputSchemas,
-    outputSchemas: procedure['~orpc'].outputSchemas,
-    metaPlugins: procedure['~orpc'].metaPlugins,
-    errorMap: procedure['~orpc'].errorMap,
-    meta: procedure['~orpc'].meta,
-  })
-}
-
 describe('augmentRouter', () => {
   function createAugmentOptions() {
     return {
@@ -409,45 +394,6 @@ describe('walkProcedureContractsSync', () => {
     expect(result).toEqual([])
   })
 
-  it('passes procedures of hidden contracts as plain contracts, never as implementations', async () => {
-    const withHiddenContract = withHiddenRouterContract({}, router as any)
-    const entries = vi.fn()
-    const result = walkProcedureContractsSync(withHiddenContract, entries)
-
-    expect(entries).toHaveBeenCalledTimes(3)
-    expect(entries.mock.calls.map(([, path]) => path)).toEqual([['p1'], ['p2'], ['nested', 'p1']])
-    expectPlainContractOf(entries.mock.calls[0]![0], procedure1)
-    expectPlainContractOf(entries.mock.calls[1]![0], procedure2)
-    expectPlainContractOf(entries.mock.calls[2]![0], procedure1)
-
-    // lazy routers inside hidden contracts are still walked as contracts once loaded
-    expect(result).toEqual([{ path: ['lazy'], router: expect.any(Lazy) }])
-    expect(result[0]!.router['~orpc'].meta).toBe(router.lazy['~orpc'].meta)
-
-    const lazyEntries = vi.fn()
-    walkProcedureContractsSync(await unlazyDefault(result[0]!.router), lazyEntries, ['lazy'])
-
-    expect(lazyEntries).toHaveBeenCalledTimes(2)
-    expect(lazyEntries.mock.calls.map(([, path]) => path)).toEqual([['lazy', 'p1'], ['lazy', 'nested', 'p1']])
-    expectPlainContractOf(lazyEntries.mock.calls[0]![0], procedure1)
-    expectPlainContractOf(lazyEntries.mock.calls[1]![0], procedure1)
-  })
-
-  it('keeps non-object lazy contracts as is', async () => {
-    const lazyInvalid = new Lazy({ loader: async () => ({ default: 'invalid' as any }), meta: {} })
-    const result = walkProcedureContractsSync(withHiddenRouterContract({}, { lazy: lazyInvalid } as any), vi.fn())
-
-    expect(await unlazyDefault(result[0]!.router)).toBe('invalid')
-  })
-
-  it('ignores nullish routers', () => {
-    const entries = vi.fn()
-
-    expect(walkProcedureContractsSync({ p1: procedure1, undefined, null: null } as any, entries)).toEqual([])
-    expect(entries).toHaveBeenCalledTimes(1)
-    expect(entries).toHaveBeenCalledWith(procedure1, ['p1'])
-  })
-
   it('supports a custom base path', () => {
     const entries = vi.fn()
 
@@ -456,6 +402,13 @@ describe('walkProcedureContractsSync', () => {
     expect(entries).toHaveBeenNthCalledWith(1, router.p1, ['custom', 'p1'])
     expect(entries).toHaveBeenNthCalledWith(2, router.p2, ['custom', 'p2'])
     expect(entries).toHaveBeenNthCalledWith(3, router.nested.p1, ['custom', 'nested', 'p1'])
+  })
+
+  it('ignores nullish routers', () => {
+    const entries = vi.fn()
+
+    expect(walkProcedureContractsSync({ p1: procedure1, undefined, null: null } as any, entries)).toEqual([])
+    expect(entries).toHaveBeenCalledExactlyOnceWith(procedure1, ['p1'])
   })
 
   it('ignores invalid roots', () => {
@@ -519,31 +472,6 @@ describe('walkProcedureContractsAsync', () => {
     expect(entries).toHaveBeenNthCalledWith(2, contract.nested.p2, ['nested', 'p2'])
   })
 
-  it('passes procedures of hidden contracts as plain contracts, never as implementations', async () => {
-    const withHiddenContract = withHiddenRouterContract({}, router as any)
-    const entries = vi.fn(async (_contract: unknown, _path: string[]) => {})
-
-    await walkProcedureContractsAsync(withHiddenContract, entries)
-
-    expect(entries).toHaveBeenCalledTimes(5)
-    expect(entries.mock.calls.map(([, path]) => path)).toEqual([['p1'], ['p2'], ['nested', 'p1'], ['lazy', 'p1'], ['lazy', 'nested', 'p1']])
-    expectPlainContractOf(entries.mock.calls[0]![0], procedure1)
-    expectPlainContractOf(entries.mock.calls[1]![0], procedure2)
-    expectPlainContractOf(entries.mock.calls[2]![0], procedure1)
-    expectPlainContractOf(entries.mock.calls[3]![0], procedure1)
-    expectPlainContractOf(entries.mock.calls[4]![0], procedure1)
-  })
-
-  it('ignores nullish routers, including lazy ones', async () => {
-    const entries = vi.fn(async () => {})
-    const lazyUndefined = new Lazy({ loader: async () => ({ default: undefined as any }), meta: {} })
-
-    await walkProcedureContractsAsync({ p1: procedure1, undefined, null: null, lazyUndefined } as any, entries)
-
-    expect(entries).toHaveBeenCalledTimes(1)
-    expect(entries).toHaveBeenCalledWith(procedure1, ['p1'])
-  })
-
   it('supports a custom base path', async () => {
     const entries = vi.fn(async () => {})
     const routerLazy = await unlazyDefault(router.lazy)
@@ -556,6 +484,15 @@ describe('walkProcedureContractsAsync', () => {
     expect(entries).toHaveBeenNthCalledWith(3, router.nested.p1, ['custom', 'nested', 'p1'])
     expect(entries).toHaveBeenNthCalledWith(4, routerLazy.p1, ['custom', 'lazy', 'p1'])
     expect(entries).toHaveBeenNthCalledWith(5, routerLazy.nested.p1, ['custom', 'lazy', 'nested', 'p1'])
+  })
+
+  it('ignores nullish routers, including lazy ones', async () => {
+    const entries = vi.fn(async () => {})
+    const lazyUndefined = new Lazy({ loader: async () => ({ default: undefined as any }), meta: {} })
+
+    await walkProcedureContractsAsync({ p1: procedure1, undefined, null: null, lazyUndefined } as any, entries)
+
+    expect(entries).toHaveBeenCalledExactlyOnceWith(procedure1, ['p1'])
   })
 })
 
