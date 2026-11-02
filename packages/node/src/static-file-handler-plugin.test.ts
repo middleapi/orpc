@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
-import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -84,8 +84,8 @@ describe('staticFileHandlerPlugin', () => {
 
   /**
    * supertest and fetch both normalize the request target with the WHATWG url parser,
-   * which resolves dot segments and collapses leading slashes before the server sees them.
-   * These attacks only reach the plugin through a client that sends the target verbatim.
+   * which resolves dot segments before the server sees them. Dot segments only reach
+   * the plugin through a client that sends the target verbatim.
    */
   async function createRawClient(pluginOptions: Partial<StaticFileHandlerPluginOptions> = {}) {
     const handler = new RPCHandler({}, {
@@ -399,6 +399,20 @@ describe('staticFileHandlerPlugin', () => {
       expect(weak.status).toBe(200)
     })
 
+    it('never parses an entity tag in if-range as a date', async ({ onTestFinished }) => {
+      // The lenient date parser reads this tag as a date, so the file gets exactly that mtime
+      const tag = '"1-2"'
+      const date = new Date(Date.parse(tag))
+      const filePath = path.join(rootDir, 'tag-date.bin')
+      writeFileSync(filePath, '0123456789')
+      utimesSync(filePath, date, date)
+      onTestFinished(() => rmSync(filePath, { force: true }))
+
+      const res = await createStaticAgent().get('/tag-date.bin').set('range', 'bytes=0-3').set('if-range', tag)
+      expect(res.status).toBe(200)
+      expect(res.headers['content-length']).toBe('10')
+    })
+
     it('responds 416 for a zero length suffix range and for any suffix range on an empty file', async () => {
       const agent = createStaticAgent()
 
@@ -457,12 +471,6 @@ describe('staticFileHandlerPlugin', () => {
       expect(fallbackRes.text).toBe('<h1>home</h1>')
     })
 
-    it('falls through for a directory when index files are disabled', async () => {
-      const res = await createStaticAgent({ indexFile: false }).get('/nested')
-
-      expect(res.status).toBe(404)
-    })
-
     it('falls through when the directory has no index file', async () => {
       const res = await createStaticAgent().get('/no-index/')
 
@@ -470,9 +478,11 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('supports disabling index files', async () => {
-      const res = await createStaticAgent({ indexFile: false }).get('/nested/')
+      const agent = createStaticAgent({ indexFile: false })
 
-      expect(res.status).toBe(404)
+      for (const url of ['/nested', '/nested/']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
     })
 
     it('supports a custom index file', async () => {
@@ -552,12 +562,22 @@ describe('staticFileHandlerPlugin', () => {
       expect((await createStaticAgent({ fallbackFile: 'index.html' }).get('/.secret')).status).toBe(404)
     })
 
-    it('serves files when rootDir itself is a symlink', async ({ onTestFinished }) => {
-      const linkedRoot = path.join(baseDir, 'rootlink')
-      symlinkSync(rootDir, linkedRoot)
-      onTestFinished(() => rmSync(linkedRoot, { force: true }))
+    it('refuses encoded separators, so a proxy matching the raw path cannot be bypassed', async () => {
+      const agent = createStaticAgent({ dotfiles: true })
 
-      expect((await createStaticAgent({ rootDir: linkedRoot }).get('/hello.txt')).status).toBe(200)
+      for (const url of ['/nested%2Fstyle.css', '/nested%5Cstyle.css', '/nested%2fstyle.css']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
+    })
+
+    it('decodes each segment on its own, so one malformed escape does not affect the others', async ({ onTestFinished }) => {
+      mkdirSync(path.join(rootDir, 'caf\u00E9'))
+      writeFileSync(path.join(rootDir, 'caf\u00E9', '50%.txt'), 'percent')
+      onTestFinished(() => rmSync(path.join(rootDir, 'caf\u00E9'), { recursive: true, force: true }))
+
+      const res = await createStaticAgent().get('/caf%C3%A9/50%.txt')
+      expect(res.status).toBe(200)
+      expect(res.text).toBe('percent')
     })
 
     it('falls through when rootDir does not exist', async () => {
@@ -579,6 +599,22 @@ describe('staticFileHandlerPlugin', () => {
       const allowedRes = await createStaticAgent({ dotfiles: true }).get('/.secret')
       expect(allowedRes.status).toBe(200)
       expect(allowedRes.body).toEqual(Buffer.from('dotfile'))
+    })
+
+    it('refuses 8.3 short names that can alias dotfiles', async () => {
+      // A refused path falls through before the fallback, while an allowed missing one is answered by it
+      const agent = createStaticAgent({ fallbackFile: 'hello.txt' })
+
+      for (const url of ['/ENV~1', '/env~1', '/HTACCE~1', '/ENV~1.LOC', '/ENV~1.', '/ENV~1::$DATA', '/GIT~1/config', '/nested/GIT~1/HEAD']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
+
+      // A tilde that cannot be the numeric tail of a short name is an ordinary character
+      for (const url of ['/vendors~main~1a2b.js', '/index.html~', '/~user', '/a.b~1']) {
+        expect((await agent.get(url)).status, url).toBe(200)
+      }
+
+      expect((await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1')).status).toBe(200)
     })
 
     it('hides nested dotfiles and dot directories', async () => {

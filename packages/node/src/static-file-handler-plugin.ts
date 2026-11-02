@@ -11,15 +11,19 @@ import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
 
 /**
- * Null bytes and `..` segments, after decoding. Refusing them up front means
- * the joined path can never leave `rootDir`.
+ * Decoded segments that are refused: `..`, so the joined path can never leave `rootDir`;
+ * null bytes; and encoded separators, so the path joined matches the one a proxy in front sees.
  */
-const UNSAFE_PATH_REGEX = /\0|(?:^|[/\\])\.\.(?:[/\\]|$)/
+const UNSAFE_SEGMENT_REGEX = /^\.\.$|[\0/\\]/
 
 /**
- * Any segment starting with a dot, like `.env` or `.git/config`.
+ * Like {@link UNSAFE_SEGMENT_REGEX}, plus names starting with a dot, and 8.3 short names like
+ * `ENV~1` or `GIT~1`, which NTFS and FAT resolve to dotfiles. A generated alias ends a base of
+ * at most eight characters with a `~` numeric tail, so only that prefix is matched.
+ *
+ * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names
  */
-const DOTFILE_PATH_REGEX = /(?:^|[/\\])\./
+const UNSAFE_OR_DOTFILE_SEGMENT_REGEX = /^\.|^[^.]{0,6}~\d|[\0/\\]/
 
 const PRECOMPRESSED_ENCODINGS = [
   ['br', '.br'],
@@ -67,6 +71,8 @@ export interface StaticFileHandlerPluginOptions {
 
   /**
    * Whether files and directories whose name starts with a dot can be served.
+   * When disabled, names shaped like 8.3 short names, such as `ENV~1`, are refused too,
+   * since NTFS and FAT resolve them to dotfiles.
    *
    * @default false
    */
@@ -113,9 +119,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   private readonly rootDir: string
   private readonly path: `/${string}`
   private readonly indexFile: string | false
-  private readonly fallbackFile: string | undefined
+  private readonly fallbackFilePath: string | undefined
   private readonly cacheControl: string | false
-  private readonly dotfiles: boolean
+  private readonly unsafeSegmentRegex: RegExp
   private readonly precompressed: boolean
   private readonly mimeTypes: Record<string, string>
 
@@ -123,9 +129,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     this.rootDir = path.resolve(options.rootDir)
     this.path = stripTrailingSlash(options.path ?? '/')
     this.indexFile = options.indexFile ?? 'index.html'
-    this.fallbackFile = options.fallbackFile
+    this.fallbackFilePath = options.fallbackFile === undefined ? undefined : path.join(this.rootDir, options.fallbackFile)
     this.cacheControl = options.cacheControl ?? 'public, max-age=0'
-    this.dotfiles = options.dotfiles ?? false
+    this.unsafeSegmentRegex = options.dotfiles ? UNSAFE_SEGMENT_REGEX : UNSAFE_OR_DOTFILE_SEGMENT_REGEX
     this.precompressed = options.precompressed ?? false
     // A null prototype prevents extensions like "constructor" from resolving through the prototype chain
     this.mimeTypes = Object.assign(Object.create(null) as Record<string, string>, options.mimeTypes)
@@ -166,16 +172,30 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    const filename = safeDecodeURIComponent(pathname.slice(base.length))
+    const segments: string[] = []
 
-    if (UNSAFE_PATH_REGEX.test(filename) || (!this.dotfiles && DOTFILE_PATH_REGEX.test(filename))) {
-      return undefined
+    // Decoded per segment, so one malformed escape cannot prevent the others from decoding
+    for (const rawSegment of pathname.slice(base.length).split('/')) {
+      const segment = safeDecodeURIComponent(rawSegment)
+
+      if (segment === '') {
+        continue
+      }
+
+      if (this.unsafeSegmentRegex.test(segment)) {
+        return undefined
+      }
+
+      segments.push(segment)
     }
 
-    let filePath = path.join(this.rootDir, filename)
-    let stats = await getStats(filePath)
+    // A url ending in a slash denotes a directory, so only its index file can be served
+    const isDirectoryUrl = pathname.endsWith('/')
 
-    if (stats?.isDirectory()) {
+    let filePath = path.join(this.rootDir, ...segments)
+    let stats = isDirectoryUrl ? undefined : await getStats(filePath)
+
+    if (isDirectoryUrl || stats?.isDirectory()) {
       stats = undefined
 
       if (this.indexFile !== false) {
@@ -184,8 +204,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       }
     }
 
-    if (!stats?.isFile() && this.fallbackFile !== undefined) {
-      filePath = path.join(this.rootDir, this.fallbackFile)
+    if (!stats?.isFile() && this.fallbackFilePath !== undefined) {
+      filePath = this.fallbackFilePath
       stats = await getStats(filePath)
     }
 
@@ -241,10 +261,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let end = size - 1
 
     const range = request.method === 'GET' ? flattenStandardHeader(request.headers.range) : undefined
-    const ifRange = flattenStandardHeader(request.headers['if-range'])
 
-    // If-Range uses the strong comparison function, so a weak tag never matches
-    if (range !== undefined && (ifRange === undefined || ifRange === etag || Date.parse(ifRange) === lastModifiedTime)) {
+    if (range !== undefined && isRangeApplicable(request.headers, etag, lastModifiedTime)) {
       const parsed = parseByteRange(range, size)
 
       if (parsed === 'unsatisfiable') {
@@ -322,6 +340,22 @@ function isNotModified(requestHeaders: StandardHeaders, etag: string, lastModifi
 
   // An unparsable date is NaN, which never compares true
   return ifModifiedSince !== undefined && lastModifiedTime <= Date.parse(ifModifiedSince)
+}
+
+/**
+ * An entity tag uses the strong comparison function, so a weak tag never matches. Only other
+ * values are parsed as dates, since the lenient date parser accepts some tags like `"1-2"`.
+ */
+function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number): boolean {
+  const ifRange = flattenStandardHeader(requestHeaders['if-range'])
+
+  if (ifRange === undefined) {
+    return true
+  }
+
+  return ifRange.startsWith('"') || ifRange.startsWith('W/')
+    ? ifRange === etag
+    : Date.parse(ifRange) === lastModifiedTime
 }
 
 /**
