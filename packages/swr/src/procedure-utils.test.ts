@@ -355,6 +355,29 @@ describe('procedureUtils', () => {
       expect(client.mock.calls[0]![1].signal.aborted).toBe(true)
     })
 
+    it('does not start the stream when unsubscribed before the call resolves', async () => {
+      const started = vi.fn()
+      const connected = promiseWithResolvers<void>()
+      client.mockImplementationOnce(async () => {
+        await connected.promise
+        return (async function* () {
+          started()
+          yield '__event__1'
+        })()
+      })
+      const subscriber = utils.liveSubscriber()
+
+      const next = vi.fn()
+      const unsubscribe = subscriber(key, { next })
+
+      unsubscribe()
+      connected.resolve()
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(started).not.toHaveBeenCalled()
+      expect(next).not.toHaveBeenCalled()
+    })
+
     it('stops writing after unsubscribe when the iterator ignores the signal', async () => {
       const paused = promiseWithResolvers<void>()
       client.mockImplementationOnce(async function* () {
