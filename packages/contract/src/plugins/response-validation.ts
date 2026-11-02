@@ -1,8 +1,9 @@
 import type { ClientContext } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
+import type { ThrowableError } from '@orpc/shared'
 import type { RouterContract } from '../router'
-import { ORPCError } from '@orpc/client'
-import { toArray } from '@orpc/shared'
+import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import { isAsyncIteratorObject, override, toArray } from '@orpc/shared'
 import { ValidationError } from '../error'
 import { reconcileORPCError } from '../error-utils'
 import { getProcedureContractOrThrow } from '../router-utils'
@@ -28,15 +29,34 @@ export class ResponseValidationLinkPlugin<T extends ClientContext> implements St
         async ({ next, path }) => {
           const procedure = getProcedureContractOrThrow(this.contract, path)
 
-          try {
-            return await next()
-          }
-          catch (error) {
+          const reconcileError = async (error: ThrowableError) => {
             if (error instanceof ORPCError) {
-              throw await reconcileORPCError(procedure['~orpc'].errorMap, error)
+              return await reconcileORPCError(procedure['~orpc'].errorMap, error)
             }
 
-            throw error
+            return error
+          }
+
+          try {
+            const output = await next()
+
+            if (isAsyncIteratorObject(output)) {
+              /**
+               * Errors thrown while consuming the iterator must be reconciled too.
+               *
+               * @warning
+               * Remember use `override` for AsyncIteratorObject to remain other special properties
+               */
+              return override(output, wrapAsyncIteratorPreservingEventMeta(
+                output,
+                { mapError: reconcileError },
+              )) as typeof output
+            }
+
+            return output
+          }
+          catch (error) {
+            throw await reconcileError(error as ThrowableError)
           }
         },
         ...toArray(options.interceptors),

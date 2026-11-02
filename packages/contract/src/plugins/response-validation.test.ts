@@ -1,9 +1,10 @@
-import { ORPCError } from '@orpc/client'
+import { getEventMeta, ORPCError, withEventMeta } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import * as z from 'zod'
 import { ValidationError } from '../error'
 import { reconcileORPCError } from '../error-utils'
 import { ProcedureContract } from '../procedure'
+import { asyncIteratorObject } from '../schema-built-in'
 import { ResponseValidationLinkPlugin } from './response-validation'
 
 vi.mock('../error-utils', async original => ({
@@ -40,12 +41,26 @@ describe('responseValidationLinkPlugin', () => {
     meta: {},
   })
 
+  const streamProcedure = new ProcedureContract({
+    outputSchemas: [asyncIteratorObject(z.number())],
+    errorMap: {
+      NOT_FOUND: {
+        data: z.object({
+          value: z.string().transform(value => Number.parseInt(value)),
+        }),
+      },
+    },
+    meta: {},
+  })
+
   const contract = {
     procedure,
     nested: {
       procedure,
     },
     withoutOutputSchema: withoutOutputSchemaProcedure,
+    stream: streamProcedure,
+    withoutOutputSchemaStream: withoutOutputSchemaProcedure,
   }
 
   const codec = {
@@ -195,5 +210,123 @@ describe('responseValidationLinkPlugin', () => {
     await expect(interceptor.mock.results[0]?.value).rejects.toBe(error)
 
     expect(reconcileORPCError).not.toHaveBeenCalled()
+  })
+
+  describe('async iterator output', () => {
+    function mockStreamResponse(path: string, output: unknown) {
+      codec.encodeInput.mockResolvedValueOnce({
+        method: 'POST',
+        url: path,
+        headers: {},
+        body: '__encoded__',
+      })
+      transport.send.mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.resolve('__body__'),
+      })
+      codec.decodeResponse.mockResolvedValueOnce({ kind: 'output', output })
+    }
+
+    it('reconciles ORPCError thrown while consuming the iterator', async () => {
+      const error = new ORPCError('NOT_FOUND', { data: { value: '123' } })
+      const reconciled = new ORPCError('NOT_FOUND', { data: { value: 123 } })
+
+      mockStreamResponse('/stream', (async function* () {
+        yield 1
+        throw error
+      })())
+      vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
+
+      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+
+      expect(reconcileORPCError).not.toHaveBeenCalled()
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(output.next()).rejects.toBe(reconciled)
+
+      expect(reconcileORPCError).toHaveBeenCalledTimes(1)
+      expect(reconcileORPCError).toHaveBeenCalledWith(contract.stream['~orpc'].errorMap, error)
+    })
+
+    it('reconciles mid-stream errors when the procedure has no output schemas', async () => {
+      const error = new ORPCError('TEST')
+      const reconciled = new ORPCError('TEST', { message: 'reconciled' })
+
+      mockStreamResponse('/withoutOutputSchemaStream', (async function* () {
+        throw error
+      })())
+      vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
+
+      const output = await link.call(['withoutOutputSchemaStream'], {}, { context: {} }) as AsyncIteratorObject<number>
+
+      await expect(output.next()).rejects.toBe(reconciled)
+      expect(reconcileORPCError).toHaveBeenCalledWith(contract.withoutOutputSchemaStream['~orpc'].errorMap, error)
+    })
+
+    it('preserves event meta of reconciled mid-stream errors', async () => {
+      const error = withEventMeta(new ORPCError('NOT_FOUND', { data: { value: '123' } }), { id: 'id-1', retry: 1000 })
+      const reconciled = new ORPCError('NOT_FOUND', { data: { value: 123 } })
+
+      mockStreamResponse('/stream', (async function* () {
+        throw error
+      })())
+      vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
+
+      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+
+      const thrown = await output.next().catch(e => e)
+
+      expect(thrown).toBeInstanceOf(ORPCError)
+      expect(thrown.data).toEqual({ value: 123 })
+      expect(getEventMeta(thrown)).toEqual({ id: 'id-1', retry: 1000 })
+    })
+
+    it('rethrows non-ORPCError mid-stream failures without reconciliation', async () => {
+      const error = new Error('plain failure')
+
+      mockStreamResponse('/stream', (async function* () {
+        throw error
+      })())
+
+      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+
+      await expect(output.next()).rejects.toBe(error)
+      expect(reconcileORPCError).not.toHaveBeenCalled()
+    })
+
+    it('reconciles mid-stream errors the same way as direct errors', async () => {
+      const { reconcileORPCError: actualReconcileORPCError } = await vi.importActual<typeof import('../error-utils')>('../error-utils')
+      vi.mocked(reconcileORPCError).mockImplementation(actualReconcileORPCError)
+      onTestFinished(() => {
+        vi.mocked(reconcileORPCError).mockReset()
+      })
+
+      mockStreamResponse('/stream', (async function* () {
+        yield 1
+        throw new ORPCError('NOT_FOUND', { data: { value: '123' } })
+      })())
+
+      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      const streamError = await output.next().catch(e => e)
+
+      codec.encodeInput.mockResolvedValueOnce({ method: 'POST', url: '/stream', headers: {}, body: '__encoded__' })
+      transport.send.mockResolvedValueOnce({ status: 404, headers: {}, resolveBody: () => Promise.resolve('__body__') })
+      codec.decodeResponse.mockResolvedValueOnce({
+        kind: 'error',
+        error: new ORPCError('NOT_FOUND', { data: { value: '123' } }),
+      })
+
+      const directError: any = await link.call(['stream'], {}, { context: {} }).catch(e => e)
+
+      expect(directError).toBeInstanceOf(ORPCError)
+      expect(directError.defined).toBe(true)
+      expect(directError.data).toEqual({ value: 123 })
+
+      expect(streamError).toBeInstanceOf(ORPCError)
+      expect(streamError.defined).toBe(directError.defined)
+      expect(streamError.data).toEqual(directError.data)
+    })
   })
 })
