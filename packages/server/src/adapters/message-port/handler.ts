@@ -55,6 +55,9 @@ export class MessagePortHandler<T extends Context> {
    * Attaches message and close listeners to a message port.
    *
    * Prefer this over calling `.message()` and `.close()` manually.
+   *
+   * Errors thrown while handling a message are swallowed, since no caller can catch them.
+   * Use `interceptors` (e.g. `onError`) to observe procedure errors.
    */
   upgrade(
     port: SupportedMessagePort,
@@ -64,7 +67,11 @@ export class MessagePortHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    onMessagePortMessage(port, message => this.message(port, message, ...rest))
+    // A rejection (e.g. a throwing context or interceptor) has no caller to reach,
+    // and the client has already been sent a cancel. Swallow it so a client cannot crash the process.
+    onMessagePortMessage(port, (message) => {
+      this.message(port, message, ...rest).catch(() => {})
+    })
     onMessagePortClose(port, () => this.close(port))
   }
 

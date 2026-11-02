@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import WebSocket, { WebSocketServer } from 'ws'
 import { os } from '../../builder'
+import { RethrowHandlerPlugin } from '../../plugins'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -271,6 +272,98 @@ describe('rpcHandler', () => {
 
     expect(procedure).not.toHaveBeenCalled()
     expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  describe('does not cause unhandled rejections via upgrade', () => {
+    const unhandledRejectionHandler = vi.fn()
+
+    beforeEach(() => {
+      process.on('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    afterEach(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const expectCancelled = async (ws: ReturnType<typeof createWs>) => {
+      await vi.waitFor(() => {
+        expect(ws.send).toHaveBeenCalledTimes(1)
+      })
+
+      const decoded = decodePeerMessage((ws as any).send.mock.calls[0][0]) as any
+      expect(decoded.message).toEqual({ id: '19', kind: 'cancel' })
+
+      // let any unhandled rejection surface
+      await new Promise(resolve => setTimeout(resolve, 10))
+      expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+    }
+
+    it('when context throws', async () => {
+      const handler = createHandler()
+      const ws = createWs()
+
+      handler.upgrade(ws as any, {
+        context: async () => {
+          throw new Error('auth')
+        },
+      })
+
+      ws.listeners.message!({ data: await createRequestMessage() })
+
+      await expectCancelled(ws)
+    })
+
+    it('when routing interceptor throws', async () => {
+      const handler = createHandler({
+        routingInterceptors: [() => {
+          throw new Error('interceptor')
+        }],
+      })
+      const ws = createWs()
+
+      handler.upgrade(ws as any)
+      ws.listeners.message!({ data: await createRequestMessage() })
+
+      await expectCancelled(ws)
+    })
+
+    it('when RethrowHandlerPlugin rethrows', async () => {
+      const handler = new RPCHandler({
+        ping: os.handler(() => {
+          throw new Error('rethrow')
+        }),
+      }, {
+        plugins: [new RethrowHandlerPlugin({ filter: () => true })],
+      })
+      const ws = createWs()
+
+      handler.upgrade(ws as any)
+      ws.listeners.message!({ data: await createRequestMessage() })
+
+      await expectCancelled(ws)
+    })
+
+    it('when loading a Blob message fails', async () => {
+      const handler = createHandler()
+      const ws = createWs()
+
+      handler.upgrade(ws as any)
+
+      const blob = new Blob([await createRequestMessage() as string])
+      blob.bytes = () => Promise.reject(new Error('load failed'))
+      ws.listeners.message!({ data: blob })
+
+      // let any unhandled rejection surface
+      await new Promise(resolve => setTimeout(resolve, 10))
+      expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+
+      // subsequent messages are still handled
+      ws.listeners.message!({ data: await createRequestMessage() })
+
+      await vi.waitFor(() => {
+        expect(ws.send).toHaveBeenCalledTimes(1)
+      })
+    })
   })
 
   it('ignores messages received after close', async () => {

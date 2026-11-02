@@ -288,6 +288,75 @@ describe('rpcHandler', () => {
     expect(ws.send).not.toHaveBeenCalled()
   })
 
+  describe('does not cause unhandled rejections via upgrade', () => {
+    const unhandledRejectionHandler = vi.fn()
+
+    beforeEach(() => {
+      process.on('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    afterEach(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const createFakePort = () => {
+      let onMessage: ((event: { data: unknown }) => void) | undefined
+
+      const port = {
+        addEventListener: vi.fn((event: string, callback: any) => {
+          if (event === 'message') {
+            onMessage = callback
+          }
+        }),
+        postMessage: vi.fn(),
+      }
+
+      return { port, emit: (data: unknown) => onMessage!({ data }) }
+    }
+
+    const expectCancelled = async (port: ReturnType<typeof createFakePort>['port']) => {
+      await vi.waitFor(() => {
+        expect(port.postMessage).toHaveBeenCalledTimes(1)
+      })
+
+      const decoded = decodePeerMessage(port.postMessage.mock.calls[0]![0]) as any
+      expect(decoded.message).toEqual({ id: '19', kind: 'cancel' })
+
+      // let any unhandled rejection surface
+      await new Promise(resolve => setTimeout(resolve, 10))
+      expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+    }
+
+    it('when context throws', async () => {
+      const handler = createHandler()
+      const { port, emit } = createFakePort()
+
+      handler.upgrade(port as any, {
+        context: async () => {
+          throw new Error('auth')
+        },
+      })
+
+      emit(await createRequestMessage())
+
+      await expectCancelled(port)
+    })
+
+    it('when routing interceptor throws', async () => {
+      const handler = createHandler({
+        routingInterceptors: [() => {
+          throw new Error('interceptor')
+        }],
+      })
+      const { port, emit } = createFakePort()
+
+      handler.upgrade(port as any)
+      emit(await createRequestMessage())
+
+      await expectCancelled(port)
+    })
+  })
+
   it('ignore invalid message format', async () => {
     const handler = createHandler()
     const { serverPort } = createPort()

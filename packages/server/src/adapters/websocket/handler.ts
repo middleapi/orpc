@@ -106,6 +106,9 @@ export class WebSocketHandler<T extends Context> {
    * Attaches message, close, and error event listeners to a WebSocket.
    *
    * Prefer this over calling `.message()` and `.close()` manually.
+   *
+   * Errors thrown while handling a message are swallowed, since no caller can catch them.
+   * Use `interceptors` (e.g. `onError`) to observe procedure errors.
    */
   upgrade(
     ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
@@ -115,14 +118,19 @@ export class WebSocketHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    ws.addEventListener('message', sequential(async (event) => {
+    const onMessage = sequential(async (event: MessageEvent) => {
       // For better compatibility avoid control or depend on websocket.binaryType
       const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
 
       // Not awaited: `this.message` runs business logic that may be slow,
       // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
-    }))
+      // A rejection (e.g. a throwing context, interceptor, or `ws.send` after close) has no caller to reach,
+      // and the client has already been sent a cancel. Swallow it so a client cannot crash the process.
+      this.message(ws, data, ...rest).catch(() => {})
+    })
+
+    // Swallow `loadBytes` failures for the same reason.
+    ws.addEventListener('message', event => onMessage(event).catch(() => {}))
     ws.addEventListener('close', () => this.close(ws))
 
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
