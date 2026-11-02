@@ -1,7 +1,7 @@
 import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
-import { promiseWithResolvers } from '@orpc/shared'
+import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
 import { BaseRedisPublisher } from './base-redis'
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
@@ -103,7 +103,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     })
     subscription.on('message', ({ message }) => {
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
-      this.listenersMap.get(channel)?.slice().forEach(listener => listener(message))
+      this.listenersMap.get(channel)?.slice().forEach(listener => tryOrUndefined(() => listener(message)))
     })
 
     this.pendingSubscriptionsMap.set(channel, promise)

@@ -706,3 +706,43 @@ it('prefix creates a publisher that appends the prefix and shares the client', a
   await publisher.publish('event', { order: 1 })
   expect(redis.publish).toHaveBeenCalledWith('tenant:event', expect.any(String))
 })
+
+it('does not broadcast a throwing onError to other subscribers', async () => {
+  const subscription = createFakeSubscription()
+  const messages: string[] = []
+  const redis = {
+    publish: async (_channel: string, message: string) => messages.push(message),
+    subscribe: () => {
+      queueMicrotask(() => subscription.emit('subscribe', 1))
+      return subscription
+    },
+  }
+  const publisher = new UpstashPublisher<Record<string, object>>(redis as unknown as Redis)
+  const listener2 = vi.fn()
+  const onError2 = vi.fn()
+
+  const unsubscribe1 = await publisher.subscribe('room', () => {
+    throw new Error('listener failed')
+  }, {
+    onError: () => {
+      throw new Error('onError failed')
+    },
+  })
+  const unsubscribe2 = await publisher.subscribe('room', listener2, { onError: onError2 })
+
+  await publisher.publish('room', { order: 1 })
+
+  // Like Upstash, which emits a throw from a message handler as an `error` event.
+  try {
+    subscription.emit('message', { channel: 'room', message: messages[0] })
+  }
+  catch (error) {
+    subscription.emit('error', error)
+  }
+
+  expect(listener2).toHaveBeenCalledExactlyOnceWith({ order: 1 })
+  expect(onError2).not.toHaveBeenCalled()
+
+  await unsubscribe1()
+  await unsubscribe2()
+})

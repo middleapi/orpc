@@ -284,4 +284,24 @@ describe('memoryPublisher', () => {
       await unsubscribeSecond()
     })
   })
+
+  it('keeps delivering to other listeners when one throws', async () => {
+    const publisher = new MemoryPublisher<TestEvents>()
+    const error = new Error('listener failed')
+    const onError = vi.fn()
+    const listener = vi.fn()
+
+    const unsubscribe1 = await publisher.subscribe('message', () => {
+      throw error
+    }, { onError })
+    const unsubscribe2 = await publisher.subscribe('message', listener)
+
+    await expect(publisher.publish('message', { text: 'hello' })).resolves.toBeUndefined()
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(error)
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ text: 'hello' })
+
+    await unsubscribe1()
+    await unsubscribe2()
+  })
 })
