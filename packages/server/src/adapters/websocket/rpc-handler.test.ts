@@ -21,10 +21,17 @@ describe('rpcHandler', () => {
     }, options)
   }
 
-  const createWs = () => ({
-    addEventListener: vi.fn(),
-    send: vi.fn(() => undefined),
-  })
+  const createWs = () => {
+    const listeners: Record<string, (event?: any) => void> = {}
+
+    return {
+      listeners,
+      addEventListener: vi.fn((event: string, callback: (event?: any) => void) => {
+        listeners[event] = callback
+      }),
+      send: vi.fn(() => undefined),
+    }
+  }
 
   const createRequestMessage = async ({
     prefix,
@@ -241,5 +248,44 @@ describe('rpcHandler', () => {
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
+  })
+
+  it('ignores Blob messages that finish loading after close via upgrade', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+    const messageSpy = vi.spyOn(handler, 'message')
+
+    const ws = createWs()
+    handler.upgrade(ws as any)
+
+    const request = await createRequestMessage()
+    ws.listeners.message!({ data: new Blob([request as string]) })
+    ws.listeners.close!() // closes before the Blob finishes loading
+
+    await vi.waitFor(() => {
+      expect(messageSpy).toHaveBeenCalledTimes(1)
+    })
+    await expect(messageSpy.mock.results[0]!.value).resolves.toMatchObject({ matched: true })
+
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const ws = createWs()
+    await handler.close(ws as any)
+
+    const result = await handler.message(ws as any, await createRequestMessage())
+
+    expect(result.matched).toBe(true)
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
   })
 })

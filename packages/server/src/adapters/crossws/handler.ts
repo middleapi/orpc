@@ -23,7 +23,10 @@ export interface experimental_CrosswsHandlerOptions<_T extends Context> {
 }
 
 export class experimental_CrosswsHandler<T extends Context> {
-  private readonly peers: WeakMap<CrosswsPeerLike, ServerPeer> = new WeakMap()
+  /**
+   * `null` marks a closed peer, so late messages never create a new server peer.
+   */
+  private readonly peers: WeakMap<CrosswsPeerLike, ServerPeer | null> = new WeakMap()
   private readonly encodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['decodePeerMessage']
 
@@ -48,7 +51,19 @@ export class experimental_CrosswsHandler<T extends Context> {
     message: CrosswsMessageLike,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
+    const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
+    const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
+
     let peer = this.peers.get(ws)
+
+    // Closed: a new peer here would leak and its requests would never be aborted.
+    if (peer === null) {
+      return result
+    }
 
     if (!peer) {
       this.peers.set(ws, peer = new ServerPeer(async (message) => {
@@ -56,12 +71,6 @@ export class experimental_CrosswsHandler<T extends Context> {
       }))
     }
 
-    /**
-     * Message order is important: loading -> decode -> .message.
-     * This flow must stay synchronous, or we need to use `sequential` helper
-     */
-    const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
-    const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
       await peer.message(
         result.message,
@@ -74,15 +83,13 @@ export class experimental_CrosswsHandler<T extends Context> {
 
   /**
    * Cleans up peer state for a closed WebSocket.
+   * Messages passed to `.message()` for this peer afterwards are ignored.
    *
    * @param ws The same crossws peer instance passed to `.message()`.
    */
   async close(ws: CrosswsPeerLike): Promise<void> {
-    const server = this.peers.get(ws)
-
-    if (server) {
-      await server.close()
-      this.peers.delete(ws)
-    }
+    const peer = this.peers.get(ws)
+    this.peers.set(ws, null)
+    await peer?.close()
   }
 }
