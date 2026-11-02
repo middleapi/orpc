@@ -18,11 +18,7 @@ Repeated middleware work can hurt performance, especially for expensive operatio
 
 When a router-level builder applies its middleware with `.router` or `.lazy`, oRPC skips that middleware for every procedure whose middleware chain already **starts** with the same middleware, in the same order. This covers the common case where the router and its procedures are built from the same base builder:
 
-```ts twoslash
-import { os } from '@orpc/server'
-
-const authProvider = os.middleware(({ next }) => next())
-// ---cut---
+```ts
 const authed = os.use(authProvider)
 
 const foo = authed.handler(() => 'foo')
@@ -34,10 +30,7 @@ const router = authed.router({ foo, bar })
 
 [Metadata](/docs/metadata) plugins are deduped the same way: the leading plugins a procedure shares with the router-level builder, such as those from a common base builder, are not applied again. This keeps metadata that accumulates, such as OpenAPI `tags` and `prefix`, from being doubled:
 
-```ts twoslash
-import { os } from '@orpc/server'
-import { openapi } from '@orpc/openapi'
-// ---cut---
+```ts
 const base = os.meta(openapi({ tags: ['planets'], prefix: '/planets' }))
 
 const router = base.router({
@@ -56,31 +49,10 @@ Middleware is compared by reference and only as a leading sequence applied befor
 
 To always apply router-level middleware or metadata plugins, disable dedupe with `$config` on the builder that calls `.router` or `.lazy`:
 
-```ts twoslash
-import { os } from '@orpc/server'
-// ---cut---
-const base = os.$config({
-  dedupeLeadingMiddlewares: false,
-  dedupeLeadingMetaPlugins: false,
-})
-```
-
-The contract builder supports the metadata option too, for router contracts built with `oc.router`:
-
-```ts twoslash
-import { oc } from '@orpc/contract'
-// ---cut---
-const base = oc.$config({ dedupeLeadingMetaPlugins: false })
-```
-
-[Contract-first](/docs/contract/implementation) implementers only apply router-level middleware, so they accept the middleware option only:
-
-```ts twoslash
-import type { contract } from './shared/planet'
-// ---cut---
-import { implement } from '@orpc/server'
-
-const implementer = implement(contract).$config({ dedupeLeadingMiddlewares: false })
+```ts
+os.$config({ dedupeLeadingMiddlewares: false, dedupeLeadingMetaPlugins: false })
+oc.$config({ dedupeLeadingMetaPlugins: false })
+implement(contract).$config({ dedupeLeadingMiddlewares: false }) // implementers never apply router-level metadata
 ```
 
 ## Manual Dedupe
