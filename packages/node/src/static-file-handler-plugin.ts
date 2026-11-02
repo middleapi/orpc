@@ -243,7 +243,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
    * `O_NOFOLLOW` only guards the final component. A directory inside the root swapped for a link
    * between `realpath` and the open is still followed, since node exposes no `openat2` with
    * `RESOLVE_BENEATH` to resolve the whole path beneath the root in one step. Windows has no
-   * `O_NOFOLLOW` at all, though creating file links there needs elevated privileges.
+   * `O_NOFOLLOW` at all, so a file link swapped in there after `lstat` is followed. Creating one
+   * needs admin rights or Developer Mode.
    */
   private async openFile(openPath: string): Promise<{ handle: FileHandle, stats: Stats } | undefined> {
     const handle = await open(openPath, this.allowSymlinks ? OPEN_FLAGS : OPEN_NO_FOLLOW_FLAGS).catch(() => undefined)

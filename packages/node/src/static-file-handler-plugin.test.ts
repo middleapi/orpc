@@ -787,7 +787,8 @@ describe('staticFileHandlerPlugin', () => {
         }
       }
 
-      it('never serves a symlink that replaced a checked file', async () => {
+      // Windows has no O_NOFOLLOW, see `openFile`
+      it.skipIf(process.platform === 'win32')('never serves a symlink that replaced a checked file', async () => {
         swapAfterCheck(() => {
           rmSync(swapPath())
           symlinkSync(path.join(baseDir, 'secret.txt'), swapPath())
