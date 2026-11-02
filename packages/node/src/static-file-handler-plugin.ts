@@ -34,7 +34,7 @@ const TEXT_CONTENT_TYPE_REGEX = /^text\//
  */
 const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 
-// Windows defines neither flag
+// Windows defines neither flag, so `serve` also requires the opened file to be the one `lstat` saw
 const OPEN_FLAGS: number = fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0)
 const OPEN_NO_FOLLOW_FLAGS: number = OPEN_FLAGS | (fsConstants.O_NOFOLLOW ?? 0)
 
@@ -151,11 +151,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   before: string[] = ['~head-method']
 
   private readonly rootDir: string
-  /**
-   * `rootDir` with its own symbolic links resolved, so a symlinked `rootDir` keeps working and
-   * platform links like the macOS `/var` to `/private/var` do not reject every file.
-   */
-  private rootDirReal: Promise<string>
   private readonly path: Exclude<StaticFileHandlerPluginOptions['path'], undefined>
   private readonly indexFile: Exclude<StaticFileHandlerPluginOptions['indexFile'], undefined>
   private readonly fallbackFile: StaticFileHandlerPluginOptions['fallbackFile']
@@ -167,7 +162,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
   constructor(options: StaticFileHandlerPluginOptions) {
     this.rootDir = path.resolve(options.rootDir)
-    this.rootDirReal = this.resolveRootDirReal()
     this.path = stripTrailingSlash(options.path ?? '/')
     this.indexFile = options.indexFile ?? 'index.html'
     this.fallbackFile = options.fallbackFile
@@ -220,36 +214,23 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     return isWithin(this.rootDir, resolved) ? resolved : undefined
   }
 
-  private resolveRootDirReal(): Promise<string> {
-    return realpath(this.rootDir).catch(() => this.rootDir)
-  }
-
   /**
    * Resolves symbolic links and confirms the target is still inside the root,
    * which the lexical `resolveWithinRoot` check cannot see.
+   * The root is resolved too, so a symlinked `rootDir` keeps working when repointed and
+   * platform links like the macOS `/var` to `/private/var` do not reject every file.
    */
   private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
     if (this.allowSymlinks) {
       return filePath
     }
 
-    const realPath = await realpath(filePath).catch(() => undefined)
+    const [realPath, rootDirReal] = await Promise.all([
+      realpath(filePath).catch(() => undefined),
+      realpath(this.rootDir).catch(() => this.rootDir),
+    ])
 
-    if (realPath === undefined) {
-      return undefined
-    }
-
-    const cached = this.rootDirReal
-
-    if (isWithin(await cached, realPath)) {
-      return realPath
-    }
-
-    if (this.rootDirReal === cached) {
-      this.rootDirReal = this.resolveRootDirReal()
-    }
-
-    return isWithin(await this.rootDirReal, realPath) ? realPath : undefined
+    return realPath !== undefined && isWithin(rootDirReal, realPath) ? realPath : undefined
   }
 
   /**
@@ -445,7 +426,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     const opened = await this.openFile(found.openPath)
 
-    if (opened === undefined) {
+    if (opened === undefined || opened.stats.dev !== found.stats.dev || opened.stats.ino !== found.stats.ino) {
+      if (opened !== undefined) {
+        void opened.handle.close().catch(() => {})
+      }
+
       return undefined
     }
 
