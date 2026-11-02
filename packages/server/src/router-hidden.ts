@@ -59,5 +59,5 @@ export function withHiddenRouterContract<T extends Lazyable<AnyRouter>>(router: 
 }
 
 export function getHiddenRouterContract(router: Lazyable<AnyRouter | RouterContract>): RouterContract | undefined {
-  return (router as any)?.[HIDDEN_ROUTER_CONTRACT_SYMBOL]
+  return (router as any)[HIDDEN_ROUTER_CONTRACT_SYMBOL]
 }

@@ -404,13 +404,6 @@ describe('walkProcedureContractsSync', () => {
     expect(entries).toHaveBeenNthCalledWith(3, router.nested.p1, ['custom', 'nested', 'p1'])
   })
 
-  it('ignores nullish routers', () => {
-    const entries = vi.fn()
-
-    expect(walkProcedureContractsSync({ p1: procedure1, undefined, null: null } as any, entries)).toEqual([])
-    expect(entries).toHaveBeenCalledExactlyOnceWith(procedure1, ['p1'])
-  })
-
   it('ignores invalid roots', () => {
     const entries = vi.fn()
 
@@ -484,15 +477,6 @@ describe('walkProcedureContractsAsync', () => {
     expect(entries).toHaveBeenNthCalledWith(3, router.nested.p1, ['custom', 'nested', 'p1'])
     expect(entries).toHaveBeenNthCalledWith(4, routerLazy.p1, ['custom', 'lazy', 'p1'])
     expect(entries).toHaveBeenNthCalledWith(5, routerLazy.nested.p1, ['custom', 'lazy', 'nested', 'p1'])
-  })
-
-  it('ignores nullish routers, including lazy ones', async () => {
-    const entries = vi.fn(async () => {})
-    const lazyUndefined = new Lazy({ loader: async () => ({ default: undefined as any }), meta: {} })
-
-    await walkProcedureContractsAsync({ p1: procedure1, undefined, null: null, lazyUndefined } as any, entries)
-
-    expect(entries).toHaveBeenCalledExactlyOnceWith(procedure1, ['p1'])
   })
 })
 

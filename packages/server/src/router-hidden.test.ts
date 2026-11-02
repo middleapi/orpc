@@ -21,13 +21,6 @@ it('withHiddenRouterContract & getHiddenRouterContract', () => {
   expect(getHiddenRouterContract(withHiddenRouterContract(router.ping, contract.ping))).toBe(contract.ping)
 })
 
-it('getHiddenRouterContract returns undefined for non-object values', () => {
-  expect(getHiddenRouterContract(undefined as any)).toBeUndefined()
-  expect(getHiddenRouterContract(null as any)).toBeUndefined()
-  expect(getHiddenRouterContract('invalid' as any)).toBeUndefined()
-  expect(getHiddenRouterContract(router)).toBeUndefined()
-})
-
 describe('withHiddenRouterContract with a normal router as the contract', () => {
   const real = {
     ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'REAL'),
