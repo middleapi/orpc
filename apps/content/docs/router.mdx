@@ -44,7 +44,7 @@ const router = os.use(requiredAuth).meta(requireAuthMeta).router({
 ```
 
 :::info
-When the router and its procedures are built from the same builder, oRPC automatically skips router-level middleware and metadata that a procedure already applies. In other cases, middleware applied with `.use` at both the router and procedure levels may run more than once. See the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
+Router-level middleware and metadata that a procedure already has from the same builder are skipped. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
 :::
 
 ## Lazy Router

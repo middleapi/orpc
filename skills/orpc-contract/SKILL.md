@@ -64,7 +64,7 @@ export const router = implementer.router({
 ```
 
 - `.$context` declares the initial context the procedures require, as on `os`.
-- Apply middleware per procedure with `.use(mw)` before `.handler`. That runs after input validation (the contract already registered `.input`); to wrap validation, apply it at router level: `implementer.use(mw)` for every procedure, or `implementer.planet.use(mw).list` for a subtree. Router-level middleware that a procedure already applies as its leading chain (`const authed = implementer.use(mw)`, then `authed.router({ x: authed.x.handler(...) })`) is deduped automatically; other overlaps run twice, so use the dedupe pattern from the `orpc` skill.
+- Apply middleware per procedure with `.use(mw)` before `.handler`. That runs after input validation (the contract already registered `.input`); to wrap validation, apply it at router level: `implementer.use(mw)` for every procedure, or `implementer.planet.use(mw).list` for a subtree. Router-level middleware a procedure already has from the same implementer is skipped automatically; other overlaps run twice, so use the dedupe pattern from the `orpc` skill.
 - `implementer.middleware(fn)` creates middleware that infers the contract's typesafe errors. When not every procedure defines a code, guard with the `in` operator: `if ('TOO_MANY_REQUESTS' in errors) throw errors.TOO_MANY_REQUESTS()`. Any type-compatible middleware also works.
 - The result is a normal router: serve it with `RPCHandler` (`orpc` skill) or `OpenAPIHandler` (`orpc-openapi` skill), call it in-process with `call` or `createRouterClient` from `@orpc/server`.
 

@@ -62,7 +62,7 @@ export const router = {
 }
 ```
 
-Infer types with `InferRouterInputs` / `InferRouterOutputs` from `@orpc/server`. Router-level middleware and meta plugins that a procedure already applies as its leading chain (both built from the same builder) are deduped automatically (opt out with `$config({ dedupeLeadingMiddlewares: false, dedupeLeadingMetaPlugins: false })`); other overlaps run twice, see the dedupe pattern below.
+Infer types with `InferRouterInputs` / `InferRouterOutputs` from `@orpc/server`. Router-level middleware and meta plugins a procedure already has from the same builder are skipped automatically; other overlaps run twice, see the dedupe pattern below.
 
 ## Middleware and context
 
@@ -84,7 +84,7 @@ const requireAuth = base.middleware(async ({ context, next }) => {
 
 `.use` accepts named middleware or inline functions. Middleware registered before `.input` runs before validation, the rest after. Middleware can also declare typed input (`os.middleware(async ({ next }, id: number) => ...)`); adapt mismatched shapes with `.use(mw.adaptInput(input => input.id))`.
 
-Best practice, dedupe expensive middleware: the same middleware can still run twice in one call (router-level plus procedure-level `.use` in a different position, or a procedure `call`ing another). Cache the result in context:
+Best practice, dedupe expensive middleware: the same middleware can still run twice in one call (e.g. a procedure `call`ing another). Cache the result in context:
 
 ```ts
 const authProvider = os

@@ -45,20 +45,17 @@ const router = oc.meta(requireAuthMeta).router({
 })
 ```
 
-When the router and its procedure contracts are built from the same base builder, the metadata plugins they share are applied only once, so accumulating metadata, such as OpenAPI `tags` and `prefix`, is not doubled:
+Metadata a procedure already has from the same builder is not applied twice:
 
 ```ts
-const base = oc.meta(openapi({ tags: ['planets'], prefix: '/planets' }))
+const base = oc.meta(openapi({ tags: ['planets'] }))
 
 const router = base.router({
-  // tags stays ['planets'] and prefix stays '/planets'
-  list: base.output(z.array(z.string())),
+  list: base.output(z.array(z.string())), // tags: ['planets'], not ['planets', 'planets']
 })
 ```
 
-:::info
-To always apply the router-level metadata plugins again, use `oc.$config({ dedupeLeadingMetaPlugins: false })` on the builder that calls `.router`. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
-:::
+Disable it with `oc.$config({ dedupeLeadingMetaPlugins: false })`. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
 
 ## Router to Contract
 
