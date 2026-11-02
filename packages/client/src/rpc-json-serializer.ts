@@ -263,7 +263,8 @@ export class RPCJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    this.handlerEntries = handlerEntries
+    // undefined = no handlers to check, so the inline path can return primitives early
+    this.handlerEntries = handlerEntries.length === 0 ? undefined : handlerEntries
   }
 
   serializeJson(data: unknown): RPCJsonSerialization {
@@ -287,19 +288,28 @@ export class RPCJsonSerializer {
    * so it must be copied before being stored in `meta` or `maps`.
    */
   private serializeValue(data: unknown, segments: Segment[], meta: RPCJsonSerializationMeta[], maps: Segment[][], blobs: Blob[]): unknown {
+    const handlerEntries = this.handlerEntries
+
     /**
      * Inlined version of DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: primitives are
      * dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
+     * Primitives without a built-in handler return early unless custom handlers must see them.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
         case 'string':
         case 'boolean':
-          return data
+          if (handlerEntries === undefined) {
+            return data
+          }
+          break
         case 'number':
           if (Number.isFinite(data)) {
-            return data
+            if (handlerEntries === undefined) {
+              return data
+            }
+            break
           }
           if (Number.isNaN(data)) {
             meta.push(['nan', ...segments])
@@ -315,7 +325,10 @@ export class RPCJsonSerializer {
           return data.toString()
         case 'object': {
           if (data === null) {
-            return data
+            if (handlerEntries === undefined) {
+              return data
+            }
+            break
           }
           if (data instanceof Date) {
             meta.push(['date', ...segments])
@@ -339,7 +352,6 @@ export class RPCJsonSerializer {
       }
     }
 
-    const handlerEntries = this.handlerEntries
     if (handlerEntries) {
       for (let i = 0; i < handlerEntries.length; i++) {
         const entry = handlerEntries[i]!
@@ -364,6 +376,10 @@ export class RPCJsonSerializer {
           return result
         }
       }
+    }
+
+    if (typeof data !== 'object' || data === null) {
+      return data
     }
 
     if (data instanceof Blob) {

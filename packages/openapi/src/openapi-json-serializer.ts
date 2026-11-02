@@ -189,7 +189,8 @@ export class OpenAPIJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    this.handlerEntries = handlerEntries
+    // undefined = no handlers to check, so the inline path can return primitives early
+    this.handlerEntries = handlerEntries.length === 0 ? undefined : handlerEntries
   }
 
   serializeJson(data: unknown): OpenAPIJsonSerialization {
@@ -206,25 +207,40 @@ export class OpenAPIJsonSerializer {
    * so it must be copied before being stored in `maps`.
    */
   private serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[]): unknown {
+    const handlerEntries = this.handlerEntries
+
     /**
      * Inlined version of DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: primitives
      * are dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
+     * Primitives without a built-in handler return early unless custom handlers must see them.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
         case 'string':
         case 'boolean':
-          return data
+          if (handlerEntries === undefined) {
+            return data
+          }
+          break
         case 'number':
-          return Number.isFinite(data) ? data : null
+          if (!Number.isFinite(data)) {
+            return null
+          }
+          if (handlerEntries === undefined) {
+            return data
+          }
+          break
         case 'undefined':
           return null
         case 'bigint':
           return data.toString()
         case 'object': {
           if (data === null) {
-            return data
+            if (handlerEntries === undefined) {
+              return data
+            }
+            break
           }
           if (data instanceof Date) {
             return Number.isNaN(data.getTime()) ? null : data.toISOString()
@@ -242,7 +258,6 @@ export class OpenAPIJsonSerializer {
       }
     }
 
-    const handlerEntries = this.handlerEntries
     if (handlerEntries) {
       for (let i = 0; i < handlerEntries.length; i++) {
         const handler = handlerEntries[i]!
@@ -262,6 +277,10 @@ export class OpenAPIJsonSerializer {
           return this.serializeValue(serialized, segments, maps, blobs)
         }
       }
+    }
+
+    if (typeof data !== 'object' || data === null) {
+      return data
     }
 
     if (data instanceof Blob) {
