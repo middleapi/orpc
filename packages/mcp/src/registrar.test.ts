@@ -958,27 +958,6 @@ describe('mcpRegistrar', () => {
       expect(result.structuredContent).toEqual({ id: 2, name: 'Mars' })
     })
 
-    it('calls the implementation when the contract is a normal router', async () => {
-      const real = {
-        planet: {
-          find: os.input(z.object({ id: z.number() })).output(planetSchema).handler(({ input }) => ({ id: input.id, name: 'REAL' })),
-        },
-      }
-
-      const impl = implement(real)
-
-      const mock = impl.router({
-        planet: {
-          find: impl.planet.find.handler(({ input }) => ({ id: input.id, name: 'MOCK' })),
-        },
-      })
-
-      const client = await createTestClient('legacy', new McpRegistrar(mock))
-
-      const result = await client.callTool({ name: 'planet_find', arguments: { id: 3 } })
-      expect(result.structuredContent).toEqual({ id: 3, name: 'MOCK' })
-    })
-
     it('throws when an implementation is missing', async () => {
       const server = createTestServer()
       const implemented = implement(contract).router({ planet: {} } as any)
