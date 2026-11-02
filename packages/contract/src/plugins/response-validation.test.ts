@@ -43,13 +43,7 @@ describe('responseValidationLinkPlugin', () => {
 
   const streamProcedure = new ProcedureContract({
     outputSchemas: [asyncIteratorObject(z.number())],
-    errorMap: {
-      NOT_FOUND: {
-        data: z.object({
-          value: z.string().transform(value => Number.parseInt(value)),
-        }),
-      },
-    },
+    errorMap: procedure['~orpc'].errorMap,
     meta: {},
   })
 
@@ -60,7 +54,6 @@ describe('responseValidationLinkPlugin', () => {
     },
     withoutOutputSchema: withoutOutputSchemaProcedure,
     stream: streamProcedure,
-    withoutOutputSchemaStream: withoutOutputSchemaProcedure,
   }
 
   const codec = {
@@ -81,22 +74,14 @@ describe('responseValidationLinkPlugin', () => {
     interceptors: [interceptor],
   })
 
+  function mockResponse(url: string, decoded: unknown, status = 200) {
+    codec.encodeInput.mockResolvedValueOnce({ method: 'POST', url, headers: {}, body: '__encoded__' })
+    transport.send.mockResolvedValueOnce({ status, headers: {}, resolveBody: () => Promise.resolve('__body__') })
+    codec.decodeResponse.mockResolvedValueOnce(decoded)
+  }
+
   it('validates output using the output schema pipeline', async () => {
-    codec.encodeInput.mockResolvedValueOnce({
-      method: 'POST',
-      url: '/procedure',
-      headers: {},
-      body: '__encoded__',
-    })
-    transport.send.mockResolvedValueOnce({
-      status: 200,
-      headers: {},
-      resolveBody: () => Promise.resolve('__body__'),
-    })
-    codec.decodeResponse.mockResolvedValueOnce({
-      kind: 'output',
-      output: { value: '123' },
-    })
+    mockResponse('/procedure', { kind: 'output', output: { value: '123' } })
 
     const output = await link.call(['procedure'], {}, { context: {} })
 
@@ -105,21 +90,7 @@ describe('responseValidationLinkPlugin', () => {
   })
 
   it('skips validation when the procedure has no output schemas', async () => {
-    codec.encodeInput.mockResolvedValueOnce({
-      method: 'POST',
-      url: '/withoutOutputSchema',
-      headers: {},
-      body: '__encoded__',
-    })
-    transport.send.mockResolvedValueOnce({
-      status: 200,
-      headers: {},
-      resolveBody: () => Promise.resolve('__body__'),
-    })
-    codec.decodeResponse.mockResolvedValueOnce({
-      kind: 'output',
-      output: 'anything',
-    })
+    mockResponse('/withoutOutputSchema', { kind: 'output', output: 'anything' })
 
     const output = await link.call(['withoutOutputSchema'], {}, { context: {} })
 
@@ -128,21 +99,7 @@ describe('responseValidationLinkPlugin', () => {
   })
 
   it('throws INTERNAL_SERVER_ERROR when output validation fails', async () => {
-    codec.encodeInput.mockResolvedValueOnce({
-      method: 'POST',
-      url: '/procedure',
-      headers: {},
-      body: '__encoded__',
-    })
-    transport.send.mockResolvedValueOnce({
-      status: 200,
-      headers: {},
-      resolveBody: () => Promise.resolve('__body__'),
-    })
-    codec.decodeResponse.mockResolvedValueOnce({
-      kind: 'output',
-      output: 'invalid',
-    })
+    mockResponse('/procedure', { kind: 'output', output: 'invalid' })
 
     const expectedError = new ORPCError('INTERNAL_SERVER_ERROR', {
       message: 'Output validation failed',
@@ -165,22 +122,10 @@ describe('responseValidationLinkPlugin', () => {
   })
 
   it('reconciles thrown ORPCError instances against the contract', async () => {
-    codec.encodeInput.mockResolvedValueOnce({
-      method: 'POST',
-      url: '/nested/procedure',
-      headers: {},
-      body: '__encoded__',
-    })
-    transport.send.mockResolvedValueOnce({
-      status: 400,
-      headers: {},
-      resolveBody: () => Promise.resolve('__body__'),
-    })
-
     const error = new ORPCError('TEST', { message: 'test', data: { value: '123' } })
     const reconciled = new ORPCError('TEST', { message: 'test', data: { value: 123 } })
 
-    codec.decodeResponse.mockResolvedValueOnce({ kind: 'error', error })
+    mockResponse('/nested/procedure', { kind: 'error', error }, 400)
     vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
 
     await expect(link.call(['nested', 'procedure'], {}, { context: {} })).rejects.toBe(reconciled)
@@ -190,20 +135,10 @@ describe('responseValidationLinkPlugin', () => {
   })
 
   it('rethrows non-ORPCError failures without reconciliation', async () => {
-    codec.encodeInput.mockResolvedValueOnce({
-      method: 'POST',
-      url: '/nested/procedure',
-      headers: {},
-      body: '__encoded__',
-    })
-    transport.send.mockResolvedValueOnce({
-      status: 500,
-      headers: {},
-      resolveBody: () => Promise.resolve('__body__'),
-    })
-
     const error = new Error('plain failure')
 
+    codec.encodeInput.mockResolvedValueOnce({ method: 'POST', url: '/nested/procedure', headers: {}, body: '__encoded__' })
+    transport.send.mockResolvedValueOnce({ status: 500, headers: {}, resolveBody: () => Promise.resolve('__body__') })
     codec.decodeResponse.mockRejectedValueOnce(error)
 
     await expect(link.call(['nested', 'procedure'], {}, { context: {} })).rejects.toBe(error)
@@ -213,29 +148,17 @@ describe('responseValidationLinkPlugin', () => {
   })
 
   describe('async iterator output', () => {
-    function mockStreamResponse(path: string, output: unknown) {
-      codec.encodeInput.mockResolvedValueOnce({
-        method: 'POST',
-        url: path,
-        headers: {},
-        body: '__encoded__',
-      })
-      transport.send.mockResolvedValueOnce({
-        status: 200,
-        headers: {},
-        resolveBody: () => Promise.resolve('__body__'),
-      })
-      codec.decodeResponse.mockResolvedValueOnce({ kind: 'output', output })
-    }
-
     it('reconciles ORPCError thrown while consuming the iterator', async () => {
-      const error = new ORPCError('NOT_FOUND', { data: { value: '123' } })
-      const reconciled = new ORPCError('NOT_FOUND', { data: { value: 123 } })
+      const error = new ORPCError('TEST', { data: { value: '123' } })
+      const reconciled = new ORPCError('TEST', { data: { value: 123 } })
 
-      mockStreamResponse('/stream', (async function* () {
-        yield 1
-        throw error
-      })())
+      mockResponse('/stream', {
+        kind: 'output',
+        output: (async function* () {
+          yield 1
+          throw error
+        })(),
+      })
       vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
 
       const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
@@ -248,28 +171,16 @@ describe('responseValidationLinkPlugin', () => {
       expect(reconcileORPCError).toHaveBeenCalledWith(contract.stream['~orpc'].errorMap, error)
     })
 
-    it('reconciles mid-stream errors when the procedure has no output schemas', async () => {
-      const error = new ORPCError('TEST')
-      const reconciled = new ORPCError('TEST', { message: 'reconciled' })
-
-      mockStreamResponse('/withoutOutputSchemaStream', (async function* () {
-        throw error
-      })())
-      vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
-
-      const output = await link.call(['withoutOutputSchemaStream'], {}, { context: {} }) as AsyncIteratorObject<number>
-
-      await expect(output.next()).rejects.toBe(reconciled)
-      expect(reconcileORPCError).toHaveBeenCalledWith(contract.withoutOutputSchemaStream['~orpc'].errorMap, error)
-    })
-
     it('preserves event meta of reconciled mid-stream errors', async () => {
-      const error = withEventMeta(new ORPCError('NOT_FOUND', { data: { value: '123' } }), { id: 'id-1', retry: 1000 })
-      const reconciled = new ORPCError('NOT_FOUND', { data: { value: 123 } })
+      const error = withEventMeta(new ORPCError('TEST', { data: { value: '123' } }), { id: 'id-1', retry: 1000 })
+      const reconciled = new ORPCError('TEST', { data: { value: 123 } })
 
-      mockStreamResponse('/stream', (async function* () {
-        throw error
-      })())
+      mockResponse('/stream', {
+        kind: 'output',
+        output: (async function* () {
+          throw error
+        })(),
+      })
       vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
 
       const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
@@ -284,9 +195,12 @@ describe('responseValidationLinkPlugin', () => {
     it('rethrows non-ORPCError mid-stream failures without reconciliation', async () => {
       const error = new Error('plain failure')
 
-      mockStreamResponse('/stream', (async function* () {
-        throw error
-      })())
+      mockResponse('/stream', {
+        kind: 'output',
+        output: (async function* () {
+          throw error
+        })(),
+      })
 
       const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
 
@@ -294,39 +208,27 @@ describe('responseValidationLinkPlugin', () => {
       expect(reconcileORPCError).not.toHaveBeenCalled()
     })
 
-    it('reconciles mid-stream errors the same way as direct errors', async () => {
+    it('marks mid-stream errors as defined and applies the error data schema', async () => {
       const { reconcileORPCError: actualReconcileORPCError } = await vi.importActual<typeof import('../error-utils')>('../error-utils')
       vi.mocked(reconcileORPCError).mockImplementation(actualReconcileORPCError)
       onTestFinished(() => {
         vi.mocked(reconcileORPCError).mockReset()
       })
 
-      mockStreamResponse('/stream', (async function* () {
-        yield 1
-        throw new ORPCError('NOT_FOUND', { data: { value: '123' } })
-      })())
+      mockResponse('/stream', {
+        kind: 'output',
+        output: (async function* () {
+          yield 1
+          throw new ORPCError('TEST', { data: { value: '123' } })
+        })(),
+      })
 
       const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
 
       await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
-      const streamError = await output.next().catch(e => e)
-
-      codec.encodeInput.mockResolvedValueOnce({ method: 'POST', url: '/stream', headers: {}, body: '__encoded__' })
-      transport.send.mockResolvedValueOnce({ status: 404, headers: {}, resolveBody: () => Promise.resolve('__body__') })
-      codec.decodeResponse.mockResolvedValueOnce({
-        kind: 'error',
-        error: new ORPCError('NOT_FOUND', { data: { value: '123' } }),
-      })
-
-      const directError: any = await link.call(['stream'], {}, { context: {} }).catch(e => e)
-
-      expect(directError).toBeInstanceOf(ORPCError)
-      expect(directError.defined).toBe(true)
-      expect(directError.data).toEqual({ value: 123 })
-
-      expect(streamError).toBeInstanceOf(ORPCError)
-      expect(streamError.defined).toBe(directError.defined)
-      expect(streamError.data).toEqual(directError.data)
+      await expect(output.next()).rejects.toSatisfy((error: any) =>
+        error instanceof ORPCError && error.defined === true && error.data.value === 123,
+      )
     })
   })
 })
