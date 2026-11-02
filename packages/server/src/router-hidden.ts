@@ -8,12 +8,13 @@ import { Procedure } from './procedure'
 const HIDDEN_ROUTER_CONTRACT_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_ROUTER_CONTRACT')
 
 /**
- * A normal router can be used as a contract, but its procedures carry implementation details
- * (handler, middlewares, config). Handlers serve the hidden contract and treat any procedure as
- * the implementation, so the contract's procedures would run instead of the actual implementation.
+ * A normal router can be used as a contract, but its procedures carry a handler and middlewares.
+ * Handlers serve the hidden contract and treat any procedure as the implementation, so the
+ * contract's procedures would run instead of the actual implementation.
  *
- * Rebuilds the contract with every procedure stripped down to a plain {@link ProcedureContract},
- * copying only the routers that contain one, so contract-first contracts are returned as is.
+ * Rebuilds the contract with every procedure turned into a plain {@link ProcedureContract}
+ * (without `handler` and `orderedMiddlewares`), copying only the routers that contain one,
+ * so contract-first contracts are returned as is.
  */
 function toPlainRouterContract<T>(contract: T): T {
   if (!isTypescriptObject(contract)) {
