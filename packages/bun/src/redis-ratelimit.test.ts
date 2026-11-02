@@ -192,6 +192,24 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
     })
   }, { timeout: 20_000 })
 
+  it('does not count rejected requests', async () => {
+    const limiter = await createTestingRateLimiter({ maxRequests: 5, window: 10_000 })
+    const key = 'rejected-not-counted'
+
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: true, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: false, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({ success: true, remaining: 0 })
+    await expect(limiter.limit(key, { weight: 1 })).resolves.toMatchObject({ success: false, remaining: 0 })
+  }, { timeout: 20_000 })
+
+  it('denies a request heavier than the limit without consuming quota', async () => {
+    const limiter = await createTestingRateLimiter({ maxRequests: 3, window: 10_000 })
+    const key = 'too-heavy'
+
+    await expect(limiter.limit(key, { weight: 4 })).resolves.toMatchObject({ success: false, limit: 3, remaining: 3 })
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: true, limit: 3, remaining: 0 })
+  }, { timeout: 20_000 })
+
   describe('timeout', () => {
     it('waits until the next window when capacity is unavailable', async () => {
       const limiter = await createTestingRateLimiter({
@@ -245,6 +263,24 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
       })
     }, { timeout: 20_000 })
 
+    it('gives up right away when the weight exceeds the limit', async () => {
+      const limiter = await createTestingRateLimiter({
+        maxRequests: 2,
+        window: 1000,
+        timeout: 4000,
+      })
+
+      const start = Date.now()
+
+      await expect(limiter.limit('blocking-too-heavy', { weight: 3 })).resolves.toMatchObject({
+        success: false,
+        limit: 2,
+        remaining: 2,
+      })
+
+      expect(Date.now() - start).toBeLessThan(500)
+    }, { timeout: 20_000 })
+
     it('returns denial when reset exceeds timeout', async () => {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
@@ -263,7 +299,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
       ).resolves.toMatchObject({
         success: false,
         limit: 2,
-        remaining: 0,
+        remaining: 1,
       })
     }, { timeout: 20_000 })
   })

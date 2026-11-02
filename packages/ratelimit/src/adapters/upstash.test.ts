@@ -139,6 +139,24 @@ describe.concurrent('upstash rate limiter integration', {
     })
   })
 
+  it('does not count rejected requests', async () => {
+    const limiter = createTestingRateLimiter({ maxRequests: 5, window: 10_000 })
+    const key = 'rejected-not-counted'
+
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: true, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: false, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({ success: true, remaining: 0 })
+    await expect(limiter.limit(key, { weight: 1 })).resolves.toMatchObject({ success: false, remaining: 0 })
+  })
+
+  it('denies a request heavier than the limit without consuming quota', async () => {
+    const limiter = createTestingRateLimiter({ maxRequests: 3, window: 10_000 })
+    const key = 'too-heavy'
+
+    await expect(limiter.limit(key, { weight: 4 })).resolves.toMatchObject({ success: false, limit: 3, remaining: 3 })
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: true, limit: 3, remaining: 0 })
+  })
+
   describe('timeout', () => {
     it('waits until the next window when capacity is unavailable', async () => {
       const limiter = createTestingRateLimiter({
@@ -183,6 +201,24 @@ describe.concurrent('upstash rate limiter integration', {
       })
     })
 
+    it('gives up right away when the weight exceeds the limit', async () => {
+      const limiter = createTestingRateLimiter({
+        maxRequests: 2,
+        window: 1000,
+        timeout: 4000,
+      })
+
+      const start = Date.now()
+
+      await expect(limiter.limit('blocking-too-heavy', { weight: 3 })).resolves.toMatchObject({
+        success: false,
+        limit: 2,
+        remaining: 2,
+      })
+
+      expect(Date.now() - start).toBeLessThan(500)
+    })
+
     it('returns denial when reset exceeds timeout', async () => {
       const limiter = createTestingRateLimiter({
         maxRequests: 2,
@@ -198,16 +234,16 @@ describe.concurrent('upstash rate limiter integration', {
       await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
         success: false,
         limit: 2,
-        remaining: 0,
+        remaining: 1,
       })
     })
   })
 })
 
 it('prefix creates a limiter that appends the prefix and shares the client', async () => {
-  const redis = { eval: vi.fn(async () => [1, 1000]) }
+  const redis = { eval: vi.fn(async () => [1, 1, 1000]) }
   const limiter = new UpstashRateLimiter(redis as any, { maxRequests: 1, window: 1000, prefix: 'app:' }).prefix('tenant:')
 
   await expect(limiter.limit('key')).resolves.toMatchObject({ success: true, remaining: 0 })
-  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], ['1', '1000'])
+  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], ['1', '1000', '1'])
 })

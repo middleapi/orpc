@@ -2,11 +2,12 @@ import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
 import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
- * Consumes `ARGV[1]` points from the counter at `KEYS[1]`, starts a window of
- * `ARGV[2]` milliseconds when the counter is new, and replies with `[used, ttl]`.
- * Kept on one line because `EVAL` sends it with every call.
+ * Consumes `ARGV[1]` points from the counter at `KEYS[1]` only when the total stays within
+ * `ARGV[3]`, so rejected requests do not count. Gives the counter a window of `ARGV[2]`
+ * milliseconds whenever it has no expiry, which also repairs keys left without one.
+ * Replies with `[success, used, ttl]`. Kept on one line because `EVAL` sends it with every call.
  */
-const FIXED_WINDOW_SCRIPT = `local c=redis.call('INCRBY',KEYS[1],ARGV[1]) if c==tonumber(ARGV[1]) then redis.call('PEXPIRE',KEYS[1],ARGV[2]) end return {c,redis.call('PTTL',KEYS[1])}`
+const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local p=tonumber(ARGV[2]) local c=tonumber(redis.call('GET',KEYS[1]) or '0') local ok=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) ok=1 end local t=redis.call('PTTL',KEYS[1]) if t==-1 then redis.call('PEXPIRE',KEYS[1],p) t=p elseif t==-2 then t=p end return {ok,c,t}`
 
 /**
  * Options shared by every Redis-backed rate limiter adapter.
@@ -27,13 +28,14 @@ export interface BaseRedisRateLimiterOptions {
   maxRequests: number
 
   /**
-   * The duration of the fixed window in milliseconds.
+   * The duration of the fixed window in milliseconds. Must be an integer greater than 0.
    */
   window: number
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Gives up right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses,
+   * or when the request weight exceeds `maxRequests`.
    *
    * @default 0
    */
@@ -55,7 +57,14 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   protected readonly window: number
   protected readonly timeout: number
 
+  /**
+   * @throws {TypeError} when `window` is not an integer greater than 0
+   */
   constructor(options: BaseRedisRateLimiterOptions) {
+    if (!Number.isInteger(options.window) || options.window <= 0) {
+      throw new TypeError('Rate limit window must be an integer greater than 0')
+    }
+
     this.keyPrefix = options.prefix ?? ''
     this.maxRequests = options.maxRequests
     this.window = options.window
@@ -71,18 +80,18 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
     key = `${this.keyPrefix}${key}`
     const weight = resolveWeight(options)
 
-    return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
+    return blockUntilReady(() => this.checkLimit(key, weight), weight, this.timeout)
   }
 
   private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
-    const [used, ttl] = await this.evalScript(
+    const [success, used, ttl] = await this.evalScript(
       FIXED_WINDOW_SCRIPT,
       [key],
-      [String(weight), String(this.window)],
-    ) as [used: number, ttl: number]
+      [String(weight), String(this.window), String(this.maxRequests)],
+    ) as [success: number, used: number, ttl: number]
 
     return {
-      success: used <= this.maxRequests,
+      success: success === 1,
       limit: this.maxRequests,
       remaining: Math.max(0, this.maxRequests - used),
       reset: Date.now() + ttl,

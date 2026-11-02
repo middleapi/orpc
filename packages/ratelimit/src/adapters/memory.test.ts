@@ -118,6 +118,22 @@ describe('memoryRateLimiter', () => {
       expect(await pending).toEqual({ success: true, limit: 3, remaining: 1, reset: 1000 })
     })
 
+    it('gives up immediately when the weight exceeds the limit', async () => {
+      const limiter = new MemoryRateLimiter({
+        maxRequests: 2,
+        window: 500,
+        timeout: 10_000,
+      })
+
+      const pending = limiter.limit('key', { weight: 3 })
+      const settled = vi.fn()
+      void pending.then(settled)
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(settled).toHaveBeenCalledExactlyOnceWith({ success: false, limit: 2, remaining: 2, reset: 500 })
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
     it('gives up immediately when the wait would exceed the timeout', async () => {
       const limiter = new MemoryRateLimiter({
         maxRequests: 1,

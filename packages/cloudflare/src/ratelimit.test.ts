@@ -50,6 +50,16 @@ describe('cloudflareRateLimiter', () => {
     })
   })
 
+  it('stops at the first denied call and does not refund points already consumed', async () => {
+    const limit = vi.fn()
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: false })
+    const limiter = new CloudflareRateLimiter({ limit })
+
+    expect(await limiter.limit('user:123', { weight: 3 })).toEqual({ success: false })
+    expect(limit).toHaveBeenCalledTimes(2)
+  })
+
   it('throws a TypeError when weight is zero, negative, or non-integer', async () => {
     const limiter = createTestingLimiter()
 

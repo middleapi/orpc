@@ -14,7 +14,8 @@ export interface MemoryRateLimiterOptions {
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Gives up right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses,
+   * or when the request weight exceeds `maxRequests`.
    *
    * @default 0
    */
@@ -44,7 +45,7 @@ export class MemoryRateLimiter implements RateLimiter {
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
     const weight = resolveWeight(options)
 
-    return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
+    return blockUntilReady(() => this.checkLimit(key, weight), weight, this.timeout)
   }
 
   private rotateIfNeeded(now: number): void {
