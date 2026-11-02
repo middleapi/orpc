@@ -2,11 +2,13 @@ import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
 import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
- * Consumes `ARGV[1]` points from the counter at `KEYS[1]`, starts a window of
- * `ARGV[2]` milliseconds when the counter is new, and replies with `[used, ttl]`.
+ * Consumes `ARGV[1]` points from the counter at `KEYS[1]` only when that keeps it
+ * within `ARGV[3]`, starts a window of `ARGV[2]` milliseconds when the counter is new,
+ * and replies with `[success, used, ttl]`, where `success` is `1` or `0`.
+ * Rejected requests leave the counter untouched.
  * Kept on one line because `EVAL` sends it with every call.
  */
-const FIXED_WINDOW_SCRIPT = `local c=redis.call('INCRBY',KEYS[1],ARGV[1]) if c==tonumber(ARGV[1]) then redis.call('PEXPIRE',KEYS[1],ARGV[2]) end return {c,redis.call('PTTL',KEYS[1])}`
+const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local c=tonumber(redis.call('GET',KEYS[1]) or '0') local s=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) s=1 if c==w then redis.call('PEXPIRE',KEYS[1],ARGV[2]) end end return {s,c,redis.call('PTTL',KEYS[1])}`
 
 /**
  * Options shared by every Redis-backed rate limiter adapter.
@@ -75,17 +77,19 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   }
 
   private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
-    const [used, ttl] = await this.evalScript(
+    const [success, used, ttl] = await this.evalScript(
       FIXED_WINDOW_SCRIPT,
       [key],
-      [String(weight), String(this.window)],
-    ) as [used: number, ttl: number]
+      [String(weight), String(this.window), String(this.maxRequests)],
+    ) as [success: number, used: number, ttl: number]
 
     return {
-      success: used <= this.maxRequests,
+      success: success === 1,
       limit: this.maxRequests,
       remaining: Math.max(0, this.maxRequests - used),
-      reset: Date.now() + ttl,
+      // A negative TTL means no window has started yet (a request heavier than
+      // `maxRequests` was rejected before any was consumed), so report a full window.
+      reset: Date.now() + (ttl >= 0 ? ttl : this.window),
     }
   }
 }

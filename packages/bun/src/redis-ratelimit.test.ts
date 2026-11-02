@@ -41,6 +41,29 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
     })
   }, { timeout: 20_000 })
 
+  it('does not consume weight for rejected requests', async () => {
+    const limiter = await createTestingRateLimiter({ maxRequests: 5, window: 10_000 })
+    const key = 'weighted-rejection'
+
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: true, limit: 5, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: false, limit: 5, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({ success: true, limit: 5, remaining: 0 })
+    await expect(limiter.limit(key, { weight: 1 })).resolves.toMatchObject({ success: false, limit: 5, remaining: 0 })
+  }, { timeout: 20_000 })
+
+  it('rejects requests heavier than the limit without starting a window', async () => {
+    const limiter = await createTestingRateLimiter({ maxRequests: 2, window: 10_000, timeout: 100 })
+    const key = 'too-heavy'
+
+    const startedAt = Date.now()
+    const denied = await limiter.limit(key, { weight: 3 })
+
+    expect(denied).toMatchObject({ success: false, limit: 2, remaining: 2 })
+    expect(denied.reset).toBeGreaterThanOrEqual(startedAt + 10_000)
+
+    await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({ success: true, limit: 2, remaining: 0 })
+  }, { timeout: 20_000 })
+
   it('tracks counters independently for each key', async () => {
     const limiter = await createTestingRateLimiter()
 
@@ -263,7 +286,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
       ).resolves.toMatchObject({
         success: false,
         limit: 2,
-        remaining: 0,
+        remaining: 1,
       })
     }, { timeout: 20_000 })
   })

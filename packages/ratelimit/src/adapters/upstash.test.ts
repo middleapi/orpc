@@ -41,6 +41,29 @@ describe.concurrent('upstash rate limiter integration', {
     })
   })
 
+  it('does not consume weight for rejected requests', async () => {
+    const limiter = createTestingRateLimiter({ maxRequests: 5, window: 10_000 })
+    const key = 'weighted-rejection'
+
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: true, limit: 5, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 3 })).resolves.toMatchObject({ success: false, limit: 5, remaining: 2 })
+    await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({ success: true, limit: 5, remaining: 0 })
+    await expect(limiter.limit(key, { weight: 1 })).resolves.toMatchObject({ success: false, limit: 5, remaining: 0 })
+  })
+
+  it('rejects requests heavier than the limit without starting a window', async () => {
+    const limiter = createTestingRateLimiter({ maxRequests: 2, window: 10_000, timeout: 100 })
+    const key = 'too-heavy'
+
+    const startedAt = Date.now()
+    const denied = await limiter.limit(key, { weight: 3 })
+
+    expect(denied).toMatchObject({ success: false, limit: 2, remaining: 2 })
+    expect(denied.reset).toBeGreaterThanOrEqual(startedAt + 10_000)
+
+    await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({ success: true, limit: 2, remaining: 0 })
+  })
+
   it('tracks counters independently for each key', async () => {
     const limiter = createTestingRateLimiter()
 
@@ -198,16 +221,16 @@ describe.concurrent('upstash rate limiter integration', {
       await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
         success: false,
         limit: 2,
-        remaining: 0,
+        remaining: 1,
       })
     })
   })
 })
 
 it('prefix creates a limiter that appends the prefix and shares the client', async () => {
-  const redis = { eval: vi.fn(async () => [1, 1000]) }
+  const redis = { eval: vi.fn(async () => [1, 1, 1000]) }
   const limiter = new UpstashRateLimiter(redis as any, { maxRequests: 1, window: 1000, prefix: 'app:' }).prefix('tenant:')
 
   await expect(limiter.limit('key')).resolves.toMatchObject({ success: true, remaining: 0 })
-  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], ['1', '1000'])
+  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], ['1', '1000', '1'])
 })
