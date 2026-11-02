@@ -40,7 +40,7 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
         const exceededChecks = pluginContext.checks.filter(r => !r.result.success)
 
         // Pick the most constrained result: prefer exceeded limits, fall back to all results.
-        // Treat undefined remaining as 0 — unknown capacity is assumed fully exhausted.
+        // Treat undefined remaining as Infinity, so results that report their remaining capacity win ties.
         const mostConstrained = (exceededChecks.length ? exceededChecks : pluginContext.checks).reduce(
           (a, b) => (a.result.remaining ?? Infinity) <= (b.result.remaining ?? Infinity) ? a : b,
         )
