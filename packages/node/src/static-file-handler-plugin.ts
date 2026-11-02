@@ -34,15 +34,10 @@ const TEXT_CONTENT_TYPE_REGEX = /^text\//
  */
 const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 
-/**
- * `O_NONBLOCK` keeps opening a fifo from blocking a libuv worker until a writer appears, and has
- * no effect on reads of a regular file. `O_NOFOLLOW` refuses a final component swapped for a
- * symbolic link after `realpath` resolved it. Windows defines neither flag.
- */
+// Windows defines neither flag
 const OPEN_FLAGS: number = fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0)
 const OPEN_NO_FOLLOW_FLAGS: number = OPEN_FLAGS | (fsConstants.O_NOFOLLOW ?? 0)
 
-/** A contained path, the resolved path to open it by, and the stats of that resolved path. */
 interface Entry {
   filePath: string
   openPath: string
@@ -159,7 +154,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /**
    * `rootDir` with its own symbolic links resolved, so a symlinked `rootDir` keeps working and
    * platform links like the macOS `/var` to `/private/var` do not reject every file.
-   * Cached, and re-resolved when an existing file falls outside it.
    */
   private rootDirReal: Promise<string>
   private readonly path: Exclude<StaticFileHandlerPluginOptions['path'], undefined>
@@ -231,8 +225,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Resolves symbolic links and confirms the target is still inside the root, which the lexical
-   * `resolveWithinRoot` check cannot see, returning the resolved path to open.
+   * Resolves symbolic links and confirms the target is still inside the root,
+   * which the lexical `resolveWithinRoot` check cannot see.
    */
   private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
     if (this.allowSymlinks) {
@@ -251,10 +245,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return realPath
     }
 
-    /**
-     * The root may have moved since it was resolved, like a `current` link repointed to a new
-     * release, or a root created after startup. Concurrent requests share one resolution.
-     */
     if (this.rootDirReal === cached) {
       this.rootDirReal = this.resolveRootDirReal()
     }
@@ -263,10 +253,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Opens a path `resolveContainedRealPath` returned and stats the descriptor, so a response with
-   * a body describes the file streamed, whatever happens to the path afterwards.
-   * Resolves to `undefined`, closing the handle, when the opened entry is not a regular file.
-   *
    * @remarks
    * `O_NOFOLLOW` only guards the final component. A directory inside the root swapped for a link
    * between `realpath` and the open is still followed, since node exposes no `openat2` with
@@ -315,11 +301,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     return filePath === undefined ? Promise.resolve(undefined) : this.lookupPath(filePath)
   }
 
-  /**
-   * Stats the resolved path without following a final symbolic link, so an entry swapped for a
-   * link after `realpath` is neither a file nor a directory. These stats only route the request
-   * and answer responses without a body, which never read the file.
-   */
   private async lookupPath(filePath: string): Promise<Entry | undefined> {
     const openPath = await this.resolveContainedRealPath(filePath)
 
@@ -468,24 +449,18 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    // Rebuilt from the descriptor, so the headers describe the bytes streamed even if the file changed
     const { response, read } = this.respond(request, opened.stats, contentType, negotiatesEncoding, contentEncoding)
 
     if (read === undefined) {
       void opened.handle.close().catch(() => {})
     }
     else {
-      // The stream closes the handle once it ends or is destroyed
       response.body = toWebReadableStream(opened.handle.createReadStream(read))
     }
 
     return response
   }
 
-  /**
-   * Builds the response from a file's stats, with the read options for its body when it carries the
-   * representation. Responses without one, `HEAD` included, need none of the file contents.
-   */
   private respond(
     request: StandardLazyRequest,
     stats: Stats,

@@ -19,7 +19,6 @@ import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
 
 const fsHooks = vi.hoisted(() => ({
-  /** Runs once a check resolves: `realpath` for containment, then `lstat` for the file type. */
   afterCheck: undefined as ((check: 'realpath' | 'lstat', path: string) => void) | undefined,
   openedHandles: [] as FileHandle[],
 }))
@@ -840,11 +839,9 @@ describe('staticFileHandlerPlugin', () => {
 
       await agent.get('/hello.txt')
       await agent.get('/hello.txt').set('range', 'bytes=0-1')
-      // Only the chosen sidecar is opened
       await agent.get('/compressed.txt').set('accept-encoding', 'gzip, br')
       expect(fsHooks.openedHandles).toHaveLength(3)
 
-      // Responses without a body never open the file
       await agent.head('/hello.txt')
       await agent.get('/hello.txt').set('if-none-match', helloEtag)
       await agent.get('/hello.txt').set('if-match', '"other"')
@@ -881,7 +878,6 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.status).toBe(200)
       expect(res.text).toBe('b')
 
-      // The refreshed root still rejects links that leave it
       symlinkSync(path.join(baseDir, 'secret.txt'), path.join(releasesDir, 'b', 'link.txt'))
       expect((await agent.get('/link.txt')).status).toBe(404)
     })
