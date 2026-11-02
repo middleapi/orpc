@@ -62,7 +62,9 @@ const handler = new RPCHandler(router, {
       /**
        * Whether files and directories whose name starts with a dot can be served.
        * When disabled, names shaped like 8.3 short names, such as `ENV~1`, are
-       * refused too, since NTFS and FAT resolve them to dotfiles.
+       * refused too, since NTFS and FAT resolve them to dotfiles. This is a
+       * request path policy, so it does not apply to a configured `indexFile`
+       * or `fallbackFile`, nor to the target of a symbolic link.
        *
        * @default false
        */
@@ -75,14 +77,6 @@ const handler = new RPCHandler(router, {
        * @default false
        */
       precompressed: false,
-
-      /**
-       * Whether symbolic links whose target lies outside `rootDir` can be served.
-       * Enabling this exposes every file those links reach.
-       *
-       * @default false
-       */
-      allowSymlinks: false,
 
       /**
        * Extra content types keyed by lowercase file extension without the dot,
@@ -102,7 +96,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 :::
 
 :::warning
-`rootDir` should contain only files you intend to make public. Requests cannot escape it through `..` segments or symbolic links, but every file inside it is reachable.
+`rootDir` should contain only files you intend to make public. Requests containing `..` segments are refused, but every file inside it is reachable, and symbolic links are followed, so a link inside it exposes its target even when that lies outside `rootDir`.
 :::
 
 ## Compression
