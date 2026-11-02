@@ -180,7 +180,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     for (const rawSegment of pathname.slice(base.length).split('/')) {
       const segment = safeDecodeURIComponent(rawSegment)
 
-      if (segment === '') {
+      // A single dot denotes the current directory, so like an empty segment it is skipped
+      if (segment === '' || segment === '.') {
         continue
       }
 

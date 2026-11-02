@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
-import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -553,6 +553,42 @@ describe('staticFileHandlerPlugin', () => {
         expect(res.status, target).toBe(404)
         expect(res.body, target).toBe('not matched')
       }
+    })
+
+    it('skips single dot segments sent verbatim', async ({ onTestFinished }) => {
+      const client = await createRawClient({ path: '/assets' })
+      onTestFinished(() => client.close())
+
+      for (const target of ['/assets/./hello.txt', '/assets/%2e/hello.txt', '/assets/nested/./style.css']) {
+        expect((await client.get(target)).status, target).toBe(200)
+      }
+    })
+
+    it('follows symbolic links, including ones that leave the root', async ({ onTestFinished }) => {
+      const outsideDir = path.join(baseDir, 'outside-dir')
+      mkdirSync(outsideDir, { recursive: true })
+      writeFileSync(path.join(outsideDir, 'file.txt'), 'outside dir')
+      writeFileSync(path.join(baseDir, 'outside.gz'), gzipSync('outside gzip'))
+      writeFileSync(path.join(rootDir, 'sidecar.txt'), 'identity content')
+      symlinkSync(path.join(baseDir, 'secret.txt'), path.join(rootDir, 'link.txt'))
+      symlinkSync(outsideDir, path.join(rootDir, 'linkdir'))
+      symlinkSync(path.join(baseDir, 'outside.gz'), path.join(rootDir, 'sidecar.txt.gz'))
+      onTestFinished(() => {
+        for (const name of ['link.txt', 'linkdir', 'sidecar.txt', 'sidecar.txt.gz']) {
+          rmSync(path.join(rootDir, name), { force: true })
+        }
+        rmSync(outsideDir, { recursive: true, force: true })
+        rmSync(path.join(baseDir, 'outside.gz'), { force: true })
+      })
+
+      const agent = createStaticAgent({ precompressed: true })
+
+      expect((await agent.get('/link.txt')).text).toBe('outside root')
+      expect((await agent.get('/linkdir/file.txt')).text).toBe('outside dir')
+
+      const sidecarRes = await agent.get('/sidecar.txt').set('accept-encoding', 'gzip')
+      expect(sidecarRes.headers['content-encoding']).toBe('gzip')
+      expect(sidecarRes.text).toBe('outside gzip')
     })
 
     it('allows names that merely contain dots', async ({ onTestFinished }) => {
