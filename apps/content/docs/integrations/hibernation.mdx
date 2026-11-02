@@ -46,6 +46,10 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
    })
    ```
 
+   :::info
+   Procedures with an event iterator output schema (e.g. `.output(eventIterator(...))` or contract-first procedures) can also return a `HibernationAsyncIteratorClass` from their handler. Events sent with `encodeHibernationRPCEvent` do not go through the procedure, so they are **not** validated against that schema.
+   :::
+
 2. Send events to clients with `encodeHibernationRPCEvent`
 
    ```ts
