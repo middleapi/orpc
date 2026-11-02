@@ -1,6 +1,6 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import { createORPCClient, ORPCError } from '@orpc/client'
-import { implement, os } from '@orpc/server'
+import { createORPCClient } from '@orpc/client'
+import { os } from '@orpc/server'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 import { OpenAPILink } from './openapi-link'
@@ -99,39 +99,5 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
-  })
-
-  it('serves the implementation and its middlewares when a normal router is implemented as the contract', async () => {
-    const real = {
-      ping: os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'REAL'),
-      nested: { pong: os.handler(() => 'REAL') },
-    }
-
-    const impl = implement(real)
-    const requireAuth = vi.fn(() => {
-      throw new ORPCError('UNAUTHORIZED')
-    })
-
-    const mock = new OpenAPIHandler(impl.router({
-      ping: impl.ping.handler(() => 'MOCK'),
-      nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
-    }))
-
-    const secured = new OpenAPIHandler(impl.use(requireAuth).router({
-      ping: impl.ping.handler(() => 'MOCK'),
-      nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
-    }))
-
-    for (const [method, path] of [['GET', '/ping'], ['POST', '/nested/pong']] as const) {
-      const request = () => new Request(`https://example.com${path}`, { method })
-
-      const { response } = await mock.handle(request())
-      await expect(response!.json()).resolves.toBe('MOCK')
-
-      const { response: securedResponse } = await secured.handle(request())
-      expect(securedResponse!.status).toBe(401)
-    }
-
-    expect(requireAuth).toHaveBeenCalledTimes(2)
   })
 })

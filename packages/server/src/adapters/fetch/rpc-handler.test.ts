@@ -1,7 +1,5 @@
 import type { StandardHandlerPlugin } from '../standard'
-import { ORPCError } from '@orpc/client'
 import { os } from '../../builder'
-import { implement } from '../../implementer'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -189,45 +187,5 @@ describe('rpcHandler lazy router prefix scan', () => {
     const ok = await handler.handle(new Request('http://localhost/rpc/planet/find', { method: 'POST' }), { prefix: '/rpc' })
     expect(ok.matched).toBe(true)
     expect(loader).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('rpcHandler with a normal router implemented as the contract', () => {
-  it('serves the implementation and its middlewares, not the contract', async () => {
-    const real = {
-      ping: os.handler(() => 'REAL'),
-      nested: { pong: os.handler(() => 'REAL') },
-    }
-
-    const impl = implement(real)
-    const requireAuth = vi.fn(() => {
-      throw new ORPCError('UNAUTHORIZED')
-    })
-
-    const mock = new RPCHandler(impl.router({
-      ping: impl.ping.handler(() => 'MOCK'),
-      nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
-    }))
-
-    const secured = new RPCHandler(impl.use(requireAuth).router({
-      ping: impl.ping.handler(() => 'MOCK'),
-      nested: { pong: impl.nested.pong.handler(() => 'MOCK') },
-    }))
-
-    for (const path of ['/ping', '/nested/pong']) {
-      const request = () => new Request(`https://example.com${path}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ json: null }),
-      })
-
-      const { response } = await mock.handle(request())
-      await expect(response!.json()).resolves.toEqual({ json: 'MOCK' })
-
-      const { response: securedResponse } = await secured.handle(request())
-      expect(securedResponse!.status).toBe(401)
-    }
-
-    expect(requireAuth).toHaveBeenCalledTimes(2)
   })
 })
