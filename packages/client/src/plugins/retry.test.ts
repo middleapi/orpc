@@ -293,6 +293,93 @@ describe('retryLinkPlugin', () => {
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
   })
 
+  describe('consumable input', () => {
+    const makeStream = () => new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]))
+        controller.close()
+      },
+    })
+
+    const makeIterator = () => (async function* () {
+      yield 'event-1'
+      yield 'event-2'
+    })()
+
+    it.each([
+      ['ReadableStream', makeStream],
+      ['AsyncIteratorObject', makeIterator],
+      ['ReadableStream as detailed body', () => ({ params: { id: '1' }, body: makeStream() })],
+      ['AsyncIteratorObject as detailed body', () => ({ params: { id: '1' }, body: makeIterator() })],
+    ])('does not retry a %s input and throws the original error', async (_, makeInput) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const error = new TypeError('Failed to fetch')
+      vi.mocked(transport.send).mockRejectedValue(error)
+
+      const shouldRetry = vi.fn(() => true)
+      const onRetry = vi.fn()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(
+        link.call(['upload'], makeInput(), { context: { retry: 3, retryDelay: 0, shouldRetry, onRetry } }),
+      ).rejects.toBe(error)
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+      expect(shouldRetry).not.toHaveBeenCalled()
+      expect(onRetry).not.toHaveBeenCalled()
+    })
+
+    it('does not reconnect an AsyncIteratorObject output when the input is an AsyncIteratorObject', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockResolvedValue({
+        kind: 'output',
+        output: (async function* () {
+          yield 'first'
+          throw new Error('DISCONNECTED')
+        })(),
+      })
+
+      const shouldRetry = vi.fn(() => true)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['chat'], makeIterator(), { context: { retry: 3, retryDelay: 0, shouldRetry } }) as AsyncIterator<any>
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 'first' })
+      await expect(iterator.next()).rejects.toThrow('DISCONNECTED')
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(shouldRetry).not.toHaveBeenCalled()
+    })
+
+    it('still retries a Blob input since it can be resent', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockRejectedValue(new TypeError('Failed to fetch'))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(
+        link.call(['upload'], { file: new Blob(['data']) }, { context: { retry: 2, retryDelay: 0 } }),
+      ).rejects.toThrow('Failed to fetch')
+
+      expect(transport.send).toHaveBeenCalledTimes(3)
+    })
+  })
+
   describe('asyncIteratorObject', () => {
     it('retries AsyncIteratorObject and forwards lastEventId from metadata', async () => {
       const codec = makeCodec()

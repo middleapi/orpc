@@ -81,6 +81,10 @@ const link = new RPCLink<ClientContext>({
 
 :::
 
+## Stream and Iterator Inputs
+
+Calls whose input is a [`ReadableStream`](/docs/binary-data#readablestreamuint8array) or an [`AsyncIteratorObject`](/docs/async-iterator-object) are never retried, including when it is the `body` of a [detailed input](/docs/openapi/input-and-output-mapping#detailed-input-structure). The first attempt consumes the input, so a retry could only resend a locked stream or the remaining events of the iterator. The call runs once and its error is thrown as-is, without calling `shouldRetry` or `onRetry`. This also applies when an `AsyncIteratorObject` output disconnects.
+
 ## Client Error Responses
 
 By default, errors from a 4xx response other than `408` and `429` are not retried, since retrying would most likely fail the same way. To retry every error, set `shouldRetry` to `true`, or extend the default with `isRetryableError`:

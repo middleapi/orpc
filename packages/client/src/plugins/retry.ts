@@ -1,7 +1,7 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, isTypescriptObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
 
@@ -89,6 +89,18 @@ export function isRetryableError(error: unknown): boolean {
 }
 
 /**
+ * Whether the input (or the `body` of a detailed input) is a stream or iterator
+ * that can be consumed only once.
+ */
+function isConsumableInput(input: unknown): boolean {
+  return isConsumableBody(input) || (isTypescriptObject(input) && isConsumableBody(input.body))
+}
+
+function isConsumableBody(body: unknown): boolean {
+  return body instanceof ReadableStream || isAsyncIteratorObject(body)
+}
+
+/**
  * Automatically retries failed requests based on customizable retry strategies,
  * improving the resilience of your application.
  *
@@ -124,7 +136,12 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       const shouldRetry = callOptions.context.shouldRetry ?? this.defaultShouldRetry
       const onRetry = callOptions.context.onRetry ?? this.defaultOnRetry
 
-      if (maxAttempts <= 0) {
+      /**
+       * A stream or iterator input is consumed by the first attempt and cannot be resent:
+       * a retry would send a locked stream or only the remaining events of the iterator.
+       * So the call runs once, and its error is thrown as-is.
+       */
+      if (maxAttempts <= 0 || isConsumableInput(callOptions.input)) {
         return next(callOptions)
       }
 
