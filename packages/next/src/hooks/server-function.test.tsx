@@ -221,6 +221,76 @@ describe('useServerFunction', () => {
     })
   })
 
+  describe('interceptors change between renders', () => {
+    const a = vi.fn(({ next }) => next())
+    const b = vi.fn(({ next }) => next())
+
+    function setup(initialInterceptors: any[] | undefined) {
+      return renderHook(
+        ({ interceptors }) => useServerFunction(fn, { interceptors }),
+        { initialProps: { interceptors: initialInterceptors } },
+      )
+    }
+
+    async function execute(result: { current: ReturnType<typeof useServerFunction<any, any, any>> }) {
+      await act(async () => {
+        await result.current.execute({ input: 123 })
+      })
+    }
+
+    it('[a] -> [a, b]', async () => {
+      const { result, rerender } = setup([a])
+
+      rerender({ interceptors: [a, b] })
+      await execute(result)
+
+      expect(a).toHaveBeenCalledTimes(1)
+      expect(b).toHaveBeenCalledTimes(1)
+    })
+
+    it('undefined -> [a]', async () => {
+      const { result, rerender } = setup(undefined)
+
+      rerender({ interceptors: [a] })
+      await execute(result)
+
+      expect(a).toHaveBeenCalledTimes(1)
+    })
+
+    it('[a, b] -> [a]', async () => {
+      const { result, rerender } = setup([a, b])
+
+      rerender({ interceptors: [a] })
+      await execute(result)
+
+      expect(a).toHaveBeenCalledTimes(1)
+      expect(b).toHaveBeenCalledTimes(0)
+    })
+
+    it('[a] -> undefined', async () => {
+      const { result, rerender } = setup([a])
+
+      rerender({ interceptors: undefined })
+      await execute(result)
+
+      expect(a).toHaveBeenCalledTimes(0)
+    })
+
+    it('keeps execute stable across renders', () => {
+      const { result, rerender } = setup([a])
+      const execute = result.current.execute
+
+      rerender({ interceptors: [a, b] })
+      expect(result.current.execute).toBe(execute)
+
+      rerender({ interceptors: [vi.fn(({ next }) => next())] })
+      expect(result.current.execute).toBe(execute)
+
+      rerender({ interceptors: undefined })
+      expect(result.current.execute).toBe(execute)
+    })
+  })
+
   it('multiple execute calls', async () => {
     const { result } = renderHook(() => useServerFunction(fn))
 
