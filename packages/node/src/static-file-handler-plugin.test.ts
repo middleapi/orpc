@@ -532,6 +532,16 @@ describe('staticFileHandlerPlugin', () => {
       for (const url of ['/../secret.txt', '/..%c0%af/secret.txt', '/..%c0%afsecret.txt', '/..%2fsecret.txt']) {
         expect((await agent.get(url)).status, url).toBe(404)
       }
+
+      // Win32 strips trailing dots and spaces, so any segment of only those can mean `..` there.
+      // A refused path falls through before the fallback, while an allowed missing one is answered by it.
+      const fallbackAgent = createStaticAgent({ dotfiles: true, fallbackFile: 'hello.txt' })
+
+      for (const url of ['/..%20/secret.txt', '/...%20./secret.txt', '/.../secret.txt', '/%20./secret.txt']) {
+        expect((await fallbackAgent.get(url)).status, url).toBe(404)
+      }
+
+      expect((await fallbackAgent.get('/..a/missing.txt')).status).toBe(200)
     })
 
     it('refuses dot segments instead of resolving them', async ({ onTestFinished }) => {

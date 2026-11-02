@@ -13,8 +13,10 @@ import mime from 'mime'
 /**
  * Decoded segments that are refused: `..`, so the joined path can never leave `rootDir`;
  * null bytes; and encoded separators, so the path joined matches the one a proxy in front sees.
+ * Any segment of only dots and spaces is refused, since Win32 strips trailing dots and spaces
+ * from a name, so `.. ` or `...` can still mean `..` there.
  */
-const UNSAFE_SEGMENT_REGEX = /^\.\.$|[\0/\\]/
+const UNSAFE_SEGMENT_REGEX = /^[. ]+$|[\0/\\]/
 
 /**
  * Like {@link UNSAFE_SEGMENT_REGEX}, plus names starting with a dot, and 8.3 short names like
