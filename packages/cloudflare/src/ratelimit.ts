@@ -14,6 +14,8 @@ export interface CloudflareRateLimiterOptions {
  *
  * @remarks
  * **Note**: Blocking mode is not supported by this adapter.
+ * The binding consumes one point per call, so a request with `weight` greater than `1`
+ * calls it repeatedly. When one of those calls is rejected, the points already consumed are not refunded.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */

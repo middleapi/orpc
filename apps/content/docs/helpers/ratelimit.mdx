@@ -305,6 +305,8 @@ const tenantLimiter = limiter.prefix('tenant:123:')
 
 Uses the Workers Rate Limiting binding, so limits are configured in your Worker settings rather than in the adapter.
 
+The binding consumes one point per call, so a request with a `weight` greater than `1` calls it once per point. When one of those calls is rejected, the points already consumed are not refunded.
+
 ```ts
 import { CloudflareRateLimiter } from '@orpc/cloudflare'
 
