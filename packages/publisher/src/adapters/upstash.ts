@@ -17,6 +17,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
   private readonly onErrorsMap = new Map<string, Array<(error: ThrowableError) => void>>()
   private readonly subscriptionMap = new Map<string, ReturnType<Redis['subscribe']>>()
   private readonly pendingSubscriptionsMap = new Map<string, Promise<void>>()
+  private readonly subscriptionErrors = new WeakMap<ReturnType<Redis['subscribe']>, ThrowableError>()
 
   constructor(
     private readonly redis: Redis,
@@ -47,7 +48,12 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     push(this.listenersMap, channel, listener)
 
     try {
-      await this.subscribeIfNeeded(channel)
+      const subscription = await this.subscribeIfNeeded(channel)
+
+      // The stream may have failed before this resumed, and onError was not registered yet to report it.
+      if (this.subscriptionMap.get(channel) !== subscription) {
+        throw this.subscriptionErrors.get(subscription) ?? new Error('Upstash subscription was closed before it could be used.')
+      }
     }
     catch (error) {
       remove(this.listenersMap, channel, listener)
@@ -84,33 +90,69 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     return results?.[0]?.[1].map(([id, fields]) => ({ id, data: fields[1] })) ?? []
   }
 
-  private async subscribeIfNeeded(channel: string): Promise<void> {
+  /**
+   * Resolves with the established subscription of the channel, opening one if needed.
+   */
+  private async subscribeIfNeeded(channel: string): Promise<ReturnType<Redis['subscribe']>> {
     while (this.pendingSubscriptionsMap.has(channel)) {
       await this.pendingSubscriptionsMap.get(channel)!.catch(() => {}) // a failed attempt is reported to its owner; waiters retry
     }
 
-    if (this.subscriptionMap.has(channel)) {
-      return
+    const existing = this.subscriptionMap.get(channel)
+
+    if (existing) {
+      return existing
     }
 
     const { promise, resolve, reject } = promiseWithResolvers<void>()
     const subscription = this.redis.subscribe(channel)
+    let state: 'pending' | 'established' | 'failed' = 'pending'
 
-    subscription.on('subscribe', () => resolve())
+    subscription.on('subscribe', () => {
+      if (state === 'pending') {
+        state = 'established'
+        // Set synchronously, so an error right after this is handled as a failure of the established subscription.
+        this.subscriptionMap.set(channel, subscription)
+        resolve()
+      }
+    })
     subscription.on('error', (error) => {
-      reject(error)
+      if (state !== 'established') {
+        state = 'failed'
+        reject(error) // no-op if this attempt was already rejected
+        return
+      }
+
+      // The stream ends for good on error: Upstash does not reconnect. Drop it so the next subscribe opens a fresh one.
+      if (this.subscriptionMap.get(channel) !== subscription) {
+        return // already torn down or replaced
+      }
+
+      this.subscriptionMap.delete(channel)
+      this.subscriptionErrors.set(subscription, error)
+      subscription.unsubscribe().catch(() => {}) // only aborts the dead stream
+
+      // Snapshot, since a callback may unsubscribe itself mid-dispatch.
       this.onErrorsMap.get(channel)?.slice().forEach(onError => onError(error))
     })
     subscription.on('message', ({ message }) => {
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
-      this.listenersMap.get(channel)?.slice().forEach(listener => listener(message))
+      this.listenersMap.get(channel)?.slice().forEach((listener) => {
+        try {
+          listener(message)
+        }
+        catch {
+          // Listeners report their own failures through onError; a throw must neither stop delivery
+          // to the others nor reach Upstash, which would emit it as an `error` event.
+        }
+      })
     })
 
     this.pendingSubscriptionsMap.set(channel, promise)
 
     try {
       await promise
-      this.subscriptionMap.set(channel, subscription)
+      return subscription
     }
     catch (error) {
       await subscription.unsubscribe()

@@ -1,3 +1,4 @@
+import type { ThrowableError } from '@orpc/shared'
 import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { compareSequentialIds, once, SequentialIdGenerator } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
@@ -77,17 +78,27 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       }
     }
 
+    // Isolated, so a throwing listener neither stops delivery to the others nor rejects `publish`.
+    const isolatedListener = (payload: T[K]) => {
+      try {
+        listener(payload)
+      }
+      catch (error) {
+        options?.onError?.(error as ThrowableError)
+      }
+    }
+
     let listeners = this.listenersMap.get(event)
     if (!listeners) {
       this.listenersMap.set(event, listeners = [])
     }
 
-    listeners.push(listener)
+    listeners.push(isolatedListener)
 
     // Ensure the returned cleanup function is safe to call multiple times.
     return once(async () => {
       const current = this.listenersMap.get(event)!
-      const index = current.indexOf(listener)
+      const index = current.indexOf(isolatedListener)
       const remaining = current.filter((_, i) => i !== index)
 
       if (remaining.length === 0) {
