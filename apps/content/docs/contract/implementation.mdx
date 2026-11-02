@@ -95,8 +95,8 @@ const router = implementer.use(requireAuth).router({
 })
 ```
 
-:::danger
-If you apply middleware with `.use` at both the router and procedure levels, it may run more than once. That duplication can hurt performance. To avoid redundant middleware execution, see the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
+:::info
+When the router and its procedures are implemented from the same implementer, such as `implementer.use(requireAuth)`, oRPC automatically skips router-level middleware that a procedure already applies. In other cases, middleware applied with `.use` at both the router and procedure levels may run more than once. See the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
 :::
 
 ## Creating Middleware

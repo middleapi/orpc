@@ -104,7 +104,6 @@ Most v1 names still compile through deprecated aliases (strike-through hints, no
    - `adapterInterceptors` was removed from handlers and links, because regular interceptors can now customize body parsing behavior.
 3. **Audit silent behavior changes** (compile fine, behave differently):
    - **Wire format changed:** a v1 link cannot talk to a v2 server, in either direction. Deploy the upgraded server and clients together.
-   - **Automatic middleware deduplication removed:** middleware applied at both router and procedure level now runs twice, with no warning. Guard shared middleware with the context-flag pattern from the dedupe-middleware recipe.
    - **Batch Plugin `exclude` became `filter` with the opposite meaning.** Usually delete `exclude`; if skipping is still needed, negate the predicate.
    - **`RPCHandler` rejects GET by default** (`allowMethods` defaults to POST/PUT/PATCH/DELETE). Simplest fix: stop sending GET from the link; only allow GET deliberately, with CSRF protection.
    - **Handler `filter` takes positional arguments now;** the v1 destructured form still type-checks but reads wrong values.

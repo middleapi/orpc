@@ -25,6 +25,24 @@ export type InitialInputSchema = Schema<void, unknown>
  */
 export type InitialOutputSchema = Schema<unknown>
 
+export interface ContractBuilderConfig {
+  /**
+   * When enabled, `.router` (and `.lazy` on the `os` builder) skips this builder's metadata plugins
+   * that a procedure (or lazy router) already applies as its leading plugins, such as those from a common base builder.
+   * This prevents accumulating metadata, like OpenAPI `tags` and `prefix`, from being applied twice.
+   * Only the value on the builder calling `.router` or `.lazy` is read.
+   *
+   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
+   *
+   * @default true
+   */
+  dedupeLeadingMetaPlugins?: boolean | undefined
+}
+
+export interface ContractBuilderDefinition<TErrorMap extends ErrorMap>
+  extends ProcedureContractDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>, ContractBuilderConfig {
+}
+
 /**
  * The contract builder behind `oc`. Chain its methods to define procedure
  * contracts — metadata, errors, and input/output schemas — without any
@@ -35,11 +53,13 @@ export type InitialOutputSchema = Schema<unknown>
 export class ContractBuilder<
   TErrorMap extends ErrorMap,
 > extends ProcedureContract<InitialInputSchema, InitialOutputSchema, TErrorMap> {
+  declare '~orpc': ContractBuilderDefinition<TErrorMap>
+
   /**
    * Private constructor to prevent direct instantiation.
    * Use the static `create` method to initialize a new instance with a safe initial definition.
    */
-  private constructor(definition: ProcedureContractDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>) {
+  private constructor(definition: ContractBuilderDefinition<TErrorMap>) {
     super(definition)
   }
 
@@ -53,6 +73,19 @@ export class ContractBuilder<
     return new ContractBuilder({
       errorMap: {},
       meta: {},
+    })
+  }
+
+  /**
+   * Overrides the contract builder configuration, such as disabling
+   * the automatic dedupe of metadata plugins in `.router`.
+   *
+   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
+   */
+  $config(config: ContractBuilderConfig): ContractBuilder<TErrorMap> {
+    return new ContractBuilder({
+      ...this['~orpc'],
+      ...config,
     })
   }
 

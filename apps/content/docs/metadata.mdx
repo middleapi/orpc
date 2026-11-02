@@ -119,3 +119,38 @@ const procedure = os
     return { id: '1', name: 'Alice' }
   })
 ```
+
+## Router-Level Metadata
+
+Metadata applied before `.router` (or `.lazy`) applies to every procedure in the router. When a procedure already applies the same leading plugins, for example because the router and the procedure share a base builder, those plugins are not applied a second time:
+
+```ts twoslash
+import { defineMeta, os } from '@orpc/server'
+// ---cut---
+const [tagsMeta, getTagsMeta] = defineMeta(
+  'tags',
+  (incoming: string[], current) => [...(current ?? []), ...incoming],
+)
+
+const base = os.meta(tagsMeta(['planets']))
+
+const router = base.router({
+  list: base.handler(() => []), // getTagsMeta(router.list) is ['planets'], not ['planets', 'planets']
+})
+```
+
+:::info
+Plugins are compared by reference, so this only covers plugins that come from the same `.meta` call, such as a shared base builder. Calling `tagsMeta(['planets'])` again creates a new plugin, which is applied again.
+:::
+
+To always apply the router-level plugins again, disable dedupe with `$config` on the builder that calls `.router` or `.lazy`:
+
+```ts twoslash
+import { os } from '@orpc/server'
+import { oc } from '@orpc/contract'
+// ---cut---
+const base = os.$config({ dedupeLeadingMetaPlugins: false })
+const contractBase = oc.$config({ dedupeLeadingMetaPlugins: false })
+```
+
+Learn more in the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.

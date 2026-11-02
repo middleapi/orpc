@@ -45,6 +45,26 @@ const router = oc.meta(requireAuthMeta).router({
 })
 ```
 
+When the router and its procedure contracts are built from the same base builder, the metadata plugins they share are applied only once, so accumulating metadata, such as OpenAPI `tags` and `prefix`, is not doubled:
+
+```ts twoslash
+import { z } from 'zod'
+// ---cut---
+import { oc } from '@orpc/contract'
+import { openapi } from '@orpc/openapi'
+
+const base = oc.meta(openapi({ tags: ['planets'], prefix: '/planets' }))
+
+export const router = base.router({
+  // tags stays ['planets'] and prefix stays '/planets'
+  list: base.output(z.array(z.string())),
+})
+```
+
+:::info
+To always apply the router-level metadata plugins again, use `oc.$config({ dedupeLeadingMetaPlugins: false })` on the builder that calls `.router`. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
+:::
+
 ## Router to Contract
 
 A normal [router](/docs/router) can be used as a contract router as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.

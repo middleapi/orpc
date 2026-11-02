@@ -1,22 +1,91 @@
 ---
 title: "Dedupe Middleware"
-description: "Learn how to use context to prevent the same middleware from repeating expensive work when it runs multiple times in a single call."
+description: "Learn how oRPC automatically dedupes middleware and metadata shared between a router and its procedures, and how to use context to prevent repeated work in the remaining cases."
 ---
 
 ## Problem
 
 The same middleware can run more than once during a single call. This often happens when:
 
-- a procedure [calls](/docs/client/server-side#one-off-calls) another procedure that both use the same middleware
 - you use `.use(authProvider).router(router)`, and some procedures in `router` already use `authProvider`
+- a procedure [calls](/docs/client/server-side#one-off-calls) another procedure that both use the same middleware
 
 :::warning
 Repeated middleware work can hurt performance, especially for expensive operations such as opening a database connection.
 :::
 
-## Solution
+## Automatic Dedupe
 
-Store the computed value in [`context`](/docs/context) and reuse it when the [middleware](/docs/middleware) runs again.
+When a router-level builder applies its middleware with `.router` or `.lazy`, oRPC skips that middleware for every procedure whose middleware chain already **starts** with the same middleware, in the same order. This covers the common case where the router and its procedures are built from the same base builder:
+
+```ts twoslash
+import { os } from '@orpc/server'
+
+const authProvider = os.middleware(({ next }) => next())
+// ---cut---
+const authed = os.use(authProvider)
+
+const foo = authed.handler(() => 'foo')
+const bar = authed.handler(() => 'bar')
+
+// authProvider runs only once for foo and bar
+const router = authed.router({ foo, bar })
+```
+
+[Metadata](/docs/metadata) plugins are deduped the same way: the leading plugins a procedure shares with the router-level builder, such as those from a common base builder, are not applied again. This keeps metadata that accumulates, such as OpenAPI `tags` and `prefix`, from being doubled:
+
+```ts twoslash
+import { os } from '@orpc/server'
+import { openapi } from '@orpc/openapi'
+// ---cut---
+const base = os.meta(openapi({ tags: ['planets'], prefix: '/planets' }))
+
+const router = base.router({
+  // tags stays ['planets'] and prefix stays '/planets'
+  list: base.handler(() => []),
+})
+```
+
+The same applies to [contract-first](/docs/contract/implementation) implementers (`implementer.use(mw).router(...)`) and contract routers built with `oc.router`.
+
+:::info
+Middleware is compared by reference and only as a leading sequence applied before any `.input`/`.output` schema, the same position router-level middleware runs at. Middleware applied in a different position, such as `os.use(logger).use(authProvider)` or `os.input(schema).use(authProvider)` under `os.use(authProvider).router(...)`, still runs twice.
+:::
+
+### Disable Automatic Dedupe
+
+To always apply router-level middleware or metadata plugins, disable dedupe with `$config` on the builder that calls `.router` or `.lazy`:
+
+```ts twoslash
+import { os } from '@orpc/server'
+// ---cut---
+const base = os.$config({
+  dedupeLeadingMiddlewares: false,
+  dedupeLeadingMetaPlugins: false,
+})
+```
+
+The contract builder supports the metadata option too, for router contracts built with `oc.router`:
+
+```ts twoslash
+import { oc } from '@orpc/contract'
+// ---cut---
+const base = oc.$config({ dedupeLeadingMetaPlugins: false })
+```
+
+[Contract-first](/docs/contract/implementation) implementers only apply router-level middleware, so they accept the middleware option only:
+
+```ts twoslash
+import type { contract } from './shared/planet'
+// ---cut---
+import { implement } from '@orpc/server'
+
+const implementer = implement(contract).$config({ dedupeLeadingMiddlewares: false })
+```
+
+## Manual Dedupe
+
+For the remaining cases, such as one procedure calling another, store the computed value in [`context`](/docs/context) and reuse it when the [middleware](/docs/middleware) runs again.
 
 For example, this middleware loads auth at most once per call:
 
@@ -63,13 +132,14 @@ const bar = base.use(authProvider).handler(({ context }) => {
   return call(foo, undefined, { context }) // [!code highlight]
 })
 
-// Applying authProvider again does not load auth a second time.
+// authProvider is not the leading middleware of foo and bar here,
+// but applying it again does not load auth a second time.
 const router = base
-  .use(authProvider) // [!code highlight]
   .use(({ next }) => {
     // Additional middleware logic
     return next()
   })
+  .use(authProvider) // [!code highlight]
   .router({
     foo,
     bar,
