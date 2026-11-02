@@ -263,10 +263,7 @@ export class RPCJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    /**
-     * Left undefined when nothing needs checking, so the inline path can
-     * return primitives early without consulting custom handlers.
-     */
+    // undefined = no handlers to check, so the inline path can return primitives early
     this.handlerEntries = handlerEntries.length === 0 ? undefined : handlerEntries
   }
 
@@ -292,17 +289,12 @@ export class RPCJsonSerializer {
    */
   private serializeValue(data: unknown, segments: Segment[], meta: RPCJsonSerializationMeta[], maps: Segment[][], blobs: Blob[]): unknown {
     const handlerEntries = this.handlerEntries
-    let isUnhandledPrimitive = false
 
     /**
      * Inlined version of DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: primitives are
      * dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
-     *
-     * Values no built-in handler matches (strings, booleans, finite numbers, null)
-     * return early only when there are no custom handlers; otherwise they fall
-     * through so custom handlers still get a chance, as on the generic path,
-     * and return right after them, skipping the container checks.
+     * Primitives without a built-in handler return early unless custom handlers must see them.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
@@ -311,14 +303,12 @@ export class RPCJsonSerializer {
           if (handlerEntries === undefined) {
             return data
           }
-          isUnhandledPrimitive = true
           break
         case 'number':
           if (Number.isFinite(data)) {
             if (handlerEntries === undefined) {
               return data
             }
-            isUnhandledPrimitive = true
             break
           }
           if (Number.isNaN(data)) {
@@ -338,7 +328,6 @@ export class RPCJsonSerializer {
             if (handlerEntries === undefined) {
               return data
             }
-            isUnhandledPrimitive = true
             break
           }
           if (data instanceof Date) {
@@ -389,7 +378,7 @@ export class RPCJsonSerializer {
       }
     }
 
-    if (isUnhandledPrimitive) {
+    if (typeof data !== 'object' || data === null) {
       return data
     }
 
