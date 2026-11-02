@@ -146,7 +146,7 @@ describe('toORPCRouter', () => {
     const nested = os.meta({ name: 'nested', init: meta => ({ ...meta, nested: true, meta1: 'nested' }) }).router({ router })
     expect(nested.router.ping['~orpc'].meta).toEqual({ '~openapi': { tags: ['trpc'] }, 'outer': true, 'nested': true, 'meta1': 'test' })
 
-    await expect(createRouterClient(router as any).ping()).resolves.toEqual('pong')
+    await expect(call(router.ping, undefined, { context: { a: 'test' } })).resolves.toEqual('pong')
   })
 
   describe('calls', () => {
