@@ -194,7 +194,6 @@ describe('rpcHandler', () => {
     })
 
     const peer = createPeer()
-
     await handler.close(peer as any)
 
     const result = await handler.message(peer as any, await createMessage() as any)

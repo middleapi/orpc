@@ -122,6 +122,7 @@ export class MessagePortHandler<T extends Context> {
 
   /**
    * Cleans up peer state for a closed message port.
+   * Messages passed to `.message()` for this message port afterwards are ignored.
    *
    * @param port The same message port instance passed to `.message()`.
    */

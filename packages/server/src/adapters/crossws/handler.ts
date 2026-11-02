@@ -75,6 +75,7 @@ export class experimental_CrosswsHandler<T extends Context> {
 
   /**
    * Cleans up peer state for a closed WebSocket.
+   * Messages passed to `.message()` for this peer afterwards are ignored.
    *
    * @param ws The same crossws peer instance passed to `.message()`.
    */

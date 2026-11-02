@@ -84,6 +84,7 @@ export class WebSocketHandler<T extends Context> {
 
   /**
    * Cleans up peer state for a closed WebSocket.
+   * Messages passed to `.message()` for this WebSocket afterwards are ignored.
    *
    * @param ws The same WebSocket instance passed to `.message()`.
    */
