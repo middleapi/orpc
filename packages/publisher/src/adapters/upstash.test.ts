@@ -490,9 +490,9 @@ describe.concurrent(
 
       const unsubscribe = await publisher.subscribe(event, listener, { onError })
       const channel = `${(publisher as any).eventPrefix}${event}`
-      const entry = (publisher as any).subscriptionMap.get(channel)
+      const subscription = (publisher as any).subscriptionMap.get(channel)
 
-      if (!entry) {
+      if (!subscription) {
         throw new Error('No active subscription found')
       }
 
@@ -500,7 +500,7 @@ describe.concurrent(
       ;(publisher as any).subscriptionMap.delete(channel)
 
       await expect(unsubscribe()).resolves.toBeUndefined()
-      await entry.subscription.unsubscribe()
+      await subscription.unsubscribe()
     })
 
     it('works with clients that disable automatic deserialization', async () => {
@@ -678,7 +678,6 @@ describe('upstashPublisher with a fake client', () => {
     }
     const publisher = new UpstashPublisher<Record<string, object>>(redis as unknown as Redis)
 
-    /** Subscribes and confirms the Redis subscription if this call opened one. */
     const subscribeEstablished = (
       event: string,
       listener: (payload: object) => void,

@@ -6,12 +6,6 @@ import { BaseRedisPublisher } from './base-redis'
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 
-interface ChannelSubscription {
-  subscription: ReturnType<Redis['subscribe']>
-  /** Set when the established stream fails, since Upstash does not reconnect. */
-  error?: ThrowableError
-}
-
 /**
  * Publisher adapter for Upstash Redis. Distributes events across processes via
  * Upstash Pub/Sub, with optional resume support backed by Redis Streams.
@@ -21,7 +15,8 @@ interface ChannelSubscription {
 export class UpstashPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
   private readonly listenersMap = new Map<string, Array<(message: unknown) => void>>()
   private readonly onErrorsMap = new Map<string, Array<(error: ThrowableError) => void>>()
-  private readonly subscriptionMap = new Map<string, ChannelSubscription>()
+  private readonly subscriptionMap = new Map<string, ReturnType<Redis['subscribe']>>()
+  private readonly subscriptionErrors = new WeakMap<ReturnType<Redis['subscribe']>, ThrowableError>()
   private readonly pendingSubscriptionsMap = new Map<string, Promise<void>>()
 
   constructor(
@@ -53,9 +48,9 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     push(this.listenersMap, channel, listener)
 
     try {
-      const { error } = await this.subscribeIfNeeded(channel)
+      const subscription = await this.subscribeIfNeeded(channel)
+      const error = this.subscriptionErrors.get(subscription)
 
-      // The stream may have failed before this resumed, and onError was not registered yet to report it.
       if (error) {
         throw error
       }
@@ -95,10 +90,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     return results?.[0]?.[1].map(([id, fields]) => ({ id, data: fields[1] })) ?? []
   }
 
-  /**
-   * Resolves with the established subscription of the channel, opening one if needed.
-   */
-  private async subscribeIfNeeded(channel: string): Promise<ChannelSubscription> {
+  private async subscribeIfNeeded(channel: string): Promise<ReturnType<Redis['subscribe']>> {
     while (this.pendingSubscriptionsMap.has(channel)) {
       await this.pendingSubscriptionsMap.get(channel)!.catch(() => {}) // a failed attempt is reported to its owner; waiters retry
     }
@@ -111,36 +103,29 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
     const { promise, resolve, reject } = promiseWithResolvers<void>()
     const subscription = this.redis.subscribe(channel)
-    const entry: ChannelSubscription = { subscription }
     let failed = false
 
     subscription.on('subscribe', () => {
       if (!failed && !this.subscriptionMap.has(channel)) {
-        // Set synchronously, so an error right after this is handled as a failure of the established subscription.
-        this.subscriptionMap.set(channel, entry)
+        this.subscriptionMap.set(channel, subscription)
         resolve()
       }
     })
     subscription.on('error', (error) => {
-      if (this.subscriptionMap.get(channel) !== entry) {
-        // Not established yet; a no-op once the attempt settled, e.g. it already failed or was torn down.
+      if (this.subscriptionMap.get(channel) !== subscription) {
         failed = true
         reject(error)
         return
       }
 
-      // The stream ends for good on error: Upstash does not reconnect. Drop it so the next subscribe opens a fresh one.
-      entry.error = error
+      // Upstash does not reconnect, so drop the dead stream to let the next subscribe open a fresh one.
+      this.subscriptionErrors.set(subscription, error)
       this.subscriptionMap.delete(channel)
-      subscription.unsubscribe().catch(() => {}) // only aborts the dead stream
-
-      // Snapshot, since a callback may unsubscribe itself mid-dispatch.
+      subscription.unsubscribe().catch(() => {})
       this.onErrorsMap.get(channel)?.slice().forEach(onError => onError(error))
     })
     subscription.on('message', ({ message }) => {
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
-      // Listeners already route their failures to onError, so this only guards against a throwing onError,
-      // which must neither stop delivery to the others nor reach Upstash, which would emit it as an `error` event.
       this.listenersMap.get(channel)?.slice().forEach(listener => tryOrUndefined(() => listener(message)))
     })
 
@@ -148,7 +133,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
     try {
       await promise
-      return entry
+      return subscription
     }
     catch (error) {
       await subscription.unsubscribe()
@@ -161,11 +146,11 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
   private async unsubscribeIfUnused(channel: string): Promise<void> {
     // No need to await a pending attempt: its owner still holds a listener, which blocks teardown below.
-    const entry = this.subscriptionMap.get(channel)
+    const subscription = this.subscriptionMap.get(channel)
 
-    if (entry && !this.listenersMap.has(channel)) {
+    if (subscription && !this.listenersMap.has(channel)) {
       this.subscriptionMap.delete(channel) // before awaiting, so concurrent callers skip it
-      await entry.subscription.unsubscribe()
+      await subscription.unsubscribe()
     }
   }
 }

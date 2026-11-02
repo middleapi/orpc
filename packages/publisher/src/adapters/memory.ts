@@ -78,7 +78,6 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       }
     }
 
-    // Isolated, so a throwing listener neither stops delivery to the others nor rejects `publish`.
     const isolatedListener = (payload: T[K]) => {
       try {
         listener(payload)
