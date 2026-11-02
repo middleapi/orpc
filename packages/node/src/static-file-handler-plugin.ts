@@ -25,7 +25,7 @@ const UNSAFE_SEGMENT_REGEX = /^[. ]+$|[\0/\\]/
  *
  * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names
  */
-const UNSAFE_OR_DOTFILE_SEGMENT_REGEX = /^\.|^[^.]{0,6}~\d|[\0/\\]/
+const UNSAFE_OR_DOTFILE_SEGMENT_REGEX = /^[. ]+$|^\.|^[^.]{0,6}~\d|[\0/\\]/
 
 const PRECOMPRESSED_ENCODINGS = [
   ['br', '.br'],
@@ -73,6 +73,8 @@ export interface StaticFileHandlerPluginOptions {
 
   /**
    * Whether files and directories whose name starts with a dot can be served.
+   * This is a request path policy, so it does not apply to a configured `indexFile`
+   * or `fallbackFile`, nor to the target of a symbolic link.
    * When disabled, names shaped like 8.3 short names, such as `ENV~1`, are refused too,
    * since NTFS and FAT resolve them to dotfiles.
    *
@@ -175,13 +177,17 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     const segments: string[] = []
+    // A url ending in a slash, or a dot segment, denotes a directory, so only its index file can be served
+    let isDirectoryUrl = false
 
     // Decoded per segment, so one malformed escape cannot prevent the others from decoding
     for (const rawSegment of pathname.slice(base.length).split('/')) {
       const segment = safeDecodeURIComponent(rawSegment)
 
       // A single dot denotes the current directory, so like an empty segment it is skipped
-      if (segment === '' || segment === '.') {
+      isDirectoryUrl = segment === '' || segment === '.'
+
+      if (isDirectoryUrl) {
         continue
       }
 
@@ -191,9 +197,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
       segments.push(segment)
     }
-
-    // A url ending in a slash denotes a directory, so only its index file can be served
-    const isDirectoryUrl = pathname.endsWith('/')
 
     let filePath = path.join(this.rootDir, ...segments)
     let stats = isDirectoryUrl ? undefined : await getStats(filePath)
@@ -279,6 +282,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       }
     }
 
+    // Representation metadata is kept off the 304 and 416, neither of which carries the representation
     if (contentEncoding !== undefined) {
       headers['content-encoding'] = contentEncoding
     }

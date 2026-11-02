@@ -494,8 +494,11 @@ describe('staticFileHandlerPlugin', () => {
   })
 
   describe('security', () => {
-    it('blocks directory traversal', async () => {
-      const agent = createStaticAgent()
+    // Sent verbatim, since supertest would resolve dot segments itself. secret.txt really exists
+    // one directory above the root, so a 404 here asserts a blocked escape.
+    it.for([false, true])('blocks directory traversal (dotfiles: %s)', async (dotfiles, { onTestFinished }) => {
+      const client = await createRawClient({ dotfiles })
+      onTestFinished(() => client.close())
 
       const urls = [
         '/../secret.txt',
@@ -505,7 +508,9 @@ describe('staticFileHandlerPlugin', () => {
         '/%2e%2e%2fsecret.txt',
         '/%252e%252e/secret.txt',
         '/..%c0%af/secret.txt',
+        '/..%c0%afsecret.txt',
         '/nested/%2e%2e/%2e%2e/secret.txt',
+        '/nested/../../secret.txt',
         '/foo%5c..%5cbar.txt',
         '/foo%2fbar.txt',
         '/....//secret.txt',
@@ -520,28 +525,24 @@ describe('staticFileHandlerPlugin', () => {
       ]
 
       for (const url of urls) {
-        const res = await agent.get(url)
+        const res = await client.get(url)
         expect(res.status, url).toBe(404)
-        expect(res.text, url).toBe('not matched')
+        expect(res.body, url).toBe('not matched')
       }
     })
 
-    it('blocks directory traversal when dotfiles are enabled', async () => {
-      const agent = createStaticAgent({ dotfiles: true })
+    // Win32 strips trailing dots and spaces, so any segment of only those can mean `..` there.
+    // A refused path falls through before the fallback, while an allowed missing one is answered by it.
+    it.for([false, true])('refuses segments of only dots and spaces (dotfiles: %s)', async (dotfiles, { onTestFinished }) => {
+      const client = await createRawClient({ dotfiles, fallbackFile: 'hello.txt' })
+      onTestFinished(() => client.close())
 
-      for (const url of ['/../secret.txt', '/..%c0%af/secret.txt', '/..%c0%afsecret.txt', '/..%2fsecret.txt']) {
-        expect((await agent.get(url)).status, url).toBe(404)
+      for (const url of ['/..', '/..%20/secret.txt', '/...%20./secret.txt', '/.../secret.txt', '/%20./secret.txt', '/%20../secret.txt', '/%20/secret.txt']) {
+        expect((await client.get(url)).status, url).toBe(404)
       }
 
-      // Win32 strips trailing dots and spaces, so any segment of only those can mean `..` there.
-      // A refused path falls through before the fallback, while an allowed missing one is answered by it.
-      const fallbackAgent = createStaticAgent({ dotfiles: true, fallbackFile: 'hello.txt' })
-
-      for (const url of ['/..%20/secret.txt', '/...%20./secret.txt', '/.../secret.txt', '/%20./secret.txt']) {
-        expect((await fallbackAgent.get(url)).status, url).toBe(404)
-      }
-
-      expect((await fallbackAgent.get('/..a/missing.txt')).status).toBe(200)
+      expect((await client.get('/..a/missing.txt')).status).toBe(dotfiles ? 200 : 404)
+      expect((await client.get('/a%20b/missing.txt')).status).toBe(200)
     })
 
     it('refuses dot segments instead of resolving them', async ({ onTestFinished }) => {
@@ -562,6 +563,13 @@ describe('staticFileHandlerPlugin', () => {
       for (const target of ['/assets/./hello.txt', '/assets/%2e/hello.txt', '/assets/nested/./style.css']) {
         expect((await client.get(target)).status, target).toBe(200)
       }
+
+      // A trailing dot segment denotes a directory like a trailing slash, so a file is not served
+      for (const target of ['/assets/hello.txt/.', '/assets/hello.txt/%2e']) {
+        expect((await client.get(target)).status, target).toBe(404)
+      }
+
+      expect((await client.get('/assets/nested/.')).body).toBe('<h1>nested</h1>')
     })
 
     it('follows symbolic links, including ones that leave the root', async ({ onTestFinished }) => {
@@ -841,6 +849,17 @@ describe('staticFileHandlerPlugin', () => {
       const res = await agent.get('/compressed.txt').set('accept-encoding', 'gzip').set('if-none-match', etag)
 
       expect(res.status).toBe(304)
+      expect(res.headers['content-encoding']).toBeUndefined()
+      expect(res.headers.vary).toBe('accept-encoding')
+    })
+
+    it('omits content-encoding from a 416', async () => {
+      const res = await createStaticAgent({ precompressed: true })
+        .get('/compressed.txt')
+        .set('accept-encoding', 'gzip')
+        .set('range', 'bytes=999-')
+
+      expect(res.status).toBe(416)
       expect(res.headers['content-encoding']).toBeUndefined()
       expect(res.headers.vary).toBe('accept-encoding')
     })
