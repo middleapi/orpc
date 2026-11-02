@@ -1,22 +1,56 @@
 ---
 title: "Dedupe Middleware"
-description: "Learn how to use context to prevent the same middleware from repeating expensive work when it runs multiple times in a single call."
+description: "Learn how oRPC skips repeated middleware and metadata, and how to use context to dedupe the rest."
 ---
 
 ## Problem
 
 The same middleware can run more than once during a single call. This often happens when:
 
-- a procedure [calls](/docs/client/server-side#one-off-calls) another procedure that both use the same middleware
 - you use `.use(authProvider).router(router)`, and some procedures in `router` already use `authProvider`
+- a procedure [calls](/docs/client/server-side#one-off-calls) another procedure that both use the same middleware
 
 :::warning
 Repeated middleware work can hurt performance, especially for expensive operations such as opening a database connection.
 :::
 
-## Solution
+## Automatic Dedupe
 
-Store the computed value in [`context`](/docs/context) and reuse it when the [middleware](/docs/middleware) runs again.
+oRPC skips router-level middleware that a procedure already starts with:
+
+```ts
+const authed = os.use(auth)
+
+const router = authed.router({
+  foo: authed.handler(() => 'foo'), // auth runs once
+})
+```
+
+[Metadata](/docs/metadata) works the same way:
+
+```ts
+const base = os.meta(openapi({ tags: ['planets'] }))
+
+const router = base.router({
+  list: base.handler(() => []), // tags: ['planets'], not ['planets', 'planets']
+})
+```
+
+:::info
+Only the same middleware in the same leading position, before any `.input`/`.output`, is skipped.
+:::
+
+To disable it:
+
+```ts
+os.$config({ dedupeLeadingMiddlewares: false, dedupeLeadingMetaPlugins: false })
+oc.$config({ dedupeLeadingMetaPlugins: false })
+implement(contract).$config({ dedupeLeadingMiddlewares: false })
+```
+
+## Manual Dedupe
+
+For other cases, such as one procedure calling another, store the computed value in [`context`](/docs/context) and reuse it when the [middleware](/docs/middleware) runs again.
 
 For example, this middleware loads auth at most once per call:
 
@@ -63,13 +97,13 @@ const bar = base.use(authProvider).handler(({ context }) => {
   return call(foo, undefined, { context }) // [!code highlight]
 })
 
-// Applying authProvider again does not load auth a second time.
+// authProvider runs again here, but loads auth only once.
 const router = base
-  .use(authProvider) // [!code highlight]
   .use(({ next }) => {
     // Additional middleware logic
     return next()
   })
+  .use(authProvider) // [!code highlight]
   .router({
     foo,
     bar,

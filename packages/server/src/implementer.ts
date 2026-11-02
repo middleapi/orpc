@@ -1,11 +1,18 @@
 import type { RouterContract } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
-import type { DefaultInitialContext } from './builder'
+import type { BuilderConfig, DefaultInitialContext } from './builder'
 import type { Context } from './context'
 import type { RouterImplementer } from './implementer-router'
 import type { ProcedureConfig } from './procedure'
 import { isTypescriptObject } from '@orpc/shared'
 import { createRouterImplementer } from './implementer-router'
+
+/**
+ * Configuration of `implement`: the procedure configuration,
+ * plus options only read when the implementer augments a router with `.router` or `.lazy`.
+ */
+export interface ImplementerConfig extends ProcedureConfig, Pick<BuilderConfig, 'dedupeLeadingMiddlewares'> {
+}
 
 export type Implementer<
   TContract extends RouterContract,
@@ -13,7 +20,7 @@ export type Implementer<
 >
   = & {
     $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>
-    $config(config: ProcedureConfig): Implementer<TContract, TInitialContext>
+    $config(config: ImplementerConfig): Implementer<TContract, TInitialContext>
   }
   & RouterImplementer<TContract, TInitialContext>
 
@@ -25,7 +32,7 @@ export type Implementer<
  */
 export function implement<TContract extends RouterContract, TInitialContext extends Context = DefaultInitialContext>(
   contract: TContract,
-  config: ProcedureConfig = {},
+  config: ImplementerConfig = {},
 ): Implementer<TContract, TInitialContext & object> {
   // Using `& object` avoids "has no properties in common with type" errors
   // when combining procedures or routers with compatible but non-overlapping contexts.
@@ -39,7 +46,7 @@ export function implement<TContract extends RouterContract, TInitialContext exte
         method = () => implementer
       }
       else if (p === '$config') {
-        method = (incoming: ProcedureConfig) => implement(contract, { ...config, ...incoming })
+        method = (incoming: ImplementerConfig) => implement(contract, { ...config, ...incoming })
       }
 
       const value = Reflect.get(routerImplementer, p)

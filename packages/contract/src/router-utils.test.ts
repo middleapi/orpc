@@ -6,11 +6,11 @@ import { ProcedureContract } from './procedure'
 import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils'
 
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
-const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
+const resolveAugmentedMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveAugmentedMetaPlugins')
 
 beforeEach(() => {
   mergeErrorMapSpy.mockClear()
-  resolveMetaPluginsSpy.mockClear()
+  resolveAugmentedMetaPluginsSpy.mockClear()
 })
 
 const schema1 = z.object({ schema1: z.string() })
@@ -98,16 +98,17 @@ describe('augmentContractRouter', () => {
     original: any,
     options: ReturnType<typeof createAugmentOptions>,
   ) {
-    const resolved = resolveMetaPluginsSpy.mock.results[callIndex - 1]?.value
+    const resolved = resolveAugmentedMetaPluginsSpy.mock.results[callIndex - 1]?.value
 
     expect(actual).toBeInstanceOf(ProcedureContract)
     expect(actual).not.toBe(original)
     expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(callIndex, options.errorMap, original['~orpc'].errorMap)
-    expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
+    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenNthCalledWith(
       callIndex,
       options.meta,
       options.metaPlugins,
       original['~orpc'].metaPlugins,
+      options,
     )
     expect(actual['~orpc']).toEqual({
       ...original['~orpc'],
@@ -127,7 +128,7 @@ describe('augmentContractRouter', () => {
     expect(augmented.nested.invalid).toBe('invalid')
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(3)
-    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(3)
+    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledTimes(3)
 
     expectAugmentedProcedure(1, augmented.ping, router.ping, options)
     expectAugmentedProcedure(2, augmented.pong, router.pong, options)
@@ -139,7 +140,7 @@ describe('augmentContractRouter', () => {
     const augmented = augmentContractRouter(router.pong, options)
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
-    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
+    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledTimes(1)
 
     expectAugmentedProcedure(1, augmented, router.pong, options)
   })
@@ -153,7 +154,7 @@ describe('augmentContractRouter', () => {
     expect(augmented.invalid).toBe('invalid')
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
-    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
+    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledTimes(1)
 
     expectAugmentedProcedure(1, augmented.ping, router.nested.ping, options)
   })
@@ -164,7 +165,27 @@ describe('augmentContractRouter', () => {
 
     expect(augmentContractRouter(invalid, options)).toBe(invalid)
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
-    expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+    expect(resolveAugmentedMetaPluginsSpy).not.toHaveBeenCalled()
+  })
+
+  describe('dedupeLeadingMetaPlugins', () => {
+    const contract = new ProcedureContract({
+      errorMap: {},
+      meta: { meta1: true },
+      metaPlugins: [meta1],
+    })
+
+    it('dedupes leading meta plugins by default', () => {
+      const augmented = augmentContractRouter(contract, { errorMap: {}, meta: { meta1: true }, metaPlugins: [meta1] })
+
+      expect(augmented['~orpc'].metaPlugins).toEqual([meta1])
+    })
+
+    it('does not dedupe when disabled', () => {
+      const augmented = augmentContractRouter(contract, { errorMap: {}, meta: { meta1: true }, metaPlugins: [meta1], dedupeLeadingMetaPlugins: false })
+
+      expect(augmented['~orpc'].metaPlugins).toEqual([meta1, meta1])
+    })
   })
 })
 

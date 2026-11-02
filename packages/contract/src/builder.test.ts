@@ -56,6 +56,17 @@ describe('contractBuilder', () => {
     })
   })
 
+  it('$config', () => {
+    const applied = builder.$config({ dedupeLeadingMetaPlugins: false })
+
+    expect(applied).toBeInstanceOf(ContractBuilder)
+    expect(applied).not.toBe(builder)
+    expect(applied['~orpc']).toEqual({
+      ...builder['~orpc'],
+      dedupeLeadingMetaPlugins: false,
+    })
+  })
+
   it('.meta', () => {
     const applied = builder.meta(metaPlugin)
     expect(applied).toBeInstanceOf(ContractBuilder)

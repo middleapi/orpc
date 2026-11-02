@@ -44,6 +44,8 @@ describe('Builder', () => {
 
     // @ts-expect-error - invalid setting
     builder.$config('invalid')
+
+    builder.$config({ dedupeLeadingMiddlewares: false, dedupeLeadingMetaPlugins: false })
   })
 
   it('.errors', () => {

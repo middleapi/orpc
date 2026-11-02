@@ -45,6 +45,20 @@ const router = oc.meta(requireAuthMeta).router({
 })
 ```
 
+Metadata a procedure already has from the same builder is not applied twice:
+
+```ts
+const base = oc.meta(openapi({ tags: ['planets'] }))
+
+const router = base.router({
+  list: base.output(z.array(z.string())), // tags: ['planets'], not ['planets', 'planets']
+})
+```
+
+:::tip
+Disable it with `oc.$config({ dedupeLeadingMetaPlugins: false })`.
+:::
+
 ## Router to Contract
 
 A normal [router](/docs/router) can be used as a contract router as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.
