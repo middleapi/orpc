@@ -674,6 +674,121 @@ describe('openAPILinkCodec', () => {
       })
     })
 
+    describe('serializer asFormData default', () => {
+      const formDataSerializer = new OpenAPISerializer({ serialize: { asFormData: true } })
+
+      it('does not affect path param encoding', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{ids}/{filter}/{+rest}',
+            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+          })),
+        }, { url: '/api', serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({
+          id: '42',
+          ids: [1, 2n],
+          filter: { color: 'red', at: new Date('2023-01-01T00:00:00.000Z') },
+          rest: 'docs/v1',
+        }, ['item'], { context: {} })
+
+        expect(request.url).toBe('/api/items/42/1,2/color,red,at,2023-01-01T00%3A00%3A00.000Z/docs/v1')
+      })
+
+      it('does not affect path param encoding in detailed requests', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'GET',
+            path: '/x/{id}',
+            inputStructure: 'detailed',
+          })),
+        }, { serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({ params: { id: '42' } }, ['item'], { context: {} })
+
+        expect(request.url).toBe('/x/42')
+      })
+
+      it('does not affect styled query values', async () => {
+        const codec = new OpenAPILinkCodec({
+          search: oc.meta(openapi({
+            method: 'GET',
+            queryStyles: {
+              p: 'primitive',
+              a: 'array',
+              j: 'json',
+              ca: 'comma-delimited-array',
+              co: 'comma-delimited-object',
+              sa: 'space-delimited-array',
+              so: 'space-delimited-object',
+              pa: 'pipe-delimited-array',
+              po: 'pipe-delimited-object',
+              mismatch: 'comma-delimited-array',
+            },
+          })),
+        }, { url: '/api', serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({
+          p: 'x',
+          a: ['1', 2],
+          j: { k: 'v', n: [1] },
+          ca: ['a', 'b'],
+          co: { k: 'v' },
+          sa: ['a', 'b'],
+          so: { k: 'v' },
+          pa: ['a', 'b'],
+          po: { k: 'v' },
+          mismatch: 'scalar',
+          rest: { nested: 'value' },
+        }, ['search'], { context: {} })
+
+        const url = new URL(request.url, 'http://localhost')
+
+        expect(url.searchParams.get('p')).toBe('x')
+        expect(url.searchParams.getAll('a')).toEqual(['1', '2'])
+        expect(JSON.parse(url.searchParams.get('j')!)).toEqual({ k: 'v', n: [1] })
+        expect(url.searchParams.get('ca')).toBe('a,b')
+        expect(url.searchParams.get('co')).toBe('k,v')
+        expect(url.searchParams.get('sa')).toBe('a b')
+        expect(url.searchParams.get('so')).toBe('k v')
+        expect(url.searchParams.get('pa')).toBe('a|b')
+        expect(url.searchParams.get('po')).toBe('k|v')
+        expect(url.searchParams.get('mismatch')).toBe('scalar')
+        expect(url.searchParams.get('rest[nested]')).toBe('value')
+        expect(request.url).not.toContain('FormData')
+      })
+
+      it('does not affect styled query values in detailed requests', async () => {
+        const codec = new OpenAPILinkCodec({
+          search: oc.meta(openapi({
+            method: 'GET',
+            path: '/search',
+            inputStructure: 'detailed',
+            queryStyles: { q: 'primitive', j: 'json' },
+          })),
+        }, { serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({ query: { q: 'term', j: { a: 1 } } }, ['search'], { context: {} })
+
+        expect(request.url).toBe('/search?q=term&j=%7B%22a%22%3A1%7D')
+      })
+
+      it('still applies to the request body', async () => {
+        const codec = new OpenAPILinkCodec({
+          create: oc.meta(openapi({
+            method: 'POST',
+            path: '/items/{id}',
+          })),
+        }, { url: '/api', serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({ id: '42', name: 'item' }, ['create'], { context: {} })
+
+        expect(request.url).toBe('/api/items/42')
+        expect(request.body).toBeInstanceOf(FormData)
+        expect((request.body as FormData).get('name')).toBe('item')
+      })
+    })
+
     describe('option handling', () => {
       it('accepts Headers instances for base headers', async () => {
         const codec = new OpenAPILinkCodec({

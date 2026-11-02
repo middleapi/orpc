@@ -219,20 +219,20 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     if (style === 'comma-delimited-array' && Array.isArray(val)) {
       encoded = val
-        .map(val => this.serializer.serialize(val))
+        .map(val => this.serializeURLValue(val))
         .filter(val => val !== undefined && val !== null)
         .map(val => safeEncodeURIComponent(String(val)))
         .join(',')
     }
     else if (style === 'comma-delimited-object' && isTypescriptObject(val)) {
       encoded = Object.entries(val)
-        .map(([key, val]) => [key, this.serializer.serialize(val)])
+        .map(([key, val]) => [key, this.serializeURLValue(val)])
         .filter(([, val]) => val !== undefined && val !== null)
         .map(([key, val]) => `${safeEncodeURIComponent(String(key))},${safeEncodeURIComponent(String(val))}`)
         .join(',')
     }
     else {
-      const serialized = this.serializer.serialize(val)
+      const serialized = this.serializeURLValue(val)
 
       if (serialized !== undefined && serialized !== null) {
         if (param.allowsSlash) {
@@ -260,6 +260,14 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     return encoded
   }
 
+  /**
+   * Serializes a single path/query value. Always pinned to `asFormData: false`
+   * so the serializer's default (meant for bodies) cannot turn URL values into FormData.
+   */
+  private serializeURLValue(value: unknown): unknown {
+    return this.serializer.serialize(value, { asFormData: false })
+  }
+
   private serializeQueryString(data: unknown, queryStyles: OpenAPIMeta['queryStyles']): string | undefined {
     if (!queryStyles || !isTypescriptObject(data)) {
       return toURLSearchParams(
@@ -279,7 +287,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       delete remaining[key]
 
       if (style === 'primitive') {
-        const serialized = this.serializer.serialize(value)
+        const serialized = this.serializeURLValue(value)
         if (serialized !== undefined && serialized !== null) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(String(serialized))}`
         }
@@ -289,7 +297,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         const encodedKey = encodeURLSearchParamComponent(key)
 
         value.forEach((v) => {
-          const s = this.serializer.serialize(v)
+          const s = this.serializeURLValue(v)
           if (s !== undefined && s !== null) {
             query += `&${encodedKey}=${encodeURLSearchParamComponent(String(s))}`
           }
@@ -297,7 +305,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       }
 
       else if (style === 'json') {
-        const serialized = this.serializer.serialize(value)
+        const serialized = this.serializeURLValue(value)
 
         if (serialized !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(stringifyJSON(serialized))}`
@@ -306,7 +314,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       else if (style === 'comma-delimited-array' && Array.isArray(value)) {
         const encodedValue = encodeDelimitedArray(
-          value.map(v => this.serializer.serialize(v)),
+          value.map(v => this.serializeURLValue(v)),
           ',',
         )
 
@@ -317,7 +325,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       else if (style === 'comma-delimited-object' && isTypescriptObject(value)) {
         const encodedValue = encodeDelimitedObject(
-          Object.entries(value).map(([key, value]) => [key, this.serializer.serialize(value)]),
+          Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           ',',
         )
 
@@ -328,7 +336,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       else if (style === 'pipe-delimited-array' && Array.isArray(value)) {
         const encodedValue = encodeDelimitedArray(
-          value.map(v => this.serializer.serialize(v)),
+          value.map(v => this.serializeURLValue(v)),
           '%7C' /* '/' */,
         )
 
@@ -339,7 +347,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       else if (style === 'pipe-delimited-object' && isTypescriptObject(value)) {
         const encodedValue = encodeDelimitedObject(
-          Object.entries(value).map(([key, value]) => [key, this.serializer.serialize(value)]),
+          Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           '%7C' /* '/' */,
         )
 
@@ -350,7 +358,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       else if (style === 'space-delimited-array' && Array.isArray(value)) {
         const encodedValue = encodeDelimitedArray(
-          value.map(v => this.serializer.serialize(v)),
+          value.map(v => this.serializeURLValue(v)),
           '%20' /* ' ' */,
         )
 
@@ -361,7 +369,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       else if (style === 'space-delimited-object' && isTypescriptObject(value)) {
         const encodedValue = encodeDelimitedObject(
-          Object.entries(value).map(([key, value]) => [key, this.serializer.serialize(value)]),
+          Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           '%20' /* ' ' */,
         )
 
@@ -371,7 +379,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       }
 
       else {
-        const serialized = this.serializer.serialize(value)
+        const serialized = this.serializeURLValue(value)
         if (serialized !== undefined && serialized !== null) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(String(serialized))}`
         }
