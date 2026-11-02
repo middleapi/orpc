@@ -261,6 +261,62 @@ describe('openAPIJsonSerializer', () => {
       expect(serialized.blobs).toEqual([expect.any(Blob)])
     })
 
+    describe.each([
+      ['built-in handlers kept', {}],
+      ['a built-in handler overridden', { url: undefined }],
+    ] as const)('custom primitive handlers with %s', (_, extraHandlers) => {
+      const custom = new OpenAPIJsonSerializer({
+        handlers: {
+          ...extraHandlers,
+          negZero: {
+            condition: data => Object.is(data, -0),
+            serialize: () => '-0',
+            isTerminal: true,
+          },
+          secret: {
+            condition: data => typeof data === 'string' && data.startsWith('secret:'),
+            serialize: () => '***',
+            isTerminal: true,
+          },
+          flag: {
+            condition: data => typeof data === 'boolean',
+            serialize: (data: boolean) => (data ? 'yes' : 'no'),
+            isTerminal: true,
+          },
+          nil: {
+            condition: data => data === null,
+            serialize: () => 'null',
+            isTerminal: true,
+          },
+        },
+      })
+
+      it('runs custom handlers for strings, booleans, finite numbers and null', () => {
+        expect(custom.serializeJson({ zero: -0, text: 'secret:abc', flag: true, nil: null }).json)
+          .toEqual({ zero: '-0', text: '***', flag: 'yes', nil: 'null' })
+      })
+
+      it('leaves primitives no custom handler matches untouched', () => {
+        expect(custom.serializeJson({ zero: 0, num: 1.5, text: 'plain' }).json)
+          .toEqual({ zero: 0, num: 1.5, text: 'plain' })
+      })
+
+      it('still gives built-in handlers precedence over custom handlers', () => {
+        const numbers = new OpenAPIJsonSerializer({
+          handlers: {
+            ...extraHandlers,
+            number: {
+              condition: data => typeof data === 'number',
+              serialize: (data: number) => `n${data}`,
+              isTerminal: true,
+            },
+          },
+        })
+
+        expect(numbers.serializeJson([1, Number.NaN, Number.POSITIVE_INFINITY]).json).toEqual(['n1', null, null])
+      })
+    })
+
     it('can disable omitting undefined properties', () => {
       const custom = new OpenAPIJsonSerializer({ omitUndefinedProperties: false })
       expect(custom.serializeJson({ a: 1, b: undefined }).json).toEqual({ a: 1, b: null })

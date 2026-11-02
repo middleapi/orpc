@@ -380,6 +380,84 @@ describe('rpcJsonSerializer: custom handlers', () => {
   })
 })
 
+describe.each([
+  ['built-in handlers kept', {}],
+  ['a built-in handler overridden', { url: undefined }],
+] as const)('rpcJsonSerializer: custom primitive handlers with %s', (_, extraHandlers) => {
+  const serializer = new RPCJsonSerializer({
+    handlers: {
+      ...extraHandlers,
+      negZero: {
+        condition: data => Object.is(data, -0),
+        serialize: () => '-0',
+        deserialize: () => -0,
+        isTerminal: true,
+      },
+      secret: {
+        condition: data => typeof data === 'string' && data.startsWith('secret:'),
+        serialize: (data: string) => data.slice(7),
+        deserialize: (data: string) => `secret:${data}`,
+        isTerminal: true,
+      },
+      flag: {
+        condition: data => typeof data === 'boolean',
+        serialize: (data: boolean) => (data ? 1 : 0),
+        deserialize: (data: number) => data === 1,
+        isTerminal: true,
+      },
+      nil: {
+        condition: data => data === null,
+        serialize: () => 'null',
+        deserialize: () => null,
+        isTerminal: true,
+      },
+    },
+  })
+
+  it('runs custom handlers for strings, booleans, finite numbers and null', () => {
+    const value = { zero: -0, text: 'secret:abc', flag: true, nil: null }
+    const serialized = serializer.serializeJson(value)
+
+    expect(serialized.json).toEqual({ zero: '-0', text: 'abc', flag: 1, nil: 'null' })
+    expect(serialized.meta).toEqual([
+      ['negZero', 'zero'],
+      ['secret', 'text'],
+      ['flag', 'flag'],
+      ['nil', 'nil'],
+    ])
+
+    const restored = roundTripThroughWire(serializer, value) as any
+    expect(Object.is(restored.zero, -0)).toBe(true)
+    expect(restored).toEqual(value)
+  })
+
+  it('leaves primitives no custom handler matches untouched', () => {
+    const serialized = serializer.serializeJson({ zero: 0, num: 1.5, text: 'plain' })
+
+    expect(serialized.json).toEqual({ zero: 0, num: 1.5, text: 'plain' })
+    expect(serialized.meta).toBeUndefined()
+  })
+
+  it('still gives built-in handlers precedence over custom handlers', () => {
+    const numbers = new RPCJsonSerializer({
+      handlers: {
+        ...extraHandlers,
+        number: {
+          condition: data => typeof data === 'number',
+          serialize: (data: number) => `n${data}`,
+          deserialize: (data: string) => Number(data.slice(1)),
+          isTerminal: true,
+        },
+      },
+    })
+
+    const serialized = numbers.serializeJson([1, Number.NaN, Number.POSITIVE_INFINITY])
+
+    expect(serialized.json).toEqual(['n1', null, 'Infinity'])
+    expect(serialized.meta).toEqual([['number', 0], ['nan', 1], ['infinity', 2]])
+  })
+})
+
 describe('rpcJsonSerializer: unknown types', () => {
   const serializer = new RPCJsonSerializer({ handlers: { url: undefined } })
 

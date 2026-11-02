@@ -263,7 +263,11 @@ export class RPCJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    this.handlerEntries = handlerEntries
+    /**
+     * Left undefined when nothing needs checking, so the inline path can
+     * return primitives early without consulting custom handlers.
+     */
+    this.handlerEntries = handlerEntries.length === 0 ? undefined : handlerEntries
   }
 
   serializeJson(data: unknown): RPCJsonSerialization {
@@ -287,19 +291,35 @@ export class RPCJsonSerializer {
    * so it must be copied before being stored in `meta` or `maps`.
    */
   private serializeValue(data: unknown, segments: Segment[], meta: RPCJsonSerializationMeta[], maps: Segment[][], blobs: Blob[]): unknown {
+    const handlerEntries = this.handlerEntries
+    let isUnhandledPrimitive = false
+
     /**
      * Inlined version of DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: primitives are
      * dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
+     *
+     * Values no built-in handler matches (strings, booleans, finite numbers, null)
+     * return early only when there are no custom handlers; otherwise they fall
+     * through so custom handlers still get a chance, as on the generic path,
+     * and return right after them, skipping the container checks.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
         case 'string':
         case 'boolean':
-          return data
+          if (handlerEntries === undefined) {
+            return data
+          }
+          isUnhandledPrimitive = true
+          break
         case 'number':
           if (Number.isFinite(data)) {
-            return data
+            if (handlerEntries === undefined) {
+              return data
+            }
+            isUnhandledPrimitive = true
+            break
           }
           if (Number.isNaN(data)) {
             meta.push(['nan', ...segments])
@@ -315,7 +335,11 @@ export class RPCJsonSerializer {
           return data.toString()
         case 'object': {
           if (data === null) {
-            return data
+            if (handlerEntries === undefined) {
+              return data
+            }
+            isUnhandledPrimitive = true
+            break
           }
           if (data instanceof Date) {
             meta.push(['date', ...segments])
@@ -339,7 +363,6 @@ export class RPCJsonSerializer {
       }
     }
 
-    const handlerEntries = this.handlerEntries
     if (handlerEntries) {
       for (let i = 0; i < handlerEntries.length; i++) {
         const entry = handlerEntries[i]!
@@ -364,6 +387,10 @@ export class RPCJsonSerializer {
           return result
         }
       }
+    }
+
+    if (isUnhandledPrimitive) {
+      return data
     }
 
     if (data instanceof Blob) {
