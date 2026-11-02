@@ -22,7 +22,7 @@ it('withHiddenRouterContract & getHiddenRouterContract', () => {
 })
 
 it('getHiddenRouterContract returns undefined for non-object values', () => {
-  expect(getHiddenRouterContract(undefined)).toBeUndefined()
+  expect(getHiddenRouterContract(undefined as any)).toBeUndefined()
   expect(getHiddenRouterContract(null as any)).toBeUndefined()
   expect(getHiddenRouterContract('invalid' as any)).toBeUndefined()
   expect(getHiddenRouterContract(router)).toBeUndefined()
@@ -42,13 +42,8 @@ describe('withHiddenRouterContract with a normal router as the contract', () => 
     for (const [procedure, original] of [[hidden.ping, real.ping], [hidden.nested.pong, real.nested.pong]] as const) {
       expect(procedure).toBeInstanceOf(ProcedureContract)
       expect(procedure).not.toBeInstanceOf(Procedure)
-      expect(procedure['~orpc']).toEqual({
-        inputSchemas: original['~orpc'].inputSchemas,
-        outputSchemas: original['~orpc'].outputSchemas,
-        metaPlugins: original['~orpc'].metaPlugins,
-        errorMap: original['~orpc'].errorMap,
-        meta: original['~orpc'].meta,
-      })
+      const { handler, orderedMiddlewares, ...contractDef } = original['~orpc']
+      expect(procedure['~orpc']).toEqual(contractDef)
     }
 
     // routers without procedures are kept as is

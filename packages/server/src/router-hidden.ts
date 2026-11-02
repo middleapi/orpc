@@ -2,7 +2,7 @@ import type { RouterContract } from '@orpc/contract'
 import type { Lazyable } from './lazy'
 import type { AnyRouter } from './router'
 import { ProcedureContract } from '@orpc/contract'
-import { isTypescriptObject } from '@orpc/shared'
+import { isTypescriptObject, omit } from '@orpc/shared'
 import { Procedure } from './procedure'
 
 const HIDDEN_ROUTER_CONTRACT_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_ROUTER_CONTRACT')
@@ -25,9 +25,8 @@ function toPlainRouterContract<T>(contract: T): T {
       return contract
     }
 
-    const { inputSchemas, outputSchemas, metaPlugins, errorMap, meta } = contract['~orpc']
-
-    return new ProcedureContract({ inputSchemas, outputSchemas, metaPlugins, errorMap, meta }) as T
+    // handler & orderedMiddlewares are what make a definition a procedure (see Procedure[Symbol.hasInstance])
+    return new ProcedureContract(omit(contract['~orpc'], ['handler', 'orderedMiddlewares'])) as T
   }
 
   let copied: Record<string, unknown> | undefined
@@ -59,6 +58,6 @@ export function withHiddenRouterContract<T extends Lazyable<AnyRouter>>(router: 
   })
 }
 
-export function getHiddenRouterContract(router: Lazyable<AnyRouter | RouterContract> | undefined): RouterContract | undefined {
+export function getHiddenRouterContract(router: Lazyable<AnyRouter | RouterContract>): RouterContract | undefined {
   return (router as any)?.[HIDDEN_ROUTER_CONTRACT_SYMBOL]
 }
