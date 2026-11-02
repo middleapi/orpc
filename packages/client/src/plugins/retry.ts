@@ -159,7 +159,11 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           let retryDelayMs = 0
 
           if (currentError) {
-            if (isIteratorAborted || attempt > maxAttempts) {
+            /**
+             * An error thrown by the output iterator reaches here without the abort check
+             * below, so check the signal first to avoid retrying a deliberate abort.
+             */
+            if (isIteratorAborted || attempt > maxAttempts || updatedCallOptions.signal?.aborted) {
               throw currentError.error
             }
 

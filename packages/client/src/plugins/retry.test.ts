@@ -630,6 +630,39 @@ describe('retryLinkPlugin', () => {
       expect(clean).toHaveBeenCalledWith(false)
     })
 
+    it('does not retry or call onRetry when the signal is aborted while iterating', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const controller = new AbortController()
+      const abortError = new Error('ABORTED')
+
+      vi.mocked(codec.decodeResponse).mockResolvedValue({
+        kind: 'output',
+        output: (async function* () {
+          yield 'first'
+          controller.abort()
+          throw abortError
+        })(),
+      })
+
+      const shouldRetry = vi.fn(() => true)
+      const onRetry = vi.fn()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['stream'], undefined, { context: { retry: 3, retryDelay: 0, shouldRetry, onRetry }, signal: controller.signal }) as AsyncIterator<any>
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 'first' })
+      await expect(iterator.next()).rejects.toBe(abortError)
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(shouldRetry).not.toHaveBeenCalled()
+      expect(onRetry).not.toHaveBeenCalled()
+    })
+
     it('reset special AsyncIteratorObject properties after retry', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
