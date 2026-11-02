@@ -243,6 +243,37 @@ describe('openAPIGenerator operation builders', () => {
       expect(operation.requestBody).toBeUndefined()
     })
 
+    it('does not use deepObject for query params whose $ref resolves to a primitive', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(ctx, operation, testDef({
+        inputs: [testSchema({
+          type: 'object',
+          properties: {
+            status: { $ref: '#/$defs/Status' },
+            statuses: { anyOf: [{ $ref: '#/$defs/Status' }, { type: 'array', items: { $ref: '#/$defs/Status' } }] },
+            filter: { $ref: '#/$defs/Filter' },
+            filters: { anyOf: [{ $ref: '#/$defs/Filter' }, { type: 'array', items: { $ref: '#/$defs/Filter' } }] },
+          },
+          required: ['status', 'statuses', 'filter', 'filters'],
+          $defs: {
+            Status: { type: 'string', enum: ['a', 'b'] },
+            Filter: { type: 'object', properties: { status: { $ref: '#/$defs/Status' } } },
+          },
+        })],
+      }), { method: 'GET' }, undefined)
+
+      expect(operation.parameters?.map((p) => {
+        const { name, style, explode } = p as OpenAPIV3_2.ParameterObject
+        return { name, style, explode }
+      })).toEqual([
+        { name: 'status', style: undefined, explode: undefined },
+        { name: 'statuses', style: undefined, explode: undefined },
+        { name: 'filter', style: 'deepObject', explode: true },
+        { name: 'filters', style: 'deepObject', explode: true },
+      ])
+    })
+
     it('maps HEAD inputs to query parameters like GET', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}' as const
@@ -528,6 +559,54 @@ describe('openAPIGenerator operation builders', () => {
           },
         },
       })
+    })
+
+    it('detects file bodies behind a $ref and ignores unreachable file defs', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(ctx, operation, testDef({
+        outputs: [testSchema({
+          anyOf: [
+            {
+              type: 'object',
+              properties: { status: { const: 200 }, body: { $ref: '#/$defs/Download' } },
+              required: ['status', 'body'],
+            },
+            {
+              type: 'object',
+              properties: { status: { const: 201 }, body: { type: 'object', properties: { id: { type: 'string' } } } },
+              required: ['status', 'body'],
+            },
+            {
+              type: 'object',
+              properties: { status: { const: 202 }, body: { $ref: '#/$defs/Upload' } },
+              required: ['status', 'body'],
+            },
+          ],
+          $defs: {
+            Download: { type: 'string', contentEncoding: 'binary' },
+            Image: { type: 'string', contentMediaType: 'image/png' },
+            Upload: { type: 'object', properties: { image: { $ref: '#/$defs/Image' }, self: { $ref: '#/$defs/Upload' } } },
+          },
+        })],
+      }), { outputStructure: 'detailed' })
+
+      expect(Object.keys((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content ?? {})).toEqual(['*/*'])
+      expect(Object.keys((operation.responses?.['201'] as OpenAPIV3_2.ResponseObject).content ?? {})).toEqual(['application/json'])
+      expect(Object.keys((operation.responses?.['202'] as OpenAPIV3_2.ResponseObject).content ?? {})).toEqual(['multipart/form-data'])
+    })
+
+    it('reads the content media type of a file body from its $ref target', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(ctx, operation, testDef({
+        outputs: [testSchema({
+          anyOf: [{ $ref: '#/$defs/Image' }, { type: 'object' }],
+          $defs: { Image: { type: 'string', contentMediaType: 'image/png' } },
+        })],
+      }), undefined)
+
+      expect(Object.keys((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content ?? {})).toEqual(['application/json', 'image/png'])
     })
 
     it('maps AsyncIteratorObject outputs to an SSE success response', () => {

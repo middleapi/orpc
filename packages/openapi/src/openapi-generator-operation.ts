@@ -17,6 +17,7 @@ import {
   isJsonPrimitiveSchema,
   isUnconstrainedSchema,
   matchArrayableJsonSchema,
+  resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import { stringifyJSON, value } from '@orpc/shared'
@@ -631,7 +632,8 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
       return !isUnconstrainedSchema(s)
     }
 
-    const contentMediaType = s.contentMediaType ?? '*/*'
+    const resolved = resolveJsonSchemaRootLocalRef(s)
+    const contentMediaType = (typeof resolved === 'object' ? resolved.contentMediaType : undefined) ?? '*/*'
     const schemas = fileSchemasByMediaType.get(contentMediaType)
     if (schemas) {
       schemas.push(s)

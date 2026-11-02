@@ -14,6 +14,17 @@ it('isJsonPrimitiveSchema', () => {
   expect(isJsonPrimitiveSchema({ description: 'primitive union', anyOf: [{ type: 'number' }, { oneOf: [{ type: 'boolean' }, { const: 'x' }] }] })).toBe(false)
 })
 
+it('isJsonPrimitiveSchema resolves root local refs', () => {
+  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Status', $defs: { Status: { type: 'string', enum: ['a', 'b'] } } })).toBe(true)
+  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/B' }, B: { const: 1 } } })).toBe(true)
+
+  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Obj', $defs: { Obj: { type: 'object' } } })).toBe(false)
+  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Missing', $defs: {} })).toBe(false)
+  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Status' })).toBe(false)
+  // recursive refs terminate
+  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } } })).toBe(false)
+})
+
 it('isJsonFileSchema', () => {
   expect(isJsonFileSchema({ type: 'string', contentMediaType: 'image/png' })).toBe(true)
   expect(isJsonFileSchema({ type: 'string', format: 'binary' })).toBe(true)
@@ -27,6 +38,16 @@ it('isJsonFileSchema', () => {
   expect(isJsonFileSchema(true)).toBe(false)
 })
 
+it('isJsonFileSchema resolves root local refs', () => {
+  expect(isJsonFileSchema({ $ref: '#/$defs/File', $defs: { File: { type: 'string', format: 'binary' } } })).toBe(true)
+  expect(isJsonFileSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/File' }, File: { type: 'string', contentMediaType: 'image/png' } } })).toBe(true)
+
+  expect(isJsonFileSchema({ $ref: '#/$defs/Text', $defs: { Text: { type: 'string' } } })).toBe(false)
+  expect(isJsonFileSchema({ $ref: '#/$defs/File' })).toBe(false)
+  // recursive refs terminate
+  expect(isJsonFileSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/A' } } })).toBe(false)
+})
+
 it('containsJsonFileSchema', () => {
   expect(containsJsonFileSchema({ type: 'string', contentMediaType: 'image/png' })).toBe(true)
   expect(containsJsonFileSchema({ type: 'object', properties: { avatar: { type: 'string', format: 'binary' } } })).toBe(true)
@@ -35,6 +56,34 @@ it('containsJsonFileSchema', () => {
 
   expect(containsJsonFileSchema({ type: 'object', properties: { name: { type: 'string' } } })).toBe(false)
   expect(containsJsonFileSchema(true)).toBe(false)
+})
+
+it('containsJsonFileSchema follows only reachable refs', () => {
+  const $defs: Record<string, JsonSchema> = {
+    File: { type: 'string', contentMediaType: '*/*' },
+    WithFile: { type: 'object', properties: { file: { $ref: '#/$defs/File' } } },
+    Tree: { type: 'object', properties: { name: { type: 'string' }, children: { type: 'array', items: { $ref: '#/$defs/Tree' } } } },
+    TreeWithFile: { type: 'object', properties: { file: { $ref: '#/$defs/File' }, children: { type: 'array', items: { $ref: '#/$defs/TreeWithFile' } } } },
+  }
+
+  // unused defs are ignored
+  expect(containsJsonFileSchema({ type: 'object', properties: { id: { type: 'string' } }, $defs })).toBe(false)
+  expect(containsJsonFileSchema({ $ref: '#/$defs/Tree', $defs })).toBe(false)
+
+  // chained and nested refs are followed
+  expect(containsJsonFileSchema({ type: 'object', properties: { nested: { $ref: '#/$defs/WithFile' } }, $defs })).toBe(true)
+  expect(containsJsonFileSchema({ anyOf: [{ $ref: '#/$defs/Tree' }, { $ref: '#/$defs/TreeWithFile' }], $defs })).toBe(true)
+  expect(containsJsonFileSchema({ type: 'object', properties: { file: { $ref: '#/$defs/WithFile/properties/file' } }, $defs })).toBe(true)
+
+  // recursive root refs terminate
+  expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' } } })).toBe(false)
+  expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' }, file: { type: 'string', format: 'binary' } } })).toBe(true)
+
+  // unresolvable refs are ignored
+  expect(containsJsonFileSchema({ $ref: '#/$defs/Missing', $defs })).toBe(false)
+
+  // values of non-schema keywords are not schemas
+  expect(containsJsonFileSchema({ type: 'object', default: { type: 'string', format: 'binary' } })).toBe(false)
 })
 
 it('isJsonObjectSchema', () => {
