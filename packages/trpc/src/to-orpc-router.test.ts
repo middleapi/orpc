@@ -1,6 +1,6 @@
 import type { OpenAPIMeta } from '@orpc/openapi'
-import { getOpenAPIMeta } from '@orpc/openapi'
-import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
+import { getOpenAPIMeta, openapi } from '@orpc/openapi'
+import { call, createRouterClient, getEventMeta, Lazy, ORPCError, os, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
@@ -108,6 +108,45 @@ describe('toORPCRouter', () => {
     expect(orpcRouter.ping['~orpc'].meta).toEqual({ meta1: 'test' })
     expect(orpcRouter.openapi['~orpc'].meta).toEqual({ '~openapi': { path: '/openapi', description: 'OpenAPI procedure' } })
     expect(getOpenAPIMeta(orpcRouter.openapi)).toEqual({ path: '/openapi', description: 'OpenAPI procedure' })
+  })
+
+  it('keeps meta when used under oRPC .router', async () => {
+    const orpcRouter = toORPCRouter(t.router({
+      ping: t.procedure
+        .meta({ meta1: 'test' })
+        .query(() => 'pong'),
+
+      openapi: t.procedure
+        .meta({ '~openapi': { path: '/openapi' } })
+        .query(() => 'pong'),
+
+      none: t.procedure.query(() => 'pong'),
+
+      lazy: lazy(() => Promise.resolve({ default: t.router({
+        ping: t.procedure
+          .meta({ meta1: 'lazy' })
+          .query(() => 'pong'),
+      }) })),
+    }))
+
+    const router = os
+      .meta(openapi({ tags: ['trpc'] }), { name: 'outer', init: meta => ({ ...meta, outer: true, meta1: 'outer' }) })
+      .router(orpcRouter)
+
+    expect(router.ping['~orpc'].meta).toEqual({ '~openapi': { tags: ['trpc'] }, 'outer': true, 'meta1': 'test' })
+    // tRPC meta merges shallowly, so it overrides the whole `~openapi` meta like chained tRPC `.meta` calls
+    expect(router.openapi['~orpc'].meta).toEqual({ '~openapi': { path: '/openapi' }, 'outer': true, 'meta1': 'outer' })
+    expect(router.none['~orpc'].meta).toEqual({ '~openapi': { tags: ['trpc'] }, 'outer': true, 'meta1': 'outer' })
+
+    expect(router.lazy).toBeInstanceOf(Lazy)
+    const { default: lazyRouter } = await unlazy(router.lazy) as any
+    expect(lazyRouter.ping['~orpc'].meta).toEqual({ '~openapi': { tags: ['trpc'] }, 'outer': true, 'meta1': 'lazy' })
+
+    // applies again when nested under another .router
+    const nested = os.meta({ name: 'nested', init: meta => ({ ...meta, nested: true, meta1: 'nested' }) }).router({ router })
+    expect(nested.router.ping['~orpc'].meta).toEqual({ '~openapi': { tags: ['trpc'] }, 'outer': true, 'nested': true, 'meta1': 'test' })
+
+    await expect(call(router.ping, undefined, { context: { a: 'test' } })).resolves.toEqual('pong')
   })
 
   describe('calls', () => {
