@@ -28,6 +28,13 @@ export const router = {
   nested: {
     static: staticProcedure,
   },
+  rich: os
+    .input(z.object({ ids: z.set(z.number()), tags: z.map(z.string(), z.bigint()), since: z.date() }))
+    .handler(({ input }) => ({
+      ids: [...input.ids],
+      tags: Object.fromEntries([...input.tags].map(([key, value]) => [key, value.toString()])),
+      since: input.since.toISOString(),
+    })),
 }
 
 const handler = new RPCHandler(router)

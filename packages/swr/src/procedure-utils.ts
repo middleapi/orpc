@@ -1,6 +1,6 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
+import type { OperationKey, OperationKeyBaseOptions, OperationKeyOptions } from './key'
 import type {
   Fetcher,
   FetcherOptions,
@@ -14,11 +14,11 @@ import type {
   SubscriberOptions,
 } from './types'
 import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { generateOperationKey } from './key'
+import { deserializeOperationKeyInput, generateOperationKey } from './key'
 import { SharedUtils } from './shared-utils'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
-export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {
+export interface ProcedureUtilsOptions extends OperationKeyBaseOptions {
 }
 
 export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
@@ -48,7 +48,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   ): OperationKey<TInput> {
     const options = resolveMaybeOptionalOptions(rest)
 
-    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix } as OperationKeyOptions<TInput>)
+    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix, serializer: this.options.serializer } as OperationKeyOptions<TInput>)
   }
 
   /**
@@ -62,11 +62,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const options = resolveMaybeOptionalOptions(rest)
 
     return async (key) => {
-      /**
-       * Input can be omitted from the key when it is undefined,
-       * so we can safely cast it to TInput with an undefined fallback.
-       */
-      const { input } = key[key.length - 1] as { input: TInput }
+      const input = deserializeOperationKeyInput(key, this.options.serializer)
 
       return this.call(input, {
         context: {
@@ -92,11 +88,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
       void (async () => {
         try {
-          /**
-           * Input can be omitted from the key when it is undefined,
-           * so we can safely cast it to TInput with an undefined fallback.
-           */
-          const { input } = key[key.length - 1] as { input: TInput }
+          const input = deserializeOperationKeyInput(key, this.options.serializer)
 
           const iterator = await this.call(input, {
             context: {
@@ -194,11 +186,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
       void (async () => {
         try {
-          /**
-           * Input can be omitted from the key when it is undefined,
-           * so we can safely cast it to TInput with an undefined fallback.
-           */
-          const { input } = key[key.length - 1] as { input: TInput }
+          const input = deserializeOperationKeyInput(key, this.options.serializer)
 
           const iterator = await this.call(input, {
             context: {

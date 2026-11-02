@@ -1,3 +1,4 @@
+import { RPCJsonSerializer } from '@orpc/client'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
 
@@ -54,6 +55,16 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, { prefix: '__prefix__' })
     expect(pongUtils.matcher()(['__prefix__', ['key', 'pong'], {}])).toBe(true)
     expect(pongUtils.fetcher()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value)
+  })
+
+  it('passes the serializer to procedure & shared utils', () => {
+    const serializer = new RPCJsonSerializer()
+    const router = { nested: { ping: vi.fn() } } as any
+    const utils = createRouterUtils(router, { serializer }) as any
+
+    expect(utils.nested.matcher({ input: { ids: new Set([1]) } })([['nested'], { input: { ids: [1] }, inputMeta: { '["ids"]': ['set'] } }])).toBe(true)
+    expect(utils.nested.ping).toBeDefined()
+    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, { prefix: undefined, serializer })
   })
 
   it('returns strictly equal utils on repeated access', () => {

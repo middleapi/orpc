@@ -35,19 +35,22 @@ describe('isSubsetOf', () => {
     expect(isSubsetOf([1, 2], [2, 3])).toBe(false)
     expect(isSubsetOf([[1]], [[2]])).toBe(false)
 
-    // Different dates
-    expect(isSubsetOf(new Date(1), new Date(2))).toBe(false)
-    expect(isSubsetOf(new Date(1), new Date('invalid'))).toBe(false)
-    expect(isSubsetOf(new Date(1), 1)).toBe(false)
-
-    // Different instances of other non-plain objects
+    // Non-JSON values are compared by reference, since keys are compared in their serialized form
+    expect(isSubsetOf(new Date(1), new Date(1))).toBe(false)
+    expect(isSubsetOf(new Set([1]), new Set([1]))).toBe(false)
+    expect(isSubsetOf(new Map([[1, 1]]), new Map([[1, 1]]))).toBe(false)
     expect(isSubsetOf(new URL('https://orpc.dev'), new URL('https://orpc.dev'))).toBe(false)
   })
 
-  it('compares dates by time, like SWR hashes keys', () => {
-    expect(isSubsetOf(new Date(1), new Date(1))).toBe(true)
-    expect(isSubsetOf(new Date('invalid'), new Date('invalid'))).toBe(true)
-    expect(isSubsetOf({ since: new Date(1) }, { since: new Date(1), limit: 10 })).toBe(true)
-    expect(isSubsetOf([new Date(1)], [new Date(1), new Date(2)])).toBe(true)
+  it('compares serialized keys', () => {
+    expect(isSubsetOf(
+      { input: { ids: [1] }, inputMeta: { '["ids"]': ['set'] } },
+      { input: { ids: [1, 2], since: '2024-01-01T00:00:00.000Z' }, inputMeta: { '["ids"]': ['set'], '["since"]': ['date'] } },
+    )).toBe(true)
+
+    expect(isSubsetOf(
+      { input: { value: '1' }, inputMeta: { '["value"]': ['bigint'] } },
+      { input: { value: '1' } },
+    )).toBe(false)
   })
 })

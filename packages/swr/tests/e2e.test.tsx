@@ -56,6 +56,44 @@ it('case: useSWR & mutate & useSWRMutation', async () => {
   expect(fetcher).toHaveBeenCalledTimes(4)
 })
 
+it('case: useSWR & mutate with Set, Map, BigInt and Date inputs', async () => {
+  const fetcher = vi.fn(orpc.rich.fetcher())
+  const createInput = () => ({ ids: new Set([1, 2]), tags: new Map([['a', 1n]]), since: new Date('2024-01-01') })
+
+  const { result, rerender } = renderHook(() => useSWR(
+    // a new key with new Set/Map/Date instances on every render
+    orpc.rich.key({ input: createInput() }),
+    fetcher,
+  ))
+
+  await act(async () => {
+    await vi.waitFor(() => expect(result.current.data).toEqual({ ids: [1, 2], tags: { a: '1' }, since: '2024-01-01T00:00:00.000Z' }))
+  })
+
+  rerender()
+  rerender()
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 10))
+  })
+  expect(fetcher).toHaveBeenCalledTimes(1)
+
+  await act(async () => {
+    await mutate(orpc.rich.matcher({ input: createInput(), strategy: 'exact' }))
+  })
+  expect(fetcher).toHaveBeenCalledTimes(2)
+
+  await act(async () => {
+    await mutate(orpc.rich.matcher({ input: { ids: new Set([1]) } }))
+  })
+  expect(fetcher).toHaveBeenCalledTimes(3)
+
+  await act(async () => {
+    await mutate(orpc.rich.matcher({ input: { since: new Date('2024-01-02') } }))
+  })
+  // not matched - no invalidate happens
+  expect(fetcher).toHaveBeenCalledTimes(3)
+})
+
 it('case: useSWRInfinite', async () => {
   const { result } = renderHook(() => {
     const swr = useSWRInfinite(

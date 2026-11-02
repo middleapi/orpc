@@ -1,5 +1,6 @@
 export type {
   OperationKey,
+  OperationKeyBaseOptions,
   OperationKeyOptions,
   OperationKeyPrefixOptions,
 } from './key'

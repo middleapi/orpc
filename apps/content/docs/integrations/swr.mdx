@@ -56,6 +56,14 @@ const { data, error, isLoading } = useSWR(
 )
 ```
 
+### Key Serializer
+
+oRPC serializes inputs with the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer) when building keys, and restores them in `.fetcher`, `.subscriber`, and `.liveSubscriber`. This lets SWR cache, deduplicate, and [match](#manual-revalidation) inputs like `Date`, `BigInt`, `Set`, and `Map` by value. It also gives a `BigInt` and a number different keys, and a `Date` and its ISO string different keys. If your link uses a custom [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer), pass it here too, so custom types get the same support:
+
+```ts
+const orpc = createSWRUtils(client, { serializer })
+```
+
 ## Infinite Queries
 
 Use `.key` and `.fetcher` methods to configure `useSWRInfinite` for infinite queries:

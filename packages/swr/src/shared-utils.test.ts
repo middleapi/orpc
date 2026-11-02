@@ -1,3 +1,5 @@
+import { RPCJsonSerializer } from '@orpc/client'
+import { generateOperationKey } from './key'
 import { SharedUtils } from './shared-utils'
 
 describe('sharedUtils', () => {
@@ -19,12 +21,59 @@ describe('sharedUtils', () => {
       expect(utils.matcher({ strategy: 'exact', input: { value1: 'test' } })([['invalid'], { input: { value1: 'test' } }])).toBe(false)
     })
 
-    it('matches dates in the input by time', () => {
-      const key = [['test', 'path'], { input: { since: new Date('2024-01-01') } }]
+    describe.each<[string, () => unknown, () => unknown, () => unknown]>([
+      ['Set', () => ({ ids: new Set([1, 2]) }), () => ({ ids: new Set([1]) }), () => ({ ids: new Set([2]) })],
+      ['Map', () => ({ map: new Map([['a', 1], ['b', 2]]) }), () => ({ map: new Map([['a', 1]]) }), () => ({ map: new Map([['a', 2]]) })],
+      ['BigInt', () => ({ value: 1n, other: 1 }), () => ({ value: 1n }), () => ({ value: 2n })],
+      ['Date', () => ({ since: new Date('2024-01-01'), other: 1 }), () => ({ since: new Date('2024-01-01') }), () => ({ since: new Date('2024-01-02') })],
+    ])('%s input', (_, create, createPartial, createDifferent) => {
+      const key = generateOperationKey(['test', 'path'], { input: create() })
 
-      expect(utils.matcher({ input: { since: new Date('2024-01-01') } })(key)).toBe(true)
-      expect(utils.matcher({ strategy: 'exact', input: { since: new Date('2024-01-01') } })(key)).toBe(true)
-      expect(utils.matcher({ input: { since: new Date('2024-01-02') } })(key)).toBe(false)
+      it('strategy=exact matches an equal input', () => {
+        expect(utils.matcher({ strategy: 'exact', input: create() })(key)).toBe(true)
+        expect(utils.matcher({ strategy: 'exact', input: createPartial() })(key)).toBe(false)
+        expect(utils.matcher({ strategy: 'exact', input: createDifferent() })(key)).toBe(false)
+      })
+
+      it('strategy=partial matches equal and partial inputs', () => {
+        expect(utils.matcher({ input: create() })(key)).toBe(true)
+        expect(utils.matcher({ input: createPartial() })(key)).toBe(true)
+        expect(utils.matcher({ input: createDifferent() })(key)).toBe(false)
+      })
+    })
+
+    it('does not match values that only share a JSON form', () => {
+      const bigintKey = generateOperationKey(['test', 'path'], { input: { value: 1n } })
+      const numberKey = generateOperationKey(['test', 'path'], { input: { value: 1 } })
+      const dateKey = generateOperationKey(['test', 'path'], { input: { since: new Date('2024-01-01') } })
+
+      expect(utils.matcher({ input: { value: 1 } })(bigintKey)).toBe(false)
+      expect(utils.matcher({ input: { value: 1n } })(numberKey)).toBe(false)
+      expect(utils.matcher({ strategy: 'exact', input: { value: '1' } })(bigintKey)).toBe(false)
+      expect(utils.matcher({ strategy: 'exact', input: { since: '2024-01-01T00:00:00.000Z' } })(dateKey)).toBe(false)
+    })
+
+    it('uses the serializer option', () => {
+      class Point {
+        constructor(public x: number, public y: number) {}
+      }
+
+      const serializer = new RPCJsonSerializer({
+        handlers: {
+          point: {
+            condition: (value: unknown) => value instanceof Point,
+            serialize: (value: Point) => [value.x, value.y],
+            deserialize: ([x, y]: [number, number]) => new Point(x, y),
+            isTerminal: true,
+          },
+        },
+      })
+
+      const serializerUtils = new SharedUtils<{ at: Point }>(['test', 'path'], { serializer })
+      const key = generateOperationKey(['test', 'path'], { serializer, input: { at: new Point(1, 2) } })
+
+      expect(serializerUtils.matcher({ strategy: 'exact', input: { at: new Point(1, 2) } })(key)).toBe(true)
+      expect(serializerUtils.matcher({ strategy: 'exact', input: { at: new Point(1, 3) } })(key)).toBe(false)
     })
 
     it('with prefix', () => {

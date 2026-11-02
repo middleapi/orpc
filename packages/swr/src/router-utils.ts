@@ -1,6 +1,6 @@
 import type { AnyNestedClient, Client } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { OperationKeyPrefixOptions } from './key'
+import type { OperationKeyBaseOptions } from './key'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, isTypescriptObject, toArray } from '@orpc/shared'
 import { ProcedureUtils } from './procedure-utils'
@@ -13,7 +13,7 @@ export type RouterUtils<T extends AnyNestedClient>
       [K in keyof T]: T[K] extends AnyNestedClient ? RouterUtils<T[K]> : never
     } & Public<SharedUtils<unknown>>
 
-export interface RouterUtilsOptions extends OperationKeyPrefixOptions {
+export interface RouterUtilsOptions extends OperationKeyBaseOptions {
   /**
    * Base path for all keys.
    *
@@ -38,8 +38,8 @@ export function createRouterUtils<T extends AnyNestedClient>(
   const path = toArray(options.path)
 
   const utils = typeof client === 'function'
-    ? bindMethods(new ProcedureUtils(path, client, { prefix: options.prefix }), { unbound: ['call'] })
-    : bindMethods(new SharedUtils(path, { prefix: options.prefix }))
+    ? bindMethods(new ProcedureUtils(path, client, { prefix: options.prefix, serializer: options.serializer }), { unbound: ['call'] })
+    : bindMethods(new SharedUtils(path, { prefix: options.prefix, serializer: options.serializer }))
 
   const cache = new Map<string, unknown>()
 
