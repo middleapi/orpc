@@ -3,6 +3,7 @@ import type { IntersectPick } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { Middleware } from './middleware'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
+import { getMiddlewareMetaPluginsToApply } from './middleware-decorated'
 import { Procedure } from './procedure'
 
 export class DecoratedProcedure<
@@ -79,8 +80,9 @@ export class DecoratedProcedure<
       }],
     })
 
-    if (middleware['~orpc']?.metaPlugins) {
-      procedure = procedure.meta(...middleware['~orpc']?.metaPlugins) as any
+    const plugins = getMiddlewareMetaPluginsToApply(middleware, this['~orpc'].metaPlugins)
+    if (plugins.length) {
+      procedure = procedure.meta(...plugins) as any
     }
 
     return procedure as any

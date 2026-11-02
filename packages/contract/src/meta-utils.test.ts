@@ -86,9 +86,35 @@ describe('resolveAugmentedMetaPlugins', () => {
     expect(plugin1.init).not.toHaveBeenCalled()
   })
 
+  it('dedupes one occurrence of each shared plugin included in the router plugins', () => {
+    // not a leading prefix, but shared (e.g. carried by a deduped middleware)
+    expect(resolveAugmentedMetaPlugins({ p2: [2], p1: [1] }, [plugin2, plugin1], [plugin1], {}, [plugin1]))
+      .toEqual([{ p2: [2], p1: [1] }, [plugin2, plugin1]])
+
+    expect(resolveAugmentedMetaPlugins({ p2: [2], p1: [1] }, [plugin2, plugin1], [plugin3, plugin1], {}, [plugin1, plugin1]))
+      .toEqual([{ p2: [2], p1: [1], p3: true }, [plugin2, plugin1, plugin3]])
+
+    // only one occurrence is skipped
+    expect(resolveAugmentedMetaPlugins({ p2: [2], p1: [1] }, [plugin2, plugin1], [plugin1, plugin1], {}, [plugin1]))
+      .toEqual([{ p2: [2], p1: [1, 1] }, [plugin2, plugin1, plugin1]])
+
+    // already skipped as part of the leading prefix
+    expect(resolveAugmentedMetaPlugins({ p1: [1] }, [plugin1], [plugin1, plugin1], {}, [plugin1]))
+      .toEqual([{ p1: [1, 1] }, [plugin1, plugin1]])
+
+    // not applied at the router level, so it must still be applied
+    expect(resolveAugmentedMetaPlugins({ p2: [2] }, [plugin2], [plugin1], {}, [plugin1]))
+      .toEqual([{ p2: [2], p1: [1] }, [plugin2, plugin1]])
+  })
+
   it('does not dedupe when dedupeLeadingMetaPlugins is disabled', () => {
     expect(resolveAugmentedMetaPlugins({ p1: [1] }, [plugin1], [plugin1, plugin3], { dedupeLeadingMetaPlugins: false }))
       .toEqual(resolveMetaPlugins({ p1: [1] }, [plugin1], [plugin1, plugin3]))
+  })
+
+  it('does not dedupe shared plugins when dedupeLeadingMetaPlugins is disabled', () => {
+    expect(resolveAugmentedMetaPlugins({ p2: [2], p1: [1] }, [plugin2, plugin1], [plugin1], { dedupeLeadingMetaPlugins: false }, [plugin1]))
+      .toEqual(resolveMetaPlugins({ p2: [2], p1: [1] }, [plugin2, plugin1], [plugin1]))
   })
 
   it('resolves like resolveMetaPlugins when no leading plugins are shared', () => {

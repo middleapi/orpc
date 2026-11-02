@@ -222,6 +222,43 @@ describe('builder', () => {
         ],
       })
     })
+
+    it('skips meta plugins the builder already has', () => {
+      const existing = builder['~orpc'].metaPlugins![0]!
+      const middleware: any = vi.fn()
+      middleware['~orpc'] = { metaPlugins: [existing, metaPlugin, metaPlugin] }
+
+      builder.use(middleware)
+
+      expect(resolveMetaPluginsSpy).toHaveBeenCalledOnce()
+      expect(resolveMetaPluginsSpy).toHaveBeenCalledWith(
+        builder['~orpc'].meta,
+        builder['~orpc'].metaPlugins,
+        [metaPlugin],
+      )
+    })
+
+    it('does not resolve meta when every meta plugin is already applied', () => {
+      const middleware: any = vi.fn()
+      middleware['~orpc'] = { metaPlugins: [...builder['~orpc'].metaPlugins!] }
+
+      const applied = builder.use(middleware)
+
+      expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+      expect(applied['~orpc'].meta).toBe(builder['~orpc'].meta)
+      expect(applied['~orpc'].metaPlugins).toBe(builder['~orpc'].metaPlugins)
+    })
+
+    it('does not re-apply builder meta plugins embedded by .middleware', () => {
+      const plugin = { name: 'counter', init: (meta: any) => ({ ...meta, count: (meta.count ?? 0) + 1 }) }
+      const base = os.meta(plugin)
+      const mid = base.middleware(({ next }) => next())
+
+      const applied = base.use(mid).handler(() => 1)
+
+      expect(applied['~orpc'].meta).toEqual({ count: 1 })
+      expect(applied['~orpc'].metaPlugins).toEqual([plugin])
+    })
   })
 
   describe('.middleware', () => {

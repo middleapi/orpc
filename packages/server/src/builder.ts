@@ -10,7 +10,7 @@ import type { AugmentedRouter } from './router-utils'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
 import { toArray } from '@orpc/shared'
 import { Lazy } from './lazy'
-import { decorateMiddleware } from './middleware-decorated'
+import { decorateMiddleware, getMiddlewareMetaPluginsToApply } from './middleware-decorated'
 import { DecoratedProcedure } from './procedure-decorated'
 import { augmentRouter } from './router-utils'
 
@@ -192,8 +192,9 @@ export class Builder<
       }],
     })
 
-    if (middleware['~orpc']?.metaPlugins) {
-      builder = builder.meta(...middleware['~orpc']?.metaPlugins) as any
+    const plugins = getMiddlewareMetaPluginsToApply(middleware, this['~orpc'].metaPlugins)
+    if (plugins.length) {
+      builder = builder.meta(...plugins) as any
     }
 
     return builder as any

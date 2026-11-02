@@ -138,6 +138,8 @@ describe('augmentRouter', () => {
       options.metaPlugins,
       original['~orpc'].metaPlugins,
       options,
+      // router-level middlewares are not deduped here
+      undefined,
     )
     expect(actual['~orpc']).toEqual({
       disableOutputValidation: true,
@@ -274,6 +276,67 @@ describe('augmentRouter', () => {
         ...dedupeProcedure['~orpc'].orderedMiddlewares,
       ])
       expect(augmented['~orpc'].metaPlugins).toEqual([dedupePlugin2, dedupePlugin1, dedupePlugin2])
+    })
+
+    it('dedupes meta plugins carried by deduped middlewares', () => {
+      const mid: any = vi.fn()
+      mid['~orpc'] = { metaPlugins: [dedupePlugin1] }
+
+      const procedure = new Procedure({
+        ...dedupeProcedure['~orpc'],
+        meta: { plugin1: [1] },
+        metaPlugins: [dedupePlugin1],
+        orderedMiddlewares: middlewareEntries([mid]) as any,
+      })
+
+      // router-level plugins [plugin2, plugin1] do not start with the procedure's [plugin1]
+      const options = {
+        errorMap: {},
+        meta: { plugin1: [1], plugin2: true },
+        metaPlugins: [dedupePlugin2, dedupePlugin1],
+        middlewares: [mid],
+      }
+
+      const augmented = augmentRouter(procedure, options)
+
+      expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledWith(
+        options.meta,
+        options.metaPlugins,
+        procedure['~orpc'].metaPlugins,
+        options,
+        [dedupePlugin1],
+      )
+      expect(augmented['~orpc'].orderedMiddlewares).toEqual(procedure['~orpc'].orderedMiddlewares)
+      expect(augmented['~orpc'].metaPlugins).toEqual([dedupePlugin2, dedupePlugin1])
+      expect(augmented['~orpc'].meta).toEqual({ plugin1: [1], plugin2: true })
+    })
+
+    it('does not dedupe meta plugins carried by middlewares that are not deduped', () => {
+      const mid: any = vi.fn()
+      mid['~orpc'] = { metaPlugins: [dedupePlugin1] }
+
+      const procedure = new Procedure({
+        ...dedupeProcedure['~orpc'],
+        meta: { plugin1: [1] },
+        metaPlugins: [dedupePlugin1],
+        orderedMiddlewares: middlewareEntries([dedupeMid2, mid]) as any,
+      })
+
+      const options = {
+        errorMap: {},
+        meta: { plugin1: [1], plugin2: true },
+        metaPlugins: [dedupePlugin2, dedupePlugin1],
+        middlewares: [mid],
+      }
+
+      const augmented = augmentRouter(procedure, options)
+
+      expect(augmented['~orpc'].orderedMiddlewares).toEqual([
+        ...middlewareEntries([mid]),
+        ...procedure['~orpc'].orderedMiddlewares,
+      ])
+      expect(augmented['~orpc'].metaPlugins).toEqual([dedupePlugin2, dedupePlugin1, dedupePlugin1])
+      expect(augmented['~orpc'].meta).toEqual({ plugin1: [1, 1], plugin2: true })
     })
 
     it('does not dedupe middlewares when dedupeLeadingMiddlewares is disabled', () => {

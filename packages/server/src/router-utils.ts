@@ -8,7 +8,7 @@ import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, OrderedMiddleware } from './procedure'
 import type { AnyRouter } from './router'
 import { mergeErrorMap, ProcedureContract, resolveAugmentedMetaPlugins } from '@orpc/contract'
-import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
+import { getOwn, isTypescriptObject, omit, toArray } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { createContractProcedure } from './procedure-utils'
@@ -132,11 +132,18 @@ export function augmentRouter<
   }
 
   if (router instanceof Procedure) {
+    const orderedMiddlewares = mergeRouterMiddlewares(options.middlewares, router['~orpc'].orderedMiddlewares, options)
+
     const [meta, metaPlugins] = resolveAugmentedMetaPlugins(
       options.meta,
       options.metaPlugins,
       router['~orpc'].metaPlugins,
       options,
+      // router-level middlewares deduped from the procedure's chain carry meta plugins
+      // that the router-level meta already includes, so don't apply them again
+      orderedMiddlewares === router['~orpc'].orderedMiddlewares
+        ? options.middlewares.flatMap(middleware => toArray(middleware['~orpc']?.metaPlugins))
+        : undefined,
     )
 
     const enhanced = new Procedure({
@@ -145,7 +152,7 @@ export function augmentRouter<
       meta,
       metaPlugins,
       errorMap: mergeErrorMap(options.errorMap, router['~orpc'].errorMap),
-      orderedMiddlewares: mergeRouterMiddlewares(options.middlewares, router['~orpc'].orderedMiddlewares, options),
+      orderedMiddlewares,
     })
 
     return enhanced as any

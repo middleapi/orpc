@@ -37,10 +37,14 @@ export function resolveMetaPlugins<
 /**
  * Resolves the metadata of a procedure (or lazy router) when a router-level builder
  * applies its own metadata plugins to it. Behaves like {@link resolveMetaPlugins},
- * except that the leading target plugins shared with the router-level plugins
- * (for example, both are built from the same base builder) are already included
- * in `routerMeta`, so they are deduplicated instead of being applied again,
- * unless `config.dedupeLeadingMetaPlugins` is `false`.
+ * except that target plugins already included in `routerMeta` are deduplicated
+ * instead of being applied again, unless `config.dedupeLeadingMetaPlugins` is `false`:
+ *
+ * - The leading target plugins shared with the router-level plugins
+ *   (for example, both are built from the same base builder).
+ * - One occurrence of each of `sharedPlugins` that is also a router-level plugin
+ *   (for example, the plugins of router-level middlewares that were deduplicated
+ *   from the procedure's middleware chain).
  */
 export function resolveAugmentedMetaPlugins<
   TInputSchema extends AnySchema,
@@ -51,16 +55,35 @@ export function resolveAugmentedMetaPlugins<
   routerPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
   targetPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
   config: Pick<ContractBuilderConfig, 'dedupeLeadingMetaPlugins'>,
+  sharedPlugins?: readonly MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
 ): [meta: Meta, plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]] {
   routerPlugins = toArray(routerPlugins)
   targetPlugins = toArray(targetPlugins)
 
+  if (!(config.dedupeLeadingMetaPlugins ?? true)) {
+    return resolveMetaPlugins(routerMeta, routerPlugins, targetPlugins)
+  }
+
   let shared = 0
-  while ((config.dedupeLeadingMetaPlugins ?? true) && shared < routerPlugins.length && routerPlugins[shared] === targetPlugins[shared]) {
+  while (shared < routerPlugins.length && routerPlugins[shared] === targetPlugins[shared]) {
     shared++
   }
 
-  return resolveMetaPlugins(routerMeta, routerPlugins, targetPlugins.slice(shared))
+  const leadingPlugins = targetPlugins.slice(0, shared)
+  const remainingPlugins = targetPlugins.slice(shared)
+
+  for (const plugin of new Set(sharedPlugins)) {
+    if (!routerPlugins.includes(plugin) || leadingPlugins.includes(plugin)) {
+      continue
+    }
+
+    const index = remainingPlugins.indexOf(plugin)
+    if (index !== -1) {
+      remainingPlugins.splice(index, 1)
+    }
+  }
+
+  return resolveMetaPlugins(routerMeta, routerPlugins, remainingPlugins)
 }
 
 /**

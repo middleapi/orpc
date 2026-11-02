@@ -41,6 +41,28 @@ describe('auto dedupe', () => {
     expect(getOpenAPIMeta(router.ping)).toEqual(expect.objectContaining({ tags: ['users'], prefix: '/api', path: '/ping' }))
   })
 
+  it('builder: does not re-apply builder meta plugins embedded in a middleware created from it', () => {
+    const base = os.meta(openapi({ tags: ['users'], prefix: '/api' }))
+    const mid = base.middleware(({ next }) => next())
+
+    expect(getOpenAPIMeta(base.use(mid).handler(() => 'pong'))).toEqual(expect.objectContaining({ tags: ['users'], prefix: '/api' }))
+    expect(getOpenAPIMeta(base.handler(() => 'pong').use(mid))).toEqual(expect.objectContaining({ tags: ['users'], prefix: '/api' }))
+  })
+
+  it('builder: applies meta plugins of a deduped middleware once', async () => {
+    const auth = vi.fn(({ next }) => next())
+    const authMiddleware = os.meta(openapi({ tags: ['auth'], prefix: '/auth' })).middleware(auth)
+
+    const router = os.meta(openapi({ prefix: '/api' })).use(authMiddleware).router({
+      ping: os.use(authMiddleware).handler(() => 'pong'),
+    })
+
+    expect(getOpenAPIMeta(router.ping)).toEqual(expect.objectContaining({ tags: ['auth'], prefix: '/api/auth' }))
+
+    await call(router.ping, undefined)
+    expect(auth).toHaveBeenCalledTimes(1)
+  })
+
   it('builder: still runs middleware applied in a different position', async () => {
     const auth = vi.fn(({ next }) => next())
     const other = vi.fn(({ next }) => next())

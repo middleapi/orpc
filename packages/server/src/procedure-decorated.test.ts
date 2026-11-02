@@ -184,5 +184,35 @@ describe('decoratedProcedure', () => {
         ],
       })
     })
+
+    it('skips meta plugins the procedure already has', () => {
+      const existing = procedure['~orpc'].metaPlugins![0]!
+      const middleware: AnyMiddleware = ({ next }) => next()
+      middleware['~orpc'] = {
+        metaPlugins: [existing, metaPlugin, metaPlugin],
+      }
+
+      procedure.use(middleware)
+
+      expect(resolveMetaPluginsSpy).toHaveBeenCalledOnce()
+      expect(resolveMetaPluginsSpy).toHaveBeenCalledWith(
+        procedure['~orpc'].meta,
+        procedure['~orpc'].metaPlugins,
+        [metaPlugin],
+      )
+    })
+
+    it('does not resolve meta when every meta plugin is already applied', () => {
+      const middleware: AnyMiddleware = ({ next }) => next()
+      middleware['~orpc'] = {
+        metaPlugins: [...procedure['~orpc'].metaPlugins!],
+      }
+
+      const applied = procedure.use(middleware)
+
+      expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+      expect(applied['~orpc'].meta).toBe(procedure['~orpc'].meta)
+      expect(applied['~orpc'].metaPlugins).toBe(procedure['~orpc'].metaPlugins)
+    })
   })
 })

@@ -1,9 +1,24 @@
-import type { ErrorMap, MergedErrorMap } from '@orpc/contract'
+import type { AnyMetaPlugin, ErrorMap, MergedErrorMap } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { AnyMiddleware, Middleware, MiddlewareNextOptions, MiddlewareResult } from './middleware'
 import { mergeErrorMap } from '@orpc/contract'
 import { toArray } from '@orpc/shared'
+
+/**
+ * Returns the meta plugins of a middleware that `.use` should apply to a builder
+ * or procedure, skipping (by identity) the plugins the target already has.
+ * A middleware created with `builder.middleware` embeds the builder's plugins,
+ * so using it on that builder must not apply them again.
+ */
+export function getMiddlewareMetaPluginsToApply(
+  middleware: AnyMiddleware,
+  existingPlugins: readonly AnyMetaPlugin[] | undefined,
+): AnyMetaPlugin[] {
+  const existing = new Set(existingPlugins)
+
+  return [...new Set(middleware['~orpc']?.metaPlugins)].filter(plugin => !existing.has(plugin))
+}
 
 export interface DecoratedMiddleware<
   TInContext extends Context,
