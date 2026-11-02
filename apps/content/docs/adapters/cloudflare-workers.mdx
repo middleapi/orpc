@@ -79,7 +79,15 @@ export default {
 
 ## Compatibility Flags
 
-oRPC forwards `request.signal` to every procedure call so handlers can stop work when the client disconnects. Workers only abort that signal when the [`enable_request_signal`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests) flag is set, so add it to your Wrangler configuration:
+oRPC forwards `request.signal` to every procedure call so handlers can stop work when the client disconnects. Workers abort that signal by default when your `compatibility_date` is `2026-11-17` or later:
+
+```jsonc title="wrangler.jsonc"
+{
+  "compatibility_date": "2026-11-17"
+}
+```
+
+If your `compatibility_date` is before `2026-11-17`, add the [`enable_request_signal`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests) flag instead:
 
 ```jsonc title="wrangler.jsonc"
 {
