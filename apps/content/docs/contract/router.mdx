@@ -47,15 +47,10 @@ const router = oc.meta(requireAuthMeta).router({
 
 When the router and its procedure contracts are built from the same base builder, the metadata plugins they share are applied only once, so accumulating metadata, such as OpenAPI `tags` and `prefix`, is not doubled:
 
-```ts twoslash
-import { z } from 'zod'
-// ---cut---
-import { oc } from '@orpc/contract'
-import { openapi } from '@orpc/openapi'
-
+```ts
 const base = oc.meta(openapi({ tags: ['planets'], prefix: '/planets' }))
 
-export const router = base.router({
+const router = base.router({
   // tags stays ['planets'] and prefix stays '/planets'
   list: base.output(z.array(z.string())),
 })
