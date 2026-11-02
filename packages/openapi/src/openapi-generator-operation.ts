@@ -288,10 +288,12 @@ function renderQueryParameters(
       delete parameter.allowReserved
     }
     else if (style === undefined) {
-      if (flattenJsonUnionSchema(schema).some(s => !isJsonPrimitiveSchema(s))) {
+      const isPrimitive = (s: JsonSchema) => isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(s))
+
+      if (!flattenJsonUnionSchema(schema).every(isPrimitive)) {
         const arrayable = matchArrayableJsonSchema(schema)
 
-        if (!arrayable || flattenJsonUnionSchema(arrayable[0]).some(s => !isJsonPrimitiveSchema(s))) {
+        if (!arrayable || !flattenJsonUnionSchema(arrayable[0]).every(isPrimitive)) {
           parameter.style = 'deepObject'
           parameter.explode = true
         }
@@ -628,12 +630,13 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
   const fileSchemasByMediaType = new Map<string, JsonSchema[]>()
 
   const rest = flattenJsonUnionSchema(schema).filter((s) => {
-    if (!isJsonFileSchema(s)) {
+    // classify by the ref target, but keep `s` itself so component refs are preserved
+    const resolved = resolveJsonSchemaRootLocalRef(s)
+    if (!isJsonFileSchema(resolved)) {
       return !isUnconstrainedSchema(s)
     }
 
-    const resolved = resolveJsonSchemaRootLocalRef(s)
-    const contentMediaType = (typeof resolved === 'object' ? resolved.contentMediaType : undefined) ?? '*/*'
+    const contentMediaType = resolved.contentMediaType ?? '*/*'
     const schemas = fileSchemasByMediaType.get(contentMediaType)
     if (schemas) {
       schemas.push(s)

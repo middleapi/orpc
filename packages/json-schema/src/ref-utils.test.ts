@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef, visitJsonSchemaRefs } from './ref-utils'
+import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaLocalPointer, resolveJsonSchemaRootLocalRef, visitJsonSchemaRefs } from './ref-utils'
 
 describe('visitJsonSchemaRefs', () => {
   it('visits refs under the same keywords mapJsonSchemaRefs rewrites, and skips non-schema keywords', () => {
@@ -66,6 +66,26 @@ describe('json pointer utils', () => {
   it('encodes and decodes JSON pointer segments', () => {
     expect(encodeJsonPointerSegment('a~/b')).toBe('a~0~1b')
     expect(decodeJsonPointerSegment('a~0~1b')).toBe('a~/b')
+  })
+})
+
+describe('resolveJsonSchemaLocalPointer', () => {
+  const root: JsonSchema = {
+    type: 'object',
+    properties: { 'a/b': { type: 'string' } },
+    $defs: { User: { type: 'object' } },
+  }
+
+  it('resolves root and absolute local pointers', () => {
+    expect(resolveJsonSchemaLocalPointer(root, '#')).toBe(root)
+    expect(resolveJsonSchemaLocalPointer(root, '#/$defs/User')).toEqual({ type: 'object' })
+    expect(resolveJsonSchemaLocalPointer(root, '#/properties/a~1b')).toEqual({ type: 'string' })
+  })
+
+  it('returns undefined for missing targets and non-local refs', () => {
+    expect(resolveJsonSchemaLocalPointer(root, '#/$defs/Missing')).toBeUndefined()
+    expect(resolveJsonSchemaLocalPointer(root, 'https://example.com/schema')).toBeUndefined()
+    expect(resolveJsonSchemaLocalPointer(root, '#anchor')).toBeUndefined()
   })
 })
 

@@ -4,17 +4,14 @@
  */
 
 import type { JsonSchema } from './types'
-import { get } from '@orpc/shared'
 import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
-import { decodeJsonPointerSegment, resolveJsonSchemaRootLocalRef } from './ref-utils'
+import { resolveJsonSchemaLocalPointer } from './ref-utils'
 
 /**
  * Returns true when the schema describes a primitive value (a primitive `type`, `const`, or `enum`).
- * A root-level local `$ref` is resolved against the schema's own `$defs` first.
+ * `$ref`s are not followed: resolve them first, e.g. with `resolveJsonSchemaRootLocalRef`.
  */
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
-  schema = resolveJsonSchemaRootLocalRef(schema)
-
   if (typeof schema === 'boolean') {
     return false
   }
@@ -38,14 +35,9 @@ export type JsonFileSchema = JsonSchema & object & { type: 'string', contentMedi
 
 /**
  * Returns true when the schema is a file-like string schema.
- * A root-level local `$ref` is resolved against the schema's own `$defs` first,
- * so read file details (like `contentMediaType`) from the resolved schema.
+ * `$ref`s are not followed: resolve them first, e.g. with `resolveJsonSchemaRootLocalRef`.
  */
-export function isJsonFileSchema(schema: JsonSchema): boolean {
-  return isJsonFileSchemaShape(resolveJsonSchemaRootLocalRef(schema))
-}
-
-function isJsonFileSchemaShape(schema: JsonSchema): schema is JsonFileSchema {
+export function isJsonFileSchema(schema: JsonSchema): schema is JsonFileSchema {
   return typeof schema !== 'boolean' && schema.type === 'string' && (typeof schema.contentMediaType === 'string' || schema.format === 'binary' || schema.contentEncoding === 'binary')
 }
 
@@ -54,7 +46,7 @@ function isJsonFileSchemaShape(schema: JsonSchema): schema is JsonFileSchema {
  * Definitions are only inspected when a `$ref` reaches them, so unused `$defs` entries are ignored.
  */
 export function containsJsonFileSchema(schema: JsonSchema): boolean {
-  const followedRefs = new Set<string>()
+  // shared targets and recursive refs resolve to already seen objects, which ends the walk
   const seen = new Set<object>()
 
   const visit = (value: unknown, schemaLevel: boolean): boolean => {
@@ -70,37 +62,26 @@ export function containsJsonFileSchema(schema: JsonSchema): boolean {
 
     const record = value as Record<string, unknown>
 
-    if (schemaLevel) {
-      if (isJsonFileSchemaShape(record as JsonSchema)) {
-        return true
-      }
-
-      const ref = record.$ref
-      if (typeof ref === 'string' && (ref === '#' || ref.startsWith('#/')) && !followedRefs.has(ref)) {
-        followedRefs.add(ref)
-
-        const target = ref === '#' ? schema : get(schema, ref.slice(2).split('/').map(decodeJsonPointerSegment))
-        if (visit(target, true)) {
-          return true
-        }
-      }
+    if (schemaLevel && isJsonFileSchema(record as JsonSchema)) {
+      return true
     }
 
-    for (const key of Object.keys(record)) {
+    return Object.keys(record).some((key) => {
+      const val = record[key]
+
+      if (key === '$ref' && typeof val === 'string') {
+        return visit(resolveJsonSchemaLocalPointer(schema, val), true)
+      }
+
       if (!schemaLevel) {
-        if (visit(record[key], true)) {
-          return true
-        }
+        return visit(val, true)
       }
-      // definitions are only reachable through refs
-      else if (key !== '$defs' && (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key))) {
-        if (visit(record[key], !JSON_SCHEMA_RECORD_KEYWORDS.has(key))) {
-          return true
-        }
-      }
-    }
 
-    return false
+      // definitions are only reachable through refs
+      return key !== '$defs'
+        && (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key))
+        && visit(val, !JSON_SCHEMA_RECORD_KEYWORDS.has(key))
+    })
   }
 
   return visit(schema, true)

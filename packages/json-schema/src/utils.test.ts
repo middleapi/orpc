@@ -14,17 +14,6 @@ it('isJsonPrimitiveSchema', () => {
   expect(isJsonPrimitiveSchema({ description: 'primitive union', anyOf: [{ type: 'number' }, { oneOf: [{ type: 'boolean' }, { const: 'x' }] }] })).toBe(false)
 })
 
-it('isJsonPrimitiveSchema resolves root local refs', () => {
-  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Status', $defs: { Status: { type: 'string', enum: ['a', 'b'] } } })).toBe(true)
-  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/B' }, B: { const: 1 } } })).toBe(true)
-
-  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Obj', $defs: { Obj: { type: 'object' } } })).toBe(false)
-  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Missing', $defs: {} })).toBe(false)
-  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/Status' })).toBe(false)
-  // recursive refs terminate
-  expect(isJsonPrimitiveSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } } })).toBe(false)
-})
-
 it('isJsonFileSchema', () => {
   expect(isJsonFileSchema({ type: 'string', contentMediaType: 'image/png' })).toBe(true)
   expect(isJsonFileSchema({ type: 'string', format: 'binary' })).toBe(true)
@@ -36,16 +25,6 @@ it('isJsonFileSchema', () => {
   expect(isJsonFileSchema({ type: 'object', format: 'binary' })).toBe(false)
   expect(isJsonFileSchema({ type: 'object', contentEncoding: 'binary' })).toBe(false)
   expect(isJsonFileSchema(true)).toBe(false)
-})
-
-it('isJsonFileSchema resolves root local refs', () => {
-  expect(isJsonFileSchema({ $ref: '#/$defs/File', $defs: { File: { type: 'string', format: 'binary' } } })).toBe(true)
-  expect(isJsonFileSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/File' }, File: { type: 'string', contentMediaType: 'image/png' } } })).toBe(true)
-
-  expect(isJsonFileSchema({ $ref: '#/$defs/Text', $defs: { Text: { type: 'string' } } })).toBe(false)
-  expect(isJsonFileSchema({ $ref: '#/$defs/File' })).toBe(false)
-  // recursive refs terminate
-  expect(isJsonFileSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/A' } } })).toBe(false)
 })
 
 it('containsJsonFileSchema', () => {
