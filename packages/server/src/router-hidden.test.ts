@@ -18,6 +18,7 @@ it('withHiddenRouterContract & getHiddenRouterContract', () => {
   expect(applied).not.toBe(router)
   expect(applied).toEqual(router)
   expect(getHiddenRouterContract(applied)).toBe(contract)
+  expect(getHiddenRouterContract(withHiddenRouterContract(router.ping, contract.ping))).toBe(contract.ping)
 })
 
 it('getHiddenRouterContract returns undefined for non-object values', () => {
