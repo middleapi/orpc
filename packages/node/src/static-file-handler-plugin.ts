@@ -2,8 +2,9 @@ import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Stats } from 'node:fs'
-import { createReadStream } from 'node:fs'
-import { realpath, stat } from 'node:fs/promises'
+import type { FileHandle } from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
+import { open, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { getTracer, isAcceptableEncoding, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
@@ -32,6 +33,20 @@ const TEXT_CONTENT_TYPE_REGEX = /^text\//
  * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names
  */
 const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
+
+/**
+ * `O_NONBLOCK` keeps an open of a fifo swapped in after the stat from blocking a libuv worker
+ * until a writer appears, and has no effect on reads of a regular file. `O_NOFOLLOW` refuses a
+ * final component swapped for a symbolic link after `realpath` resolved it. Windows defines
+ * neither flag.
+ */
+const OPEN_FLAGS: number = fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0)
+const OPEN_NO_FOLLOW_FLAGS: number = OPEN_FLAGS | (fsConstants.O_NOFOLLOW ?? 0)
+
+type RootDirRealPaths = [rootDirReal: string, rootDirRealPrefix: string]
+
+/** The path a request resolved to, the path to open it by, and stats used only for routing. */
+type Found = [filePath: string, openPath: string, stats: Stats]
 
 const PRECOMPRESSED_ENCODINGS: [encoding: string, extension: string][] = [
   ['br', '.br'],
@@ -143,11 +158,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /** `rootDir` with a trailing separator, precomputed for the lexical containment check. */
   private readonly rootDirPrefix: string
   /**
-   * `rootDir` with its own symbolic links resolved, paired with its trailing separator form.
-   * Resolved once, so a symlinked `rootDir` keeps working and platform links like the macOS
-   * `/var` to `/private/var` do not reject every file.
+   * `rootDir` with its own symbolic links resolved, paired with its trailing separator form,
+   * so a symlinked `rootDir` keeps working and platform links like the macOS `/var` to
+   * `/private/var` do not reject every file. Cached, and re-resolved when a file falls outside it.
    */
-  private readonly rootDirRealPaths: Promise<[rootDirReal: string, rootDirRealPrefix: string]>
+  private rootDirRealPaths: Promise<RootDirRealPaths>
   private readonly path: Exclude<StaticFileHandlerPluginOptions['path'], undefined>
   private readonly indexFile: Exclude<StaticFileHandlerPluginOptions['indexFile'], undefined>
   private readonly fallbackFile: StaticFileHandlerPluginOptions['fallbackFile']
@@ -160,9 +175,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   constructor(options: StaticFileHandlerPluginOptions) {
     this.rootDir = path.resolve(options.rootDir)
     this.rootDirPrefix = this.rootDir.endsWith(path.sep) ? this.rootDir : this.rootDir + path.sep
-    this.rootDirRealPaths = realpath(this.rootDir)
-      .catch(() => this.rootDir)
-      .then(rootDirReal => [rootDirReal, rootDirReal.endsWith(path.sep) ? rootDirReal : rootDirReal + path.sep])
+    this.rootDirRealPaths = this.resolveRootDirRealPaths()
     this.path = stripTrailingSlash(options.path ?? '/')
     this.indexFile = options.indexFile ?? 'index.html'
     this.fallbackFile = options.fallbackFile
@@ -219,20 +232,71 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     return resolved
   }
 
+  private async resolveRootDirRealPaths(): Promise<RootDirRealPaths> {
+    const rootDirReal = await realpath(this.rootDir).catch(() => this.rootDir)
+
+    return [rootDirReal, rootDirReal.endsWith(path.sep) ? rootDirReal : rootDirReal + path.sep]
+  }
+
   /**
    * Resolves symbolic links and confirms the target is still inside the root,
    * which the lexical `resolveWithinRoot` check cannot see.
+   * The returned path is the one to open, since `filePath` can be swapped for a link after the check.
    */
   private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
     if (this.allowSymlinks) {
       return filePath
     }
 
-    const [rootDirReal, rootDirRealPrefix] = await this.rootDirRealPaths
-    // An empty string is contained by no root, so an unresolvable path is simply not contained
-    const realPath = await realpath(filePath).catch(() => '')
+    const realPath = await realpath(filePath).catch(() => undefined)
 
-    return realPath === rootDirReal || realPath.startsWith(rootDirRealPrefix) ? realPath : undefined
+    if (realPath === undefined) {
+      return undefined
+    }
+
+    const cached = this.rootDirRealPaths
+
+    if (isWithinRoot(await cached, realPath)) {
+      return realPath
+    }
+
+    /**
+     * The root may have moved since it was resolved, like a `current` link repointed to a new
+     * release, or a root created after startup. Only an existing file outside the cached root
+     * triggers this, and concurrent requests share one resolution.
+     */
+    if (this.rootDirRealPaths === cached) {
+      this.rootDirRealPaths = this.resolveRootDirRealPaths()
+    }
+
+    return isWithinRoot(await this.rootDirRealPaths, realPath) ? realPath : undefined
+  }
+
+  /**
+   * Opens the path `resolveContainedRealPath` returned and stats the descriptor, so the file the
+   * response headers describe is the file streamed, whatever happens to the path afterwards.
+   * Resolves to `undefined`, closing the handle, when the opened entry is not a regular file.
+   *
+   * @remarks
+   * `O_NOFOLLOW` only guards the final component. A directory inside the root swapped for a link
+   * between `realpath` and the open is still followed, since node exposes no `openat2` with
+   * `RESOLVE_BENEATH` to resolve the whole path beneath the root in one step.
+   */
+  private async openFile(openPath: string): Promise<[handle: FileHandle, stats: Stats] | undefined> {
+    const handle = await open(openPath, this.allowSymlinks ? OPEN_FLAGS : OPEN_NO_FOLLOW_FLAGS).catch(() => undefined)
+
+    if (handle === undefined) {
+      return undefined
+    }
+
+    const stats = await handle.stat().catch(() => undefined)
+
+    if (stats?.isFile()) {
+      return [handle, stats]
+    }
+
+    await handle.close().catch(() => {})
+    return undefined
   }
 
   private resolveContentType(filePath: string): string {
@@ -259,8 +323,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /**
    * Resolves segments under `rootDir` and stats the result, rejecting anything that
    * escapes the root either lexically or by following a symbolic link.
+   * The stats only route the request: the file served is opened by `openPath` and described by its descriptor.
    */
-  private async lookup(segments: string[]): Promise<[filePath: string, stats: Stats] | undefined> {
+  private async lookup(segments: string[]): Promise<Found | undefined> {
     const filePath = this.resolveWithinRoot(segments)
 
     if (filePath === undefined) {
@@ -277,7 +342,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    return [filePath, stats]
+    return [filePath, containedRealPath, stats]
   }
 
   /**
@@ -335,7 +400,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    let found: [filePath: string, stats: Stats] | undefined
+    let found: Found | undefined
 
     if (pathname.endsWith('/')) {
       // The url already denotes a directory, so only its index file can be served
@@ -344,7 +409,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     else {
       found = await this.lookup(segments)
 
-      if (found?.[1].isDirectory()) {
+      if (found?.[2].isDirectory()) {
         if (this.indexFile === false) {
           found = undefined
         }
@@ -367,23 +432,24 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       }
     }
 
-    if (found === undefined || !found[1].isFile()) {
+    if (found === undefined || !found[2].isFile()) {
       if (this.fallbackFile === undefined) {
         return undefined
       }
 
       found = await this.lookup([this.fallbackFile])
 
-      if (found === undefined || !found[1].isFile()) {
+      if (found === undefined || !found[2].isFile()) {
         return undefined
       }
     }
 
-    let [filePath, stats] = found
+    const [filePath, openPath] = found
 
     const contentType = this.resolveContentType(filePath)
     const negotiatesEncoding = this.precompressed && isCompressibleContentType(contentType)
 
+    let opened: [handle: FileHandle, stats: Stats] | undefined
     let contentEncoding: string | undefined
 
     if (negotiatesEncoding) {
@@ -392,27 +458,63 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       const variants = await Promise.all(PRECOMPRESSED_ENCODINGS
         .filter(([encoding]) => isAcceptableEncoding(qualities, encoding))
         .map(async ([encoding, extension]) => {
-          const candidatePath = filePath + extension
           // Sidecars are reached by string concatenation, so they need the same containment check
-          const [candidateStats, containedRealPath] = await Promise.all([
-            stat(candidatePath).catch(() => undefined),
-            this.resolveContainedRealPath(candidatePath),
-          ])
+          const candidateOpenPath = await this.resolveContainedRealPath(filePath + extension)
+          const candidate = candidateOpenPath === undefined ? undefined : await this.openFile(candidateOpenPath)
 
-          return candidateStats?.isFile() && containedRealPath !== undefined
-            ? { encoding, extension, stats: candidateStats }
-            : undefined
+          return candidate === undefined ? undefined : { encoding, candidate }
         }))
 
       const variant = variants.find(variant => variant !== undefined)
 
+      await Promise.all(variants.map(other => other !== variant && other?.candidate[0].close().catch(() => {})))
+
       if (variant !== undefined) {
-        filePath += variant.extension
-        stats = variant.stats
+        opened = variant.candidate
         contentEncoding = variant.encoding
       }
     }
 
+    // A file swapped for something unservable after the lookup is treated as missing
+    opened ??= await this.openFile(openPath)
+
+    if (opened === undefined) {
+      return undefined
+    }
+
+    const [handle, stats] = opened
+    let streaming = false
+
+    try {
+      const { response, read } = this.respond(request, stats, contentType, negotiatesEncoding, contentEncoding)
+
+      if (read !== undefined) {
+        // Streamed from the descriptor the headers were built from, never reopened by path
+        response.body = toWebReadableStream(handle.createReadStream(read))
+        streaming = true
+      }
+
+      return response
+    }
+    finally {
+      // A stream closes the handle once it ends or is destroyed, every other response closes it here
+      if (!streaming) {
+        await handle.close().catch(() => {})
+      }
+    }
+  }
+
+  /**
+   * Builds the response from the opened file's stats, with the read options for its body when it carries the
+   * representation. Responses without one, `HEAD` included, need none of the file contents.
+   */
+  private respond(
+    request: StandardLazyRequest,
+    stats: Stats,
+    contentType: string,
+    negotiatesEncoding: boolean,
+    contentEncoding: string | undefined,
+  ): { response: StandardResponse, read?: { start?: number, end?: number } } {
     const size = stats.size
     // Size and mtime at millisecond resolution, a strictly finer validator than the one nginx treats as strong
     const etag = `"${size.toString(16)}-${stats.mtime.getTime().toString(16)}"`
@@ -435,11 +537,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     if (isPreconditionFailed(request.headers, etag, lastModifiedTime)) {
-      return { status: 412, headers }
+      return { response: { status: 412, headers } }
     }
 
     if (isRequestFresh(request.headers, etag, lastModifiedTime)) {
-      return { status: 304, headers }
+      return { response: { status: 304, headers } }
     }
 
     let status = 200
@@ -452,7 +554,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       const parsed = parseByteRange(range, size)
 
       if (parsed === 'unsatisfiable') {
-        return { status: 416, headers: { ...headers, 'content-range': `bytes */${size}` } }
+        return { response: { status: 416, headers: { ...headers, 'content-range': `bytes */${size}` } } }
       }
 
       if (parsed !== undefined) {
@@ -474,12 +576,16 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      * A HEAD response uses an empty stream instead of no body, because
      * the adapters drop `content-type` and `content-length` when the body is `undefined`.
      */
-    const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD'
-      ? new ReadableStream({ start: controller => controller.close() })
-      : toWebReadableStream(status === 206 ? createReadStream(filePath, { start, end }) : createReadStream(filePath))
+    if (request.method === 'HEAD') {
+      return { response: { status, headers, body: new ReadableStream({ start: controller => controller.close() }) } }
+    }
 
-    return { status, headers, body }
+    return { response: { status, headers }, read: status === 206 ? { start, end } : {} }
   }
+}
+
+function isWithinRoot([rootDirReal, rootDirRealPrefix]: RootDirRealPaths, realPath: string): boolean {
+  return realPath === rootDirReal || realPath.startsWith(rootDirRealPrefix)
 }
 
 function stripTrailingSlash(path: `/${string}`): `/${string}` {

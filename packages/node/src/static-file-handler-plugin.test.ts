@@ -1,8 +1,10 @@
+import type { FileHandle } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
-import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -15,6 +17,30 @@ import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
+
+const fsHooks = vi.hoisted(() => ({
+  /** Runs once `realpath` resolves, the moment the containment check has passed. */
+  afterRealpath: undefined as ((path: string) => void) | undefined,
+  openedHandles: [] as FileHandle[],
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs/promises')>()
+
+  return {
+    ...original,
+    realpath: async (...args: Parameters<typeof original.realpath>) => {
+      const resolved = await original.realpath(...args)
+      fsHooks.afterRealpath?.(String(args[0]))
+      return resolved
+    },
+    open: async (...args: Parameters<typeof original.open>) => {
+      const handle = await original.open(...args)
+      fsHooks.openedHandles.push(handle)
+      return handle
+    },
+  }
+})
 
 describe('staticFileHandlerPlugin', () => {
   let baseDir: string
@@ -57,6 +83,11 @@ describe('staticFileHandlerPlugin', () => {
     const res = await createStaticAgent().get('/hello.txt')
     helloEtag = res.headers.etag!
     helloLastModified = res.headers['last-modified']!
+  })
+
+  afterEach(() => {
+    fsHooks.afterRealpath = undefined
+    fsHooks.openedHandles.length = 0
   })
 
   afterAll(() => {
@@ -723,6 +754,110 @@ describe('staticFileHandlerPlugin', () => {
       }
 
       expect((await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1')).status).toBe(200)
+    })
+
+    describe('entries swapped after the containment check', () => {
+      const swapPath = (): string => path.join(rootDir, 'swap.txt')
+
+      beforeEach(() => {
+        writeFileSync(swapPath(), 'inside')
+      })
+
+      afterEach(() => {
+        rmSync(swapPath(), { force: true })
+      })
+
+      function swapAfterCheck(swap: () => void): void {
+        fsHooks.afterRealpath = (filePath) => {
+          if (filePath === swapPath()) {
+            fsHooks.afterRealpath = undefined
+            swap()
+          }
+        }
+      }
+
+      it('never serves a symlink that replaced a checked file', async () => {
+        swapAfterCheck(() => {
+          rmSync(swapPath())
+          symlinkSync(path.join(baseDir, 'secret.txt'), swapPath())
+        })
+
+        const res = await createStaticAgent().get('/swap.txt')
+
+        expect(res.status).toBe(404)
+        expect(res.text).not.toContain('outside root')
+      })
+
+      it('describes the file it streams when the file is replaced', async () => {
+        swapAfterCheck(() => {
+          writeFileSync(`${swapPath()}.tmp`, 'replaced content')
+          renameSync(`${swapPath()}.tmp`, swapPath())
+        })
+
+        const res = await createStaticAgent().get('/swap.txt')
+
+        expect(res.status).toBe(200)
+        expect(res.text).toBe('replaced content')
+        expect(res.headers['content-length']).toBe(`${'replaced content'.length}`)
+        expect(res.headers.etag).toBe(`"${'replaced content'.length.toString(16)}-${statSync(swapPath()).mtime.getTime().toString(16)}"`)
+      })
+
+      it.skipIf(process.platform === 'win32')('does not hang on a fifo that replaced a checked file', async () => {
+        swapAfterCheck(() => {
+          rmSync(swapPath())
+          execFileSync('mkfifo', [swapPath()])
+        })
+
+        expect((await createStaticAgent().get('/swap.txt')).status).toBe(404)
+      })
+    })
+
+    it('closes every file it opens', async () => {
+      const agent = createStaticAgent({ precompressed: true })
+
+      await agent.get('/hello.txt')
+      await agent.head('/hello.txt')
+      await agent.get('/hello.txt').set('if-none-match', helloEtag)
+      await agent.get('/hello.txt').set('if-match', '"other"')
+      await agent.get('/hello.txt').set('range', 'bytes=100-')
+      await agent.get('/hello.txt').set('range', 'bytes=0-1')
+      // Both sidecars are opened, and only the preferred one is streamed
+      await agent.get('/compressed.txt').set('accept-encoding', 'gzip, br')
+
+      expect(fsHooks.openedHandles).toHaveLength(8)
+      await vi.waitFor(() => {
+        for (const handle of fsHooks.openedHandles) {
+          expect(handle.fd).toBe(-1)
+        }
+      })
+    })
+
+    it('follows rootDir when the symlink it sits behind is repointed', async ({ onTestFinished }) => {
+      const releasesDir = path.join(baseDir, 'releases')
+      const currentLink = path.join(baseDir, 'current')
+      mkdirSync(path.join(releasesDir, 'a'), { recursive: true })
+      mkdirSync(path.join(releasesDir, 'b'), { recursive: true })
+      writeFileSync(path.join(releasesDir, 'a', 'version.txt'), 'a')
+      writeFileSync(path.join(releasesDir, 'b', 'version.txt'), 'b')
+      symlinkSync(path.join(releasesDir, 'a'), currentLink)
+      onTestFinished(() => {
+        rmSync(currentLink, { force: true })
+        rmSync(releasesDir, { recursive: true, force: true })
+      })
+
+      const agent = createStaticAgent({ rootDir: currentLink })
+      expect((await agent.get('/version.txt')).text).toBe('a')
+
+      rmSync(currentLink)
+      symlinkSync(path.join(releasesDir, 'b'), currentLink)
+
+      const res = await agent.get('/version.txt')
+      expect(res.status).toBe(200)
+      expect(res.text).toBe('b')
+
+      // The refreshed root still rejects links that leave it
+      symlinkSync(path.join(baseDir, 'secret.txt'), path.join(releasesDir, 'b', 'link.txt'))
+      expect((await agent.get('/link.txt')).status).toBe(404)
     })
   })
 
