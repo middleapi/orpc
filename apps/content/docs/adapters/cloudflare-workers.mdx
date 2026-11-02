@@ -79,7 +79,15 @@ export default {
 
 ## Compatibility Flags
 
-Use a `compatibility_date` of `2026-11-17` or later. On older dates, enable these flags:
+Use a `compatibility_date` of `2026-11-17` or later:
+
+```jsonc title="wrangler.jsonc"
+{
+  "compatibility_date": "2026-11-17"
+}
+```
+
+On older dates, enable these flags:
 
 - [`enable_request_signal`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests): aborts `request.signal` when the client disconnects, so procedures can stop work.
 - [`unhandled_rejection_after_microtask_checkpoint`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#defer-unhandled-rejection-processing-to-after-microtask-checkpoint) (default from `2026-03-03`): prevents false `unhandledrejection` errors.
