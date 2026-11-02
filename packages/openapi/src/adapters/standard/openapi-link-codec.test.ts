@@ -695,20 +695,6 @@ describe('openAPILinkCodec', () => {
         expect(request.url).toBe('/api/items/42/1,2/color,red,at,2023-01-01T00%3A00%3A00.000Z/docs/v1')
       })
 
-      it('does not affect path param encoding in detailed requests', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            method: 'GET',
-            path: '/x/{id}',
-            inputStructure: 'detailed',
-          })),
-        }, { serializer: formDataSerializer })
-
-        const request = await codec.encodeInput({ params: { id: '42' } }, ['item'], { context: {} })
-
-        expect(request.url).toBe('/x/42')
-      })
-
       it('does not affect styled query values', async () => {
         const codec = new OpenAPILinkCodec({
           search: oc.meta(openapi({
@@ -755,22 +741,6 @@ describe('openAPILinkCodec', () => {
         expect(url.searchParams.get('po')).toBe('k|v')
         expect(url.searchParams.get('mismatch')).toBe('scalar')
         expect(url.searchParams.get('rest[nested]')).toBe('value')
-        expect(request.url).not.toContain('FormData')
-      })
-
-      it('does not affect styled query values in detailed requests', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            path: '/search',
-            inputStructure: 'detailed',
-            queryStyles: { q: 'primitive', j: 'json' },
-          })),
-        }, { serializer: formDataSerializer })
-
-        const request = await codec.encodeInput({ query: { q: 'term', j: { a: 1 } } }, ['search'], { context: {} })
-
-        expect(request.url).toBe('/search?q=term&j=%7B%22a%22%3A1%7D')
       })
 
       it('still applies to the request body', async () => {

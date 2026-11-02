@@ -261,11 +261,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   }
 
   /**
-   * Serializes a single path/query value. Always pinned to `asFormData: false`
-   * so the serializer's default (meant for bodies) cannot turn URL values into FormData.
+   * Serializes a single path/query value, like header values, so body-level
+   * serialize defaults (e.g. `asFormData`) never apply to URLs.
    */
   private serializeURLValue(value: unknown): unknown {
-    return this.serializer.serialize(value, { asFormData: false })
+    return value === undefined ? undefined : this.serializer.serializeJson(value).json
   }
 
   private serializeQueryString(data: unknown, queryStyles: OpenAPIMeta['queryStyles']): string | undefined {
