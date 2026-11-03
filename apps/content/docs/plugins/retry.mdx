@@ -104,9 +104,10 @@ A retry sends the same `input` again. This is fine for plain values, `Blob`, and
 Avoid retrying calls with streamed input. For example, disable retries based on the input:
 
 ```ts
+import { isAsyncIteratorObject } from '@orpc/shared'
+
 function isStreamedInput(input: unknown): boolean {
-  return input instanceof ReadableStream
-    || (typeof input === 'object' && input !== null && Symbol.asyncIterator in input)
+  return input instanceof ReadableStream || isAsyncIteratorObject(input)
 }
 
 const link = new RPCLink<ClientContext>({
