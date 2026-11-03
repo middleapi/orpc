@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
+import type { BatchClientServerTestOptions, CreateBatchClientServerTest } from './client-server'
 import * as http from 'node:http'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
@@ -21,7 +21,7 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
     method = 'POST',
     serializer = defaultBatchClientServerOptions.serializer,
     mode,
-  } = {},
+  }: BatchClientServerTestOptions = {}, // annotated: TypeScript 7.1 loses the contextual type here (microsoft/TypeScript#64974)
 ) => {
   const handler = new RPCHandler(router, {
     serializer,

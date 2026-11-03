@@ -1,6 +1,6 @@
 import type { Promisable } from 'type-fest'
 import type { StartSpanOptions } from './tracing'
-import type { PromiseWithError, ThrowableError } from './types'
+import type { ThrowableError } from './types'
 import { AsyncIteratorClass } from '@standard-server/shared'
 import { once } from './function'
 import { AsyncIdQueue } from './queue'
@@ -193,7 +193,9 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
  * @see {@link https://orpc.dev/docs/client/async-iterator-object#using-consumeasynciterator | AsyncIteratorObject in Client - Using consumeAsyncIterator}
  */
 export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
-  iterator: AsyncIterator<T, TReturn> | PromiseWithError<AsyncIterator<T, TReturn>, TError>,
+  // `PromiseWithError` is written out instead of using the alias: TypeScript 7.1 infers `T` as `unknown`
+  // when the argument is also a `PromiseWithError` (microsoft/TypeScript#64757).
+  iterator: AsyncIterator<T, TReturn> | (Promise<AsyncIterator<T, TReturn>> & { __error?: { type: TError } }),
   options: ConsumeAsyncIteratorOptions<T, TReturn, TError | ThrowableError>,
 ): () => Promise<void> {
   // The typed error should always be combined with `ThrowableError`

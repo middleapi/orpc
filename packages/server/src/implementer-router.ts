@@ -40,7 +40,7 @@ export class SharedRouterImplementer<
     config: ImplementerConfig,
     middlewares: AnyMiddleware[] = [],
   ): SharedRouterImplementer<TContract, TInitialContext> | SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
-    return new SharedRouterImplementer(
+    return new SharedRouterImplementer<TContract, TInitialContext>(
       contract,
       config,
       middlewares,

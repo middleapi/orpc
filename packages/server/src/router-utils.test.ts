@@ -80,7 +80,8 @@ const router = {
 }
 
 async function unlazyDefault<T>(value: T): Promise<T extends Lazy<infer U> ? U : T> {
-  return (await unlazy(value)).default
+  // cast: TypeScript 7.1 rejects two identical distributive conditional types (microsoft/TypeScript#64673)
+  return (await unlazy(value)).default as T extends Lazy<infer U> ? U : T
 }
 
 // procedure and lazy router built from a shared base: leading [mid1] and [plugin1]

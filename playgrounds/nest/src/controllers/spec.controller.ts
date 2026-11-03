@@ -1,4 +1,5 @@
 import { Controller, Get, Header } from '@nestjs/common'
+import type { OpenAPIDocument } from '@orpc/openapi'
 import { OpenAPIGenerator } from '@orpc/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { contract } from '../contracts'
@@ -44,7 +45,7 @@ export class SpecController {
   }
 
   @Get('spec.json')
-  spec() {
+  spec(): Promise<OpenAPIDocument<'3.2.0'>> {
     return generator.generate(contract, {
       base: {
         servers: [{ url: '/' }],
