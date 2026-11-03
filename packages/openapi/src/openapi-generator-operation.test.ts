@@ -462,6 +462,13 @@ describe('openAPIGenerator operation builders', () => {
         message: 'Schema keys:  (none)',
       },
       {
+        name: 'a streamed compact input has dynamic params',
+        inputs: [asyncIteratorObject(testSchema({ type: 'string' }))],
+        meta: { path: '/chat/{id}' as const },
+        path: '/chat/{id}' as const,
+        message: 'declares path params ({id}) but there is no object schema to source them from',
+      },
+      {
         name: 'a dynamic param is optional in the input schema',
         inputs: [testSchema({ type: 'object', properties: { id: { type: 'string' } } })],
         meta: { path: '/planets/{id}' as const },
@@ -658,6 +665,48 @@ describe('openAPIGenerator operation builders', () => {
           headers: {
             'x-opt': { schema: { type: 'string' } },
           },
+        },
+      })
+    })
+
+    it('also documents the success status when the detailed status is optional', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(ctx, operation, testDef({
+        outputs: [testSchema({
+          anyOf: [
+            {
+              type: 'object',
+              properties: {
+                status: { const: 201, description: 'created' },
+                body: { type: 'string' },
+              },
+              required: ['body'],
+            },
+            {
+              type: 'object',
+              properties: {
+                status: { type: 'number', enum: [202, 299] },
+                body: { type: 'boolean' },
+              },
+              required: ['body'],
+            },
+          ],
+        })],
+      }), { outputStructure: 'detailed', successStatus: 299 })
+
+      expect(operation.responses).toEqual({
+        201: {
+          description: 'created',
+          content: { 'application/json': { schema: { type: 'string' } } },
+        },
+        202: {
+          description: 'OK',
+          content: { 'application/json': { schema: { type: 'boolean' } } },
+        },
+        299: {
+          description: 'OK',
+          content: { 'application/json': { schema: { anyOf: [{ type: 'string' }, { type: 'boolean' }] } } },
         },
       })
     })
@@ -866,6 +915,20 @@ describe('openAPIGenerator operation builders', () => {
       }))
 
       expect(Object.keys(operation.responses ?? {})).toEqual(['400', '404'])
+    })
+
+    it('ignores inherited properties of the status map for prototype-named codes', () => {
+      const { ctx, operation } = createContext()
+
+      buildErrorResponse(ctx, operation, testDef({
+        errors: {
+          constructor: {},
+          toString: {},
+          ['__proto__']: {},
+        } as ErrorMap,
+      }))
+
+      expect(Object.keys(operation.responses ?? {})).toEqual(['400'])
     })
 
     it('falls back to the "Error" component name for codes without alphanumeric characters', () => {

@@ -141,11 +141,15 @@ export class OpenAPIGenerator {
     }
 
     const errors: string[] = []
+    const routeOwners = new Map<string, string>()
+    const operationIdOwners = new Map<string, string>()
 
     await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(options.filter, contract, path) === false) {
         return
       }
+
+      const procedurePath = path.length ? path.join('.') : '(root)'
 
       try {
         const def = contract['~orpc']
@@ -187,6 +191,34 @@ export class OpenAPIGenerator {
           operation = meta.spec(operation)
         }
 
+        const routeKey = `${method} ${toOpenAPIPath(httpPath, dynamicPathParams?.map(p => ({ ...p, parameterName: '' })))}`
+        const routeOwner = routeOwners.get(routeKey)
+
+        if (routeOwner !== undefined) {
+          throw new OpenAPIGeneratorError(
+            `${method.toUpperCase()} ${openApiPath} is already documented by the procedure at ${routeOwner}.\n`
+            + `  OpenAPI allows one operation per method and path (path param names are ignored).\n`
+            + `  Fix: change the method or path of one of them.`,
+          )
+        }
+
+        const { operationId } = operation
+
+        if (operationId !== undefined) {
+          const operationIdOwner = operationIdOwners.get(operationId)
+
+          if (operationIdOwner !== undefined) {
+            throw new OpenAPIGeneratorError(
+              `operationId "${operationId}" is already used by the procedure at ${operationIdOwner}.\n`
+              + `  OpenAPI requires operationIds to be unique. Fix: give one of them a different operationId.`,
+            )
+          }
+
+          operationIdOwners.set(operationId, procedurePath)
+        }
+
+        routeOwners.set(routeKey, procedurePath)
+
         doc.paths ??= {}
         doc.paths[openApiPath] ??= {}
         doc.paths[openApiPath][method] = operation
@@ -195,7 +227,7 @@ export class OpenAPIGenerator {
         if (!(e instanceof OpenAPIGeneratorError)) {
           throw e
         }
-        errors.push(`Procedure at ${path.join('.') || '(root)'}: ${e.message}`)
+        errors.push(`Procedure at ${procedurePath}: ${e.message}`)
       }
     })
 
