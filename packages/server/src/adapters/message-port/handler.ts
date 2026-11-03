@@ -101,7 +101,6 @@ export class MessagePortHandler<T extends Context> {
 
     let peer = this.peers.get(port)
 
-    // Closed: a new peer here would leak and never be aborted.
     if (peer === null) {
       return { matched: true }
     }
@@ -135,7 +134,6 @@ export class MessagePortHandler<T extends Context> {
    */
   async close(port: SupportedMessagePort): Promise<void> {
     const peer = this.peers.get(port)
-    // mark closed before awaiting, so messages during close never reach this peer or create a new one
     this.peers.set(port, null)
     await peer?.close()
   }
