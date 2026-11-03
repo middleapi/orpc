@@ -714,7 +714,7 @@ export default [
   {
     "name": "grim",
     "login": "ripgrim",
-    "avatar": "https://avatars.githubusercontent.com/u/75869731?u=b17c42ec2309552fdb822a86b25a2f99146a4d72&v=4",
+    "avatar": "https://avatars.githubusercontent.com/u/75869731?u=cc07a1b835267771bc03954ea0bb1446fe1208b5&v=4",
     "link": "https://github.com/ripgrim?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
