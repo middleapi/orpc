@@ -179,3 +179,15 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
     expect(count).toBe(5)
   }, { timeout: 20_000 })
 })
+
+it('preserves the callback outcome when the release fails', async () => {
+  const redis = {
+    send: vi.fn((command: string) => command === 'SET' ? Promise.resolve('OK') : Promise.reject(new Error('connection lost'))),
+  }
+  const locker = new BunRedisLocker(redis as any, { ttl: 1000 })
+  const error = new Error('fn failed')
+
+  await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
+  await expect(locker.lock('key', () => Promise.reject(error))).rejects.toBe(error)
+  expect(redis.send).toHaveBeenCalledTimes(4)
+})
