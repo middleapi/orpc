@@ -500,6 +500,75 @@ describe('openAPIGenerator basic & options', () => {
     )
 
     expect(root.message).toContain('Procedure at (root):')
+
+    const emptyKey = await generator.generate({
+      '': oc.meta(openapi({ method: 'GET' })).input(z.string()),
+    }).then(
+      () => { throw new Error('expected generate to reject') },
+      e => e,
+    )
+
+    expect(emptyKey.message).toContain('Procedure at : ')
+    expect(emptyKey.message).not.toContain('(root)')
+  })
+
+  it.each([
+    {
+      name: 'the same method and path',
+      paths: ['/users', '/users'] as const,
+      message: 'GET /users is already documented by the procedure at first',
+    },
+    {
+      name: 'a {+param} and a {param} at the same position',
+      paths: ['/files/{+p}', '/files/{p}'] as const,
+      message: 'GET /files/{p} is already documented by the procedure at first',
+    },
+    {
+      name: 'path params that differ only by name',
+      paths: ['/users/{id}', '/users/{name}'] as const,
+      message: 'GET /users/{name} is already documented by the procedure at first',
+    },
+  ])('reports a collision instead of overwriting for $name', async ({ paths, message }) => {
+    const input = z.object({ id: z.string(), p: z.string(), name: z.string() })
+    const result = generator.generate({
+      first: oc.meta(openapi({ method: 'GET', path: paths[0] })).input(input),
+      second: oc.meta(openapi({ method: 'GET', path: paths[1] })).input(input),
+    })
+
+    await expect(result).rejects.toThrow('(1 error)')
+    await expect(result).rejects.toThrow(`Procedure at second: ${message}`)
+  })
+
+  it('does not report collisions for filtered-out procedures', async () => {
+    const doc = await generator.generate({
+      first: oc.meta(openapi({ method: 'GET', path: '/users' })),
+      second: oc.meta(openapi({ method: 'GET', path: '/users' })),
+    }, {
+      filter: (_, path) => path[0] !== 'second',
+    })
+
+    expect(doc.paths?.['/users']).toEqual({
+      get: expect.objectContaining({ operationId: 'first' }),
+    })
+  })
+
+  it('reports duplicate operationIds', async () => {
+    await expect(generator.generate({
+      first: oc.meta(openapi({ method: 'GET', path: '/a', operationId: 'same' })),
+      nested: {
+        second: oc.meta(openapi({ method: 'GET', path: '/b', spec: op => ({ ...op, operationId: 'same' }) })),
+      },
+    })).rejects.toThrow('Procedure at nested.second: operationId "same" is already used by the procedure at first')
+  })
+
+  it('documents the success status for an optional detailed status', async () => {
+    const doc = await generator.generate({
+      create: oc
+        .meta(openapi({ method: 'POST', outputStructure: 'detailed' }))
+        .output(z.object({ status: z.literal(201).optional(), body: z.string() })),
+    })
+
+    expect(Object.keys(doc.paths?.['/create']?.post?.responses ?? {})).toEqual(['200', '201'])
   })
 
   it('rethrows non-generator errors immediately without wrapping', async () => {
