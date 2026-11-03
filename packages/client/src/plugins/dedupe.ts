@@ -1,4 +1,4 @@
-import type { AsyncIteratorClass, InterceptorOptions, Value } from '@orpc/shared'
+import type { AsyncIteratorClass, DisposableAllAbortSignal, InterceptorOptions, Value } from '@orpc/shared'
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
@@ -157,7 +157,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
   ): Promise<void> {
     const first = activeCallers[0]!
     const matchedOptions = activeCallers.map(caller => caller.options)
-    let disposeSharedSignal: (() => void) | undefined
+    let sharedSignal: DisposableAllAbortSignal | undefined
 
     try {
       if (!shouldDedupe(matchedOptions)) {
@@ -168,8 +168,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
       const context = value(group.context, matchedOptions) as T
       const signals = matchedOptions.map(options => options.request.signal)
-      const sharedSignal = disposableAllAbortSignal(signals)
-      disposeSharedSignal = sharedSignal.dispose
+      sharedSignal = disposableAllAbortSignal(signals)
 
       const request: StandardRequest = {
         ...first.options.request,
@@ -183,17 +182,13 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      /**
-       * Once the body is resolved, the shared signal is no longer needed: a streamed body's replicas
-       * cancel the source once all of them are cancelled. So stop listening to the callers' signals,
-       * which may be long-lived and shared across many requests.
-       */
+      // Streamed replicas cancel the source once all are cancelled, so the shared signal is not needed past the body
       const replicatedResponses = replicateLazyResponse(response, signals, sharedSignal.dispose)
 
       activeCallers.forEach((caller, index) => caller.resolve(replicatedResponses[index]!))
     }
     catch (error) {
-      disposeSharedSignal?.()
+      sharedSignal?.dispose()
 
       for (const caller of activeCallers) {
         caller.reject(error)

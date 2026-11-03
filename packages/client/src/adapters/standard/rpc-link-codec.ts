@@ -129,20 +129,16 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     const deserialized = await (async () => {
       try {
-        /**
-         * A JSON success body must be an RPC envelope. Without `json`, it is not one
-         * (e.g. a proxy's JSON), and must not resolve to `undefined`.
-         */
+        // unlike requests, where `{}` means no input, a success body without `json` is not an RPC envelope
         if (isOk && isPlainObject(body) && !Object.hasOwn(body, 'json')) {
-          throw new TypeError('Invalid RPC serialized data: expected an object with a "json" property.')
+          throw new TypeError('Missing "json" in RPC response body.')
         }
 
         return this.serializer.deserialize(body)
       }
       catch (cause) {
         throw new MalformedResponseError({
-          // error bodies from proxies and gateways (e.g. plain text) often carry a better message
-          message: isOk ? 'Invalid RPC response format.' : undefined,
+          message: isOk ? 'Invalid RPC response format.' : undefined, // else inferred from the error body
           response: { status: response.status, headers: response.headers, body },
           cause,
         })

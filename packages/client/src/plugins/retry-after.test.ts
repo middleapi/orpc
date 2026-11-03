@@ -363,7 +363,6 @@ describe('retryAfterLinkPlugin', () => {
       expect(cancels[0]).toHaveBeenCalledTimes(1)
       expect(cancels[1]).toHaveBeenCalledTimes(1)
       expect(cancels[2]).not.toHaveBeenCalled()
-      // the last response is returned with its body intact
       expect(result).toBeInstanceOf(ReadableStream)
       expect((result as ReadableStream).locked).toBe(false)
     })

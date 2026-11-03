@@ -3,7 +3,7 @@ import type { StandardLazyResponse } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
 import { isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
-import { flattenStandardHeader } from '@standard-server/core'
+import { cancelStandardBody, flattenStandardHeader } from '@standard-server/core'
 import { COMMON_ERROR_STATUS_MAP } from '../error'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
@@ -129,14 +129,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
  * so its connection (e.g. an undici keep-alive socket) is not held until garbage collection.
  */
 function discardResponseBody(response: StandardLazyResponse): void {
-  response.resolveBody('octet-stream').then(async (body) => {
-    if (body instanceof ReadableStream) {
-      await body.cancel()
-    }
-    else if (isAsyncIteratorObject(body)) {
-      await body.return?.()
-    }
-  }).catch(() => {
+  response.resolveBody('octet-stream').then(body => cancelStandardBody(body)).catch(() => {
     // the body may already be consumed, or the transport may fail while cancelling
   })
 }

@@ -491,7 +491,7 @@ describe('rpcJsonSerializer: deserialize', () => {
   it('rejects non-array meta and maps', () => {
     expect(() => serializer.deserializeJson({ json: 1, meta: 'x' as any })).toThrow('"meta" must be an array.')
     expect(() => serializer.deserializeJson({ json: 1, maps: {} as any, blobs: [] })).toThrow('"maps" must be an array.')
-    expect(() => serializer.deserializeJson({ json: [null], blobs: [new Blob()] } as any)).toThrow('"maps" must be an array when blobs are present.')
+    expect(() => serializer.deserializeJson({ json: [null], blobs: [new Blob()] } as any)).toThrow('"maps" must be an array.')
   })
 
   it('treats a missing json as undefined, the way JSON drops it', () => {

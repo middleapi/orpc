@@ -34,13 +34,11 @@ export function disposableAllAbortSignal(signals: readonly (AbortSignal | undefi
 
   abortIfAllAborted()
 
-  if (!controller.signal.aborted) {
-    for (const signal of realSignals) {
-      signal.addEventListener('abort', abortIfAllAborted, {
-        once: true,
-        signal: listenersController.signal,
-      })
-    }
+  for (const signal of realSignals) {
+    signal.addEventListener('abort', abortIfAllAborted, {
+      once: true,
+      signal: listenersController.signal,
+    })
   }
 
   return { signal: controller.signal, dispose }
@@ -48,10 +46,6 @@ export function disposableAllAbortSignal(signals: readonly (AbortSignal | undefi
 
 /**
  * Returns a signal that aborts only after all provided signals are aborted.
- *
- * @remarks
- * Its listeners on the input signals are removed only once all of them abort,
- * use {@link disposableAllAbortSignal} to remove them earlier.
  */
 export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): AbortSignal | undefined {
   return disposableAllAbortSignal(signals).signal
