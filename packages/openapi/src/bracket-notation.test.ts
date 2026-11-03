@@ -232,6 +232,33 @@ describe('bracket notation serializer', () => {
       })
     })
 
+    it('keeps a leaf value as the first item when bracket keys follow it, like a repeated key', () => {
+      expect(serializer.deserialize([
+        ['a', '1'],
+        ['a[1]', '2'],
+      ])).toEqual({ a: ['1', '2'] })
+
+      expect(serializer.deserialize([
+        ['a', '1'],
+        ['a[0]', '2'],
+      ])).toEqual({ a: [['1', '2']] })
+
+      expect(serializer.deserialize([
+        ['a', '1'],
+        ['a[]', '2'],
+      ])).toEqual({ a: { '0': '1', '': '2' } })
+
+      expect(serializer.deserialize([
+        ['a', '1'],
+        ['a[1][b]', '2'],
+      ])).toEqual({ a: ['1', { b: '2' }] })
+
+      expect(serializer.deserialize([
+        ['a', undefined],
+        ['a[1]', '2'],
+      ])).toEqual({ a: [undefined, '2'] })
+    })
+
     it('should be an array if [] conflict keys', () => {
       expect(serializer.deserialize([
         ['users[]', 1],

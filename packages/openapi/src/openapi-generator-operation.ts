@@ -20,7 +20,7 @@ import {
   resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
-import { stringifyJSON, value } from '@orpc/shared'
+import { getOwn, stringifyJSON, value } from '@orpc/shared'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
@@ -93,11 +93,14 @@ export function buildRequest(
 ): void {
   const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
   const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
+  const dynamicParams = dynamicPathParams?.map(v => v.parameterName)
 
   if (inputStructure === 'compact') {
     const iteratorDetails = getAsyncIteratorObjectSchemasDetails(def.inputSchemas)
 
     if (iteratorDetails) {
+      renderPathParameters(ctx, operation, dynamicParams, undefined, undefined)
+
       operation.requestBody = {
         required: true,
         content: toAsyncIteratorObjectContent(
@@ -112,7 +115,6 @@ export function buildRequest(
     }
   }
 
-  const dynamicParams = dynamicPathParams?.map(v => v.parameterName)
   const [schema, optional] = ctx.convertSchemas(def.inputSchemas, 'input')
 
   if (isUnconstrainedSchema(schema) && !dynamicParams?.length) {
@@ -416,10 +418,8 @@ function extractDetailedResponseParts(
       )
     }
 
-    const statusSchema = entries.find(([name]) => name === 'status')?.[1]
-    const statuses = statusSchema === undefined
-      ? new Map([[defaultStatus, undefined]])
-      : extractDetailedStatuses(statusSchema)
+    const [, statusSchema, statusOptional = true] = entries.find(([name]) => name === 'status') ?? []
+    const statuses = statusSchema === undefined ? new Map<number, string | undefined>() : extractDetailedStatuses(statusSchema)
 
     if (!statuses) {
       throw new OpenAPIGeneratorError(
@@ -427,6 +427,11 @@ function extractDetailedResponseParts(
         + `  Expected: literal integers below 400 (const, enum, or a union of them)\n`
         + `  Received: ${stringifyJSON(statusSchema)}`,
       )
+    }
+
+    // an omitted status falls back to the success status at runtime
+    if (statusOptional && !statuses.has(defaultStatus)) {
+      statuses.set(defaultStatus, undefined)
     }
 
     const headersSchema = entries.find(([name]) => name === 'headers')?.[1]
@@ -502,7 +507,7 @@ export function buildErrorResponse(
       continue
     }
 
-    const status = ctx.errorStatusMap[code] ?? DEFAULT_ERROR_STATUS
+    const status = getOwn(ctx.errorStatusMap, code) ?? DEFAULT_ERROR_STATUS
     const [dataJsonSchema, dataOptional] = ctx.convertSchemas(config.data !== undefined ? [config.data] : undefined, 'output')
 
     let definitions = definitionsByStatus.get(status)

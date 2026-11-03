@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { getOwn, isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
+import { isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
 
 export type BracketNotationSerializeResult = [string, unknown][]
 
@@ -68,12 +68,18 @@ export class BracketNotationSerializer {
         const segment = segments[i]!
         const isLast = i === segments.length - 1
 
-        const existing: any = getOwn(currentRef, nextSegment)
+        const hasExisting = Object.hasOwn(currentRef, nextSegment)
+        const existing: any = hasExisting ? currentRef[nextSegment] : undefined
         let child: any = existing
         let key: string | number = segment
 
-        // A missing or primitive value is treated like an empty array, which becomes an object if it cannot stay one
+        // A missing value is treated like an empty array and a leaf value like a one-item array (as if its key
+        // were repeated), which becomes an object if it cannot stay one
         if (Array.isArray(child) || !isPlainObject(child)) {
+          if (hasExisting && !Array.isArray(child)) {
+            child = [child]
+          }
+
           const isArray = Array.isArray(child)
           const isPushStyle = isArray && !!arrayPushStyles?.has(child)
           const length = isArray ? child.length : 0
