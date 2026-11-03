@@ -79,16 +79,18 @@ export default {
 
 ## Compatibility Flags
 
-oRPC forwards `request.signal` to every procedure call so handlers can stop work when the client disconnects. Workers only abort that signal when the [`enable_request_signal`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests) flag is set, so add it to your Wrangler configuration:
+Use a `compatibility_date` of `2026-11-17` or later:
 
 ```jsonc title="wrangler.jsonc"
 {
-  "compatibility_date": "2026-07-01",
-  "compatibility_flags": ["enable_request_signal"]
+  "compatibility_date": "2026-11-17"
 }
 ```
 
-If your `compatibility_date` is before `2026-03-03`, also add [`unhandled_rejection_after_microtask_checkpoint`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#defer-unhandled-rejection-processing-to-after-microtask-checkpoint). Without it, Workers can report false `unhandledrejection` errors for promises that are handled a microtask later.
+On older dates, enable these flags:
+
+- [`enable_request_signal`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests): aborts `request.signal` when the client disconnects, so procedures can stop work.
+- [`unhandled_rejection_after_microtask_checkpoint`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#defer-unhandled-rejection-processing-to-after-microtask-checkpoint) (default from `2026-03-03`): prevents false `unhandledrejection` errors.
 
 ## Traces
 
