@@ -107,6 +107,21 @@ describe('corsHandlerPlugin', () => {
     expect(response!.headers.get('access-control-allow-methods')).toBe('GET, HEAD, PUT, POST, DELETE, PATCH, QUERY')
   })
 
+  it('sends no allow-origin when origin is null', async () => {
+    const handler = new RPCHandler(router, {
+      plugins: [new CORSHandlerPlugin({ origin: null })],
+    })
+
+    const { response } = await handler.handle(new Request('https://example.com', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://example.com',
+      },
+    }))
+
+    expect(response!.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
   it('sets allowed origin only when custom origin function approves', async () => {
     const customOrigin = (origin: string) => origin === 'https://allowed.com' ? origin : null
     const customRouter = {

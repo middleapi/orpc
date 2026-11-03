@@ -78,7 +78,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
   constructor(options: CORSHandlerPluginOptions<T> = {}) {
     this.options = {
       ...options,
-      origin: options.origin ?? '*',
+      origin: options.origin === undefined ? '*' : options.origin,
       allowMethods: options.allowMethods ?? ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
     }
   }
