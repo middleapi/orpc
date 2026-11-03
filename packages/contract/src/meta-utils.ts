@@ -55,7 +55,7 @@ export function resolveAugmentedMetaPlugins<
   routerPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
   targetPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
   config: Pick<ContractBuilderConfig, 'dedupeLeadingMetaPlugins'>,
-  sharedPlugins?: readonly MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
+  sharedPlugins?: readonly MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[],
 ): [meta: Meta, plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]] {
   routerPlugins = toArray(routerPlugins)
   targetPlugins = toArray(targetPlugins)
@@ -69,11 +69,11 @@ export function resolveAugmentedMetaPlugins<
     shared++
   }
 
-  const leadingPlugins = targetPlugins.slice(0, shared)
   const remainingPlugins = targetPlugins.slice(shared)
 
   for (const plugin of new Set(sharedPlugins)) {
-    if (!routerPlugins.includes(plugin) || leadingPlugins.includes(plugin)) {
+    // not a router-level plugin, or already skipped as part of the shared leading plugins
+    if (routerPlugins.indexOf(plugin) < shared) {
       continue
     }
 

@@ -8,7 +8,7 @@ import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, OrderedMiddleware } from './procedure'
 import type { AnyRouter } from './router'
 import { mergeErrorMap, ProcedureContract, resolveAugmentedMetaPlugins } from '@orpc/contract'
-import { getOwn, isTypescriptObject, omit, toArray } from '@orpc/shared'
+import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { createContractProcedure } from './procedure-utils'
@@ -71,7 +71,8 @@ export type AugmentedRouterWithMiddlewares<
  * Prepends router-level middlewares to a procedure's ordered middlewares.
  * When `dedupeLeadingMiddlewares` is enabled (default) and the procedure's middleware chain
  * already starts with the router-level middlewares, applied before any input/output schema
- * (the same position router-level middlewares run at), they are not added again.
+ * (the same position router-level middlewares run at), they are not added again
+ * and `orderedMiddlewares` itself is returned.
  */
 export function mergeRouterMiddlewares(
   middlewares: AnyMiddleware[],
@@ -139,10 +140,8 @@ export function augmentRouter<
       options.metaPlugins,
       router['~orpc'].metaPlugins,
       options,
-      // router-level middlewares deduped from the procedure's chain carry meta plugins
-      // that the router-level meta already includes, so don't apply them again
       orderedMiddlewares === router['~orpc'].orderedMiddlewares
-        ? options.middlewares.flatMap(middleware => toArray(middleware['~orpc']?.metaPlugins))
+        ? options.middlewares.flatMap(middleware => middleware['~orpc']?.metaPlugins ?? [])
         : undefined,
     )
 

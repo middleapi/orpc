@@ -138,7 +138,6 @@ describe('augmentRouter', () => {
       options.metaPlugins,
       original['~orpc'].metaPlugins,
       options,
-      // router-level middlewares are not deduped here
       undefined,
     )
     expect(actual['~orpc']).toEqual({
@@ -289,7 +288,6 @@ describe('augmentRouter', () => {
         orderedMiddlewares: middlewareEntries([mid]) as any,
       })
 
-      // router-level plugins [plugin2, plugin1] do not start with the procedure's [plugin1]
       const options = {
         errorMap: {},
         meta: { plugin1: [1], plugin2: true },
