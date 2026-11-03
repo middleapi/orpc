@@ -1,12 +1,12 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
-import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
+import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions, ServerPeer } from '@standard-server/peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage } from '@standard-server/peer'
+import { createStandardPeerRequestHandler, ServerPeerRegistry } from '../standard-peer'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (message: infer TMessage) => unknown
   ? TMessage
@@ -37,10 +37,7 @@ export interface MessagePortHandlerOptions<_T extends Context> {
 }
 
 export class MessagePortHandler<T extends Context> {
-  /**
-   * `null` marks a closed port, so late messages never create a new peer.
-   */
-  private readonly peers = new WeakMap<SupportedMessagePort, ServerPeer | null>()
+  private readonly peers = new ServerPeerRegistry<SupportedMessagePort>()
   private readonly transfer: MessagePortHandlerOptions<T>['experimental_transfer']
   private readonly encodePeerMessageOptions: MessagePortHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: MessagePortHandlerOptions<T>['decodePeerMessage']
@@ -99,30 +96,23 @@ export class MessagePortHandler<T extends Context> {
       return { matched: false }
     }
 
-    let peer = this.peers.get(port)
+    // `undefined` once closed, so late messages are ignored.
+    const peer = this.peers.get(port, () => async (message) => {
+      const transfer = await value(this.transfer, message, port)
 
-    if (peer === null) {
-      return { matched: true }
-    }
-
-    if (!peer) {
-      this.peers.set(port, peer = new ServerPeer(async (message) => {
-        const transfer = await value(this.transfer, message, port)
-
-        if (transfer) {
-          postMessagePortMessage(port, message, transfer)
-        }
-        else {
-          postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
-        }
-      }))
-    }
+      if (transfer) {
+        postMessagePortMessage(port, message, transfer)
+      }
+      else {
+        postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
+      }
+    })
 
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    await peer.message(peerMessage, createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)))
+    await peer?.message(peerMessage, createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)))
     return { matched: true }
   }
 
@@ -133,8 +123,6 @@ export class MessagePortHandler<T extends Context> {
    * @param port The same message port instance passed to `.message()`.
    */
   async close(port: SupportedMessagePort): Promise<void> {
-    const peer = this.peers.get(port)
-    this.peers.set(port, null)
-    await peer?.close()
+    await this.peers.close(port)
   }
 }
