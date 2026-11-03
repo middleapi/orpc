@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract'
-import { implement, os } from '@orpc/server'
+import { call, implement, os } from '@orpc/server'
+import { z } from 'zod'
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
 
@@ -787,6 +788,23 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/missing', undefined)).rejects.toThrowError(
         '[Contract-First] Missing or invalid implementation for procedure at path: "missing"',
       )
+    })
+
+    it('uses the implemented handler and config when implementing a server router', async () => {
+      const original = {
+        ping: os
+          .$config({ disableInputValidation: true })
+          .meta(openapi({ method: 'GET', path: '/ping' }))
+          .input(z.string())
+          .handler(() => 'original'),
+      }
+      const implementer = implement(original, { disableInputValidation: false })
+      const matcher = new OpenAPIMatcher(implementer.router({ ping: implementer.ping.handler(() => 'implemented') }))
+
+      const { procedure } = (await matcher.match('GET', '/ping', undefined))!
+
+      await expect(call(procedure, 'input')).resolves.toBe('implemented')
+      await expect(call(procedure, 123)).rejects.toThrow('Input validation failed')
     })
   })
 })
