@@ -107,6 +107,10 @@ const result = await call(
 )
 ```
 
+:::warning[Streaming Outputs]
+When a procedure returns an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data#readablestreamuint8array), the lock is held until the output completes, throws, or is cancelled, not just until the handler returns. An output that is never consumed or cancelled keeps the lock until its `ttl` expires, so set a `ttl` as a safeguard.
+:::
+
 :::info[Automatic Deduplication]
 When the same `locker` and `key` combination is used multiple times in a single request chain, the `lock` middleware acquires the lock only once, so a procedure never waits for a lock it already holds. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
 :::

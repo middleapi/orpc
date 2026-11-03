@@ -1,5 +1,7 @@
 import type { Locker } from './types'
-import { call, ORPCError, os, type } from '@orpc/server'
+import { call, getEventMeta, ORPCError, os, type, withEventMeta } from '@orpc/server'
+import { sleep } from '@orpc/shared'
+import { MemoryLocker } from './adapters/memory'
 import { LockTimeoutError } from './error'
 import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
 
@@ -197,6 +199,248 @@ describe('lock', () => {
         { context: {} },
       )
       expect(locker.lock).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('streaming outputs', () => {
+    const isHeld = (locker: Locker, key: string) =>
+      locker.lock(key, () => false, { timeout: 0 }).catch(e => e instanceof LockTimeoutError)
+
+    async function consume(iterator: AsyncIterable<unknown>) {
+      const values: unknown[] = []
+      for await (const value of iterator) {
+        values.push(value)
+      }
+      return values
+    }
+
+    async function consumeStream(stream: ReadableStream) {
+      const values: unknown[] = []
+      const reader = stream.getReader()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          return values
+        }
+        values.push(value)
+      }
+    }
+
+    it('keeps async iterator calls sharing a key from running concurrently', async () => {
+      let running = 0
+      let maxRunning = 0
+      const procedure = os
+        .use(lock({ locker: new MemoryLocker(), key: 'k' }))
+        .handler(async function* () {
+          running++
+          maxRunning = Math.max(maxRunning, running)
+          await sleep(20)
+          yield 1
+          await sleep(20)
+          yield 2
+          running--
+        })
+
+      const results = await Promise.all([
+        call(procedure, undefined, { context: {} }).then(consume),
+        call(procedure, undefined, { context: {} }).then(consume),
+        call(procedure, undefined, { context: {} }).then(consume),
+      ])
+
+      expect(results).toEqual([[1, 2], [1, 2], [1, 2]])
+      expect(maxRunning).toBe(1)
+    })
+
+    it('keeps readable stream calls sharing a key from running concurrently', async () => {
+      let running = 0
+      let maxRunning = 0
+      const procedure = os
+        .use(lock({ locker: new MemoryLocker(), key: 'k' }))
+        .handler(() => new ReadableStream<number>({
+          async pull(controller) {
+            running++
+            maxRunning = Math.max(maxRunning, running)
+            await sleep(20)
+            controller.enqueue(1)
+            controller.close()
+            running--
+          },
+        }, { highWaterMark: 0 }))
+
+      const results = await Promise.all([
+        call(procedure, undefined, { context: {} }).then(consumeStream),
+        call(procedure, undefined, { context: {} }).then(consumeStream),
+      ])
+
+      expect(results).toEqual([[1], [1]])
+      expect(maxRunning).toBe(1)
+    })
+
+    it('holds the lock until the iterator completes', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os
+        .use(lock({ locker, key: 'k' }))
+        .handler(async function* () {
+          yield 1
+          yield 2
+        })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      expect(await isHeld(locker, 'k')).toBe(true)
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 2 })
+      expect(await isHeld(locker, 'k')).toBe(true)
+
+      await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+      expect(await isHeld(locker, 'k')).toBe(false)
+    })
+
+    it('releases the lock after an early return', async () => {
+      const locker = new MemoryLocker()
+      let finished = false
+      const procedure = os
+        .use(lock({ locker, key: 'k' }))
+        .handler(async function* () {
+          try {
+            yield 1
+            yield 2
+          }
+          finally {
+            finished = true
+          }
+        })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(await isHeld(locker, 'k')).toBe(true)
+
+      await iterator.return(undefined)
+
+      expect(finished).toBe(true)
+      expect(await isHeld(locker, 'k')).toBe(false)
+    })
+
+    it('releases the lock after an error mid-stream', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('mid-stream')
+      const procedure = os
+        .use(lock({ locker, key: 'k' }))
+        .handler(async function* () {
+          yield 1
+          throw error
+        })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(await isHeld(locker, 'k')).toBe(true)
+      await expect(iterator.next()).rejects.toBe(error)
+
+      expect(await isHeld(locker, 'k')).toBe(false)
+    })
+
+    it('releases the lock when the signal aborts and the handler honors it', async () => {
+      const locker = new MemoryLocker()
+      const controller = new AbortController()
+      const procedure = os
+        .use(lock({ locker, key: 'k' }))
+        .handler(async function* ({ signal }) {
+          yield 1
+          await sleep(10_000, { signal })
+          yield 2
+        })
+
+      const iterator = await call(procedure, undefined, { context: {}, signal: controller.signal })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(await isHeld(locker, 'k')).toBe(true)
+
+      const next = iterator.next()
+      controller.abort(new Error('aborted'))
+
+      await expect(next).rejects.toThrow('aborted')
+      expect(await isHeld(locker, 'k')).toBe(false)
+    })
+
+    it('releases the lock when a readable stream is cancelled or errors', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('stream error')
+      const cancel = vi.fn()
+      const procedure = os
+        .input(type<'cancel' | 'error'>())
+        .use(lock({ locker, key: 'k' }))
+        .handler(({ input }) => new ReadableStream({
+          pull(controller) {
+            if (input === 'error') {
+              controller.error(error)
+            }
+            else {
+              controller.enqueue(1)
+            }
+          },
+          cancel,
+        }, { highWaterMark: 0 }))
+
+      const cancelled = await call(procedure, 'cancel', { context: {} })
+      const reader = cancelled.getReader()
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
+      expect(await isHeld(locker, 'k')).toBe(true)
+      await reader.cancel('reason')
+      expect(cancel).toHaveBeenCalledWith('reason')
+      expect(await isHeld(locker, 'k')).toBe(false)
+
+      const errored = await call(procedure, 'error', { context: {} })
+      expect(await isHeld(locker, 'k')).toBe(true)
+      await expect(errored.getReader().read()).rejects.toBe(error)
+      expect(await isHeld(locker, 'k')).toBe(false)
+    })
+
+    it('surfaces release errors to the consumer', async () => {
+      const error = new Error('release failed')
+      const locker: Locker = {
+        async lock(_key, fn) {
+          await fn({ waited: false })
+          throw error
+        },
+      }
+      const procedure = os
+        .use(lock({ locker, key: 'k' }))
+        .handler(async function* () {
+          yield 1
+        })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).rejects.toBe(error)
+    })
+
+    it('preserves event meta', async () => {
+      const procedure = os
+        .use(lock({ locker: new MemoryLocker(), key: 'k' }))
+        .handler(async function* () {
+          yield withEventMeta({ value: 1 }, { id: 'id-1' })
+        })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      const { value } = await iterator.next()
+
+      expect(getEventMeta(value)).toEqual({ id: 'id-1' })
+    })
+
+    it('holds the outer lock while a deduped nested iterator runs', async () => {
+      const locker = new MemoryLocker()
+      const mw = lock({ locker, key: 'k' })
+      const inner = os.use(mw).handler(async function* () {
+        yield 1
+      })
+      const outer = os.use(mw).handler(async function* ({ context }) {
+        yield* await call(inner, undefined, { context })
+      })
+
+      const iterator = await call(outer, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(await isHeld(locker, 'k')).toBe(true)
+      await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+      expect(await isHeld(locker, 'k')).toBe(false)
     })
   })
 })
