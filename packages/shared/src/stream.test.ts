@@ -755,3 +755,50 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
     expect(cleanupCalled).toBe(true)
   })
 })
+
+describe.each([
+  { name: 'asyncIteratorToStream', toStream: asyncIteratorToStream },
+  { name: 'asyncIteratorToUnproxiedDataStream', toStream: asyncIteratorToUnproxiedDataStream },
+])('$name pulls on demand', ({ toStream }) => {
+  it('should not start the iterator before the first read', async () => {
+    let started = false
+
+    const stream = toStream(async function* () {
+      started = true
+      yield 1
+    }())
+
+    await sleep(0)
+    expect(started).toBe(false)
+
+    const reader = stream.getReader()
+    expect(await reader.read()).toEqual({ done: false, value: 1 })
+    expect(started).toBe(true)
+  })
+
+  it('should call iterator.return promptly on cancel while the iterator is pending', async () => {
+    const cleanup = vi.fn()
+
+    const stream = toStream(async function* () {
+      try {
+        yield 1
+        await new Promise(() => {})
+      }
+      finally {
+        cleanup()
+      }
+    }())
+
+    const reader = stream.getReader()
+    expect(await reader.read()).toEqual({ done: false, value: 1 })
+    await sleep(0)
+
+    const cancelled = await Promise.race([
+      reader.cancel().then(() => true),
+      sleep(100).then(() => false),
+    ])
+
+    expect(cancelled).toBe(true)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+  })
+})
