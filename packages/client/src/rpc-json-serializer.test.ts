@@ -480,6 +480,30 @@ describe('rpcJsonSerializer: deserialize', () => {
   const serializer = new RPCJsonSerializer()
 
   it.each([
+    ['a string', 'hello'],
+    ['an array', [{ json: 1 }]],
+    ['null', null],
+    ['a number', 1],
+  ])('rejects %s instead of resolving to undefined', (_, value) => {
+    expect(() => serializer.deserializeJson(value as any)).toThrow('Invalid RPC serialized data: expected an object.')
+  })
+
+  it('rejects non-array meta and maps', () => {
+    expect(() => serializer.deserializeJson({ json: 1, meta: 'x' as any })).toThrow('"meta" must be an array.')
+    expect(() => serializer.deserializeJson({ json: 1, maps: {} as any, blobs: [] })).toThrow('"maps" must be an array.')
+    expect(() => serializer.deserializeJson({ json: [null], blobs: [new Blob()] } as any)).toThrow('"maps" must be an array when blobs are present.')
+  })
+
+  it('treats a missing json as undefined, the way JSON drops it', () => {
+    expect(serializer.deserializeJson({} as any)).toBeUndefined()
+    expect(serializer.deserializeJson(JSON.parse(JSON.stringify(serializer.serializeJson(undefined))))).toBeUndefined()
+  })
+
+  it('accepts a null-prototype envelope', () => {
+    expect(serializer.deserializeJson(Object.assign(Object.create(null), { json: '1', meta: [['bigint']] }))).toBe(1n)
+  })
+
+  it.each([
     ['json', { count: 10n, list: [{ tags: new Set(['a']), nested: [new Date('2023-01-01'), new URL('https://orpc.dev')] }] }],
     ['blobs', { files: [new Blob(['hello'])], map: new Map([[1n, new Set(['a'])]]) }],
   ])('does not mutate the input and can deserialize repeatedly: %s', (_, value) => {

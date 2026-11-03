@@ -335,5 +335,50 @@ describe('rpcLinkCodec', () => {
       expect(error.response).toEqual({ status: 200, headers: {}, body: { meta: 123 } })
       expect(error.cause).toBeInstanceOf(Error)
     })
+
+    it.each([
+      ['a string', 'hello'],
+      ['an array', [1, 2, 3]],
+      ['an object without json', { message: 'ok' }],
+      ['null', null],
+    ])('throws MalformedResponseError on a success body that is %s', async (_, body) => {
+      const error: any = await codec.decodeResponse({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        resolveBody: () => Promise.resolve(body),
+      }).then(() => null, e => e)
+
+      expect(error).toBeInstanceOf(MalformedResponseError)
+      expect(error.message).toBe('Invalid RPC response format.')
+      expect(error.response).toEqual({ status: 200, headers: { 'content-type': 'application/json' }, body })
+      expect(error.cause).toBeInstanceOf(TypeError)
+    })
+
+    it('still decodes an envelope with an undefined or null json', async () => {
+      await expect(codec.decodeResponse({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.resolve({ json: null }),
+      })).resolves.toEqual({ kind: 'output', output: null })
+
+      await expect(codec.decodeResponse({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.resolve(undefined),
+      })).resolves.toEqual({ kind: 'output', output: undefined })
+    })
+
+    it('infers the message of a non-envelope error body', async () => {
+      const error: any = await codec.decodeResponse({
+        status: 502,
+        headers: { 'content-type': 'text/plain' },
+        resolveBody: () => Promise.resolve('Upstream is down'),
+      }).then(() => null, e => e)
+
+      expect(error).toBeInstanceOf(MalformedResponseError)
+      expect(error.message).toBe('Upstream is down')
+      expect(error.response).toEqual({ status: 502, headers: { 'content-type': 'text/plain' }, body: 'Upstream is down' })
+      expect(error.cause).toBeInstanceOf(TypeError)
+    })
   })
 })

@@ -99,7 +99,8 @@ export class RPCSerializer extends RPCJsonSerializer {
           return { done: result.done, value: this.deserializePayload(result.value) }
         },
         mapError: (e) => {
-          if (!(e instanceof ErrorEvent)) {
+          // `event: error` without data carries nothing to deserialize
+          if (!(e instanceof ErrorEvent) || e.data === undefined) {
             return e
           }
 

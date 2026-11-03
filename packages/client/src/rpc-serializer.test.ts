@@ -250,6 +250,16 @@ describe('rpcSerializer', () => {
       await expect(deserialized.next()).rejects.toBe(error)
     })
 
+    it('keeps a data-less error event as is', async () => {
+      const event = new ErrorEvent(undefined)
+
+      const iterator = serializer.deserialize((async function* () {
+        throw event
+      })()) as any
+
+      await expect(iterator.next()).rejects.toBe(event)
+    })
+
     it('deserialize an invalid ORPCError json', async () => {
       const iterator = serializer.deserialize((async function* () {
         throw new ErrorEvent({ json: { value: 1234 } })

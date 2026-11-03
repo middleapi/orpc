@@ -2,7 +2,7 @@ import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard'
-import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, isPlainObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import { MalformedResponseError, ResponseError } from '../../error'
@@ -129,11 +129,20 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     const deserialized = await (async () => {
       try {
+        /**
+         * A JSON success body must be an RPC envelope. Without `json`, it is not one
+         * (e.g. a proxy's JSON), and must not resolve to `undefined`.
+         */
+        if (isOk && isPlainObject(body) && !Object.hasOwn(body, 'json')) {
+          throw new TypeError('Invalid RPC serialized data: expected an object with a "json" property.')
+        }
+
         return this.serializer.deserialize(body)
       }
       catch (cause) {
         throw new MalformedResponseError({
-          message: 'Invalid RPC response format.',
+          // error bodies from proxies and gateways (e.g. plain text) often carry a better message
+          message: isOk ? 'Invalid RPC response format.' : undefined,
           response: { status: response.status, headers: response.headers, body },
           cause,
         })

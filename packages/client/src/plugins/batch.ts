@@ -479,6 +479,8 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         await peer.close(new TypeError('Batch response is incomplete.'))
       }
       catch (error) {
+        // release the underlying response (e.g. a still-open stream after a decode error)
+        controller.abort(error)
         await peer.close(error)
       }
     }
@@ -590,6 +592,11 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, re
         break
       }
     }
+  }
+  catch (error) {
+    // stop the rest of the response instead of leaving it open
+    reader.cancel(error).catch(() => {})
+    throw error
   }
   finally {
     reader.releaseLock()

@@ -115,11 +115,30 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
         if (interceptorOptions.signal?.aborted) {
           return response
         }
+
+        discardResponseBody(response)
       }
     }
 
     return { ...options, transportInterceptors: [interceptor, ...toArray(options.transportInterceptors)] }
   }
+}
+
+/**
+ * Releases the body of a response that is being replaced by a retry,
+ * so its connection (e.g. an undici keep-alive socket) is not held until garbage collection.
+ */
+function discardResponseBody(response: StandardLazyResponse): void {
+  response.resolveBody('octet-stream').then(async (body) => {
+    if (body instanceof ReadableStream) {
+      await body.cancel()
+    }
+    else if (isAsyncIteratorObject(body)) {
+      await body.return?.()
+    }
+  }).catch(() => {
+    // the body may already be consumed, or the transport may fail while cancelling
+  })
 }
 
 function parseRetryAfterHeader(value: string | undefined): number | undefined {

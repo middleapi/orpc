@@ -430,6 +430,27 @@ export class RPCJsonSerializer {
   }
 
   deserializeJson(serialized: RPCJsonSerialization): unknown {
+    /**
+     * `serialized` usually comes from the wire, so reject anything that is not an envelope
+     * (e.g. a bare string or an array) instead of silently resolving to `undefined`.
+     * A missing `json` still means `undefined`, since that is how JSON drops it.
+     */
+    if (!isPlainObject(serialized)) {
+      throw invalidSerializedData('expected an object.')
+    }
+
+    if (serialized.meta !== undefined && !Array.isArray(serialized.meta)) {
+      throw invalidSerializedData('"meta" must be an array.')
+    }
+
+    if (serialized.maps !== undefined && !Array.isArray(serialized.maps)) {
+      throw invalidSerializedData('"maps" must be an array.')
+    }
+
+    if (serialized.blobs?.length && !Array.isArray(serialized.maps)) {
+      throw invalidSerializedData('"maps" must be an array when blobs are present.')
+    }
+
     const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {

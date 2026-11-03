@@ -1,4 +1,5 @@
-import { allAbortSignal, anyAbortSignal, runWithSignal } from './signal'
+import { getEventListeners } from 'node:events'
+import { allAbortSignal, anyAbortSignal, disposableAllAbortSignal, runWithSignal } from './signal'
 
 describe('allAbortSignal', () => {
   it('should return undefined if contains undefined or empty array', () => {
@@ -53,6 +54,79 @@ describe('allAbortSignal', () => {
     controllerLater2.abort()
     expect(batchSignal?.aborted).toBe(true)
     expect(abortSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('disposableAllAbortSignal', () => {
+  it('returns an undefined signal and a no-op dispose if contains undefined or empty array', () => {
+    const empty = disposableAllAbortSignal([])
+    expect(empty.signal).toBe(undefined)
+    expect(() => empty.dispose()).not.toThrow()
+
+    const withUndefined = disposableAllAbortSignal([new AbortController().signal, undefined])
+    expect(withUndefined.signal).toBe(undefined)
+    expect(() => withUndefined.dispose()).not.toThrow()
+  })
+
+  it('aborts once all signals abort, and then removes its listeners', () => {
+    const controller1 = new AbortController()
+    const controller2 = new AbortController()
+
+    const { signal } = disposableAllAbortSignal([controller1.signal, controller2.signal])
+
+    expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(1)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(1)
+
+    controller1.abort()
+    expect(signal?.aborted).toBe(false)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(1)
+
+    controller2.abort()
+    expect(signal?.aborted).toBe(true)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(0)
+  })
+
+  it('removes its listeners on dispose, after which the signal never aborts', () => {
+    const longLived = new AbortController()
+    const other = new AbortController()
+
+    for (let i = 0; i < 5; i++) {
+      const { dispose } = disposableAllAbortSignal([longLived.signal, other.signal])
+      dispose()
+    }
+
+    expect(getEventListeners(longLived.signal, 'abort')).toHaveLength(0)
+    expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
+
+    const { signal, dispose } = disposableAllAbortSignal([longLived.signal, other.signal])
+    dispose()
+    dispose()
+    longLived.abort()
+    other.abort()
+    expect(signal?.aborted).toBe(false)
+  })
+
+  it('adds no listeners if all signals are already aborted', () => {
+    const controller1 = new AbortController()
+    const controller2 = new AbortController()
+    controller1.abort()
+    controller2.abort()
+
+    const { signal } = disposableAllAbortSignal([controller1.signal, controller2.signal])
+
+    expect(signal?.aborted).toBe(true)
+    expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(0)
+  })
+
+  it('handles the same signal passed more than once', () => {
+    const controller = new AbortController()
+
+    const { signal, dispose } = disposableAllAbortSignal([controller.signal, controller.signal])
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(1)
+
+    controller.abort()
+    expect(signal?.aborted).toBe(true)
+    expect(() => dispose()).not.toThrow()
   })
 })
 

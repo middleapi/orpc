@@ -1369,6 +1369,89 @@ describe('batchLinkPlugin', () => {
     })
   })
 
+  describe('decode errors on a still-open streamed batch response', () => {
+    it('cancels the stream and aborts the batch request', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const cancel = vi.fn()
+      let batchSignal: AbortSignal | undefined
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        batchSignal = request.signal
+        const bytes = await toLengthPrefixedBytes(['INVALID'])
+
+        return {
+          status: 207,
+          headers: {},
+          // the stream never closes on its own, like a live response whose server keeps streaming
+          resolveBody: async () => new ReadableStream({
+            start(controller) {
+              controller.enqueue(bytes)
+            },
+            cancel,
+          }),
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toThrow('Invalid batch response: invalid message.'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toThrow('Invalid batch response: invalid message.'),
+      ])
+
+      expect(cancel).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ message: 'Invalid batch response: invalid message.' }))
+      expect(batchSignal?.aborted).toBe(true)
+      expect(batchSignal?.reason).toEqual(expect.objectContaining({ message: 'Invalid batch response: invalid message.' }))
+    })
+
+    it('aborts the batch request on an invalid batch response format', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      let batchSignal: AbortSignal | undefined
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        batchSignal = request.signal
+        return { status: 207, headers: {}, resolveBody: async () => 'INVALID' }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toThrow('Invalid batch response format'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toThrow('Invalid batch response format'),
+      ])
+
+      expect(batchSignal?.aborted).toBe(true)
+    })
+
+    it('does not abort the batch request once the response completes', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      let batchSignal: AbortSignal | undefined
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        batchSignal = request.signal
+        return { status: 207, headers: {}, resolveBody: async () => [] }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toThrow('Batch response is incomplete.'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toThrow('Batch response is incomplete.'),
+      ])
+
+      expect(batchSignal?.aborted).toBe(false)
+    })
+  })
+
   describe('error batch responses', () => {
     it('forwards batch responses with status >= 400 to every subrequest', async () => {
       const codec = makeCodec()

@@ -2,7 +2,7 @@ import type { AsyncIteratorClass, InterceptorOptions, Value } from '@orpc/shared
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { allAbortSignal, captureAsyncContext, defer, isAsyncIteratorObject, replicateAsyncIterator, replicateReadableStream, runWithSignal, stringifyJSON, throwIfAborted, toArray, value, wrapAsyncIterator } from '@orpc/shared'
+import { captureAsyncContext, defer, disposableAllAbortSignal, isAsyncIteratorObject, replicateAsyncIterator, replicateReadableStream, runWithSignal, stringifyJSON, throwIfAborted, toArray, value, wrapAsyncIterator } from '@orpc/shared'
 
 export interface DedupeLinkPluginGroup<T extends ClientContext> {
   condition: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
@@ -157,6 +157,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
   ): Promise<void> {
     const first = activeCallers[0]!
     const matchedOptions = activeCallers.map(caller => caller.options)
+    let disposeSharedSignal: (() => void) | undefined
 
     try {
       if (!shouldDedupe(matchedOptions)) {
@@ -167,10 +168,12 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
       const context = value(group.context, matchedOptions) as T
       const signals = matchedOptions.map(options => options.request.signal)
+      const sharedSignal = disposableAllAbortSignal(signals)
+      disposeSharedSignal = sharedSignal.dispose
 
       const request: StandardRequest = {
         ...first.options.request,
-        signal: allAbortSignal(signals),
+        signal: sharedSignal.signal,
       }
 
       const response = await first.options.next({
@@ -180,11 +183,18 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      const replicatedResponses = replicateLazyResponse(response, signals)
+      /**
+       * Once the body is resolved, the shared signal is no longer needed: a streamed body's replicas
+       * cancel the source once all of them are cancelled. So stop listening to the callers' signals,
+       * which may be long-lived and shared across many requests.
+       */
+      const replicatedResponses = replicateLazyResponse(response, signals, sharedSignal.dispose)
 
       activeCallers.forEach((caller, index) => caller.resolve(replicatedResponses[index]!))
     }
     catch (error) {
+      disposeSharedSignal?.()
+
       for (const caller of activeCallers) {
         caller.reject(error)
       }
@@ -224,13 +234,17 @@ function createRequestKey(path: string[], request: StandardRequest): string {
  * Replicates the response once per signal. Like an unshared response, each replica's body
  * fails and stops streaming once its own signal aborts, without affecting the other replicas.
  */
-function replicateLazyResponse(response: StandardLazyResponse, signals: (AbortSignal | undefined)[]): StandardLazyResponse[] {
+function replicateLazyResponse(
+  response: StandardLazyResponse,
+  signals: (AbortSignal | undefined)[],
+  onBodySettled: () => void,
+): StandardLazyResponse[] {
   let bodiesPromise: Promise<StandardBody[]> | undefined
 
   return signals.map((signal, i) => ({
     ...response,
     resolveBody: hint => runWithSignal(signal, async () => {
-      bodiesPromise ??= response.resolveBody(hint).then((body) => {
+      bodiesPromise ??= response.resolveBody(hint).finally(onBodySettled).then((body) => {
         if (isAsyncIteratorObject(body)) {
           return replicateAsyncIterator(body, signals.length)
             .map((replica, index) => closeAsyncIteratorOnAbort(replica, signals[index]))
