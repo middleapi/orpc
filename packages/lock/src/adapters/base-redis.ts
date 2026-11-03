@@ -106,7 +106,12 @@ export abstract class BaseRedisLocker implements Locker {
       return await fn({ waited })
     }
     finally {
-      await this.evalScript(RELEASE_LOCK_SCRIPT, [prefixedKey], [token])
+      try {
+        await this.evalScript(RELEASE_LOCK_SCRIPT, [prefixedKey], [token])
+      }
+      catch {
+        // the lock still expires through its TTL
+      }
     }
   }
 }

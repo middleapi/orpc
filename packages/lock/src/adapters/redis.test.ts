@@ -194,3 +194,13 @@ describe.concurrent('redis locker integration', {
     expect(redis.isOpen).toBe(true)
   })
 })
+
+it('preserves the callback outcome when the release fails', async () => {
+  const redis = { isOpen: true, set: vi.fn(async () => 'OK'), eval: vi.fn().mockRejectedValue(new Error('connection lost')) }
+  const locker = new RedisLocker(redis as any, { ttl: 1000 })
+  const error = new Error('fn failed')
+
+  await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
+  await expect(locker.lock('key', () => Promise.reject(error))).rejects.toBe(error)
+  expect(redis.eval).toHaveBeenCalledTimes(2)
+})
