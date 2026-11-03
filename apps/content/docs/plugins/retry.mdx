@@ -81,6 +81,10 @@ const link = new RPCLink<ClientContext>({
 
 :::
 
+:::warning
+Calls whose input is, or directly contains (such as the `body` of a detailed [OpenAPILink](/docs/openapi/link) input), a [`ReadableStream`](/docs/binary-data#readablestreamuint8array) or an [`AsyncIteratorObject`](/docs/async-iterator-object) are never retried. The first attempt consumes the input, so it cannot be resent, and the plugin throws the first attempt's error as-is.
+:::
+
 ## Client Error Responses
 
 By default, errors from a 4xx response other than `408` and `429` are not retried, since retrying would most likely fail the same way. To retry every error, set `shouldRetry` to `true`, or extend the default with `isRetryableError`:

@@ -4,6 +4,7 @@ import type { ClientContext } from '../types'
 import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
+import { isStreamInput } from './utils'
 
 export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
   /**
@@ -94,6 +95,8 @@ export function isRetryableError(error: unknown): boolean {
  *
  * @remarks
  * **Note**: Retry behavior is configured through the client context on each call.
+ * Calls whose input is, or directly contains, a stream or async iterator are never retried,
+ * since the input cannot be resent.
  *
  * @see {@link https://orpc.dev/docs/plugins/retry | Retry Plugin}
  */
@@ -124,7 +127,11 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       const shouldRetry = callOptions.context.shouldRetry ?? this.defaultShouldRetry
       const onRetry = callOptions.context.onRetry ?? this.defaultOnRetry
 
-      if (maxAttempts <= 0) {
+      /**
+       * A stream or iterator input is consumed by the first attempt and cannot be resent,
+       * so make a single attempt and surface its error instead of retrying with an empty or locked input.
+       */
+      if (maxAttempts <= 0 || isStreamInput(callOptions.input)) {
         return next(callOptions)
       }
 
@@ -142,7 +149,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           let retryDelayMs = 0
 
           if (currentError) {
-            if (isIteratorAborted || attempt > maxAttempts) {
+            if (isIteratorAborted || updatedCallOptions.signal?.aborted || attempt > maxAttempts) {
               throw currentError.error
             }
 

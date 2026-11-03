@@ -3,6 +3,7 @@ import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/stand
 import type { RetryLinkPluginContext } from './retry'
 import { promiseWithResolvers } from '@orpc/shared'
 import { withEventMeta } from '@standard-server/core'
+import { RPCLink } from '../adapters/fetch'
 import { StandardLink } from '../adapters/standard'
 import { MalformedResponseError, ORPCError, ResponseError } from '../error'
 import { isRetryableError, RetryLinkPlugin } from './retry'
@@ -293,6 +294,80 @@ describe('retryLinkPlugin', () => {
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
   })
 
+  describe('stream inputs', () => {
+    function makeFetch() {
+      const bodies: string[] = []
+      const fetch = vi.fn(async (url: string, init: RequestInit) => {
+        bodies.push(await new Request(url, init).text())
+        throw new TypeError('NETWORK_FAIL')
+      })
+
+      return { fetch, bodies }
+    }
+
+    it('does not retry an AsyncIteratorObject input and throws the original error', async () => {
+      const { fetch, bodies } = makeFetch()
+      const shouldRetry = vi.fn(() => true)
+
+      const link = new RPCLink<TestContext>({
+        origin: 'http://localhost',
+        fetch,
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const input = (async function* () {
+        yield 'a'
+        yield 'b'
+      })()
+
+      await expect(link.call(['upload'], input, { context: { retry: 1, retryDelay: 0, shouldRetry } })).rejects.toThrow('NETWORK_FAIL')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(bodies[0]).toContain('"a"')
+      expect(shouldRetry).not.toHaveBeenCalled()
+    })
+
+    it('does not retry a ReadableStream input and throws the original error', async () => {
+      const { fetch, bodies } = makeFetch()
+      const shouldRetry = vi.fn(() => true)
+
+      const link = new RPCLink<TestContext>({
+        origin: 'http://localhost',
+        fetch,
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const input = new Blob(['payload']).stream()
+
+      await expect(link.call(['upload'], input, { context: { retry: 1, retryDelay: 0, shouldRetry } })).rejects.toThrow('NETWORK_FAIL')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(bodies[0]).toBe('payload')
+      expect(shouldRetry).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['ReadableStream', () => new Blob(['payload']).stream()],
+      ['AsyncIteratorObject', () => (async function* () { yield 'a' })()],
+    ])('does not retry an input containing a %s', async (_, makeBody) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const shouldRetry = vi.fn(() => true)
+
+      const error = new Error('FAIL')
+      vi.mocked(transport.send).mockRejectedValue(error)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(link.call(['upload'], { params: { id: '1' }, body: makeBody() }, { context: { retry: 3, retryDelay: 0, shouldRetry } })).rejects.toBe(error)
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(shouldRetry).not.toHaveBeenCalled()
+    })
+  })
+
   describe('asyncIteratorObject', () => {
     it('retries AsyncIteratorObject and forwards lastEventId from metadata', async () => {
       const codec = makeCodec()
@@ -541,6 +616,45 @@ describe('retryLinkPlugin', () => {
       expect(onRetry).toHaveBeenCalledTimes(1)
       expect(clean).toHaveBeenCalledTimes(1)
       expect(clean).toHaveBeenCalledWith(false)
+    })
+
+    it('does not retry or run retry hooks when the signal is aborted while consuming', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const controller = new AbortController()
+
+      vi.mocked(codec.decodeResponse).mockResolvedValue({
+        kind: 'output',
+        output: (async function* () {
+          yield 1
+          throw new Error('ABORTED')
+        })(),
+      })
+
+      const shouldRetry = vi.fn(() => true)
+      const retryDelay = vi.fn(() => 0)
+      const onRetry = vi.fn()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['stream'], undefined, {
+        context: { retry: 3, shouldRetry, retryDelay, onRetry },
+        signal: controller.signal,
+      }) as AsyncIterator<any>
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+
+      controller.abort()
+
+      await expect(iterator.next()).rejects.toThrow('ABORTED')
+
+      expect(shouldRetry).not.toHaveBeenCalled()
+      expect(retryDelay).not.toHaveBeenCalled()
+      expect(onRetry).not.toHaveBeenCalled()
+      expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
     })
 
     it('reset special AsyncIteratorObject properties after retry', async () => {
