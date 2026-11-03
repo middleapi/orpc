@@ -177,21 +177,7 @@ export function streamToAsyncIteratorObject<T>(
 export function asyncIteratorToStream<T>(
   iterator: AsyncIterator<T>,
 ): ReadableStream<T> {
-  return new ReadableStream<T>({
-    async pull(controller) {
-      const { done, value } = await iterator.next()
-
-      if (done) {
-        controller.close()
-      }
-      else {
-        controller.enqueue(value)
-      }
-    },
-    async cancel() {
-      await iterator.return?.()
-    },
-  })
+  return createIteratorStream(iterator, value => value)
 }
 
 /**
@@ -203,6 +189,17 @@ export function asyncIteratorToStream<T>(
 export function asyncIteratorToUnproxiedDataStream<T>(
   iterator: AsyncIterator<T>,
 ): ReadableStream<T> {
+  return createIteratorStream(iterator, value => isPlainObject(value)
+    ? { ...value }
+    : Array.isArray(value)
+      ? value.map(i => i) as T // use .map instead of ... to deal with sparse arrays
+      : value)
+}
+
+function createIteratorStream<T>(
+  iterator: AsyncIterator<T>,
+  map: (value: T) => T,
+): ReadableStream<T> {
   return new ReadableStream<T>({
     async pull(controller) {
       const { done, value } = await iterator.next()
@@ -211,17 +208,11 @@ export function asyncIteratorToUnproxiedDataStream<T>(
         controller.close()
       }
       else {
-        const unproxied = isPlainObject(value)
-          ? { ...value }
-          : Array.isArray(value)
-            ? value.map(i => i) as T // use .map instead of ... to deal with sparse arrays
-            : value
-
-        controller.enqueue(unproxied)
+        controller.enqueue(map(value))
       }
     },
     async cancel() {
       await iterator.return?.()
     },
-  })
+  }, { highWaterMark: 0 })
 }

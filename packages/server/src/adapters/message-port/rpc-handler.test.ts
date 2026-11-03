@@ -200,6 +200,50 @@ describe('rpcHandler', () => {
     await handler.close(serverPort as any) // safe to invoke multiple times
   })
 
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const { serverPort } = createPort()
+    const postMessage = vi.spyOn(serverPort, 'postMessage').mockImplementation(() => {
+      // noop
+    })
+
+    await handler.close(serverPort as any)
+
+    const result = await handler.message(serverPort as any, await createRequestMessage())
+
+    expect(result.matched).toBe(true)
+    expect(procedure).not.toHaveBeenCalled()
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
+  it('ignores messages received while closing', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const { serverPort } = createPort()
+    const postMessage = vi.spyOn(serverPort, 'postMessage').mockImplementation(() => {
+      // noop
+    })
+
+    await handler.message(serverPort as any, await createRequestMessage())
+    expect(procedure).toHaveBeenCalledTimes(1)
+    postMessage.mockClear()
+
+    const closing = handler.close(serverPort as any)
+    const result = await handler.message(serverPort as any, await createRequestMessage())
+    await closing
+
+    expect(result.matched).toBe(true)
+    expect(procedure).toHaveBeenCalledTimes(1)
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
   it('can receive and send un-encoded messages with transfer option (structured clone)', async () => {
     const transferable = new Uint8Array([1, 2, 3]).buffer
 

@@ -23,6 +23,7 @@ const DOCS_URL_PREFIX = 'https://orpc.dev/docs/'
  * Justified exceptions, keyed by `<specifier>#<name>`, value is the reason.
  */
 const ALLOWLIST: Record<string, string> = {
+  '@orpc/shared#isAsyncIteratorObject': 're-exported from the external @standard-server/shared package, its declaration cannot carry an orpc.dev backlink',
 }
 
 interface Mention {
