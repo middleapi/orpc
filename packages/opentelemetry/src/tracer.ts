@@ -5,10 +5,7 @@ import { INVALID_SPAN_CONTEXT, SpanStatusCode } from '@opentelemetry/api'
 export class OpenTelemetrySpan implements TracingSpan {
   constructor(
     readonly span: Span,
-    /**
-     * The full context this span was extracted from, used as-is when the span is a parent,
-     * so entries beside the span (e.g. W3C baggage) are not dropped.
-     */
+    /** The extracted context, used as the parent context so baggage is kept. */
     readonly context?: Context | undefined,
   ) {}
 
@@ -79,17 +76,11 @@ export class OpenTelemetryTracer implements Tracer {
         const extracted = propagation.extract(active, headers)
         const span = this.trace.getSpan(extracted)
 
-        if (span !== undefined) {
-          return new OpenTelemetrySpan(span, extracted)
+        if (span === undefined && extracted === active) {
+          return undefined
         }
 
-        /**
-         * Headers can carry entries without a trace context (e.g. only `baggage`).
-         * Wrap them with an invalid span so children still start a new trace under this context.
-         */
-        return extracted === active
-          ? undefined
-          : new OpenTelemetrySpan(this.trace.wrapSpanContext(INVALID_SPAN_CONTEXT), extracted)
+        return new OpenTelemetrySpan(span ?? this.trace.wrapSpanContext(INVALID_SPAN_CONTEXT), extracted)
       }
     }
   }

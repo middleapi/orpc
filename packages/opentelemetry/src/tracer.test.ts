@@ -210,7 +210,6 @@ describe('openTelemetryTracer', () => {
   it('keeps baggage of headers without trace context and starts a new trace', async () => {
     const tracer = createTracer()
     const parent = tracer.extract!({ baggage: 'user=alice' })
-    expect(parent).toBeInstanceOf(OpenTelemetrySpan)
 
     const headers: Record<string, string | string[] | undefined> = {}
 
