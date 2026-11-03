@@ -121,7 +121,9 @@ export class WebSocketHandler<T extends Context> {
 
       // Not awaited: `this.message` runs business logic that may be slow,
       // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
+      // Rejections (e.g. a throwing `context`) are swallowed: the peer has already cancelled the request,
+      // and an unhandled rejection would let a single client message crash the process.
+      this.message(ws, data, ...rest).catch(() => {})
     }))
     ws.addEventListener('close', () => this.close(ws))
 

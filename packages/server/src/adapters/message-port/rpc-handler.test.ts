@@ -1,3 +1,4 @@
+import { ORPCError } from '@orpc/client'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
@@ -286,6 +287,50 @@ describe('rpcHandler', () => {
     })
 
     expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  it('does not leak an unhandled rejection when context throws via upgrade', async () => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    let onMessage: ((event: { data: unknown }) => void) | undefined
+    const port = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+      }),
+      postMessage: vi.fn(),
+    }
+
+    handler.upgrade(port as any, {
+      context: () => {
+        throw new ORPCError('UNAUTHORIZED')
+      },
+    })
+
+    onMessage!({ data: await createRequestMessage() })
+
+    await vi.waitFor(() => {
+      expect(port.postMessage).toHaveBeenCalledTimes(1)
+    })
+
+    const decoded = decodePeerMessage(port.postMessage.mock.calls[0]![0]) as any
+    expect(decoded.message).toEqual({ id: '19', kind: 'cancel' })
+
+    // let any unhandled rejection surface
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    expect(unhandledRejection).not.toHaveBeenCalled()
+    expect(procedure).not.toHaveBeenCalled()
   })
 
   it('ignore invalid message format', async () => {

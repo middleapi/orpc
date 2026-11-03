@@ -64,7 +64,11 @@ export class MessagePortHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    onMessagePortMessage(port, message => this.message(port, message, ...rest))
+    onMessagePortMessage(port, (message) => {
+      // Rejections (e.g. a throwing `context`) are swallowed: the peer has already cancelled the request,
+      // and an unhandled rejection would let a single client message crash the process.
+      this.message(port, message, ...rest).catch(() => {})
+    })
     onMessagePortClose(port, () => this.close(port))
   }
 

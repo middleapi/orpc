@@ -1,5 +1,6 @@
 import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
+import { ORPCError } from '@orpc/client'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import WebSocket, { WebSocketServer } from 'ws'
 import { os } from '../../builder'
@@ -271,6 +272,41 @@ describe('rpcHandler', () => {
 
     expect(procedure).not.toHaveBeenCalled()
     expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  it('does not leak an unhandled rejection when context throws via upgrade', async () => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const ws = createWs()
+    handler.upgrade(ws as any, {
+      context: () => {
+        throw new ORPCError('UNAUTHORIZED')
+      },
+    })
+
+    ws.listeners.message!({ data: await createRequestMessage() })
+
+    await vi.waitFor(() => {
+      expect(ws.send).toHaveBeenCalledTimes(1)
+    })
+
+    const decoded = decodePeerMessage((ws as any).send.mock.calls[0][0]) as any
+    expect(decoded.message).toEqual({ id: '19', kind: 'cancel' })
+
+    // let any unhandled rejection surface
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    expect(unhandledRejection).not.toHaveBeenCalled()
+    expect(procedure).not.toHaveBeenCalled()
   })
 
   it('ignores messages received after close', async () => {
