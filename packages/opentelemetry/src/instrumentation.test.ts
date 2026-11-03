@@ -1,26 +1,26 @@
 import { trace } from '@opentelemetry/api'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
-import * as SharedModule from '@orpc/shared'
+import { getTracer, setTracer } from '@orpc/shared'
 import pkg from '../package.json'
 import { ORPCInstrumentation } from './instrumentation'
 import { OpenTelemetryTracer } from './tracer'
 
-const setTracerSpy = vi.spyOn(SharedModule, 'setTracer').mockImplementation(() => {})
 const getTracerSpy = vi.spyOn(trace, 'getTracer')
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setTracer(undefined)
 })
 
 describe('oRPCInstrumentation', () => {
   it('should initialize the instrumentation and enable by default', () => {
-    void new ORPCInstrumentation()
+    const instrumentation = new ORPCInstrumentation()
 
     expect(getTracerSpy).toHaveBeenCalledWith(pkg.name, pkg.version)
-    expect(setTracerSpy).toHaveBeenCalledTimes(1)
+    expect(instrumentation.isEnabled()).toBe(true)
 
-    const tracer = setTracerSpy.mock.calls[0]![0]
+    const tracer = getTracer()
     expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
     expect(tracer!.inject).toBeTypeOf('function')
     expect(tracer!.extract).toBeTypeOf('function')
@@ -29,21 +29,29 @@ describe('oRPCInstrumentation', () => {
   it('should support propagationEnabled=false', () => {
     void new ORPCInstrumentation({ propagationEnabled: false })
 
-    const tracer = setTracerSpy.mock.calls[0]![0]
+    const tracer = getTracer()
     expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
     expect(tracer!.inject).toBeUndefined()
     expect(tracer!.extract).toBeUndefined()
   })
 
   it('should not enable if enabled=false', () => {
-    void new ORPCInstrumentation({ enabled: false })
-    expect(setTracerSpy).not.toHaveBeenCalled()
+    const instrumentation = new ORPCInstrumentation({ enabled: false })
+
+    expect(instrumentation.isEnabled()).toBe(false)
+    expect(getTracer()).toBeUndefined()
   })
 
-  it('can disable the instrumentation', () => {
+  it('can disable and re-enable the instrumentation', () => {
     const instrumentation = new ORPCInstrumentation()
+
     instrumentation.disable()
-    expect(setTracerSpy).toHaveBeenCalledWith(undefined)
+    expect(instrumentation.isEnabled()).toBe(false)
+    expect(getTracer()).toBeUndefined()
+
+    instrumentation.enable()
+    expect(instrumentation.isEnabled()).toBe(true)
+    expect(getTracer()).toBeInstanceOf(OpenTelemetryTracer)
   })
 
   describe('tracer provider given to registerInstrumentations', () => {
@@ -60,7 +68,7 @@ describe('oRPCInstrumentation', () => {
     ])('receives the spans of %s instrumentation without being registered globally', (_, config) => {
       registerInstrumentations({ instrumentations: [new ORPCInstrumentation(config)], tracerProvider: provider })
 
-      setTracerSpy.mock.lastCall![0]!.startSpan('span').end()
+      getTracer()!.startSpan('span').end()
 
       expect(exporter.getFinishedSpans()).toHaveLength(1)
     })
