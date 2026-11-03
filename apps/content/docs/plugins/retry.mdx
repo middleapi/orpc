@@ -99,7 +99,9 @@ const planets = await client.planet.list({ limit: 10 }, {
 
 ## Streamed Input
 
-Streamed input ([AsyncIteratorObject](/docs/async-iterator-object), [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array)) can be read only once, so avoid retrying these calls:
+A retry sends the same `input` again. This is fine for plain values, `Blob`, and `File`, but streamed input, such as an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array), can be read only once. By the time a retry happens, the first attempt has already consumed part or all of the stream, so the retry would send incomplete input.
+
+Avoid retrying calls with streamed input. For example, disable retries based on the input:
 
 ```ts
 function isStreamedInput(input: unknown): boolean {
@@ -117,6 +119,10 @@ const link = new RPCLink<ClientContext>({
   ],
 })
 ```
+
+:::info
+This only applies to input. Streamed output can be retried safely, see [Event Source Simulation](#event-source-simulation).
+:::
 
 ## Event Source Simulation
 
