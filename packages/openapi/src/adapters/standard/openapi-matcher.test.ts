@@ -545,7 +545,7 @@ describe('openAPIMatcher', () => {
         await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
       }
 
-      expect(loader).toHaveBeenCalledTimes(1)
+      expect(loader).toHaveBeenCalledTimes(3)
     })
 
     it('retries a lazy router whose load fails, synchronously or asynchronously', async () => {

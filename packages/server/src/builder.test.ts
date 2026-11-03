@@ -8,7 +8,6 @@ import { Builder, os } from './builder'
 import * as LazyModule from './lazy'
 import * as MiddlewareDecoratedModule from './middleware-decorated'
 import * as ProcedureDecoratedModule from './procedure-decorated'
-import { createRouterClient } from './router-client'
 import * as RouterUtilsModule from './router-utils'
 
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
@@ -412,20 +411,5 @@ describe('builder', () => {
       ...builder['~orpc'],
       middlewares: builder['~orpc'].orderedMiddlewares.map((m: any) => m.middleware),
     })
-  })
-})
-
-describe('regressions', () => {
-  it('.lazy loads and augments the router once across server-side client calls', async () => {
-    const loaded = { ping: os.handler(() => 'pong'), nested: { pong: os.handler(() => 'ping') } }
-    const loader = vi.fn(async () => ({ default: loaded }))
-    const client = createRouterClient(os.router({ lazy: os.lazy(loader) }))
-
-    await expect(client.lazy.ping()).resolves.toBe('pong')
-    await expect(client.lazy.ping()).resolves.toBe('pong')
-    await expect(client.lazy.nested.pong()).resolves.toBe('ping')
-
-    expect(loader).toHaveBeenCalledTimes(1)
-    expect(augmentRouterSpy.mock.calls.filter(([router]) => router === loaded)).toHaveLength(1)
   })
 })

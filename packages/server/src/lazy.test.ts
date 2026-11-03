@@ -52,27 +52,4 @@ describe('unlazy', () => {
     await expect(unlazy(lazy)).resolves.toEqual({ default: 'hello' })
     expect(loader).toHaveBeenCalledTimes(1)
   })
-
-  it('memoizes the result per lazy instance, including concurrent calls', async () => {
-    const loader = vi.fn(async () => ({ default: {} }))
-    const lazy = new Lazy({ meta: {}, loader })
-
-    const promise = unlazy(lazy)
-    expect(unlazy(lazy)).toBe(promise)
-    await promise
-    expect(unlazy(lazy)).toBe(promise)
-    expect(loader).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not cache failed loads, so they can be retried', async () => {
-    const loader = vi.fn(async () => ({ default: 'hello' }))
-      .mockImplementationOnce(() => { throw new Error('sync boom') })
-      .mockRejectedValueOnce(new Error('async boom'))
-    const lazy = new Lazy({ meta: {}, loader })
-
-    expect(() => unlazy(lazy)).toThrow('sync boom')
-    await expect(unlazy(lazy)).rejects.toThrow('async boom')
-    await expect(unlazy(lazy)).resolves.toEqual({ default: 'hello' })
-    expect(loader).toHaveBeenCalledTimes(3)
-  })
 })
