@@ -8,7 +8,7 @@ import type { AnyProcedure } from './procedure'
 import type { ContractedRouter } from './router'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { bindMethods, isTypescriptObject, omit, setOwn } from '@orpc/shared'
+import { bindMethods, omit, setOwn } from '@orpc/shared'
 import { ProcedureImplementer } from './implementer-procedure'
 import { Lazy } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
@@ -225,11 +225,7 @@ export function createRouterImplementer<
  * (without `handler`, `orderedMiddlewares` and procedure config), copying only the routers that contain one,
  * so contract-first contracts are returned as is.
  */
-function toPlainRouterContract<T>(contract: T): T {
-  if (!isTypescriptObject(contract)) {
-    return contract
-  }
-
+function toPlainRouterContract<T extends RouterContract>(contract: T): T {
   if (contract instanceof ProcedureContract) {
     if (!(contract instanceof Procedure)) {
       return contract
@@ -245,14 +241,13 @@ function toPlainRouterContract<T>(contract: T): T {
     ])) as T
   }
 
-  let copied: Record<string, unknown> | undefined
+  let copied: Record<string, RouterContract> | undefined
 
-  for (const key of Object.keys(contract)) {
-    const child = (contract as Record<string, unknown>)[key]
+  for (const [key, child] of Object.entries(contract as Record<string, RouterContract>)) {
     const plainChild = toPlainRouterContract(child)
 
     if (plainChild !== child) {
-      copied ??= { ...contract }
+      copied ??= { ...contract } as Record<string, RouterContract>
       copied[key] = plainChild
     }
   }
