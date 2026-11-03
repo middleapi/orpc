@@ -1,13 +1,14 @@
-import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
+import type { AnyProcedureContract, ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
 import type { IntersectPick, Public } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { ImplementerConfig } from './implementer'
 import type { AnyMiddleware, Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
+import type { AnyProcedure } from './procedure'
 import type { ContractedRouter } from './router'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { bindMethods } from '@orpc/shared'
+import { bindMethods, omit, setOwn } from '@orpc/shared'
 import { ProcedureImplementer } from './implementer-procedure'
 import { Lazy } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
@@ -213,6 +214,22 @@ export function createRouterImplementer<
   return createRouterImplementerInternal(contract, config, []) as any
 }
 
+/**
+ * Keeps only the contract part of a procedure contract's definition.
+ * A server {@link Procedure} can be implemented like a contract (e.g. for mocking), but its
+ * `handler`/`orderedMiddlewares` must not make the implementer pass as a procedure, and its own
+ * procedure config must not override the config passed to `implement`.
+ */
+function toContractDefinition(contract: AnyProcedureContract): AnyProcedureContract['~orpc'] {
+  return omit(contract['~orpc'] as AnyProcedure['~orpc'] & ImplementerConfig, [
+    'handler',
+    'orderedMiddlewares',
+    'disableInputValidation',
+    'disableOutputValidation',
+    'dedupeLeadingMiddlewares',
+  ])
+}
+
 function createRouterImplementerInternal<
   TContract extends RouterContract,
   TInitialContext extends Context,
@@ -224,8 +241,8 @@ function createRouterImplementerInternal<
 ): RouterImplementer<TContract, TInitialContext> | RouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
   if (contract instanceof ProcedureContract) {
     return new ProcedureImplementer({
+      ...toContractDefinition(contract),
       ...config,
-      ...contract['~orpc'],
       orderedMiddlewares: middlewares.map(middleware => ({ middleware })),
     }) as any
   }
@@ -233,13 +250,13 @@ function createRouterImplementerInternal<
   const implementer: Record<string, any> = {}
 
   for (const [key, child] of Object.entries(contract)) {
-    implementer[key] = createRouterImplementerInternal(child as RouterContract, config, middlewares)
+    setOwn(implementer, key, createRouterImplementerInternal(child as RouterContract, config, middlewares))
   }
 
   const shared = bindMethods(SharedRouterImplementer.create(contract, config, middlewares))
 
   for (const [key, method] of Object.entries(shared)) {
-    if (key in implementer) {
+    if (Object.hasOwn(implementer, key)) {
       const child = implementer[key]
 
       implementer[key] = new Proxy(method, {

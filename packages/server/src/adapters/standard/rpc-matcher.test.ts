@@ -29,7 +29,8 @@ describe('rpcMatcher', () => {
     }),
   } }))
 
-  const router = {
+  // unlazy memoizes per Lazy instance, so each test gets fresh lazy routers to count loader calls from zero
+  const createRouter = () => ({
     ping: procedure1,
     nested: {
       echo: procedure2,
@@ -38,7 +39,13 @@ describe('rpcMatcher', () => {
       loader: lazyLoader,
       meta: {},
     }),
-  }
+  })
+
+  let router = createRouter()
+
+  beforeEach(() => {
+    router = createRouter()
+  })
 
   it('matches a top-level procedure', async () => {
     const matcher = new RPCMatcher(router)

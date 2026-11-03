@@ -42,6 +42,33 @@ export class Lazy<T> {
 
 export type Lazyable<T> = T | Lazy<T>
 
+const UNLAZY_CACHE: WeakMap<object, Promise<{ default: unknown }>> = /* @__PURE__ */ new WeakMap()
+
+/**
+ * Resolves a lazy value, or returns a non-lazy value as is.
+ *
+ * The result is memoized per {@link Lazy} instance, so its loader (and any work done on top of it,
+ * like augmenting a router) runs once. A rejected load is not cached, so it can be retried.
+ */
 export function unlazy<T extends Lazyable<any>>(maybeLazy: T): Promise<{ default: T extends Lazy<infer U> ? U : T }> {
-  return maybeLazy instanceof Lazy ? maybeLazy['~orpc'].loader() : Promise.resolve({ default: maybeLazy as T extends Lazy<infer U> ? U : T })
+  if (!(maybeLazy instanceof Lazy)) {
+    return Promise.resolve({ default: maybeLazy as T extends Lazy<infer U> ? U : T })
+  }
+
+  let promise = UNLAZY_CACHE.get(maybeLazy)
+
+  if (promise === undefined) {
+    const loading: Promise<{ default: unknown }> = Promise.resolve(maybeLazy['~orpc'].loader())
+    promise = loading
+
+    UNLAZY_CACHE.set(maybeLazy, loading)
+
+    loading.catch(() => {
+      if (UNLAZY_CACHE.get(maybeLazy) === loading) {
+        UNLAZY_CACHE.delete(maybeLazy)
+      }
+    })
+  }
+
+  return promise as Promise<{ default: T extends Lazy<infer U> ? U : T }>
 }

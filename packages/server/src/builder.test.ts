@@ -2,12 +2,14 @@ import type { AnyMetaPlugin, ErrorMap } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
 import type { AnyMiddleware } from './middleware'
 import * as ContractModule from '@orpc/contract'
-import { toArray } from '@orpc/shared'
+import { getOwn, toArray } from '@orpc/shared'
 import { z } from 'zod'
 import { Builder, os } from './builder'
 import * as LazyModule from './lazy'
 import * as MiddlewareDecoratedModule from './middleware-decorated'
+import { Procedure } from './procedure'
 import * as ProcedureDecoratedModule from './procedure-decorated'
+import { createRouterClient } from './router-client'
 import * as RouterUtilsModule from './router-utils'
 
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
@@ -411,5 +413,49 @@ describe('builder', () => {
       ...builder['~orpc'],
       middlewares: builder['~orpc'].orderedMiddlewares.map((m: any) => m.middleware),
     })
+  })
+})
+
+describe('regressions', () => {
+  it('.router keeps a __proto__ key as an own route instead of re-parenting the router', () => {
+    const proc = os.handler(() => 'ok')
+    const result = os.router({ ['__proto__']: proc, other: proc }) as any
+
+    expect(result).not.toBeInstanceOf(Procedure)
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype)
+    expect(Object.keys(result)).toEqual(['__proto__', 'other'])
+    expect(getOwn(result, '__proto__')).toBeInstanceOf(Procedure)
+  })
+
+  it('.lazy loads and augments the router once across server-side client calls', async () => {
+    const loaded = { ping: os.handler(() => 'pong'), nested: { pong: os.handler(() => 'ping') } }
+    const loader = vi.fn(async () => ({ default: loaded }))
+    const router = os.router({ lazy: os.lazy(loader) })
+    const client = createRouterClient(router)
+
+    await expect(client.lazy.ping()).resolves.toBe('pong')
+    await expect(client.lazy.ping()).resolves.toBe('pong')
+    await expect(client.lazy.nested.pong()).resolves.toBe('ping')
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(augmentRouterSpy.mock.calls.filter(([router]) => router === loaded)).toHaveLength(1)
+
+    // the router augmented by the outer `os.router` is resolved once too
+    const { default: first } = await LazyModule.unlazy(router.lazy)
+    const { default: second } = await LazyModule.unlazy(router.lazy)
+    expect(second).toBe(first)
+    expect(first.ping).not.toBe(loaded.ping)
+  })
+
+  it('.lazy retries a failed load', async () => {
+    const router = { ping: os.handler(() => 'pong') }
+    const loader = vi.fn(async () => ({ default: router }))
+      .mockRejectedValueOnce(new Error('boom'))
+    const client = createRouterClient({ lazy: os.lazy(loader) })
+
+    await expect(client.lazy.ping()).rejects.toThrow('boom')
+    await expect(client.lazy.ping()).resolves.toBe('pong')
+    await expect(client.lazy.ping()).resolves.toBe('pong')
+    expect(loader).toHaveBeenCalledTimes(2)
   })
 })

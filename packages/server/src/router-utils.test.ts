@@ -1,4 +1,5 @@
 import * as ContractModule from '@orpc/contract'
+import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
@@ -666,5 +667,37 @@ describe('unlazyRouter', () => {
   it('returns procedures and non-object values as-is', async () => {
     expect(await unlazyRouter(router.p1)).toBe(router.p1)
     expect(await unlazyRouter('invalid' as any)).toBe('invalid')
+  })
+})
+
+describe('__proto__ keys are kept as own routes instead of re-parenting the rebuilt router', () => {
+  const procedure = new Procedure({
+    errorMap: {},
+    meta: {},
+    orderedMiddlewares: [],
+    handler: () => {},
+  })
+
+  // Object.fromEntries creates an own `__proto__` key, like a computed key or JSON.parse does
+  const withProto = <T>(value: T): Record<string, T> => Object.fromEntries([['__proto__', value], ['other', value]])
+
+  function expectOwnRoutes(router: any): void {
+    expect(Object.getPrototypeOf(router)).toBe(Object.prototype)
+    expect(router).not.toBeInstanceOf(Procedure)
+    expect(Object.keys(router)).toEqual(['__proto__', 'other'])
+    expect(Object.hasOwn(router, '__proto__')).toBe(true)
+    expect(getOwn(router, '__proto__')).toBeInstanceOf(Procedure)
+  }
+
+  it('augmentRouter', () => {
+    expectOwnRoutes(augmentRouter(withProto(procedure), { errorMap: {}, meta: {}, middlewares: [] }))
+  })
+
+  it('augmentImplementedRouter', () => {
+    expectOwnRoutes(augmentImplementedRouter(withProto(procedure), { middlewares: [({ next }) => next()] }))
+  })
+
+  it('unlazyRouter', async () => {
+    expectOwnRoutes(await unlazyRouter(withProto(new Lazy({ meta: {}, loader: async () => ({ default: procedure }) }))))
   })
 })
