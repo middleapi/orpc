@@ -545,7 +545,6 @@ describe('openAPIMatcher', () => {
         await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
       }
 
-      // the successful load is memoized by `unlazy`; only the indexing is retried
       expect(loader).toHaveBeenCalledTimes(1)
     })
 

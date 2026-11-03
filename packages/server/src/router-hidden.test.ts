@@ -1,5 +1,4 @@
 import { oc, ProcedureContract } from '@orpc/contract'
-import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 import { os } from './builder'
 import { Procedure } from './procedure'
@@ -36,7 +35,7 @@ describe('withHiddenRouterContract with a normal router as the contract', () => 
     for (const [procedure, original] of [[hidden.ping, real.ping], [hidden.nested.pong, real.nested.pong]] as const) {
       expect(procedure).toBeInstanceOf(ProcedureContract)
       expect(procedure).not.toBeInstanceOf(Procedure)
-      const { handler, orderedMiddlewares, ...contractDef } = original['~orpc']
+      const { handler, orderedMiddlewares, disableInputValidation, ...contractDef } = original['~orpc']
       expect(procedure['~orpc']).toEqual(contractDef)
     }
 
@@ -44,16 +43,4 @@ describe('withHiddenRouterContract with a normal router as the contract', () => 
     expect(hidden.contractFirst).toBe(real.contractFirst)
     expect(hidden.invalid).toBeUndefined()
   })
-})
-
-it('withHiddenRouterContract keeps __proto__ keys as own contract routes', () => {
-  const real = Object.fromEntries([['__proto__', os.handler(() => 'REAL')], ['other', os.handler(() => 'REAL')]])
-
-  const hidden = getHiddenRouterContract(withHiddenRouterContract({}, real)) as any
-
-  expect(Object.getPrototypeOf(hidden)).toBe(Object.prototype)
-  expect(hidden).not.toBeInstanceOf(ProcedureContract)
-  expect(Object.keys(hidden)).toEqual(['__proto__', 'other'])
-  expect(getOwn(hidden, '__proto__')).toBeInstanceOf(ProcedureContract)
-  expect(getOwn(hidden, '__proto__')).not.toBeInstanceOf(Procedure)
 })

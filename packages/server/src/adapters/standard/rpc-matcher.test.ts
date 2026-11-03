@@ -29,7 +29,7 @@ describe('rpcMatcher', () => {
     }),
   } }))
 
-  // unlazy memoizes per Lazy instance, so each test gets fresh lazy routers to count loader calls from zero
+  // fresh Lazy instances per test, since unlazy memoizes per instance
   const createRouter = () => ({
     ping: procedure1,
     nested: {
@@ -41,7 +41,7 @@ describe('rpcMatcher', () => {
     }),
   })
 
-  let router = createRouter()
+  let router: ReturnType<typeof createRouter>
 
   beforeEach(() => {
     router = createRouter()

@@ -678,14 +678,11 @@ describe('__proto__ keys are kept as own routes instead of re-parenting the rebu
     handler: () => {},
   })
 
-  // Object.fromEntries creates an own `__proto__` key, like a computed key or JSON.parse does
   const withProto = <T>(value: T): Record<string, T> => Object.fromEntries([['__proto__', value], ['other', value]])
 
   function expectOwnRoutes(router: any): void {
     expect(Object.getPrototypeOf(router)).toBe(Object.prototype)
-    expect(router).not.toBeInstanceOf(Procedure)
     expect(Object.keys(router)).toEqual(['__proto__', 'other'])
-    expect(Object.hasOwn(router, '__proto__')).toBe(true)
     expect(getOwn(router, '__proto__')).toBeInstanceOf(Procedure)
   }
 

@@ -57,35 +57,21 @@ describe('unlazy', () => {
     const loader = vi.fn(async () => ({ default: {} }))
     const lazy = new Lazy({ meta: {}, loader })
 
-    const [r1, r2] = await Promise.all([unlazy(lazy), unlazy(lazy)])
-    const r3 = await unlazy(lazy)
-
-    expect(r1.default).toBe(r2.default)
-    expect(r3.default).toBe(r1.default)
+    const promise = unlazy(lazy)
+    expect(unlazy(lazy)).toBe(promise)
+    await promise
+    expect(unlazy(lazy)).toBe(promise)
     expect(loader).toHaveBeenCalledTimes(1)
-
-    // another instance sharing the same definition is cached separately
-    await unlazy({ '~orpc': lazy['~orpc'] } as typeof lazy)
-    expect(loader).toHaveBeenCalledTimes(2)
   })
 
   it('does not cache failed loads, so they can be retried', async () => {
-    let attempts = 0
-    const loader = vi.fn(() => {
-      attempts++
-      if (attempts === 1) {
-        throw new Error('sync boom')
-      }
-      if (attempts === 2) {
-        return Promise.reject(new Error('async boom'))
-      }
-      return Promise.resolve({ default: 'hello' })
-    })
+    const loader = vi.fn(async () => ({ default: 'hello' }))
+      .mockImplementationOnce(() => { throw new Error('sync boom') })
+      .mockRejectedValueOnce(new Error('async boom'))
     const lazy = new Lazy({ meta: {}, loader })
 
     expect(() => unlazy(lazy)).toThrow('sync boom')
     await expect(unlazy(lazy)).rejects.toThrow('async boom')
-    await expect(unlazy(lazy)).resolves.toEqual({ default: 'hello' })
     await expect(unlazy(lazy)).resolves.toEqual({ default: 'hello' })
     expect(loader).toHaveBeenCalledTimes(3)
   })

@@ -1,5 +1,7 @@
 import type { RouterContract } from '@orpc/contract'
+import type { ImplementerConfig } from './implementer'
 import type { Lazyable } from './lazy'
+import type { AnyProcedure } from './procedure'
 import type { AnyRouter } from './router'
 import { ProcedureContract } from '@orpc/contract'
 import { isTypescriptObject, omit } from '@orpc/shared'
@@ -13,10 +15,10 @@ const HIDDEN_ROUTER_CONTRACT_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_RO
  * contract's procedures would run instead of the actual implementation.
  *
  * Rebuilds the contract with every procedure turned into a plain {@link ProcedureContract}
- * (without `handler` and `orderedMiddlewares`), copying only the routers that contain one,
+ * (without `handler`, `orderedMiddlewares` and procedure config), copying only the routers that contain one,
  * so contract-first contracts are returned as is.
  */
-function toPlainRouterContract<T>(contract: T): T {
+export function toPlainRouterContract<T>(contract: T): T {
   if (!isTypescriptObject(contract)) {
     return contract
   }
@@ -26,8 +28,15 @@ function toPlainRouterContract<T>(contract: T): T {
       return contract
     }
 
-    // handler & orderedMiddlewares are what make a definition a procedure (see Procedure[Symbol.hasInstance])
-    return new ProcedureContract(omit(contract['~orpc'], ['handler', 'orderedMiddlewares'])) as T
+    // handler & orderedMiddlewares are what make a definition a procedure (see Procedure[Symbol.hasInstance]),
+    // the config is dropped so it cannot override the config passed to `implement`
+    return new ProcedureContract(omit(contract['~orpc'] as AnyProcedure['~orpc'] & ImplementerConfig, [
+      'handler',
+      'orderedMiddlewares',
+      'disableInputValidation',
+      'disableOutputValidation',
+      'dedupeLeadingMiddlewares',
+    ])) as T
   }
 
   let copied: Record<string, unknown> | undefined

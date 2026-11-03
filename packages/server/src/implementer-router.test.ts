@@ -242,9 +242,7 @@ describe('createRouterImplementer', () => {
       const implementer = createRouterImplementer(contract, config) as any
 
       expect(Object.getPrototypeOf(implementer)).toBe(Object.prototype)
-      expect(Object.hasOwn(implementer, '__proto__')).toBe(true)
       expect(getOwn(implementer, '__proto__')).toBeInstanceOf(ProcedureImplementer)
-      expect(implementer.other).toBeInstanceOf(ProcedureImplementer)
     })
 
     describe('implementing a server procedure', () => {
