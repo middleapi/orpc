@@ -97,6 +97,34 @@ const planets = await client.planet.list({ limit: 10 }, {
 })
 ```
 
+## Streamed Input
+
+The plugin retries by calling the procedure again with the same `input`. That works for plain values, `Blob`, and `File`, which can be read again, but not for streamed input such as an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array). Those can be read only once, so the first attempt has already consumed some or all of the stream, and a retry would send an empty or partial input.
+
+:::warning
+Do not enable retries for calls with streamed input. Disable them per call, or skip them based on the input:
+
+```ts
+function isStreamedInput(input: unknown): boolean {
+  return input instanceof ReadableStream
+    || (typeof input === 'object' && input !== null && Symbol.asyncIterator in input)
+}
+
+const link = new RPCLink<ClientContext>({
+  plugins: [
+    new RetryLinkPlugin({
+      default: {
+        retry: ({ input }) => isStreamedInput(input) ? 0 : 3,
+      },
+    }),
+  ],
+})
+```
+
+:::
+
+This limitation applies only to input. Retrying a call whose output is streamed is supported, as shown in [Event Source Simulation](#event-source-simulation).
+
 ## Event Source Simulation
 
 To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) for an [AsyncIteratorObject](/docs/async-iterator-object), use the following configuration:
