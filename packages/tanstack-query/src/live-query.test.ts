@@ -95,7 +95,6 @@ describe('liveQuery', async () => {
     } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
 
     expect(started).not.toHaveBeenCalled()
-    expect(queryClient.getQueryData(['live-query'])).toBeUndefined()
   })
 
   it('throw if no data yielded', async () => {

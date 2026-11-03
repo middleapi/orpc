@@ -16,7 +16,6 @@ export function liveQuery<T>(
 
     const stream = await queryFn(context)
 
-    // close without reading, so a generator the query no longer wants never starts
     if (signal.aborted) {
       await stream[Symbol.asyncIterator]().return?.()
       throw signal.reason

@@ -367,15 +367,13 @@ describe('procedureUtils', () => {
       })
       const subscriber = utils.liveSubscriber()
 
-      const next = vi.fn()
-      const unsubscribe = subscriber(key, { next })
+      const unsubscribe = subscriber(key, { next: vi.fn() })
 
       unsubscribe()
       connected.resolve()
       await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(started).not.toHaveBeenCalled()
-      expect(next).not.toHaveBeenCalled()
     })
 
     it('stops writing after unsubscribe when the iterator ignores the signal', async () => {

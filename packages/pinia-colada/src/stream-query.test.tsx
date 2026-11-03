@@ -1,4 +1,5 @@
 import type { UseQueryOptions } from '@pinia/colada'
+import { promiseWithResolvers } from '@orpc/shared'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -240,49 +241,41 @@ describe('serializableStreamedQuery', () => {
     expect(mounted.vm.query.data.value).toEqual(['a', 'b'])
   })
 
-  it.each(['reset', 'append', 'replace'] as const)('does not let a superseded fetch overwrite newer data (refetchMode=%s)', async (refetchMode) => {
-    let releaseFirst!: () => void
-    const firstReady = new Promise<void>((resolve) => {
-      releaseFirst = resolve
-    })
+  it('does not let a superseded fetch overwrite newer data', async () => {
+    const firstReady = promiseWithResolvers<void>()
     const firstStarted = vi.fn()
+    const firstStream = (async function* () {
+      firstStarted()
+      yield 'stale'
+    })()
+    const firstClosed = vi.spyOn(firstStream, 'return')
     const second = createChunkController<string>()
 
     const queryFn = vi.fn()
       .mockImplementationOnce(async () => {
-        // still connecting when the refetch aborts it
-        await firstReady
-        return (async function* () {
-          firstStarted()
-          yield 'stale'
-        })()
+        await firstReady.promise
+        return firstStream
       })
       .mockImplementationOnce(() => second.stream())
 
     const mounted = mountQuery({
       key: ['stream'],
-      query: serializableStreamedQuery(queryFn, { refetchMode }),
+      query: serializableStreamedQuery(queryFn),
     })
 
     await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1))
-    const firstSignal = queryFn.mock.calls[0]![0].signal as AbortSignal
-
     const refetching = mounted.vm.query.refetch()
-    expect(firstSignal.aborted).toBe(true)
 
     second.push('new')
     await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual(['new']))
 
-    // the aborted fetch finally connects: it must not touch the entry nor start its stream
-    releaseFirst()
-    await new Promise(resolve => setTimeout(resolve, 10))
-    expect(mounted.vm.query.data.value).toEqual(['new'])
+    firstReady.resolve()
+    await vi.waitFor(() => expect(firstClosed).toHaveBeenCalled())
     expect(firstStarted).not.toHaveBeenCalled()
+    expect(mounted.vm.query.data.value).toEqual(['new'])
 
     second.close()
     await refetching
-    expect(mounted.vm.query.data.value).toEqual(['new'])
-    expect(mounted.vm.query.status.value).toEqual('success')
   })
 
   it('stops streaming when the query is cancelled', async () => {

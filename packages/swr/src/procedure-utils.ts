@@ -212,7 +212,6 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             throw new TypeError('.liveSubscriber requires an AsyncIteratorObject output')
           }
 
-          // close without reading, so a stream the subscriber no longer wants never starts
           if (controller.signal.aborted) {
             await iterator.return?.()
             return

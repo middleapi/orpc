@@ -48,8 +48,6 @@ export function serializableStreamedQuery<T>(
 
     const stream = await queryFn(context)
 
-    // close without reading, so a generator the query no longer wants never starts
-    // and a superseded fetch never overwrites the entry state
     if (signal.aborted) {
       await stream[Symbol.asyncIterator]().return?.()
       throw signal.reason
