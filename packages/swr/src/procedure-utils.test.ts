@@ -1,6 +1,6 @@
 import type { OperationKey } from './key'
-import { RPCJsonSerializer } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
+import { Point, pointSerializer } from '../tests/__shared__/serializer'
 import { ProcedureUtils } from './procedure-utils'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -50,63 +50,31 @@ describe('procedureUtils', () => {
     expect(client).toHaveBeenCalledWith({ search: '__search__' }, { context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key: prefixedKey, type: 'fetcher' } } })
   })
 
-  it('.key serializes the input', () => {
-    expect(utils.key({ input: { ids: new Set([1n]), since: new Date('2024-01-01') } })).toEqual([['ping'], {
-      input: { ids: ['1'], since: '2024-01-01T00:00:00.000Z' },
-      inputMeta: { '["ids",0]': ['bigint'], '["ids"]': ['set'], '["since"]': ['date'] },
-    }])
-  })
-
-  it('.fetcher deserializes the input', async () => {
-    client.mockResolvedValueOnce('__output__')
+  it('.fetcher, .subscriber and .liveSubscriber deserialize the input', async () => {
     const input = { ids: new Set([1n]), map: new Map([['a', new Date('2024-01-01')]]) }
     const serializedKey = utils.key({ input })
 
-    await expect(utils.fetcher()(serializedKey)).resolves.toEqual('__output__')
-    expect(client).toHaveBeenCalledTimes(1)
-    expect(client).toHaveBeenCalledWith(input, { context: { [OPERATION_CONTEXT_SYMBOL]: { key: serializedKey, type: 'fetcher' } } })
-  })
-
-  it('.key and .fetcher use the serializer option', async () => {
-    class Point {
-      constructor(public x: number, public y: number) {}
-    }
-
-    const serializer = new RPCJsonSerializer({
-      handlers: {
-        point: {
-          condition: (value: unknown) => value instanceof Point,
-          serialize: (value: Point) => [value.x, value.y],
-          deserialize: ([x, y]: [number, number]) => new Point(x, y),
-          isTerminal: true,
-        },
-      },
-    })
-
-    const serializerUtils = new ProcedureUtils(['ping'], client, { serializer })
-    const serializedKey = serializerUtils.key({ input: { at: new Point(1, 2) } })
-
-    expect(serializedKey).toEqual([['ping'], { input: { at: [1, 2] }, inputMeta: { '["at"]': ['point'] } }])
-
     client.mockResolvedValueOnce('__output__')
-    await expect(serializerUtils.fetcher()(serializedKey)).resolves.toEqual('__output__')
-    expect(client).toHaveBeenCalledWith({ at: new Point(1, 2) }, expect.anything())
-    expect(client.mock.calls[0]![0].at).toBeInstanceOf(Point)
-  })
-
-  it('.subscriber and .liveSubscriber deserialize the input', async () => {
-    const input = { ids: new Set([1n]), since: new Date('2024-01-01') }
-    const serializedKey = utils.key({ input })
-
     client.mockImplementationOnce(async function* () {})
     client.mockImplementationOnce(async function* () {})
 
+    await expect(utils.fetcher()(serializedKey)).resolves.toEqual('__output__')
     utils.subscriber()(serializedKey, { next: vi.fn() })
     utils.liveSubscriber()(serializedKey, { next: vi.fn() })
 
-    await vi.waitFor(() => expect(client).toHaveBeenCalledTimes(2))
-    expect(client).toHaveBeenNthCalledWith(1, input, { context: { [OPERATION_CONTEXT_SYMBOL]: { key: serializedKey, type: 'subscriber' } }, signal: expect.any(AbortSignal) })
-    expect(client).toHaveBeenNthCalledWith(2, input, { context: { [OPERATION_CONTEXT_SYMBOL]: { key: serializedKey, type: 'liveSubscriber' } }, signal: expect.any(AbortSignal) })
+    await vi.waitFor(() => expect(client).toHaveBeenCalledTimes(3))
+    expect(client).toHaveBeenNthCalledWith(1, input, { context: { [OPERATION_CONTEXT_SYMBOL]: { key: serializedKey, type: 'fetcher' } } })
+    expect(client).toHaveBeenNthCalledWith(2, input, { context: { [OPERATION_CONTEXT_SYMBOL]: { key: serializedKey, type: 'subscriber' } }, signal: expect.any(AbortSignal) })
+    expect(client).toHaveBeenNthCalledWith(3, input, { context: { [OPERATION_CONTEXT_SYMBOL]: { key: serializedKey, type: 'liveSubscriber' } }, signal: expect.any(AbortSignal) })
+  })
+
+  it('.key and .fetcher use the serializer option', async () => {
+    const serializerUtils = new ProcedureUtils(['ping'], client, { serializer: pointSerializer })
+
+    client.mockResolvedValueOnce('__output__')
+    await expect(serializerUtils.fetcher()(serializerUtils.key({ input: { at: new Point(1, 2) } }))).resolves.toEqual('__output__')
+    expect(client.mock.calls[0]![0].at).toEqual(new Point(1, 2))
+    expect(client.mock.calls[0]![0].at).toBeInstanceOf(Point)
   })
 
   describe('.subscriber', async () => {

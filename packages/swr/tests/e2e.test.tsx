@@ -71,7 +71,6 @@ it('case: useSWR & mutate with Set, Map, BigInt and Date inputs', async () => {
   })
 
   rerender()
-  rerender()
   await act(async () => {
     await new Promise(resolve => setTimeout(resolve, 10))
   })

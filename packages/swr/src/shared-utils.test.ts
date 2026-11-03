@@ -1,4 +1,4 @@
-import { RPCJsonSerializer } from '@orpc/client'
+import { Point, pointSerializer } from '../tests/__shared__/serializer'
 import { generateOperationKey } from './key'
 import { SharedUtils } from './shared-utils'
 
@@ -54,23 +54,8 @@ describe('sharedUtils', () => {
     })
 
     it('uses the serializer option', () => {
-      class Point {
-        constructor(public x: number, public y: number) {}
-      }
-
-      const serializer = new RPCJsonSerializer({
-        handlers: {
-          point: {
-            condition: (value: unknown) => value instanceof Point,
-            serialize: (value: Point) => [value.x, value.y],
-            deserialize: ([x, y]: [number, number]) => new Point(x, y),
-            isTerminal: true,
-          },
-        },
-      })
-
-      const serializerUtils = new SharedUtils<{ at: Point }>(['test', 'path'], { serializer })
-      const key = generateOperationKey(['test', 'path'], { serializer, input: { at: new Point(1, 2) } })
+      const serializerUtils = new SharedUtils<{ at: Point }>(['test', 'path'], { serializer: pointSerializer })
+      const key = generateOperationKey(['test', 'path'], { serializer: pointSerializer, input: { at: new Point(1, 2) } })
 
       expect(serializerUtils.matcher({ strategy: 'exact', input: { at: new Point(1, 2) } })(key)).toBe(true)
       expect(serializerUtils.matcher({ strategy: 'exact', input: { at: new Point(1, 3) } })(key)).toBe(false)

@@ -1,4 +1,4 @@
-import { RPCJsonSerializer } from '@orpc/client'
+import { Point, pointSerializer } from '../tests/__shared__/serializer'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
 
@@ -58,13 +58,12 @@ describe('createRouterUtils', () => {
   })
 
   it('passes the serializer to procedure & shared utils', () => {
-    const serializer = new RPCJsonSerializer()
     const router = { nested: { ping: vi.fn() } } as any
-    const utils = createRouterUtils(router, { serializer }) as any
+    const utils = createRouterUtils(router, { serializer: pointSerializer }) as any
 
-    expect(utils.nested.matcher({ input: { ids: new Set([1]) } })([['nested'], { input: { ids: [1] }, inputMeta: { '["ids"]': ['set'] } }])).toBe(true)
+    expect(utils.nested.matcher({ input: { at: new Point(1, 2) } })([['nested'], { input: { at: [1, 2] }, inputMeta: { '["at"]': ['point'] } }])).toBe(true)
     expect(utils.nested.ping).toBeDefined()
-    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, { prefix: undefined, serializer })
+    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, { prefix: undefined, serializer: pointSerializer })
   })
 
   it('returns strictly equal utils on repeated access', () => {

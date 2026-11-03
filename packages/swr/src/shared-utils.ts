@@ -13,7 +13,6 @@ export class SharedUtils<TInput> {
 
   /**
    * Generate a matcher function that returns `true` if the key matches the specified conditions.
-   * The input is serialized like in `.key`, so keys are compared by their serialized forms.
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#manual-revalidation | SWR Integration - Manual Revalidation}
    */

@@ -37,9 +37,11 @@ export function createRouterUtils<T extends AnyNestedClient>(
 ): RouterUtils<T> {
   const path = toArray(options.path)
 
+  const keyOptions = { prefix: options.prefix, serializer: options.serializer }
+
   const utils = typeof client === 'function'
-    ? bindMethods(new ProcedureUtils(path, client, { prefix: options.prefix, serializer: options.serializer }), { unbound: ['call'] })
-    : bindMethods(new SharedUtils(path, { prefix: options.prefix, serializer: options.serializer }))
+    ? bindMethods(new ProcedureUtils(path, client, keyOptions), { unbound: ['call'] })
+    : bindMethods(new SharedUtils(path, keyOptions))
 
   const cache = new Map<string, unknown>()
 

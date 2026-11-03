@@ -1,11 +1,5 @@
 import { isPlainObject } from '@orpc/shared'
 
-/**
- * Checks whether `subsetKey` partially matches `fullKey`.
- *
- * Keys are compared in their serialized (JSON-compatible) form, as produced by `generateOperationKey`,
- * so values like `Date`, `BigInt`, `Set` and `Map` match by value.
- */
 export function isSubsetOf(subsetKey: unknown, fullKey: unknown): boolean {
   return subsetKey === fullKey
     ? true
