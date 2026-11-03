@@ -76,6 +76,27 @@ describe('liveQuery', async () => {
     expect(cleanupCalled).toBe(true)
   })
 
+  it('closes the stream without reading it when aborted before it resolves', async () => {
+    const started = vi.fn()
+    const controller = new AbortController()
+
+    const queryFn = liveQuery(async () => {
+      controller.abort()
+      return (async function* () {
+        started()
+        yield 1
+      })()
+    })
+
+    await expect(queryFn({
+      queryKey: ['live-query'],
+      signal: controller.signal,
+      client: queryClient,
+    } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
+
+    expect(started).not.toHaveBeenCalled()
+  })
+
   it('throw if no data yielded', async () => {
     const queryFn = liveQuery(async function* () {
       // No yield

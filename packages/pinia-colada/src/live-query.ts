@@ -15,6 +15,12 @@ export function liveQuery<T>(
     const { entry, signal } = context
 
     const stream = await queryFn(context)
+
+    if (signal.aborted) {
+      await stream[Symbol.asyncIterator]().return?.()
+      throw signal.reason
+    }
+
     let last: { chunk: T } | undefined
 
     for await (const chunk of stream) {

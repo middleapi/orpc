@@ -12,6 +12,12 @@ export function liveQuery<
 ): QueryFunction<TQueryFnData, TQueryKey> {
   return async (context) => {
     const stream = await queryFn(context)
+
+    if (context.signal.aborted) {
+      await stream[Symbol.asyncIterator]().return?.()
+      throw context.signal.reason
+    }
+
     let last: { chunk: TQueryFnData } | undefined
 
     for await (const chunk of stream) {

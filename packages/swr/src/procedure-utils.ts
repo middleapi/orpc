@@ -212,6 +212,11 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             throw new TypeError('.liveSubscriber requires an AsyncIteratorObject output')
           }
 
+          if (controller.signal.aborted) {
+            await iterator.return?.()
+            return
+          }
+
           for await (const event of iterator) {
             if (controller.signal.aborted) {
               break

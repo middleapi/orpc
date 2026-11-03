@@ -102,6 +102,22 @@ describe('liveQuery', () => {
     expect(mounted.vm.query.status.value).toEqual('error')
   })
 
+  it('closes the stream without reading it when aborted before it resolves', async () => {
+    const started = vi.fn()
+    const controller = new AbortController()
+
+    const queryFn = liveQuery(async () => {
+      controller.abort()
+      return (async function* () {
+        started()
+        yield 1
+      })()
+    })
+
+    await expect(queryFn({ signal: controller.signal } as any)).rejects.toBe(controller.signal.reason)
+    expect(started).not.toHaveBeenCalled()
+  })
+
   it('stops streaming when the query is cancelled', async () => {
     const controller = createChunkController<number>()
     const mounted = mountQuery({

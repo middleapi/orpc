@@ -1,4 +1,5 @@
 import type { UseQueryOptions } from '@pinia/colada'
+import { promiseWithResolvers } from '@orpc/shared'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -238,6 +239,43 @@ describe('serializableStreamedQuery', () => {
     second.close()
     await refetching
     expect(mounted.vm.query.data.value).toEqual(['a', 'b'])
+  })
+
+  it('does not let a superseded fetch overwrite newer data', async () => {
+    const firstReady = promiseWithResolvers<void>()
+    const firstStarted = vi.fn()
+    const firstStream = (async function* () {
+      firstStarted()
+      yield 'stale'
+    })()
+    const firstClosed = vi.spyOn(firstStream, 'return')
+    const second = createChunkController<string>()
+
+    const queryFn = vi.fn()
+      .mockImplementationOnce(async () => {
+        await firstReady.promise
+        return firstStream
+      })
+      .mockImplementationOnce(() => second.stream())
+
+    const mounted = mountQuery({
+      key: ['stream'],
+      query: serializableStreamedQuery(queryFn),
+    })
+
+    await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1))
+    const refetching = mounted.vm.query.refetch()
+
+    second.push('new')
+    await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual(['new']))
+
+    firstReady.resolve()
+    await vi.waitFor(() => expect(firstClosed).toHaveBeenCalled())
+    expect(firstStarted).not.toHaveBeenCalled()
+    expect(mounted.vm.query.data.value).toEqual(['new'])
+
+    second.close()
+    await refetching
   })
 
   it('stops streaming when the query is cancelled', async () => {
