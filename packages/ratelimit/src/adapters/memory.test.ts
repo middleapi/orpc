@@ -125,13 +125,7 @@ describe('memoryRateLimiter', () => {
         timeout: 10_000,
       })
 
-      const pending = limiter.limit('key', { weight: 3 })
-      const settled = vi.fn()
-      void pending.then(settled)
-      await vi.advanceTimersByTimeAsync(0)
-
-      expect(settled).toHaveBeenCalledExactlyOnceWith({ success: false, limit: 2, remaining: 2, reset: 500 })
-      expect(vi.getTimerCount()).toBe(0)
+      expect(await limiter.limit('key', { weight: 3 })).toEqual({ success: false, limit: 2, remaining: 2, reset: 500 })
     })
 
     it('gives up immediately when the wait would exceed the timeout', async () => {

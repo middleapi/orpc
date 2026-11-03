@@ -20,7 +20,6 @@ export function resolveWeight(options?: RateLimitOptions): number {
 /**
  * Runs `check`, and while it fails, retries each time the window resets
  * before `timeout` milliseconds elapse. Resolves with the last result.
- * Gives up right away when `weight` exceeds the limit, since such a request can never succeed.
  */
 export async function blockUntilReady(
   check: () => Promisable<Required<RateLimitResult>>,

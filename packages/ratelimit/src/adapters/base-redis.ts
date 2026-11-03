@@ -2,12 +2,11 @@ import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
 import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
- * Consumes `ARGV[1]` points from the counter at `KEYS[1]` only when the total stays within
- * `ARGV[3]`, so rejected requests do not count. Gives the counter a window of `ARGV[2]`
- * milliseconds whenever it has no expiry, which also repairs keys left without one.
- * Replies with `[success, used, ttl]`. Kept on one line because `EVAL` sends it with every call.
+ * Consumes `ARGV[1]` points from the counter at `KEYS[1]` when the total stays within `ARGV[3]`,
+ * ensures a window of `ARGV[2]` milliseconds, and replies with `[success, used, ttl]`.
+ * Kept on one line because `EVAL` sends it with every call.
  */
-const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local p=tonumber(ARGV[2]) local c=tonumber(redis.call('GET',KEYS[1]) or '0') local ok=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) ok=1 end local t=redis.call('PTTL',KEYS[1]) if t==-1 then redis.call('PEXPIRE',KEYS[1],p) t=p elseif t==-2 then t=p end return {ok,c,t}`
+const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local p=tonumber(ARGV[2]) local c=tonumber(redis.call('GET',KEYS[1]) or '0') local ok=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) ok=1 end local t=redis.call('PTTL',KEYS[1]) if t<0 then redis.call('PEXPIRE',KEYS[1],p) t=p end return {ok,c,t}`
 
 /**
  * Options shared by every Redis-backed rate limiter adapter.
@@ -28,7 +27,7 @@ export interface BaseRedisRateLimiterOptions {
   maxRequests: number
 
   /**
-   * The duration of the fixed window in milliseconds. Must be an integer greater than 0.
+   * The duration of the fixed window in milliseconds.
    */
   window: number
 
@@ -57,9 +56,6 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   protected readonly window: number
   protected readonly timeout: number
 
-  /**
-   * @throws {TypeError} when `window` is not an integer greater than 0
-   */
   constructor(options: BaseRedisRateLimiterOptions) {
     if (!Number.isInteger(options.window) || options.window <= 0) {
       throw new TypeError('Rate limit window must be an integer greater than 0')

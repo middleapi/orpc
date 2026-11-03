@@ -15,10 +15,8 @@ export interface CloudflareRateLimiterOptions {
  * @remarks
  * **Note**: Blocking mode is not supported by this adapter.
  *
- * **Note**: The binding consumes one point per call and cannot refund points, so a request
- * with `weight` calls it up to `weight` times. When a call is denied partway through, the
- * points already consumed are not returned, so a rejected weighted request may still use up
- * part of the quota.
+ * **Note**: Each call to the binding consumes one point, so a weighted request calls it up to
+ * `weight` times. If a call is denied, points already consumed are not refunded.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */

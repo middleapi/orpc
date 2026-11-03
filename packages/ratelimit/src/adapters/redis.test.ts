@@ -228,35 +228,21 @@ describe.concurrent('redis rate limiter integration', {
     await expect(redis.exists(`${prefix}too-heavy`)).resolves.toBe(0)
   })
 
-  it('sets an expiry on a counter that has none', async () => {
+  it.each([
+    ['1', true, 1],
+    ['3', false, 0],
+  ])('sets an expiry on a counter of %s that has none', async (seed, success, remaining) => {
     const prefix = `orpc-redis-rate-limiter-${crypto.randomUUID()}:`
     const limiter = await createTestingRateLimiter({ prefix, maxRequests: 3, window: 10_000 })
-    const redisKey = `${prefix}no-ttl`
 
-    await redis.set(redisKey, '1')
-    await expect(redis.pTTL(redisKey)).resolves.toBe(-1)
+    await redis.set(`${prefix}no-ttl`, seed)
 
     const startedAt = Date.now()
     const result = await limiter.limit('no-ttl')
 
-    expect(result).toMatchObject({ success: true, limit: 3, remaining: 1 })
+    expect(result).toMatchObject({ success, limit: 3, remaining })
     expect(result.reset).toBeGreaterThan(startedAt + 5_000)
-    await expect(redis.pTTL(redisKey)).resolves.toBeGreaterThan(5_000)
-  })
-
-  it('sets an expiry on a full counter that has none', async () => {
-    const prefix = `orpc-redis-rate-limiter-${crypto.randomUUID()}:`
-    const limiter = await createTestingRateLimiter({ prefix, maxRequests: 3, window: 10_000 })
-    const redisKey = `${prefix}full-no-ttl`
-
-    await redis.set(redisKey, '3')
-
-    const startedAt = Date.now()
-    const result = await limiter.limit('full-no-ttl')
-
-    expect(result).toMatchObject({ success: false, limit: 3, remaining: 0 })
-    expect(result.reset).toBeGreaterThan(startedAt + 5_000)
-    await expect(redis.pTTL(redisKey)).resolves.toBeGreaterThan(5_000)
+    await expect(redis.pTTL(`${prefix}no-ttl`)).resolves.toBeGreaterThan(5_000)
   })
 
   it('rejects invalid windows', async () => {
