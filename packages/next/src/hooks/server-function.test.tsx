@@ -221,74 +221,46 @@ describe('useServerFunction', () => {
     })
   })
 
-  describe('interceptors change between renders', () => {
+  it('interceptors change between renders', async () => {
     const a = vi.fn(({ next }) => next())
     const b = vi.fn(({ next }) => next())
 
-    function setup(initialInterceptors: any[] | undefined) {
-      return renderHook(
-        ({ interceptors }) => useServerFunction(fn, { interceptors }),
-        { initialProps: { interceptors: initialInterceptors } },
-      )
-    }
+    const { result, rerender } = renderHook(
+      ({ interceptors }) => useServerFunction(fn, { interceptors }),
+      { initialProps: { interceptors: undefined as any[] | undefined } },
+    )
 
-    async function execute(result: { current: ReturnType<typeof useServerFunction<any, any, any>> }) {
-      await act(async () => {
-        await result.current.execute({ input: 123 })
-      })
-    }
+    const execute = result.current.execute
 
-    it('[a] -> [a, b]', async () => {
-      const { result, rerender } = setup([a])
+    rerender({ interceptors: [a, b] })
+    expect(result.current.execute).toBe(execute)
 
-      rerender({ interceptors: [a, b] })
-      await execute(result)
-
-      expect(a).toHaveBeenCalledTimes(1)
-      expect(b).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await result.current.execute({ input: 123 })
     })
 
-    it('undefined -> [a]', async () => {
-      const { result, rerender } = setup(undefined)
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
 
-      rerender({ interceptors: [a] })
-      await execute(result)
+    rerender({ interceptors: [a] })
+    expect(result.current.execute).toBe(execute)
 
-      expect(a).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await result.current.execute({ input: 123 })
     })
 
-    it('[a, b] -> [a]', async () => {
-      const { result, rerender } = setup([a, b])
+    expect(a).toHaveBeenCalledTimes(2)
+    expect(b).toHaveBeenCalledTimes(1)
 
-      rerender({ interceptors: [a] })
-      await execute(result)
+    rerender({ interceptors: undefined })
+    expect(result.current.execute).toBe(execute)
 
-      expect(a).toHaveBeenCalledTimes(1)
-      expect(b).toHaveBeenCalledTimes(0)
+    await act(async () => {
+      await result.current.execute({ input: 123 })
     })
 
-    it('[a] -> undefined', async () => {
-      const { result, rerender } = setup([a])
-
-      rerender({ interceptors: undefined })
-      await execute(result)
-
-      expect(a).toHaveBeenCalledTimes(0)
-    })
-
-    it('keeps execute stable across renders', () => {
-      const { result, rerender } = setup([a])
-      const execute = result.current.execute
-
-      rerender({ interceptors: [a, b] })
-      expect(result.current.execute).toBe(execute)
-
-      rerender({ interceptors: [vi.fn(({ next }) => next())] })
-      expect(result.current.execute).toBe(execute)
-
-      rerender({ interceptors: undefined })
-      expect(result.current.execute).toBe(execute)
-    })
+    expect(a).toHaveBeenCalledTimes(2)
+    expect(b).toHaveBeenCalledTimes(1)
   })
 
   it('multiple execute calls', async () => {

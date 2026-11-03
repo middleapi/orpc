@@ -120,10 +120,6 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
   const [input, setInput] = useState<TInput | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
 
-  /**
-   * Keep the latest interceptors in a ref so `execute` stays stable across renders
-   * while always using the interceptors from the most recent render.
-   */
   const interceptorsRef = useRef(options.interceptors)
   interceptorsRef.current = options.interceptors
 
