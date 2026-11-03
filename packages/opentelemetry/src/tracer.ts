@@ -1,9 +1,16 @@
 import type { Context, ContextAPI, Tracer as OpenTelemetryApiTracer, PropagationAPI, Span, TraceAPI } from '@opentelemetry/api'
 import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
-import { SpanStatusCode } from '@opentelemetry/api'
+import { INVALID_SPAN_CONTEXT, SpanStatusCode } from '@opentelemetry/api'
 
 export class OpenTelemetrySpan implements TracingSpan {
-  constructor(readonly span: Span) {}
+  constructor(
+    readonly span: Span,
+    /**
+     * The full context this span was extracted from, used as-is when the span is a parent,
+     * so entries beside the span (e.g. W3C baggage) are not dropped.
+     */
+    readonly context?: Context | undefined,
+  ) {}
 
   setAttribute(key: string, value: TracingAttributeValue): void {
     this.span.setAttribute(key, value)
@@ -68,8 +75,21 @@ export class OpenTelemetryTracer implements Tracer {
       }
 
       this.extract = (headers) => {
-        const span = this.trace.getSpan(propagation.extract(this.context.active(), headers))
-        return span === undefined ? undefined : new OpenTelemetrySpan(span)
+        const active = this.context.active()
+        const extracted = propagation.extract(active, headers)
+        const span = this.trace.getSpan(extracted)
+
+        if (span !== undefined) {
+          return new OpenTelemetrySpan(span, extracted)
+        }
+
+        /**
+         * Headers can carry entries without a trace context (e.g. only `baggage`).
+         * Wrap them with an invalid span so children still start a new trace under this context.
+         */
+        return extracted === active
+          ? undefined
+          : new OpenTelemetrySpan(this.trace.wrapSpanContext(INVALID_SPAN_CONTEXT), extracted)
       }
     }
   }
@@ -102,6 +122,7 @@ export class OpenTelemetryTracer implements Tracer {
   }
 
   private contextOf(parent: TracingSpan): Context {
-    return this.trace.setSpan(this.context.active(), (parent as OpenTelemetrySpan).span)
+    const { span, context } = parent as OpenTelemetrySpan
+    return context ?? this.trace.setSpan(this.context.active(), span)
   }
 }
