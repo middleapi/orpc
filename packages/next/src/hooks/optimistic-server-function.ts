@@ -2,7 +2,7 @@ import type { AnyORPCErrorJSON } from '@orpc/client'
 import type { ServerFunction, ServerFunctionError } from '../server-function'
 import type { UserSeverFunctionOptions, UseServerFunctionResult } from './server-function'
 import { onStart, toArray } from '@orpc/shared'
-import { useCallback, useMemo, useOptimistic } from 'react'
+import { useMemo, useOptimistic } from 'react'
 import { useServerFunction } from './server-function'
 
 export interface UseOptimisticServerFunctionOptions<TInput, TOutput, TError, TOptimisticState> extends
@@ -30,9 +30,9 @@ export function useOptimisticServerFunction<TInput, TOutput, TError extends AnyO
   const state = useServerFunction(fn, {
     ...options,
     interceptors: [
-      useCallback(onStart(({ input }) => {
+      onStart(({ input }) => {
         addOptimistic(input)
-      }), [addOptimistic]),
+      }),
       ...toArray(options.interceptors),
     ],
   })

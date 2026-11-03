@@ -120,6 +120,9 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
   const [input, setInput] = useState<TInput | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
 
+  const interceptorsRef = useRef(options.interceptors)
+  interceptorsRef.current = options.interceptors
+
   const reset = useCallback(() => {
     executedAtRef.current = undefined
     setInput(undefined)
@@ -135,7 +138,7 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
     return new Promise((resolve) => {
       startTransition(async () => {
         const result = await safe(intercept(
-          [...toArray(options.interceptors), ...toArray(executeOptions.interceptors)],
+          [...toArray(interceptorsRef.current), ...toArray(executeOptions.interceptors)],
           { input: input as TInput },
           async ({ input }) => fn(input).then(([error, data]) => {
             if (error) {
@@ -164,7 +167,7 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
         resolve(result)
       })
     })
-  }, [fn, ...toArray(options.interceptors)])
+  }, [fn])
 
   const result = useMemo(() => {
     const currentState = isPending && executedAtRef.current !== undefined

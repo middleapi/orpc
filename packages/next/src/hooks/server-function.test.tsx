@@ -221,6 +221,48 @@ describe('useServerFunction', () => {
     })
   })
 
+  it('interceptors change between renders', async () => {
+    const a = vi.fn(({ next }) => next())
+    const b = vi.fn(({ next }) => next())
+
+    const { result, rerender } = renderHook(
+      ({ interceptors }) => useServerFunction(fn, { interceptors }),
+      { initialProps: { interceptors: undefined as any[] | undefined } },
+    )
+
+    const execute = result.current.execute
+
+    rerender({ interceptors: [a, b] })
+    expect(result.current.execute).toBe(execute)
+
+    await act(async () => {
+      await result.current.execute({ input: 123 })
+    })
+
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
+
+    rerender({ interceptors: [a] })
+    expect(result.current.execute).toBe(execute)
+
+    await act(async () => {
+      await result.current.execute({ input: 123 })
+    })
+
+    expect(a).toHaveBeenCalledTimes(2)
+    expect(b).toHaveBeenCalledTimes(1)
+
+    rerender({ interceptors: undefined })
+    expect(result.current.execute).toBe(execute)
+
+    await act(async () => {
+      await result.current.execute({ input: 123 })
+    })
+
+    expect(a).toHaveBeenCalledTimes(2)
+    expect(b).toHaveBeenCalledTimes(1)
+  })
+
   it('multiple execute calls', async () => {
     const { result } = renderHook(() => useServerFunction(fn))
 
