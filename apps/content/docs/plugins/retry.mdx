@@ -101,7 +101,7 @@ const planets = await client.planet.list({ limit: 10 }, {
 
 A retry sends the same `input` again. This is fine for plain values, `Blob`, and `File`, but streamed input, such as an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array), can be read only once. By the time a retry happens, the first attempt has already consumed part or all of the stream, so the retry would send incomplete input.
 
-Avoid retrying calls with streamed input. For example, disable retries based on the input:
+Avoid retrying calls with streamed input. If you enable retries by default, disable them based on the input:
 
 ```ts
 import { isAsyncIteratorObject } from '@orpc/shared'
