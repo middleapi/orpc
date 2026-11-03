@@ -25,6 +25,13 @@ describe('setCookie', () => {
     expect(headers.get('Set-Cookie')).toContain('Path=/api')
   })
 
+  it('should keep default path when path is explicitly undefined', () => {
+    const headers = new Headers()
+    setCookie(headers, 'test', 'value', { path: undefined })
+
+    expect(headers.get('Set-Cookie')).toBe('test=value; Path=/')
+  })
+
   it('should append multiple cookies', () => {
     const headers = new Headers()
     setCookie(headers, 'first', 'value1')
@@ -139,6 +146,13 @@ describe('deleteCookie', () => {
     deleteCookie(headers, 'test', { path: '/api', maxAge: 10 })
 
     expect(headers.get('Set-Cookie')).toContain('test=; Max-Age=0; Path=/api')
+  })
+
+  it('should keep default path when path is explicitly undefined', () => {
+    const headers = new Headers()
+    deleteCookie(headers, 'test', { path: undefined })
+
+    expect(headers.get('Set-Cookie')).toBe('test=; Max-Age=0; Path=/')
   })
 
   it('should do nothing when headers is undefined', () => {

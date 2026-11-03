@@ -76,14 +76,11 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
   after: string[] = ['~tracing', '~batch']
 
   constructor(options: CORSHandlerPluginOptions<T> = {}) {
-    const defaults: CORSHandlerPluginOptions<T> = {
-      origin: '*',
-      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
-    }
-
+    // `??` instead of spreading defaults, so an explicit `undefined` (e.g. an unset env var) still gets the default.
     this.options = {
-      ...defaults,
       ...options,
+      origin: options.origin ?? '*',
+      allowMethods: options.allowMethods ?? ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
     }
   }
 

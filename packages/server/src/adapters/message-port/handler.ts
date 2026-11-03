@@ -37,7 +37,10 @@ export interface MessagePortHandlerOptions<_T extends Context> {
 }
 
 export class MessagePortHandler<T extends Context> {
-  private readonly peers = new WeakMap<SupportedMessagePort, ServerPeer>()
+  /**
+   * `null` marks a closed port, so late messages never create a new peer.
+   */
+  private readonly peers = new WeakMap<SupportedMessagePort, ServerPeer | null>()
   private readonly transfer: MessagePortHandlerOptions<T>['experimental_transfer']
   private readonly encodePeerMessageOptions: MessagePortHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: MessagePortHandlerOptions<T>['decodePeerMessage']
@@ -78,21 +81,6 @@ export class MessagePortHandler<T extends Context> {
     data: unknown,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let peer = this.peers.get(port)
-
-    if (!peer) {
-      this.peers.set(port, peer = new ServerPeer(async (message) => {
-        const transfer = await value(this.transfer, message, port)
-
-        if (transfer) {
-          postMessagePortMessage(port, message, transfer)
-        }
-        else {
-          postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
-        }
-      }))
-    }
-
     let peerMessage: ClientPeerSendMessage | undefined
 
     if (typeof data === 'string' || data instanceof Uint8Array) {
@@ -111,6 +99,26 @@ export class MessagePortHandler<T extends Context> {
       return { matched: false }
     }
 
+    let peer = this.peers.get(port)
+
+    // Closed: a new peer here would leak and never be aborted.
+    if (peer === null) {
+      return { matched: true }
+    }
+
+    if (!peer) {
+      this.peers.set(port, peer = new ServerPeer(async (message) => {
+        const transfer = await value(this.transfer, message, port)
+
+        if (transfer) {
+          postMessagePortMessage(port, message, transfer)
+        }
+        else {
+          postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
+        }
+      }))
+    }
+
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
@@ -121,16 +129,14 @@ export class MessagePortHandler<T extends Context> {
 
   /**
    * Cleans up peer state for a closed message port.
+   * Messages passed to `.message()` for this port afterwards are ignored.
    *
    * @param port The same message port instance passed to `.message()`.
    */
   async close(port: SupportedMessagePort): Promise<void> {
     const peer = this.peers.get(port)
-
-    if (peer) {
-      // delete before close to avoid potential race conditions
-      this.peers.delete(port)
-      await peer.close()
-    }
+    // mark closed before awaiting, so messages during close never reach this peer or create a new one
+    this.peers.set(port, null)
+    await peer?.close()
   }
 }
