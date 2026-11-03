@@ -191,7 +191,7 @@ export function asyncIteratorToStream<T>(
     async cancel() {
       await iterator.return?.()
     },
-  })
+  }, { highWaterMark: 0 }) // only pull on read, so cancel is not queued behind an eager `next()`
 }
 
 /**
@@ -223,5 +223,5 @@ export function asyncIteratorToUnproxiedDataStream<T>(
     async cancel() {
       await iterator.return?.()
     },
-  })
+  }, { highWaterMark: 0 }) // only pull on read, so cancel is not queued behind an eager `next()`
 }

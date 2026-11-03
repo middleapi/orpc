@@ -614,6 +614,48 @@ describe('asyncIteratorToStream', () => {
 
     expect(cleanupCalled).toBe(true)
   })
+  it('should not start the iterator before the first read', async () => {
+    let started = false
+
+    const stream = asyncIteratorToStream(async function* () {
+      started = true
+      yield 1
+    }())
+
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(started).toBe(false)
+
+    const reader = stream.getReader()
+    expect(await reader.read()).toEqual({ done: false, value: 1 })
+    expect(started).toBe(true)
+  })
+
+  it('should call iterator.return promptly on cancel while the iterator is pending', async () => {
+    const cleanup = vi.fn()
+
+    const stream = asyncIteratorToStream(async function* () {
+      try {
+        yield 1
+        await new Promise(() => {}) // never resolves
+        yield 2
+      }
+      finally {
+        cleanup()
+      }
+    }())
+
+    const reader = stream.getReader()
+    expect(await reader.read()).toEqual({ done: false, value: 1 })
+    await new Promise(resolve => setTimeout(resolve, 10)) // let any eager pull reach the pending await
+
+    const cancelled = await Promise.race([
+      reader.cancel().then(() => true),
+      new Promise(resolve => setTimeout(resolve, 100, false)),
+    ])
+
+    expect(cancelled).toBe(true)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+  })
 })
 
 it('streamToAsyncIteratorClass + asyncIteratorToStream', async () => {
@@ -753,5 +795,47 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
     await reader.cancel()
 
     expect(cleanupCalled).toBe(true)
+  })
+  it('should not start the iterator before the first read', async () => {
+    let started = false
+
+    const stream = asyncIteratorToUnproxiedDataStream(async function* () {
+      started = true
+      yield 1
+    }())
+
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(started).toBe(false)
+
+    const reader = stream.getReader()
+    expect(await reader.read()).toEqual({ done: false, value: 1 })
+    expect(started).toBe(true)
+  })
+
+  it('should call iterator.return promptly on cancel while the iterator is pending', async () => {
+    const cleanup = vi.fn()
+
+    const stream = asyncIteratorToUnproxiedDataStream(async function* () {
+      try {
+        yield 1
+        await new Promise(() => {}) // never resolves
+        yield 2
+      }
+      finally {
+        cleanup()
+      }
+    }())
+
+    const reader = stream.getReader()
+    expect(await reader.read()).toEqual({ done: false, value: 1 })
+    await new Promise(resolve => setTimeout(resolve, 10)) // let any eager pull reach the pending await
+
+    const cancelled = await Promise.race([
+      reader.cancel().then(() => true),
+      new Promise(resolve => setTimeout(resolve, 100, false)),
+    ])
+
+    expect(cancelled).toBe(true)
+    expect(cleanup).toHaveBeenCalledTimes(1)
   })
 })
