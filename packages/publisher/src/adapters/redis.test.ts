@@ -170,6 +170,35 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribeResume()
   })
 
+  it('does not drop resumed events beyond maxBufferedEvents for a slow iterator consumer', async () => {
+    const publisher = createTestingPublisher({
+      resume: { enabled: true, ttl: 10_000 },
+      maxBufferedEvents: 2,
+    })
+    const event = 'slow-consumer'
+
+    for (let i = 0; i < 5; i++) {
+      await publisher.publish(event, { order: i })
+    }
+
+    const iterator = publisher.subscribe(event, { lastEventId: '0' })
+
+    // the consumer does not pull until every missed event has been replayed
+    await sleep(300)
+
+    const orders: number[] = []
+    for await (const payload of iterator) {
+      const { order } = payload as { order: number }
+      orders.push(order)
+
+      if (order === 4) {
+        break
+      }
+    }
+
+    expect(orders).toEqual([0, 1, 2, 3, 4])
+  })
+
   it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
     const publisher = createTestingPublisher({
       resume: { enabled: true, ttl: 10_000 },

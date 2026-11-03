@@ -188,7 +188,7 @@ describe('durable publisher', () => {
     await unsubscribe()
   })
 
-  it('caps resumed events at maxBufferedEvents for a slow iterator consumer', async () => {
+  it('does not drop resumed events beyond maxBufferedEvents for a slow iterator consumer', async () => {
     const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON, { maxBufferedEvents: 2 })
     const subscribeListener = vi.spyOn(publisher as any, 'subscribeListener')
 
@@ -211,7 +211,7 @@ describe('durable publisher', () => {
       }
     }
 
-    expect(orders).toEqual([3, 4])
+    expect(orders).toEqual([0, 1, 2, 3, 4])
   })
 
   it('throws when an event is too large to store for resume', async () => {

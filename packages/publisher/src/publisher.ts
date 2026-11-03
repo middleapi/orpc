@@ -8,6 +8,11 @@ export interface PublisherOptions {
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
    *
+   * Events replayed while resuming from `lastEventId` (everything delivered before the
+   * subscription is established) are never dropped and do not count toward this limit,
+   * so a resumed subscriber receives every missed event the adapter still retains.
+   * The limit only applies to live events that arrive after the replay.
+   *
    * Set to:
    * - `0`: Disable buffering. Events must be consumed before the next one arrives.
    * - `1`: Only keep the latest event. Useful for real-time updates where only the most recent value matters.
@@ -136,6 +141,10 @@ export abstract class Publisher<T extends Record<string, object>> {
 
     throwIfAborted(signal)
 
+    // Events delivered while resuming from `lastEventId` (before `subscribeListener` resolves)
+    // are replayed missed events. They are kept separately so `maxBufferedEvents` never drops them.
+    let replaying = listenerOrOptions?.lastEventId !== undefined
+    const replayedEvents = new Queue<T[K]>()
     const bufferedEvents = new Queue<T[K]>()
     const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
 
@@ -150,6 +159,9 @@ export abstract class Publisher<T extends Record<string, object>> {
         if (resolver) {
           resolver.resolve({ done: false, value: payload })
         }
+        else if (replaying) {
+          replayedEvents.push(payload)
+        }
         else {
           bufferedEvents.push(payload)
 
@@ -160,6 +172,10 @@ export abstract class Publisher<T extends Record<string, object>> {
       }, {
         lastEventId: listenerOrOptions?.lastEventId,
         onError: error => terminate({ kind: 'error', error }),
+      })
+      .then((unsubscribe) => {
+        replaying = false
+        return unsubscribe
       })
       .catch(error => terminate({ kind: 'error', error }))
 
@@ -184,6 +200,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
       if (signal?.aborted) {
         pullResolvers.length = 0
+        replayedEvents.clear()
         bufferedEvents.clear()
       }
 
@@ -198,7 +215,7 @@ export abstract class Publisher<T extends Record<string, object>> {
           return { done: true, value: undefined }
         }
 
-        const value = bufferedEvents.shift()
+        const value = replayedEvents.shift() ?? bufferedEvents.shift()
 
         if (value !== undefined) {
           return { done: false, value }

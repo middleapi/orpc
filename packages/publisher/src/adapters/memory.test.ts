@@ -146,6 +146,55 @@ describe('memoryPublisher', () => {
       await noticeIterator.return()
     })
 
+    it('does not drop resumed events beyond maxBufferedEvents for AsyncIteratorObject subscribers', async () => {
+      const publisher = new MemoryPublisher<{ e: { i: number } }>({
+        resume: {
+          enabled: true,
+        },
+      })
+
+      for (let i = 0; i <= 150; i++) {
+        await publisher.publish('e', { i })
+      }
+
+      const iterator = publisher.subscribe('e', { lastEventId: '1' })
+
+      for (let i = 1; i <= 150; i++) {
+        const result = await iterator.next()
+        expect(result.value?.i).toBe(i)
+      }
+
+      await iterator.return()
+    })
+
+    it('still caps live events after the resumed events', async () => {
+      const publisher = new MemoryPublisher<{ e: { i: number } }>({
+        resume: {
+          enabled: true,
+        },
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await publisher.publish('e', { i })
+      }
+
+      const iterator = publisher.subscribe('e', { lastEventId: '0', maxBufferedEvents: 2 })
+      await delayMicrotasks(1)
+
+      for (let i = 5; i < 10; i++) {
+        await publisher.publish('e', { i })
+      }
+
+      const received: number[] = []
+      for (let n = 0; n < 7; n++) {
+        received.push((await iterator.next()).value!.i)
+      }
+
+      expect(received).toEqual([0, 1, 2, 3, 4, 8, 9])
+
+      await iterator.return()
+    })
+
     it('stays consistent under heavy interleaving of publishes and repeated unsubscriptions', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {

@@ -349,6 +349,89 @@ describe('publisher', () => {
       })
     })
 
+    describe('when resuming from lastEventId', () => {
+      it('never drops events replayed before the subscription is established', async () => {
+        const { promise, resolve } = promiseWithResolvers<() => Promise<void>>()
+        let listener: ((payload: TestEvents['count']) => void) | undefined
+
+        subscribeListenerSpy.mockImplementationOnce(async (_event: any, innerListener: any) => {
+          listener = innerListener
+          return promise
+        })
+
+        const iterator = publisher.subscribe('count', { lastEventId: '0', maxBufferedEvents: 2 })
+
+        for (let i = 0; i < 5; i++) {
+          listener?.({ value: i })
+        }
+
+        resolve(async () => {})
+        await sleep(0)
+
+        // live events after the replay are still capped
+        for (let i = 5; i < 10; i++) {
+          listener?.({ value: i })
+        }
+
+        const received: number[] = []
+        for (let i = 0; i < 7; i++) {
+          received.push((await iterator.next()).value!.value)
+        }
+
+        expect(received).toEqual([0, 1, 2, 3, 4, 8, 9])
+
+        await iterator.return()
+      })
+
+      it('keeps replayed events even when buffering is disabled', async () => {
+        const { promise, resolve } = promiseWithResolvers<() => Promise<void>>()
+        let listener: ((payload: TestEvents['count']) => void) | undefined
+
+        subscribeListenerSpy.mockImplementationOnce(async (_event: any, innerListener: any) => {
+          listener = innerListener
+          return promise
+        })
+
+        const iterator = publisher.subscribe('count', { lastEventId: '0', maxBufferedEvents: 0 })
+
+        listener?.({ value: 0 })
+        listener?.({ value: 1 })
+        resolve(async () => {})
+        await sleep(0)
+        listener?.({ value: 2 }) // dropped, nobody is waiting
+
+        await expect(iterator.next()).resolves.toEqual({ done: false, value: { value: 0 } })
+        await expect(iterator.next()).resolves.toEqual({ done: false, value: { value: 1 } })
+
+        const nextPromise = iterator.next()
+        await sleep(0)
+        listener?.({ value: 3 })
+        await expect(nextPromise).resolves.toEqual({ done: false, value: { value: 3 } })
+
+        await iterator.return()
+      })
+
+      it('drops replayed events when the subscriber aborts before reading them', async () => {
+        const controller = new AbortController()
+        const { promise, resolve } = promiseWithResolvers<() => Promise<void>>()
+        let listener: ((payload: TestEvents['count']) => void) | undefined
+
+        subscribeListenerSpy.mockImplementationOnce(async (_event: any, innerListener: any) => {
+          listener = innerListener
+          return promise
+        })
+
+        const iterator = publisher.subscribe('count', { lastEventId: '0', signal: controller.signal })
+
+        listener?.({ value: 0 })
+        controller.abort(new Error('Aborted'))
+        resolve(async () => {})
+
+        await expect(iterator.next()).rejects.toThrow('Aborted')
+        await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+      })
+    })
+
     describe('when the backing listener fails during setup', () => {
       it('fails the first read if subscription setup breaks immediately', async () => {
         const { promise, reject } = promiseWithResolvers<any>()

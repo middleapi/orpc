@@ -367,6 +367,10 @@ const iterator = publisher.subscribe('something-updated', {
 })
 ```
 
+:::info
+Missed events replayed through `lastEventId` are never dropped by the iterator's `maxBufferedEvents` limit (default `100`), so a resumed subscriber receives every event the adapter still retains. The limit applies only to live events that arrive after the replay.
+:::
+
 :::warning
 When resume is enabled, the publisher manages event ids automatically. This means:
 
