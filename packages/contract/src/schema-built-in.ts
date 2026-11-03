@@ -1,7 +1,7 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnySchema, Schema } from './schema'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { isAsyncIteratorObject, ORPC_NAME } from '@orpc/shared'
+import { isAsyncIteratorObject, ORPC_NAME, override } from '@orpc/shared'
 import { ValidationError } from './error'
 
 const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS')
@@ -56,7 +56,7 @@ export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TR
           },
         })
 
-        return { value: mapped }
+        return { value: override(iterator, mapped) }
       },
     },
   }

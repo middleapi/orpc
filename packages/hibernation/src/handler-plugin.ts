@@ -1,7 +1,6 @@
 import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import { Procedure } from '@orpc/server'
-import { isAsyncIteratorObject, toArray } from '@orpc/shared'
+import { toArray } from '@orpc/shared'
 import { HibernationAsyncIteratorClass } from '@standard-server/peer'
 
 /**
@@ -59,42 +58,10 @@ export class HibernationHandlerPlugin<T extends Context> implements StandardHand
         throw new TypeError('[HibernationHandlerPlugin] Hibernation context has been corrupted or modified by another plugin or interceptor')
       }
 
-      /**
-       * Output validation (e.g. `.output(eventIterator(...))`) runs before client interceptors
-       * see the result and wraps async iterators, which loses the `HibernationAsyncIteratorClass`
-       * identity. Wrap the handler so the raw handler output is captured before validation.
-       */
-      let handlerHibernation: HibernationAsyncIteratorClass<any> | undefined
-      const def = options.procedure['~orpc']
-
-      const output = await options.next({
-        ...options,
-        procedure: new Procedure({
-          ...def,
-          handler: async (...args) => {
-            const output = await def.handler(...args)
-
-            if (output instanceof HibernationAsyncIteratorClass) {
-              handlerHibernation = output
-            }
-
-            return output
-          },
-        }),
-      })
+      const output = await options.next()
 
       if (output instanceof HibernationAsyncIteratorClass) {
         pluginContext.hibernation = output
-        return undefined
-      }
-
-      /**
-       * The handler returned a hibernation iterator and the output is still an async iterator
-       * (typically the validation wrapper around it). Hibernated streams yield nothing from the
-       * server-side iterator, so the wrapper is dropped and the original iterator is used instead.
-       */
-      if (handlerHibernation && isAsyncIteratorObject(output)) {
-        pluginContext.hibernation = handlerHibernation
         return undefined
       }
 

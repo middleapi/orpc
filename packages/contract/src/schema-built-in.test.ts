@@ -81,6 +81,28 @@ describe('asyncIteratorObject', () => {
     await expect(result.value.next()).resolves.toEqual({ done: true, value: 'anything' })
   })
 
+  it('preserves the original iterator identity and properties', async () => {
+    class CustomIterator implements AsyncIterator<unknown> {
+      async next() {
+        return { done: false, value: { order: '1' } }
+      }
+
+      [Symbol.asyncIterator]() {
+        return this
+      }
+
+      special = 'special'
+    }
+
+    const schema = asyncIteratorObject(ORDER_SCHEMA)
+    const result = await schema['~standard'].validate(new CustomIterator())
+    assertValidationSuccess(result)
+
+    expect(result.value).toBeInstanceOf(CustomIterator)
+    expect((result.value as any).special).toBe('special')
+    await expect(result.value.next()).rejects.toThrow('AsyncIteratorObject validation failed')
+  })
+
   it('cleanup origin when validation fails', async () => {
     let cleanupCalled = false
     const schema = asyncIteratorObject(ORDER_SCHEMA)
