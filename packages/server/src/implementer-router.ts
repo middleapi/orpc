@@ -4,13 +4,15 @@ import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { ImplementerConfig } from './implementer'
 import type { AnyMiddleware, Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
+import type { AnyProcedure } from './procedure'
 import type { ContractedRouter } from './router'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { bindMethods } from '@orpc/shared'
+import { bindMethods, omit, setOwn } from '@orpc/shared'
 import { ProcedureImplementer } from './implementer-procedure'
 import { Lazy } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
+import { Procedure } from './procedure'
 import { withHiddenRouterContract } from './router-hidden'
 import { augmentImplementedRouter } from './router-utils'
 
@@ -210,7 +212,47 @@ export function createRouterImplementer<
   contract: TContract,
   config: ImplementerConfig,
 ): RouterImplementer<TContract, TInitialContext> {
-  return createRouterImplementerInternal(contract, config, []) as any
+  return createRouterImplementerInternal(toPlainRouterContract(contract), config, []) as any
+}
+
+/**
+ * A normal router can be used as a contract (e.g. for mocking), but its procedures carry a handler,
+ * middlewares and config. Kept as is, unimplemented procedures would pass as procedures, their config
+ * would override the config passed to `implement`, and handlers serving the hidden contract would run
+ * the contract's procedures instead of the actual implementation.
+ *
+ * Rebuilds the contract with every procedure turned into a plain {@link ProcedureContract}
+ * (without `handler`, `orderedMiddlewares` and procedure config), copying only the routers that contain one,
+ * so contract-first contracts are returned as is.
+ */
+function toPlainRouterContract<T extends RouterContract>(contract: T): T {
+  if (contract instanceof ProcedureContract) {
+    if (!(contract instanceof Procedure)) {
+      return contract
+    }
+
+    // handler & orderedMiddlewares are what make a definition a procedure (see Procedure[Symbol.hasInstance])
+    return new ProcedureContract(omit(contract['~orpc'] as AnyProcedure['~orpc'] & ImplementerConfig, [
+      'handler',
+      'orderedMiddlewares',
+      'disableInputValidation',
+      'disableOutputValidation',
+      'dedupeLeadingMiddlewares',
+    ])) as T
+  }
+
+  let copied: Record<string, RouterContract> | undefined
+
+  for (const [key, child] of Object.entries(contract as Record<string, RouterContract>)) {
+    const plainChild = toPlainRouterContract(child)
+
+    if (plainChild !== child) {
+      copied ??= { ...contract } as Record<string, RouterContract>
+      copied[key] = plainChild
+    }
+  }
+
+  return (copied ?? contract) as T
 }
 
 function createRouterImplementerInternal<
@@ -233,13 +275,13 @@ function createRouterImplementerInternal<
   const implementer: Record<string, any> = {}
 
   for (const [key, child] of Object.entries(contract)) {
-    implementer[key] = createRouterImplementerInternal(child as RouterContract, config, middlewares)
+    setOwn(implementer, key, createRouterImplementerInternal(child as RouterContract, config, middlewares))
   }
 
   const shared = bindMethods(SharedRouterImplementer.create(contract, config, middlewares))
 
   for (const [key, method] of Object.entries(shared)) {
-    if (key in implementer) {
+    if (Object.hasOwn(implementer, key)) {
       const child = implementer[key]
 
       implementer[key] = new Proxy(method, {

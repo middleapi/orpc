@@ -8,7 +8,7 @@ import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, OrderedMiddleware } from './procedure'
 import type { AnyRouter } from './router'
 import { mergeErrorMap, ProcedureContract, resolveAugmentedMetaPlugins } from '@orpc/contract'
-import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
+import { getOwn, isTypescriptObject, omit, setOwn } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { createContractProcedure } from './procedure-utils'
@@ -158,7 +158,7 @@ export function augmentRouter<
   const enhanced = {} as Record<string, any>
 
   for (const [key, child] of Object.entries(router as Record<string, AnyRouter>)) {
-    enhanced[key] = augmentRouter(child, options)
+    setOwn(enhanced, key, augmentRouter(child, options))
   }
 
   return enhanced as any
@@ -206,7 +206,7 @@ export function augmentImplementedRouter<
   const enhanced = {} as Record<string, any>
 
   for (const [key, child] of Object.entries(router as Record<string, AnyRouter>)) {
-    enhanced[key] = augmentImplementedRouter(child, options)
+    setOwn(enhanced, key, augmentImplementedRouter(child, options))
   }
 
   return enhanced as any
@@ -390,7 +390,7 @@ export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<Unla
 
     const { default: unlaziedRouter } = await unlazy(item)
 
-    unlazied[key] = await unlazyRouter(unlaziedRouter)
+    setOwn(unlazied, key, await unlazyRouter(unlaziedRouter))
   }
 
   return unlazied as any

@@ -1,9 +1,12 @@
-import { oc } from '@orpc/contract'
+import { oc, ProcedureContract } from '@orpc/contract'
+import { getOwn } from '@orpc/shared'
 import z from 'zod'
+import { os } from './builder'
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
 import { createRouterImplementer } from './implementer-router'
 import { Lazy } from './lazy'
 import * as MiddlewareDecoratedModule from './middleware-decorated'
+import { Procedure } from './procedure'
 import * as RouterHiddenModule from './router-hidden'
 import { getHiddenRouterContract } from './router-hidden'
 import * as RouterUtilsModule from './router-utils'
@@ -230,6 +233,66 @@ describe('createRouterImplementer', () => {
         ...config,
         ...contract.ping['~orpc'],
         orderedMiddlewares: [],
+      })
+    })
+
+    it('keeps __proto__ keys as own procedure implementers', () => {
+      const contract = Object.fromEntries([['__proto__', oc.output(z.string())], ['other', oc.output(z.string())]])
+
+      const implementer = createRouterImplementer(contract, config) as any
+
+      expect(Object.getPrototypeOf(implementer)).toBe(Object.prototype)
+      expect(getOwn(implementer, '__proto__')).toBeInstanceOf(ProcedureImplementer)
+    })
+
+    it('strips server procedures down to plain contracts, keeping contract-first routers as is', () => {
+      const contractFirst = { ping: oc.errors({ BAD_GATEWAY: {} }) }
+      const real = {
+        ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'REAL'),
+        nested: { pong: os.handler(() => 'REAL') },
+        contractFirst,
+      }
+
+      const hidden = getHiddenRouterContract(createRouterImplementer(real, config).router({} as any)) as any
+
+      for (const [procedure, original] of [[hidden.ping, real.ping], [hidden.nested.pong, real.nested.pong]] as const) {
+        expect(procedure).toBeInstanceOf(ProcedureContract)
+        expect(procedure).not.toBeInstanceOf(Procedure)
+        const { handler, orderedMiddlewares, disableInputValidation, ...contractDef } = original['~orpc']
+        expect(procedure['~orpc']).toEqual(contractDef)
+      }
+
+      expect(hidden.contractFirst).toBe(contractFirst)
+    })
+
+    describe('implementing a server procedure', () => {
+      const procedure = os
+        .$config({ disableInputValidation: true, disableOutputValidation: true })
+        .input(z.string())
+        .handler(() => 'original')
+
+      it('lets the implementer config win over the procedure config', () => {
+        const implementer = createRouterImplementer(procedure, { disableOutputValidation: false })
+        expect(implementer['~orpc'].disableInputValidation).toBeUndefined()
+        expect(implementer['~orpc'].disableOutputValidation).toBe(false)
+
+        const nested = createRouterImplementer({ procedure }, { disableInputValidation: false })
+        expect(nested.procedure['~orpc'].disableInputValidation).toBe(false)
+        expect(nested.procedure['~orpc'].disableOutputValidation).toBeUndefined()
+      })
+
+      it('does not copy the handler and middlewares, so an unimplemented procedure is not a procedure', () => {
+        const implementer = createRouterImplementer(procedure.use(vi.fn()), config)
+
+        expect(implementer).not.toBeInstanceOf(Procedure)
+        expect(implementer['~orpc']).not.toHaveProperty('handler')
+        expect(implementer['~orpc'].orderedMiddlewares).toEqual([])
+        expect(implementer['~orpc'].inputSchemas).toEqual(procedure['~orpc'].inputSchemas)
+
+        const handler = vi.fn()
+        const implemented = implementer.handler(handler)
+        expect(implemented).toBeInstanceOf(Procedure)
+        expect(implemented['~orpc'].handler).toBe(handler)
       })
     })
   })

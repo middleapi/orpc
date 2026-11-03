@@ -1,6 +1,7 @@
 import { oc } from '@orpc/contract'
 import { z } from 'zod'
 import { os } from '../../builder'
+import { implement } from '../../implementer'
 import { Lazy } from '../../lazy'
 import * as ProcedureUtils from '../../procedure-utils'
 import { withHiddenRouterContract } from '../../router-hidden'
@@ -441,6 +442,19 @@ describe('rpcMatcher', () => {
 
       const matcher = new RPCMatcher(withHiddenRouterContract(router, contract))
       await expect(matcher.match('POST', '/missing', undefined)).rejects.toThrowError('[Contract-First] Missing or invalid implementation for procedure at path: "missing"')
+    })
+
+    it('uses the implemented handler and config when implementing a server router', async () => {
+      const original = {
+        ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'original'),
+      }
+      const implementer = implement(original, { disableInputValidation: false })
+      const matcher = new RPCMatcher(implementer.router({ ping: implementer.ping.handler(() => 'implemented') }))
+
+      const { procedure } = (await matcher.match('POST', '/ping', undefined))!
+
+      await expect(ProcedureUtils.call(procedure, 'input')).resolves.toBe('implemented')
+      await expect(ProcedureUtils.call(procedure, 123)).rejects.toThrow('Input validation failed')
     })
   })
 
