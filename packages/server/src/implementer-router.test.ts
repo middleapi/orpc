@@ -1,4 +1,4 @@
-import { oc } from '@orpc/contract'
+import { oc, ProcedureContract } from '@orpc/contract'
 import { getOwn } from '@orpc/shared'
 import z from 'zod'
 import { os } from './builder'
@@ -243,6 +243,26 @@ describe('createRouterImplementer', () => {
 
       expect(Object.getPrototypeOf(implementer)).toBe(Object.prototype)
       expect(getOwn(implementer, '__proto__')).toBeInstanceOf(ProcedureImplementer)
+    })
+
+    it('strips server procedures down to plain contracts, keeping contract-first routers as is', () => {
+      const contractFirst = { ping: oc.errors({ BAD_GATEWAY: {} }) }
+      const real = {
+        ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'REAL'),
+        nested: { pong: os.handler(() => 'REAL') },
+        contractFirst,
+      }
+
+      const hidden = getHiddenRouterContract(createRouterImplementer(real, config).router({} as any)) as any
+
+      for (const [procedure, original] of [[hidden.ping, real.ping], [hidden.nested.pong, real.nested.pong]] as const) {
+        expect(procedure).toBeInstanceOf(ProcedureContract)
+        expect(procedure).not.toBeInstanceOf(Procedure)
+        const { handler, orderedMiddlewares, disableInputValidation, ...contractDef } = original['~orpc']
+        expect(procedure['~orpc']).toEqual(contractDef)
+      }
+
+      expect(hidden.contractFirst).toBe(contractFirst)
     })
 
     describe('implementing a server procedure', () => {
