@@ -8,10 +8,8 @@ export interface PublisherOptions {
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
    *
-   * Events replayed while resuming from `lastEventId` (everything delivered before the
-   * subscription is established) are never dropped and do not count toward this limit,
-   * so a resumed subscriber receives every missed event the adapter still retains.
-   * The limit only applies to live events that arrive after the replay.
+   * Events replayed via `lastEventId` are not counted or dropped; the limit only
+   * applies to live events that arrive after the replay.
    *
    * Set to:
    * - `0`: Disable buffering. Events must be consumed before the next one arrives.
@@ -87,7 +85,9 @@ export abstract class Publisher<T extends Record<string, object>> {
    * Returns an unsubscribe function to remove the listener.
    *
    * @remarks
-   * This method should be protected to avoid conflicts with `subscribe` method
+   * This method should be protected to avoid conflicts with `subscribe` method.
+   * When `lastEventId` is given, deliver missed events before the returned promise resolves,
+   * since `subscribe` exempts events delivered before then from `maxBufferedEvents`.
    */
   protected abstract subscribeListener<K extends keyof T & string>(
     event: K,
@@ -141,8 +141,6 @@ export abstract class Publisher<T extends Record<string, object>> {
 
     throwIfAborted(signal)
 
-    // Events delivered while resuming from `lastEventId` (before `subscribeListener` resolves)
-    // are replayed missed events. They are kept separately so `maxBufferedEvents` never drops them.
     let replaying = listenerOrOptions?.lastEventId !== undefined
     const replayedEvents = new Queue<T[K]>()
     const bufferedEvents = new Queue<T[K]>()
@@ -173,11 +171,13 @@ export abstract class Publisher<T extends Record<string, object>> {
         lastEventId: listenerOrOptions?.lastEventId,
         onError: error => terminate({ kind: 'error', error }),
       })
-      .then((unsubscribe) => {
-        replaying = false
-        return unsubscribe
-      })
-      .catch(error => terminate({ kind: 'error', error }))
+      .then(
+        (unsubscribe) => {
+          replaying = false
+          return unsubscribe
+        },
+        error => terminate({ kind: 'error', error }),
+      )
 
     const abortListener = () => terminate({ kind: 'error', error: signal!.reason })
     signal?.addEventListener('abort', abortListener)

@@ -176,27 +176,23 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
       maxBufferedEvents: 2,
     })
     const event = 'slow-consumer'
+    const subscribeListener = vi.spyOn(publisher as any, 'subscribeListener')
 
     for (let i = 0; i < 5; i++) {
       await publisher.publish(event, { order: i })
     }
 
     const iterator = publisher.subscribe(event, { lastEventId: '0' })
-
-    // the consumer does not pull until every missed event has been replayed
-    await sleep(300)
+    await subscribeListener.mock.results[0]!.value
 
     const orders: number[] = []
-    for await (const payload of iterator) {
-      const { order } = payload as { order: number }
-      orders.push(order)
-
-      if (order === 4) {
-        break
-      }
+    for (let i = 0; i < 5; i++) {
+      orders.push(((await iterator.next()).value as { order: number }).order)
     }
 
     expect(orders).toEqual([0, 1, 2, 3, 4])
+
+    await iterator.return()
   })
 
   it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {

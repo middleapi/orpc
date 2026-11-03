@@ -32,3 +32,4 @@ vitest.config.ts.timestamp-*
 *.local
 *.pem
 *.local.*
+dump.rdb
