@@ -127,11 +127,11 @@
     "@standard-server/fetch": "~0.14.0"
   },
   "devDependencies": {
-    "@scalar/api-reference": "^1.76.3",
+    "@scalar/api-reference": "^1.76.4",
     "@standard-server/aws-lambda": "~0.14.0",
     "@types/swagger-ui": "^5.32.1",
     "fastify": "^5.12.7",
-    "swagger-ui": "^5.34.0",
+    "swagger-ui": "^5.34.1",
     "zod": "^4.6.7"
   }
 }
