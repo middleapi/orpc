@@ -5,11 +5,11 @@ import { createORPCErrorFromJson, safe } from '@orpc/client'
 import { intercept, toArray } from '@orpc/shared'
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 
-export interface UserSeverFunctionOptions<TInput, TOutput, TError> {
+export interface UseServerFunctionOptions<TInput, TOutput, TError> {
   interceptors?: Interceptor<{ input: TInput }, PromiseWithError<TOutput, TError>>[] | undefined
 }
 
-export interface UseServerFunctionExecuteOptions<TInput, TOutput, TError> extends Pick<UserSeverFunctionOptions<TInput, TOutput, TError>, 'interceptors'> {
+export interface UseServerFunctionExecuteOptions<TInput, TOutput, TError> extends Pick<UseServerFunctionOptions<TInput, TOutput, TError>, 'interceptors'> {
 }
 
 export type UseServerFunctionExecuteRest<TInput, TOutput, TError>
@@ -107,7 +107,7 @@ const PENDING_STATE = {
  */
 export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJSON>(
   fn: ServerFunction<TInput, TOutput, TError>,
-  options: UserSeverFunctionOptions<TInput, TOutput, ServerFunctionError<TError>> = {},
+  options: UseServerFunctionOptions<TInput, TOutput, ServerFunctionError<TError>> = {},
 ): UseServerFunctionResult<TInput, TOutput, ServerFunctionError<TError>> {
   const [state, setState] = useState<Omit<
     | UseServerFunctionIdleResult<TInput, TOutput, ServerFunctionError<TError>>

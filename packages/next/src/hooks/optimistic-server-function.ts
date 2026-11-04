@@ -1,12 +1,12 @@
 import type { AnyORPCErrorJSON } from '@orpc/client'
 import type { ServerFunction, ServerFunctionError } from '../server-function'
-import type { UserSeverFunctionOptions, UseServerFunctionResult } from './server-function'
+import type { UseServerFunctionOptions, UseServerFunctionResult } from './server-function'
 import { onStart, toArray } from '@orpc/shared'
 import { useMemo, useOptimistic } from 'react'
 import { useServerFunction } from './server-function'
 
 export interface UseOptimisticServerFunctionOptions<TInput, TOutput, TError, TOptimisticState> extends
-  UserSeverFunctionOptions<TInput, TOutput, TError> {
+  UseServerFunctionOptions<TInput, TOutput, TError> {
   optimisticPassthrough: TOptimisticState
   optimisticReducer: (state: TOptimisticState, input: TInput) => TOptimisticState
 }
