@@ -257,11 +257,11 @@ importers:
         specifier: ~0.14.0
         version: 0.14.0
       '@tanstack/ai':
-        specifier: ^0.69.0
-        version: 0.69.0(@opentelemetry/api@1.10.0)(zod@4.6.7)
+        specifier: ^1.0.1
+        version: 1.0.1(@opentelemetry/api@1.10.0)(zod@4.6.7)
       '@tanstack/ai-client':
-        specifier: ^0.39.3
-        version: 0.39.3(@opentelemetry/api@1.10.0)(zod@4.6.7)
+        specifier: ^1.0.1
+        version: 1.0.1(@opentelemetry/api@1.10.0)(zod@4.6.7)
       '@testing-library/dom':
         specifier: ^10.4.2
         version: 10.4.2
@@ -426,7 +426,7 @@ importers:
         version: 26.6.6
       blume:
         specifier: ^2.2.6
-        version: 2.2.6(@astrojs/cloudflare@14.4.3(@types/node@26.6.6)(astro@7.4.4(@types/node@26.6.6)(@upstash/redis@1.40.0)(@vercel/functions@3.9.5(ws@8.22.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(workerd@1.20261023.1)(wrangler@4.156.0(@types/node@26.6.6))(yaml@2.9.0))(@asyncapi/converter@2.0.2)(@shikijs/themes@4.4.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@upstash/redis@1.40.0)(@vercel/functions@3.9.5(ws@8.22.0))(babel-plugin-react-compiler@1.0.0)(csstype@3.2.3)(esbuild@0.28.2)(next@16.4.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(prettier@3.9.6)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.57.3(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))(ws@8.22.0)(yaml@2.9.0)
+        version: 2.2.6(ceb3bae75aa69c7884a5050cd1d659b9)
       effect:
         specifier: ^4.1.0
         version: 4.1.0
@@ -2051,6 +2051,9 @@ packages:
   '@capsizecss/unpack@4.0.1':
     resolution: {integrity: sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ==}
     engines: {node: '>=18'}
+
+  '@cfworker/json-schema@4.1.4':
+    resolution: {integrity: sha512-20rPE8EX0dSg6JGOVe31HpqsLYZTDSlcFJZA5mpZqQxcZ71vh/SXCMX+UuHO1mMcZBDKeb752z+3L8IWa+0Svg==}
 
   '@chevrotain/cst-dts-gen@13.2.0':
     resolution: {integrity: sha512-bA9dvWlhAUcHkNwU+8w9yiUxJPlj/Lm3VqS7MD+NbIR/7LmpNLuK/AWNFdCo/T3SK5ND0/UHf3IJvl/Jn/i6yg==}
@@ -5574,17 +5577,17 @@ packages:
       csstype:
         optional: true
 
-  '@tanstack/ai-client@0.39.3':
-    resolution: {integrity: sha512-co3F4rh1xhadedk5wfvNV+sja5iueIS/S8+KGZjQ/C6+IA68rfE9iWhe2xNO4hYX4bOvyXnA5XX/d0KOFduZDA==}
+  '@tanstack/ai-client@1.0.1':
+    resolution: {integrity: sha512-G/557Gzxwp159EYTSLIQvwn1lVgMeznu8S9OAukB+U/ZTXMwridnsC2hOoYV1OCT6FQsz6TPqz6WHsoilM1P3A==}
 
-  '@tanstack/ai-event-client@0.13.1':
-    resolution: {integrity: sha512-lCPcshu6Sd4tFNeMSr+HXgdqCGupYU2cpJZVUent4GkFx41dXzrBaKkwOgkji6olDBT99OBagWCce1NZ15XeJA==}
+  '@tanstack/ai-event-client@1.0.0':
+    resolution: {integrity: sha512-RXlk6XkIYU4n25QYoCmETKiFjPnEpwvQv5Ve62pdtHaEVP//VZUdwGSRGCf/PATgwYdib8FT49tPmqnKtXPDhw==}
 
-  '@tanstack/ai-utils@0.4.2':
-    resolution: {integrity: sha512-ucSgSK9kLloInqr/7s0VZlp1IFtbpgPnskISvnLXti/hc8koqXc4Zv9pfTTc8V80WzIKYWMf+ZgSIDeFM50eCw==}
+  '@tanstack/ai-utils@1.0.0':
+    resolution: {integrity: sha512-0Nl9rUmS3zTGKP8dPmyS2zJ18mieAheKqS9V+390vjViJvD6kpP+1gdCdHkNUqQsSzSFvb32QW8bkTVCAOv0qA==}
 
-  '@tanstack/ai@0.69.0':
-    resolution: {integrity: sha512-Y018M4Cg3LPr1meRoVG/ePDB1mdazL9cPBA7bnm8WJm2LT0cN2LoUEXRimKSZjyYY7G+9BtQeNiKlaLJkbqHKQ==}
+  '@tanstack/ai@1.0.1':
+    resolution: {integrity: sha512-oddcGha40pa0MMWdMogvljNiul6OY3H+V9fDOS6DZ+2+8KdUXxWfOf8QDYtkat6xAuZf4E4Clc7b1RAewbxSkA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
@@ -5643,6 +5646,9 @@ packages:
     resolution: {integrity: sha512-ewPzDb6zPF53006Iebv+C2wEtZ+KrXgpcg8CdLkzMxrYN+0ndgqMaO5Cba+CUuf98s/ylLeZQ/OxsiR4UT/MAg==}
     peerDependencies:
       solid-js: ^1.6.0
+
+  '@tanstack/store@0.11.2':
+    resolution: {integrity: sha512-sJ4mjol8uQsHV0gOJzzjwXfh2Fwm+Sz0+8deqiTm4jGbMdjzNSW+xZCFm0kUa870uhd8yi+DpKnZb5Kc4apa0Q==}
 
   '@tanstack/svelte-query@6.3.6':
     resolution: {integrity: sha512-t00PjiCTrv2nB/Lb39pOb+TIwe80p+FpKzDCFy+6FZC6mz2j++b8lUITQ6O/JrZvkQn8eEEUvaju0nQ81vjorA==}
@@ -13424,6 +13430,8 @@ snapshots:
     dependencies:
       fontkitten: 1.0.3
 
+  '@cfworker/json-schema@4.1.4': {}
+
   '@chevrotain/cst-dts-gen@13.2.0':
     dependencies:
       '@chevrotain/gast': 13.2.0
@@ -14485,7 +14493,7 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.7)':
+  '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.4)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
       '@hono/node-server': 2.1.5(hono@4.13.5)
       ajv: 8.20.0
@@ -14504,6 +14512,8 @@ snapshots:
       raw-body: 3.0.2
       zod: 4.6.7
       zod-to-json-schema: 3.25.2(zod@4.6.7)
+    optionalDependencies:
+      '@cfworker/json-schema': 4.1.4
     transitivePeerDependencies:
       - supports-color
 
@@ -17539,27 +17549,29 @@ snapshots:
       - preact
       - react
 
-  '@tanstack/ai-client@0.39.3(@opentelemetry/api@1.10.0)(zod@4.6.7)':
+  '@tanstack/ai-client@1.0.1(@opentelemetry/api@1.10.0)(zod@4.6.7)':
     dependencies:
-      '@tanstack/ai': 0.69.0(@opentelemetry/api@1.10.0)(zod@4.6.7)
-      '@tanstack/ai-event-client': 0.13.1
-      '@tanstack/ai-utils': 0.4.2
+      '@tanstack/ai': 1.0.1(@opentelemetry/api@1.10.0)(zod@4.6.7)
+      '@tanstack/ai-event-client': 1.0.0
+      '@tanstack/ai-utils': 1.0.0
+      '@tanstack/store': 0.11.2
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - zod
 
-  '@tanstack/ai-event-client@0.13.1':
+  '@tanstack/ai-event-client@1.0.0':
     dependencies:
       '@tanstack/devtools-event-client': 0.4.4
 
-  '@tanstack/ai-utils@0.4.2': {}
+  '@tanstack/ai-utils@1.0.0': {}
 
-  '@tanstack/ai@0.69.0(@opentelemetry/api@1.10.0)(zod@4.6.7)':
+  '@tanstack/ai@1.0.1(@opentelemetry/api@1.10.0)(zod@4.6.7)':
     dependencies:
       '@ag-ui/core': 1.0.0(zod@4.6.7)
+      '@cfworker/json-schema': 4.1.4
       '@standard-schema/spec': 1.1.0
-      '@tanstack/ai-event-client': 0.13.1
-      '@tanstack/ai-utils': 0.4.2
+      '@tanstack/ai-event-client': 1.0.0
+      '@tanstack/ai-utils': 1.0.0
       fast-json-patch: 3.1.1
       partial-json: 0.1.7
     optionalDependencies:
@@ -17627,6 +17639,8 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.105.0
       solid-js: 1.9.15
+
+  '@tanstack/store@0.11.2': {}
 
   '@tanstack/svelte-query@6.3.6(svelte@5.57.3(@typescript-eslint/types@8.68.0))':
     dependencies:
@@ -19212,7 +19226,7 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  blume@2.2.6(@astrojs/cloudflare@14.4.3(@types/node@26.6.6)(astro@7.4.4(@types/node@26.6.6)(@upstash/redis@1.40.0)(@vercel/functions@3.9.5(ws@8.22.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(workerd@1.20261023.1)(wrangler@4.156.0(@types/node@26.6.6))(yaml@2.9.0))(@asyncapi/converter@2.0.2)(@shikijs/themes@4.4.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@upstash/redis@1.40.0)(@vercel/functions@3.9.5(ws@8.22.0))(babel-plugin-react-compiler@1.0.0)(csstype@3.2.3)(esbuild@0.28.2)(next@16.4.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(prettier@3.9.6)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.57.3(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))(ws@8.22.0)(yaml@2.9.0):
+  blume@2.2.6(ceb3bae75aa69c7884a5050cd1d659b9):
     dependencies:
       '@astrojs/check': 0.9.10(prettier@3.9.6)(typescript@6.0.3)
       '@astrojs/markdown-satteri': 0.4.6
@@ -19224,7 +19238,7 @@ snapshots:
       '@iconify-json/lucide': 1.2.140
       '@iconify/types': 2.0.0
       '@iconify/utils': 3.1.7
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.4)(supports-color@10.2.2)(zod@4.6.7)
       '@orama/orama': 3.1.18
       '@pierre/diffs': 1.5.2(@shikijs/themes@4.4.3)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@scalar/astro': 0.4.27(astro@7.4.4(@types/node@26.6.6)(@upstash/redis@1.40.0)(@vercel/functions@3.9.5(ws@8.22.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
