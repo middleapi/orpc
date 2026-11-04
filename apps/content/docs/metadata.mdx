@@ -45,6 +45,10 @@ const cachedProcedure = base
   })
 ```
 
+:::warning
+Metadata applied before `.router` or `.lazy` is applied again to every procedure, even if a procedure already has it, so the merge function runs again. A merge function that accumulates values, such as concatenating arrays, then duplicates them. Apply shared metadata at only one level.
+:::
+
 ## Manually Define Meta
 
 If `defineMeta` is not flexible enough, define a plugin directly with `MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>`. This gives you full control and lets the plugin infer or restrict procedure types.

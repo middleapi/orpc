@@ -45,6 +45,10 @@ const router = oc.meta(requireAuthMeta).router({
 })
 ```
 
+:::warning
+Router-level metadata is always applied again, even if a procedure contract already has it. For example, if both the router and a procedure contract are built from `oc.meta(openapi({ tags: ['planets'] }))`, `tags` becomes `['planets', 'planets']`. Apply shared metadata at only one level.
+:::
+
 ## Router to Contract
 
 A normal [router](/docs/router) can be used as a contract router as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.

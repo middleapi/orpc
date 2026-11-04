@@ -63,6 +63,10 @@ When `openapi` is applied multiple times, most fields, such as `method`, `path`,
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/openapi/src/meta.ts).
 
+:::warning
+Router-level metadata is applied again even if a procedure already has it. If both the router and a procedure are built from `os.meta(openapi({ tags: ['planets'] }))`, `tags` becomes `['planets', 'planets']`. Apply shared `tags` and `prefix` at only one level.
+:::
+
 ```ts
 const router = os
   .meta(openapi({
