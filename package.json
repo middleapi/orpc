@@ -40,6 +40,7 @@
     "@orpc/next": "workspace:*",
     "@orpc/node": "workspace:*",
     "@orpc/openapi": "workspace:*",
+    "@orpc/openrpc": "workspace:*",
     "@orpc/opentelemetry": "workspace:*",
     "@orpc/pino": "workspace:*",
     "@orpc/publisher": "workspace:*",
