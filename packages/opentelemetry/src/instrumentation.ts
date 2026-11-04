@@ -1,7 +1,6 @@
-import type { InstrumentationConfig, InstrumentationModuleDefinition } from '@opentelemetry/instrumentation'
-import { context, propagation, trace } from '@opentelemetry/api'
+import type { InstrumentationConfig } from '@opentelemetry/instrumentation'
 import { InstrumentationBase } from '@opentelemetry/instrumentation'
-import { setTracer } from '@orpc/shared'
+import { getTracer, setTracer } from '@orpc/shared'
 import pkg from '../package.json' with { type: 'json' }
 import { OpenTelemetryTracer } from './tracer'
 
@@ -27,19 +26,20 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
     super(pkg.name, pkg.version, config)
   }
 
-  protected override init(): InstrumentationModuleDefinition | InstrumentationModuleDefinition[] | void {
-  }
+  protected override init(): void {}
 
   override enable(): void {
     setTracer(new OpenTelemetryTracer({
       tracer: () => this.tracer,
-      trace,
-      context,
-      propagation: (this._config.propagationEnabled ?? true) ? propagation : undefined,
+      propagationEnabled: this.getConfig().propagationEnabled,
     }))
   }
 
   override disable(): void {
     setTracer(undefined)
+  }
+
+  override isEnabled(): boolean {
+    return getTracer() !== undefined
   }
 }
