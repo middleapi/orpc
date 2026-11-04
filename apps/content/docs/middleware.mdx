@@ -42,44 +42,25 @@ Learn more in the [Context Documentation](/docs/context).
 
 ## Metadata
 
-Use `.meta` to attach metadata to middleware. Any builder or procedure that uses the middleware with `.use` gets this metadata too, so the metadata stays next to the middleware it describes. Learn more in the [Metadata documentation](/docs/metadata).
-
-For example, an auth middleware can add an OpenAPI [security requirement](/docs/openapi/specification#customizing-the-operation-object) to every procedure it protects:
+Use `.meta` to attach [metadata](/docs/metadata). Every procedure that uses the middleware gets it. For example, an auth middleware can add its OpenAPI security requirement:
 
 ```ts
-import { ORPCError, os } from '@orpc/server'
-import { openapi } from '@orpc/openapi'
-
 const requireAuth = os
-  .$context<{ user?: { id: string } }>()
-  .meta(openapi({ // [!code highlight]
-    spec: current => ({ // [!code highlight]
-      ...current, // [!code highlight]
-      security: [{ bearerAuth: [] }], // [!code highlight]
-    }), // [!code highlight]
-  })) // [!code highlight]
-  .middleware(async ({ context, next }) => {
-    if (!context.user) {
-      throw new ORPCError('UNAUTHORIZED')
-    }
-
-    return next({ context: { user: context.user } })
+  .meta(openapi({
+    spec: current => ({ ...current, security: [{ bearerAuth: [] }] }),
+  }))
+  .middleware(async ({ next }) => {
+    // check auth...
+    return next()
   })
 
 const getProfile = os
-  .$context<{ user?: { id: string } }>()
-  .use(requireAuth) // <- also adds `security: [{ bearerAuth: [] }]` to this operation
-  .handler(async ({ context }) => context.user)
+  .use(requireAuth) // operation gets `security: [{ bearerAuth: [] }]`
+  .handler(() => ({}))
 ```
 
-Declare the `bearerAuth` scheme once in `components.securitySchemes` when you [generate the specification](/docs/openapi/specification#openapi-generator).
-
 :::info
-`implement(contract)` does not apply metadata attached to middleware, because in [contract-first](/docs/contract-first) metadata comes from the contract. Attach it to the contract instead.
-:::
-
-:::warning
-Middleware metadata is applied every time the middleware is used. If both a router and one of its procedures use `requireAuth`, the middleware runs twice and its metadata is applied twice. See [Extending Router](/docs/router#extending-router).
+`implement(contract)` ignores middleware metadata. Put it in the contract instead.
 :::
 
 ## Typesafe Errors

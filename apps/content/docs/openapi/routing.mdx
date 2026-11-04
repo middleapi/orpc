@@ -114,7 +114,15 @@ const router = {
 When `openapi` is applied multiple times, `prefix` values are concatenated in definition order, while `method`, `path`, and `successStatus` are overridden by the most recent call. For the full merge behavior of every field, see [Metadata Merging](/docs/openapi/specification#metadata-merging).
 
 :::warning
-Router-level metadata is applied again even if a procedure already has it. If both the router and a procedure are built from `os.meta(openapi({ prefix: '/api' }))`, the prefix becomes `/api/api`. Apply a shared `prefix` at only one level.
+A router-level `prefix` applies again, even if a procedure already has it:
+
+```ts
+const base = os.meta(openapi({ prefix: '/api' }))
+
+const router = base.router({
+  ping: base.handler(() => 'pong'), // prefix: '/api/api'
+})
+```
 :::
 
 ```ts

@@ -44,7 +44,17 @@ const router = os.use(requiredAuth).meta(requireAuthMeta).router({
 ```
 
 :::warning
-Router-level middleware and metadata are always applied again, even if a procedure already has them. For example, if both the router and a procedure are built from `os.use(auth).meta(openapi({ tags: ['planets'] }))`, `auth` runs twice and `tags` becomes `['planets', 'planets']`. Apply shared middleware and metadata at only one level, or see the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
+Router-level middleware and metadata apply again, even if a procedure already has them:
+
+```ts
+const authed = os.use(auth).meta(openapi({ tags: ['planets'] }))
+
+const router = authed.router({
+  list: authed.handler(() => []), // auth runs twice, tags: ['planets', 'planets']
+})
+```
+
+Apply them at one level only, or see [Dedupe Middleware](/docs/recipes/dedupe-middleware).
 :::
 
 ## Lazy Router

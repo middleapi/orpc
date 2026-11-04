@@ -46,7 +46,7 @@ const cachedProcedure = base
 ```
 
 :::warning
-Metadata applied before `.router` or `.lazy` is applied again to every procedure, even if a procedure already has it, so the merge function runs again. A merge function that accumulates values, such as concatenating arrays, then duplicates them. Apply shared metadata at only one level.
+Metadata applied before `.router` or `.lazy` applies again, even if a procedure already has it. See [Extending Router](/docs/router#extending-router).
 :::
 
 ## Manually Define Meta
