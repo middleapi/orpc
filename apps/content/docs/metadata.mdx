@@ -119,19 +119,3 @@ const procedure = os
     return { id: '1', name: 'Alice' }
   })
 ```
-
-## Router-Level Metadata
-
-Metadata applied before `.router` applies to every procedure. Metadata a procedure already has from the same builder is not applied twice:
-
-```ts
-const base = os.meta(openapi({ tags: ['planets'] }))
-
-const router = base.router({
-  list: base.handler(() => []), // tags: ['planets'], not ['planets', 'planets']
-})
-```
-
-:::tip
-Disable it with `$config({ dedupeLeadingMetaPlugins: false })`.
-:::

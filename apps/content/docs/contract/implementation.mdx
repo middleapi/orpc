@@ -95,8 +95,8 @@ const router = implementer.use(requireAuth).router({
 })
 ```
 
-:::info
-Router-level middleware that a procedure already has from the same implementer is skipped. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
+:::danger
+If you apply middleware with `.use` at both the router and procedure levels, it may run more than once. That duplication can hurt performance. To avoid redundant middleware execution, see the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
 :::
 
 ## Creating Middleware

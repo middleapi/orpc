@@ -1,4 +1,4 @@
-import type { AnySchema, ContractBuilderConfig, ErrorMap, InferSchemaInput, InferSchemaOutput, InitialInputSchema, InitialOutputSchema, MergedErrorMap, MetaPlugin, ORPCErrorConstructorMap, ProcedureContractDefinition, Schema } from '@orpc/contract'
+import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, InitialInputSchema, InitialOutputSchema, MergedErrorMap, MetaPlugin, ORPCErrorConstructorMap, ProcedureContractDefinition, Schema } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import type { BuilderWithInput, BuilderWithMiddlewares, BuilderWithOutput } from './builder-variants'
 import type { Context, MergedInitialContext } from './context'
@@ -24,30 +24,11 @@ import { augmentRouter } from './router-utils'
 export interface DefaultInitialContext {
 }
 
-/**
- * Configuration of the `os` builder: the procedure configuration,
- * plus options only read when the builder augments a router with `.router` or `.lazy`.
- */
-export interface BuilderConfig extends ProcedureConfig, ContractBuilderConfig {
-  /**
-   * When enabled, `.router` and `.lazy` skip this builder's middleware for every procedure
-   * whose middleware chain already starts with the same middleware, in the same order,
-   * applied before any `.input`/`.output` schema.
-   * This prevents middleware from running twice when the router and its procedures
-   * are built from the same builder. Only the value on the builder calling `.router` or `.lazy` is read.
-   *
-   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
-   *
-   * @default true
-   */
-  dedupeLeadingMiddlewares?: boolean | undefined
-}
-
 export interface BuilderDefinition<
   TInputSchema extends AnySchema,
   TInjectedContext extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap>, BuilderConfig {
+>extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap>, ProcedureConfig {
   orderedMiddlewares: OrderedMiddleware[]
 }
 
@@ -103,13 +84,12 @@ export class Builder<
   }
 
   /**
-   * Overrides the builder configuration, such as disabling runtime
-   * input/output validation or the automatic dedupe in `.router` and `.lazy`.
+   * Overrides the procedure configuration, such as disabling runtime
+   * input/output validation.
    *
    * @see {@link https://orpc.dev/docs/recipes/validation-customization | Validation Customization}
-   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
    */
-  $config(config: BuilderConfig): Builder<TInitialContext, TErrorMap> {
+  $config(config: ProcedureConfig): Builder<TInitialContext, TErrorMap> {
     return new Builder({
       ...this['~orpc'],
       ...config,

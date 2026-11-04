@@ -44,15 +44,6 @@ describe('ContractBuilder', () => {
     builder.errors({ TOO_MANY_REQUESTS: { data: {} } })
   })
 
-  it('$config', () => {
-    expectTypeOf(builder.$config({ dedupeLeadingMetaPlugins: false })).toEqualTypeOf<typeof builder>()
-
-    // @ts-expect-error - invalid setting
-    builder.$config('invalid')
-    // @ts-expect-error - $config is not available after .input
-    builder.input(schema1).$config({})
-  })
-
   it('.meta', () => {
     const plugin = { name: 'test', init: (m: Meta) => m }
     expectTypeOf(builder.meta(plugin)).toEqualTypeOf<typeof builder>()
