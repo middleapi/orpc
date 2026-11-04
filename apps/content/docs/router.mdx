@@ -43,8 +43,18 @@ const router = os.use(requiredAuth).meta(requireAuthMeta).router({
 })
 ```
 
-:::info
-Router-level middleware and metadata that a procedure already has from the same builder are skipped. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
+:::warning
+Router-level middleware and metadata apply again, even if a procedure already has them:
+
+```ts
+const authed = os.use(auth).meta(openapi({ prefix: '/api' }))
+
+const router = authed.router({
+  list: authed.handler(() => []), // auth runs twice, prefix: '/api/api'
+})
+```
+
+Apply them at one level only, or see [Dedupe Middleware](/docs/recipes/dedupe-middleware).
 :::
 
 ## Lazy Router

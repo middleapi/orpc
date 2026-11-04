@@ -10,6 +10,7 @@ Most of your code keeps working: many v1 names still compile through deprecated 
 :::warning[Read these first]
 
 - The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) and [OpenAPI Link](/docs/openapi/link) clients cannot talk to a v2 server (OpenAPI Link 1.16.0+ can). Deploy the upgraded server and client together. See [Wire Format Changes](#wire-format-changes).
+- Automatic middleware deduplication was removed. Middleware applied at both router and procedure level now runs twice. See [Middleware](#middleware).
 - The Batch Plugin replaced `exclude` with `filter`, which has the opposite meaning. In most cases you can simply remove `exclude`. See [Batch Plugin](#batch-plugin).
 - A prefix now applies to every procedure, not only the ones that define a `path`, so procedures relying on the router-derived path move under the prefix. See [Routing Moved to OpenAPI Metadata](#routing-moved-to-openapi-metadata).
 
@@ -252,7 +253,7 @@ Stacked object input schemas compose into a single flat value, so one schema nev
 
 ### `.$config` options changed
 
-The index-based validation options were replaced by two simple flags. v2 tracks the order of middleware and validation automatically, so the index options are gone. `dedupeLeadingMiddlewares` still works. See [Validation Customization](/docs/recipes/validation-customization).
+The index-based validation options were replaced by two simple flags. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/recipes/validation-customization).
 
 <CodeGroup>
 
@@ -378,6 +379,32 @@ const cacheMiddleware = os.middleware(async ({ next }, input, output) => {
 ```
 
 </CodeGroup>
+
+### Automatic deduplication removed
+
+v1 automatically skipped router-level middleware that was already applied to a procedure. v2 no longer does this.
+
+:::warning
+Middleware applied at both the router and the procedure level now runs twice. Nothing warns you about it: an auth or logging middleware simply executes two times per request.
+:::
+
+Guard shared middleware yourself with the context flag pattern from [Dedupe Middleware](/docs/recipes/dedupe-middleware):
+
+```ts
+const authMiddleware = os
+  .$context<{ user?: User, authLoaded?: boolean }>()
+  .middleware(async ({ context, next }) => {
+    if (context.authLoaded) {
+      return next()
+    }
+
+    return next({
+      context: { user: await loadUser(), authLoaded: true },
+    })
+  })
+```
+
+The `dedupeLeadingMiddlewares` config option was removed together with this behavior.
 
 ## Error Handling
 

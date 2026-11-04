@@ -45,6 +45,10 @@ const cachedProcedure = base
   })
 ```
 
+:::warning
+Metadata applied before `.router` or `.lazy` applies again, even if a procedure already has it. See [Extending Router](/docs/router#extending-router).
+:::
+
 ## Manually Define Meta
 
 If `defineMeta` is not flexible enough, define a plugin directly with `MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>`. This gives you full control and lets the plugin infer or restrict procedure types.
@@ -119,19 +123,3 @@ const procedure = os
     return { id: '1', name: 'Alice' }
   })
 ```
-
-## Router-Level Metadata
-
-Metadata applied before `.router` applies to every procedure. Metadata a procedure already has from the same builder is not applied twice:
-
-```ts
-const base = os.meta(openapi({ tags: ['planets'] }))
-
-const router = base.router({
-  list: base.handler(() => []), // tags: ['planets'], not ['planets', 'planets']
-})
-```
-
-:::tip
-Disable it with `$config({ dedupeLeadingMetaPlugins: false })`.
-:::

@@ -95,8 +95,20 @@ const router = implementer.use(requireAuth).router({
 })
 ```
 
-:::info
-Router-level middleware that a procedure already has from the same implementer is skipped. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
+:::warning
+Router-level middleware runs again, even if a procedure already uses it:
+
+```ts
+const authed = implementer.use(requireAuth)
+
+const router = authed.router({
+  planet: {
+    list: authed.planet.list.handler(() => []), // requireAuth runs twice
+  },
+})
+```
+
+Apply it at one level only, or see [Dedupe Middleware](/docs/recipes/dedupe-middleware).
 :::
 
 ## Creating Middleware

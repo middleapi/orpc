@@ -1,10 +1,9 @@
 import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
 import type { IntersectPick, Public } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { ImplementerConfig } from './implementer'
 import type { AnyMiddleware, Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
-import type { AnyProcedure } from './procedure'
+import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { ContractedRouter } from './router'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
@@ -22,24 +21,24 @@ export class SharedRouterImplementer<
 > {
   private constructor(
     private readonly contract: TContract,
-    private readonly config: ImplementerConfig,
+    private readonly config: ProcedureConfig,
     private readonly middlewares: AnyMiddleware[],
   ) {}
 
   static create<TContract extends RouterContract, TInitialContext extends Context>(
     contract: TContract,
-    config: ImplementerConfig
+    config: ProcedureConfig
   ): SharedRouterImplementer<TContract, TInitialContext>
 
   static create<TContract extends RouterContract, TInitialContext extends Context, TInjectedContext extends Context>(
     contract: TContract,
-    config: ImplementerConfig,
+    config: ProcedureConfig,
     middlewares: AnyMiddleware[],
   ): SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext>
 
   static create<TContract extends RouterContract, TInitialContext extends Context, TInjectedContext extends Context>(
     contract: TContract,
-    config: ImplementerConfig,
+    config: ProcedureConfig,
     middlewares: AnyMiddleware[] = [],
   ): SharedRouterImplementer<TContract, TInitialContext> | SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
     return new SharedRouterImplementer(
@@ -210,7 +209,7 @@ export function createRouterImplementer<
   TInitialContext extends Context,
 >(
   contract: TContract,
-  config: ImplementerConfig,
+  config: ProcedureConfig,
 ): RouterImplementer<TContract, TInitialContext> {
   return createRouterImplementerInternal(toPlainRouterContract(contract), config, []) as any
 }
@@ -232,12 +231,11 @@ function toPlainRouterContract<T extends RouterContract>(contract: T): T {
     }
 
     // handler & orderedMiddlewares are what make a definition a procedure (see Procedure[Symbol.hasInstance])
-    return new ProcedureContract(omit(contract['~orpc'] as AnyProcedure['~orpc'] & ImplementerConfig, [
+    return new ProcedureContract(omit(contract['~orpc'] as AnyProcedure['~orpc'], [
       'handler',
       'orderedMiddlewares',
       'disableInputValidation',
       'disableOutputValidation',
-      'dedupeLeadingMiddlewares',
     ])) as T
   }
 
@@ -261,7 +259,7 @@ function createRouterImplementerInternal<
   TInjectedContext extends Context,
 >(
   contract: TContract,
-  config: ImplementerConfig,
+  config: ProcedureConfig,
   middlewares: AnyMiddleware[],
 ): RouterImplementer<TContract, TInitialContext> | RouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
   if (contract instanceof ProcedureContract) {

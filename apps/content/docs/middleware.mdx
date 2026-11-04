@@ -42,7 +42,26 @@ Learn more in the [Context Documentation](/docs/context).
 
 ## Metadata
 
-Use `.meta` to attach metadata to middleware. This metadata is applied to any procedures that use the middleware. Learn more in the [Metadata documentation](/docs/metadata).
+Use `.meta` to attach [metadata](/docs/metadata). Every procedure that uses the middleware gets it. For example, an auth middleware can add its OpenAPI security requirement:
+
+```ts
+const requireAuth = os
+  .meta(openapi({
+    spec: current => ({ ...current, security: [{ bearerAuth: [] }] }),
+  }))
+  .middleware(async ({ next }) => {
+    // check auth...
+    return next()
+  })
+
+const getProfile = os
+  .use(requireAuth) // operation gets `security: [{ bearerAuth: [] }]`
+  .handler(() => ({}))
+```
+
+:::info
+`implement(contract)` ignores middleware metadata. Put it in the contract instead.
+:::
 
 ## Typesafe Errors
 

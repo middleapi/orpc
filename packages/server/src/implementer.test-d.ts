@@ -24,10 +24,6 @@ describe('Implementer', () => {
 
   it('.$config', () => {
     const withConfig = implementer.$config({ disableInputValidation: true })
-
-    implementer.$config({ dedupeLeadingMiddlewares: false })
-    // @ts-expect-error - implementer routers never apply router-level meta plugins
-    implementer.$config({ dedupeLeadingMetaPlugins: false })
     expectTypeOf(withConfig).toEqualTypeOf<typeof implementer>()
   })
 

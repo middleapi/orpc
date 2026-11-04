@@ -63,6 +63,18 @@ When `openapi` is applied multiple times, most fields, such as `method`, `path`,
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/openapi/src/meta.ts).
 
+:::warning
+Router-level metadata applies again, even if a procedure already has it:
+
+```ts
+const base = os.meta(openapi({ prefix: '/api' }))
+
+const router = base.router({
+  list: base.handler(() => []), // prefix: '/api/api'
+})
+```
+:::
+
 ```ts
 const router = os
   .meta(openapi({

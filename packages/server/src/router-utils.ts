@@ -1,13 +1,11 @@
 import type { AnyProcedureContract, AugmentContractRouterOptions, ErrorMap, MergedErrorMap, RouterContract } from '@orpc/contract'
 import type { Promisable } from '@orpc/shared'
-import type { BuilderConfig } from './builder'
 import type { Context, MergedInitialContext } from './context'
-import type { ImplementerConfig } from './implementer'
 import type { Lazyable } from './lazy'
 import type { AnyMiddleware } from './middleware'
-import type { AnyProcedure, OrderedMiddleware } from './procedure'
+import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
-import { mergeErrorMap, ProcedureContract, resolveAugmentedMetaPlugins } from '@orpc/contract'
+import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { getOwn, isTypescriptObject, omit, setOwn } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
@@ -67,37 +65,7 @@ export type AugmentedRouterWithMiddlewares<
             : never
       }
 
-/**
- * Prepends router-level middlewares to a procedure's ordered middlewares.
- * When `dedupeLeadingMiddlewares` is enabled (default) and the procedure's middleware chain
- * already starts with the router-level middlewares, applied before any input/output schema
- * (the same position router-level middlewares run at), they are not added again.
- */
-export function mergeRouterMiddlewares(
-  middlewares: AnyMiddleware[],
-  orderedMiddlewares: OrderedMiddleware[],
-  config: Pick<BuilderConfig, 'dedupeLeadingMiddlewares'>,
-): OrderedMiddleware[] {
-  if (
-    (config.dedupeLeadingMiddlewares ?? true)
-    && middlewares.every((middleware, i) => {
-      const ordered = orderedMiddlewares[i]
-
-      return ordered?.middleware === middleware
-        && !ordered.inputSchemasLengthAtUse
-        && !ordered.outputSchemasLengthAtUse
-    })
-  ) {
-    return orderedMiddlewares
-  }
-
-  return [
-    ...middlewares.map(middleware => ({ middleware, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 })),
-    ...orderedMiddlewares,
-  ]
-}
-
-interface AugmentRouterOptions<TErrorMap extends ErrorMap> extends AugmentContractRouterOptions<TErrorMap>, BuilderConfig {
+interface AugmentRouterOptions<TErrorMap extends ErrorMap> extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 
@@ -111,11 +79,10 @@ export function augmentRouter<
   options: AugmentRouterOptions<TErrorMap>,
 ): AugmentedRouter<T, TErrorMap> | AugmentedRouterWithMiddlewares<T, TInitialContext, TCurrentContext, TErrorMap> {
   if (router instanceof Lazy) {
-    const [meta, metaPlugins] = resolveAugmentedMetaPlugins(
+    const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
       router['~orpc'].metaPlugins,
-      options,
     )
 
     const enhanced = new Lazy({
@@ -132,11 +99,10 @@ export function augmentRouter<
   }
 
   if (router instanceof Procedure) {
-    const [meta, metaPlugins] = resolveAugmentedMetaPlugins(
+    const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
       router['~orpc'].metaPlugins,
-      options,
     )
 
     const enhanced = new Procedure({
@@ -145,7 +111,10 @@ export function augmentRouter<
       meta,
       metaPlugins,
       errorMap: mergeErrorMap(options.errorMap, router['~orpc'].errorMap),
-      orderedMiddlewares: mergeRouterMiddlewares(options.middlewares, router['~orpc'].orderedMiddlewares, options),
+      orderedMiddlewares: [
+        ...options.middlewares.map(middleware => ({ middleware, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 })),
+        ...router['~orpc'].orderedMiddlewares,
+      ],
     })
 
     return enhanced as any
@@ -164,7 +133,7 @@ export function augmentRouter<
   return enhanced as any
 }
 
-interface AugmentImplementedRouterOptions extends ImplementerConfig {
+interface AugmentImplementedRouterOptions extends ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 
@@ -193,7 +162,10 @@ export function augmentImplementedRouter<
     const enhanced = new Procedure({
       ...omit(options, ['middlewares']),
       ...router['~orpc'],
-      orderedMiddlewares: mergeRouterMiddlewares(options.middlewares, router['~orpc'].orderedMiddlewares, options),
+      orderedMiddlewares: [
+        ...options.middlewares.map(middleware => ({ middleware, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 })),
+        ...router['~orpc'].orderedMiddlewares,
+      ],
     })
 
     return enhanced as any

@@ -45,18 +45,16 @@ const router = oc.meta(requireAuthMeta).router({
 })
 ```
 
-Metadata a procedure already has from the same builder is not applied twice:
+:::warning
+Router-level metadata applies again, even if a procedure already has it:
 
 ```ts
-const base = oc.meta(openapi({ tags: ['planets'] }))
+const base = oc.meta(openapi({ prefix: '/api' }))
 
 const router = base.router({
-  list: base.output(z.array(z.string())), // tags: ['planets'], not ['planets', 'planets']
+  list: base.output(z.array(z.string())), // prefix: '/api/api'
 })
 ```
-
-:::tip
-Disable it with `oc.$config({ dedupeLeadingMetaPlugins: false })`.
 :::
 
 ## Router to Contract

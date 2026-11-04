@@ -1,4 +1,3 @@
-import type { ContractBuilderConfig } from './builder'
 import type { ErrorMap } from './error'
 import type { MergedErrorMap } from './error-utils'
 import type { AnyMetaPlugin, Meta } from './meta'
@@ -6,7 +5,7 @@ import type { AnyProcedureContract } from './procedure'
 import type { RouterContract } from './router'
 import { getOwn, isTypescriptObject, setOwn } from '@orpc/shared'
 import { mergeErrorMap } from './error-utils'
-import { resolveAugmentedMetaPlugins } from './meta-utils'
+import { resolveMetaPlugins } from './meta-utils'
 import { ProcedureContract } from './procedure'
 
 export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap>
@@ -16,7 +15,7 @@ export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends 
         [K in keyof T]: T[K] extends RouterContract ? AugmentedContractRouter<T[K], TErrorMap> : never
       }
 
-export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> extends ContractBuilderConfig {
+export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {
   meta: Meta
   metaPlugins?: AnyMetaPlugin[] | undefined
   errorMap: TErrorMap
@@ -30,11 +29,10 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
   options: AugmentContractRouterOptions<TErrorMap>,
 ): AugmentedContractRouter<T, TErrorMap> {
   if (router instanceof ProcedureContract) {
-    const [meta, metaPlugins] = resolveAugmentedMetaPlugins(
+    const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
       router['~orpc'].metaPlugins,
-      options,
     )
 
     const enhanced = new ProcedureContract({

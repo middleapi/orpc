@@ -10,7 +10,7 @@ oRPC is a typesafe API framework: write plain TypeScript functions on the server
 
 This skill targets oRPC v2. Check what is installed before writing code: `npm ls @orpc/server` (or any `@orpc/*` package). A 1.x version means v1, where this skill's guidance does not apply; use the `orpc-migrate` skill to upgrade. v2 currently ships under the `beta` dist-tag (`npm install @orpc/server@beta @orpc/client@beta`; a plain install silently gets v1). If `npm view @orpc/server dist-tags` shows `latest` at 2.x, the beta has ended: install normally.
 
-Pretrained oRPC knowledge describes v1 and is often wrong for v2 (routing moved to `.meta(openapi(...))`, `RPCLink` split `url` into `origin` plus a path). Prefer retrieval: the index of every docs page is at https://orpc.dev/llms.txt; see [Full documentation](#full-documentation) for the mechanics.
+Pretrained oRPC knowledge describes v1 and is often wrong for v2 (routing moved to `.meta(openapi(...))`, `RPCLink` split `url` into `origin` plus a path, automatic middleware dedupe was removed). Prefer retrieval: the index of every docs page is at https://orpc.dev/llms.txt; see [Full documentation](#full-documentation) for the mechanics.
 
 Package map:
 
@@ -62,7 +62,7 @@ export const router = {
 }
 ```
 
-Infer types with `InferRouterInputs` / `InferRouterOutputs` from `@orpc/server`. Router-level middleware and meta plugins a procedure already has from the same builder are skipped automatically; other overlaps run twice, see the dedupe pattern below.
+Infer types with `InferRouterInputs` / `InferRouterOutputs` from `@orpc/server`. Applying `.use` or `.meta` at both router and procedure level applies it twice: the middleware runs twice and metadata merges again (an OpenAPI `prefix: '/api'` becomes `/api/api`). Apply shared middleware and metadata at one level only, or see the dedupe pattern below.
 
 ## Middleware and context
 
@@ -84,7 +84,7 @@ const requireAuth = base.middleware(async ({ context, next }) => {
 
 `.use` accepts named middleware or inline functions. Middleware registered before `.input` runs before validation, the rest after. Middleware can also declare typed input (`os.middleware(async ({ next }, id: number) => ...)`); adapt mismatched shapes with `.use(mw.adaptInput(input => input.id))`.
 
-Best practice, dedupe expensive middleware: the same middleware can still run twice in one call (e.g. a procedure `call`ing another). Cache the result in context:
+Best practice, dedupe expensive middleware: the same middleware can run twice in one call (router-level plus procedure-level `.use`, or a procedure `call`ing another). Cache the result in context:
 
 ```ts
 const authProvider = os
