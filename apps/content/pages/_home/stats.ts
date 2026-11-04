@@ -72,9 +72,9 @@ function readJson(url: string): Promise<unknown> {
   return promise
 }
 
-async function weeklyDownloads(): Promise<string | null> {
+async function monthlyDownloads(): Promise<string | null> {
   const data = await readJson(
-    `https://api.npmjs.org/downloads/point/last-week/${NPM_PACKAGE}`,
+    `https://api.npmjs.org/downloads/point/last-month/${NPM_PACKAGE}`,
   ) as { downloads?: unknown } | null
 
   return typeof data?.downloads === 'number' ? compact.format(data.downloads) : null
@@ -112,7 +112,7 @@ export async function githubStars(): Promise<string | null> {
 
 export async function landingStats(): Promise<Stat[]> {
   const [downloads, covered, starred] = await Promise.all([
-    weeklyDownloads(),
+    monthlyDownloads(),
     coverage(),
     githubStars(),
   ])
@@ -121,7 +121,7 @@ export async function landingStats(): Promise<Stat[]> {
     ...(downloads
       ? [{
           value: downloads,
-          label: 'Downloads each week',
+          label: 'Downloads each month',
           href: `https://www.npmjs.com/package/${NPM_PACKAGE}`,
         }]
       : []),
