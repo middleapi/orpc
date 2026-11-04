@@ -47,10 +47,10 @@ const router = os.use(requiredAuth).meta(requireAuthMeta).router({
 Router-level middleware and metadata apply again, even if a procedure already has them:
 
 ```ts
-const authed = os.use(auth).meta(openapi({ tags: ['planets'] }))
+const authed = os.use(auth).meta(openapi({ prefix: '/api' }))
 
 const router = authed.router({
-  list: authed.handler(() => []), // auth runs twice, tags: ['planets', 'planets']
+  list: authed.handler(() => []), // auth runs twice, prefix: '/api/api'
 })
 ```
 
