@@ -62,7 +62,7 @@ export const router = {
 }
 ```
 
-Infer types with `InferRouterInputs` / `InferRouterOutputs` from `@orpc/server`. Applying `.use` at both router and procedure level can run the same middleware twice; see the dedupe pattern below.
+Infer types with `InferRouterInputs` / `InferRouterOutputs` from `@orpc/server`. Applying `.use` or `.meta` at both router and procedure level applies it twice: the middleware runs twice and metadata merges again (an OpenAPI `prefix: '/api'` becomes `/api/api`). Apply shared middleware and metadata at one level only, or see the dedupe pattern below.
 
 ## Middleware and context
 
