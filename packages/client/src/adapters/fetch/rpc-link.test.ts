@@ -360,7 +360,7 @@ describe('rpcLink', () => {
   it.each([
     [
       'opaqueredirect',
-      "Unexpected opaque redirect response: browsers hide redirect responses requested with `redirect: 'manual'`.",
+      "Unexpected opaque redirect response: browsers hide redirects under `redirect: 'manual'`.",
     ],
     [
       'opaque',

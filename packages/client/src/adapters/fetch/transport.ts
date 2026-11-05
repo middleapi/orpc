@@ -108,10 +108,10 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     const response = await fetch(url, init, options, path)
 
     // Opaque responses (status 0, no headers or body) would otherwise decode as a successful empty output.
-    // Browsers return them for redirects when a custom `fetch` sets `redirect: 'manual'`, and for cross-origin `no-cors` requests.
+    // Browsers return them for redirects under `redirect: 'manual'` and for cross-origin `no-cors` requests.
     if (response.type === 'opaqueredirect') {
       throw new TypeError(
-        "Unexpected opaque redirect response: browsers hide redirect responses requested with `redirect: 'manual'`.",
+        "Unexpected opaque redirect response: browsers hide redirects under `redirect: 'manual'`.",
       )
     }
 

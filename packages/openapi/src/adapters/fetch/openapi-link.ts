@@ -15,8 +15,8 @@ export interface OpenAPILinkOptions<T extends ClientContext>
  * Client link that calls an OpenAPI (RESTful) oRPC server over HTTP using the Fetch API.
  *
  * @remarks
- * **Warning**: By default `fetch` follows redirects, so redirect (`3xx`) responses are not reflected in the call.
- * Override `fetch` with `redirect: 'manual'` to receive them (server runtimes only, browsers hide them).
+ * **Warning**: `fetch` follows redirects by default, so `3xx` responses are never returned.
+ * Use a custom `fetch` with `redirect: 'manual'` to get them (server runtimes only).
  *
  * @see {@link https://orpc.dev/docs/openapi/link | OpenAPI Link}
  * @see {@link https://orpc.dev/docs/openapi/link#redirect-responses | OpenAPI Link - Redirect Responses}

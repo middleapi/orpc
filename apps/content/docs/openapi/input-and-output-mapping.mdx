@@ -242,7 +242,7 @@ const redirect = os
 ```
 
 :::warning
-By default, [OpenAPI Link](/docs/openapi/link) follows redirects and cannot reflect the `3xx` response. To receive it as the output, [override `fetch` with `redirect: 'manual'`](/docs/openapi/link#redirect-responses). This only works in server runtimes: browsers hide redirect responses, so the call throws there.
+[OpenAPI Link](/docs/openapi/link) follows redirects by default. To get the `3xx` response as the output, see [Redirect Responses](/docs/openapi/link#redirect-responses).
 :::
 
 ## Body Hints
