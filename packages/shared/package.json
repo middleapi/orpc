@@ -1,23 +1,30 @@
 {
   "name": "@orpc/shared",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Internal utilities shared across oRPC packages",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "orpc"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/shared"
   },
-  "keywords": [
-    "orpc"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -28,13 +35,6 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc"
   },

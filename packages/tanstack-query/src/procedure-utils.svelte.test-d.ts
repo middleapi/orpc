@@ -1,10 +1,17 @@
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { GetNextPageParamFunction, InfiniteData } from '@tanstack/svelte-query'
-import type { ProcedureUtils } from './procedure-utils.ts'
-import { createInfiniteQuery, createMutation, createQueries, createQuery, QueryClient } from '@tanstack/svelte-query'
+import {
+  createInfiniteQuery,
+  createMutation,
+  createQueries,
+  createQuery,
+  QueryClient,
+} from '@tanstack/svelte-query'
 import z from 'zod'
 
-export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+import type { ProcedureUtils } from './procedure-utils.ts'
+
+export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 const baseErrorMap = {
   BASE: {
@@ -13,7 +20,7 @@ const baseErrorMap = {
   OVERRIDE: {},
 }
 describe('ProcedureUtils', () => {
-  type UtilsInput = { search?: string, cursor?: number } | undefined
+  type UtilsInput = { search?: string; cursor?: number } | undefined
   type UtilsOutput = { title: string }[]
   type UtilsError = ORPCErrorFromErrorMap<typeof baseErrorMap>
 
@@ -42,21 +49,25 @@ describe('ProcedureUtils', () => {
       })
 
       it('can infer errors inside options', () => {
-        const query = createQuery(() => optionalUtils.queryOptions({
-          throwOnError(error) {
-            expectTypeOf(error).toEqualTypeOf<UtilsError>()
-            return false
-          },
-        }))
+        const query = createQuery(() =>
+          optionalUtils.queryOptions({
+            throwOnError(error) {
+              expectTypeOf(error).toEqualTypeOf<UtilsError>()
+              return false
+            },
+          }),
+        )
         expectTypeOf(query.data).toEqualTypeOf<UtilsOutput | undefined>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
       })
 
       it('with initial data & select', () => {
-        const query = createQuery(() => optionalUtils.queryOptions({
-          select: data => ({ mapped: data }),
-          initialData: [{ title: 'title' }],
-        }))
+        const query = createQuery(() =>
+          optionalUtils.queryOptions({
+            select: (data) => ({ mapped: data }),
+            initialData: [{ title: 'title' }],
+          }),
+        )
 
         expectTypeOf(query.data).toEqualTypeOf<{ mapped: UtilsOutput }>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
@@ -72,7 +83,7 @@ describe('ProcedureUtils', () => {
             context: { batch: true },
           }),
           optionalUtils.queryOptions({
-            select: data => ({ mapped: data }),
+            select: (data) => ({ mapped: data }),
           }),
         ],
       }))
@@ -87,9 +98,7 @@ describe('ProcedureUtils', () => {
     })
 
     it('fetchQuery', () => {
-      expectTypeOf(
-        queryClient.fetchQuery(optionalUtils.queryOptions()),
-      ).toEqualTypeOf<
+      expectTypeOf(queryClient.fetchQuery(optionalUtils.queryOptions())).toEqualTypeOf<
         Promise<UtilsOutput>
       >()
     })
@@ -104,21 +113,25 @@ describe('ProcedureUtils', () => {
       })
 
       it('can infer errors inside options', () => {
-        const query = createQuery(() => streamUtils.streamedOptions({
-          throwOnError(error) {
-            expectTypeOf(error).toEqualTypeOf<UtilsError>()
-            return false
-          },
-        }))
+        const query = createQuery(() =>
+          streamUtils.streamedOptions({
+            throwOnError(error) {
+              expectTypeOf(error).toEqualTypeOf<UtilsError>()
+              return false
+            },
+          }),
+        )
         expectTypeOf(query.data).toEqualTypeOf<UtilsOutput | undefined>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
       })
 
       it('with initial data & select', () => {
-        const query = createQuery(() => streamUtils.streamedOptions({
-          select: data => ({ mapped: data }),
-          initialData: [{ title: 'title' }],
-        }))
+        const query = createQuery(() =>
+          streamUtils.streamedOptions({
+            select: (data) => ({ mapped: data }),
+            initialData: [{ title: 'title' }],
+          }),
+        )
 
         expectTypeOf(query.data).toEqualTypeOf<{ mapped: UtilsOutput }>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
@@ -134,7 +147,7 @@ describe('ProcedureUtils', () => {
             context: { batch: true },
           }),
           streamUtils.streamedOptions({
-            select: data => ({ mapped: data }),
+            select: (data) => ({ mapped: data }),
           }),
         ],
       }))
@@ -149,9 +162,7 @@ describe('ProcedureUtils', () => {
     })
 
     it('fetchQuery', () => {
-      expectTypeOf(
-        queryClient.fetchQuery(streamUtils.streamedOptions()),
-      ).toEqualTypeOf<
+      expectTypeOf(queryClient.fetchQuery(streamUtils.streamedOptions())).toEqualTypeOf<
         Promise<UtilsOutput>
       >()
     })
@@ -166,21 +177,25 @@ describe('ProcedureUtils', () => {
       })
 
       it('can infer errors inside options', () => {
-        const query = createQuery(() => streamUtils.liveOptions({
-          throwOnError(error) {
-            expectTypeOf(error).toEqualTypeOf<UtilsError>()
-            return false
-          },
-        }))
+        const query = createQuery(() =>
+          streamUtils.liveOptions({
+            throwOnError(error) {
+              expectTypeOf(error).toEqualTypeOf<UtilsError>()
+              return false
+            },
+          }),
+        )
         expectTypeOf(query.data).toEqualTypeOf<UtilsOutput[number] | undefined>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
       })
 
       it('with initial data & select', () => {
-        const query = createQuery(() => streamUtils.liveOptions({
-          select: data => ({ mapped: data }),
-          initialData: { title: 'title' },
-        }))
+        const query = createQuery(() =>
+          streamUtils.liveOptions({
+            select: (data) => ({ mapped: data }),
+            initialData: { title: 'title' },
+          }),
+        )
 
         expectTypeOf(query.data).toEqualTypeOf<{ mapped: UtilsOutput[number] }>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
@@ -196,7 +211,7 @@ describe('ProcedureUtils', () => {
             context: { batch: true },
           }),
           streamUtils.liveOptions({
-            select: data => ({ mapped: data }),
+            select: (data) => ({ mapped: data }),
           }),
         ],
       }))
@@ -211,9 +226,7 @@ describe('ProcedureUtils', () => {
     })
 
     it('fetchQuery', () => {
-      expectTypeOf(
-        queryClient.fetchQuery(streamUtils.liveOptions()),
-      ).toEqualTypeOf<
+      expectTypeOf(queryClient.fetchQuery(streamUtils.liveOptions())).toEqualTypeOf<
         Promise<UtilsOutput[number]>
       >()
     })
@@ -225,38 +238,44 @@ describe('ProcedureUtils', () => {
 
     describe('createInfiniteQuery', () => {
       it('with minimal args', () => {
-        const query = createInfiniteQuery(() => optionalUtils.infiniteOptions({
-          input: () => ({}),
-          getNextPageParam,
-          initialPageParam,
-        }))
+        const query = createInfiniteQuery(() =>
+          optionalUtils.infiniteOptions({
+            input: () => ({}),
+            getNextPageParam,
+            initialPageParam,
+          }),
+        )
         expectTypeOf(query.data).toEqualTypeOf<InfiniteData<UtilsOutput, number> | undefined>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
       })
 
       it('can infer errors inside options', () => {
-        const query = createInfiniteQuery(() => optionalUtils.infiniteOptions({
-          input: () => ({}),
-          getNextPageParam,
-          initialPageParam,
-          throwOnError(error) {
-            expectTypeOf(error).toEqualTypeOf<UtilsError>()
-            return false
-          },
-        }))
+        const query = createInfiniteQuery(() =>
+          optionalUtils.infiniteOptions({
+            input: () => ({}),
+            getNextPageParam,
+            initialPageParam,
+            throwOnError(error) {
+              expectTypeOf(error).toEqualTypeOf<UtilsError>()
+              return false
+            },
+          }),
+        )
 
         expectTypeOf(query.data).toEqualTypeOf<InfiniteData<UtilsOutput, number> | undefined>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
       })
 
       it('with initial data & select', () => {
-        const query = createInfiniteQuery(() => optionalUtils.infiniteOptions({
-          input: () => ({}),
-          getNextPageParam,
-          initialPageParam,
-          select: data => ({ mapped: data }),
-          initialData: { pageParams: [], pages: [] },
-        }))
+        const query = createInfiniteQuery(() =>
+          optionalUtils.infiniteOptions({
+            input: () => ({}),
+            getNextPageParam,
+            initialPageParam,
+            select: (data) => ({ mapped: data }),
+            initialData: { pageParams: [], pages: [] },
+          }),
+        )
 
         expectTypeOf(query.data).toEqualTypeOf<{ mapped: InfiniteData<UtilsOutput, number> }>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
@@ -265,14 +284,14 @@ describe('ProcedureUtils', () => {
 
     it('fetchQuery', () => {
       expectTypeOf(
-        queryClient.fetchInfiniteQuery(optionalUtils.infiniteOptions({
-          input: () => ({}),
-          getNextPageParam,
-          initialPageParam,
-        })),
-      ).toEqualTypeOf<
-        Promise<InfiniteData<UtilsOutput, number>>
-      >()
+        queryClient.fetchInfiniteQuery(
+          optionalUtils.infiniteOptions({
+            input: () => ({}),
+            getNextPageParam,
+            initialPageParam,
+          }),
+        ),
+      ).toEqualTypeOf<Promise<InfiniteData<UtilsOutput, number>>>()
     })
   })
 
@@ -290,17 +309,19 @@ describe('ProcedureUtils', () => {
       })
 
       it('can infer errors & variables & mutation context inside options', () => {
-        const mutation = createMutation(() => optionalUtils.mutationOptions({
-          onMutate: (variables) => {
-            expectTypeOf(variables).toEqualTypeOf<UtilsInput>()
-            return ({ customContext: true })
-          },
-          onError: (error, variables, context) => {
-            expectTypeOf(context?.customContext).toEqualTypeOf<boolean | undefined>()
-            expectTypeOf(error).toEqualTypeOf<UtilsError>()
-            expectTypeOf(variables).toEqualTypeOf<UtilsInput>()
-          },
-        }))
+        const mutation = createMutation(() =>
+          optionalUtils.mutationOptions({
+            onMutate: (variables) => {
+              expectTypeOf(variables).toEqualTypeOf<UtilsInput>()
+              return { customContext: true }
+            },
+            onError: (error, variables, context) => {
+              expectTypeOf(context?.customContext).toEqualTypeOf<boolean | undefined>()
+              expectTypeOf(error).toEqualTypeOf<UtilsError>()
+              expectTypeOf(variables).toEqualTypeOf<UtilsInput>()
+            },
+          }),
+        )
 
         expectTypeOf(mutation.data).toEqualTypeOf<UtilsOutput | undefined>()
         expectTypeOf(mutation.error).toEqualTypeOf<UtilsError | null>()

@@ -1,11 +1,12 @@
 import type { ClientContext } from '@orpc/client'
 import type { AnySchema, ErrorMap } from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
+
 import type { Context } from '../context.ts'
-import type { Procedure } from '../procedure.ts'
 import type { ProcedureClient, ProcedureClientOptions } from '../procedure-client.ts'
 import { createProcedureClient } from '../procedure-client.ts'
 import { DecoratedProcedure } from '../procedure-decorated.ts'
+import type { Procedure } from '../procedure.ts'
 
 declare module '@orpc/server' {
   interface DecoratedProcedure<
@@ -17,15 +18,10 @@ declare module '@orpc/server' {
   > {
     callable<TClientContext extends ClientContext>(
       ...rest: MaybeOptionalOptions<
-        ProcedureClientOptions<
-          TInitialContext,
-          TOutputSchema,
-          TErrorMap,
-          TClientContext
-        >
+        ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, TClientContext>
       >
-    ): Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
-      & ProcedureClient<TClientContext, TInputSchema, TOutputSchema, TErrorMap>
+    ): Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap> &
+      ProcedureClient<TClientContext, TInputSchema, TOutputSchema, TErrorMap>
   }
 }
 

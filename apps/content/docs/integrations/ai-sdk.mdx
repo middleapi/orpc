@@ -1,8 +1,8 @@
 ---
-title: "AI SDK Integration"
-description: "Learn how to use oRPC as a transport for AI SDK streams and turn oRPC procedures and contracts into AI SDK tools."
+title: 'AI SDK Integration'
+description: 'Learn how to use oRPC as a transport for AI SDK streams and turn oRPC procedures and contracts into AI SDK tools.'
 sidebar:
-  label: "AI SDK"
+  label: 'AI SDK'
 ---
 
 :::warning
@@ -23,7 +23,7 @@ import { convertToModelMessages, streamText, toUIMessageStream, UIMessage } from
 import { google } from '@ai-sdk/google'
 
 export const chat = os
-  .input(type<{ chatId: string, messages: UIMessage[] }>())
+  .input(type<{ chatId: string; messages: UIMessage[] }>())
   .handler(async ({ input }) => {
     const result = streamText({
       model: google('gemini-2.5-flash'),
@@ -31,9 +31,7 @@ export const chat = os
       messages: await convertToModelMessages(input.messages),
     })
 
-    return streamToAsyncIteratorObject(
-      toUIMessageStream(result),
-    )
+    return streamToAsyncIteratorObject(toUIMessageStream(result))
   })
 ```
 
@@ -51,10 +49,15 @@ export function Example() {
   const { messages, sendMessage, status } = useChat({
     transport: {
       async sendMessages(options) {
-        return asyncIteratorToUnproxiedDataStream(await client.chat({
-          chatId: options.chatId,
-          messages: options.messages,
-        }, { signal: options.abortSignal }))
+        return asyncIteratorToUnproxiedDataStream(
+          await client.chat(
+            {
+              chatId: options.chatId,
+              messages: options.messages,
+            },
+            { signal: options.abortSignal },
+          ),
+        )
       },
       reconnectToStream(options) {
         throw new Error('Unsupported')
@@ -65,7 +68,7 @@ export function Example() {
 
   return (
     <>
-      {messages.map(message => (
+      {messages.map((message) => (
         <div key={message.id}>
           {message.role === 'user' ? 'User: ' : 'AI: '}
           {message.parts.map((part, index) =>
@@ -85,7 +88,7 @@ export function Example() {
       >
         <input
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={(e) => setInput(e.target.value)}
           disabled={status !== 'ready'}
           placeholder="Say something..."
         />
@@ -116,17 +119,24 @@ Implements a [procedure contract](/docs/contract/procedure) as an [AI SDK Tool](
 import { aiSdkTool, implementToolFactory } from '@orpc/ai-sdk'
 
 const getWeatherContract = oc
-  .meta(aiSdkTool({ // Base AI SDK tool options
-    description: 'Get the weather in a location',
-    metadata: { source: 'weather-service' }
-  }))
-  .input(z.object({
-    location: z.string().describe('The location to get the weather for'),
-  }))
-  .output(z.object({
-    location: z.string().describe('The location the weather is for'),
-    temperature: z.number().describe('The temperature in Celsius'),
-  }))
+  .meta(
+    aiSdkTool({
+      // Base AI SDK tool options
+      description: 'Get the weather in a location',
+      metadata: { source: 'weather-service' },
+    }),
+  )
+  .input(
+    z.object({
+      location: z.string().describe('The location to get the weather for'),
+    }),
+  )
+  .output(
+    z.object({
+      location: z.string().describe('The location the weather is for'),
+      temperature: z.number().describe('The temperature in Celsius'),
+    }),
+  )
 
 const implementTool = implementToolFactory()
 
@@ -157,17 +167,24 @@ import { os } from '@orpc/server'
 import { z } from 'zod'
 
 const getWeatherProcedure = os
-  .meta(aiSdkTool({ // Base AI SDK tool options
-    description: 'Get the weather in a location',
-    metadata: { source: 'weather-service' }
-  }))
-  .input(z.object({
-    location: z.string().describe('The location to get the weather for'),
-  }))
-  .output(z.object({
-    location: z.string().describe('The location the weather is for'),
-    temperature: z.number().describe('The temperature in Celsius'),
-  }))
+  .meta(
+    aiSdkTool({
+      // Base AI SDK tool options
+      description: 'Get the weather in a location',
+      metadata: { source: 'weather-service' },
+    }),
+  )
+  .input(
+    z.object({
+      location: z.string().describe('The location to get the weather for'),
+    }),
+  )
+  .output(
+    z.object({
+      location: z.string().describe('The location the weather is for'),
+      temperature: z.number().describe('The temperature in Celsius'),
+    }),
+  )
   .handler(async ({ input }) => ({
     location: input.location,
     temperature: 72 + Math.floor(Math.random() * 21) - 10,
@@ -192,12 +209,14 @@ import { asyncIteratorObject, os } from '@orpc/server'
 
 const deployProcedure = os
   .input(z.object({ app: z.string() }))
-  .output(asyncIteratorObject(
-    z.object({
-      status: z.string(),
-      url: z.string().optional().describe('Available once the deploy finishes'),
-    }),
-  ))
+  .output(
+    asyncIteratorObject(
+      z.object({
+        status: z.string(),
+        url: z.string().optional().describe('Available once the deploy finishes'),
+      }),
+    ),
+  )
   .handler(async function* ({ input }) {
     yield { status: 'building' }
     yield { status: 'uploading' }

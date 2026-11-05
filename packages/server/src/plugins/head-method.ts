@@ -1,9 +1,14 @@
-import type { StandardBody, StandardHeaders, StandardResponse } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
 import { isAsyncIteratorObject, toArray } from '@orpc/shared'
+import type { StandardBody, StandardHeaders, StandardResponse } from '@standard-server/core'
 import { cancelStandardBody, getRequiredStandardBodyHint } from '@standard-server/core'
 import { toFetchBody } from '@standard-server/fetch'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 const textEncoder = /* @__PURE__ */ new TextEncoder()
 
@@ -46,7 +51,9 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
     /**
      * Placed last, so falling back to `GET` repeats routing rather than the routing interceptors before this one.
      */
-    const fallbackInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
+    const fallbackInterceptor: StandardHandlerRoutingInterceptor<T> = async (
+      interceptorOptions,
+    ) => {
       const { next, request } = interceptorOptions
 
       if (request.method !== 'HEAD') {
@@ -102,13 +109,11 @@ function toHeadResponse(response: StandardResponse): StandardResponse {
 
   if (encoded instanceof ReadableStream) {
     discardBody(encoded)
-  }
-  else if (encoded instanceof FormData) {
+  } else if (encoded instanceof FormData) {
     // The encoded body is never cancelled, since undici rejects unhandled when cancelled mid-serialization
     headers['standard-server'] = []
     headers['content-type'] = new Response(encoded).headers.get('content-type')!
-  }
-  else if (typeof encoded === 'string' || encoded instanceof URLSearchParams) {
+  } else if (typeof encoded === 'string' || encoded instanceof URLSearchParams) {
     headers['standard-server'] ??= []
     headers['content-length'] = textEncoder.encode(encoded.toString()).byteLength.toString()
   }
@@ -117,7 +122,7 @@ function toHeadResponse(response: StandardResponse): StandardResponse {
 }
 
 function createEmptyStream(): ReadableStream<Uint8Array<ArrayBuffer>> {
-  return new ReadableStream({ start: controller => controller.close() })
+  return new ReadableStream({ start: (controller) => controller.close() })
 }
 
 /**

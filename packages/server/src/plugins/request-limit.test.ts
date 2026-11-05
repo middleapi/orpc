@@ -1,5 +1,7 @@
 import zlib from 'node:zlib'
+
 import supertest from 'supertest'
+
 import { RPCHandler } from '../adapters/fetch/index.ts'
 import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
 import { os } from '../builder.ts'
@@ -26,7 +28,9 @@ describe('requestLimitHandlerPlugin', () => {
       },
     )
 
-    const { matched, response } = await handler.handle(new Request('https://example.com/ping?data=%7B%7D'))
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/ping?data=%7B%7D'),
+    )
 
     expect(matched).toBe(true)
     await expect(response!.text()).resolves.toContain('ping')
@@ -43,13 +47,15 @@ describe('requestLimitHandlerPlugin', () => {
       },
     )
 
-    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(size22Json),
-    }))
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(size22Json),
+      }),
+    )
 
     expect(matched).toBe(true)
     await expect(response!.text()).resolves.toContain('ping')
@@ -66,13 +72,15 @@ describe('requestLimitHandlerPlugin', () => {
       },
     )
 
-    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'content-length': '22',
-      },
-      body: JSON.stringify({}),
-    }))
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'content-length': '22',
+        },
+        body: JSON.stringify({}),
+      }),
+    )
 
     expect(matched).toBe(true)
     await expect(response!.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
@@ -90,13 +98,15 @@ describe('requestLimitHandlerPlugin', () => {
       },
     )
 
-    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(size22Json),
-    }))
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(size22Json),
+      }),
+    )
 
     expect(matched).toBe(true)
     await expect(response!.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
@@ -125,7 +135,7 @@ describe('requestLimitHandlerPlugin', () => {
                     },
                   })
                 },
-                ...options.routingInterceptors ?? [],
+                ...(options.routingInterceptors ?? []),
               ],
             }
           },
@@ -133,12 +143,14 @@ describe('requestLimitHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+    )
 
     expect(response?.status).toBe(200)
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), '__MOCKED__')
@@ -158,7 +170,8 @@ describe('requestLimitHandlerPlugin', () => {
       nodeHandler.handle(req, res)
     })
 
-    const response = await server.post('/ping')
+    const response = await server
+      .post('/ping')
       .set('content-type', 'application/json')
       .send(size22Json)
 
@@ -189,14 +202,16 @@ describe('requestLimitHandlerPlugin', () => {
         },
       )
 
-      const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
-        method: 'POST',
-        headers: {
-          'content-encoding': 'gzip',
-          'content-type': 'application/json',
-        },
-        body: compressed,
-      }))
+      const { matched, response } = await handler.handle(
+        new Request('https://example.com/ping', {
+          method: 'POST',
+          headers: {
+            'content-encoding': 'gzip',
+            'content-type': 'application/json',
+          },
+          body: compressed,
+        }),
+      )
 
       expect(matched).toBe(true)
       await expect(response!.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
@@ -220,14 +235,16 @@ describe('requestLimitHandlerPlugin', () => {
         },
       )
 
-      const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
-        method: 'POST',
-        headers: {
-          'content-encoding': 'gzip',
-          'content-type': 'application/json',
-        },
-        body: compressed,
-      }))
+      const { matched, response } = await handler.handle(
+        new Request('https://example.com/ping', {
+          method: 'POST',
+          headers: {
+            'content-encoding': 'gzip',
+            'content-type': 'application/json',
+          },
+          body: compressed,
+        }),
+      )
 
       expect(matched).toBe(true)
       await expect(response!.text()).resolves.toContain('ping')

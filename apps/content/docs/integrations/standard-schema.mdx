@@ -1,8 +1,8 @@
 ---
-title: "Standard Schema Integration"
-description: "Use Zod, Valibot, ArkType, or any Standard Schema library with oRPC, plus automatic JSON Schema conversion via Standard JSON Schema."
+title: 'Standard Schema Integration'
+description: 'Use Zod, Valibot, ArkType, or any Standard Schema library with oRPC, plus automatic JSON Schema conversion via Standard JSON Schema.'
 sidebar:
-  label: "Standard Schema"
+  label: 'Standard Schema'
 ---
 
 oRPC natively supports any library that implements the [Standard Schema](https://standardschema.dev/) specification, such as [Zod](/docs/integrations/zod), [Valibot](/docs/integrations/valibot), [ArkType](/docs/integrations/arktype), and [many more](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec). Use them directly in `.input`, `.output`, and `.errors` without any extra setup.
@@ -11,9 +11,7 @@ oRPC natively supports any library that implements the [Standard Schema](https:/
 import * as z from 'zod'
 import * as v from 'valibot'
 
-const example = os
-  .input(z.object({ name: z.string() }))
-  .output(v.object({ name: v.string() }))
+const example = os.input(z.object({ name: z.string() })).output(v.object({ name: v.string() }))
 ```
 
 ## Standard JSON Schema
@@ -29,7 +27,7 @@ import type {
   AnySchema,
   JsonSchema,
   JsonSchemaConverter,
-  JsonSchemaConverterDirection
+  JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import { toJsonSchema } from '@valibot/to-json-schema'
 
@@ -40,7 +38,7 @@ class MyCustomConverter implements JsonSchemaConverter {
 
   convert(
     schema: AnySchema | undefined,
-    direction: JsonSchemaConverterDirection
+    direction: JsonSchemaConverterDirection,
   ): [jsonSchema: JsonSchema, optional: boolean] {
     // In most cases, treating the schema as required is acceptable.
     return [toJsonSchema(schema as any), false] as any

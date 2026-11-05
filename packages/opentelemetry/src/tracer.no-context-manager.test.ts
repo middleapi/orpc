@@ -1,6 +1,11 @@
-import type { TracingHeaders } from '@orpc/shared'
 import { context, propagation, trace } from '@opentelemetry/api'
-import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
+import type { TracingHeaders } from '@orpc/shared'
+
 import { OpenTelemetryTracer } from './tracer.ts'
 
 /**
@@ -35,9 +40,11 @@ it('keeps explicit parents and injects trace context without a context manager',
     parent.end()
   })
 
-  const parent = exporter.getFinishedSpans().find(span => span.name === 'parent')!
-  const child = exporter.getFinishedSpans().find(span => span.name === 'child')!
+  const parent = exporter.getFinishedSpans().find((span) => span.name === 'parent')!
+  const child = exporter.getFinishedSpans().find((span) => span.name === 'child')!
 
   expect(child.parentSpanContext?.spanId).toBe(parent.spanContext().spanId)
-  expect(headers.traceparent).toBe(`00-${parent.spanContext().traceId}-${parent.spanContext().spanId}-01`)
+  expect(headers.traceparent).toBe(
+    `00-${parent.spanContext().traceId}-${parent.spanContext().spanId}-01`,
+  )
 })

@@ -3,6 +3,7 @@ import { openapi, OpenAPISerializer } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
+
 import { Person } from '../rpc/__shared__/client-server.ts'
 import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch.ts'
 import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http.ts'
@@ -16,8 +17,8 @@ describe.each([
   const customSerializer = new OpenAPISerializer({
     handlers: {
       person: {
-        condition: value => value instanceof Person,
-        serialize: value => ({
+        condition: (value) => value instanceof Person,
+        serialize: (value) => ({
           __person__: {
             name: value.name,
             age: value.age,
@@ -30,46 +31,54 @@ describe.each([
   const router = {
     get: os
       .input(z.any())
-      .meta(openapi({
-        method: 'GET',
-        path: '/items/{id}',
-        queryStyles: {
-          keyword: 'primitive',
-          tags: 'array',
-          meta: 'json',
-        },
-      }))
+      .meta(
+        openapi({
+          method: 'GET',
+          path: '/items/{id}',
+          queryStyles: {
+            keyword: 'primitive',
+            tags: 'array',
+            meta: 'json',
+          },
+        }),
+      )
       .handler(({ input, lastEventId }) => ({ input, lastEventId })),
     post: os
       .input(z.any())
-      .meta(openapi({
-        method: 'POST',
-        path: '/items',
-      }))
+      .meta(
+        openapi({
+          method: 'POST',
+          path: '/items',
+        }),
+      )
       .handler(({ input }) => input),
     upload: os
       .input(z.any())
-      .meta(openapi({
-        method: 'POST',
-        path: '/upload',
-      }))
+      .meta(
+        openapi({
+          method: 'POST',
+          path: '/upload',
+        }),
+      )
       .handler(({ input }) => input),
     detailed: os
       .$context<{ userId: string }>()
       .input(z.any())
-      .meta(openapi({
-        method: 'POST',
-        path: '/articles/{id}/{tags}',
-        inputStructure: 'detailed',
-        outputStructure: 'detailed',
-        successStatus: 201,
-        paramsStyles: {
-          tags: 'comma-delimited-array',
-        },
-        queryStyles: {
-          meta: 'json',
-        },
-      }))
+      .meta(
+        openapi({
+          method: 'POST',
+          path: '/articles/{id}/{tags}',
+          inputStructure: 'detailed',
+          outputStructure: 'detailed',
+          successStatus: 201,
+          paramsStyles: {
+            tags: 'comma-delimited-array',
+          },
+          queryStyles: {
+            meta: 'json',
+          },
+        }),
+      )
       .handler(({ input, context, signal }) => ({
         status: 202,
         headers: {
@@ -80,10 +89,12 @@ describe.each([
       })),
     error: os
       .input(z.any())
-      .meta(openapi({
-        method: 'GET',
-        path: '/errors/{id}',
-      }))
+      .meta(
+        openapi({
+          method: 'GET',
+          path: '/errors/{id}',
+        }),
+      )
       .handler(() => {
         throw new ORPCError('NOT_FOUND', {
           message: 'Missing item',
@@ -97,17 +108,21 @@ describe.each([
           data: z.object({ reason: z.string() }),
         },
       })
-      .meta(openapi({
-        method: 'GET',
-        path: '/defined-errors',
-      }))
+      .meta(
+        openapi({
+          method: 'GET',
+          path: '/defined-errors',
+        }),
+      )
       .handler(({ errors }) => {
         throw errors.FORBIDDEN({
           message: 'Access denied',
           data: { reason: 'no-permission' },
         })
       }),
-    customSerializer: os.input(z.any()).handler(({ input }) => ({ client: input, server: new Person('server', 12) })),
+    customSerializer: os
+      .input(z.any())
+      .handler(({ input }) => ({ client: input, server: new Person('server', 12) })),
   }
 
   const client = createClientServer(router, {
@@ -115,15 +130,20 @@ describe.each([
   })
 
   it('supports compact GET input with path params, styled query, and lastEventId', async () => {
-    await expect(client.get({
-      id: '42',
-      keyword: 1,
-      tags: ['red', 'blue'],
-      meta: { enabled: true },
-      filter: { published: true },
-    }, {
-      lastEventId: '__EVENT_123__',
-    })).resolves.toEqual({
+    await expect(
+      client.get(
+        {
+          id: '42',
+          keyword: 1,
+          tags: ['red', 'blue'],
+          meta: { enabled: true },
+          filter: { published: true },
+        },
+        {
+          lastEventId: '__EVENT_123__',
+        },
+      ),
+    ).resolves.toEqual({
       input: {
         id: '42',
         keyword: '1',
@@ -136,13 +156,15 @@ describe.each([
   })
 
   it('supports compact POST JSON bodies', async () => {
-    await expect(client.post({
-      count: 1n,
-      when: date,
-      nested: {
-        flag: true,
-      },
-    })).resolves.toEqual({
+    await expect(
+      client.post({
+        count: 1n,
+        when: date,
+        nested: {
+          flag: true,
+        },
+      }),
+    ).resolves.toEqual({
       count: '1',
       when: date.toISOString(),
       nested: {
@@ -202,11 +224,11 @@ describe.each([
       yield { when: date }
       await completion.promise
       return { completeAt: date }
-    }())
+    })()
 
     // The source holds everything after its first event until the test releases it, so a transport
     // that buffered the stream would hang here instead of resolving.
-    const result = await client.post(stream) as AsyncIteratorObject<unknown>
+    const result = (await client.post(stream)) as AsyncIteratorObject<unknown>
     await expect(result.next()).resolves.toEqual({ value: 'order 1', done: false })
 
     order2.resolve()
@@ -242,7 +264,7 @@ describe.each([
 
     // The source holds everything after its first chunk until the test releases it, so a transport
     // that buffered the stream would hang here instead of resolving.
-    const result = await client.post(stream) as ReadableStream<Uint8Array>
+    const result = (await client.post(stream)) as ReadableStream<Uint8Array>
 
     const reader = result.getReader()
 
@@ -308,9 +330,11 @@ describe.each([
   })
 
   it('propagates ORPC errors through OpenAPI responses', async () => {
-    await expect(client.error({
-      id: '42',
-    })).rejects.toMatchObject({
+    await expect(
+      client.error({
+        id: '42',
+      }),
+    ).rejects.toMatchObject({
       code: 'NOT_FOUND',
       message: 'Missing item',
       data: { id: 'missing-item' },

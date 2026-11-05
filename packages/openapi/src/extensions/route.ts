@@ -1,14 +1,13 @@
 import type { AnySchema, ErrorMap } from '@orpc/contract'
-import type { Context } from '@orpc/server'
-import type { OpenAPIMeta } from '../meta.ts'
 import { ContractBuilder } from '@orpc/contract'
+import type { Context } from '@orpc/server'
 import { Builder, DecoratedProcedure } from '@orpc/server'
+
+import type { OpenAPIMeta } from '../meta.ts'
 import { openapi } from '../meta.ts'
 
 declare module '@orpc/contract' {
-  interface ContractBuilder<
-    TErrorMap extends ErrorMap,
-  > {
+  interface ContractBuilder<TErrorMap extends ErrorMap> {
     route(meta: OpenAPIMeta): ContractBuilder<TErrorMap>
   }
 
@@ -31,7 +30,9 @@ declare module '@orpc/contract' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
-    route(meta: OpenAPIMeta): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap>
+    route(
+      meta: OpenAPIMeta,
+    ): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap>
   }
 }
 
@@ -40,10 +41,7 @@ ContractBuilder.prototype.route = function route(meta) {
 }
 
 declare module '@orpc/server' {
-  interface Builder<
-    TInitialContext extends Context,
-    TErrorMap extends ErrorMap,
-  > {
+  interface Builder<TInitialContext extends Context, TErrorMap extends ErrorMap> {
     route(meta: OpenAPIMeta): Builder<TInitialContext, TErrorMap>
   }
 
@@ -61,7 +59,9 @@ declare module '@orpc/server' {
     TInputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
-    route(meta: OpenAPIMeta): BuilderWithInput<TInitialContext, TInjectedContext, TInputSchema, TErrorMap>
+    route(
+      meta: OpenAPIMeta,
+    ): BuilderWithInput<TInitialContext, TInjectedContext, TInputSchema, TErrorMap>
   }
 
   interface BuilderWithOutput<
@@ -70,7 +70,9 @@ declare module '@orpc/server' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
-    route(meta: OpenAPIMeta): BuilderWithOutput<TInitialContext, TInjectedContext, TOutputSchema, TErrorMap>
+    route(
+      meta: OpenAPIMeta,
+    ): BuilderWithOutput<TInitialContext, TInjectedContext, TOutputSchema, TErrorMap>
   }
 
   interface BuilderWithInputOutput<
@@ -80,7 +82,15 @@ declare module '@orpc/server' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
-    route(meta: OpenAPIMeta): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    route(
+      meta: OpenAPIMeta,
+    ): BuilderWithInputOutput<
+      TInitialContext,
+      TInjectedContext,
+      TInputSchema,
+      TOutputSchema,
+      TErrorMap
+    >
   }
 
   interface DecoratedProcedure<
@@ -90,7 +100,9 @@ declare module '@orpc/server' {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
-    route(meta: OpenAPIMeta): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    route(
+      meta: OpenAPIMeta,
+    ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
   }
 }
 

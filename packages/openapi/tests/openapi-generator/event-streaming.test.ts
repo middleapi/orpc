@@ -1,5 +1,6 @@
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import z from 'zod'
+
 import { openapi, OpenAPIGenerator } from '../../src/index.ts'
 import { zodJsonSchemaConverter } from '../__shared__/schema.ts'
 
@@ -10,8 +11,12 @@ describe('openAPIGenerator e2e: server-sent event streaming', () => {
     const doc = await generator.generate({
       chat: oc
         .meta(openapi({ path: '/chat' }))
-        .input(asyncIteratorObject(z.object({ prompt: z.string() }), z.object({ done: z.boolean() })))
-        .output(asyncIteratorObject(z.object({ delta: z.string() }), z.object({ usage: z.number() }))),
+        .input(
+          asyncIteratorObject(z.object({ prompt: z.string() }), z.object({ done: z.boolean() })),
+        )
+        .output(
+          asyncIteratorObject(z.object({ delta: z.string() }), z.object({ usage: z.number() })),
+        ),
     })
 
     expect(doc.paths?.['/chat']?.post?.requestBody).toEqual({
@@ -91,7 +96,9 @@ describe('openAPIGenerator e2e: server-sent event streaming', () => {
         .output(asyncIteratorObject(z.object({ title: z.string() }))),
     })
 
-    const schema = (doc.paths?.['/notifications']?.get?.responses?.['200'] as any).content['text/event-stream'].schema
+    const schema = (doc.paths?.['/notifications']?.get?.responses?.['200'] as any).content[
+      'text/event-stream'
+    ].schema
 
     expect(schema.oneOf[1]).toEqual({
       type: 'object',

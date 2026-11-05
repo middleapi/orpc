@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Specification"
-description: "Learn how to configure openapi metadata and generate OpenAPI 3.2, 3.1, or 3.0 documents from your oRPC contracts and routers with OpenAPIGenerator."
+title: 'OpenAPI Specification'
+description: 'Learn how to configure openapi metadata and generate OpenAPI 3.2, 3.1, or 3.0 documents from your oRPC contracts and routers with OpenAPIGenerator.'
 ---
 
 ## Metadata
@@ -13,23 +13,29 @@ import { openapi } from '@orpc/openapi'
 import { z } from 'zod'
 
 const getPlanet = oc
-  .meta(openapi({
-    method: 'GET',
-    path: '/planets/{id}',
-    operationId: 'getPlanet',
-    summary: 'Get a planet',
-    description: 'Returns a single planet.',
-    tags: ['planets'],
-    successStatus: 200,
-    successDescription: 'Planet payload',
-  }))
-  .input(z.object({
-    id: z.string(),
-  }))
-  .output(z.object({
-    id: z.string(),
-    name: z.string(),
-  }))
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/planets/{id}',
+      operationId: 'getPlanet',
+      summary: 'Get a planet',
+      description: 'Returns a single planet.',
+      tags: ['planets'],
+      successStatus: 200,
+      successDescription: 'Planet payload',
+    }),
+  )
+  .input(
+    z.object({
+      id: z.string(),
+    }),
+  )
+  .output(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+  )
 ```
 
 :::info
@@ -42,14 +48,16 @@ Use `spec` to customize the generated operation object. If `spec` is an object, 
 
 ```ts
 const getPlanet = oc
-  .meta(openapi({
-    method: 'GET',
-    path: '/planets/{id}',
-    spec: current => ({
-      ...current,
-      security: [{ bearerAuth: [] }],
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/planets/{id}',
+      spec: (current) => ({
+        ...current,
+        security: [{ bearerAuth: [] }],
+      }),
     }),
-  }))
+  )
   .input(z.object({ id: z.string() }))
 ```
 
@@ -73,33 +81,38 @@ const router = base.router({
   list: base.handler(() => []), // prefix: '/api/api'
 })
 ```
+
 :::
 
 ```ts
 const router = os
-  .meta(openapi({
-    tags: ['planets'],
-    spec: current => ({
-      ...current,
-      security: [{ bearerAuth: [] }],
+  .meta(
+    openapi({
+      tags: ['planets'],
+      spec: (current) => ({
+        ...current,
+        security: [{ bearerAuth: [] }],
+      }),
     }),
-  }))
+  )
   .router({
     list: os
       .meta(openapi({ method: 'GET', summary: 'List planets', tags: ['list'] }))
-      .meta(openapi({
-        spec: {
-          operationId: 'getPlanet',
-          summary: 'List planets',
-          responses: {
-            200: {
-              description: 'List of planets',
+      .meta(
+        openapi({
+          spec: {
+            operationId: 'getPlanet',
+            summary: 'List planets',
+            responses: {
+              200: {
+                description: 'List of planets',
+              },
             },
-          }
-        }
-      }))
+          },
+        }),
+      )
       .input(z.object({ q: z.string().optional() }))
-      .handler(async () => ([])),
+      .handler(async () => []),
   })
 ```
 
@@ -108,23 +121,25 @@ These are equivalent to:
 ```ts
 const router = {
   list: os
-    .meta(openapi({
-      method: 'GET',
-      tags: ['planets', 'list'],
-      summary: 'List planets',
-      spec: {
-        operationId: 'getPlanet',
+    .meta(
+      openapi({
+        method: 'GET',
+        tags: ['planets', 'list'],
         summary: 'List planets',
-        responses: {
-          200: {
-            description: 'List of planets',
+        spec: {
+          operationId: 'getPlanet',
+          summary: 'List planets',
+          responses: {
+            200: {
+              description: 'List of planets',
+            },
           },
+          security: [{ bearerAuth: [] }],
         },
-        security: [{ bearerAuth: [] }],
-      },
-    }))
+      }),
+    )
     .input(z.object({ q: z.string().optional() }))
-    .handler(async () => ([])),
+    .handler(async () => []),
 }
 ```
 
@@ -132,9 +147,7 @@ const router = {
 Metadata resets to its default behavior when set to `undefined` in subsequent calls:
 
 ```ts
-const example = os
-  .meta(openapi({ tags: ['planets'] }))
-  .meta(openapi({ tags: undefined }))
+const example = os.meta(openapi({ tags: ['planets'] })).meta(openapi({ tags: undefined }))
 ```
 
 In this example, the final `tags` is `undefined`, so no tags are applied to `example`.
@@ -159,9 +172,7 @@ const spec = await generator.generate(router, {
       title: 'Planet API',
       version: '1.0.0',
     },
-    servers: [
-      { url: 'https://example.com/api' },
-    ],
+    servers: [{ url: 'https://example.com/api' }],
   },
 })
 ```

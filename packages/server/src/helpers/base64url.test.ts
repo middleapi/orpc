@@ -59,7 +59,7 @@ describe('decodeBase64url canonical form', () => {
   it('rejects non-canonical and non-base64url input', () => {
     expect(decodeBase64url('')).toEqual(new Uint8Array([]))
     expect(decodeBase64url('QQ')).toEqual(new Uint8Array([0x41]))
-    expect(decodeBase64url('-_-_')).toEqual(new Uint8Array([0xFB, 0xFF, 0xBF]))
+    expect(decodeBase64url('-_-_')).toEqual(new Uint8Array([0xfb, 0xff, 0xbf]))
 
     for (const input of ['QR', 'QS', 'QT', 'QQ=', 'QQ==', ' QQ ', 'QQ\n\n', '+/+/', 'A', 'AAAAA']) {
       expect(decodeBase64url(input), JSON.stringify(input)).toBeUndefined()

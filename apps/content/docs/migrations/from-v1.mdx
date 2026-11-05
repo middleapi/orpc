@@ -1,8 +1,8 @@
 ---
-title: "Migrating from oRPC v1"
-description: "Upgrade an oRPC v1 app to v2, with side-by-side v1 and v2 comparisons for every change that needs your attention."
+title: 'Migrating from oRPC v1'
+description: 'Upgrade an oRPC v1 app to v2, with side-by-side v1 and v2 comparisons for every change that needs your attention.'
 sidebar:
-  label: "Migrating from v1"
+  label: 'Migrating from v1'
 ---
 
 Most of your code keeps working: many v1 names still compile through deprecated aliases, so your editor shows a strike-through hint instead of an error.
@@ -60,7 +60,7 @@ If your [OpenAPI Handler](/docs/openapi/handler) endpoints have external consume
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 
 const handler = new OpenAPIHandler(router, {
-  errorResponseBodyEncoder: error => ({
+  errorResponseBodyEncoder: (error) => ({
     ...error.toJSON(),
     status: COMMON_ERROR_STATUS_MAP[error.code] ?? 400,
   }),
@@ -76,9 +76,7 @@ The biggest change: `.route`, `.prefix`, `.tag`, and `.$route` no longer exist o
 ```ts v2
 import { openapi } from '@orpc/openapi'
 
-const listPlanet = os
-  .meta(openapi({ method: 'GET', path: '/planets' }))
-  .handler(async () => [])
+const listPlanet = os.meta(openapi({ method: 'GET', path: '/planets' })).handler(async () => [])
 
 const router = os
   .meta(openapi({ prefix: '/planets', tags: ['planets'] }))
@@ -86,14 +84,9 @@ const router = os
 ```
 
 ```ts v1
-const listPlanet = os
-  .route({ method: 'GET', path: '/planets' })
-  .handler(async () => [])
+const listPlanet = os.route({ method: 'GET', path: '/planets' }).handler(async () => [])
 
-const router = os
-  .prefix('/planets')
-  .tag('planets')
-  .router({ list: listPlanet })
+const router = os.prefix('/planets').tag('planets').router({ list: listPlanet })
 ```
 
 </CodeGroup>
@@ -172,9 +165,7 @@ const result = await call(getting, undefined, { context: {} })
 ```
 
 ```ts v1
-const getting = os
-  .handler(async () => 'pong')
-  .callable({ context: {} })
+const getting = os.handler(async () => 'pong').callable({ context: {} })
 
 const result = await getting()
 ```
@@ -187,9 +178,7 @@ If you prefer the v1 style, the [`.callable` extension](/docs/client/server-side
 ```ts
 import '@orpc/server/extensions/callable' // once at init time
 
-const getting = os
-  .handler(async () => 'pong')
-  .callable({ context: {} })
+const getting = os.handler(async () => 'pong').callable({ context: {} })
 ```
 
 :::
@@ -208,9 +197,7 @@ import { os } from '@orpc/server'
 
 const functionable = createServerFunctionable({ context: {} })
 
-export const getting = functionable(
-  os.handler(async () => 'pong'),
-)
+export const getting = functionable(os.handler(async () => 'pong'))
 ```
 
 ```ts v1
@@ -218,9 +205,7 @@ export const getting = functionable(
 
 import { os } from '@orpc/server'
 
-export const getting = os
-  .handler(async () => 'pong')
-  .actionable({ context: {} })
+export const getting = os.handler(async () => 'pong').actionable({ context: {} })
 ```
 
 </CodeGroup>
@@ -282,10 +267,7 @@ const base = os.$config({
 ```ts v2
 import { defineMeta, os } from '@orpc/server'
 
-const [cacheMeta, getCacheMeta] = defineMeta(
-  'cache',
-  (incoming: boolean) => incoming,
-)
+const [cacheMeta, getCacheMeta] = defineMeta('cache', (incoming: boolean) => incoming)
 
 const base = os.use(async ({ procedure, next }) => {
   if (getCacheMeta(procedure) !== true) {
@@ -295,9 +277,7 @@ const base = os.use(async ({ procedure, next }) => {
   return next()
 })
 
-const example = base
-  .meta(cacheMeta(true))
-  .handler(async () => {})
+const example = base.meta(cacheMeta(true)).handler(async () => {})
 ```
 
 ```ts v1
@@ -307,19 +287,15 @@ interface ORPCMetadata {
   cache?: boolean
 }
 
-const base = os
-  .$meta<ORPCMetadata>({})
-  .use(async ({ procedure, next }) => {
-    if (!procedure['~orpc'].meta.cache) {
-      return next()
-    }
-    // ...
+const base = os.$meta<ORPCMetadata>({}).use(async ({ procedure, next }) => {
+  if (!procedure['~orpc'].meta.cache) {
     return next()
-  })
+  }
+  // ...
+  return next()
+})
 
-const example = base
-  .meta({ cache: true })
-  .handler(async () => {})
+const example = base.meta({ cache: true }).handler(async () => {})
 ```
 
 </CodeGroup>
@@ -337,7 +313,7 @@ const merged = aMiddleware.use(anotherMiddleware)
 
 const example = os
   .input(z.object({ id: z.number() }))
-  .use(canUpdate.adaptInput(input => input.id))
+  .use(canUpdate.adaptInput((input) => input.id))
   .handler(async () => {})
 ```
 
@@ -346,7 +322,7 @@ const merged = aMiddleware.concat(anotherMiddleware)
 
 const example = os
   .input(z.object({ id: z.number() }))
-  .use(canUpdate, input => input.id)
+  .use(canUpdate, (input) => input.id)
   .handler(async () => {})
 ```
 
@@ -392,7 +368,7 @@ Guard shared middleware yourself with the context flag pattern from [Dedupe Midd
 
 ```ts
 const authMiddleware = os
-  .$context<{ user?: User, authLoaded?: boolean }>()
+  .$context<{ user?: User; authLoaded?: boolean }>()
   .middleware(async ({ context, next }) => {
     if (context.authLoaded) {
       return next()
@@ -622,8 +598,8 @@ import { RPCSerializer } from '@orpc/client'
 const serializer = new RPCSerializer({
   handlers: {
     user: {
-      condition: data => data instanceof User,
-      serialize: data => data.toJSON(),
+      condition: (data) => data instanceof User,
+      serialize: (data) => data.toJSON(),
       deserialize: (data: any) => new User(data.id, data.name),
     },
   },
@@ -638,9 +614,9 @@ import type { StandardRPCCustomJsonSerializer } from '@orpc/client/standard'
 
 const userSerializer: StandardRPCCustomJsonSerializer = {
   type: 21, // unique number > 20
-  condition: data => data instanceof User,
-  serialize: data => data.toJSON(),
-  deserialize: data => new User(data.id, data.name),
+  condition: (data) => data instanceof User,
+  serialize: (data) => data.toJSON(),
+  deserialize: (data) => new User(data.id, data.name),
 }
 
 const handler = new RPCHandler(router, { customJsonSerializers: [userSerializer] })
@@ -661,7 +637,7 @@ const REGEXP_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
 const serializer = new RPCSerializer({
   handlers: {
     regexp: {
-      condition: data => data instanceof RegExp,
+      condition: (data) => data instanceof RegExp,
       serialize: (data: RegExp) => data.toString(),
       deserialize: (data: string) => {
         const [, pattern, flags] = data.match(REGEXP_PATTERN)!
@@ -681,7 +657,8 @@ The flat `eventIterator*` handler options moved under the adapter's response opt
 
 ```ts v2
 const handler = new RPCHandler(router, {
-  toFetchResponse: { // fetch adapter; node uses sendStandardResponse
+  toFetchResponse: {
+    // fetch adapter; node uses sendStandardResponse
     eventStream: {
       keepAlive: { enabled: true, interval: 15000, comment: '' },
     },
@@ -740,10 +717,7 @@ Handler plugins were renamed with a `HandlerPlugin` suffix. Deprecated aliases e
 <CodeGroup>
 
 ```ts v2
-import {
-  RequestLimitHandlerPlugin,
-  ResponseCompressionHandlerPlugin,
-} from '@orpc/server/plugins'
+import { RequestLimitHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [
@@ -757,10 +731,7 @@ const handler = new RPCHandler(router, {
 import { BodyLimitPlugin, CompressionPlugin } from '@orpc/server/fetch'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new BodyLimitPlugin({ maxBodySize: 1024 * 1024 }),
-    new CompressionPlugin(),
-  ],
+  plugins: [new BodyLimitPlugin({ maxBodySize: 1024 * 1024 }), new CompressionPlugin()],
 })
 ```
 
@@ -835,20 +806,22 @@ The first argument of a custom `fetch` is now the URL string instead of a `Reque
 ```ts v2
 const link = new RPCLink({
   url: '/rpc',
-  fetch: (url, init, { context }) => globalThis.fetch(url, {
-    ...init,
-    credentials: 'include',
-  }),
+  fetch: (url, init, { context }) =>
+    globalThis.fetch(url, {
+      ...init,
+      credentials: 'include',
+    }),
 })
 ```
 
 ```ts v1
 const link = new RPCLink({
   url: 'http://localhost:3000/rpc',
-  fetch: (request, init, { context }) => globalThis.fetch(request, {
-    ...init,
-    credentials: 'include',
-  }),
+  fetch: (request, init, { context }) =>
+    globalThis.fetch(request, {
+      ...init,
+      credentials: 'include',
+    }),
 })
 ```
 
@@ -1092,9 +1065,10 @@ const handler = new OpenAPIHandler(router, {
   plugins: [
     new OpenAPIReferenceHandlerPlugin({
       provider: 'scalar',
-      spec: () => generator.generate(router, {
-        base: { info: { title: 'My App', version: '0.0.0' } },
-      }),
+      spec: () =>
+        generator.generate(router, {
+          base: { info: { title: 'My App', version: '0.0.0' } },
+        }),
     }),
   ],
 })
@@ -1287,10 +1261,12 @@ import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
 const limiter = new MemoryRateLimiter({ maxRequests: 10, window: 60_000 })
 
 const example = os
-  .use(ratelimit({
-    limiter: () => limiter,
-    key: ({ context }) => `user:${context.user.id}`,
-  }))
+  .use(
+    ratelimit({
+      limiter: () => limiter,
+      key: ({ context }) => `user:${context.user.id}`,
+    }),
+  )
   .handler(async () => {})
 ```
 
@@ -1301,10 +1277,12 @@ import { MemoryRatelimiter } from '@orpc/experimental-ratelimit/memory'
 const limiter = new MemoryRatelimiter({ maxRequests: 10, window: 60_000 })
 
 const example = os
-  .use(createRatelimitMiddleware({
-    limiter: () => limiter,
-    key: ({ context }) => `user:${context.user.id}`,
-  }))
+  .use(
+    createRatelimitMiddleware({
+      limiter: () => limiter,
+      key: ({ context }) => `user:${context.user.id}`,
+    }),
+  )
   .handler(async () => {})
 ```
 
@@ -1332,12 +1310,15 @@ import { UpstashRatelimiter } from '@orpc/experimental-ratelimit/upstash-ratelim
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
-const limiter = new UpstashRatelimiter(new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.fixedWindow(10, '60 s'),
-}), {
-  blockingUntilReady: { enabled: true, timeout: 5_000 },
-})
+const limiter = new UpstashRatelimiter(
+  new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.fixedWindow(10, '60 s'),
+  }),
+  {
+    blockingUntilReady: { enabled: true, timeout: 5_000 },
+  },
+)
 ```
 
 </CodeGroup>

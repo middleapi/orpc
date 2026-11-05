@@ -2,6 +2,7 @@ import { access, readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
+
 import GithubSlugger from 'github-slugger'
 import ts from 'typescript-6'
 
@@ -23,7 +24,8 @@ const DOCS_URL_PREFIX = 'https://orpc.dev/docs/'
  * Justified exceptions, keyed by `<specifier>#<name>`, value is the reason.
  */
 const ALLOWLIST: Record<string, string> = {
-  '@orpc/shared#isAsyncIteratorObject': 're-exported from the external @standard-server/shared package, its declaration cannot carry an orpc.dev backlink',
+  '@orpc/shared#isAsyncIteratorObject':
+    're-exported from the external @standard-server/shared package, its declaration cannot carry an orpc.dev backlink',
 }
 
 interface Mention {
@@ -67,9 +69,8 @@ async function findFiles(dir: string, extension: string): Promise<string[]> {
         continue
       }
 
-      result.push(...await findFiles(fullPath, extension))
-    }
-    else if (entry.isFile() && entry.name.endsWith(extension)) {
+      result.push(...(await findFiles(fullPath, extension)))
+    } else if (entry.isFile() && entry.name.endsWith(extension)) {
       result.push(fullPath)
     }
   }
@@ -80,10 +81,10 @@ async function findFiles(dir: string, extension: string): Promise<string[]> {
 const FENCE_OPEN_RE = /^\s*(`{3,})(\S*)/
 const CODE_LANGS = new Set(['ts', 'typescript', 'tsx', 'js', 'jsx', 'vue', 'svelte'])
 
-function extractCodeFences(markdown: string): { code: string[], outside: string[] } {
+function extractCodeFences(markdown: string): { code: string[]; outside: string[] } {
   const code: string[] = []
   const outside: string[] = []
-  let fence: { marker: string, lines: string[], isCode: boolean } | undefined
+  let fence: { marker: string; lines: string[]; isCode: boolean } | undefined
 
   for (const line of markdown.split('\n')) {
     if (fence) {
@@ -118,7 +119,8 @@ function extractCodeFences(markdown: string): { code: string[], outside: string[
   return { code, outside }
 }
 
-const IMPORT_RE = /import\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?\{([^}]+)\}\s*from\s*['"](@orpc\/[^'"]+)['"]/g
+const IMPORT_RE =
+  /import\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?\{([^}]+)\}\s*from\s*['"](@orpc\/[^'"]+)['"]/g
 
 function collectImportedNames(code: string): Map<string, Set<string>> {
   const result = new Map<string, Set<string>>()
@@ -133,7 +135,11 @@ function collectImportedNames(code: string): Map<string, Set<string>> {
     }
 
     for (const rawName of match[1]!.split(',')) {
-      const name = rawName.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0]?.trim()
+      const name = rawName
+        .trim()
+        .replace(/^type\s+/, '')
+        .split(/\s+as\s+/)[0]
+        ?.trim()
 
       if (name && /^[\w$]+$/.test(name)) {
         names.add(name)
@@ -165,8 +171,7 @@ function extractFrontmatterTitle(raw: string): string {
   if (value.startsWith('"')) {
     try {
       return JSON.parse(value)
-    }
-    catch {
+    } catch {
       return value
     }
   }
@@ -174,7 +179,10 @@ function extractFrontmatterTitle(raw: string): string {
   return value.replace(/^'(.*)'$/, '$1')
 }
 
-function extractHeadings(outsideFenceLines: string[]): { title: string, slugs: Map<string, string> } {
+function extractHeadings(outsideFenceLines: string[]): {
+  title: string
+  slugs: Map<string, string>
+} {
   const slugs = new Map<string, string>()
   const slugger = new GithubSlugger()
   let title = ''
@@ -206,13 +214,22 @@ function extractHeadings(outsideFenceLines: string[]): { title: string, slugs: M
  * Collects every content page (keyed by site path, `''` for the homepage) and, for
  * `docs/` pages only, the `@orpc/*` APIs their code fences import.
  */
-async function collectDocs(): Promise<{ mentions: Map<string, Mention>, pages: Map<string, DocPage> }> {
+async function collectDocs(): Promise<{
+  mentions: Map<string, Mention>
+  pages: Map<string, DocPage>
+}> {
   const mentions = new Map<string, Mention>()
   const pages = new Map<string, DocPage>()
 
-  for (const file of [...await findFiles(CONTENT_DIR, '.md'), ...await findFiles(CONTENT_DIR, '.mdx')].toSorted()) {
+  for (const file of [
+    ...(await findFiles(CONTENT_DIR, '.md')),
+    ...(await findFiles(CONTENT_DIR, '.mdx')),
+  ].toSorted()) {
     const raw = await readFile(file, 'utf8')
-    const relPage = path.relative(CONTENT_DIR, file).replace(/\.mdx?$/, '').replaceAll(path.sep, '/')
+    const relPage = path
+      .relative(CONTENT_DIR, file)
+      .replace(/\.mdx?$/, '')
+      .replaceAll(path.sep, '/')
     const { code, outside } = extractCodeFences(raw)
 
     const headings = extractHeadings(outside)
@@ -284,12 +301,11 @@ async function loadEntrypoints(): Promise<Entrypoints> {
     }
 
     const packageDir = path.join(PACKAGES_DIR, entry.name)
-    let packageJson: { name?: string, exports?: Record<string, unknown> }
+    let packageJson: { name?: string; exports?: Record<string, unknown> }
 
     try {
       packageJson = JSON.parse(await readFile(path.join(packageDir, 'package.json'), 'utf8'))
-    }
-    catch {
+    } catch {
       continue
     }
 
@@ -323,9 +339,10 @@ async function loadEntrypoints(): Promise<Entrypoints> {
 function getJsDocText(declaration: ts.Declaration): string {
   const sourceFile = declaration.getSourceFile()
 
-  return ts.getJSDocCommentsAndTags(declaration)
+  return ts
+    .getJSDocCommentsAndTags(declaration)
     .filter(ts.isJSDoc)
-    .map(doc => doc.getText(sourceFile))
+    .map((doc) => doc.getText(sourceFile))
     .join('\n')
 }
 
@@ -342,7 +359,10 @@ const LEGACY_TAG_RES: [RegExp, string][] = [
   [/@warning\b/, 'non-standard @warning tag (use @remarks with **Warning**:)'],
   [/\{@see\s/, '{@see ...} misuse (use {@link ...})'],
   [/@return\s/, '@return tag (use @returns)'],
-  [/\{@link\s+https:\/\/orpc\.dev\/\S+[^\S\n]+[^|}\s]/, 'space-form {@link url Title} (use {@link url | Title})'],
+  [
+    /\{@link\s+https:\/\/orpc\.dev\/\S+[^\S\n]+[^|}\s]/,
+    'space-form {@link url Title} (use {@link url | Title})',
+  ],
 ]
 
 function escapeRegExp(value: string): string {
@@ -382,8 +402,10 @@ function checkMention(
     return
   }
 
-  const links = [...jsDocText.matchAll(SEE_LINK_RE)]
-    .map(match => ({ url: match[1]!, title: match[2]?.trim() }))
+  const links = [...jsDocText.matchAll(SEE_LINK_RE)].map((match) => ({
+    url: match[1]!,
+    title: match[2]?.trim(),
+  }))
 
   if (links.length === 0) {
     report('error', 'E3', 'JSDoc has no @see {@link https://orpc.dev/docs/...} backlink')
@@ -410,19 +432,28 @@ function checkMention(
     }
 
     const anchorHeading = anchor !== undefined ? page.slugs.get(anchor) : undefined
-    const expectedTitle = anchorHeading && anchorHeading !== page.title
-      ? `${page.title} - ${anchorHeading}`
-      : page.title
+    const expectedTitle =
+      anchorHeading && anchorHeading !== page.title
+        ? `${page.title} - ${anchorHeading}`
+        : page.title
 
     if (title !== expectedTitle) {
-      report('error', 'E6', `link title should be "| ${expectedTitle}"${title ? ` (found "| ${title}")` : ' (title missing)'}`)
+      report(
+        'error',
+        'E6',
+        `link title should be "| ${expectedTitle}"${title ? ` (found "| ${title}")` : ' (title missing)'}`,
+      )
       continue
     }
 
     const wordRe = new RegExp(`\\b${escapeRegExp(mention.name)}\\b`)
 
     if (!wordRe.test(page.raw)) {
-      report(strict ? 'error' : 'warning', 'W1', `linked page "${pagePath}" never mentions "${mention.name}"`)
+      report(
+        strict ? 'error' : 'warning',
+        'W1',
+        `linked page "${pagePath}" never mentions "${mention.name}"`,
+      )
     }
   }
 
@@ -447,7 +478,7 @@ async function collectCustomPageRoutes(): Promise<Set<string>> {
     const relPath = path.relative(path.join(CONTENT_DIR, 'pages'), file).replaceAll(path.sep, '/')
 
     // underscore-prefixed segments are not routed; dynamic routes are unpredictable
-    if (relPath.split('/').some(part => part.startsWith('_') || part.startsWith('['))) {
+    if (relPath.split('/').some((part) => part.startsWith('_') || part.startsWith('['))) {
       continue
     }
 
@@ -465,8 +496,7 @@ async function isPublicAsset(pagePath: string): Promise<boolean> {
   try {
     await access(path.join(CONTENT_DIR, 'public', pagePath))
     return true
-  }
-  catch {
+  } catch {
     return false
   }
 }
@@ -477,7 +507,10 @@ async function isPublicAsset(pagePath: string): Promise<boolean> {
  * an existing content page and heading. Existence only — titles are enforced on
  * `@see` tags.
  */
-async function scanSourceLinks(context: CheckContext, filterDirs: Set<string> | undefined): Promise<number> {
+async function scanSourceLinks(
+  context: CheckContext,
+  filterDirs: Set<string> | undefined,
+): Promise<number> {
   let scanned = 0
   const customPageRoutes = await collectCustomPageRoutes()
 
@@ -494,14 +527,17 @@ async function scanSourceLinks(context: CheckContext, filterDirs: Set<string> | 
       let files: string[]
 
       try {
-        files = [...await findFiles(srcDir, '.ts'), ...await findFiles(srcDir, '.tsx')]
-      }
-      catch {
+        files = [...(await findFiles(srcDir, '.ts')), ...(await findFiles(srcDir, '.tsx'))]
+      } catch {
         continue
       }
 
       for (const file of files) {
-        if (/\.(?:test|test-d|bench)\./.test(file) || file.includes('__tests__') || file.includes('__mocks__')) {
+        if (
+          /\.(?:test|test-d|bench)\./.test(file) ||
+          file.includes('__tests__') ||
+          file.includes('__mocks__')
+        ) {
           continue
         }
 
@@ -528,14 +564,20 @@ async function scanSourceLinks(context: CheckContext, filterDirs: Set<string> | 
             const page = context.pages.get(pagePath)
 
             if (!page) {
-              if (!customPageRoutes.has(pagePath) && !await isPublicAsset(pagePath)) {
-                report('E4', `link page "/${pagePath}" has no apps/content/${pagePath || 'index'}.md`)
+              if (!customPageRoutes.has(pagePath) && !(await isPublicAsset(pagePath))) {
+                report(
+                  'E4',
+                  `link page "/${pagePath}" has no apps/content/${pagePath || 'index'}.md`,
+                )
               }
               continue
             }
 
             if (anchor !== undefined && !page.slugs.has(anchor)) {
-              report('E5', `anchor "#${anchor}" not found in apps/content/${pagePath || 'index'}.md`)
+              report(
+                'E5',
+                `anchor "#${anchor}" not found in apps/content/${pagePath || 'index'}.md`,
+              )
             }
           }
         }
@@ -562,14 +604,18 @@ async function main(): Promise<void> {
     return entrypoints.packageNameToDir.get(packageName)
   }
 
-  const filterDirs = values.filter ? new Set(values.filter.split(',').map(part => part.trim())) : undefined
+  const filterDirs = values.filter
+    ? new Set(values.filter.split(',').map((part) => part.trim()))
+    : undefined
   const selected = [...mentions.values()]
-    .filter(mention => !filterDirs || filterDirs.has(packageDirOf(mention.specifier) ?? ''))
+    .filter((mention) => !filterDirs || filterDirs.has(packageDirOf(mention.specifier) ?? ''))
     .toSorted((a, b) => a.specifier.localeCompare(b.specifier) || a.name.localeCompare(b.name))
 
   if (values.list) {
     for (const mention of selected) {
-      console.log(`${mention.specifier}#${mention.name}\t${[...mention.pages].toSorted().join(', ')}`)
+      console.log(
+        `${mention.specifier}#${mention.name}\t${[...mention.pages].toSorted().join(', ')}`,
+      )
     }
 
     console.log(`\n${selected.length} docs-mentioned symbols`)
@@ -584,8 +630,7 @@ async function main(): Promise<void> {
 
     if (entryFile) {
       entryFiles.add(entryFile)
-    }
-    else {
+    } else {
       unknownSpecifiers.add(mention.specifier)
     }
   }
@@ -668,7 +713,8 @@ async function main(): Promise<void> {
       symbols.push(checker.getAliasedSymbol(symbol))
     }
 
-    const declarations = symbols.flatMap(part => part.declarations ?? [])
+    const declarations = symbols
+      .flatMap((part) => part.declarations ?? [])
       .toSorted((a, b) => (ts.isExportSpecifier(a) ? 1 : 0) - (ts.isExportSpecifier(b) ? 1 : 0))
 
     checkMention(context, mention, declarations)
@@ -676,8 +722,8 @@ async function main(): Promise<void> {
 
   const scannedLinks = await scanSourceLinks(context, filterDirs)
 
-  const errors = context.issues.filter(issue => issue.severity === 'error')
-  const warnings = context.issues.filter(issue => issue.severity === 'warning')
+  const errors = context.issues.filter((issue) => issue.severity === 'error')
+  const warnings = context.issues.filter((issue) => issue.severity === 'warning')
   const byGroup = new Map<string, Issue[]>()
 
   for (const issue of context.issues) {
@@ -691,13 +737,17 @@ async function main(): Promise<void> {
 
     for (const issue of issues) {
       const severityLabel = issue.severity === 'error' ? 'error' : 'warn '
-      console.log(`  ${severityLabel} [${issue.code}] ${issue.label}  ${issue.location ?? '(unresolved)'}`)
+      console.log(
+        `  ${severityLabel} [${issue.code}] ${issue.label}  ${issue.location ?? '(unresolved)'}`,
+      )
       console.log(`        ${issue.message}${issue.note ? ` (${issue.note})` : ''}`)
     }
   }
 
   const allowlistNote = allowlisted > 0 ? `, ${allowlisted} allowlisted` : ''
-  console.log(`\n${errors.length} errors, ${warnings.length} warnings across ${selected.length} docs-mentioned symbols and ${scannedLinks} orpc.dev links${allowlistNote}`)
+  console.log(
+    `\n${errors.length} errors, ${warnings.length} warnings across ${selected.length} docs-mentioned symbols and ${scannedLinks} orpc.dev links${allowlistNote}`,
+  )
 
   if (errors.length > 0) {
     process.exitCode = 1

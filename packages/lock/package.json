@@ -1,31 +1,42 @@
 {
   "name": "@orpc/experimental-lock",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Locking for oRPC procedures, with memory, Redis, and Upstash adapters",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "lock",
+    "locking",
+    "middleware",
+    "mutex",
+    "orpc",
+    "redis",
+    "typescript",
+    "upstash"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/lock"
   },
-  "keywords": [
-    "orpc",
-    "lock",
-    "locking",
-    "mutex",
-    "redis",
-    "upstash",
-    "middleware",
-    "api",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./base-redis": "./src/adapters/base-redis.ts",
+    "./memory": "./src/adapters/memory.ts",
+    "./redis": "./src/adapters/redis.ts",
+    "./upstash": "./src/adapters/upstash.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -56,19 +67,16 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./base-redis": "./src/adapters/base-redis.ts",
-    "./memory": "./src/adapters/memory.ts",
-    "./redis": "./src/adapters/redis.ts",
-    "./upstash": "./src/adapters/upstash.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc"
+  },
+  "dependencies": {
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@upstash/redis": "^1.41.0",
+    "redis": "^6.3.1"
   },
   "peerDependencies": {
     "@upstash/redis": ">=1.35.6",
@@ -81,13 +89,5 @@
     "redis": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@orpc/server": "workspace:*",
-    "@orpc/shared": "workspace:*"
-  },
-  "devDependencies": {
-    "@upstash/redis": "^1.41.0",
-    "redis": "^6.3.1"
   }
 }

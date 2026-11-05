@@ -1,29 +1,66 @@
+import { Readable } from 'node:stream'
+
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
+import * as NestCommon from '@nestjs/common'
+import {
+  applyDecorators,
+  Delete,
+  Get,
+  Head,
+  HttpCode,
+  HttpException,
+  Inject,
+  Injectable,
+  Optional,
+  Options,
+  Patch,
+  Post,
+  Put,
+  StreamableFile,
+  UseInterceptors,
+} from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
 import type { NodeRequest, NodeResponse } from '@nestjs/platform-node'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
-import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
-import type { Promisable } from '@orpc/shared'
-import type { StandardBodyHint, StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
-import type { FastifyReply, FastifyRequest } from 'fastify'
-import type { Observable } from 'rxjs'
-import type { NestStandardLazyRequest, ORPCModuleConfig } from './module.ts'
-import { Readable } from 'node:stream'
-import * as NestCommon from '@nestjs/common'
-import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
-import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
+import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
+import type {
+  ResolvedStandardHandlerHandleOptions,
+  StandardHandlerCodec,
+  StandardHandlerCodecResolvedProcedure,
+} from '@orpc/server/standard'
 import { StandardHandler } from '@orpc/server/standard'
-import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, toArray, value } from '@orpc/shared'
-import { flattenStandardHeader, generateContentDisposition, getRequiredStandardBodyHint } from '@standard-server/core'
+import type { Promisable } from '@orpc/shared'
+import {
+  isAsyncIteratorObject,
+  mergeHttpPath,
+  NullProtoObj,
+  stringifyJSON,
+  toArray,
+  value,
+} from '@orpc/shared'
+import type {
+  StandardBodyHint,
+  StandardHeaders,
+  StandardLazyRequest,
+  StandardResponse,
+} from '@standard-server/core'
+import {
+  flattenStandardHeader,
+  generateContentDisposition,
+  getRequiredStandardBodyHint,
+} from '@standard-server/core'
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
+import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { Observable } from 'rxjs'
 import { mergeMap } from 'rxjs'
 
 import { ORPC_MODULE_CONFIG_SYMBOL } from './constants.ts'
+import type { NestStandardLazyRequest, ORPCModuleConfig } from './module.ts'
 
 // Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
 const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined
@@ -59,10 +96,11 @@ export function Implement<T extends RouterContract>(
 ) => void {
   if (contract instanceof ProcedureContract) {
     return (target, propertyKey, descriptor) => {
-      applyDecorators(
-        toNestRouteDecorator(contract),
-        UseInterceptors(ImplementInterceptor),
-      )(target, propertyKey, descriptor)
+      applyDecorators(toNestRouteDecorator(contract), UseInterceptors(ImplementInterceptor))(
+        target,
+        propertyKey,
+        descriptor,
+      )
     }
   }
 
@@ -98,16 +136,10 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
       `)
     }
 
-    return applyDecorators(
-      QueryMethod(path),
-      HttpCode(successStatus),
-    )
+    return applyDecorators(QueryMethod(path), HttpCode(successStatus))
   }
 
-  return applyDecorators(
-    MethodDecoratorMap[method](path),
-    HttpCode(successStatus),
-  )
+  return applyDecorators(MethodDecoratorMap[method](path), HttpCode(successStatus))
 }
 
 function implementRouterContract(
@@ -133,11 +165,21 @@ function implementRouterContract(
 
     queueMicrotask(() => {
       for (const p of Reflect.getOwnMetadataKeys(target, propertyKey)) {
-        Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target, propertyKey), target, methodName)
+        Reflect.defineMetadata(
+          p,
+          Reflect.getOwnMetadata(p, target, propertyKey),
+          target,
+          methodName,
+        )
       }
 
       for (const p of Reflect.getOwnMetadataKeys(target.constructor, propertyKey)) {
-        Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target.constructor, propertyKey), target.constructor, methodName)
+        Reflect.defineMetadata(
+          p,
+          Reflect.getOwnMetadata(p, target.constructor, propertyKey),
+          target.constructor,
+          methodName,
+        )
       }
     })
 
@@ -150,8 +192,7 @@ function implementRouterContract(
       queueMicrotask(() => {
         routeDecorator(target, methodName, childDescriptor)
       })
-    }
-    else {
+    } else {
       implementRouterContract(childContract, target, methodName, childDescriptor)
     }
   }
@@ -162,7 +203,10 @@ export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
   private readonly codec: NestHandlerCodec<DefaultInitialContext>
   private readonly handler: StandardHandler<DefaultInitialContext>
-  private readonly toNestStandardLazyRequest: Exclude<ORPCModuleConfig['toNestStandardLazyRequest'], undefined>
+  private readonly toNestStandardLazyRequest: Exclude<
+    ORPCModuleConfig['toNestStandardLazyRequest'],
+    undefined
+  >
   private readonly httpAdapterHost: HttpAdapterHost
 
   constructor(
@@ -170,26 +214,31 @@ export class ImplementInterceptor implements NestInterceptor {
     @Inject(HttpAdapterHost) httpAdapterHost: HttpAdapterHost,
   ) {
     // @Optional() does not allow set default value so we need to do it here
-    this.config = config ?? {} as ORPCModuleConfig
+    this.config = config ?? ({} as ORPCModuleConfig)
     this.httpAdapterHost = httpAdapterHost
 
     this.codec = new NestHandlerCodec(this.config)
     this.handler = new StandardHandler(this.codec, this.config)
-    this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest | NodeRequest, res: ExpressResponse | FastifyReply | NodeResponse) => {
-      const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
-        'raw' in req ? req.raw : req,
-        'raw' in res ? res.raw : res,
-      )
+    this.toNestStandardLazyRequest =
+      this.config.toNestStandardLazyRequest ??
+      ((
+        req: ExpressRequest | FastifyRequest | NodeRequest,
+        res: ExpressResponse | FastifyReply | NodeResponse,
+      ) => {
+        const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
+          'raw' in req ? req.raw : req,
+          'raw' in res ? res.raw : res,
+        )
 
-      // if body already parsed by NestJS
-      if (req.body !== undefined) {
-        standardRequest.resolveBody = () => Promise.resolve(req.body)
-      }
+        // if body already parsed by NestJS
+        if (req.body !== undefined) {
+          standardRequest.resolveBody = () => Promise.resolve(req.body)
+        }
 
-      standardRequest.params = req.params as NestStandardLazyRequest['params']
+        standardRequest.params = req.params as NestStandardLazyRequest['params']
 
-      return standardRequest
-    })
+        return standardRequest
+      })
   }
 
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<any> {
@@ -208,7 +257,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
         const standardRequest = this.toNestStandardLazyRequest(req, res)
 
-        const context = await value(this.config.context ?? {} as DefaultInitialContext, ctx)
+        const context = await value(this.config.context ?? ({} as DefaultInitialContext), ctx)
 
         const result = await this.handler.handle(standardRequest, {
           context: this.codec.withMatch(context, { procedure, params: standardRequest.params }),
@@ -220,7 +269,11 @@ export class ImplementInterceptor implements NestInterceptor {
           )
         }
 
-        const [nestBody, headers] = toNestHttpBody(result.response, standardRequest.signal, this.config.toNestResponse)
+        const [nestBody, headers] = toNestHttpBody(
+          result.response,
+          standardRequest.signal,
+          this.config.toNestResponse,
+        )
 
         const httpAdapter = this.httpAdapterHost.httpAdapter
 
@@ -230,8 +283,7 @@ export class ImplementInterceptor implements NestInterceptor {
           toArray(headers[key]).forEach((value, index) => {
             if (index === 0) {
               httpAdapter.setHeader(res, key, value)
-            }
-            else {
+            } else {
               httpAdapter.appendHeader(res, key, value)
             }
           })
@@ -267,7 +319,9 @@ function toNestHttpBody(
   if (body instanceof Blob) {
     headers['standard-server'] ??= 'file' satisfies StandardBodyHint
     headers['content-type'] ??= body.type
-    headers['content-disposition'] ??= generateContentDisposition(body instanceof File ? body.name : 'blob')
+    headers['content-disposition'] ??= generateContentDisposition(
+      body instanceof File ? body.name : 'blob',
+    )
 
     // BunS3 can use NaN for the size
     if (Number.isFinite(body.size)) {
@@ -304,12 +358,7 @@ function toNestHttpBody(
   }
 
   // Prefer throwing an HttpException for more native error handling in NestJS.
-  if (
-    status >= 300
-    && typeof body === 'object'
-    && body !== null
-    && !Array.isArray(body)
-  ) {
+  if (status >= 300 && typeof body === 'object' && body !== null && !Array.isArray(body)) {
     if (headers['content-type'] !== undefined) {
       headers['standard-server'] = getRequiredStandardBodyHint('json', headers)
     }
@@ -319,7 +368,12 @@ function toNestHttpBody(
 
   headers['content-type'] ??= 'application/json'
   headers['standard-server'] = getRequiredStandardBodyHint('json', headers)
-  return [typeof body === 'string' || body === null || headers['standard-server'] !== undefined ? stringifyJSON(body) : body, headers]
+  return [
+    typeof body === 'string' || body === null || headers['standard-server'] !== undefined
+      ? stringifyJSON(body)
+      : body,
+    headers,
+  ]
 }
 
 interface NestHandlerCodecMatch {
@@ -327,14 +381,20 @@ interface NestHandlerCodecMatch {
   params: NestStandardLazyRequest['params']
 }
 
-class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> implements StandardHandlerCodec<T> {
+class NestHandlerCodec<T extends Context>
+  extends OpenAPIHandlerCodecCore<T>
+  implements StandardHandlerCodec<T>
+{
   private readonly CONTEXT_SYMBOL = Symbol('ORPC_NEST_HANDLER_CODEC_CONTEXT')
 
   withMatch(context: T, match: NestHandlerCodecMatch): T {
     return { ...context, [this.CONTEXT_SYMBOL]: match }
   }
 
-  resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): StandardHandlerCodecResolvedProcedure | undefined {
+  resolveProcedure(
+    request: StandardLazyRequest,
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): StandardHandlerCodecResolvedProcedure | undefined {
     const match = options.context[this.CONTEXT_SYMBOL] as NestHandlerCodecMatch | undefined
 
     if (!match) {
@@ -346,10 +406,14 @@ class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> imp
     return {
       path: getPathMeta(procedure) ?? [],
       procedure,
-      decodeInput: () => this.decodeInput({
-        procedure,
-        params: toORPCOpenAPIParams(procedure, params),
-      }, request),
+      decodeInput: () =>
+        this.decodeInput(
+          {
+            procedure,
+            params: toORPCOpenAPIParams(procedure, params),
+          },
+          request,
+        ),
     }
   }
 }
@@ -358,14 +422,17 @@ class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> imp
  * Destroys the stream once the request is aborted, because Nest's Express adapter only pipes a StreamableFile
  * and never destroys it on client disconnect, which would leave the underlying event iterator or stream uncanceled.
  */
-function toStreamableFile(stream: Readable, headers: StandardHeaders, signal: AbortSignal | undefined): StreamableFile {
+function toStreamableFile(
+  stream: Readable,
+  headers: StandardHeaders,
+  signal: AbortSignal | undefined,
+): StreamableFile {
   const type = flattenStandardHeader(headers['content-type'])
   headers['content-type'] = undefined
 
   if (signal?.aborted) {
     stream.destroy()
-  }
-  else {
+  } else {
     signal?.addEventListener('abort', () => stream.destroy(), { once: true })
   }
 
@@ -376,7 +443,10 @@ function flattenParamValue(value: string | string[]): string {
   return Array.isArray(value) ? value.join('/') : value
 }
 
-function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandardLazyRequest['params']): undefined | Record<string, string> {
+function toORPCOpenAPIParams(
+  contract: AnyProcedureContract,
+  params: NestStandardLazyRequest['params'],
+): undefined | Record<string, string> {
   const meta = getOpenAPIMeta(contract)
 
   if (!params || meta?.path === undefined || Object.keys(params).length === 0) {
@@ -392,7 +462,7 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
     if (key === restKey) {
       const restParams = getDynamicPathParams(
         meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
-      )?.filter(c => c.allowsSlash)
+      )?.filter((c) => c.allowsSlash)
 
       if (restParams?.length) {
         for (const c of restParams) {
@@ -419,7 +489,10 @@ function toNestPattern(path: `/${string}`): `/${string}` {
   for (let i = params.length - 1; i >= 0; i--) {
     const param = params[i]!
     const pattern = param.allowsSlash ? `*` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
+    path =
+      path.slice(0, param.startIndex) +
+      pattern +
+      path.slice(param.startIndex + param.segment.length)
   }
 
   return path

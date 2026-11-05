@@ -1,4 +1,5 @@
 import * as ServerModule from '@orpc/server'
+
 import * as ServerFormFunctionModule from './server-form-function.ts'
 import { createServerFormFunctionable } from './server-form-functionable.ts'
 
@@ -10,7 +11,10 @@ beforeEach(() => {
 })
 
 describe('createServerFormFunctionable', () => {
-  const procedure = os.input(type<any>()).output(type<any>()).handler(() => 'output')
+  const procedure = os
+    .input(type<any>())
+    .output(type<any>())
+    .handler(() => 'output')
 
   it('returns the wrapped server form function and preserves the procedure metadata', () => {
     const client = vi.fn().mockResolvedValue(undefined) as any

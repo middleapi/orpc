@@ -1,7 +1,7 @@
 {
   "name": "@orpc/content",
-  "type": "module",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "blume dev",
     "build": "blume build",

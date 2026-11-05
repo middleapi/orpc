@@ -75,7 +75,8 @@ describe('encrypt/decrypt', () => {
       {
         value: 'compatibility-value',
         secret: 'compatibility-encryption-secret',
-        encrypted: 'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
+        encrypted:
+          'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
       },
       {
         value: '',
@@ -85,7 +86,8 @@ describe('encrypt/decrypt', () => {
       {
         value: 'value.with.dots-🚀-中文',
         secret: 'compatibility-encryption-secret',
-        encrypted: 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
+        encrypted:
+          'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
       },
     ] as const
 

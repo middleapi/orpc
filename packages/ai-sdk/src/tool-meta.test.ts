@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+
 import { aiSdkTool, getAiSdkToolMeta } from './tool-meta.ts'
 
 describe('aiSdkTool meta', () => {

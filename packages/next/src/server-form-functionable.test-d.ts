@@ -1,7 +1,8 @@
 import type { Procedure } from '@orpc/server'
-import type { ServerFormFunction } from './server-form-function.ts'
 import { os } from '@orpc/server'
 import { z } from 'zod'
+
+import type { ServerFormFunction } from './server-form-function.ts'
 import { createServerFormFunctionable } from './server-form-functionable.ts'
 
 const errorMap = {
@@ -11,8 +12,8 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 describe('createServerFormFunctionable', () => {
   const functionable = createServerFormFunctionable({
@@ -22,11 +23,16 @@ describe('createServerFormFunctionable', () => {
   it('returns the wrapped server function and preserves the procedure metadata', () => {
     expectTypeOf(
       functionable(
-        os.$context<{ auth: boolean }>().input(schema1).output(schema2).errors(errorMap).handler(() => ({ schema2: 123 })),
+        os
+          .$context<{ auth: boolean }>()
+          .input(schema1)
+          .output(schema2)
+          .errors(errorMap)
+          .handler(() => ({ schema2: 123 })),
       ),
     ).toEqualTypeOf<
-      & ServerFormFunction
-      & Procedure<{ auth: boolean }, object, typeof schema1, typeof schema2, typeof errorMap>
+      ServerFormFunction &
+        Procedure<{ auth: boolean }, object, typeof schema1, typeof schema2, typeof errorMap>
     >()
   })
 

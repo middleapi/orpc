@@ -1,10 +1,28 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, pick, set, setOwn } from './object.ts'
+
+import {
+  bindMethods,
+  clone,
+  copyOnWrite,
+  findDeepMatches,
+  get,
+  getConstructor,
+  getConstructors,
+  getOwn,
+  isPlainObject,
+  isPropertyKey,
+  mergeTwoLevels,
+  NullProtoObj,
+  omit,
+  pick,
+  set,
+  setOwn,
+} from './object.ts'
 
 it('findDeepMatches', () => {
-  const { maps, values } = findDeepMatches(v => typeof v === 'string', {
+  const { maps, values } = findDeepMatches((v) => typeof v === 'string', {
     array: ['v1', 'v2'],
     nested: {
       nested: [
@@ -26,12 +44,7 @@ it('findDeepMatches', () => {
     ['nested', 'nested', 1],
   ])
 
-  expect(values).toEqual([
-    'v1',
-    'v2',
-    'v3',
-    'v4',
-  ])
+  expect(values).toEqual(['v1', 'v2', 'v3', 'v4'])
 })
 
 it('getConstructor', () => {
@@ -41,7 +54,7 @@ it('getConstructor', () => {
 
   expect(getConstructor({})).toBe(Object)
   expect(getConstructor(new Error('hi'))).toBe(Error)
-  expect(getConstructor(() => { })).toBe(Function)
+  expect(getConstructor(() => {})).toBe(Function)
 })
 
 describe('getConstructors', () => {
@@ -109,11 +122,13 @@ it('isPlainObject', () => {
 
   expect({}).toSatisfy(isPlainObject)
   expect(Object.create(null)).toSatisfy(isPlainObject)
-  expect((() => {
-    const obj = {}
-    Object.setPrototypeOf(obj, null)
-    return obj
-  })()).toSatisfy(isPlainObject)
+  expect(
+    (() => {
+      const obj = {}
+      Object.setPrototypeOf(obj, null)
+      return obj
+    })(),
+  ).toSatisfy(isPlainObject)
 })
 
 it('getOwn', () => {
@@ -127,9 +142,9 @@ it('get', () => {
   expect(get({ a: { b: 1 } }, ['a', 'b'])).toEqual(1)
   expect(get({ a: { b: 1 } }, ['a', 'b', 'c'])).toEqual(undefined)
   expect(get({ a: { b: 1 } }, ['a', 'b', 'c', 'd'])).toEqual(undefined)
-  expect(get({ a: { b: () => { } } }, ['a', 'b', 'name'])).toEqual('b')
-  expect(get({ a: { b: () => { } } }, ['a', 'b', 'uuuu'])).toEqual(undefined)
-  expect(get({ a: { b: () => { } } }, ['a', 'b', 'uuuu', 'zzzz'])).toEqual(undefined)
+  expect(get({ a: { b: () => {} } }, ['a', 'b', 'name'])).toEqual('b')
+  expect(get({ a: { b: () => {} } }, ['a', 'b', 'uuuu'])).toEqual(undefined)
+  expect(get({ a: { b: () => {} } }, ['a', 'b', 'uuuu', 'zzzz'])).toEqual(undefined)
   expect(get({}, ['__proto__'])).toEqual(undefined)
   expect(get({}, ['constructor'])).toEqual(undefined)
   expect(get({}, ['toString'])).toEqual(undefined)
@@ -325,19 +340,23 @@ describe('mergeTwoLevels', () => {
   })
 
   it('merges one level deeper', () => {
-    expect(mergeTwoLevels(
-      { user: { name: 'NAME', shared: 'first' } },
-      { user: { age: 1, shared: 'second' } },
-    )).toEqual({
+    expect(
+      mergeTwoLevels(
+        { user: { name: 'NAME', shared: 'first' } },
+        { user: { age: 1, shared: 'second' } },
+      ),
+    ).toEqual({
       user: { name: 'NAME', age: 1, shared: 'second' },
     })
   })
 
   it('replaces anything deeper than two levels', () => {
-    expect(mergeTwoLevels(
-      { user: { address: { city: 'CITY' } } },
-      { user: { address: { zip: 'ZIP' } } },
-    )).toEqual({
+    expect(
+      mergeTwoLevels(
+        { user: { address: { city: 'CITY' } } },
+        { user: { address: { zip: 'ZIP' } } },
+      ),
+    ).toEqual({
       user: { address: { zip: 'ZIP' } },
     })
   })
@@ -430,14 +449,14 @@ describe('pick', () => {
   })
 
   it('keeps keys explicitly set to undefined', () => {
-    const result = pick({ a: undefined, b: 2 } as { a?: number, b: number }, ['a'])
+    const result = pick({ a: undefined, b: 2 } as { a?: number; b: number }, ['a'])
 
     expect(result).toEqual({ a: undefined })
     expect(Object.hasOwn(result, 'a')).toBe(true)
   })
 
   it('skips missing and inherited keys', () => {
-    const obj = Object.create({ inherited: 1 }) as { inherited?: number, missing?: number }
+    const obj = Object.create({ inherited: 1 }) as { inherited?: number; missing?: number }
 
     expect(Object.keys(pick(obj, ['inherited', 'missing']))).toEqual([])
   })
@@ -723,7 +742,7 @@ describe('bindMethods', () => {
       fn() {},
     })
 
-    expect(Object.getPrototypeOf(methods)).toBe(Object.getPrototypeOf((new NullProtoObj())))
+    expect(Object.getPrototypeOf(methods)).toBe(Object.getPrototypeOf(new NullProtoObj()))
   })
 
   it('returns an empty object when no methods exist', () => {

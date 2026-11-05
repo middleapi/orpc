@@ -1,23 +1,78 @@
-import type { CallToolResult, ContentBlock, EmbeddedResource, McpServer, RegisteredTool, ServerContext, StandardSchemaWithJSON, ToolAnnotations } from '@modelcontextprotocol/server'
+import type {
+  CallToolResult,
+  ContentBlock,
+  EmbeddedResource,
+  McpServer,
+  RegisteredTool,
+  ServerContext,
+  StandardSchemaWithJSON,
+  ToolAnnotations,
+} from '@modelcontextprotocol/server'
+import {
+  BAGGAGE_META_KEY,
+  TRACEPARENT_META_KEY,
+  TRACESTATE_META_KEY,
+} from '@modelcontextprotocol/server'
 import type { AnyORPCError } from '@orpc/client'
+import {
+  COMMON_ERROR_STATUS_MAP,
+  ORPCError,
+  toORPCError,
+  wrapAsyncIteratorPreservingEventMeta,
+} from '@orpc/client'
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { JsonSchemaConverter } from '@orpc/json-schema'
-import type { OpenAPIMeta } from '@orpc/openapi'
-import type { AnyProcedure, AnyRouter, Context, InferRouterInitialContext, StandardHeaders, StandardLazyRequest, StandardResponse } from '@orpc/server'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerOptions } from '@orpc/server/standard'
-import type { MaybeOptionalOptions, Promisable, Public, Value } from '@orpc/shared'
-import type { McpToolMeta } from './meta.ts'
-import type { ToolInputJsonSchema } from './utils.ts'
-import { BAGGAGE_META_KEY, TRACEPARENT_META_KEY, TRACESTATE_META_KEY } from '@modelcontextprotocol/server'
-import { COMMON_ERROR_STATUS_MAP, ORPCError, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { DelegatingJsonSchemaConverter, StandardJsonSchemaConverter } from '@orpc/json-schema'
+import type { OpenAPIMeta } from '@orpc/openapi'
 import { getOpenAPIMeta, OpenAPIJsonSerializer } from '@orpc/openapi'
-import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS, ErrorEvent, resolveContractProcedure, walkProcedureContractsAsync } from '@orpc/server'
+import type {
+  AnyProcedure,
+  AnyRouter,
+  Context,
+  InferRouterInitialContext,
+  StandardHeaders,
+  StandardLazyRequest,
+  StandardResponse,
+} from '@orpc/server'
+import {
+  DEFAULT_ERROR_STATUS,
+  DEFAULT_SUCCESS_STATUS,
+  ErrorEvent,
+  resolveContractProcedure,
+  walkProcedureContractsAsync,
+} from '@orpc/server'
+import type {
+  StandardHandlerCodec,
+  StandardHandlerCodecResolvedProcedure,
+  StandardHandlerOptions,
+} from '@orpc/server/standard'
 import { StandardHandler } from '@orpc/server/standard'
-import { encodeBase64, getOwn, isAsyncIteratorObject, isPlainObject, loadBytes, pathToHttpPath, resolveMaybeOptionalOptions, safeEncodeURIComponent, stringifyJSON, throwIfAborted, toArray, value } from '@orpc/shared'
+import type { MaybeOptionalOptions, Promisable, Public, Value } from '@orpc/shared'
+import {
+  encodeBase64,
+  getOwn,
+  isAsyncIteratorObject,
+  isPlainObject,
+  loadBytes,
+  pathToHttpPath,
+  resolveMaybeOptionalOptions,
+  safeEncodeURIComponent,
+  stringifyJSON,
+  throwIfAborted,
+  toArray,
+  value,
+} from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+
+import type { McpToolMeta } from './meta.ts'
 import { getMcpToolMeta } from './meta.ts'
-import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils.ts'
+import type { ToolInputJsonSchema } from './utils.ts'
+import {
+  resolveToolInput,
+  resolveToolInputJsonSchema,
+  resolveToolOutputJsonSchema,
+  toPassthroughStandardSchema,
+} from './utils.ts'
 
 /**
  * Options for {@link McpRegistrar}. Tool calls run through a standard handler,
@@ -25,7 +80,9 @@ import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSche
  *
  * @see {@link https://orpc.dev/docs/integrations/mcp#plugins-and-interceptors | MCP Integration - Plugins and Interceptors}
  */
-export interface McpRegistrarOptions<TInitialContext extends Context> extends StandardHandlerOptions<TInitialContext> {
+export interface McpRegistrarOptions<
+  TInitialContext extends Context,
+> extends StandardHandlerOptions<TInitialContext> {
   /**
    * Converters that turn input and output schemas into the JSON Schemas tools advertise.
    * Schemas implementing [Standard JSON Schema](https://standardschema.dev/json-schema),
@@ -48,7 +105,9 @@ export interface McpRegistrarOptions<TInitialContext extends Context> extends St
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
+  filter?:
+    | Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+    | undefined
 }
 
 /**
@@ -58,8 +117,8 @@ export interface McpRegistrarOptions<TInitialContext extends Context> extends St
  * which exposes the HTTP request and verified auth info when served over HTTP.
  * It is optional only when an empty object satisfies the initial context.
  */
-export type McpRegistrarRegisterOptions<TInitialContext extends Context>
-  = object extends TInitialContext
+export type McpRegistrarRegisterOptions<TInitialContext extends Context> =
+  object extends TInitialContext
     ? { context?: Value<Promisable<TInitialContext>, [ctx: ServerContext]> | undefined }
     : { context: Value<Promisable<TInitialContext>, [ctx: ServerContext]> }
 
@@ -132,9 +191,17 @@ export class McpRegistrar<T extends AnyRouter> {
 
   constructor(
     router: T,
-    { converters, serializer, filter, ...options }: McpRegistrarOptions<InferRouterInitialContext<T>> = {},
+    {
+      converters,
+      serializer,
+      filter,
+      ...options
+    }: McpRegistrarOptions<InferRouterInitialContext<T>> = {},
   ) {
-    this.converter = new DelegatingJsonSchemaConverter([...toArray(converters), new StandardJsonSchemaConverter()])
+    this.converter = new DelegatingJsonSchemaConverter([
+      ...toArray(converters),
+      new StandardJsonSchemaConverter(),
+    ])
     this.matcher = new McpMatcher(router, this.converter, filter)
     this.codec = new McpHandlerCodec(this.matcher, serializer ?? new OpenAPIJsonSerializer())
     this.handler = new StandardHandler(this.codec, options)
@@ -162,8 +229,8 @@ export class McpRegistrar<T extends AnyRouter> {
 
       if (existing !== undefined) {
         throw new TypeError(
-          `[MCP] Procedures at "${existing.path.join('.')}" and "${route.path.join('.')}" share the tool name "${tool.name}". `
-          + `Set a unique one with mcp.tool({ name }), or exclude one with the filter option.`,
+          `[MCP] Procedures at "${existing.path.join('.')}" and "${route.path.join('.')}" share the tool name "${tool.name}". ` +
+            `Set a unique one with mcp.tool({ name }), or exclude one with the filter option.`,
         )
       }
 
@@ -179,16 +246,25 @@ export class McpRegistrar<T extends AnyRouter> {
     return registered
   }
 
-  private createToolDefinition(url: `/${string}`, { path, contract, inputJsonSchema }: McpRoute, context: McpRegistrarRegisterOptions<Context>['context']): McpToolDefinition {
+  private createToolDefinition(
+    url: `/${string}`,
+    { path, contract, inputJsonSchema }: McpRoute,
+    context: McpRegistrarRegisterOptions<Context>['context'],
+  ): McpToolDefinition {
     const mcpMeta = getMcpToolMeta(contract)
     const openapiMeta = getOpenAPIMeta(contract)
     const name = mcpMeta?.name ?? openapiMeta?.operationId ?? path.join('_')
 
     if (name === '') {
-      throw new TypeError(`[MCP] Procedure at "${path.join('.') || '(root)'}" has no name. Set one with mcp.tool({ name }).`)
+      throw new TypeError(
+        `[MCP] Procedure at "${path.join('.') || '(root)'}" has no name. Set one with mcp.tool({ name }).`,
+      )
     }
 
-    const outputJsonSchema = resolveToolOutputJsonSchema(this.converter, toArray(contract['~orpc'].outputSchemas))
+    const outputJsonSchema = resolveToolOutputJsonSchema(
+      this.converter,
+      toArray(contract['~orpc'].outputSchemas),
+    )
     const inferredAnnotations = openapiMeta?.method && METHOD_ANNOTATIONS[openapiMeta.method]
 
     return {
@@ -199,9 +275,10 @@ export class McpRegistrar<T extends AnyRouter> {
         description: mcpMeta?.description ?? openapiMeta?.description ?? openapiMeta?.summary,
         inputSchema: toPassthroughStandardSchema(inputJsonSchema.jsonSchema),
         outputSchema: outputJsonSchema && toPassthroughStandardSchema(outputJsonSchema),
-        annotations: inferredAnnotations || mcpMeta?.annotations
-          ? { ...inferredAnnotations, ...mcpMeta?.annotations }
-          : undefined,
+        annotations:
+          inferredAnnotations || mcpMeta?.annotations
+            ? { ...inferredAnnotations, ...mcpMeta?.annotations }
+            : undefined,
         icons: mcpMeta?.icons,
         _meta: mcpMeta?._meta,
       },
@@ -209,8 +286,14 @@ export class McpRegistrar<T extends AnyRouter> {
         try {
           const { matched, response } = await this.handler.handle(
             // tool calls have no HTTP request of their own, so only the trace context is carried over
-            { method: 'POST', url, headers: toTraceHeaders(ctx.mcpReq._meta), signal: ctx.mcpReq.signal, resolveBody: () => Promise.resolve(args) },
-            { context: async () => await value(context, ctx) ?? {} },
+            {
+              method: 'POST',
+              url,
+              headers: toTraceHeaders(ctx.mcpReq._meta),
+              signal: ctx.mcpReq.signal,
+              resolveBody: () => Promise.resolve(args),
+            },
+            { context: async () => (await value(context, ctx)) ?? {} },
           )
 
           if (!matched) {
@@ -225,11 +308,15 @@ export class McpRegistrar<T extends AnyRouter> {
             return await toCallToolResult(await consumeIteratorBody(response.body, ctx))
           }
 
-          return await toCallToolResult(response.body, flattenStandardHeader(response.headers['content-type']))
-        }
-        catch (e) {
+          return await toCallToolResult(
+            response.body,
+            flattenStandardHeader(response.headers['content-type']),
+          )
+        } catch (e) {
           // a tool execution error the model can read, rather than a protocol error
-          return await toErrorCallToolResult(e instanceof ErrorEvent ? e.data : this.codec.encodeError(toORPCError(e)).body)
+          return await toErrorCallToolResult(
+            e instanceof ErrorEvent ? e.data : this.codec.encodeError(toORPCError(e)).body,
+          )
         }
       },
     }
@@ -250,11 +337,11 @@ class McpMatcher {
   ) {}
 
   resolveRoutes(): Promise<Map<`/${string}`, McpRoute>> {
-    return this.routes ??= this.loadRoutes().catch((error) => {
+    return (this.routes ??= this.loadRoutes().catch((error) => {
       // retry on the next call, such as when a lazy router failed to load
       this.routes = undefined
       throw error
-    })
+    }))
   }
 
   async match(pathname: `/${string}`): Promise<McpRoute | undefined> {
@@ -273,7 +360,10 @@ class McpMatcher {
         path,
         contract,
         procedure: await resolveContractProcedure(this.router, contract, path),
-        inputJsonSchema: resolveToolInputJsonSchema(this.converter, toArray(contract['~orpc'].inputSchemas)),
+        inputJsonSchema: resolveToolInputJsonSchema(
+          this.converter,
+          toArray(contract['~orpc'].inputSchemas),
+        ),
       })
     })
 
@@ -290,7 +380,9 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
     private readonly serializer: Public<OpenAPIJsonSerializer>,
   ) {}
 
-  async resolveProcedure(request: StandardLazyRequest): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+  async resolveProcedure(
+    request: StandardLazyRequest,
+  ): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const [pathname] = parseStandardUrl(request.url)
     const route = await this.matcher.match(pathname)
 
@@ -311,8 +403,8 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
         status: DEFAULT_SUCCESS_STATUS,
         headers: {},
         body: wrapAsyncIteratorPreservingEventMeta(output, {
-          mapResult: result => ({ done: result.done, value: this.serialize(result.value) }),
-          mapError: e => new ErrorEvent(this.serialize(toORPCError(e).toJSON()), { cause: e }),
+          mapResult: (result) => ({ done: result.done, value: this.serialize(result.value) }),
+          mapError: (e) => new ErrorEvent(this.serialize(toORPCError(e).toJSON()), { cause: e }),
         }),
       }
     }
@@ -339,7 +431,10 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
  * Tools return a single result, so the last event becomes the result,
  * and every event is reported as progress when the client asks for it.
  */
-async function consumeIteratorBody(iterator: AsyncIterable<unknown>, ctx: ServerContext): Promise<unknown> {
+async function consumeIteratorBody(
+  iterator: AsyncIterable<unknown>,
+  ctx: ServerContext,
+): Promise<unknown> {
   const progressToken = ctx.mcpReq._meta?.progressToken
 
   let last: unknown
@@ -389,9 +484,14 @@ function toText(json: unknown): string | undefined {
  * A stream has no type of its own, so it takes the content type of the response,
  * such as one a procedure sets with the Response Headers Plugin.
  */
-async function toCallToolResult(serialized: unknown, contentType?: string): Promise<CallToolResult> {
+async function toCallToolResult(
+  serialized: unknown,
+  contentType?: string,
+): Promise<CallToolResult> {
   if (serialized instanceof ReadableStream) {
-    serialized = await new Response(serialized, { headers: contentType === undefined ? {} : { 'content-type': contentType } }).blob()
+    serialized = await new Response(serialized, {
+      headers: contentType === undefined ? {} : { 'content-type': contentType },
+    }).blob()
   }
 
   if (serialized instanceof Blob) {
@@ -403,13 +503,19 @@ async function toCallToolResult(serialized: unknown, contentType?: string): Prom
   }
 
   return {
-    content: [{ type: 'text', text: toText(serialized)! }, ...await toNestedBlobContents(serialized)],
+    content: [
+      { type: 'text', text: toText(serialized)! },
+      ...(await toNestedBlobContents(serialized)),
+    ],
     structuredContent: serialized,
   }
 }
 
 async function toErrorCallToolResult(json: unknown): Promise<CallToolResult> {
-  return { content: [{ type: 'text', text: stringifyJSON(json)! }, ...await toNestedBlobContents(json)], isError: true }
+  return {
+    content: [{ type: 'text', text: stringifyJSON(json)! }, ...(await toNestedBlobContents(json))],
+    isError: true,
+  }
 }
 
 /**
@@ -422,11 +528,14 @@ function toNestedBlobContents(json: unknown): Promise<EmbeddedResource[]> {
   return Promise.all(blobs.map(([uri, blob]) => toEmbeddedResource(uri, blob)))
 }
 
-function collectNestedBlobs(json: unknown, segments: string[], blobs: [uri: string, blob: Blob][]): void {
+function collectNestedBlobs(
+  json: unknown,
+  segments: string[],
+  blobs: [uri: string, blob: Blob][],
+): void {
   if (json instanceof Blob) {
     blobs.push([toResourceUri(segments, json), json])
-  }
-  else if (Array.isArray(json) || isPlainObject(json)) {
+  } else if (Array.isArray(json) || isPlainObject(json)) {
     for (const key of Object.keys(json)) {
       segments.push(key)
       collectNestedBlobs((json as Record<string, unknown>)[key], segments, blobs)
@@ -450,7 +559,11 @@ async function toBinaryContent(blob: Blob): Promise<ContentBlock> {
 async function toEmbeddedResource(uri: string, blob: Blob): Promise<EmbeddedResource> {
   return {
     type: 'resource',
-    resource: { uri, mimeType: blob.type || 'application/octet-stream', blob: encodeBase64(await loadBytes(blob)) },
+    resource: {
+      uri,
+      mimeType: blob.type || 'application/octet-stream',
+      blob: encodeBase64(await loadBytes(blob)),
+    },
   }
 }
 

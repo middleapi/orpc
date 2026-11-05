@@ -1,6 +1,7 @@
 import { ORPCError } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import * as z from 'zod'
+
 import { ValidationError } from '../error.ts'
 import { ProcedureContract } from '../procedure.ts'
 import { RequestValidationLinkPlugin } from './request-validation.ts'
@@ -11,10 +12,7 @@ beforeEach(() => {
 
 describe('requestValidationLinkPlugin', () => {
   const chainedProcedure = new ProcedureContract({
-    inputSchemas: [
-      z.number().transform(value => value + 1),
-      z.number().min(2),
-    ],
+    inputSchemas: [z.number().transform((value) => value + 1), z.number().min(2)],
     outputSchemas: [],
     errorMap: {},
     meta: {},
@@ -22,7 +20,7 @@ describe('requestValidationLinkPlugin', () => {
 
   const stackedObjectProcedure = new ProcedureContract({
     inputSchemas: [
-      z.object({ parent: z.string().transform(value => `parent__${value}`) }),
+      z.object({ parent: z.string().transform((value) => `parent__${value}`) }),
       z.object({ parent: z.string(), child: z.string() }),
     ],
     outputSchemas: [],
@@ -68,16 +66,12 @@ describe('requestValidationLinkPlugin', () => {
   const interceptor = vi.fn(({ next }) => next())
 
   const link = new StandardLink(codec, transport, {
-    plugins: [
-      new RequestValidationLinkPlugin(contract),
-    ],
+    plugins: [new RequestValidationLinkPlugin(contract)],
     interceptors: [interceptor],
   })
 
   const linkUsingValidatedInput = new StandardLink(codec, transport, {
-    plugins: [
-      new RequestValidationLinkPlugin(contract, { forwardValidatedInput: true }),
-    ],
+    plugins: [new RequestValidationLinkPlugin(contract, { forwardValidatedInput: true })],
   })
 
   it('forwards the original input by default after local validation succeeds', async () => {
@@ -136,7 +130,9 @@ describe('requestValidationLinkPlugin', () => {
     codec.decodeResponse.mockResolvedValueOnce({ kind: 'output', output: '__output__' })
 
     const input = { parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' }
-    const output = await linkUsingValidatedInput.call(['stackedObjectProcedure'], input as any, { context: {} })
+    const output = await linkUsingValidatedInput.call(['stackedObjectProcedure'], input as any, {
+      context: {},
+    })
 
     expect(output).toBe('__output__')
     expect(codec.encodeInput).toHaveBeenCalledWith(
@@ -161,7 +157,9 @@ describe('requestValidationLinkPlugin', () => {
     codec.decodeResponse.mockResolvedValueOnce({ kind: 'output', output: '__output__' })
 
     const input = { params: { id: 'ID', slug: 'SLUG', unknown: 'UNKNOWN' }, query: { page: 1 } }
-    const output = await linkUsingValidatedInput.call(['nestedObjectProcedure'], input as any, { context: {} })
+    const output = await linkUsingValidatedInput.call(['nestedObjectProcedure'], input as any, {
+      context: {},
+    })
 
     expect(output).toBe('__output__')
     expect(codec.encodeInput).toHaveBeenCalledWith(
@@ -188,7 +186,9 @@ describe('requestValidationLinkPlugin', () => {
     const output = await link.call(['withoutInputSchema'], 'anything', { context: {} })
 
     expect(output).toBe('__output__')
-    expect(codec.encodeInput).toHaveBeenCalledWith('anything', ['withoutInputSchema'], { context: {} })
+    expect(codec.encodeInput).toHaveBeenCalledWith('anything', ['withoutInputSchema'], {
+      context: {},
+    })
   })
 
   it('throws a BAD_REQUEST error when any validation step fails', async () => {

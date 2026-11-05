@@ -5,34 +5,34 @@
   "compatibility_date": "2026-11-17",
   "assets": {
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api", "/api/*", "/rpc/*", "/chat-room"]
+    "run_worker_first": ["/api", "/api/*", "/rpc/*", "/chat-room"],
   },
   "observability": {
     "enabled": true,
     "traces": {
-      "enabled": true
-    }
+      "enabled": true,
+    },
   },
   "durable_objects": {
     "bindings": [
       {
         "name": "PUBLISHER_DON",
-        "class_name": "PublisherDO"
+        "class_name": "PublisherDO",
       },
       {
         "name": "CHAT_ROOM_DON",
-        "class_name": "ChatRoomDO"
-      }
-    ]
+        "class_name": "ChatRoomDO",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "add-PublisherDO",
-      "new_sqlite_classes": ["PublisherDO"]
+      "new_sqlite_classes": ["PublisherDO"],
     },
     {
       "tag": "add-ChatRoomDO",
-      "new_sqlite_classes": ["ChatRoomDO"]
-    }
-  ]
+      "new_sqlite_classes": ["ChatRoomDO"],
+    },
+  ],
 }

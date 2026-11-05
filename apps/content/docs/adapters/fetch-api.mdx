@@ -1,8 +1,8 @@
 ---
-title: "Fetch API Adapter"
-description: "Use oRPC with the Fetch API on both servers and clients, in runtimes such as Bun and Deno, and configure how event streams are sent to the client."
+title: 'Fetch API Adapter'
+description: 'Use oRPC with the Fetch API on both servers and clients, in runtimes such as Bun and Deno, and configure how event streams are sent to the client.'
 sidebar:
-  label: "Fetch API"
+  label: 'Fetch API'
 ---
 
 ## Server Usage
@@ -15,9 +15,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -28,7 +26,7 @@ const handler = new RPCHandler(router, {
 export async function fetch(request: Request): Promise<Response> {
   const { matched, response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -45,9 +43,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import { onError } from '@orpc/server'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -58,7 +54,7 @@ const handler = new OpenAPIHandler(router, {
 export async function fetch(request: Request): Promise<Response> {
   const { matched, response } = await handler.handle(request, {
     prefix: '/api',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -118,7 +114,8 @@ const link = new RPCLink({
       console.error(error)
     }),
   ],
-  fetch: (request, init) => { // <- override fetch if needed
+  fetch: (request, init) => {
+    // <- override fetch if needed
     return globalThis.fetch(request, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests
@@ -140,7 +137,8 @@ const link = new OpenAPILink(contract, {
       console.error(error)
     }),
   ],
-  fetch: (request, init) => { // <- override fetch if needed
+  fetch: (request, init) => {
+    // <- override fetch if needed
     return globalThis.fetch(request, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests

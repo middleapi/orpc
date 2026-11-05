@@ -2,10 +2,11 @@ import { os } from '@orpc/server'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { z } from 'zod'
+
 import { createServerFunction } from '../server-function.ts'
 import { useOptimisticServerFunction } from './optimistic-server-function.ts'
 
-export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+export const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -16,11 +17,7 @@ describe('useOptimisticServerFunction', () => {
     return { output: Number(input?.input ?? 0) }
   })
 
-  const fn = createServerFunction(
-    os
-      .input(inputSchema)
-      .handler(handler),
-  )
+  const fn = createServerFunction(os.input(inputSchema).handler(handler))
 
   it.each(['success', 'error'])('on %s', async (scenario) => {
     if (scenario === 'error') {
@@ -50,7 +47,7 @@ describe('useOptimisticServerFunction', () => {
     expect(result.current.state.optimisticState).toEqual([{ output: 0 }])
 
     act(() => {
-      result.current.setOutputs(prev => [...prev, { output: 123 }])
+      result.current.setOutputs((prev) => [...prev, { output: 123 }])
     })
 
     expect(result.current.state.optimisticState).toEqual([{ output: 0 }, { output: 123 }])

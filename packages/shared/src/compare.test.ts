@@ -44,27 +44,31 @@ describe('deepEqual', () => {
   })
 
   it('returns true for deeply equal nested values', () => {
-    expect(isDeepEqual(
-      {
-        items: [1, { enabled: true }],
-        meta: { count: 2 },
-      },
-      {
-        items: [1, { enabled: true }],
-        meta: { count: 2 },
-      },
-    )).toBe(true)
+    expect(
+      isDeepEqual(
+        {
+          items: [1, { enabled: true }],
+          meta: { count: 2 },
+        },
+        {
+          items: [1, { enabled: true }],
+          meta: { count: 2 },
+        },
+      ),
+    ).toBe(true)
   })
 
   it('returns false for deeply unequal nested values', () => {
-    expect(isDeepEqual(
-      {
-        items: [1, { enabled: true }],
-      },
-      {
-        items: [1, { enabled: false }],
-      },
-    )).toBe(false)
+    expect(
+      isDeepEqual(
+        {
+          items: [1, { enabled: true }],
+        },
+        {
+          items: [1, { enabled: false }],
+        },
+      ),
+    ).toBe(false)
   })
 
   it('can handle recursive object', () => {
@@ -106,16 +110,18 @@ describe('deepEqual', () => {
   it('returns true when one side reuses a reference and the other duplicates the value', () => {
     const shared = { value: 1 }
 
-    expect(isDeepEqual(
-      {
-        left: shared,
-        right: shared,
-      },
-      {
-        left: { value: 1 },
-        right: { value: 1 },
-      },
-    )).toBe(true)
+    expect(
+      isDeepEqual(
+        {
+          left: shared,
+          right: shared,
+        },
+        {
+          left: { value: 1 },
+          right: { value: 1 },
+        },
+      ),
+    ).toBe(true)
   })
 
   it('returns false when comparing a date to a plain object', () => {

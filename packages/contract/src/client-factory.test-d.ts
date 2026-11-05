@@ -1,5 +1,6 @@
 import type { ClientLink, ORPCError } from '@orpc/client'
 import type { PromiseWithError } from '@orpc/shared'
+
 import { oc } from './builder.ts'
 import { createContractClientFactory } from './client-factory.ts'
 import { type } from './schema-utils.ts'
@@ -27,9 +28,7 @@ describe('createContractClientFactory', () => {
 
           const result = next()
 
-          expectTypeOf(result).toEqualTypeOf<
-            PromiseWithError<unknown, unknown>
-          >()
+          expectTypeOf(result).toEqualTypeOf<PromiseWithError<unknown, unknown>>()
 
           return result
         },
@@ -76,17 +75,11 @@ describe('createContractClientFactory', () => {
   it('returns a client & infers procedure return types', () => {
     const factory = createContractClientFactory(link)
 
-    expectTypeOf(
-      factory(contract.ping)(),
-    ).toEqualTypeOf<
-      PromiseWithError<unknown, Error>
-    >()
+    expectTypeOf(factory(contract.ping)()).toEqualTypeOf<PromiseWithError<unknown, Error>>()
 
     expectTypeOf(
       factory(contract.nested.pong)('string', { context: { cache: true } }),
-    ).toEqualTypeOf<
-      PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>
-    >()
+    ).toEqualTypeOf<PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>>()
   })
 
   it('returns a router client when a router contract is passed', () => {
@@ -94,15 +87,9 @@ describe('createContractClientFactory', () => {
 
     const client = factory(contract)
 
-    expectTypeOf(
-      client.ping(),
-    ).toEqualTypeOf<
-      PromiseWithError<unknown, Error>
-    >()
+    expectTypeOf(client.ping()).toEqualTypeOf<PromiseWithError<unknown, Error>>()
 
-    expectTypeOf(
-      client.nested.pong('string', { context: { cache: true } }),
-    ).toEqualTypeOf<
+    expectTypeOf(client.nested.pong('string', { context: { cache: true } })).toEqualTypeOf<
       PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>
     >()
   })

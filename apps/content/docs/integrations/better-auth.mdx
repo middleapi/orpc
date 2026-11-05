@@ -1,8 +1,8 @@
 ---
-title: "Better Auth Integration"
+title: 'Better Auth Integration'
 description: "Protect oRPC procedures with typed Better Auth sessions, using your framework's Better Auth integration or the request and response headers plugins."
 sidebar:
-  label: "Better Auth"
+  label: 'Better Auth'
 ---
 
 Use [Better Auth](https://better-auth.com/) with oRPC [middleware](/docs/middleware). No extra package is needed.
@@ -16,12 +16,16 @@ In a full-stack framework, such as [Next.js](https://better-auth.com/docs/integr
 Use the [Request Headers Plugin](/docs/plugins/request-headers) to read the session and the [Response Headers Plugin](/docs/plugins/response-headers) to forward Better Auth's cookies.
 
 ```ts
-import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+import type {
+  RequestHeadersHandlerPluginContext,
+  ResponseHeadersHandlerPluginContext,
+} from '@orpc/server/plugins'
 import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { RequestHeadersHandlerPlugin, ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 
-interface ServerContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
+interface ServerContext
+  extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
 
 const base = os.$context<ServerContext>()
 
@@ -47,10 +51,7 @@ const router = {
 }
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new RequestHeadersHandlerPlugin(),
-    new ResponseHeadersHandlerPlugin(),
-  ],
+  plugins: [new RequestHeadersHandlerPlugin(), new ResponseHeadersHandlerPlugin()],
 })
 ```
 

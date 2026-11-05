@@ -1,7 +1,13 @@
-import type { JsonSchemaConverter } from '@orpc/json-schema'
 import { asyncIteratorObject, type } from '@orpc/contract'
+import type { JsonSchemaConverter } from '@orpc/json-schema'
 import { z } from 'zod'
-import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils.ts'
+
+import {
+  resolveToolInput,
+  resolveToolInputJsonSchema,
+  resolveToolOutputJsonSchema,
+  toPassthroughStandardSchema,
+} from './utils.ts'
 
 function createConverter(...results: [any, boolean][]): JsonSchemaConverter {
   let index = 0
@@ -22,7 +28,10 @@ describe('resolveToolInputJsonSchema', () => {
   })
 
   it('keeps object schemas and strips $schema', () => {
-    const converter = createConverter([{ $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' }, false])
+    const converter = createConverter([
+      { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' },
+      false,
+    ])
 
     expect(resolveToolInputJsonSchema(converter, [type()])).toEqual({
       jsonSchema: { type: 'object' },
@@ -38,33 +47,51 @@ describe('resolveToolInputJsonSchema', () => {
     [{ $ref: '#/$defs/object', $defs: { object: { type: 'object' } } }, false],
     [{ $ref: '#/$defs/string', $defs: { string: { type: 'string' } } }, true],
   ])('nests %j under `input`: %s', (jsonSchema, wrapped) => {
-    expect(resolveToolInputJsonSchema(createConverter([jsonSchema, false]), [type()]).wrapped).toBe(wrapped)
+    expect(resolveToolInputJsonSchema(createConverter([jsonSchema, false]), [type()]).wrapped).toBe(
+      wrapped,
+    )
   })
 
   it('leaves unconstrained schemas for the MCP SDK to type as objects', () => {
-    expect(resolveToolInputJsonSchema(createConverter([true, true]), [type()]).jsonSchema).toEqual({})
-    expect(resolveToolInputJsonSchema(createConverter([{ description: 'any' }, true]), [type()]).jsonSchema).toEqual({ description: 'any' })
+    expect(resolveToolInputJsonSchema(createConverter([true, true]), [type()]).jsonSchema).toEqual(
+      {},
+    )
+    expect(
+      resolveToolInputJsonSchema(createConverter([{ description: 'any' }, true]), [type()])
+        .jsonSchema,
+    ).toEqual({ description: 'any' })
   })
 
   it('nests other schemas under `input`, required unless optional', () => {
-    expect(resolveToolInputJsonSchema(createConverter([{ type: 'string' }, false]), [type()])).toEqual({
-      jsonSchema: { type: 'object', properties: { input: { type: 'string' } }, required: ['input'] },
+    expect(
+      resolveToolInputJsonSchema(createConverter([{ type: 'string' }, false]), [type()]),
+    ).toEqual({
+      jsonSchema: {
+        type: 'object',
+        properties: { input: { type: 'string' } },
+        required: ['input'],
+      },
       wrapped: true,
       emptyAsUndefined: false,
     })
 
-    expect(resolveToolInputJsonSchema(createConverter([{ type: 'string' }, true]), [type()]).jsonSchema).toEqual({
+    expect(
+      resolveToolInputJsonSchema(createConverter([{ type: 'string' }, true]), [type()]).jsonSchema,
+    ).toEqual({
       type: 'object',
       properties: { input: { type: 'string' } },
     })
   })
 
   it('moves defs to the root and rewrites root refs when nesting', () => {
-    const converter = createConverter([{
-      type: 'array',
-      items: { $ref: '#' },
-      $defs: { other: { type: 'string' } },
-    }, false])
+    const converter = createConverter([
+      {
+        type: 'array',
+        items: { $ref: '#' },
+        $defs: { other: { type: 'string' } },
+      },
+      false,
+    ])
 
     expect(resolveToolInputJsonSchema(converter, [type()]).jsonSchema).toEqual({
       type: 'object',
@@ -78,28 +105,48 @@ describe('resolveToolInputJsonSchema', () => {
   })
 
   it('combines multiple schemas with allOf', () => {
-    const converter = createConverter([{ type: 'object', required: ['a'] }, false], [{ type: 'object', required: ['b'] }, true])
+    const converter = createConverter(
+      [{ type: 'object', required: ['a'] }, false],
+      [{ type: 'object', required: ['b'] }, true],
+    )
 
     expect(resolveToolInputJsonSchema(converter, [type(), type()])).toEqual({
-      jsonSchema: { allOf: [{ type: 'object', required: ['a'] }, { type: 'object', required: ['b'] }] },
+      jsonSchema: {
+        allOf: [
+          { type: 'object', required: ['a'] },
+          { type: 'object', required: ['b'] },
+        ],
+      },
       wrapped: false,
       emptyAsUndefined: false,
     })
   })
 
   it('ignores unconstrained schemas when combining', () => {
-    const converter = createConverter([{ type: 'object', required: ['a'] }, false], [{ description: 'no JSON Schema' }, true])
+    const converter = createConverter(
+      [{ type: 'object', required: ['a'] }, false],
+      [{ description: 'no JSON Schema' }, true],
+    )
 
-    expect(resolveToolInputJsonSchema(converter, [type(), type()]).jsonSchema).toEqual({ type: 'object', required: ['a'] })
-    expect(resolveToolInputJsonSchema(createConverter([{}, true]), [type(), type()]).jsonSchema).toEqual({})
+    expect(resolveToolInputJsonSchema(converter, [type(), type()]).jsonSchema).toEqual({
+      type: 'object',
+      required: ['a'],
+    })
+    expect(
+      resolveToolInputJsonSchema(createConverter([{}, true]), [type(), type()]).jsonSchema,
+    ).toEqual({})
   })
 
   it('treats combined schemas as optional only when every schema is optional', () => {
     const optional = createConverter([{ type: 'string' }, true], [{ minLength: 1 }, true])
-    expect(resolveToolInputJsonSchema(optional, [type(), type()]).jsonSchema.required).toBeUndefined()
+    expect(
+      resolveToolInputJsonSchema(optional, [type(), type()]).jsonSchema.required,
+    ).toBeUndefined()
 
     const required = createConverter([{ type: 'string' }, true], [{ minLength: 1 }, false])
-    expect(resolveToolInputJsonSchema(required, [type(), type()]).jsonSchema.required).toEqual(['input'])
+    expect(resolveToolInputJsonSchema(required, [type(), type()]).jsonSchema.required).toEqual([
+      'input',
+    ])
   })
 })
 
@@ -109,17 +156,43 @@ describe('resolveToolOutputJsonSchema', () => {
   })
 
   it('returns the converted schema', () => {
-    expect(resolveToolOutputJsonSchema(createConverter([{ type: 'array' }, false]), [type()])).toEqual({ type: 'array' })
+    expect(
+      resolveToolOutputJsonSchema(createConverter([{ type: 'array' }, false]), [type()]),
+    ).toEqual({ type: 'array' })
   })
 
   it.each([
     ['optional', [{ type: 'object' }, true]],
     ['unconstrained', [{}, false]],
     ['binary', [{ type: 'string', contentMediaType: 'image/png' }, false]],
-    ['possibly binary', [{ anyOf: [{ type: 'object' }, { type: 'string', contentMediaType: 'image/png' }] }, false]],
-    ['intersected binary', [{ allOf: [{ type: 'string' }, { type: 'string', contentMediaType: 'image/png' }] }, false]],
-    ['referenced binary', [{ $ref: '#/$defs/Image', $defs: { Image: { type: 'string', contentMediaType: 'image/png' } } }, false]],
-    ['nested binary', [{ type: 'object', properties: { image: { type: 'string', contentMediaType: 'image/png' } } }, false]],
+    [
+      'possibly binary',
+      [{ anyOf: [{ type: 'object' }, { type: 'string', contentMediaType: 'image/png' }] }, false],
+    ],
+    [
+      'intersected binary',
+      [{ allOf: [{ type: 'string' }, { type: 'string', contentMediaType: 'image/png' }] }, false],
+    ],
+    [
+      'referenced binary',
+      [
+        {
+          $ref: '#/$defs/Image',
+          $defs: { Image: { type: 'string', contentMediaType: 'image/png' } },
+        },
+        false,
+      ],
+    ],
+    [
+      'nested binary',
+      [
+        {
+          type: 'object',
+          properties: { image: { type: 'string', contentMediaType: 'image/png' } },
+        },
+        false,
+      ],
+    ],
   ] as const)('returns undefined for %s outputs', (_, result) => {
     expect(resolveToolOutputJsonSchema(createConverter(result as any), [type()])).toBeUndefined()
   })
@@ -142,14 +215,20 @@ describe('resolveToolOutputJsonSchema', () => {
 
 describe('resolveToolInput', () => {
   it('passes arguments through', () => {
-    const inputJsonSchema = resolveToolInputJsonSchema(createConverter([{ type: 'object' }, false]), [type()])
+    const inputJsonSchema = resolveToolInputJsonSchema(
+      createConverter([{ type: 'object' }, false]),
+      [type()],
+    )
     const args = { id: 1 }
 
     expect(resolveToolInput(args, inputJsonSchema)).toBe(args)
   })
 
   it('unwraps nested inputs', () => {
-    const inputJsonSchema = resolveToolInputJsonSchema(createConverter([{ type: 'string' }, true]), [type()])
+    const inputJsonSchema = resolveToolInputJsonSchema(
+      createConverter([{ type: 'string' }, true]),
+      [type()],
+    )
 
     expect(resolveToolInput({ input: 'Earth' }, inputJsonSchema)).toBe('Earth')
     expect(resolveToolInput({}, inputJsonSchema)).toBeUndefined()
@@ -161,25 +240,58 @@ describe('resolveToolInput empty arguments', () => {
   const objectConverter = createConverter([{ type: 'object' }, true])
 
   it('passes no input for empty arguments when every input schema accepts undefined and one rejects an object', () => {
-    expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.void()]))).toBeUndefined()
-    expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.void().or(z.object({ id: z.number() }))]))).toBeUndefined()
-    expect(resolveToolInput({ id: 1 }, resolveToolInputJsonSchema(objectConverter, [z.void()]))).toEqual({ id: 1 })
+    expect(
+      resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.void()])),
+    ).toBeUndefined()
+    expect(
+      resolveToolInput(
+        {},
+        resolveToolInputJsonSchema(objectConverter, [z.void().or(z.object({ id: z.number() }))]),
+      ),
+    ).toBeUndefined()
+    expect(
+      resolveToolInput({ id: 1 }, resolveToolInputJsonSchema(objectConverter, [z.void()])),
+    ).toEqual({ id: 1 })
   })
 
   it('keeps empty arguments for inputs accepting an object or validating asynchronously', () => {
     expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [type()]))).toEqual({})
     expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.any()]))).toEqual({})
-    expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.object({}).optional()]))).toEqual({})
-    expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.void().refine(async () => true)]))).toEqual({})
+    expect(
+      resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [z.object({}).optional()])),
+    ).toEqual({})
+    expect(
+      resolveToolInput(
+        {},
+        resolveToolInputJsonSchema(objectConverter, [z.void().refine(async () => true)]),
+      ),
+    ).toEqual({})
 
     // accepts undefined, but cannot tell synchronously whether it rejects an object
-    const probe = (onObject: () => any) => ({
-      '~standard': { vendor: 'test', version: 1, validate: (value: unknown) => value === undefined ? { value } : onObject() },
-    } as const)
-    expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [probe(async () => ({ issues: [] }))]))).toEqual({})
-    expect(resolveToolInput({}, resolveToolInputJsonSchema(objectConverter, [probe(() => {
-      throw new Error('boom')
-    })]))).toEqual({})
+    const probe = (onObject: () => any) =>
+      ({
+        '~standard': {
+          vendor: 'test',
+          version: 1,
+          validate: (value: unknown) => (value === undefined ? { value } : onObject()),
+        },
+      }) as const
+    expect(
+      resolveToolInput(
+        {},
+        resolveToolInputJsonSchema(objectConverter, [probe(async () => ({ issues: [] }))]),
+      ),
+    ).toEqual({})
+    expect(
+      resolveToolInput(
+        {},
+        resolveToolInputJsonSchema(objectConverter, [
+          probe(() => {
+            throw new Error('boom')
+          }),
+        ]),
+      ),
+    ).toEqual({})
   })
 })
 
@@ -188,6 +300,8 @@ it('toPassthroughStandardSchema', async () => {
 
   const value = { anything: true }
   expect(await schema['~standard'].validate(value)).toEqual({ value })
-  expect(schema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })).toEqual({ type: 'object' })
+  expect(schema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })).toEqual({
+    type: 'object',
+  })
   expect(schema['~standard'].jsonSchema.output({ target: 'draft-07' })).toEqual({ type: 'object' })
 })

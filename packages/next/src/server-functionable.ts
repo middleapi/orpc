@@ -1,7 +1,15 @@
-import type { AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions, Schema } from '@orpc/server'
+import type {
+  AnySchema,
+  Context,
+  ErrorMap,
+  Procedure,
+  ProcedureClientOptions,
+  Schema,
+} from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ProcedureServerFunction } from './server-function.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+
+import type { ProcedureServerFunction } from './server-function.ts'
 import { createServerFunction } from './server-function.ts'
 
 export interface ServerFunctionable<TInitialContext extends Context> {
@@ -11,10 +19,9 @@ export interface ServerFunctionable<TInitialContext extends Context> {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   >(
-    procedure: Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
-  ):
-    & ProcedureServerFunction<TInputSchema, TOutputSchema, TErrorMap>
-    & Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    procedure: Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>,
+  ): ProcedureServerFunction<TInputSchema, TOutputSchema, TErrorMap> &
+    Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
 }
 
 /**
@@ -26,12 +33,7 @@ export interface ServerFunctionable<TInitialContext extends Context> {
  */
 export function createServerFunctionable<TInitialContext extends Context = object>(
   ...rest: MaybeOptionalOptions<
-    ProcedureClientOptions<
-      TInitialContext,
-      Schema<unknown>,
-      ErrorMap,
-      object
-    >
+    ProcedureClientOptions<TInitialContext, Schema<unknown>, ErrorMap, object>
   >
 ): ServerFunctionable<TInitialContext> {
   const options = resolveMaybeOptionalOptions(rest)
@@ -44,12 +46,12 @@ export function createServerFunctionable<TInitialContext extends Context = objec
   >(
     procedure: Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>,
   ) => {
-    const functionable = createServerFunction(
-      procedure,
-      options,
-    ) as
-    & ProcedureServerFunction<TInputSchema, TOutputSchema, TErrorMap>
-    & Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    const functionable = createServerFunction(procedure, options) as ProcedureServerFunction<
+      TInputSchema,
+      TOutputSchema,
+      TErrorMap
+    > &
+      Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
 
     functionable['~orpc'] = procedure['~orpc']
 

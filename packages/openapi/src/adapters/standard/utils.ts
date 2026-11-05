@@ -1,7 +1,8 @@
 import type { Public } from '@orpc/shared'
-import type { StandardHeaders } from '@standard-server/core'
-import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer.ts'
 import { isTypescriptObject, NullProtoObj } from '@orpc/shared'
+import type { StandardHeaders } from '@standard-server/core'
+
+import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer.ts'
 
 export function serializeHeaders(
   headers: object,
@@ -48,7 +49,7 @@ function serializeHeaderValue(
 
   if (Array.isArray(serialized)) {
     return serialized
-      .filter(item => item !== undefined && item !== null)
+      .filter((item) => item !== undefined && item !== null)
       .map(String)
       .join(',')
   }

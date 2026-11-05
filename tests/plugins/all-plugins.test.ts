@@ -1,9 +1,6 @@
-import type { RetryLinkPluginContext } from '@orpc/client/plugins'
-import type { OpenAPIDocument } from '@orpc/openapi'
-import type { RouterClient } from '@orpc/server'
-import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import {
   BatchLinkPlugin,
   CookieJarLinkPlugin,
@@ -19,12 +16,22 @@ import { RequestValidationLinkPlugin, ResponseValidationLinkPlugin } from '@orpc
 import { EvlogHandlerPlugin } from '@orpc/evlog'
 import { HibernationHandlerPlugin } from '@orpc/hibernation'
 import { SmartCoercionHandlerPlugin, SmartCoercionLinkPlugin } from '@orpc/json-schema'
-import { BatchResponseCompressionHandlerPlugin, StaticFileHandlerPlugin, TmpFileUploadHandlerPlugin } from '@orpc/node'
+import {
+  BatchResponseCompressionHandlerPlugin,
+  StaticFileHandlerPlugin,
+  TmpFileUploadHandlerPlugin,
+} from '@orpc/node'
+import type { OpenAPIDocument } from '@orpc/openapi'
 import { OpenAPIReferenceHandlerPlugin } from '@orpc/openapi/plugins'
 import { PinoHandlerPlugin } from '@orpc/pino'
 import { RateLimitHandlerPlugin } from '@orpc/ratelimit'
+import type { RouterClient } from '@orpc/server'
 import { implement } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
+import type {
+  RequestHeadersHandlerPluginContext,
+  ResponseHeadersHandlerPluginContext,
+} from '@orpc/server/plugins'
 import {
   BatchHandlerPlugin,
   CORSHandlerPlugin,
@@ -51,17 +58,14 @@ import { z } from 'zod'
  * New plugins belong in `createHandlerPlugins` or `createLinkPlugins` below.
  */
 
-interface TestContext extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
+interface TestContext
+  extends RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext {}
 
 interface TestClientContext extends RetryLinkPluginContext {}
 
 const contract = {
-  ping: oc
-    .input(z.object({ value: z.number() }))
-    .output(z.object({ value: z.number() })),
-  login: oc
-    .input(z.object({ user: z.string() }))
-    .output(z.object({ user: z.string() })),
+  ping: oc.input(z.object({ value: z.number() })).output(z.object({ value: z.number() })),
+  login: oc.input(z.object({ user: z.string() })).output(z.object({ user: z.string() })),
 }
 
 const spec: OpenAPIDocument<'3.2.0'> = {
@@ -90,7 +94,11 @@ function createHandlerPlugins() {
     new HeadMethodHandlerPlugin<TestContext>(),
     new HibernationHandlerPlugin<TestContext>(),
     new MethodOverrideHandlerPlugin(),
-    new OpenAPIReferenceHandlerPlugin<TestContext, 'scalar'>({ spec, docsPath: '/docs', specPath: '/spec.json' }),
+    new OpenAPIReferenceHandlerPlugin<TestContext, 'scalar'>({
+      spec,
+      docsPath: '/docs',
+      specPath: '/spec.json',
+    }),
     new PinoHandlerPlugin<TestContext>({ logger: pino({ level: 'silent' }) }),
     new RateLimitHandlerPlugin<TestContext>(),
     new RequestCompressionHandlerPlugin<TestContext>(),
@@ -135,7 +143,7 @@ function createClientServer() {
     plugins: createHandlerPlugins(),
   })
 
-  const exchanges: { request: Request, response: Response }[] = []
+  const exchanges: { request: Request; response: Response }[] = []
 
   const link = new RPCLink<TestClientContext>({
     url: '/rpc',
@@ -167,13 +175,9 @@ describe('all plugins on one handler and one link', () => {
   it('batches concurrent calls through every plugin', async () => {
     const { client, exchanges } = createClientServer()
 
-    await expect(Promise.all([
-      client.ping({ value: 1 }),
-      client.ping({ value: 2 }),
-    ])).resolves.toEqual([
-      { value: 1 },
-      { value: 2 },
-    ])
+    await expect(
+      Promise.all([client.ping({ value: 1 }), client.ping({ value: 2 })]),
+    ).resolves.toEqual([{ value: 1 }, { value: 2 }])
 
     expect(exchanges).toHaveLength(1) // both calls travelled in a single batch request
     expect(exchanges[0]!.request.headers.get('orpc-batch')).toEqual('buffered')
@@ -186,13 +190,9 @@ describe('all plugins on one handler and one link', () => {
   it('sets the cookies and shared headers of batched calls on the batch response', async () => {
     const { client, exchanges } = createClientServer()
 
-    await expect(Promise.all([
-      client.login({ user: 'alice' }),
-      client.login({ user: 'bob' }),
-    ])).resolves.toEqual([
-      { user: 'alice' },
-      { user: 'bob' },
-    ])
+    await expect(
+      Promise.all([client.login({ user: 'alice' }), client.login({ user: 'bob' })]),
+    ).resolves.toEqual([{ user: 'alice' }, { user: 'bob' }])
 
     expect(exchanges).toHaveLength(1)
     expect(exchanges[0]!.response.headers.getSetCookie().toSorted()).toEqual([
@@ -206,13 +206,9 @@ describe('all plugins on one handler and one link', () => {
     const { client, exchanges } = createClientServer()
 
     await expect(client.login({ user: 'alice' })).resolves.toEqual({ user: 'alice' })
-    await expect(Promise.all([
-      client.ping({ value: 1 }),
-      client.ping({ value: 2 }),
-    ])).resolves.toEqual([
-      { value: 1 },
-      { value: 2 },
-    ])
+    await expect(
+      Promise.all([client.ping({ value: 1 }), client.ping({ value: 2 })]),
+    ).resolves.toEqual([{ value: 1 }, { value: 2 }])
 
     expect(exchanges).toHaveLength(2)
     expect(exchanges[0]!.request.headers.get('cookie')).toBeNull()
@@ -238,8 +234,14 @@ describe('all plugins on one handler and one link', () => {
     const options = { context: {}, prefix: '/rpc' } as const
     const init = { headers: { 'accept-encoding': 'gzip' } }
 
-    const { response: getResponse } = await handler.handle(new Request(`http://localhost${path}`, init), options)
-    const { response } = await handler.handle(new Request(`http://localhost${path}`, { ...init, method: 'HEAD' }), options)
+    const { response: getResponse } = await handler.handle(
+      new Request(`http://localhost${path}`, init),
+      options,
+    )
+    const { response } = await handler.handle(
+      new Request(`http://localhost${path}`, { ...init, method: 'HEAD' }),
+      options,
+    )
 
     expect(getResponse?.status).toEqual(200)
     expect(response?.status).toEqual(200)

@@ -5,6 +5,13 @@
     "module": "preserve",
     "types": ["node"]
   },
-  "include": ["blume.config.ts", "components.ts", "experts", "pages", "sponsors", ".blume/.astro/types.d.ts"],
+  "include": [
+    "blume.config.ts",
+    "components.ts",
+    "experts",
+    "pages",
+    "sponsors",
+    ".blume/.astro/types.d.ts"
+  ],
   "exclude": []
 }

@@ -60,7 +60,7 @@ async function readMessages<T>(socket: OpenSocket, count: number): Promise<T[]> 
     expect(socket.messages).toHaveLength(count)
   })
 
-  return socket.messages.map(message => JSON.parse(message) as T)
+  return socket.messages.map((message) => JSON.parse(message) as T)
 }
 
 async function getAlarm(stub: DurableObjectStub): Promise<number | null> {
@@ -121,7 +121,7 @@ describe('durable publisher object', () => {
 
     // the closing socket is still listed alongside the healthy one when publishing
     await runInDurableObject(stub, async (_, state) => {
-      const readyStates = state.getWebSockets().map(websocket => websocket.readyState)
+      const readyStates = state.getWebSockets().map((websocket) => websocket.readyState)
       expect(readyStates.sort()).toEqual([WebSocket.OPEN, WebSocket.CLOSING])
     })
 
@@ -138,10 +138,14 @@ describe('durable publisher object', () => {
     const liveSubscriber = await openSocket(stub)
 
     expect((await publish(stub, { data: { text: 'first' } })).status).toBe(204)
-    expect((await publish(stub, {
-      data: { text: 'second' },
-      meta: { id: 'client-id', comments: ['keep me'] },
-    })).status).toBe(204)
+    expect(
+      (
+        await publish(stub, {
+          data: { text: 'second' },
+          meta: { id: 'client-id', comments: ['keep me'] },
+        })
+      ).status,
+    ).toBe(204)
     expect((await publish(stub, { data: { text: 'third' } })).status).toBe(204)
 
     const liveMessages = await readMessages<{ meta: { id: string } }>(liveSubscriber, 3)
@@ -218,7 +222,7 @@ describe('durable publisher object', () => {
 
     const messages = await readMessages<{ data: { order: number } }>(subscriber, 4)
 
-    expect(messages.map(message => message.data.order)).toEqual([1, 2, 3, 4])
+    expect(messages.map((message) => message.data.order)).toEqual([1, 2, 3, 4])
 
     await closeSocket(subscriber)
   })
@@ -351,7 +355,10 @@ describe('durable publisher object', () => {
 
     // an accepted websocket would linger in the durable object with nobody
     // on the other end, making it look active forever
-    const websockets = await runInDurableObject(stub, async (_, state) => state.getWebSockets().length)
+    const websockets = await runInDurableObject(
+      stub,
+      async (_, state) => state.getWebSockets().length,
+    )
     expect(websockets).toBe(0)
   })
 
@@ -386,16 +393,22 @@ describe('durable publisher object', () => {
   })
 
   it.each([
-    ['the id reaches the max value', (sql: SqlStorage) => {
-      sql.exec(
-        'INSERT INTO "prefix:events" (id, payload) VALUES (?, ?)',
-        '9223372036854775807',
-        JSON.stringify({ data: { text: 'before-overflow' } }),
-      )
-    }],
-    ['the table disappears under a running object', (sql: SqlStorage) => {
-      sql.exec('DROP TABLE "prefix:events"')
-    }],
+    [
+      'the id reaches the max value',
+      (sql: SqlStorage) => {
+        sql.exec(
+          'INSERT INTO "prefix:events" (id, payload) VALUES (?, ?)',
+          '9223372036854775807',
+          JSON.stringify({ data: { text: 'before-overflow' } }),
+        )
+      },
+    ],
+    [
+      'the table disappears under a running object',
+      (sql: SqlStorage) => {
+        sql.exec('DROP TABLE "prefix:events"')
+      },
+    ],
   ])('recreates the events table when %s', async (_name, breakTable) => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -406,10 +419,12 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
 
     const resumeSubscriber = await openSocket(stub, '0')
-    expect(await readMessages(resumeSubscriber, 1)).toEqual([{
-      data: { text: 'recovered' },
-      meta: { id: expect.any(String) },
-    }])
+    expect(await readMessages(resumeSubscriber, 1)).toEqual([
+      {
+        data: { text: 'recovered' },
+        meta: { id: expect.any(String) },
+      },
+    ])
     expect(resumeSubscriber.replayedEvents).toBe('1')
 
     await closeSocket(resumeSubscriber)
@@ -436,7 +451,11 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'after' } })).status).toBe(204)
 
     const resumeSubscriber = await openSocket(stub, '0')
-    expect((await readMessages<{ data: { text: string } }>(resumeSubscriber, 2)).map(message => message.data.text)).toEqual(['kept', 'after'])
+    expect(
+      (await readMessages<{ data: { text: string } }>(resumeSubscriber, 2)).map(
+        (message) => message.data.text,
+      ),
+    ).toEqual(['kept', 'after'])
 
     await closeSocket(resumeSubscriber)
   })
@@ -456,7 +475,11 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'rejected' } })).status).toBe(400)
 
     const resumeSubscriber = await openSocket(stub, '0')
-    expect((await readMessages<{ data: { text: string } }>(resumeSubscriber, 1)).map(message => message.data.text)).toEqual(['kept'])
+    expect(
+      (await readMessages<{ data: { text: string } }>(resumeSubscriber, 1)).map(
+        (message) => message.data.text,
+      ),
+    ).toEqual(['kept'])
 
     await closeSocket(resumeSubscriber)
   })
@@ -544,10 +567,16 @@ describe('durable publisher object', () => {
     }
 
     const resumeSubscriber = await openSocket(stub, seen[2]!.meta.id)
-    const resumed = await readMessages<{ data: { text: string }, meta: { id: string } }>(resumeSubscriber, 2)
+    const resumed = await readMessages<{ data: { text: string }; meta: { id: string } }>(
+      resumeSubscriber,
+      2,
+    )
 
     expect(resumeSubscriber.replayedEvents).toBe('2')
-    expect(resumed.map(message => message.data.text)).toEqual(['after cleanup 1', 'after cleanup 2'])
+    expect(resumed.map((message) => message.data.text)).toEqual([
+      'after cleanup 1',
+      'after cleanup 2',
+    ])
 
     await closeSocket(resumeSubscriber)
   })

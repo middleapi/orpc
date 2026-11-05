@@ -1,8 +1,14 @@
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
 import { ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
+
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerInterceptorOptions,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 /**
  * Adds Cross-Site Request Forgery (CSRF) protection that makes the safe `GET` method as
@@ -20,7 +26,9 @@ import { flattenStandardHeader } from '@standard-server/core'
  *
  * @see {@link https://orpc.dev/docs/plugins/get-method-csrf-protection | GET Method CSRF Protection Plugin}
  */
-export class GetMethodCsrfProtectionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+export class GetMethodCsrfProtectionHandlerPlugin<
+  T extends Context,
+> implements StandardHandlerPlugin<T> {
   name = '~get-method-csrf-protection'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {

@@ -14,32 +14,40 @@ describe('headMethodHandlerPlugin with OpenAPIHandler', () => {
   const router = {
     getTodo: os
       .input(z.object({ id: z.string() }))
-      .meta(openapi({
-        method: 'GET',
-        path: '/todos/{id}',
-        outputStructure: 'detailed',
-      }))
+      .meta(
+        openapi({
+          method: 'GET',
+          path: '/todos/{id}',
+          outputStructure: 'detailed',
+        }),
+      )
       .handler(getHandler),
     getUser: os
       .input(z.object({ id: z.string() }))
-      .meta(openapi({
-        method: 'GET',
-        path: '/users/{id}',
-      }))
+      .meta(
+        openapi({
+          method: 'GET',
+          path: '/users/{id}',
+        }),
+      )
       .handler(({ input }) => input),
     headUser: os
       .input(z.object({ id: z.string() }))
-      .meta(openapi({
-        method: 'HEAD',
-        path: '/users/{id}',
-        outputStructure: 'detailed',
-      }))
+      .meta(
+        openapi({
+          method: 'HEAD',
+          path: '/users/{id}',
+          outputStructure: 'detailed',
+        }),
+      )
       .handler(headHandler),
     createTodo: os
-      .meta(openapi({
-        method: 'POST',
-        path: '/todos',
-      }))
+      .meta(
+        openapi({
+          method: 'POST',
+          path: '/todos',
+        }),
+      )
       .handler(() => 'created'),
   }
 
@@ -52,8 +60,12 @@ describe('headMethodHandlerPlugin with OpenAPIHandler', () => {
   })
 
   it('answers HEAD with the headers of the GET route', async () => {
-    const { response: getResponse } = await handler.handle(new Request('https://example.com/todos/1'))
-    const { matched, response } = await handler.handle(new Request('https://example.com/todos/1', { method: 'HEAD' }))
+    const { response: getResponse } = await handler.handle(
+      new Request('https://example.com/todos/1'),
+    )
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/todos/1', { method: 'HEAD' }),
+    )
 
     expect(matched).toBe(true)
     expect(response!.status).toBe(200)
@@ -68,7 +80,9 @@ describe('headMethodHandlerPlugin with OpenAPIHandler', () => {
   })
 
   it('prefers the HEAD route of the same path', async () => {
-    const { matched, response } = await handler.handle(new Request('https://example.com/users/1', { method: 'HEAD' }))
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/users/1', { method: 'HEAD' }),
+    )
 
     expect(matched).toBe(true)
     expect(response!.headers.get('x-head')).toBe('1')
@@ -77,6 +91,8 @@ describe('headMethodHandlerPlugin with OpenAPIHandler', () => {
   })
 
   it('stays unmatched without a GET route', async () => {
-    await expect(handler.handle(new Request('https://example.com/todos', { method: 'HEAD' }))).resolves.toEqual({ matched: false })
+    await expect(
+      handler.handle(new Request('https://example.com/todos', { method: 'HEAD' })),
+    ).resolves.toEqual({ matched: false })
   })
 })

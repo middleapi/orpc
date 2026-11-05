@@ -70,11 +70,15 @@ describe('resolveBasePathMeta', () => {
   })
 
   it('returns an empty base path when meta.path matches the position exactly', () => {
-    expect(resolveBasePathMeta({ users: { list: createContract(['users', 'list']) } } as any)).toEqual([])
+    expect(
+      resolveBasePathMeta({ users: { list: createContract(['users', 'list']) } } as any),
+    ).toEqual([])
   })
 
   it('throws when meta.path does not match the procedure position', () => {
-    expect(() => resolveBasePathMeta({ users: { find: createContract(['members', 'find']) } } as any)).toThrow(
+    expect(() =>
+      resolveBasePathMeta({ users: { find: createContract(['members', 'find']) } } as any),
+    ).toThrow(
       'Procedure contract at "users.find" defines meta.path "members.find" that does not match its path inside the given router contract.',
     )
   })
@@ -82,9 +86,11 @@ describe('resolveBasePathMeta', () => {
   it('ignore invalid contract', () => {
     expect(resolveBasePathMeta({ find: 'invalid' } as any)).toBeUndefined()
 
-    expect(resolveBasePathMeta({
-      find: 'invalid',
-      create: createContract(['users', 'create']),
-    } as any)).toEqual(['users'])
+    expect(
+      resolveBasePathMeta({
+        find: 'invalid',
+        create: createContract(['users', 'create']),
+      } as any),
+    ).toEqual(['users'])
   })
 })

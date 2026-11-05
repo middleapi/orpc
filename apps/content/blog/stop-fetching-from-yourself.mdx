@@ -1,16 +1,16 @@
 ---
-title: "Stop Making HTTP Requests to Yourself During SSR"
-description: "Most fullstack apps fetch SSR data from their own API over HTTP. Call your API logic in-process instead, and share one client between server and browser."
+title: 'Stop Making HTTP Requests to Yourself During SSR'
+description: 'Most fullstack apps fetch SSR data from their own API over HTTP. Call your API logic in-process instead, and share one client between server and browser.'
 type: blog
 date: 2026-08-19
 search:
   tags:
     - Engineering
 authors:
-    name: Định Lê
-    role: Creator of oRPC
-    url: https://github.com/dinwwwh
-    avatar: https://github.com/dinwwwh.png
+  name: Định Lê
+  role: Creator of oRPC
+  url: https://github.com/dinwwwh
+  avatar: https://github.com/dinwwwh.png
 ai:
   exclude: true
 ---
@@ -34,7 +34,7 @@ The server needs data, so it opens a socket, serializes a request, sends it acro
 This works, but you pay for it on every render:
 
 - A full HTTP round trip: connection handling, header parsing, a second request lifecycle.
-- On serverless platforms, a self-fetch can invoke a *second* function instance: extra cold starts, double billing, and a deadlock risk when concurrency is capped.
+- On serverless platforms, a self-fetch can invoke a _second_ function instance: extra cold starts, double billing, and a deadlock risk when concurrency is capped.
 - Cookies and auth headers are not forwarded automatically. Everyone learns this the first time SSR renders the logged-out page for a logged-in user.
 - Relative URLs like `fetch('/api/planets')` fail on the server, so now you maintain a base-URL environment variable per deployment.
 
@@ -61,8 +61,7 @@ export async function handleApi(request: Request): Promise<Response> {
 Nothing in that signature requires a network. `fetch` itself is just a function from a request to a promise of a response, so you can implement it with a direct call:
 
 ```ts
-const internalFetch: typeof fetch = async (input, init) =>
-  handleApi(new Request(input, init))
+const internalFetch: typeof fetch = async (input, init) => handleApi(new Request(input, init))
 ```
 
 Any code written against `fetch` now runs your API in-process: no socket, no port, no second request lifecycle. The origin in the URL becomes a formality, since it never leaves the process, which also kills the base-URL problem. And because you construct the internal `Request` yourself, passing the incoming request's headers along is one argument, not a forwarding layer.
@@ -95,9 +94,10 @@ You want a single `client` import that every page uses, on the server and in the
 // ❌ looks fine, ships your database to the browser
 import { handleApi } from './api'
 
-export const client = typeof window === 'undefined'
-  ? createClient(internalFetch, 'http://internal')
-  : createClient(fetch, window.location.origin)
+export const client =
+  typeof window === 'undefined'
+    ? createClient(internalFetch, 'http://internal')
+    : createClient(fetch, window.location.origin)
 ```
 
 The branch runs at runtime, but bundling happens at build time. The `import { handleApi }` line pulls your entire API, and everything it imports, such as the database driver and secrets handling, into the client module graph. Best case, your framework fails the build. Worst case, server code quietly ships to every visitor.
@@ -119,8 +119,7 @@ declare global {
  * SSR uses the client registered on globalThis.
  * The browser falls back to a real fetch against the current origin.
  */
-export const client: Client = globalThis.$client
-  ?? createClient(fetch, window.location.origin)
+export const client: Client = globalThis.$client ?? createClient(fetch, window.location.origin)
 ```
 
 A separate server-only module creates the internal client and registers it:

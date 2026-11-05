@@ -33,7 +33,10 @@ export class CloudflareRateLimiter implements RateLimiter {
    * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
    */
   prefix(prefix: string): CloudflareRateLimiter {
-    return new CloudflareRateLimiter(this.ratelimit, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
+    return new CloudflareRateLimiter(this.ratelimit, {
+      ...this.options,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
   async limit(key: string, options: RateLimitOptions = {}): Promise<RateLimitResult> {

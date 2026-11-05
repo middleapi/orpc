@@ -1,9 +1,10 @@
 import type { Context, Router } from '@orpc/server'
 import type { AwsLambdaHandlerOptions } from '@orpc/server/aws-lambda'
-import type { StandardHandlerOptions } from '@orpc/server/standard'
-import type { OpenAPIHandlerCodecOptions } from '../standard/index.ts'
 import { AwsLambdaHandler } from '@orpc/server/aws-lambda'
+import type { StandardHandlerOptions } from '@orpc/server/standard'
 import { StandardHandler } from '@orpc/server/standard'
+
+import type { OpenAPIHandlerCodecOptions } from '../standard/index.ts'
 import { OpenAPIHandlerCodec } from '../standard/index.ts'
 
 export interface OpenAPIHandlerOptions<T extends Context>
@@ -18,10 +19,7 @@ export interface OpenAPIHandlerOptions<T extends Context>
  * @see {@link https://orpc.dev/docs/adapters/aws-lambda | AWS Lambda Adapter}
  */
 export class OpenAPIHandler<T extends Context> extends AwsLambdaHandler<T> {
-  constructor(
-    router: Router<T>,
-    options: NoInfer<OpenAPIHandlerOptions<T>> = {},
-  ) {
+  constructor(router: Router<T>, options: NoInfer<OpenAPIHandlerOptions<T>> = {}) {
     const codec = new OpenAPIHandlerCodec(router, options)
     const handler = new StandardHandler(codec, options)
     super(handler, options)

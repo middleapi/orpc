@@ -1,22 +1,26 @@
-import type { RateLimiter, RateLimitResult } from './types.ts'
 import { call, os, type } from '@orpc/server'
+
 import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin.ts'
 import { ratelimit, RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware.ts'
+import type { RateLimiter, RateLimitResult } from './types.ts'
 
 describe('ratelimit', () => {
   const createLimiter = (result: RateLimitResult): RateLimiter => ({
     limit: vi.fn().mockResolvedValue(result),
   })
-  const success: RateLimitResult = { success: true, limit: 10, remaining: 5, reset: Date.now() + 60000 }
+  const success: RateLimitResult = {
+    success: true,
+    limit: 10,
+    remaining: 5,
+    reset: Date.now() + 60000,
+  }
 
   it('applies rate limit successfully', async () => {
     const limiter = createLimiter(success)
     const mw = ratelimit({ limiter, key: 'key' })
     const procedure = os.use(mw).handler(() => 'ok')
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    ).resolves.toBe('ok')
+    await expect(call(procedure, undefined, { context: {} })).resolves.toBe('ok')
 
     expect(limiter.limit).toHaveBeenCalledWith('key', {})
   })
@@ -26,11 +30,10 @@ describe('ratelimit', () => {
     const limiter = createLimiter({ success: false, limit: 10, remaining: 0, reset })
     const procedure = os.use(ratelimit({ limiter, key: 'key' })).handler(() => 'ok')
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    )
-      .rejects
-      .toMatchObject({ code: 'TOO_MANY_REQUESTS', data: { limit: 10, remaining: 0, reset } })
+    await expect(call(procedure, undefined, { context: {} })).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      data: { limit: 10, remaining: 0, reset },
+    })
 
     expect(limiter.limit).toHaveBeenCalledWith('key', {})
   })
@@ -40,9 +43,7 @@ describe('ratelimit', () => {
     const mw = ratelimit({ limiter, key: 'key', weight: 3 })
     const procedure = os.use(mw).handler(() => 'ok')
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    ).resolves.toBe('ok')
+    await expect(call(procedure, undefined, { context: {} })).resolves.toBe('ok')
 
     expect(limiter.limit).toHaveBeenCalledWith('key', { weight: 3 })
   })
@@ -53,7 +54,10 @@ describe('ratelimit', () => {
     const keyFn = vi.fn().mockResolvedValueOnce('key')
     const weightFn = vi.fn().mockResolvedValueOnce(3)
     const mw = ratelimit({ limiter: limiterFn, key: keyFn, weight: weightFn })
-    const procedure = os.input(type<any>()).use(mw).handler(() => 'ok')
+    const procedure = os
+      .input(type<any>())
+      .use(mw)
+      .handler(() => 'ok')
 
     await expect(
       call(procedure, '__input__', { context: { __context__: true }, path: ['__path__'] }),
@@ -95,14 +99,10 @@ describe('ratelimit', () => {
     const limiter = createLimiter(success)
     const mw = ratelimit({ limiter, key: 'k', dedupe: false })
     const innerHandlerFn = vi.fn().mockReturnValue('in')
-    const inner = os
-      .use(mw)
-      .handler(innerHandlerFn)
-    const outer = os
-      .use(mw)
-      .handler(async ({ context }) => {
-        return `out:${await call(inner, undefined, { context })}:${await call(inner, undefined, { context })}`
-      })
+    const inner = os.use(mw).handler(innerHandlerFn)
+    const outer = os.use(mw).handler(async ({ context }) => {
+      return `out:${await call(inner, undefined, { context })}:${await call(inner, undefined, { context })}`
+    })
 
     await call(outer, undefined, { context: {} })
 
@@ -114,14 +114,26 @@ describe('ratelimit', () => {
 
     expect(context0).not.toBe(context1)
     expect(context0).toEqual(context1)
-    expect(context0).toEqual({ applied: [{ limiter, key: 'k' }, { limiter, key: 'k' }] })
+    expect(context0).toEqual({
+      applied: [
+        { limiter, key: 'k' },
+        { limiter, key: 'k' },
+      ],
+    })
   })
 
   describe('dedupe', () => {
     it('deduplicates by default', async () => {
       const limiter = createLimiter(success)
       const mw = ratelimit({ limiter, key: 'k' })
-      await call(os.use(mw).use(mw).handler(() => 'ok'), undefined, { context: {} })
+      await call(
+        os
+          .use(mw)
+          .use(mw)
+          .handler(() => 'ok'),
+        undefined,
+        { context: {} },
+      )
       expect(limiter.limit).toHaveBeenCalledTimes(1)
     })
 
@@ -129,7 +141,10 @@ describe('ratelimit', () => {
       const limiter = createLimiter(success)
       const mw = ratelimit({ limiter, key: 'k', dedupe: false })
       await call(
-        os.use(mw).use(mw).handler(() => 'ok'),
+        os
+          .use(mw)
+          .use(mw)
+          .handler(() => 'ok'),
         undefined,
         { context: {} },
       )
@@ -153,9 +168,7 @@ describe('ratelimit', () => {
     it('dedupes in nested calls', async () => {
       const limiter = createLimiter(success)
       const mw = ratelimit({ limiter, key: 'k' })
-      const inner = os
-        .use(mw)
-        .handler(() => 'in')
+      const inner = os.use(mw).handler(() => 'in')
       const outer = os
         .use(mw)
         .handler(async ({ context }) => `out:${await call(inner, undefined, { context })}`)
@@ -167,8 +180,10 @@ describe('ratelimit', () => {
     it('respects per-instance dedupe', async () => {
       const limiter = createLimiter(success)
       await call(
-        os.use(ratelimit({ limiter, key: 'k', dedupe: true }))
-          .use(ratelimit({ limiter, key: 'k', dedupe: false })).handler(() => 'ok'),
+        os
+          .use(ratelimit({ limiter, key: 'k', dedupe: true }))
+          .use(ratelimit({ limiter, key: 'k', dedupe: false }))
+          .handler(() => 'ok'),
         undefined,
         { context: {} },
       )

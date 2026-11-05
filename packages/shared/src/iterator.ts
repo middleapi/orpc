@@ -1,10 +1,11 @@
-import type { Promisable } from 'type-fest'
-import type { StartSpanOptions } from './tracing.ts'
-import type { PromiseWithError, ThrowableError } from './types.ts'
 import { AsyncIteratorClass } from '@standard-server/shared'
+import type { Promisable } from 'type-fest'
+
 import { once } from './function.ts'
 import { AsyncIdQueue } from './queue.ts'
+import type { StartSpanOptions } from './tracing.ts'
 import { recordSpanError, runInSpanContext, startSpan } from './tracing.ts'
+import type { PromiseWithError, ThrowableError } from './types.ts'
 
 export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn> {
   /**
@@ -13,7 +14,11 @@ export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMapped
    * such as AsyncLocalStorage.
    */
   runWith?: (<T>(run: () => Promise<T>) => Promisable<T>) | undefined
-  mapResult?: ((result: IteratorResult<TYield, TReturn>) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>) | undefined
+  mapResult?:
+    | ((
+        result: IteratorResult<TYield, TReturn>,
+      ) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>)
+    | undefined
   mapError?: ((error: ThrowableError) => Promisable<ThrowableError>) | undefined
   onError?: ((error: ThrowableError) => Promisable<void>) | undefined
 
@@ -25,48 +30,53 @@ export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMapped
 
 export function wrapAsyncIterator<TYield, TReturn, TMappedYield = TYield, TMappedReturn = TReturn>(
   iterator: AsyncIterator<TYield, TReturn>,
-  { runWith, mapResult, mapError, onError, onFinish }: WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn>,
+  {
+    runWith,
+    mapResult,
+    mapError,
+    onError,
+    onFinish,
+  }: WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn>,
 ): NoInfer<AsyncIteratorClass<TMappedYield, TMappedReturn>> {
-  runWith ??= run => run()
+  runWith ??= (run) => run()
 
   let isDone: boolean | undefined
 
-  return new AsyncIteratorClass<TMappedYield, TMappedReturn>(async () => {
-    try {
-      let result
+  return new AsyncIteratorClass<TMappedYield, TMappedReturn>(
+    async () => {
       try {
-        result = await runWith(() => iterator.next())
-        isDone = result.done
-      }
-      catch (error) {
-        isDone = true
-        throw error
-      }
-
-      return mapResult ? await mapResult(result) : result as any
-    }
-    catch (error) {
-      await onError?.(error as ThrowableError)
-      throw mapError ? await mapError(error as ThrowableError) : error
-    }
-  }, async (_state) => {
-    try {
-      // Only cancel the original iterator if it has not finished yet.
-      // Do not rely on _state because the user's options may throw errors.
-      if (!isDone) {
+        let result
         try {
-          await runWith(async () => iterator.return?.())
-        }
-        catch (error) {
-          await onError?.(error as ThrowableError)
+          result = await runWith(() => iterator.next())
+          isDone = result.done
+        } catch (error) {
+          isDone = true
           throw error
         }
+
+        return mapResult ? await mapResult(result) : (result as any)
+      } catch (error) {
+        await onError?.(error as ThrowableError)
+        throw mapError ? await mapError(error as ThrowableError) : error
       }
-    }
-    finally {
-      await onFinish?.()
-    }
-  })
+    },
+    async (_state) => {
+      try {
+        // Only cancel the original iterator if it has not finished yet.
+        // Do not rely on _state because the user's options may throw errors.
+        if (!isDone) {
+          try {
+            await runWith(async () => iterator.return?.())
+          } catch (error) {
+            await onError?.(error as ThrowableError)
+            throw error
+          }
+        }
+      } finally {
+        await onFinish?.()
+      }
+    },
+  )
 }
 
 export function traceAsyncIterator<T, TReturn, TNext>(
@@ -76,7 +86,7 @@ export function traceAsyncIterator<T, TReturn, TNext>(
   const getSpan = once(() => startSpan(options))
 
   return wrapAsyncIterator(iterator, {
-    runWith: run => runInSpanContext(getSpan(), run),
+    runWith: (run) => runInSpanContext(getSpan(), run),
     mapResult(result) {
       getSpan()?.addEvent(result.done ? 'completed' : 'yielded')
       return result
@@ -93,9 +103,9 @@ export function traceAsyncIterator<T, TReturn, TNext>(
 export function replicateAsyncIterator<T, TReturn, TNext>(
   source: AsyncIterator<T, TReturn, TNext>,
   count: number,
-): (AsyncIteratorClass<T, TReturn, TNext>)[] {
+): AsyncIteratorClass<T, TReturn, TNext>[] {
   const queue = new AsyncIdQueue<
-    { next: IteratorResult<T, TReturn> } | { next?: never, error: unknown }
+    { next: IteratorResult<T, TReturn> } | { next?: never; error: unknown }
   >()
 
   const ids = Array.from({ length: count }, (_, i) => i.toString())
@@ -116,15 +126,13 @@ export function replicateAsyncIterator<T, TReturn, TNext>(
           break
         }
       }
-    }
-    catch (error) {
+    } catch (error) {
       ids.forEach((id) => {
         if (queue.isOpen(id)) {
           queue.push(id, { error })
         }
       })
-    }
-    finally {
+    } finally {
       isSourceFinished = true
     }
   })
@@ -180,7 +188,13 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
    * @remarks
    * **Note**: If iterator is canceled, `undefined` can be passed on success
    */
-  onFinish?: ((state: [error: TError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]) => void) | undefined
+  onFinish?:
+    | ((
+        state:
+          | [error: TError, data: undefined, isSuccess: false]
+          | [error: null, data: TReturn | undefined, isSuccess: true],
+      ) => void)
+    | undefined
 }
 
 /**
@@ -203,7 +217,9 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
   // but this utility is shared, so it needs to support the general case.
 
   void (async () => {
-    let onFinishState: [error: TError | ThrowableError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]
+    let onFinishState:
+      | [error: TError | ThrowableError, data: undefined, isSuccess: false]
+      | [error: null, data: TReturn | undefined, isSuccess: true]
 
     try {
       const resolvedIterator = await iterator
@@ -221,19 +237,16 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
 
         try {
           options.onEvent(value)
-        }
-        catch (error) {
+        } catch (error) {
           // Close the source before reporting the onEvent error
           await resolvedIterator.return?.()
           throw error
         }
       }
-    }
-    catch (error) {
+    } catch (error) {
       onFinishState = [error as ThrowableError, undefined, false]
       options.onError?.(error as ThrowableError)
-    }
-    finally {
+    } finally {
       options.onFinish?.(onFinishState!)
     }
   })()

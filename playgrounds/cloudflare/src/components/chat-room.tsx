@@ -1,16 +1,19 @@
-import { orpc } from '../lib/orpc'
+import { parseFormData } from '@orpc/openapi/helpers'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { match } from 'ts-pattern'
-import { parseFormData } from '@orpc/openapi/helpers'
+
+import { orpc } from '../lib/orpc'
 
 const CHANNEL = 'default'
 
 export function ChatRoom() {
-  const query = useQuery(orpc.message.subscribe.streamedOptions({
-    input: { channel: CHANNEL },
-    context: { retry: Infinity },
-    queryFnOptions: { maxChunks: 10 },
-  }))
+  const query = useQuery(
+    orpc.message.subscribe.streamedOptions({
+      input: { channel: CHANNEL },
+      context: { retry: Infinity },
+      queryFnOptions: { maxChunks: 10 },
+    }),
+  )
 
   const mutation = useMutation(orpc.message.publish.mutationOptions())
 
@@ -46,28 +49,28 @@ export function ChatRoom() {
       <div className="channel-log">
         {match(query)
           .with({ status: 'pending' }, () => <p className="channel-empty">joining...</p>)
-          .with({ status: 'error' }, q => <p className="module-error">{String(q.error)}</p>)
-          .with({ status: 'success' }, q => q.data.length === 0
-            ? (
-                <p className="channel-empty">
-                  waiting for new messages..., please open in multiple tabs for chatting together
-                </p>
-              )
-            : (
-                <ul className="msg-list">
-                  {q.data.map(({ message }, i) => (
-                    <li key={i} className="msg">
-                      <span className="msg-text">{message}</span>
-                    </li>
-                  ))}
-                </ul>
-              ))
+          .with({ status: 'error' }, (q) => <p className="module-error">{String(q.error)}</p>)
+          .with({ status: 'success' }, (q) =>
+            q.data.length === 0 ? (
+              <p className="channel-empty">
+                waiting for new messages..., please open in multiple tabs for chatting together
+              </p>
+            ) : (
+              <ul className="msg-list">
+                {q.data.map(({ message }, i) => (
+                  <li key={i} className="msg">
+                    <span className="msg-text">{message}</span>
+                  </li>
+                ))}
+              </ul>
+            ),
+          )
           .exhaustive()}
       </div>
 
       <form
         className="channel-form"
-        action={form => mutation.mutate({ ...parseFormData(form), channel: CHANNEL })}
+        action={(form) => mutation.mutate({ ...parseFormData(form), channel: CHANNEL })}
       >
         <div className="prompt-wrap">
           <span className="prompt-char">›</span>

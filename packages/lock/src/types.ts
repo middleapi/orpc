@@ -44,5 +44,9 @@ export interface Locker {
    *
    * @throws {LockTimeoutError} when the lock cannot be acquired before the timeout elapses
    */
-  lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options?: LockOptions): Promise<T>
+  lock<T>(
+    key: string,
+    fn: (options: LockCallbackOptions) => Promisable<T>,
+    options?: LockOptions,
+  ): Promise<T>
 }

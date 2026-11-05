@@ -1,13 +1,34 @@
 import type { Client, ORPCError } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { PromiseWithError } from '@orpc/shared'
-import type { DataTag, GetNextPageParamFunction, InfiniteData, InfiniteQueryObserverOptions, MutationFunctionContext, MutationObserverOptions, QueryFunction, QueryFunctionContext, QueryKey, QueryObserverOptions, SkipToken } from '@tanstack/query-core'
-import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
-import type { InfiniteOptionsIn, MutationKeyOptions, MutationOptionsIn, QueryKeyOptions, QueryOptionsIn, StreamedKeyOptions, StreamedOptionsIn } from './types.ts'
+import type {
+  DataTag,
+  GetNextPageParamFunction,
+  InfiniteData,
+  InfiniteQueryObserverOptions,
+  MutationFunctionContext,
+  MutationObserverOptions,
+  QueryFunction,
+  QueryFunctionContext,
+  QueryKey,
+  QueryObserverOptions,
+  SkipToken,
+} from '@tanstack/query-core'
 import { QueryClient, skipToken } from '@tanstack/query-core'
 import z from 'zod'
 
-export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
+import type {
+  InfiniteOptionsIn,
+  MutationKeyOptions,
+  MutationOptionsIn,
+  QueryKeyOptions,
+  QueryOptionsIn,
+  StreamedKeyOptions,
+  StreamedOptionsIn,
+} from './types.ts'
+
+export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 const baseErrorMap = {
   BASE: {
@@ -17,7 +38,7 @@ const baseErrorMap = {
 }
 
 describe('ProcedureUtils', () => {
-  type UtilsInput = { search?: string, cursor?: number } | undefined
+  type UtilsInput = { search?: string; cursor?: number } | undefined
   type UtilsOutput = { title: string }[]
   type UtilsError = ORPCErrorFromErrorMap<typeof baseErrorMap>
 
@@ -32,12 +53,7 @@ describe('ProcedureUtils', () => {
     UtilsError
   >
 
-  const requiredUtils = {} as ProcedureUtils<
-    { batch: boolean },
-    'input',
-    UtilsOutput,
-    Error
-  >
+  const requiredUtils = {} as ProcedureUtils<{ batch: boolean }, 'input', UtilsOutput, Error>
 
   const streamUtils = {} as ProcedureUtils<
     { batch?: boolean },
@@ -55,7 +71,7 @@ describe('ProcedureUtils', () => {
   describe('.queryKey', () => {
     it('should handle optional `input` correctly', () => {
       optionalUtils.queryKey()
-      optionalUtils.queryKey({ })
+      optionalUtils.queryKey({})
       optionalUtils.queryKey({ input: { search: 'search' } })
     })
 
@@ -139,7 +155,10 @@ describe('ProcedureUtils', () => {
       // @ts-expect-error - invalid input type
       optionalUtils.queryOptions({ input: condition ? skipToken : { cursor: 'invalid' } })
 
-      requiredUtils.queryOptions({ input: condition ? skipToken : 'input', context: { batch: true } })
+      requiredUtils.queryOptions({
+        input: condition ? skipToken : 'input',
+        context: { batch: true },
+      })
       // @ts-expect-error - invalid input type
       requiredUtils.queryOptions({ input: condition ? skipToken : 123, context: { batch: true } })
     })
@@ -153,52 +172,74 @@ describe('ProcedureUtils', () => {
       // @ts-expect-error - invalid initialData
       optionalUtils.queryOptions({ initialData: () => 'invalid' })
 
-      requiredUtils.queryOptions({ input: 'input', context: { batch: true }, initialData: [{ title: '' }] })
-      // @ts-expect-error - invalid initialData
-      requiredUtils.queryOptions({ input: 'input', context: { batch: true }, initialData: 'invalid' })
+      requiredUtils.queryOptions({
+        input: 'input',
+        context: { batch: true },
+        initialData: [{ title: '' }],
+      })
+      requiredUtils.queryOptions({
+        input: 'input',
+        context: { batch: true },
+        // @ts-expect-error - invalid initialData
+        initialData: 'invalid',
+      })
     })
 
     it('return valid query options', () => {
-      expectTypeOf(optionalUtils.queryOptions()).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        UtilsOutput,
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, UtilsError>
-      >>()
-      expectTypeOf(optionalUtils.queryOptions({ context: { batch: true } })).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        UtilsOutput,
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, UtilsError>
-      >>()
-      expectTypeOf(optionalUtils.queryOptions({ initialData: [] })).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        UtilsOutput,
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, UtilsError>
-      >>()
-      expectTypeOf(requiredUtils.queryOptions({ input: 'input', context: { batch: true } })).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        Error,
-        UtilsOutput,
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, Error>
-      >>()
+      expectTypeOf(optionalUtils.queryOptions()).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          UtilsOutput,
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
+      expectTypeOf(optionalUtils.queryOptions({ context: { batch: true } })).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          UtilsOutput,
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
+      expectTypeOf(optionalUtils.queryOptions({ initialData: [] })).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          UtilsOutput,
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
+      expectTypeOf(
+        requiredUtils.queryOptions({ input: 'input', context: { batch: true } }),
+      ).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          Error,
+          UtilsOutput,
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, Error>
+        >
+      >()
     })
 
     it('can change query data by define select', () => {
-      expectTypeOf(optionalUtils.queryOptions({
-        select: mapped => ({ mapped }),
-      })).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        { mapped: UtilsOutput },
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, UtilsError>
-      >>()
+      expectTypeOf(
+        optionalUtils.queryOptions({
+          select: (mapped) => ({ mapped }),
+        }),
+      ).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          { mapped: UtilsOutput },
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
     })
 
     it('.getQueryState is typed correctly', () => {
@@ -248,13 +289,15 @@ describe('ProcedureUtils', () => {
 
     it('return valid query key', () => {
       expectTypeOf(optionalUtils.streamedKey()).toExtend<QueryKey>()
-      expectTypeOf(optionalUtils.streamedKey({
-        input: { search: 'search' },
-        queryFnOptions: {
-          maxChunks: 1,
-          refetchMode: 'replace',
-        },
-      })).toExtend<QueryKey>()
+      expectTypeOf(
+        optionalUtils.streamedKey({
+          input: { search: 'search' },
+          queryFnOptions: {
+            maxChunks: 1,
+            refetchMode: 'replace',
+          },
+        }),
+      ).toExtend<QueryKey>()
     })
 
     it('.getQueryState is typed correctly', () => {
@@ -301,9 +344,15 @@ describe('ProcedureUtils', () => {
       // @ts-expect-error - invalid input type
       streamUtils.streamedOptions({ input: condition ? skipToken : { cursor: 'invalid' } })
 
-      requiredUtils.streamedOptions({ input: condition ? skipToken : 'input', context: { batch: true } })
-      // @ts-expect-error - invalid input type
-      requiredUtils.streamedOptions({ input: condition ? skipToken : 123, context: { batch: true } })
+      requiredUtils.streamedOptions({
+        input: condition ? skipToken : 'input',
+        context: { batch: true },
+      })
+      requiredUtils.streamedOptions({
+        // @ts-expect-error - invalid input type
+        input: condition ? skipToken : 123,
+        context: { batch: true },
+      })
     })
 
     it('should infer types for initialData correctly', () => {
@@ -321,31 +370,46 @@ describe('ProcedureUtils', () => {
     })
 
     it('return valid streamed options', () => {
-      expectTypeOf(streamUtils.streamedOptions()).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        UtilsOutput,
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, UtilsError>
-      >>()
-      expectTypeOf(streamUtils.streamedOptions({ initialData: [] })).toExtend<QueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        UtilsOutput,
-        UtilsOutput,
-        DataTag<QueryKey, UtilsOutput, UtilsError>
-      >>()
+      expectTypeOf(streamUtils.streamedOptions()).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          UtilsOutput,
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
+      expectTypeOf(streamUtils.streamedOptions({ initialData: [] })).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          UtilsOutput,
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
     })
 
     it('return invalid streamed options if output is not an async iterable', () => {
-      expectTypeOf(optionalUtils.streamedOptions().queryFn)
-        .toEqualTypeOf<QueryFunction<never, DataTag<QueryKey, never, UtilsError>>>()
+      expectTypeOf(optionalUtils.streamedOptions().queryFn).toEqualTypeOf<
+        QueryFunction<never, DataTag<QueryKey, never, UtilsError>>
+      >()
     })
 
     it('can change streamed data by define select', () => {
-      expectTypeOf(streamUtils.streamedOptions({
-        select: mapped => ({ mapped }),
-      })).toExtend<QueryObserverOptions<UtilsOutput, UtilsError, { mapped: UtilsOutput }, UtilsOutput, DataTag<QueryKey, UtilsOutput, UtilsError>>>()
+      expectTypeOf(
+        streamUtils.streamedOptions({
+          select: (mapped) => ({ mapped }),
+        }),
+      ).toExtend<
+        QueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          { mapped: UtilsOutput },
+          UtilsOutput,
+          DataTag<QueryKey, UtilsOutput, UtilsError>
+        >
+      >()
     })
 
     it('.getQueryState is typed correctly', () => {
@@ -395,9 +459,11 @@ describe('ProcedureUtils', () => {
 
     it('return valid query key', () => {
       expectTypeOf(optionalUtils.liveKey()).toExtend<QueryKey>()
-      expectTypeOf(optionalUtils.liveKey({
-        input: { search: 'search' },
-      })).toExtend<QueryKey>()
+      expectTypeOf(
+        optionalUtils.liveKey({
+          input: { search: 'search' },
+        }),
+      ).toExtend<QueryKey>()
     })
 
     it('.getQueryState is typed correctly', () => {
@@ -444,7 +510,10 @@ describe('ProcedureUtils', () => {
       // @ts-expect-error - invalid input type
       streamUtils.liveOptions({ input: condition ? skipToken : { cursor: 'invalid' } })
 
-      requiredUtils.liveOptions({ input: condition ? skipToken : 'input', context: { batch: true } })
+      requiredUtils.liveOptions({
+        input: condition ? skipToken : 'input',
+        context: { batch: true },
+      })
       // @ts-expect-error - invalid input type
       requiredUtils.liveOptions({ input: condition ? skipToken : 123, context: { batch: true } })
     })
@@ -460,25 +529,46 @@ describe('ProcedureUtils', () => {
     })
 
     it('return valid streamed options', () => {
-      expectTypeOf(streamUtils.liveOptions()).toExtend<QueryObserverOptions<UtilsOutput[number], UtilsError, UtilsOutput[number], UtilsOutput[number], DataTag<QueryKey, UtilsOutput[number], UtilsError>>>()
-      expectTypeOf(streamUtils.liveOptions({ initialData: { title: '123' } })).toExtend<QueryObserverOptions<UtilsOutput[number], UtilsError, UtilsOutput[number], UtilsOutput[number], DataTag<QueryKey, UtilsOutput[number], UtilsError>>>()
+      expectTypeOf(streamUtils.liveOptions()).toExtend<
+        QueryObserverOptions<
+          UtilsOutput[number],
+          UtilsError,
+          UtilsOutput[number],
+          UtilsOutput[number],
+          DataTag<QueryKey, UtilsOutput[number], UtilsError>
+        >
+      >()
+      expectTypeOf(streamUtils.liveOptions({ initialData: { title: '123' } })).toExtend<
+        QueryObserverOptions<
+          UtilsOutput[number],
+          UtilsError,
+          UtilsOutput[number],
+          UtilsOutput[number],
+          DataTag<QueryKey, UtilsOutput[number], UtilsError>
+        >
+      >()
     })
 
     it('return invalid streamed live if output is not an async iterable', () => {
-      expectTypeOf(optionalUtils.liveOptions().queryFn)
-        .toEqualTypeOf<QueryFunction<never, DataTag<QueryKey, never, UtilsError>>>()
+      expectTypeOf(optionalUtils.liveOptions().queryFn).toEqualTypeOf<
+        QueryFunction<never, DataTag<QueryKey, never, UtilsError>>
+      >()
     })
 
     it('can change live data by define select', () => {
-      expectTypeOf(streamUtils.liveOptions({
-        select: mapped => ({ mapped }),
-      })).toExtend<QueryObserverOptions<
-        UtilsOutput[number],
-        UtilsError,
-        { mapped: UtilsOutput[number] },
-        UtilsOutput[number],
-        DataTag<QueryKey, UtilsOutput[number], UtilsError>
-      >>()
+      expectTypeOf(
+        streamUtils.liveOptions({
+          select: (mapped) => ({ mapped }),
+        }),
+      ).toExtend<
+        QueryObserverOptions<
+          UtilsOutput[number],
+          UtilsError,
+          { mapped: UtilsOutput[number] },
+          UtilsOutput[number],
+          DataTag<QueryKey, UtilsOutput[number], UtilsError>
+        >
+      >()
     })
 
     it('.getQueryState is typed correctly', () => {
@@ -570,17 +660,21 @@ describe('ProcedureUtils', () => {
     })
 
     it('return valid query key', () => {
-      expectTypeOf(optionalUtils.infiniteKey({
-        input: () => ({}),
-        initialPageParam,
-      })).toExtend<QueryKey>()
+      expectTypeOf(
+        optionalUtils.infiniteKey({
+          input: () => ({}),
+          initialPageParam,
+        }),
+      ).toExtend<QueryKey>()
     })
 
     it('.getQueryState is typed correctly', () => {
-      const state = queryClient.getQueryState(optionalUtils.infiniteKey({
-        input: () => ({}),
-        initialPageParam,
-      }))
+      const state = queryClient.getQueryState(
+        optionalUtils.infiniteKey({
+          input: () => ({}),
+          initialPageParam,
+        }),
+      )
 
       expectTypeOf(state?.data).toEqualTypeOf<InfiniteData<UtilsOutput, number> | undefined>()
       expectTypeOf(state?.error).toEqualTypeOf<UtilsError | null | undefined>()
@@ -740,53 +834,67 @@ describe('ProcedureUtils', () => {
     })
 
     it('return valid infinite options', () => {
-      expectTypeOf(optionalUtils.infiniteOptions({
-        input: () => ({}),
-        getNextPageParam,
-        initialPageParam,
-      })).toExtend<InfiniteQueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        InfiniteData<UtilsOutput, number>,
-        DataTag<QueryKey, InfiniteData<UtilsOutput, number>, UtilsError>,
-        number
-      >>()
+      expectTypeOf(
+        optionalUtils.infiniteOptions({
+          input: () => ({}),
+          getNextPageParam,
+          initialPageParam,
+        }),
+      ).toExtend<
+        InfiniteQueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          InfiniteData<UtilsOutput, number>,
+          DataTag<QueryKey, InfiniteData<UtilsOutput, number>, UtilsError>,
+          number
+        >
+      >()
 
-      expectTypeOf(optionalUtils.infiniteOptions({
-        input: () => ({}),
-        getNextPageParam,
-        initialPageParam,
-        initialData: { pageParams: [], pages: [] },
-      })).toExtend<InfiniteQueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        InfiniteData<UtilsOutput, number>,
-        DataTag<QueryKey, InfiniteData<UtilsOutput, number>, UtilsError>,
-        number
-      >>()
+      expectTypeOf(
+        optionalUtils.infiniteOptions({
+          input: () => ({}),
+          getNextPageParam,
+          initialPageParam,
+          initialData: { pageParams: [], pages: [] },
+        }),
+      ).toExtend<
+        InfiniteQueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          InfiniteData<UtilsOutput, number>,
+          DataTag<QueryKey, InfiniteData<UtilsOutput, number>, UtilsError>,
+          number
+        >
+      >()
     })
 
     it('can change infinite data by define select', () => {
-      expectTypeOf(optionalUtils.infiniteOptions({
-        input: () => ({}),
-        getNextPageParam,
-        initialPageParam,
-        select: mapped => ({ mapped }),
-      })).toExtend<InfiniteQueryObserverOptions<
-        UtilsOutput,
-        UtilsError,
-        { mapped: InfiniteData<UtilsOutput, number> },
-        DataTag<QueryKey, InfiniteData<UtilsOutput, number>, UtilsError>,
-        number
-      >>()
+      expectTypeOf(
+        optionalUtils.infiniteOptions({
+          input: () => ({}),
+          getNextPageParam,
+          initialPageParam,
+          select: (mapped) => ({ mapped }),
+        }),
+      ).toExtend<
+        InfiniteQueryObserverOptions<
+          UtilsOutput,
+          UtilsError,
+          { mapped: InfiniteData<UtilsOutput, number> },
+          DataTag<QueryKey, InfiniteData<UtilsOutput, number>, UtilsError>,
+          number
+        >
+      >()
     })
 
     it('.getQueryState is typed correctly', () => {
-      const state = queryClient.getQueryState(optionalUtils.infiniteOptions({
-        input: () => ({}),
-        getNextPageParam,
-        initialPageParam,
-      }).queryKey)
+      const state = queryClient.getQueryState(
+        optionalUtils.infiniteOptions({
+          input: () => ({}),
+          getNextPageParam,
+          initialPageParam,
+        }).queryKey,
+      )
 
       expectTypeOf(state?.data).toEqualTypeOf<InfiniteData<UtilsOutput, number> | undefined>()
       expectTypeOf(state?.error).toEqualTypeOf<UtilsError | null | undefined>()
@@ -835,7 +943,7 @@ describe('ProcedureUtils', () => {
 
     it('should infer mutation context type in lifecycle hooks', () => {
       optionalUtils.mutationOptions({
-        onMutate: variables => ({ customContext: true }),
+        onMutate: (variables) => ({ customContext: true }),
         onSuccess: (data, variables, context) => {
           expectTypeOf(context.customContext).toEqualTypeOf<boolean>()
         },
@@ -846,10 +954,16 @@ describe('ProcedureUtils', () => {
     })
 
     it('return valid mutation options', () => {
-      expectTypeOf(optionalUtils.mutationOptions()).toExtend<MutationObserverOptions<UtilsOutput, UtilsError, UtilsInput>>()
-      expectTypeOf(optionalUtils.mutationOptions({
-        onMutate: variables => ({ customContext: true }),
-      })).toExtend<MutationObserverOptions<UtilsOutput, UtilsError, UtilsInput, { customContext: boolean }>>()
+      expectTypeOf(optionalUtils.mutationOptions()).toExtend<
+        MutationObserverOptions<UtilsOutput, UtilsError, UtilsInput>
+      >()
+      expectTypeOf(
+        optionalUtils.mutationOptions({
+          onMutate: (variables) => ({ customContext: true }),
+        }),
+      ).toExtend<
+        MutationObserverOptions<UtilsOutput, UtilsError, UtilsInput, { customContext: boolean }>
+      >()
     })
   })
 })
@@ -863,7 +977,12 @@ describe('ProcedureUtilsOptions', () => {
   type TestOptions = ProcedureUtilsOptions<TestClientContext, TestInput, TestOutput, TestError>
 
   type TestStreamedOutput = AsyncIteratorObject<TestOutput>
-  type TestStreamedOptions = ProcedureUtilsOptions<TestClientContext, TestInput, TestStreamedOutput, TestError>
+  type TestStreamedOptions = ProcedureUtilsOptions<
+    TestClientContext,
+    TestInput,
+    TestStreamedOutput,
+    TestError
+  >
 
   it('should have all keys that ProcedureUtils provides', () => {
     // Ensures every utility method in ProcedureUtils (except 'call') has a corresponding key in CreateProcedureUtilsOptions
@@ -940,7 +1059,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       queryOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<QueryOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown, unknown>>()
+        expectTypeOf(options).toEqualTypeOf<
+          QueryOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown, unknown>
+        >()
 
         return {
           ...options,
@@ -953,7 +1074,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      queryOptions: options => ({
+      queryOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -1025,7 +1146,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       streamedOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<StreamedOptionsIn<TestClientContext, TestInput, never, TestError, unknown, unknown>>()
+        expectTypeOf(options).toEqualTypeOf<
+          StreamedOptionsIn<TestClientContext, TestInput, never, TestError, unknown, unknown>
+        >()
 
         return {
           ...options,
@@ -1037,7 +1160,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      streamedOptions: options => ({
+      streamedOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -1070,7 +1193,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      liveKey: options => ({
+      liveKey: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -1108,7 +1231,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       liveOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<QueryOptionsIn<TestClientContext, TestInput, never, TestError, unknown, unknown>>()
+        expectTypeOf(options).toEqualTypeOf<
+          QueryOptionsIn<TestClientContext, TestInput, never, TestError, unknown, unknown>
+        >()
 
         return {
           ...options,
@@ -1120,7 +1245,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      liveOptions: options => ({
+      liveOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -1174,7 +1299,17 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       infiniteOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<InfiniteOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown, unknown, unknown>>()
+        expectTypeOf(options).toEqualTypeOf<
+          InfiniteOptionsIn<
+            TestClientContext,
+            TestInput,
+            TestOutput,
+            TestError,
+            unknown,
+            unknown,
+            unknown
+          >
+        >()
 
         return {
           ...options,
@@ -1185,7 +1320,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      infiniteOptions: options => ({
+      infiniteOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -1218,7 +1353,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid mutationKey type
-      mutationKey: options => ({
+      mutationKey: (options) => ({
         mutationKey: 1,
       }),
     }
@@ -1257,7 +1392,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       mutationOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<MutationOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown>>()
+        expectTypeOf(options).toEqualTypeOf<
+          MutationOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown>
+        >()
 
         return {
           ...options,
@@ -1271,7 +1408,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid context type
-      mutationOptions: options => ({
+      mutationOptions: (options) => ({
         ...options,
         context: { batch: 'invalid' },
       }),

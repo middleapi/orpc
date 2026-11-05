@@ -34,11 +34,9 @@ describe('compareSequentialIds', () => {
 
     if (bigInt1 > bigInt2) {
       expect(result).toBeGreaterThan(0)
-    }
-    else if (bigInt1 < bigInt2) {
+    } else if (bigInt1 < bigInt2) {
       expect(result).toBeLessThan(0)
-    }
-    else {
+    } else {
       expect(result).toBe(0)
     }
   })

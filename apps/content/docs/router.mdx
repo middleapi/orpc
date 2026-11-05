@@ -1,6 +1,6 @@
 ---
-title: "Router"
-description: "Organize oRPC procedures into nestable routers, extend them with shared middleware, lazy-load routes, and infer their types."
+title: 'Router'
+description: 'Organize oRPC procedures into nestable routers, extend them with shared middleware, lazy-load routes, and infer their types.'
 ---
 
 :::info
@@ -20,7 +20,7 @@ const pong = os.handler(async () => 'pong')
 export const router = {
   ping,
   pong,
-  nested: { ping, pong }
+  nested: { ping, pong },
 }
 ```
 
@@ -39,7 +39,7 @@ const router = os.use(requiredAuth).meta(requireAuthMeta).router({
   nested: {
     ping,
     pong,
-  }
+  },
 })
 ```
 
@@ -67,7 +67,7 @@ Routers can also be lazy-loaded. This is useful for code splitting and can impro
 const router = {
   ping,
   pong,
-  planet: os.lazy(() => import('./planet'))
+  planet: os.lazy(() => import('./planet')),
 }
 ```
 

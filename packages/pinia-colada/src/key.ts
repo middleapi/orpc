@@ -1,9 +1,10 @@
+import { RPCJsonSerializer } from '@orpc/client'
 import type { PartialDeep, Public } from '@orpc/shared'
+import { stringifyJSON } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
+
 import type { SerializableStreamedQueryOptions } from './stream-query.ts'
 import type { OperationType } from './types.ts'
-import { RPCJsonSerializer } from '@orpc/client'
-import { stringifyJSON } from '@orpc/shared'
 
 export interface OperationKeyPrefixOptions {
   /**
@@ -29,7 +30,10 @@ export type OperationKeyOptions<TType extends OperationType, TInput> = Operation
   fnOptions?: (TType extends 'streamed' ? SerializableStreamedQueryOptions : never) | undefined
 }
 
-type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> & {
+type OperationKeyContent<TType extends OperationType, TInput> = Omit<
+  OperationKeyOptions<TType, TInput>,
+  keyof OperationKeyBaseOptions
+> & {
   /**
    * Serializer types of non-JSON values in `input`, keyed by their JSON-encoded path,
    * so inputs with the same JSON form (like a `Date` and its ISO string) produce different keys.
@@ -38,8 +42,8 @@ type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKe
   inputMeta?: Record<string, string[]> | undefined
 }
 
-export type OperationKey<TType extends OperationType, TInput>
-  = EntryKey & (
+export type OperationKey<TType extends OperationType, TInput> = EntryKey &
+  (
     | [path: string[], options: OperationKeyContent<TType, TInput>]
     | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
   )
@@ -59,12 +63,14 @@ export function generateOperationKey<TType extends OperationType, TInput>(
   options: OperationKeyOptions<TType, TInput> = {},
 ): OperationKey<TType, TInput> {
   return [
-    ...options.prefix !== undefined ? [options.prefix] : [],
+    ...(options.prefix !== undefined ? [options.prefix] : []),
     path,
     {
-      ...options.input !== undefined ? serializeInput(options.serializer ?? defaultSerializer, options.input) : {},
-      ...options.type !== undefined ? { type: options.type } : {},
-      ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
+      ...(options.input !== undefined
+        ? serializeInput(options.serializer ?? defaultSerializer, options.input)
+        : {}),
+      ...(options.type !== undefined ? { type: options.type } : {}),
+      ...(options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {}),
     },
   ] as OperationKey<TType, TInput>
 }
@@ -79,7 +85,7 @@ function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown) {
   const inputMeta: Record<string, string[]> = {}
 
   for (const [type, ...segments] of meta) {
-    (inputMeta[stringifyJSON(segments)] ??= []).push(type)
+    ;(inputMeta[stringifyJSON(segments)] ??= []).push(type)
   }
 
   return { input: json, inputMeta }

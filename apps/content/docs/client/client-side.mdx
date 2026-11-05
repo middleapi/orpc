@@ -1,8 +1,8 @@
 ---
-title: "Client-Side Clients"
-description: "Create oRPC clients that call procedures remotely over a link, with client context, interceptors, and type inference utilities."
+title: 'Client-Side Clients'
+description: 'Create oRPC clients that call procedures remotely over a link, with client context, interceptors, and type inference utilities.'
 sidebar:
-  label: "Client-Side"
+  label: 'Client-Side'
 ---
 
 ## Installation
@@ -99,19 +99,20 @@ const client: RouterClient<typeof router, ClientContext> = createORPCClient(link
       }
 
       return data
-    }
+    },
   ],
   scoped: {
     planet: {
       find: {
-        interceptors: [ // <- these interceptors only apply to client.planet.find
+        interceptors: [
+          // <- these interceptors only apply to client.planet.find
           async ({ context, path, next }) => {
             return next()
-          }
-        ]
-      }
-    }
-  }
+          },
+        ],
+      },
+    },
+  },
 })
 ```
 

@@ -1,34 +1,41 @@
 {
   "name": "@orpc/tanstack-query",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "TanStack Query integration for oRPC: typesafe queries, mutations, streaming, and SSR for React, Vue, Solid, Svelte, and Angular",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "angular-query",
+    "mutation",
+    "orpc",
+    "query",
+    "react-query",
+    "solid-query",
+    "ssr",
+    "svelte-query",
+    "tanstack-query",
+    "typesafe",
+    "typescript",
+    "vue-query"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/tanstack-query"
   },
-  "keywords": [
-    "orpc",
-    "tanstack-query",
-    "react-query",
-    "vue-query",
-    "solid-query",
-    "svelte-query",
-    "angular-query",
-    "query",
-    "mutation",
-    "ssr",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -39,18 +46,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc"
-  },
-  "peerDependencies": {
-    "@tanstack/query-core": ">=5.89.0"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -69,5 +66,8 @@
     "svelte": "^5.57.3",
     "vue": "^3.5.44",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@tanstack/query-core": ">=5.89.0"
   }
 }

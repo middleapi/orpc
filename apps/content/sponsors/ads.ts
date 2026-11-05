@@ -30,7 +30,7 @@ export interface AdSponsor {
    * light mode and 10% in dark — so the card reads as a surface rather than a
    * banner and --blume-muted-foreground still clears AA on top. Omit for none.
    */
-  background?: { light: string, dark: string }
+  background?: { light: string; dark: string }
 }
 
 /**
@@ -42,7 +42,7 @@ const DEFAULT_SLOT_COUNT = 6
 
 const soldPositions = slots
   .map(({ position }) => position)
-  .filter(position => Number.isInteger(position) && position >= 1)
+  .filter((position) => Number.isInteger(position) && position >= 1)
 
 const slotCount = Math.max(DEFAULT_SLOT_COUNT, ...soldPositions)
 
@@ -76,12 +76,14 @@ export interface AdSlot {
 
 /** Every position in order, unsold ones included — what the grid renders. */
 export function adSlots(): AdSlot[] {
-  return AD_POSITIONS.map(position => ({ position, sponsor: inventory[position] ?? null }))
+  return AD_POSITIONS.map((position) => ({ position, sponsor: inventory[position] ?? null }))
 }
 
 /** Sold sponsors in position order — the pool an inline slot draws from. */
 export function soldSponsors(): AdSponsor[] {
-  return AD_POSITIONS.map(position => inventory[position]).filter(sponsor => sponsor !== undefined)
+  return AD_POSITIONS.map((position) => inventory[position]).filter(
+    (sponsor) => sponsor !== undefined,
+  )
 }
 
 /**

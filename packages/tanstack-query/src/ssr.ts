@@ -1,8 +1,14 @@
-import type { AnyNestedClient, InferClientContext, InferClientError, RPCJsonSerialization } from '@orpc/client'
+import type {
+  AnyNestedClient,
+  InferClientContext,
+  InferClientError,
+  RPCJsonSerialization,
+} from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
+
 import type { RouterUtilsPlugin } from './plugin.ts'
 import type { ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils.ts'
-import { RPCJsonSerializer } from '@orpc/client'
 import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
 
 /**
@@ -42,7 +48,10 @@ export interface StreamQuerySSRUtilsPluginOptions {
 /**
  * Cancels the query once it has data, keeping that data. The cancel aborts the call's `signal`.
  */
-const cancelOnFirstData: ProcedureUtilsQueryInterceptor<any, any, any, any> = async ({ next, fnContext }) => {
+const cancelOnFirstData: ProcedureUtilsQueryInterceptor<any, any, any, any> = async ({
+  next,
+  fnContext,
+}) => {
   const cache = fnContext.client.getQueryCache()
   const query = cache.find({ queryKey: fnContext.queryKey, exact: true })
 
@@ -55,8 +64,7 @@ const cancelOnFirstData: ProcedureUtilsQueryInterceptor<any, any, any, any> = as
 
   try {
     return await next()
-  }
-  finally {
+  } finally {
     unsubscribe()
   }
 }
@@ -68,7 +76,9 @@ const cancelOnFirstData: ProcedureUtilsQueryInterceptor<any, any, any, any> = as
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#streamed-and-live-queries | TanStack Query Integration - Streamed and Live Queries}
  */
-export class StreamQuerySSRUtilsPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
+export class StreamQuerySSRUtilsPlugin<
+  T extends AnyNestedClient = AnyNestedClient,
+> implements RouterUtilsPlugin<T> {
   readonly name = '~stream-query-ssr'
 
   private readonly isServer: boolean
@@ -81,10 +91,15 @@ export class StreamQuerySSRUtilsPlugin<T extends AnyNestedClient = AnyNestedClie
     _path: string[],
     options: ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>>,
   ): ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>> {
-    return mergeProcedureUtilsOptions<any, any, any, any>({
-      ...this.isServer ? { streamedInterceptors: [cancelOnFirstData], liveInterceptors: [cancelOnFirstData] } : {},
-      streamedOptions: { initialData: [], refetchOnMount: 'always' },
-      liveOptions: { refetchOnMount: 'always' },
-    }, options)
+    return mergeProcedureUtilsOptions<any, any, any, any>(
+      {
+        ...(this.isServer
+          ? { streamedInterceptors: [cancelOnFirstData], liveInterceptors: [cancelOnFirstData] }
+          : {}),
+        streamedOptions: { initialData: [], refetchOnMount: 'always' },
+        liveOptions: { refetchOnMount: 'always' },
+      },
+      options,
+    )
   }
 }

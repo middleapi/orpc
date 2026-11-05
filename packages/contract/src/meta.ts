@@ -1,6 +1,7 @@
+import { isTypescriptObject } from '@orpc/shared'
+
 import type { ErrorMap } from './error.ts'
 import type { AnySchema } from './schema.ts'
-import { isTypescriptObject } from '@orpc/shared'
 
 /**
  * Arbitrary metadata attached to a procedure.
@@ -70,6 +71,9 @@ export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | unde
   return container[HIDDEN_META_PLUGINS_SYMBOL] as AnyMetaPlugin[] | undefined
 }
 
-export function setHiddenMetaPlugins<T extends object>(container: T, metaPlugins: AnyMetaPlugin[]): void {
-  (container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
+export function setHiddenMetaPlugins<T extends object>(
+  container: T,
+  metaPlugins: AnyMetaPlugin[],
+): void {
+  ;(container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
 }

@@ -1,11 +1,12 @@
-import type { Promisable } from 'type-fest'
-import type { StartSpanOptions } from './tracing.ts'
-import type { ThrowableError } from './types.ts'
 import { AsyncIteratorClass } from '@standard-server/shared'
+import type { Promisable } from 'type-fest'
+
 import { once } from './function.ts'
 import { isPlainObject } from './object.ts'
 import { promiseWithResolvers } from './promise.ts'
+import type { StartSpanOptions } from './tracing.ts'
 import { recordSpanError, runInSpanContext, startSpan } from './tracing.ts'
+import type { ThrowableError } from './types.ts'
 
 export function replicateReadableStream<T>(
   stream: ReadableStream<T>,
@@ -29,7 +30,9 @@ export function replicateReadableStream<T>(
   return replicated
 }
 
-export type ReadableStreamReadResult<T> = { done: false, value: T } | { done: true, value?: T | undefined }
+export type ReadableStreamReadResult<T> =
+  | { done: false; value: T }
+  | { done: true; value?: T | undefined }
 
 export interface WrapReadableStreamOptions<T, TMapped> {
   /**
@@ -38,7 +41,9 @@ export interface WrapReadableStreamOptions<T, TMapped> {
    * such as AsyncLocalStorage.
    */
   runWith?: (<T>(run: () => Promise<T>) => Promisable<T>) | undefined
-  mapResult?: ((result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>) | undefined
+  mapResult?:
+    | ((result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>)
+    | undefined
   mapError?: ((error: ThrowableError) => Promisable<ThrowableError>) | undefined
   onError?: ((error: ThrowableError) => Promisable<void>) | undefined
 
@@ -52,55 +57,55 @@ export function wrapReadableStream<T, TMapped = T>(
   stream: ReadableStream<T>,
   { runWith, mapResult, mapError, onError, onFinish }: WrapReadableStreamOptions<T, TMapped>,
 ): NoInfer<ReadableStream<TMapped>> {
-  runWith ??= run => run()
+  runWith ??= (run) => run()
 
   const reader = once(() => stream.getReader())
   const finish = once(async () => onFinish?.())
 
   // TODO:
-  return new ReadableStream<TMapped>({
-    async pull(controller) {
-      let result: ReadableStreamReadResult<TMapped>
+  return new ReadableStream<TMapped>(
+    {
+      async pull(controller) {
+        let result: ReadableStreamReadResult<TMapped>
 
-      try {
-        const readResult = await runWith(() => reader().read())
-        result = mapResult ? await mapResult(readResult) : readResult as ReadableStreamReadResult<TMapped>
-      }
-      catch (error) {
         try {
-          await onError?.(error as ThrowableError)
-          controller.error(mapError ? await mapError(error as ThrowableError) : error)
+          const readResult = await runWith(() => reader().read())
+          result = mapResult
+            ? await mapResult(readResult)
+            : (readResult as ReadableStreamReadResult<TMapped>)
+        } catch (error) {
+          try {
+            await onError?.(error as ThrowableError)
+            controller.error(mapError ? await mapError(error as ThrowableError) : error)
+          } finally {
+            await finish()
+          }
+
+          return
         }
-        finally {
+
+        if (result.done) {
+          controller.close()
+          await finish()
+        } else {
+          controller.enqueue(result.value)
+        }
+      },
+      async cancel(reason) {
+        try {
+          try {
+            await runWith(() => reader().cancel(reason))
+          } catch (error) {
+            await onError?.(error as ThrowableError)
+            throw error
+          }
+        } finally {
           await finish()
         }
-
-        return
-      }
-
-      if (result.done) {
-        controller.close()
-        await finish()
-      }
-      else {
-        controller.enqueue(result.value)
-      }
+      },
     },
-    async cancel(reason) {
-      try {
-        try {
-          await runWith(() => reader().cancel(reason))
-        }
-        catch (error) {
-          await onError?.(error as ThrowableError)
-          throw error
-        }
-      }
-      finally {
-        await finish()
-      }
-    },
-  }, { highWaterMark: 0 })
+    { highWaterMark: 0 },
+  )
 }
 
 export function traceReadableStream<T>(
@@ -109,7 +114,7 @@ export function traceReadableStream<T>(
 ): ReadableStream<T> {
   const getSpan = once(() => startSpan(options))
   return wrapReadableStream(stream, {
-    runWith: run => runInSpanContext(getSpan(), run),
+    runWith: (run) => runInSpanContext(getSpan(), run),
     mapResult(result) {
       getSpan()?.addEvent(result.done ? 'closed' : 'enqueued')
       return result
@@ -158,8 +163,7 @@ export function streamToAsyncIteratorObject<T>(
             throw reason
           }),
         ])
-      }
-      finally {
+      } finally {
         signal.removeEventListener('abort', onAbort)
       }
     },
@@ -174,10 +178,8 @@ export function streamToAsyncIteratorObject<T>(
 /**
  * Converts an `AsyncIterator` into a `ReadableStream`.
  */
-export function asyncIteratorToStream<T>(
-  iterator: AsyncIterator<T>,
-): ReadableStream<T> {
-  return createIteratorStream(iterator, value => value)
+export function asyncIteratorToStream<T>(iterator: AsyncIterator<T>): ReadableStream<T> {
+  return createIteratorStream(iterator, (value) => value)
 }
 
 /**
@@ -189,30 +191,34 @@ export function asyncIteratorToStream<T>(
 export function asyncIteratorToUnproxiedDataStream<T>(
   iterator: AsyncIterator<T>,
 ): ReadableStream<T> {
-  return createIteratorStream(iterator, value => isPlainObject(value)
-    ? { ...value }
-    : Array.isArray(value)
-      ? value.map(i => i) as T // use .map instead of ... to deal with sparse arrays
-      : value)
+  return createIteratorStream(iterator, (value) =>
+    isPlainObject(value)
+      ? { ...value }
+      : Array.isArray(value)
+        ? (value.map((i) => i) as T) // use .map instead of ... to deal with sparse arrays
+        : value,
+  )
 }
 
 function createIteratorStream<T>(
   iterator: AsyncIterator<T>,
   map: (value: T) => T,
 ): ReadableStream<T> {
-  return new ReadableStream<T>({
-    async pull(controller) {
-      const { done, value } = await iterator.next()
+  return new ReadableStream<T>(
+    {
+      async pull(controller) {
+        const { done, value } = await iterator.next()
 
-      if (done) {
-        controller.close()
-      }
-      else {
-        controller.enqueue(map(value))
-      }
+        if (done) {
+          controller.close()
+        } else {
+          controller.enqueue(map(value))
+        }
+      },
+      async cancel() {
+        await iterator.return?.()
+      },
     },
-    async cancel() {
-      await iterator.return?.()
-    },
-  }, { highWaterMark: 0 })
+    { highWaterMark: 0 },
+  )
 }

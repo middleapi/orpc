@@ -1,6 +1,6 @@
 import type { BaseRedisRateLimiterOptions } from '@orpc/ratelimit/base-redis'
-import type { RedisClient } from 'bun'
 import { BaseRedisRateLimiter } from '@orpc/ratelimit/base-redis'
+import type { RedisClient } from 'bun'
 
 export interface BunRedisRateLimiterOptions extends BaseRedisRateLimiterOptions {}
 
@@ -24,7 +24,10 @@ export class BunRedisRateLimiter extends BaseRedisRateLimiter {
    * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
    */
   prefix(prefix: string): BunRedisRateLimiter {
-    return new BunRedisRateLimiter(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
+    return new BunRedisRateLimiter(this.redis, {
+      ...this.options,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
   protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {

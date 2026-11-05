@@ -1,10 +1,16 @@
-import type { StandardBody } from '@standard-server/core'
-import type { BracketNotationSerializerOptions } from './bracket-notation.ts'
-import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer.ts'
-import { createORPCErrorFromJson, isORPCErrorJson, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import {
+  createORPCErrorFromJson,
+  isORPCErrorJson,
+  toORPCError,
+  wrapAsyncIteratorPreservingEventMeta,
+} from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
+import type { StandardBody } from '@standard-server/core'
 import { ErrorEvent } from '@standard-server/core'
+
+import type { BracketNotationSerializerOptions } from './bracket-notation.ts'
 import { BracketNotationSerializer } from './bracket-notation.ts'
+import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer.ts'
 import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
 
 export interface OpenAPISerializerSerializeOptions {
@@ -46,9 +52,7 @@ export class OpenAPISerializer extends OpenAPIJsonSerializer {
   private readonly bracketNotation: BracketNotationSerializer
   private readonly defaultSerializeOptions: OpenAPISerializerSerializeOptions | undefined
 
-  constructor(
-    { bracketNotation, serialize, ...options }: OpenAPISerializerOptions = {},
-  ) {
+  constructor({ bracketNotation, serialize, ...options }: OpenAPISerializerOptions = {}) {
     super(options)
     this.bracketNotation = new BracketNotationSerializer(bracketNotation)
     this.defaultSerializeOptions = serialize
@@ -71,23 +75,33 @@ export class OpenAPISerializer extends OpenAPIJsonSerializer {
 
             return { done: result.done, value: this.serializePayload(result.value, false, false) }
           },
-          mapError: e => new ErrorEvent(
-            this.serializePayload(toORPCError(e).toJSON(), false, false),
-            { cause: e },
-          ),
+          mapError: (e) =>
+            new ErrorEvent(this.serializePayload(toORPCError(e).toJSON(), false, false), {
+              cause: e,
+            }),
         })
       }
     }
 
-    const useFormDataForBlobFields = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
+    const useFormDataForBlobFields =
+      options.useFormDataForBlobFields ??
+      this.defaultSerializeOptions?.useFormDataForBlobFields ??
+      true
     const asFormData = options.asFormData ?? this.defaultSerializeOptions?.asFormData ?? false
     return this.serializePayload(data, useFormDataForBlobFields, asFormData)
   }
 
-  private serializePayload(value: unknown, useFormDataForBlobFields: boolean, asFormData: boolean): unknown {
+  private serializePayload(
+    value: unknown,
+    useFormDataForBlobFields: boolean,
+    asFormData: boolean,
+  ): unknown {
     const { json, blobs } = this.serializeJson(value)
 
-    if (!asFormData && (json instanceof Blob || json === undefined || !blobs?.length || !useFormDataForBlobFields)) {
+    if (
+      !asFormData &&
+      (json instanceof Blob || json === undefined || !blobs?.length || !useFormDataForBlobFields)
+    ) {
       return json
     }
 
@@ -96,8 +110,7 @@ export class OpenAPISerializer extends OpenAPIJsonSerializer {
     for (const [path, value] of this.bracketNotation.serialize(json)) {
       if (value instanceof Blob) {
         form.append(path, value)
-      }
-      else if (value !== undefined && value !== null) {
+      } else if (value !== undefined && value !== null) {
         form.append(path, String(value))
       }
     }

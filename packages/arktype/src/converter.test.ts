@@ -1,5 +1,6 @@
 import { type } from 'arktype'
 import * as z from 'zod'
+
 import { ArkTypeToJsonSchemaConverter } from './converter.ts'
 
 describe('arkTypeToJsonSchemaConverter', () => {
@@ -33,26 +34,47 @@ describe('arkTypeToJsonSchemaConverter', () => {
 
   describe('optionality', () => {
     it.each([
-      ['optional input schema', type('string | undefined'), 'input', {
-        anyOf: [
-          { type: 'string' },
-          {},
-        ],
-      }, true],
-      ['optional output schema', type('string | undefined'), 'output', {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {},
-        ],
-      }, true],
-      ['required input schema', type('string'), 'input', {
-        type: 'string',
-      }, false],
-      ['required output schema', type('string'), 'output', {
-        type: 'string',
-      }, false],
+      [
+        'optional input schema',
+        type('string | undefined'),
+        'input',
+        {
+          anyOf: [{ type: 'string' }, {}],
+        },
+        true,
+      ],
+      [
+        'optional output schema',
+        type('string | undefined'),
+        'output',
+        {
+          anyOf: [
+            {
+              type: 'string',
+            },
+            {},
+          ],
+        },
+        true,
+      ],
+      [
+        'required input schema',
+        type('string'),
+        'input',
+        {
+          type: 'string',
+        },
+        false,
+      ],
+      [
+        'required output schema',
+        type('string'),
+        'output',
+        {
+          type: 'string',
+        },
+        false,
+      ],
     ] as const)('marks %s correctly', (_, schema, direction, jsonSchema, optional) => {
       expect(converter.convert(schema, direction)).toEqual([jsonSchema, optional])
     })
@@ -60,23 +82,35 @@ describe('arkTypeToJsonSchemaConverter', () => {
 
   describe('direction', () => {
     it.each([
-      ['morph and default object', type({ a: 'string.numeric.parse', b: 'number = 5' }), {
-        type: 'object',
-        properties: {
-          a: { type: 'string', pattern: expect.any(String) },
-          b: { type: 'number', default: 5 },
+      [
+        'morph and default object',
+        type({ a: 'string.numeric.parse', b: 'number = 5' }),
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'string', pattern: expect.any(String) },
+            b: { type: 'number', default: 5 },
+          },
+          required: ['a'],
         },
-        required: ['a'],
-      }, {
-        type: 'object',
-        properties: {
-          a: { type: 'number' },
-          b: { type: 'number' },
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'number' },
+            b: { type: 'number' },
+          },
+          required: ['a', 'b'],
         },
-        required: ['a', 'b'],
-      }],
-      ['pipe with output type', type('string').pipe(s => s.length).to('number'), { type: 'string' }, { type: 'number' }],
-      ['unconstrained pipe', type('string').pipe(s => s.length), { type: 'string' }, {}],
+      ],
+      [
+        'pipe with output type',
+        type('string')
+          .pipe((s) => s.length)
+          .to('number'),
+        { type: 'string' },
+        { type: 'number' },
+      ],
+      ['unconstrained pipe', type('string').pipe((s) => s.length), { type: 'string' }, {}],
     ] as const)('converts %s from the matching side', (_, schema, input, output) => {
       expect(converter.convert(schema, 'input')).toEqual([input, false])
       expect(converter.convert(schema, 'output')).toEqual([output, false])
@@ -85,16 +119,22 @@ describe('arkTypeToJsonSchemaConverter', () => {
 
   describe('native type extensions', () => {
     it.each([
-      [type('bigint'), {
-        'type': 'string',
-        'x-native-type': 'bigint',
-        'pattern': '^-?[0-9]+$',
-      }],
-      [type('Date'), {
-        'type': 'string',
-        'x-native-type': 'date',
-        'format': 'date-time',
-      }],
+      [
+        type('bigint'),
+        {
+          'type': 'string',
+          'x-native-type': 'bigint',
+          'pattern': '^-?[0-9]+$',
+        },
+      ],
+      [
+        type('Date'),
+        {
+          'type': 'string',
+          'x-native-type': 'date',
+          'format': 'date-time',
+        },
+      ],
     ] as const)('extends conversion for %s', (schema, jsonSchema) => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
     })

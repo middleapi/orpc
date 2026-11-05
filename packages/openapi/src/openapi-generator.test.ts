@@ -1,7 +1,12 @@
 import { oc } from '@orpc/contract'
 import * as arktype from 'arktype'
 import z from 'zod'
-import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../tests/__shared__/schema.ts'
+
+import {
+  testSchema,
+  testSchemaConverter,
+  zodJsonSchemaConverter,
+} from '../tests/__shared__/schema.ts'
 import { openapi } from './meta.ts'
 import { OpenAPIGenerator, OpenAPIGeneratorError } from './openapi-generator.ts'
 
@@ -27,58 +32,66 @@ describe('openAPIGenerator basic & options', () => {
     })
 
     expect(doc.openapi).toBe('3.2.0')
-    expect(doc.paths?.['/search']?.query).toEqual(expect.objectContaining({
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: expect.objectContaining({
-              properties: { term: { type: 'string' } },
-              required: ['term'],
-            }),
-          },
-        },
-      },
-      responses: {
-        200: expect.objectContaining({
+    expect(doc.paths?.['/search']?.query).toEqual(
+      expect.objectContaining({
+        requestBody: {
+          required: true,
           content: {
             'application/json': {
               schema: expect.objectContaining({
-                properties: { result: { type: 'string' } },
-                required: ['result'],
+                properties: { term: { type: 'string' } },
+                required: ['term'],
               }),
             },
           },
-        }),
-      },
-    }))
+        },
+        responses: {
+          200: expect.objectContaining({
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  properties: { result: { type: 'string' } },
+                  required: ['result'],
+                }),
+              },
+            },
+          }),
+        },
+      }),
+    )
   })
 
   it('rejects QUERY operations when an older OpenAPI version is requested', async () => {
-    await expect(generator.generate({
-      search: oc.meta(openapi({ method: 'QUERY', path: '/search' })),
-    }, { version: '3.1.2' })).rejects.toThrow(
-      'QUERY operations require OpenAPI 3.2, but version "3.1.2" was requested.',
-    )
+    await expect(
+      generator.generate(
+        {
+          search: oc.meta(openapi({ method: 'QUERY', path: '/search' })),
+        },
+        { version: '3.1.2' },
+      ),
+    ).rejects.toThrow('QUERY operations require OpenAPI 3.2, but version "3.1.2" was requested.')
   })
 
   it('merges the provided base document and serialize the result', async () => {
     const serializer = {
-      serializeJson: vi.fn(document => ({ json: document })),
+      serializeJson: vi.fn((document) => ({ json: document })),
       deserializeJson: vi.fn(),
     }
 
     const generator = new OpenAPIGenerator({ serializer, converters: [zodJsonSchemaConverter] })
 
-    const doc = await generator.generate({}, {
-      base: {
-        info: {
-          title: 'Planet API',
-          version: '1.2.3',
+    const doc = await generator.generate(
+      {},
+      {
+        base: {
+          info: {
+            title: 'Planet API',
+            version: '1.2.3',
+          },
+          servers: [{ url: 'https://api.example.com' }],
         },
-        servers: [{ url: 'https://api.example.com' }],
       },
-    })
+    )
 
     expect(serializer.serializeJson).toHaveBeenCalledWith({
       openapi: '3.2.0',
@@ -110,9 +123,12 @@ describe('openAPIGenerator basic & options', () => {
     }
     const snapshot = structuredClone(base)
 
-    const doc = await generator.generate({
-      planet: oc.input(z.object({ planet: z.object({ id: z.string() }).meta({ id: 'Planet' }) })),
-    }, { base })
+    const doc = await generator.generate(
+      {
+        planet: oc.input(z.object({ planet: z.object({ id: z.string() }).meta({ id: 'Planet' }) })),
+      },
+      { base },
+    )
 
     expect(doc.components?.schemas).toEqual({
       Existing: { type: 'string' },
@@ -125,16 +141,21 @@ describe('openAPIGenerator basic & options', () => {
     const publicProcedure = oc.meta(openapi({ method: 'GET' }))
     const privateProcedure = oc.meta(openapi({ method: 'GET' }))
 
-    const filter = vi.fn((procedure, path) => procedure !== privateProcedure && path.join('.') !== 'admin.private')
+    const filter = vi.fn(
+      (procedure, path) => procedure !== privateProcedure && path.join('.') !== 'admin.private',
+    )
 
-    const doc = await generator.generate({
-      public: publicProcedure,
-      admin: {
-        private: privateProcedure,
+    const doc = await generator.generate(
+      {
+        public: publicProcedure,
+        admin: {
+          private: privateProcedure,
+        },
       },
-    }, {
-      filter,
-    })
+      {
+        filter,
+      },
+    )
 
     expect(filter).toHaveBeenCalledTimes(2)
     expect(filter).toHaveBeenNthCalledWith(1, publicProcedure, ['public'])
@@ -184,84 +205,97 @@ describe('openAPIGenerator basic & options', () => {
     const doc = await generator.generate({
       createPlanet: oc
         .meta(openapi({ method: 'POST', path: '/planets' }))
-        .input(testSchema({
-          type: 'object',
-          properties: { name: { type: 'string' } },
-          required: ['name'],
-        }))
-        .output(testSchema({
-          type: 'object',
-          properties: { id: { type: 'string' } },
-          required: ['id'],
-        })),
+        .input(
+          testSchema({
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          }),
+        )
+        .output(
+          testSchema({
+            type: 'object',
+            properties: { id: { type: 'string' } },
+            required: ['id'],
+          }),
+        ),
     })
 
-    expect(doc.paths?.['/planets']?.post).toEqual(expect.objectContaining({
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: { name: { type: 'string' } },
-              required: ['name'],
-            },
-          },
-        },
-      },
-      responses: {
-        200: {
-          description: 'OK',
+    expect(doc.paths?.['/planets']?.post).toEqual(
+      expect.objectContaining({
+        requestBody: {
+          required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                properties: { id: { type: 'string' } },
-                required: ['id'],
+                properties: { name: { type: 'string' } },
+                required: ['name'],
               },
             },
           },
         },
-      },
-    }))
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { id: { type: 'string' } },
+                  required: ['id'],
+                },
+              },
+            },
+          },
+        },
+      }),
+    )
   })
 
   it('converts inputs with the "input" direction and outputs with the "output" direction', async () => {
     const generator = new OpenAPIGenerator({ converters: [testSchemaConverter] })
 
-    const directionalSchema = () => testSchema(
-      { type: 'object', properties: { raw: { type: 'string' } }, required: ['raw'] },
-      { output: { type: 'object', properties: { parsed: { type: 'number' } }, required: ['parsed'] } },
-    )
-
-    const doc = await generator.generate({
-      transform: oc
-        .input(directionalSchema())
-        .output(directionalSchema()),
-    })
-
-    expect(doc.paths?.['/transform']?.post).toEqual(expect.objectContaining({
-      requestBody: expect.objectContaining({
-        content: {
-          'application/json': {
-            schema: expect.objectContaining({
-              properties: { raw: { type: 'string' } },
-            }),
+    const directionalSchema = () =>
+      testSchema(
+        { type: 'object', properties: { raw: { type: 'string' } }, required: ['raw'] },
+        {
+          output: {
+            type: 'object',
+            properties: { parsed: { type: 'number' } },
+            required: ['parsed'],
           },
         },
-      }),
-      responses: {
-        200: expect.objectContaining({
+      )
+
+    const doc = await generator.generate({
+      transform: oc.input(directionalSchema()).output(directionalSchema()),
+    })
+
+    expect(doc.paths?.['/transform']?.post).toEqual(
+      expect.objectContaining({
+        requestBody: expect.objectContaining({
           content: {
             'application/json': {
               schema: expect.objectContaining({
-                properties: { parsed: { type: 'number' } },
+                properties: { raw: { type: 'string' } },
               }),
             },
           },
         }),
-      },
-    }))
+        responses: {
+          200: expect.objectContaining({
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  properties: { parsed: { type: 'number' } },
+                }),
+              },
+            },
+          }),
+        },
+      }),
+    )
   })
 
   it('derives the path and operationId from router segments', async () => {
@@ -283,16 +317,18 @@ describe('openAPIGenerator basic & options', () => {
   it('applies route metadata: method, prefix, path, operationId, tags, summary, description, deprecated', async () => {
     const doc = await generator.generate({
       getPlanet: oc
-        .meta(openapi({
-          method: 'GET',
-          prefix: '/api/v2',
-          path: '/planets/{id}',
-          operationId: 'getPlanetById',
-          tags: ['planets'],
-          summary: 'Get a planet',
-          description: 'Returns a single planet.',
-          deprecated: true,
-        }))
+        .meta(
+          openapi({
+            method: 'GET',
+            prefix: '/api/v2',
+            path: '/planets/{id}',
+            operationId: 'getPlanetById',
+            tags: ['planets'],
+            summary: 'Get a planet',
+            description: 'Returns a single planet.',
+            deprecated: true,
+          }),
+        )
         .input(z.object({ id: z.string() })),
     })
 
@@ -303,9 +339,7 @@ describe('openAPIGenerator basic & options', () => {
         summary: 'Get a planet',
         description: 'Returns a single planet.',
         deprecated: true,
-        parameters: [
-          expect.objectContaining({ name: 'id', in: 'path', required: true }),
-        ],
+        parameters: [expect.objectContaining({ name: 'id', in: 'path', required: true })],
       }),
     })
   })
@@ -328,10 +362,12 @@ describe('openAPIGenerator basic & options', () => {
     const doc = await generator.generate({
       // this procedure would normally throw: GET with non-object input schema
       getPlanet: oc
-        .meta(openapi({
-          method: 'GET',
-          spec: { operationId: 'custom.getPlanet' },
-        }))
+        .meta(
+          openapi({
+            method: 'GET',
+            spec: { operationId: 'custom.getPlanet' },
+          }),
+        )
         .input(z.string()),
     })
 
@@ -342,10 +378,12 @@ describe('openAPIGenerator basic & options', () => {
 
   it('extends the generated operation with an openapi.spec function', async () => {
     const doc = await generator.generate({
-      getPlanet: oc.meta(openapi({
-        method: 'GET',
-        spec: current => ({ ...current, security: [{ bearerAuth: [] }] }),
-      })),
+      getPlanet: oc.meta(
+        openapi({
+          method: 'GET',
+          spec: (current) => ({ ...current, security: [{ bearerAuth: [] }] }),
+        }),
+      ),
     })
 
     expect(doc.paths?.['/getPlanet']).toEqual({
@@ -365,35 +403,37 @@ describe('openAPIGenerator basic & options', () => {
         .output(z.looseObject({ slug: z.string() })),
     })
 
-    expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              allOf: [
-                expect.objectContaining({ required: ['name'] }),
-                expect.objectContaining({ required: ['note'] }),
-              ],
-            },
-          },
-        },
-      },
-      responses: {
-        200: expect.objectContaining({
+    expect(doc.paths?.['/planet']?.post).toEqual(
+      expect.objectContaining({
+        requestBody: {
+          required: true,
           content: {
             'application/json': {
               schema: {
                 allOf: [
-                  expect.objectContaining({ required: ['id'] }),
-                  expect.objectContaining({ required: ['slug'] }),
+                  expect.objectContaining({ required: ['name'] }),
+                  expect.objectContaining({ required: ['note'] }),
                 ],
               },
             },
           },
-        }),
-      },
-    }))
+        },
+        responses: {
+          200: expect.objectContaining({
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    expect.objectContaining({ required: ['id'] }),
+                    expect.objectContaining({ required: ['slug'] }),
+                  ],
+                },
+              },
+            },
+          }),
+        },
+      }),
+    )
   })
 
   it('keeps merged request bodies optional when every input schema is optional', async () => {
@@ -415,29 +455,50 @@ describe('openAPIGenerator basic & options', () => {
         .input(z.object({ status: Status, statuses: z.union([Status, z.array(Status)]) })),
       download: oc
         .meta(openapi({ method: 'GET', path: '/download', outputStructure: 'detailed' }))
-        .output(z.union([
-          z.object({ status: z.literal(200), body: z.file().meta({ id: 'Download' }) }),
-          z.object({ status: z.literal(201), body: z.object({ id: z.string() }) }),
-        ])),
+        .output(
+          z.union([
+            z.object({ status: z.literal(200), body: z.file().meta({ id: 'Download' }) }),
+            z.object({ status: z.literal(201), body: z.object({ id: z.string() }) }),
+          ]),
+        ),
     })
 
     expect(doc.paths?.['/list']?.get?.parameters).toEqual([
-      { in: 'query', name: 'status', required: true, allowEmptyValue: true, allowReserved: true, schema: { $ref: '#/components/schemas/Status' } },
+      {
+        in: 'query',
+        name: 'status',
+        required: true,
+        allowEmptyValue: true,
+        allowReserved: true,
+        schema: { $ref: '#/components/schemas/Status' },
+      },
       {
         in: 'query',
         name: 'statuses',
         required: true,
         allowEmptyValue: true,
         allowReserved: true,
-        schema: { anyOf: [{ $ref: '#/components/schemas/Status' }, { type: 'array', items: { $ref: '#/components/schemas/Status' } }] },
+        schema: {
+          anyOf: [
+            { $ref: '#/components/schemas/Status' },
+            { type: 'array', items: { $ref: '#/components/schemas/Status' } },
+          ],
+        },
       },
     ])
 
     expect(doc.paths?.['/download']?.get?.responses).toEqual({
-      200: { description: 'OK', content: { '*/*': { schema: { $ref: '#/components/schemas/Download' } } } },
+      200: {
+        description: 'OK',
+        content: { '*/*': { schema: { $ref: '#/components/schemas/Download' } } },
+      },
       201: {
         description: 'OK',
-        content: { 'application/json': { schema: expect.objectContaining({ properties: { id: { type: 'string' } } }) } },
+        content: {
+          'application/json': {
+            schema: expect.objectContaining({ properties: { id: { type: 'string' } } }),
+          },
+        },
       },
     })
   })
@@ -456,57 +517,75 @@ describe('openAPIGenerator basic & options', () => {
     const generator = new OpenAPIGenerator({ converters: [testSchemaConverter] })
 
     const doc = await generator.generate({
-      ping: oc.input(testSchema({
-        $schema: 'https://json-schema.org/draft/2020-12/schema',
-        type: 'object',
-      } as any)),
+      ping: oc.input(
+        testSchema({
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+        } as any),
+      ),
     })
 
-    expect((doc.paths?.['/ping']?.post?.requestBody as any).content['application/json'].schema).toEqual({
+    expect(
+      (doc.paths?.['/ping']?.post?.requestBody as any).content['application/json'].schema,
+    ).toEqual({
       type: 'object',
     })
   })
 
   it('aggregates all generator errors into a single OpenAPIGeneratorError', async () => {
-    const error = await generator.generate({
-      first: oc.meta(openapi({ path: '/planets/{id}' })),
-      nested: {
-        second: oc.meta(openapi({ method: 'GET' })).input(z.string()),
-      },
-    }).then(
-      () => { throw new Error('expected generate to reject') },
-      e => e,
-    )
+    const error = await generator
+      .generate({
+        first: oc.meta(openapi({ path: '/planets/{id}' })),
+        nested: {
+          second: oc.meta(openapi({ method: 'GET' })).input(z.string()),
+        },
+      })
+      .then(
+        () => {
+          throw new Error('expected generate to reject')
+        },
+        (e) => e,
+      )
 
     expect(error).toBeInstanceOf(OpenAPIGeneratorError)
     expect(error.message).toContain('Failed to generate the OpenAPI document (2 errors)')
     expect(error.message).toContain('Procedure at first:')
     expect(error.message).toContain('Procedure at nested.second:')
 
-    const single = await generator.generate({
-      only: oc.meta(openapi({ method: 'GET' })).input(z.string()),
-    }).then(
-      () => { throw new Error('expected generate to reject') },
-      e => e,
-    )
+    const single = await generator
+      .generate({
+        only: oc.meta(openapi({ method: 'GET' })).input(z.string()),
+      })
+      .then(
+        () => {
+          throw new Error('expected generate to reject')
+        },
+        (e) => e,
+      )
 
     expect(single.message).toContain('Failed to generate the OpenAPI document (1 error)')
 
-    const root = await generator.generate(
-      oc.meta(openapi({ method: 'GET' })).input(z.string()),
-    ).then(
-      () => { throw new Error('expected generate to reject') },
-      e => e,
-    )
+    const root = await generator
+      .generate(oc.meta(openapi({ method: 'GET' })).input(z.string()))
+      .then(
+        () => {
+          throw new Error('expected generate to reject')
+        },
+        (e) => e,
+      )
 
     expect(root.message).toContain('Procedure at (root):')
 
-    const emptyKey = await generator.generate({
-      '': oc.meta(openapi({ method: 'GET' })).input(z.string()),
-    }).then(
-      () => { throw new Error('expected generate to reject') },
-      e => e,
-    )
+    const emptyKey = await generator
+      .generate({
+        '': oc.meta(openapi({ method: 'GET' })).input(z.string()),
+      })
+      .then(
+        () => {
+          throw new Error('expected generate to reject')
+        },
+        (e) => e,
+      )
 
     expect(emptyKey.message).toContain('Procedure at : ')
     expect(emptyKey.message).not.toContain('(root)')
@@ -540,12 +619,15 @@ describe('openAPIGenerator basic & options', () => {
   })
 
   it('does not report collisions for filtered-out procedures', async () => {
-    const doc = await generator.generate({
-      first: oc.meta(openapi({ method: 'GET', path: '/users' })),
-      second: oc.meta(openapi({ method: 'GET', path: '/users' })),
-    }, {
-      filter: (_, path) => path[0] !== 'second',
-    })
+    const doc = await generator.generate(
+      {
+        first: oc.meta(openapi({ method: 'GET', path: '/users' })),
+        second: oc.meta(openapi({ method: 'GET', path: '/users' })),
+      },
+      {
+        filter: (_, path) => path[0] !== 'second',
+      },
+    )
 
     expect(doc.paths?.['/users']).toEqual({
       get: expect.objectContaining({ operationId: 'first' }),
@@ -553,12 +635,18 @@ describe('openAPIGenerator basic & options', () => {
   })
 
   it('reports duplicate operationIds', async () => {
-    await expect(generator.generate({
-      first: oc.meta(openapi({ method: 'GET', path: '/a', operationId: 'same' })),
-      nested: {
-        second: oc.meta(openapi({ method: 'GET', path: '/b', spec: op => ({ ...op, operationId: 'same' }) })),
-      },
-    })).rejects.toThrow('Procedure at nested.second: operationId "same" is already used by the procedure at first')
+    await expect(
+      generator.generate({
+        first: oc.meta(openapi({ method: 'GET', path: '/a', operationId: 'same' })),
+        nested: {
+          second: oc.meta(
+            openapi({ method: 'GET', path: '/b', spec: (op) => ({ ...op, operationId: 'same' }) }),
+          ),
+        },
+      }),
+    ).rejects.toThrow(
+      'Procedure at nested.second: operationId "same" is already used by the procedure at first',
+    )
   })
 
   it('documents the success status for an optional detailed status', async () => {
@@ -573,18 +661,26 @@ describe('openAPIGenerator basic & options', () => {
 
   it('rethrows non-generator errors immediately without wrapping', async () => {
     const generator = new OpenAPIGenerator({
-      converters: [{
-        condition: () => true,
-        convert: () => { throw new Error('converter exploded') },
-      }],
+      converters: [
+        {
+          condition: () => true,
+          convert: () => {
+            throw new Error('converter exploded')
+          },
+        },
+      ],
     })
 
-    const error = await generator.generate({
-      ping: oc.input(z.string()),
-    }).then(
-      () => { throw new Error('expected generate to reject') },
-      e => e,
-    )
+    const error = await generator
+      .generate({
+        ping: oc.input(z.string()),
+      })
+      .then(
+        () => {
+          throw new Error('expected generate to reject')
+        },
+        (e) => e,
+      )
 
     expect(error).not.toBeInstanceOf(OpenAPIGeneratorError)
     expect(error.message).toBe('converter exploded')
@@ -597,16 +693,16 @@ describe('openAPIGenerator version', () => {
   const router = {
     planet: oc
       .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
-      .input(testSchema({ type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }))
+      .input(
+        testSchema({ type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }),
+      )
       .output(testSchema({ type: 'object', properties: { name: { type: ['string', 'null'] } } })),
   }
 
   const planetPath = {
     get: {
       operationId: 'planet',
-      parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
-      ],
+      parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
       responses: {
         200: {
           description: 'OK',
@@ -649,7 +745,10 @@ describe('openAPIGenerator version', () => {
                 description: 'OK',
                 content: {
                   'application/json': {
-                    schema: { type: 'object', properties: { name: { type: 'string', nullable: true } } },
+                    schema: {
+                      type: 'object',
+                      properties: { name: { type: 'string', nullable: true } },
+                    },
                   },
                 },
               },
@@ -660,43 +759,58 @@ describe('openAPIGenerator version', () => {
     })
   })
 
-  it.each(['3.2.0', '3.1.0', '3.0.3'] as const)('preserves error titles in OpenAPI %s', async (version) => {
-    const doc = await generator.generate({
-      create: oc.meta(openapi({ method: 'POST', path: '/penguins' })).errors({
-        PENGUIN_NAME_BANNED: {},
-        PENGUIN_COLONY_FULL: {},
-      }),
-    }, {
-      version,
-      errorStatusMap: { PENGUIN_NAME_BANNED: 400, PENGUIN_COLONY_FULL: 400 },
-    })
+  it.each(['3.2.0', '3.1.0', '3.0.3'] as const)(
+    'preserves error titles in OpenAPI %s',
+    async (version) => {
+      const doc = await generator.generate(
+        {
+          create: oc.meta(openapi({ method: 'POST', path: '/penguins' })).errors({
+            PENGUIN_NAME_BANNED: {},
+            PENGUIN_COLONY_FULL: {},
+          }),
+        },
+        {
+          version,
+          errorStatusMap: { PENGUIN_NAME_BANNED: 400, PENGUIN_COLONY_FULL: 400 },
+        },
+      )
 
-    const response = doc.paths?.['/penguins']?.post?.responses?.['400']
-    expect(response).toMatchObject({
-      content: {
-        'application/json': {
-          schema: {
-            oneOf: [
-              { $ref: '#/components/schemas/PenguinNameBanned' },
-              { $ref: '#/components/schemas/PenguinColonyFull' },
-              { $ref: '#/components/schemas/UndefinedError' },
-            ],
+      const response = doc.paths?.['/penguins']?.post?.responses?.['400']
+      expect(response).toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              oneOf: [
+                { $ref: '#/components/schemas/PenguinNameBanned' },
+                { $ref: '#/components/schemas/PenguinColonyFull' },
+                { $ref: '#/components/schemas/UndefinedError' },
+              ],
+            },
+          },
+        },
+      })
+      expect(doc.components?.schemas).toMatchObject({
+        PenguinNameBanned: { title: 'PENGUIN_NAME_BANNED' },
+        PenguinColonyFull: { title: 'PENGUIN_COLONY_FULL' },
+        UndefinedError: { title: 'UndefinedError' },
+      })
+    },
+  )
+
+  it('serializes non-JSON values after downgrading', async () => {
+    const doc = await generator.generate(
+      {},
+      {
+        version: '3.0.4',
+        base: {
+          info: {
+            'title': 'Planet API',
+            'version': '1.0.0',
+            'x-generated-at': new Date('2020-01-01T00:00:00.000Z'),
           },
         },
       },
-    })
-    expect(doc.components?.schemas).toMatchObject({
-      PenguinNameBanned: { title: 'PENGUIN_NAME_BANNED' },
-      PenguinColonyFull: { title: 'PENGUIN_COLONY_FULL' },
-      UndefinedError: { title: 'UndefinedError' },
-    })
-  })
-
-  it('serializes non-JSON values after downgrading', async () => {
-    const doc = await generator.generate({}, {
-      version: '3.0.4',
-      base: { info: { 'title': 'Planet API', 'version': '1.0.0', 'x-generated-at': new Date('2020-01-01T00:00:00.000Z') } },
-    })
+    )
 
     expect(doc.info['x-generated-at']).toBe('2020-01-01T00:00:00.000Z')
   })

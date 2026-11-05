@@ -1,8 +1,9 @@
 import type { AnyNestedClient, InferClientContext, InferClientError } from '@orpc/client'
 import type { OrderablePlugin } from '@orpc/shared'
+import { sortPlugins } from '@orpc/shared'
+
 import type { ProcedureUtilsOptions } from './procedure-utils.ts'
 import type { RouterUtilsOptions } from './router-utils.ts'
-import { sortPlugins } from '@orpc/shared'
 
 export interface RouterUtilsPlugin<T extends AnyNestedClient> extends OrderablePlugin {
   /**
@@ -47,9 +48,7 @@ export interface RouterUtilsPlugin<T extends AnyNestedClient> extends OrderableP
 export class CompositeRouterUtilsPlugin<T extends AnyNestedClient> implements RouterUtilsPlugin<T> {
   readonly name = '~composite'
 
-  constructor(
-    protected readonly plugins: RouterUtilsPlugin<T>[] = [],
-  ) {
+  constructor(protected readonly plugins: RouterUtilsPlugin<T>[] = []) {
     this.plugins = sortPlugins(plugins)
   }
 

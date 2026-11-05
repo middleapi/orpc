@@ -153,10 +153,12 @@ describe('openAPIReferenceHandlerPlugin', () => {
     }
 
     expect(allow).toHaveBeenCalledTimes(2)
-    expect(allow).toHaveBeenCalledWith(expect.objectContaining({
-      context: {},
-      request: expect.objectContaining({ url: '/spec.json' }),
-    }))
+    expect(allow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: {},
+        request: expect.objectContaining({ url: '/spec.json' }),
+      }),
+    )
     expect(spec).not.toHaveBeenCalled()
   })
 
@@ -193,10 +195,12 @@ describe('openAPIReferenceHandlerPlugin', () => {
     })
 
     expect(spec).toHaveBeenCalledOnce()
-    expect(spec).toHaveBeenCalledWith(expect.objectContaining({
-      prefix: '/gateway',
-      request: expect.objectContaining({ url: '/gateway/openapi.json' }),
-    }))
+    expect(spec).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefix: '/gateway',
+        request: expect.objectContaining({ url: '/gateway/openapi.json' }),
+      }),
+    )
     expect(result.matched).toBe(true)
     expect(result.response?.status).toBe(200)
     expect(result.response?.headers).toEqual({})
@@ -226,7 +230,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
 
     expect(html).toContain('<title>Scalar Default Title</title>')
     expect(html).toContain('https://cdn.jsdelivr.net/npm/@scalar/api-reference')
-    expect(html).toContain('Scalar.createApiReference(\'#app\', scalarConfig)')
+    expect(html).toContain("Scalar.createApiReference('#app', scalarConfig)")
     expect(html).toContain('const scalarConfig =')
     expect(html).not.toContain('rel="stylesheet"')
     expect(html).not.toContain('undefined')
@@ -242,7 +246,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
       providerScriptUrl: 'https://cdn.example.com/scalar.js?foo=1&bar=<tag>',
       providerCssUrl: 'https://cdn.example.com/scalar.css?foo=1&bar=<tag>',
       providerConfig: {
-        pageTitle: '&\'<>/',
+        pageTitle: "&'<>/",
       } as any,
     })
     const { interceptor } = getInterceptor(plugin)
@@ -256,8 +260,12 @@ describe('openAPIReferenceHandlerPlugin', () => {
 
     expect(html).toContain('<title>Scalar &amp; &quot;Docs&quot; &lt;Guide&gt;</title>')
     expect(html).toContain('<meta name="robots" content="noindex" />')
-    expect(html).toContain('<link rel="stylesheet" type="text/css" href="https://cdn.example.com/scalar.css?foo=1&amp;bar=&lt;tag&gt;" />')
-    expect(html).toContain('<script src="https://cdn.example.com/scalar.js?foo=1&amp;bar=&lt;tag&gt;"></script>')
+    expect(html).toContain(
+      '<link rel="stylesheet" type="text/css" href="https://cdn.example.com/scalar.css?foo=1&amp;bar=&lt;tag&gt;" />',
+    )
+    expect(html).toContain(
+      '<script src="https://cdn.example.com/scalar.js?foo=1&amp;bar=&lt;tag&gt;"></script>',
+    )
     expect(html).toContain('pageTitle')
     expect(html).toContain('\\u0026')
     expect(html).toContain('\\u0027')
@@ -339,7 +347,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
       providerCssUrl: 'https://cdn.example.com/swagger.css?foo=1&bar=<tag>',
       providerConfig: {
         tryItOutEnabled: true,
-        customOption: '&\'<>/',
+        customOption: "&'<>/",
         presets: ['SwaggerUIBundle.presets.apis', 'SwaggerUIStandalonePreset'],
         plugins: ['SwaggerUIBundle.plugins.DownloadUrl', 'MyPlugins.logger', 'Missing.plugin'],
       } as any,
@@ -355,8 +363,12 @@ describe('openAPIReferenceHandlerPlugin', () => {
 
     expect(html).toContain('<title>Swagger &amp; &quot;Docs&quot; &lt;Guide&gt;</title>')
     expect(html).toContain('<style>body{display:grid}</style>')
-    expect(html).toContain('<link rel="stylesheet" type="text/css" href="https://cdn.example.com/swagger.css?foo=1&amp;bar=&lt;tag&gt;" />')
-    expect(html).toContain('<script src="https://cdn.example.com/swagger.js?foo=1&amp;bar=&lt;tag&gt;"></script>')
+    expect(html).toContain(
+      '<link rel="stylesheet" type="text/css" href="https://cdn.example.com/swagger.css?foo=1&amp;bar=&lt;tag&gt;" />',
+    )
+    expect(html).toContain(
+      '<script src="https://cdn.example.com/swagger.js?foo=1&amp;bar=&lt;tag&gt;"></script>',
+    )
     expect(html).toContain('tryItOutEnabled')
     expect(html).toContain('customOption')
     expect(html).toContain('\\u0026')
@@ -369,7 +381,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
     const MyPlugins = { logger: { plugin: 'logger' } }
     const { bundle, config } = runSwaggerScript(html, { SwaggerUIStandalonePreset, MyPlugins })
 
-    expect(config.customOption).toBe('&\'<>/')
+    expect(config.customOption).toBe("&'<>/")
     expect(config.presets).toEqual([bundle.presets.apis, SwaggerUIStandalonePreset])
     expect(config.plugins).toEqual([bundle.plugins.DownloadUrl, MyPlugins.logger, undefined])
   })

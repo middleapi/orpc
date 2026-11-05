@@ -1,9 +1,10 @@
 import type { MergedErrorMap, MetaPlugin, ORPCErrorConstructorMap, Schema } from '@orpc/contract'
+import { expectTypeOf } from 'vitest'
+import { z } from 'zod'
+
 import type { MergedInitialContext } from './context.ts'
 import type { Middleware, MiddlewareDone } from './middleware.ts'
 import type { DecoratedProcedure } from './procedure-decorated.ts'
-import { expectTypeOf } from 'vitest'
-import { z } from 'zod'
 
 const errorMap = {
   BASE: {
@@ -92,7 +93,7 @@ describe('DecoratedProcedure', () => {
 
     it('outline middleware', () => {
       const middleware = {} as Middleware<
-        { auth: boolean, user: string, g?: boolean },
+        { auth: boolean; user: string; g?: boolean },
         { extra: boolean },
         string,
         string,
@@ -101,7 +102,11 @@ describe('DecoratedProcedure', () => {
 
       expectTypeOf(procedure.use(middleware)).toEqualTypeOf<
         DecoratedProcedure<
-          MergedInitialContext<{ auth: boolean }, { user: string }, { auth: boolean, user: string, g?: boolean }>,
+          MergedInitialContext<
+            { auth: boolean },
+            { user: string },
+            { auth: boolean; user: string; g?: boolean }
+          >,
           { user: string } & { extra: boolean },
           Schema<number, string>,
           Schema<string, number>,
@@ -109,11 +114,15 @@ describe('DecoratedProcedure', () => {
         >
       >()
 
-      // @ts-expect-error - input is invalid
-      void procedure.use({} as Middleware<{ auth: boolean, user: string }, object, number, any, object>)
+      void procedure.use(
+        // @ts-expect-error - input is invalid
+        {} as Middleware<{ auth: boolean; user: string }, object, number, any, object>,
+      )
 
-      // @ts-expect-error - output is invalid
-      void procedure.use({} as Middleware<{ auth: boolean, user: string }, object, string, number, object>)
+      void procedure.use(
+        // @ts-expect-error - output is invalid
+        {} as Middleware<{ auth: boolean; user: string }, object, string, number, object>,
+      )
 
       // @ts-expect-error - TInContext is not satisfy expected
       void procedure.use({} as Middleware<{ something: string }, object, string, string, object>)
@@ -125,13 +134,13 @@ describe('DecoratedProcedure', () => {
       void procedure.use({} as Middleware<object, { user: number }, string, string, object>)
     })
 
-    it('low-priority mid\'s errors and ignore conflicts', () => {
+    it("low-priority mid's errors and ignore conflicts", () => {
       const middleware = {} as Middleware<
-        { auth: boolean, user: string },
-          object,
-          string,
-          string,
-          { BASE: { message: 'CONFLICT' }, EXTRA: { message: string } }
+        { auth: boolean; user: string },
+        object,
+        string,
+        string,
+        { BASE: { message: 'CONFLICT' }; EXTRA: { message: string } }
       >
 
       expectTypeOf(procedure.use(middleware)).toEqualTypeOf<

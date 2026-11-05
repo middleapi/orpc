@@ -41,9 +41,12 @@ export function injectSlots(source: string): string {
   }
 
   const countWords = (text: string) => text.match(/\S+/g)?.length ?? 0
-  const gap = Math.max(WORDS_PER_AD, countWords(lines.slice(bodyStart).join('\n')) / MAX_ADS_PER_PAGE)
+  const gap = Math.max(
+    WORDS_PER_AD,
+    countWords(lines.slice(bodyStart).join('\n')) / MAX_ADS_PER_PAGE,
+  )
   const gridGap = Math.max(gap, WORDS_PER_AD + EXTRA_WORDS_AFTER_GRID_AD)
-  const gapAfter = (placed: number) => placed === 0 ? 0 : placed === 1 ? gridGap : gap
+  const gapAfter = (placed: number) => (placed === 0 ? 0 : placed === 1 ? gridGap : gap)
 
   let inFence = false
   let words = 0
@@ -52,8 +55,7 @@ export function injectSlots(source: string): string {
     const trimmed = lines[i]!.trim()
     if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
       inFence = !inFence
-    }
-    else if (!inFence && /^##\s/.test(trimmed) && words >= gapAfter(insertBefore.length)) {
+    } else if (!inFence && /^##\s/.test(trimmed) && words >= gapAfter(insertBefore.length)) {
       insertBefore.push(i)
       words = 0
     }
@@ -72,7 +74,7 @@ export function injectSlots(source: string): string {
 }
 
 const contentDirs = ['docs', 'blog'].map(
-  dir => join(dirname(fileURLToPath(import.meta.url)), '..', dir) + sep,
+  (dir) => join(dirname(fileURLToPath(import.meta.url)), '..', dir) + sep,
 )
 
 /**
@@ -85,7 +87,7 @@ export function sponsorAdsInjectPlugin() {
     enforce: 'pre' as const,
     async load(id: string) {
       const path = id.split('?')[0]!
-      if (!path.endsWith('.mdx') || !contentDirs.some(dir => path.startsWith(dir))) {
+      if (!path.endsWith('.mdx') || !contentDirs.some((dir) => path.startsWith(dir))) {
         return null
       }
       return injectSlots(await readFile(path, 'utf-8'))

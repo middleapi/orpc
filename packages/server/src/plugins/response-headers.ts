@@ -1,7 +1,8 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
 import { toArray } from '@orpc/shared'
 import { mergeStandardHeaders } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
+
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
 
 /**
  * The context shape into which the Response Headers Plugin injects `resHeaders`.
@@ -25,7 +26,9 @@ export interface ResponseHeadersHandlerPluginContext {
  *
  * @see {@link https://orpc.dev/docs/plugins/response-headers | Response Headers Plugin}
  */
-export class ResponseHeadersHandlerPlugin<T extends ResponseHeadersHandlerPluginContext> implements StandardHandlerPlugin<T> {
+export class ResponseHeadersHandlerPlugin<
+  T extends ResponseHeadersHandlerPluginContext,
+> implements StandardHandlerPlugin<T> {
   name = '~response-headers'
   /**
    * Interceptors should run after batch interceptors so headers are applied to each sub-response.

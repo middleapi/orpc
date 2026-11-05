@@ -1,8 +1,9 @@
-import type { Schema } from './schema.ts'
 import { ORPCError } from '@orpc/client'
 import z from 'zod'
-import { ValidationError } from './error.ts'
+
 import { createORPCErrorConstructorMap, error } from './error-factory.ts'
+import { ValidationError } from './error.ts'
+import type { Schema } from './schema.ts'
 
 describe('error factory', () => {
   const dataSchema = z.object({ value: z.number() })
@@ -71,7 +72,7 @@ describe('error factory', () => {
         '~standard': {
           version: 1,
           vendor: 'test',
-          validate: async value => ({ value }),
+          validate: async (value) => ({ value }),
         },
       } satisfies Schema<unknown>,
     })
@@ -91,7 +92,7 @@ describe('error factory', () => {
   })
 
   it('defaults static data to a passthrough schema', async () => {
-    const result = await SimpleError.data['~standard'].validate('anything') as any
+    const result = (await SimpleError.data['~standard'].validate('anything')) as any
 
     expect(result.value).toBe('anything')
     expect(result.issues).toBeUndefined()
@@ -140,7 +141,7 @@ describe('error factory', () => {
           '~standard': {
             version: 1,
             vendor: 'test',
-            validate: async value => ({ value }),
+            validate: async (value) => ({ value }),
           },
         } satisfies Schema<unknown>,
       })

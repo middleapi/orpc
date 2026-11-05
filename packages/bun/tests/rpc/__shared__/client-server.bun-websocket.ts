@@ -1,8 +1,10 @@
-import type { CreateClientServerTest } from './client-server.ts'
+import { afterAll } from 'bun:test'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/websocket'
 import { RPCHandler } from '@orpc/server/websocket'
-import { afterAll } from 'bun:test'
+
+import type { CreateClientServerTest } from './client-server.ts'
 import { defaultSerializer } from './client-server.ts'
 
 export const createBunWebSocketClientServerTest: CreateClientServerTest = (

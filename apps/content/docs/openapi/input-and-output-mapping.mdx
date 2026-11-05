@@ -1,8 +1,8 @@
 ---
-title: "OpenAPI Input and Output Mapping"
-description: "Learn how oRPC maps OpenAPI requests and responses to procedure inputs and outputs with compact and detailed structures, parameter styles, and body hints."
+title: 'OpenAPI Input and Output Mapping'
+description: 'Learn how oRPC maps OpenAPI requests and responses to procedure inputs and outputs with compact and detailed structures, parameter styles, and body hints.'
 sidebar:
-  label: "Input and Output Mapping"
+  label: 'Input and Output Mapping'
 ---
 
 ## Input Mapping
@@ -12,10 +12,12 @@ By default, oRPC uses `compact` mode where path parameters are merged with eithe
 ```ts
 const searchPlanets = os
   .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
-  .input(z.object({
-    id: z.string(),
-    q: z.string().optional(),
-  }))
+  .input(
+    z.object({
+      id: z.string(),
+      q: z.string().optional(),
+    }),
+  )
   .handler(async ({ input }) => {
     return { id: input.id, q: input.q }
   })
@@ -40,17 +42,21 @@ In `detailed` mode, the input is an object with separate `params`, `query`, `hea
 
 ```ts
 const updatePlanet = os
-  .meta(openapi({
-    method: 'POST',
-    path: '/planets/{id}',
-    inputStructure: 'detailed',
-  }))
-  .input(z.object({
-    params: z.object({ id: z.string() }),
-    query: z.object({ dryRun: z.coerce.boolean().optional() }).optional(),
-    headers: z.object({ 'x-trace-id': z.string() }).optional(),
-    body: z.object({ name: z.string() }),
-  }))
+  .meta(
+    openapi({
+      method: 'POST',
+      path: '/planets/{id}',
+      inputStructure: 'detailed',
+    }),
+  )
+  .input(
+    z.object({
+      params: z.object({ id: z.string() }),
+      query: z.object({ dryRun: z.coerce.boolean().optional() }).optional(),
+      headers: z.object({ 'x-trace-id': z.string() }).optional(),
+      body: z.object({ name: z.string() }),
+    }),
+  )
   .handler(async ({ input }) => {
     return input
   })
@@ -77,21 +83,25 @@ By default, path parameters are decoded as plain strings. Use `paramsStyles` to 
 
 ```ts
 const getPlanets = os
-  .meta(openapi({
-    method: 'GET',
-    path: '/planets/{ids}/{filters}',
-    paramsStyles: {
-      ids: 'comma-delimited-array',
-      filters: 'comma-delimited-object',
-    },
-  }))
-  .input(z.object({
-    ids: z.array(z.string()),
-    filters: z.object({
-      type: z.string(),
-      status: z.string(),
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/planets/{ids}/{filters}',
+      paramsStyles: {
+        ids: 'comma-delimited-array',
+        filters: 'comma-delimited-object',
+      },
     }),
-  }))
+  )
+  .input(
+    z.object({
+      ids: z.array(z.string()),
+      filters: z.object({
+        type: z.string(),
+        status: z.string(),
+      }),
+    }),
+  )
   .handler(async () => [])
 ```
 
@@ -113,16 +123,18 @@ By default, query parameters are decoded with [bracket notation](/docs/openapi/b
 
 ```ts
 const searchPlanets = os
-  .meta(openapi({
-    method: 'GET',
-    path: '/planets',
-    queryStyles: {
-      keyword: 'primitive',
-      tags: 'comma-delimited-array',
-      filters: 'comma-delimited-object',
-      meta: 'json',
-    },
-  }))
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/planets',
+      queryStyles: {
+        keyword: 'primitive',
+        tags: 'comma-delimited-array',
+        filters: 'comma-delimited-object',
+        meta: 'json',
+      },
+    }),
+  )
   .handler(async () => [])
 ```
 
@@ -167,23 +179,27 @@ In `detailed` mode, return an object with the following fields:
 
 ```ts
 const savePlanet = os
-  .meta(openapi({
-    method: 'PUT',
-    path: '/planets/{id}',
-    outputStructure: 'detailed',
-    successStatus: 200,
-  }))
+  .meta(
+    openapi({
+      method: 'PUT',
+      path: '/planets/{id}',
+      outputStructure: 'detailed',
+      successStatus: 200,
+    }),
+  )
   .input(z.object({ id: z.string() }))
-  .output(z.union([
-    z.object({
-      status: z.literal(201).meta({ description: 'Created' }),
-      body: z.object({ id: z.string(), name: z.string() }),
-    }),
-    z.object({
-      status: z.literal(200).meta({ description: 'Updated' }),
-      body: z.object({ id: z.string(), name: z.string() }),
-    }),
-  ]))
+  .output(
+    z.union([
+      z.object({
+        status: z.literal(201).meta({ description: 'Created' }),
+        body: z.object({ id: z.string(), name: z.string() }),
+      }),
+      z.object({
+        status: z.literal(200).meta({ description: 'Updated' }),
+        body: z.object({ id: z.string(), name: z.string() }),
+      }),
+    ]),
+  )
   .handler(async ({ input }) => {
     if (!isExistingPlanet(input.id)) {
       return {
@@ -205,15 +221,19 @@ Combine `successStatus` with the [detailed output structure](#detailed-output-st
 
 ```ts
 const redirect = os
-  .meta(openapi({
-    method: 'GET',
-    path: '/redirect',
-    successStatus: 307,
-    outputStructure: 'detailed',
-  }))
-  .output(z.object({
-    headers: z.object({ location: z.string() }),
-  }))
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/redirect',
+      successStatus: 307,
+      outputStructure: 'detailed',
+    }),
+  )
+  .output(
+    z.object({
+      headers: z.object({ location: z.string() }),
+    }),
+  )
   .handler(async () => {
     return {
       headers: { location: 'https://orpc.dev' },
@@ -231,10 +251,12 @@ The body parser normally uses `Content-Type`, `Content-Length`, `Content-Disposi
 
 ```ts
 const uploadLargeFile = os
-  .meta(openapi({
-    requestBodyHint: 'octet-stream',
-    responseBodyHint: 'json',
-  }))
+  .meta(
+    openapi({
+      requestBodyHint: 'octet-stream',
+      responseBodyHint: 'json',
+    }),
+  )
   .input(z.instanceof(ReadableStream))
   .handler(async ({ input }) => {
     for await (const chunk of input) {
@@ -266,16 +288,14 @@ Learn more about body hints in the [Standard Server documentation](https://githu
 When `openapi` is applied multiple times, `paramsStyles` and `queryStyles` are merged per parameter, and the most recent style defined for a parameter wins. `inputStructure`, `outputStructure`, `responseBodyHint`, and `requestBodyHint` are overridden by the most recent call. For the full merge behavior of every field, see [Metadata Merging](/docs/openapi/specification#metadata-merging).
 
 ```ts
-const router = os
-  .meta(openapi({ inputStructure: 'detailed' }))
-  .router({
-    get: os
-      .meta(openapi({ method: 'GET', path: '/planets', inputStructure: 'compact' }))
-      .meta(openapi({ queryStyles: { tags: 'comma-delimited-array' } }))
-      .meta(openapi({ queryStyles: { q: 'primitive' } }))
-      .input(z.object({ tags: z.array(z.string()), q: z.string().optional() }))
-      .handler(async () => ([])),
-  })
+const router = os.meta(openapi({ inputStructure: 'detailed' })).router({
+  get: os
+    .meta(openapi({ method: 'GET', path: '/planets', inputStructure: 'compact' }))
+    .meta(openapi({ queryStyles: { tags: 'comma-delimited-array' } }))
+    .meta(openapi({ queryStyles: { q: 'primitive' } }))
+    .input(z.object({ tags: z.array(z.string()), q: z.string().optional() }))
+    .handler(async () => []),
+})
 ```
 
 These are equivalent to:
@@ -283,17 +303,19 @@ These are equivalent to:
 ```ts
 const router = {
   get: os
-    .meta(openapi({
-      method: 'GET',
-      path: '/planets',
-      inputStructure: 'compact',
-      queryStyles: {
-        tags: 'comma-delimited-array',
-        q: 'primitive',
-      },
-    }))
+    .meta(
+      openapi({
+        method: 'GET',
+        path: '/planets',
+        inputStructure: 'compact',
+        queryStyles: {
+          tags: 'comma-delimited-array',
+          q: 'primitive',
+        },
+      }),
+    )
     .input(z.object({ tags: z.array(z.string()), q: z.string().optional() }))
-    .handler(async () => ([])),
+    .handler(async () => []),
 }
 ```
 

@@ -1,12 +1,13 @@
 import type { ClientContext } from '@orpc/client'
+import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { ThrowableError } from '@orpc/shared'
-import type { RouterContract } from '../router.ts'
-import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAsyncIteratorObject, override, toArray } from '@orpc/shared'
-import { ValidationError } from '../error.ts'
+
 import { reconcileORPCError } from '../error-utils.ts'
+import { ValidationError } from '../error.ts'
 import { getProcedureContractOrThrow } from '../router-utils.ts'
+import type { RouterContract } from '../router.ts'
 
 /**
  * Validates server responses against contract schemas before your application uses them.
@@ -14,13 +15,12 @@ import { getProcedureContractOrThrow } from '../router-utils.ts'
  *
  * @see {@link https://orpc.dev/docs/plugins/response-validation | Response Validation Plugin}
  */
-export class ResponseValidationLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
+export class ResponseValidationLinkPlugin<
+  T extends ClientContext,
+> implements StandardLinkPlugin<T> {
   name = '~response-validation'
 
-  constructor(
-    private readonly contract: RouterContract,
-  ) {
-  }
+  constructor(private readonly contract: RouterContract) {}
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     return {
@@ -47,15 +47,14 @@ export class ResponseValidationLinkPlugin<T extends ClientContext> implements St
                * @warning
                * Remember use `override` for AsyncIteratorObject to remain other special properties
                */
-              return override(output, wrapAsyncIteratorPreservingEventMeta(
+              return override(
                 output,
-                { mapError: reconcileError },
-              )) as typeof output
+                wrapAsyncIteratorPreservingEventMeta(output, { mapError: reconcileError }),
+              ) as typeof output
             }
 
             return output
-          }
-          catch (error) {
+          } catch (error) {
             throw await reconcileError(error as ThrowableError)
           }
         },

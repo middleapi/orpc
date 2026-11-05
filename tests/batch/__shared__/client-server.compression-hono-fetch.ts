@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server.ts'
+
 import { serve } from '@hono/node-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
@@ -7,6 +7,8 @@ import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
+
+import type { CreateBatchClientServerTest } from './client-server.ts'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
 
 /**
@@ -55,7 +57,8 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
   const fetchSpy = vi.fn(async (url: string, init: RequestInit) => {
     const response = await fetch(url, init)
 
-    if (response.status === 207) { // every batch response, framed or json, travels compressed here
+    if (response.status === 207) {
+      // every batch response, framed or json, travels compressed here
       expect(response.headers.get('content-encoding')).toBe('gzip')
     }
 

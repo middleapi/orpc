@@ -1,14 +1,15 @@
 import { getEventMeta, ORPCError, withEventMeta } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import * as z from 'zod'
-import { ValidationError } from '../error.ts'
+
 import { reconcileORPCError } from '../error-utils.ts'
+import { ValidationError } from '../error.ts'
 import { ProcedureContract } from '../procedure.ts'
 import { asyncIteratorObject } from '../schema-built-in.ts'
 import { ResponseValidationLinkPlugin } from './response-validation.ts'
 
-vi.mock('../error-utils.ts', async original => ({
-  ...await original(),
+vi.mock('../error-utils.ts', async (original) => ({
+  ...(await original()),
   reconcileORPCError: vi.fn(),
 }))
 
@@ -20,16 +21,16 @@ describe('responseValidationLinkPlugin', () => {
   const procedure = new ProcedureContract({
     outputSchemas: [
       z.object({
-        value: z.number().transform(value => value + 1),
+        value: z.number().transform((value) => value + 1),
       }),
       z.object({
-        value: z.string().transform(value => Number.parseInt(value)),
+        value: z.string().transform((value) => Number.parseInt(value)),
       }),
     ],
     errorMap: {
       TEST: {
         data: z.object({
-          value: z.string().transform(value => Number.parseInt(value)),
+          value: z.string().transform((value) => Number.parseInt(value)),
         }),
       },
     },
@@ -68,15 +69,22 @@ describe('responseValidationLinkPlugin', () => {
   const interceptor = vi.fn(({ next }) => next())
 
   const link = new StandardLink(codec, transport, {
-    plugins: [
-      new ResponseValidationLinkPlugin(contract),
-    ],
+    plugins: [new ResponseValidationLinkPlugin(contract)],
     interceptors: [interceptor],
   })
 
   function mockResponse(url: string, decoded: unknown, status = 200) {
-    codec.encodeInput.mockResolvedValueOnce({ method: 'POST', url, headers: {}, body: '__encoded__' })
-    transport.send.mockResolvedValueOnce({ status, headers: {}, resolveBody: () => Promise.resolve('__body__') })
+    codec.encodeInput.mockResolvedValueOnce({
+      method: 'POST',
+      url,
+      headers: {},
+      body: '__encoded__',
+    })
+    transport.send.mockResolvedValueOnce({
+      status,
+      headers: {},
+      resolveBody: () => Promise.resolve('__body__'),
+    })
     codec.decodeResponse.mockResolvedValueOnce(decoded)
   }
 
@@ -131,14 +139,26 @@ describe('responseValidationLinkPlugin', () => {
     await expect(link.call(['nested', 'procedure'], {}, { context: {} })).rejects.toBe(reconciled)
     await expect(interceptor.mock.results[0]?.value).rejects.toBe(error)
 
-    expect(reconcileORPCError).toHaveBeenCalledWith(contract.nested.procedure['~orpc'].errorMap, error)
+    expect(reconcileORPCError).toHaveBeenCalledWith(
+      contract.nested.procedure['~orpc'].errorMap,
+      error,
+    )
   })
 
   it('rethrows non-ORPCError failures without reconciliation', async () => {
     const error = new Error('plain failure')
 
-    codec.encodeInput.mockResolvedValueOnce({ method: 'POST', url: '/nested/procedure', headers: {}, body: '__encoded__' })
-    transport.send.mockResolvedValueOnce({ status: 500, headers: {}, resolveBody: () => Promise.resolve('__body__') })
+    codec.encodeInput.mockResolvedValueOnce({
+      method: 'POST',
+      url: '/nested/procedure',
+      headers: {},
+      body: '__encoded__',
+    })
+    transport.send.mockResolvedValueOnce({
+      status: 500,
+      headers: {},
+      resolveBody: () => Promise.resolve('__body__'),
+    })
     codec.decodeResponse.mockRejectedValueOnce(error)
 
     await expect(link.call(['nested', 'procedure'], {}, { context: {} })).rejects.toBe(error)
@@ -161,7 +181,11 @@ describe('responseValidationLinkPlugin', () => {
       })
       vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
 
-      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+      const output = (await link.call(
+        ['stream'],
+        {},
+        { context: {} },
+      )) as AsyncIteratorObject<number>
 
       expect(reconcileORPCError).not.toHaveBeenCalled()
       await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
@@ -172,7 +196,10 @@ describe('responseValidationLinkPlugin', () => {
     })
 
     it('preserves event meta of reconciled mid-stream errors', async () => {
-      const error = withEventMeta(new ORPCError('TEST', { data: { value: '123' } }), { id: 'id-1', retry: 1000 })
+      const error = withEventMeta(new ORPCError('TEST', { data: { value: '123' } }), {
+        id: 'id-1',
+        retry: 1000,
+      })
       const reconciled = new ORPCError('TEST', { data: { value: 123 } })
 
       mockResponse('/stream', {
@@ -183,9 +210,13 @@ describe('responseValidationLinkPlugin', () => {
       })
       vi.mocked(reconcileORPCError).mockResolvedValueOnce(reconciled)
 
-      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+      const output = (await link.call(
+        ['stream'],
+        {},
+        { context: {} },
+      )) as AsyncIteratorObject<number>
 
-      const thrown = await output.next().catch(e => e)
+      const thrown = await output.next().catch((e) => e)
 
       expect(thrown).toBeInstanceOf(ORPCError)
       expect(thrown.data).toEqual({ value: 123 })
@@ -202,14 +233,19 @@ describe('responseValidationLinkPlugin', () => {
         })(),
       })
 
-      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+      const output = (await link.call(
+        ['stream'],
+        {},
+        { context: {} },
+      )) as AsyncIteratorObject<number>
 
       await expect(output.next()).rejects.toBe(error)
       expect(reconcileORPCError).not.toHaveBeenCalled()
     })
 
     it('marks mid-stream errors as defined and applies the error data schema', async () => {
-      const { reconcileORPCError: actualReconcileORPCError } = await vi.importActual<typeof import('../error-utils.ts')>('../error-utils.ts')
+      const { reconcileORPCError: actualReconcileORPCError } =
+        await vi.importActual<typeof import('../error-utils.ts')>('../error-utils.ts')
       vi.mocked(reconcileORPCError).mockImplementation(actualReconcileORPCError)
       onTestFinished(() => {
         vi.mocked(reconcileORPCError).mockReset()
@@ -223,11 +259,15 @@ describe('responseValidationLinkPlugin', () => {
         })(),
       })
 
-      const output = await link.call(['stream'], {}, { context: {} }) as AsyncIteratorObject<number>
+      const output = (await link.call(
+        ['stream'],
+        {},
+        { context: {} },
+      )) as AsyncIteratorObject<number>
 
       await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
-      await expect(output.next()).rejects.toSatisfy((error: any) =>
-        error instanceof ORPCError &&  error.defined && error.data.value === 123,
+      await expect(output.next()).rejects.toSatisfy(
+        (error: any) => error instanceof ORPCError && error.defined && error.data.value === 123,
       )
     })
   })

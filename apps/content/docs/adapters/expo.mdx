@@ -1,8 +1,8 @@
 ---
-title: "Expo Adapter"
-description: "Use oRPC in an Expo app over fetch or WebSocket, including streaming support, binary data, and the SDK versions each feature needs."
+title: 'Expo Adapter'
+description: 'Use oRPC in an Expo app over fetch or WebSocket, including streaming support, binary data, and the SDK versions each feature needs.'
 sidebar:
-  label: "Expo"
+  label: 'Expo'
 ---
 
 [Expo](https://expo.dev/) is the supported way to run oRPC in a React Native app. It installs the browser APIs oRPC depends on, which bare React Native does not provide, so JSON calls, [AsyncIteratorObject](/docs/async-iterator-object), and streamed downloads work in a plain Expo project with no polyfill and no Metro configuration. [Some `File` and `Blob` cases](#feature-support) need one extra package.
@@ -84,8 +84,8 @@ oRPC treats binary data two different ways, and the difference decides what work
 
 Expo never parses multipart, and the WebSocket link cannot even produce it, which is why every nested row below fails somewhere.
 
-| Feature                                                                             | Fetch                                      | WebSocket                                  |
-| ----------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------ |
+| Feature                                                                             | Fetch                                       | WebSocket                                   |
+| ----------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------- |
 | [AsyncIteratorObject](/docs/async-iterator-object) download                         | ✅                                          | ✅                                          |
 | `AsyncIteratorObject` upload                                                        | 🟡 buffered                                 | ✅                                          |
 | [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) download | ✅                                          | ✅                                          |
@@ -118,7 +118,11 @@ class File extends Blob {
   lastModified: number
   webkitRelativePath = ''
 
-  constructor(fileBits: BlobPart[] | Iterable<BlobPart>, fileName: string, options?: FilePropertyBag) {
+  constructor(
+    fileBits: BlobPart[] | Iterable<BlobPart>,
+    fileName: string,
+    options?: FilePropertyBag,
+  ) {
     super(fileBits, options)
 
     this.name = String(fileName)
@@ -145,10 +149,10 @@ A nested `File` or `Blob` is packed into a `FormData` and sent as `multipart/for
 
 Writing multipart works, but only on the fetch link, where `expo/fetch` does the encoding. The WebSocket link uses `Response` to write it too, so that link fails in both directions.
 
-| Link      | Nested upload                              | Nested download |
-| --------- | ------------------------------------------ | --------------- |
-| Fetch     | 🟡 with the [Blob polyfill](#blob-polyfill) | ❌               |
-| WebSocket | ❌                                          | ❌               |
+| Link      | Nested upload                               | Nested download |
+| --------- | ------------------------------------------- | --------------- |
+| Fetch     | 🟡 with the [Blob polyfill](#blob-polyfill) | ❌              |
+| WebSocket | ❌                                          | ❌              |
 
 **The easy fix is to avoid multipart.** Keep files at the root of a procedure's input or output instead of inside an object. Or extend the [RPC JSON Serializer](/docs/rpc/serializer) to carry binary as `base64`.
 

@@ -1,8 +1,8 @@
 ---
-title: "Request Compression Plugin"
-description: "Compress request bodies on the client and decompress them on the server to reduce bandwidth usage for large payloads."
+title: 'Request Compression Plugin'
+description: 'Compress request bodies on the client and decompress them on the server to reduce bandwidth usage for large payloads.'
 sidebar:
-  label: "Request Compression"
+  label: 'Request Compression'
 ---
 
 ## Client
@@ -56,7 +56,10 @@ const link = new RPCLink({
        * @default isCompressibleContentType (covers common text-based formats)
        */
       isCompressibleContentType: (contentType, { path }) => {
-        return /^application\/x-custom-format(?:[;\s]|$)/i.test(contentType ?? '') && path[0] !== 'uploads'
+        return (
+          /^application\/x-custom-format(?:[;\s]|$)/i.test(contentType ?? '') &&
+          path[0] !== 'uploads'
+        )
       },
     }),
   ],
@@ -71,9 +74,7 @@ Use `RequestCompressionHandlerPlugin` to decompress request bodies. The plugin a
 import { RequestCompressionHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new RequestCompressionHandlerPlugin(),
-  ],
+  plugins: [new RequestCompressionHandlerPlugin()],
 })
 ```
 

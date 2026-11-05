@@ -1,5 +1,3 @@
 export * from './converter.ts'
 
-export type {
-  JsonSchema,
-} from '@orpc/json-schema'
+export type { JsonSchema } from '@orpc/json-schema'

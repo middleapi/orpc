@@ -1,4 +1,5 @@
 import type { StandardLazyRequest } from '@standard-server/core'
+
 import { createStandardPeerRequestHandler } from './utils.ts'
 
 beforeEach(() => {
@@ -13,7 +14,10 @@ describe('createStandardPeerRequestHandler', () => {
       handle: vi.fn(async () => ({ matched: true, response })),
     } as any
 
-    const handleRequest = createStandardPeerRequestHandler(handler, { context: { context: true }, prefix: '/api' })
+    const handleRequest = createStandardPeerRequestHandler(handler, {
+      context: { context: true },
+      prefix: '/api',
+    })
 
     const request: StandardLazyRequest = {
       resolveBody: async () => 'request-body',
@@ -28,7 +32,10 @@ describe('createStandardPeerRequestHandler', () => {
     expect(result).toEqual(response)
 
     expect(handler.handle).toHaveBeenCalledTimes(1)
-    expect(handler.handle).toHaveBeenCalledWith(request, { context: { context: true }, prefix: '/api' })
+    expect(handler.handle).toHaveBeenCalledWith(request, {
+      context: { context: true },
+      prefix: '/api',
+    })
   })
 
   it('returns 404 response when no procedure matched', async () => {
@@ -55,7 +62,7 @@ describe('createStandardPeerRequestHandler', () => {
       handle: vi.fn(async () => ({ matched: false, response: undefined })),
     } as any
 
-    const handleRequest = createStandardPeerRequestHandler(handler, { })
+    const handleRequest = createStandardPeerRequestHandler(handler, {})
 
     const lazyRequest = {
       resolveBody: async () => 'request-body',

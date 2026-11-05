@@ -1,20 +1,20 @@
 import type { ClientContext, ClientLink, ORPCClientOptions } from '@orpc/client'
-import type { RouterContract } from './router.ts'
-import type { RouterContractClient } from './router-client.ts'
 import { createORPCClient } from '@orpc/client'
 import { get, isTypescriptObject, set } from '@orpc/shared'
+
 import { resolveBasePathMeta } from './meta-built-in.ts'
 import { ProcedureContract } from './procedure.ts'
+import type { RouterContractClient } from './router-client.ts'
+import type { RouterContract } from './router.ts'
 
-export interface ContractClientFactory<
-  TClientContext extends ClientContext,
-> {
+export interface ContractClientFactory<TClientContext extends ClientContext> {
   <T extends RouterContract>(contract: T): RouterContractClient<T, TClientContext>
 }
 
-export interface ContractClientFactoryOptions<
-  TClientContext extends ClientContext,
-> extends Pick<ORPCClientOptions<RouterContractClient<RouterContract, TClientContext>>, 'interceptors' | 'scoped'> {
+export interface ContractClientFactoryOptions<TClientContext extends ClientContext> extends Pick<
+  ORPCClientOptions<RouterContractClient<RouterContract, TClientContext>>,
+  'interceptors' | 'scoped'
+> {
   /**
    * An optional reference to the root router-contract.
    * When provided, the client factory will automatically register the passed contract
@@ -32,9 +32,7 @@ export interface ContractClientFactoryOptions<
  *
  * @see {@link https://orpc.dev/docs/contract/client-factory | Contract Client Factory}
  */
-export function createContractClientFactory<
-  TClientContext extends ClientContext,
->(
+export function createContractClientFactory<TClientContext extends ClientContext>(
   link: ClientLink<TClientContext>,
   options: ContractClientFactoryOptions<TClientContext> = {},
 ): ContractClientFactory<TClientContext> {
@@ -65,7 +63,7 @@ export function createContractClientFactory<
       register(contract, path)
     }
 
-    return createORPCClient(link, { ...options as any, scoped: get(options.scoped, path), path })
+    return createORPCClient(link, { ...(options as any), scoped: get(options.scoped, path), path })
   }
 
   return factory

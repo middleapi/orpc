@@ -1,5 +1,6 @@
 import { MalformedResponseError, ORPCError, ResponseError } from '@orpc/client'
 import { oc } from '@orpc/contract'
+
 import { openapi } from '../../meta.ts'
 import { OpenAPISerializer } from '../../openapi-serializer.ts'
 import { OpenAPILinkCodec } from './openapi-link-codec.ts'
@@ -51,14 +52,19 @@ describe('openAPILinkCodec', () => {
       })
 
       it('builds a HEAD request with query parameters and no body', async () => {
-        const codec = new OpenAPILinkCodec({
-          check: oc.meta(openapi({ method: 'HEAD', path: '/items/{id}' })),
-        }, {
-          url: '/api',
-          serializer,
-        })
+        const codec = new OpenAPILinkCodec(
+          {
+            check: oc.meta(openapi({ method: 'HEAD', path: '/items/{id}' })),
+          },
+          {
+            url: '/api',
+            serializer,
+          },
+        )
 
-        const request = await codec.encodeInput({ id: '42', verbose: true }, ['check'], { context: {} })
+        const request = await codec.encodeInput({ id: '42', verbose: true }, ['check'], {
+          context: {},
+        })
 
         expect(request.method).toBe('HEAD')
         expect(request.body).toBeUndefined()
@@ -69,36 +75,45 @@ describe('openAPILinkCodec', () => {
       })
 
       it('builds a GET request with a prefixed path and mixed query styles', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            method: 'GET',
-            prefix: '/v1',
-            path: '/items/{id}',
-            paramsStyles: {
-              id: 'primitive',
-            },
-            queryStyles: {
-              keyword: 'primitive',
-              tags: 'array',
-              filters: 'comma-delimited-object',
-              meta: 'json',
-            },
-          })),
-        }, {
-          url: '/api?existing=1#frag',
-          headers: { 'x-client': 'openapi' },
-          serializer,
-        })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                method: 'GET',
+                prefix: '/v1',
+                path: '/items/{id}',
+                paramsStyles: {
+                  id: 'primitive',
+                },
+                queryStyles: {
+                  keyword: 'primitive',
+                  tags: 'array',
+                  filters: 'comma-delimited-object',
+                  meta: 'json',
+                },
+              }),
+            ),
+          },
+          {
+            url: '/api?existing=1#frag',
+            headers: { 'x-client': 'openapi' },
+            serializer,
+          },
+        )
 
-        const request = await codec.encodeInput({
-          id: '42',
-          keyword: 'latest',
-          tags: ['red', 'blue'],
-          filters: { size: 'large', brand: 'nike' },
-          meta: { enabled: true },
-          plain: { nested: true },
-          file: new Blob(['file']),
-        }, ['item'], { context: {}, lastEventId: 'evt-1' })
+        const request = await codec.encodeInput(
+          {
+            id: '42',
+            keyword: 'latest',
+            tags: ['red', 'blue'],
+            filters: { size: 'large', brand: 'nike' },
+            meta: { enabled: true },
+            plain: { nested: true },
+            file: new Blob(['file']),
+          },
+          ['item'],
+          { context: {}, lastEventId: 'evt-1' },
+        )
 
         expect(request.method).toBe('GET')
         expect(request.body).toBeUndefined()
@@ -120,9 +135,12 @@ describe('openAPILinkCodec', () => {
       })
 
       it('rejects non-object input when dynamic path params must be resolved', async () => {
-        const codec = new OpenAPILinkCodec({
-          ping: oc.meta(openapi({ path: '/items/{id}' })),
-        }, { serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            ping: oc.meta(openapi({ path: '/items/{id}' })),
+          },
+          { serializer },
+        )
 
         await expect(codec.encodeInput('invalid', ['ping'], { context: {} })).rejects.toThrow(
           'Input must be an object with "compact" input structure when the path has dynamic params (id) in call to procedure (ping).',
@@ -132,30 +150,39 @@ describe('openAPILinkCodec', () => {
 
     describe('detailed requests', () => {
       it('builds a request with styled params, styled query, and merged headers', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'POST',
-            path: '/search/{tags}',
-            inputStructure: 'detailed',
-            paramsStyles: {
-              tags: 'comma-delimited-array',
-            },
-            queryStyles: {
-              meta: 'json',
-            },
-          })),
-        }, {
-          url: '/api',
-          headers: { 'x-base': '1' },
-          serializer,
-        })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'POST',
+                path: '/search/{tags}',
+                inputStructure: 'detailed',
+                paramsStyles: {
+                  tags: 'comma-delimited-array',
+                },
+                queryStyles: {
+                  meta: 'json',
+                },
+              }),
+            ),
+          },
+          {
+            url: '/api',
+            headers: { 'x-base': '1' },
+            serializer,
+          },
+        )
 
-        const request = await codec.encodeInput({
-          params: { tags: ['alpha', 'beta'] },
-          query: { meta: { enabled: true } },
-          headers: { 'x-request': '2' },
-          body: { title: 'Hello' },
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            params: { tags: ['alpha', 'beta'] },
+            query: { meta: { enabled: true } },
+            headers: { 'x-request': '2' },
+            body: { title: 'Hello' },
+          },
+          ['search'],
+          { context: {} },
+        )
 
         expect(request).toEqual({
           method: 'POST',
@@ -167,13 +194,16 @@ describe('openAPILinkCodec', () => {
       })
 
       it('uses base headers when detailed input omits the headers field', async () => {
-        const codec = new OpenAPILinkCodec({
-          ping: oc.meta(openapi({ inputStructure: 'detailed' })),
-        }, {
-          url: '/api',
-          headers: { 'x-base': 'yes' },
-          serializer,
-        })
+        const codec = new OpenAPILinkCodec(
+          {
+            ping: oc.meta(openapi({ inputStructure: 'detailed' })),
+          },
+          {
+            url: '/api',
+            headers: { 'x-base': 'yes' },
+            serializer,
+          },
+        )
 
         const request = await codec.encodeInput({ body: 'data' }, ['ping'], { context: {} })
 
@@ -181,25 +211,32 @@ describe('openAPILinkCodec', () => {
       })
 
       it('serializes non-string header values before merging', async () => {
-        const codec = new OpenAPILinkCodec({
-          ping: oc.meta(openapi({ inputStructure: 'detailed' })),
-        }, {
-          url: '/api',
-          headers: { 'x-multi': 'base' },
-          serializer,
-        })
-
-        const request = await codec.encodeInput({
-          headers: {
-            'x-number': 42,
-            'x-boolean': false,
-            'x-date': new Date('2020-01-02T03:04:05.000Z'),
-            'x-array': ['a', 1, null, undefined],
-            'x-multi': ['b', 'c'],
-            'x-null': null,
-            'x-undefined': undefined,
+        const codec = new OpenAPILinkCodec(
+          {
+            ping: oc.meta(openapi({ inputStructure: 'detailed' })),
           },
-        }, ['ping'], { context: {} })
+          {
+            url: '/api',
+            headers: { 'x-multi': 'base' },
+            serializer,
+          },
+        )
+
+        const request = await codec.encodeInput(
+          {
+            headers: {
+              'x-number': 42,
+              'x-boolean': false,
+              'x-date': new Date('2020-01-02T03:04:05.000Z'),
+              'x-array': ['a', 1, null, undefined],
+              'x-multi': ['b', 'c'],
+              'x-null': null,
+              'x-undefined': undefined,
+            },
+          },
+          ['ping'],
+          { context: {} },
+        )
 
         expect(request.headers).toEqual({
           'x-number': '42',
@@ -213,18 +250,27 @@ describe('openAPILinkCodec', () => {
       })
 
       it('omits the body for GET requests while still serializing the query', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            inputStructure: 'detailed',
-            queryStyles: { q: 'primitive' },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                inputStructure: 'detailed',
+                queryStyles: { q: 'primitive' },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          query: { q: 'hello' },
-          body: 'should be omitted',
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            query: { q: 'hello' },
+            body: 'should be omitted',
+          },
+          ['search'],
+          { context: {} },
+        )
 
         expect(request.method).toBe('GET')
         expect(request.body).toBeUndefined()
@@ -232,38 +278,48 @@ describe('openAPILinkCodec', () => {
       })
 
       it('rejects invalid detailed input shapes', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            path: '/users/{id}',
-            inputStructure: 'detailed',
-          })),
-        }, { serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                path: '/users/{id}',
+                inputStructure: 'detailed',
+              }),
+            ),
+          },
+          { serializer },
+        )
 
         await expect(codec.encodeInput('invalid', ['search'], { context: {} })).rejects.toThrow(
           'Invalid "detailed" input structure in call to procedure (search):',
         )
 
-        await expect(codec.encodeInput({ query: 'invalid' }, ['search'], { context: {} })).rejects.toThrow(
-          'Invalid "detailed" input structure in call to procedure (search):',
-        )
+        await expect(
+          codec.encodeInput({ query: 'invalid' }, ['search'], { context: {} }),
+        ).rejects.toThrow('Invalid "detailed" input structure in call to procedure (search):')
 
-        await expect(codec.encodeInput({ headers: 'invalid' }, ['search'], { context: {} })).rejects.toThrow(
-          'Invalid "detailed" input structure in call to procedure (search):',
-        )
+        await expect(
+          codec.encodeInput({ headers: 'invalid' }, ['search'], { context: {} }),
+        ).rejects.toThrow('Invalid "detailed" input structure in call to procedure (search):')
 
-        await expect(codec.encodeInput({ params: 'invalid' }, ['search'], { context: {} })).rejects.toThrow(
-          'Invalid "detailed" input structure in call to procedure (search):',
-        )
+        await expect(
+          codec.encodeInput({ params: 'invalid' }, ['search'], { context: {} }),
+        ).rejects.toThrow('Invalid "detailed" input structure in call to procedure (search):')
       })
 
       it('requires params when the detailed path contains dynamic segments', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}',
-            inputStructure: 'detailed',
-          })),
-        }, { serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}',
+                inputStructure: 'detailed',
+              }),
+            ),
+          },
+          { serializer },
+        )
 
         await expect(codec.encodeInput({}, ['item'], { context: {} })).rejects.toThrow(
           'The "params" property is required for "detailed" input when the path has dynamic params',
@@ -277,57 +333,86 @@ describe('openAPILinkCodec', () => {
 
     describe('query serialization', () => {
       it('serializes and preserves literal commas for comma-delimited styles', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              tags: 'comma-delimited-array',
-              filters: 'comma-delimited-object',
-            },
-          })),
-        }, {
-          url: '/api',
-          serializer,
-        })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  tags: 'comma-delimited-array',
+                  filters: 'comma-delimited-object',
+                },
+              }),
+            ),
+          },
+          {
+            url: '/api',
+            serializer,
+          },
+        )
 
-        const request = await codec.encodeInput({
-          tags: ['alpha/', 'beta'],
-          filters: { 'size/': 'large/', 'brand': 'nike' },
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            tags: ['alpha/', 'beta'],
+            filters: { 'size/': 'large/', 'brand': 'nike' },
+          },
+          ['search'],
+          { context: {} },
+        )
 
-        expect(request.url).toBe('/api/search?tags=alpha%2F,beta&filters=size%2F,large%2F,brand,nike')
+        expect(request.url).toBe(
+          '/api/search?tags=alpha%2F,beta&filters=size%2F,large%2F,brand,nike',
+        )
       })
 
       it('serializes space-delimited and pipe-delimited query styles', async () => {
-        const spaceDelimitedCodec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              tags: 'space-delimited-array',
-              filters: 'space-delimited-object',
-            },
-          })),
-        }, { url: '/api', serializer })
+        const spaceDelimitedCodec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  tags: 'space-delimited-array',
+                  filters: 'space-delimited-object',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const pipeDelimitedCodec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              tags: 'pipe-delimited-array',
-              filters: 'pipe-delimited-object',
-            },
-          })),
-        }, { url: '/api', serializer })
+        const pipeDelimitedCodec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  tags: 'pipe-delimited-array',
+                  filters: 'pipe-delimited-object',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const spaceDelimitedRequest = await spaceDelimitedCodec.encodeInput({
-          tags: ['a/', 'b'],
-          filters: { 'x/': '1/', 'y': '2' },
-        }, ['search'], { context: {} })
+        const spaceDelimitedRequest = await spaceDelimitedCodec.encodeInput(
+          {
+            tags: ['a/', 'b'],
+            filters: { 'x/': '1/', 'y': '2' },
+          },
+          ['search'],
+          { context: {} },
+        )
 
-        const pipeDelimitedRequest = await pipeDelimitedCodec.encodeInput({
-          tags: ['a/', 'b'],
-          filters: { 'x/': '1/', 'y': '2' },
-        }, ['search'], { context: {} })
+        const pipeDelimitedRequest = await pipeDelimitedCodec.encodeInput(
+          {
+            tags: ['a/', 'b'],
+            filters: { 'x/': '1/', 'y': '2' },
+          },
+          ['search'],
+          { context: {} },
+        )
 
         const spaceDelimitedUrl = new URL(spaceDelimitedRequest.url, 'http://localhost')
         const pipeDelimitedUrl = new URL(pipeDelimitedRequest.url, 'http://localhost')
@@ -339,28 +424,37 @@ describe('openAPILinkCodec', () => {
       })
 
       it('treats a scalar as primitive input for array/object query styles', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              commaArray: 'comma-delimited-array',
-              commaObject: 'comma-delimited-object',
-              spaceArray: 'space-delimited-array',
-              spaceObject: 'space-delimited-object',
-              pipeArray: 'pipe-delimited-array',
-              pipeObject: 'pipe-delimited-object',
-            },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  commaArray: 'comma-delimited-array',
+                  commaObject: 'comma-delimited-object',
+                  spaceArray: 'space-delimited-array',
+                  spaceObject: 'space-delimited-object',
+                  pipeArray: 'pipe-delimited-array',
+                  pipeObject: 'pipe-delimited-object',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          commaArray: 'value1',
-          commaObject: 'value2',
-          spaceArray: 'value3',
-          spaceObject: 'value4',
-          pipeArray: 'value5',
-          pipeObject: 'value6',
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            commaArray: 'value1',
+            commaObject: 'value2',
+            spaceArray: 'value3',
+            spaceObject: 'value4',
+            pipeArray: 'value5',
+            pipeObject: 'value6',
+          },
+          ['search'],
+          { context: {} },
+        )
 
         const searchParams = new URL(request.url, 'http://localhost').searchParams
 
@@ -373,84 +467,111 @@ describe('openAPILinkCodec', () => {
       })
 
       it('omits undefined values for delimiter-based query styles', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              c: 'comma-delimited-array',
-              d: 'comma-delimited-object',
-              e: 'space-delimited-array',
-              f: 'space-delimited-object',
-              g: 'pipe-delimited-array',
-              h: 'pipe-delimited-object',
-            },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  c: 'comma-delimited-array',
+                  d: 'comma-delimited-object',
+                  e: 'space-delimited-array',
+                  f: 'space-delimited-object',
+                  g: 'pipe-delimited-array',
+                  h: 'pipe-delimited-object',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          c: undefined,
-          d: undefined,
-          e: undefined,
-          f: undefined,
-          g: undefined,
-          h: undefined,
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            c: undefined,
+            d: undefined,
+            e: undefined,
+            f: undefined,
+            g: undefined,
+            h: undefined,
+          },
+          ['search'],
+          { context: {} },
+        )
 
         expect(request.url).toBe('/api/search')
       })
 
       it('omits empty values for delimiter-based query styles', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              commaArray: 'comma-delimited-array',
-              commaObject: 'comma-delimited-object',
-              spaceArray: 'space-delimited-array',
-              spaceObject: 'space-delimited-object',
-              pipeArray: 'pipe-delimited-array',
-              pipeObject: 'pipe-delimited-object',
-            },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  commaArray: 'comma-delimited-array',
+                  commaObject: 'comma-delimited-object',
+                  spaceArray: 'space-delimited-array',
+                  spaceObject: 'space-delimited-object',
+                  pipeArray: 'pipe-delimited-array',
+                  pipeObject: 'pipe-delimited-object',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          commaArray: [],
-          commaObject: {},
-          spaceArray: [],
-          spaceObject: {},
-          pipeArray: [],
-          pipeObject: {},
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            commaArray: [],
+            commaObject: {},
+            spaceArray: [],
+            spaceObject: {},
+            pipeArray: [],
+            pipeObject: {},
+          },
+          ['search'],
+          { context: {} },
+        )
 
         expect(request.url).toBe('/api/search')
       })
 
       it('omits null and undefined members for delimiter-based query styles', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              commaArray: 'comma-delimited-array',
-              commaObject: 'comma-delimited-object',
-              spaceArray: 'space-delimited-array',
-              spaceObject: 'space-delimited-object',
-              pipeArray: 'pipe-delimited-array',
-              pipeObject: 'pipe-delimited-object',
-              emptyObject: 'comma-delimited-object',
-            },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  commaArray: 'comma-delimited-array',
+                  commaObject: 'comma-delimited-object',
+                  spaceArray: 'space-delimited-array',
+                  spaceObject: 'space-delimited-object',
+                  pipeArray: 'pipe-delimited-array',
+                  pipeObject: 'pipe-delimited-object',
+                  emptyObject: 'comma-delimited-object',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          commaArray: [undefined, '1', null],
-          commaObject: { a: undefined, b: '1', c: null },
-          spaceArray: [undefined, '1', null],
-          spaceObject: { a: undefined, b: '1', c: null },
-          pipeArray: [undefined, '1', null],
-          pipeObject: { a: undefined, b: '1', c: null },
-          emptyObject: { a: undefined, b: null },
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            commaArray: [undefined, '1', null],
+            commaObject: { a: undefined, b: '1', c: null },
+            spaceArray: [undefined, '1', null],
+            spaceObject: { a: undefined, b: '1', c: null },
+            pipeArray: [undefined, '1', null],
+            pipeObject: { a: undefined, b: '1', c: null },
+            emptyObject: { a: undefined, b: null },
+          },
+          ['search'],
+          { context: {} },
+        )
 
         const searchParams = new URL(request.url, 'http://localhost').searchParams
 
@@ -464,9 +585,12 @@ describe('openAPILinkCodec', () => {
       })
 
       it('serializes compact GET input as a query when no explicit query styles are defined', async () => {
-        const codec = new OpenAPILinkCodec({
-          list: oc.meta(openapi({ method: 'GET' })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            list: oc.meta(openapi({ method: 'GET' })),
+          },
+          { url: '/api', serializer },
+        )
 
         const request = await codec.encodeInput({ page: '2' }, ['list'], { context: {} })
 
@@ -476,9 +600,12 @@ describe('openAPILinkCodec', () => {
       })
 
       it('keeps compact GET requests without input free of a query string', async () => {
-        const codec = new OpenAPILinkCodec({
-          list: oc.meta(openapi({ method: 'GET' })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            list: oc.meta(openapi({ method: 'GET' })),
+          },
+          { url: '/api', serializer },
+        )
 
         const request = await codec.encodeInput(undefined, ['list'], { context: {} })
 
@@ -487,24 +614,33 @@ describe('openAPILinkCodec', () => {
       })
 
       it('filter null or undefined in styled query', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              passthrough: undefined,
-              optional: 'primitive',
-              list: 'array',
-              payload: 'json',
-            },
-          })),
-        }, { url: '/api?existing=1', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  passthrough: undefined,
+                  optional: 'primitive',
+                  list: 'array',
+                  payload: 'json',
+                },
+              }),
+            ),
+          },
+          { url: '/api?existing=1', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          passthrough: 'keep',
-          optional: null,
-          list: [undefined, 'value'],
-          payload: undefined,
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            passthrough: 'keep',
+            optional: null,
+            list: [undefined, 'value'],
+            payload: undefined,
+          },
+          ['search'],
+          { context: {} },
+        )
 
         const url = new URL(request.url, 'http://localhost')
 
@@ -516,9 +652,12 @@ describe('openAPILinkCodec', () => {
       })
 
       it('preserves the base search when a compact GET request has no additional query', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({ method: 'GET' })),
-        }, { url: '/api?existing=1#frag', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(openapi({ method: 'GET' })),
+          },
+          { url: '/api?existing=1#frag', serializer },
+        )
 
         const request = await codec.encodeInput(undefined, ['search'], { context: {} })
 
@@ -528,63 +667,98 @@ describe('openAPILinkCodec', () => {
 
     describe('path param serialization', () => {
       it('serializes and preserves literal commas for comma-delimited array/object params in the path', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{ids}/{filter}',
-            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{ids}/{filter}',
+                paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({ ids: ['a/', 'b', 'c'], filter: { 'color/': 'red/', 'size': 'xs' } }, ['item'], { context: {} })
+        const request = await codec.encodeInput(
+          { ids: ['a/', 'b', 'c'], filter: { 'color/': 'red/', 'size': 'xs' } },
+          ['item'],
+          { context: {} },
+        )
 
         expect(request.url).toBe('/api/items/a%2F,b,c/color%2F,red%2F,size,xs')
       })
 
       it('serializes mixed dynamic path params', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}/{+rest}',
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}/{+rest}',
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({
-          id: 'a/b',
-          rest: 'docs/v1/read me',
-        }, ['item'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            id: 'a/b',
+            rest: 'docs/v1/read me',
+          },
+          ['item'],
+          { context: {} },
+        )
 
         expect(request.url).toBe('/api/items/a%2Fb/docs/v1/read%20me')
       })
 
       it('treats scalar values as primitive for array/object params', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{ids}/{filter}',
-            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{ids}/{filter}',
+                paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({ ids: 'single1', filter: 'single2' }, ['item'], { context: {} })
+        const request = await codec.encodeInput({ ids: 'single1', filter: 'single2' }, ['item'], {
+          context: {},
+        })
 
         expect(request.url).toBe('/api/items/single1/single2')
       })
 
       it('throws when empty path params', async () => {
-        const primitiveCodec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}',
-          })),
-        }, { url: '/api', serializer })
-
-        await expect(primitiveCodec.encodeInput({ id: '' }, ['item'], { context: {} })).rejects.toThrow(
-          'Path param "id" cannot be empty in call to procedure (item).',
+        const primitiveCodec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}',
+              }),
+            ),
+          },
+          { url: '/api', serializer },
         )
 
-        const arrayCodec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}',
-            paramsStyles: { id: 'comma-delimited-array' },
-          })),
-        }, { url: '/api', serializer })
+        await expect(
+          primitiveCodec.encodeInput({ id: '' }, ['item'], { context: {} }),
+        ).rejects.toThrow('Path param "id" cannot be empty in call to procedure (item).')
+
+        const arrayCodec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}',
+                paramsStyles: { id: 'comma-delimited-array' },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
         await expect(arrayCodec.encodeInput({ id: [] }, ['item'], { context: {} })).rejects.toThrow(
           'Path param "id" cannot be empty in call to procedure (item).',
@@ -593,82 +767,132 @@ describe('openAPILinkCodec', () => {
           'Path param "id" cannot be empty in call to procedure (item).',
         )
 
-        const objectCodec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{filter}',
-            paramsStyles: { filter: 'comma-delimited-object' },
-          })),
-        }, { url: '/api', serializer })
+        const objectCodec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{filter}',
+                paramsStyles: { filter: 'comma-delimited-object' },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        await expect(objectCodec.encodeInput({ filter: {} }, ['item'], { context: {} })).rejects.toThrow(
-          'Path param "filter" cannot be empty in call to procedure (item).',
-        )
-        await expect(objectCodec.encodeInput({ filter: '' }, ['item'], { context: {} })).rejects.toThrow(
-          'Path param "filter" cannot be empty in call to procedure (item).',
-        )
+        await expect(
+          objectCodec.encodeInput({ filter: {} }, ['item'], { context: {} }),
+        ).rejects.toThrow('Path param "filter" cannot be empty in call to procedure (item).')
+        await expect(
+          objectCodec.encodeInput({ filter: '' }, ['item'], { context: {} }),
+        ).rejects.toThrow('Path param "filter" cannot be empty in call to procedure (item).')
       })
 
       it('throws when path params are or contain dot segments', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}/{ids}/{+rest}',
-            paramsStyles: { ids: 'comma-delimited-array' },
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}/{ids}/{+rest}',
+                paramsStyles: { ids: 'comma-delimited-array' },
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
         const valid = { id: 'a', ids: ['b'], rest: 'c' }
 
         for (const id of ['.', '..']) {
-          await expect(codec.encodeInput({ ...valid, id }, ['item'], { context: {} })).rejects.toThrow(
+          await expect(
+            codec.encodeInput({ ...valid, id }, ['item'], { context: {} }),
+          ).rejects.toThrow(
             'Path param "id" cannot contain "." or ".." segments in call to procedure (item).',
           )
         }
 
         for (const ids of [['.'], ['..'], [null, '..']]) {
-          await expect(codec.encodeInput({ ...valid, ids }, ['item'], { context: {} })).rejects.toThrow(
+          await expect(
+            codec.encodeInput({ ...valid, ids }, ['item'], { context: {} }),
+          ).rejects.toThrow(
             'Path param "ids" cannot contain "." or ".." segments in call to procedure (item).',
           )
         }
 
-        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin', '/../a']) {
-          await expect(codec.encodeInput({ ...valid, rest }, ['item'], { context: {} })).rejects.toThrow(
+        for (const rest of [
+          '.',
+          '..',
+          './a',
+          '../a',
+          'a/.',
+          'a/..',
+          'a/./b',
+          'a/../../admin',
+          '/../a',
+        ]) {
+          await expect(
+            codec.encodeInput({ ...valid, rest }, ['item'], { context: {} }),
+          ).rejects.toThrow(
             'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
           )
         }
       })
 
       it('allows path params that only contain dots within a segment', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}/{+rest}',
-          })),
-        }, { url: '/api', serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}/{+rest}',
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await codec.encodeInput({ id: '...', rest: '.well-known/a..b/v1.2/.../%2e%2e' }, ['item'], { context: {} })
+        const request = await codec.encodeInput(
+          { id: '...', rest: '.well-known/a..b/v1.2/.../%2e%2e' },
+          ['item'],
+          { context: {} },
+        )
 
         expect(request.url).toBe('/api/items/.../.well-known/a..b/v1.2/.../%252e%252e')
       })
 
       it('encodes a leading slash in catch-all path params so the url is never protocol-relative', async () => {
-        const rootCodec = new OpenAPILinkCodec({
-          file: oc.meta(openapi({
-            path: '/{+path}',
-          })),
-        }, { serializer })
+        const rootCodec = new OpenAPILinkCodec(
+          {
+            file: oc.meta(
+              openapi({
+                path: '/{+path}',
+              }),
+            ),
+          },
+          { serializer },
+        )
 
-        for (const [path, url] of [['/evil.example/x', '/%2Fevil.example/x'], ['//evil.example/x', '/%2F/evil.example/x']]) {
+        for (const [path, url] of [
+          ['/evil.example/x', '/%2Fevil.example/x'],
+          ['//evil.example/x', '/%2F/evil.example/x'],
+        ]) {
           const request = await rootCodec.encodeInput({ path }, ['file'], { context: {} })
 
           expect(request.url).toBe(url)
         }
 
-        const nestedCodec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}/{+rest}',
-          })),
-        }, { url: '/api', serializer })
+        const nestedCodec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}/{+rest}',
+              }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
 
-        const request = await nestedCodec.encodeInput({ id: 'a', rest: '/x' }, ['item'], { context: {} })
+        const request = await nestedCodec.encodeInput({ id: 'a', rest: '/x' }, ['item'], {
+          context: {},
+        })
 
         expect(request.url).toBe('/api/items/a/%2Fx')
       })
@@ -678,55 +902,75 @@ describe('openAPILinkCodec', () => {
       const formDataSerializer = new OpenAPISerializer({ serialize: { asFormData: true } })
 
       it('does not affect path param encoding', async () => {
-        const codec = new OpenAPILinkCodec({
-          item: oc.meta(openapi({
-            path: '/items/{id}/{ids}/{filter}/{+rest}',
-            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
-          })),
-        }, { url: '/api', serializer: formDataSerializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(
+              openapi({
+                path: '/items/{id}/{ids}/{filter}/{+rest}',
+                paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+              }),
+            ),
+          },
+          { url: '/api', serializer: formDataSerializer },
+        )
 
-        const request = await codec.encodeInput({
-          id: '42',
-          ids: [1, 2n],
-          filter: { color: 'red', at: new Date('2023-01-01T00:00:00.000Z') },
-          rest: 'docs/v1',
-        }, ['item'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            id: '42',
+            ids: [1, 2n],
+            filter: { color: 'red', at: new Date('2023-01-01T00:00:00.000Z') },
+            rest: 'docs/v1',
+          },
+          ['item'],
+          { context: {} },
+        )
 
-        expect(request.url).toBe('/api/items/42/1,2/color,red,at,2023-01-01T00%3A00%3A00.000Z/docs/v1')
+        expect(request.url).toBe(
+          '/api/items/42/1,2/color,red,at,2023-01-01T00%3A00%3A00.000Z/docs/v1',
+        )
       })
 
       it('does not affect styled query values', async () => {
-        const codec = new OpenAPILinkCodec({
-          search: oc.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              p: 'primitive',
-              a: 'array',
-              j: 'json',
-              ca: 'comma-delimited-array',
-              co: 'comma-delimited-object',
-              sa: 'space-delimited-array',
-              so: 'space-delimited-object',
-              pa: 'pipe-delimited-array',
-              po: 'pipe-delimited-object',
-              mismatch: 'comma-delimited-array',
-            },
-          })),
-        }, { url: '/api', serializer: formDataSerializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            search: oc.meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  p: 'primitive',
+                  a: 'array',
+                  j: 'json',
+                  ca: 'comma-delimited-array',
+                  co: 'comma-delimited-object',
+                  sa: 'space-delimited-array',
+                  so: 'space-delimited-object',
+                  pa: 'pipe-delimited-array',
+                  po: 'pipe-delimited-object',
+                  mismatch: 'comma-delimited-array',
+                },
+              }),
+            ),
+          },
+          { url: '/api', serializer: formDataSerializer },
+        )
 
-        const request = await codec.encodeInput({
-          p: 'x',
-          a: ['1', 2],
-          j: { k: 'v', n: [1] },
-          ca: ['a', 'b'],
-          co: { k: 'v' },
-          sa: ['a', 'b'],
-          so: { k: 'v' },
-          pa: ['a', 'b'],
-          po: { k: 'v' },
-          mismatch: 'scalar',
-          rest: { nested: 'value' },
-        }, ['search'], { context: {} })
+        const request = await codec.encodeInput(
+          {
+            p: 'x',
+            a: ['1', 2],
+            j: { k: 'v', n: [1] },
+            ca: ['a', 'b'],
+            co: { k: 'v' },
+            sa: ['a', 'b'],
+            so: { k: 'v' },
+            pa: ['a', 'b'],
+            po: { k: 'v' },
+            mismatch: 'scalar',
+            rest: { nested: 'value' },
+          },
+          ['search'],
+          { context: {} },
+        )
 
         const url = new URL(request.url, 'http://localhost')
 
@@ -744,14 +988,21 @@ describe('openAPILinkCodec', () => {
       })
 
       it('still applies to the request body', async () => {
-        const codec = new OpenAPILinkCodec({
-          create: oc.meta(openapi({
-            method: 'POST',
-            path: '/items/{id}',
-          })),
-        }, { url: '/api', serializer: formDataSerializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            create: oc.meta(
+              openapi({
+                method: 'POST',
+                path: '/items/{id}',
+              }),
+            ),
+          },
+          { url: '/api', serializer: formDataSerializer },
+        )
 
-        const request = await codec.encodeInput({ id: '42', name: 'item' }, ['create'], { context: {} })
+        const request = await codec.encodeInput({ id: '42', name: 'item' }, ['create'], {
+          context: {},
+        })
 
         expect(request.url).toBe('/api/items/42')
         expect(request.body).toBeInstanceOf(FormData)
@@ -761,12 +1012,15 @@ describe('openAPILinkCodec', () => {
 
     describe('option handling', () => {
       it('accepts Headers instances for base headers', async () => {
-        const codec = new OpenAPILinkCodec({
-          ping: oc.meta(openapi({})),
-        }, {
-          headers: new Headers({ 'x-token': 'abc' }),
-          serializer,
-        })
+        const codec = new OpenAPILinkCodec(
+          {
+            ping: oc.meta(openapi({})),
+          },
+          {
+            headers: new Headers({ 'x-token': 'abc' }),
+            serializer,
+          },
+        )
 
         const request = await codec.encodeInput('input', ['ping'], { context: {} })
 
@@ -774,9 +1028,12 @@ describe('openAPILinkCodec', () => {
       })
 
       it('rejects unresolved procedure paths', async () => {
-        const codec = new OpenAPILinkCodec({
-          ping: oc.meta(openapi({})),
-        }, { serializer })
+        const codec = new OpenAPILinkCodec(
+          {
+            ping: oc.meta(openapi({})),
+          },
+          { serializer },
+        )
 
         await expect(codec.encodeInput('input', ['nonexistent'], { context: {} })).rejects.toThrow(
           'Expected a procedure or contract at path (nonexistent)',
@@ -787,16 +1044,23 @@ describe('openAPILinkCodec', () => {
 
   describe('.decodeResponse', () => {
     it('returns compact output bodies directly', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({ outputStructure: 'compact', responseBodyHint: 'json' })),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({ outputStructure: 'compact', responseBodyHint: 'json' })),
+        },
+        { serializer },
+      )
 
       const resolveBody = vi.fn(async () => ({ ok: true }))
-      const result = await codec.decodeResponse({
-        status: 201,
-        headers: { 'x-trace': '1' },
-        resolveBody,
-      }, ['ping'], { context: {} })
+      const result = await codec.decodeResponse(
+        {
+          status: 201,
+          headers: { 'x-trace': '1' },
+          resolveBody,
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(result).toEqual({
         kind: 'output',
@@ -808,16 +1072,23 @@ describe('openAPILinkCodec', () => {
     })
 
     it('returns detailed output bodies with status and headers', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({ outputStructure: 'detailed', responseBodyHint: 'json' })),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({ outputStructure: 'detailed', responseBodyHint: 'json' })),
+        },
+        { serializer },
+      )
 
       const resolveBody = vi.fn(async () => ({ ok: true }))
-      const result = await codec.decodeResponse({
-        status: 202,
-        headers: { 'x-trace': '1' },
-        resolveBody,
-      }, ['ping'], { context: {} })
+      const result = await codec.decodeResponse(
+        {
+          status: 202,
+          headers: { 'x-trace': '1' },
+          resolveBody,
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(result).toEqual({
         kind: 'output',
@@ -833,16 +1104,23 @@ describe('openAPILinkCodec', () => {
     })
 
     it('defaults successful responses to compact output when outputStructure is omitted', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        { serializer },
+      )
 
       const resolveBody = vi.fn(async () => undefined)
-      const result = await codec.decodeResponse({
-        status: 200,
-        headers: { 'x-trace': '1' },
-        resolveBody,
-      }, ['ping'], { context: {} })
+      const result = await codec.decodeResponse(
+        {
+          status: 200,
+          headers: { 'x-trace': '1' },
+          resolveBody,
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(result).toEqual({
         kind: 'output',
@@ -854,20 +1132,27 @@ describe('openAPILinkCodec', () => {
     })
 
     it('decodes ORPC error payloads from unsuccessful responses', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        { serializer },
+      )
 
       const error = new ORPCError('NOT_FOUND', {
         message: 'Missing',
         data: { id: '42' },
       })
 
-      const result: any = await codec.decodeResponse({
-        status: 404,
-        headers: { 'x-request-id': 'abc' },
-        resolveBody: async () => error.toJSON(),
-      }, ['ping'], { context: {} })
+      const result: any = await codec.decodeResponse(
+        {
+          status: 404,
+          headers: { 'x-request-id': 'abc' },
+          resolveBody: async () => error.toJSON(),
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expectORPCErrorResult(result, 'NOT_FOUND', {
         message: 'Missing',
@@ -877,22 +1162,33 @@ describe('openAPILinkCodec', () => {
       expect(result.error.cause).toBeInstanceOf(ResponseError)
       expect(result.error.cause).not.toBeInstanceOf(MalformedResponseError)
       expect(result.error.cause.message).toBe('Received a 404 response.')
-      expect(result.error.cause.response).toEqual({ status: 404, headers: { 'x-request-id': 'abc' }, body: error.toJSON() })
+      expect(result.error.cause.response).toEqual({
+        status: 404,
+        headers: { 'x-request-id': 'abc' },
+        body: error.toJSON(),
+      })
     })
 
     it('ignores responseBodyHint on unsuccessful responses', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+        },
+        { serializer },
+      )
 
       const error = new ORPCError('NOT_FOUND', { message: 'Missing' })
       const resolveBody = vi.fn(async () => error.toJSON())
 
-      const result = await codec.decodeResponse({
-        status: 404,
-        headers: {},
-        resolveBody,
-      }, ['ping'], { context: {} })
+      const result = await codec.decodeResponse(
+        {
+          status: 404,
+          headers: {},
+          resolveBody,
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expectORPCErrorResult(result, 'NOT_FOUND', { message: 'Missing' })
       expect(resolveBody).toHaveBeenCalledTimes(1)
@@ -902,12 +1198,15 @@ describe('openAPILinkCodec', () => {
     it('uses a custom error decoder', async () => {
       const customError = new ORPCError('BAD_GATEWAY', { data: 'custom' })
       const errorResponseBodyDecoder = vi.fn(() => customError)
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, {
-        serializer,
-        errorResponseBodyDecoder,
-      })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        {
+          serializer,
+          errorResponseBodyDecoder,
+        },
+      )
 
       // an ORPC error body, to check the default decoding is not used as a fallback
       const response = {
@@ -920,81 +1219,131 @@ describe('openAPILinkCodec', () => {
 
       expect(result).toEqual({ kind: 'error', error: customError })
       expect(errorResponseBodyDecoder).toHaveBeenCalledOnce()
-      expect(errorResponseBodyDecoder).toHaveBeenCalledWith(new ORPCError('NOT_FOUND').toJSON(), response, expect.any(Function))
+      expect(errorResponseBodyDecoder).toHaveBeenCalledWith(
+        new ORPCError('NOT_FOUND').toJSON(),
+        response,
+        expect.any(Function),
+      )
     })
 
     it('passes the default decoding to a custom error decoder as defaultError', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, {
-        serializer,
-        errorResponseBodyDecoder: (_body, _response, defaultError) => defaultError(),
-      })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        {
+          serializer,
+          errorResponseBodyDecoder: (_body, _response, defaultError) => defaultError(),
+        },
+      )
 
-      const result: any = await codec.decodeResponse({
-        status: 404,
-        headers: {},
-        resolveBody: async () => new ORPCError('NOT_FOUND').toJSON(),
-      }, ['ping'], { context: {} })
+      const result: any = await codec.decodeResponse(
+        {
+          status: 404,
+          headers: {},
+          resolveBody: async () => new ORPCError('NOT_FOUND').toJSON(),
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expectORPCErrorResult(result, 'NOT_FOUND')
       expect(result.error.cause).toBeInstanceOf(ResponseError)
 
-      const malformed: any = await codec.decodeResponse({
-        status: 503,
-        headers: {},
-        resolveBody: async () => ({ detail: 'service unavailable' }),
-      }, ['ping'], { context: {} })
+      const malformed: any = await codec.decodeResponse(
+        {
+          status: 503,
+          headers: {},
+          resolveBody: async () => ({ detail: 'service unavailable' }),
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(malformed.error).toBeInstanceOf(MalformedResponseError)
     })
 
     it.each([
       ['a matching error', 404, 'application/problem+json', 'json'],
-      ['an error with different case and parameters', 404, 'Application/Problem+JSON; charset=utf-8', 'json'],
+      [
+        'an error with different case and parameters',
+        404,
+        'Application/Problem+JSON; charset=utf-8',
+        'json',
+      ],
       ['an error with another type', 502, 'text/html', undefined],
       ['a successful response', 200, 'application/problem+json', 'file'],
-    ] as const)('resolves the body hint of %s with errorResponseContentType', async (_, status, contentType, hint) => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
-      }, { serializer, errorResponseContentType: 'application/problem+json; charset=utf-8' })
+    ] as const)(
+      'resolves the body hint of %s with errorResponseContentType',
+      async (_, status, contentType, hint) => {
+        const codec = new OpenAPILinkCodec(
+          {
+            ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+          },
+          { serializer, errorResponseContentType: 'application/problem+json; charset=utf-8' },
+        )
 
-      const resolveBody = vi.fn(async () => new ORPCError('NOT_FOUND').toJSON())
-      await codec.decodeResponse({ status, headers: { 'content-type': contentType }, resolveBody }, ['ping'], { context: {} })
+        const resolveBody = vi.fn(async () => new ORPCError('NOT_FOUND').toJSON())
+        await codec.decodeResponse(
+          { status, headers: { 'content-type': contentType }, resolveBody },
+          ['ping'],
+          { context: {} },
+        )
 
-      expect(resolveBody).toHaveBeenCalledWith(hint)
-    })
+        expect(resolveBody).toHaveBeenCalledWith(hint)
+      },
+    )
 
     it('returns MalformedResponseError on unknown error payloads', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        { serializer },
+      )
 
-      const result: any = await codec.decodeResponse({
-        status: 503,
-        headers: {},
-        resolveBody: async () => ({ detail: 'service unavailable' }),
-      }, ['ping'], { context: {} })
+      const result: any = await codec.decodeResponse(
+        {
+          status: 503,
+          headers: {},
+          resolveBody: async () => ({ detail: 'service unavailable' }),
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(result.kind).toBe('error')
       const error = result.error
       expect(error).toBeInstanceOf(MalformedResponseError)
       expect(error.message).toBe('Service Unavailable')
-      expect(error.response).toEqual({ status: 503, headers: {}, body: { detail: 'service unavailable' } })
+      expect(error.response).toEqual({
+        status: 503,
+        headers: {},
+        body: { detail: 'service unavailable' },
+      })
     })
 
     it('rethrows the original error when the response body cannot be read', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
-
-      await expect(codec.decodeResponse({
-        status: 200,
-        headers: {},
-        resolveBody: async () => {
-          throw new Error('network error')
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
         },
-      }, ['ping'], { context: {} })).rejects.toThrow('network error')
+        { serializer },
+      )
+
+      await expect(
+        codec.decodeResponse(
+          {
+            status: 200,
+            headers: {},
+            resolveBody: async () => {
+              throw new Error('network error')
+            },
+          },
+          ['ping'],
+          { context: {} },
+        ),
+      ).rejects.toThrow('network error')
     })
 
     it('throws when the deserialized response body has an invalid format', async () => {
@@ -1005,17 +1354,29 @@ describe('openAPILinkCodec', () => {
         },
       }
 
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, {
-        serializer: badSerializer,
-      })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        {
+          serializer: badSerializer,
+        },
+      )
 
-      const error: any = await codec.decodeResponse({
-        status: 200,
-        headers: {},
-        resolveBody: async () => 'raw',
-      }, ['ping'], { context: {} }).then(() => null, e => e)
+      const error: any = await codec
+        .decodeResponse(
+          {
+            status: 200,
+            headers: {},
+            resolveBody: async () => 'raw',
+          },
+          ['ping'],
+          { context: {} },
+        )
+        .then(
+          () => null,
+          (e) => e,
+        )
 
       expect(error).toBeInstanceOf(MalformedResponseError)
       expect(error.message).toBe('Invalid OpenAPI response format.')
@@ -1024,30 +1385,44 @@ describe('openAPILinkCodec', () => {
     })
 
     it('rejects unresolved procedure paths', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
-
-      await expect(codec.decodeResponse({
-        status: 200,
-        headers: {},
-        resolveBody: async () => 'raw',
-      }, ['not-exists'], { context: {} })).rejects.toThrow(
-        'Expected a procedure or contract at path (not-exists)',
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        { serializer },
       )
+
+      await expect(
+        codec.decodeResponse(
+          {
+            status: 200,
+            headers: {},
+            resolveBody: async () => 'raw',
+          },
+          ['not-exists'],
+          { context: {} },
+        ),
+      ).rejects.toThrow('Expected a procedure or contract at path (not-exists)')
     })
 
     it.each([100, 199, 200, 204, 301, 302, 399])('treats status %i as success', async (status) => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({ outputStructure: 'compact', responseBodyHint: 'json' })),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({ outputStructure: 'compact', responseBodyHint: 'json' })),
+        },
+        { serializer },
+      )
 
       const resolveBody = vi.fn(async () => ({ ok: true }))
-      const result = await codec.decodeResponse({
-        status,
-        headers: {},
-        resolveBody,
-      }, ['ping'], { context: {} })
+      const result = await codec.decodeResponse(
+        {
+          status,
+          headers: {},
+          resolveBody,
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(result).toEqual({
         kind: 'output',
@@ -1056,17 +1431,24 @@ describe('openAPILinkCodec', () => {
     })
 
     it.each([400, 401, 403, 404, 500, 599, 600])('treats status %i as error', async (status) => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
+      const codec = new OpenAPILinkCodec(
+        {
+          ping: oc.meta(openapi({})),
+        },
+        { serializer },
+      )
 
       const error = new ORPCError('BAD_REQUEST')
 
-      const result = await codec.decodeResponse({
-        status,
-        headers: {},
-        resolveBody: async () => error.toJSON(),
-      }, ['ping'], { context: {} })
+      const result = await codec.decodeResponse(
+        {
+          status,
+          headers: {},
+          resolveBody: async () => error.toJSON(),
+        },
+        ['ping'],
+        { context: {} },
+      )
 
       expect(result.kind).toBe('error')
     })

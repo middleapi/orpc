@@ -1,16 +1,16 @@
 ---
-title: "oRPC v1 Announcement - Typesafe APIs Made Simple 🪄"
-description: "oRPC v1 is out: a stable, production-ready way to build typesafe APIs in TypeScript, and an alternative to tRPC, ts-rest, next-safe-action, and more!"
+title: 'oRPC v1 Announcement - Typesafe APIs Made Simple 🪄'
+description: 'oRPC v1 is out: a stable, production-ready way to build typesafe APIs in TypeScript, and an alternative to tRPC, ts-rest, next-safe-action, and more!'
 type: blog
 date: 2025-04-16
 search:
   tags:
     - Announcements
 authors:
-    name: Định Lê
-    role: Creator of oRPC
-    url: https://github.com/dinwwwh
-    avatar: https://github.com/dinwwwh.png
+  name: Định Lê
+  role: Creator of oRPC
+  url: https://github.com/dinwwwh
+  avatar: https://github.com/dinwwwh.png
 ai:
   exclude: true
 ---
@@ -57,11 +57,11 @@ const getting = os
   .use(retry({ times: 3 }))
   .route({ method: 'GET', path: '/getting/{id}' })
   .input(z.object({ id: z.string() }))
-  .use(canGetting, input => input.id)
+  .use(canGetting, (input) => input.id)
   .errors({
     SOME_TYPE_SAFE_ERROR: {
-      data: z.object({ something: z.string() })
-    }
+      data: z.object({ something: z.string() }),
+    },
   })
   .handler(async ({ input, errors, context }) => {
     // do something
@@ -138,6 +138,6 @@ If you're interesting in sponsoring oRPC, you can do it [here](https://github.co
 
 <p align="center">
   <a href="https://cdn.jsdelivr.net/gh/middleapi/static/sponsors.svg">
-    <img alt='Sponsors' src='https://cdn.jsdelivr.net/gh/middleapi/static/sponsors.svg'/>
+    <img alt="Sponsors" src="https://cdn.jsdelivr.net/gh/middleapi/static/sponsors.svg" />
   </a>
 </p>

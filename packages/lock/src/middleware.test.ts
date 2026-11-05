@@ -1,7 +1,8 @@
-import type { Locker } from './types.ts'
 import { call, ORPCError, os, type } from '@orpc/server'
+
 import { LockTimeoutError } from './error.ts'
 import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware.ts'
+import type { Locker } from './types.ts'
 
 describe('lock', () => {
   const createLocker = (waited = false): Locker => ({
@@ -13,33 +14,41 @@ describe('lock', () => {
     const mw = lock({ locker, key: 'key' })
     const procedure = os.use(mw).handler(({ context }) => context['lock/waited'])
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    ).resolves.toBe(false)
+    await expect(call(procedure, undefined, { context: {} })).resolves.toBe(false)
 
     expect(locker.lock).toHaveBeenCalledTimes(1)
-    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: undefined, timeout: undefined, signal: undefined })
+    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), {
+      ttl: undefined,
+      timeout: undefined,
+      signal: undefined,
+    })
   })
 
   it('exposes whether the lock was waited for', async () => {
     const locker = createLocker(true)
-    const procedure = os.use(lock({ locker, key: 'key' })).handler(({ context }) => context['lock/waited'])
+    const procedure = os
+      .use(lock({ locker, key: 'key' }))
+      .handler(({ context }) => context['lock/waited'])
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    ).resolves.toBe(true)
+    await expect(call(procedure, undefined, { context: {} })).resolves.toBe(true)
   })
 
   it('can config ttl, timeout and forwards the signal', async () => {
     const locker = createLocker()
     const controller = new AbortController()
-    const procedure = os.use(lock({ locker, key: 'key', ttl: 5000, timeout: 1000 })).handler(() => 'ok')
+    const procedure = os
+      .use(lock({ locker, key: 'key', ttl: 5000, timeout: 1000 }))
+      .handler(() => 'ok')
 
     await expect(
       call(procedure, undefined, { context: {}, signal: controller.signal }),
     ).resolves.toBe('ok')
 
-    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: 5000, timeout: 1000, signal: controller.signal })
+    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), {
+      ttl: 5000,
+      timeout: 1000,
+      signal: controller.signal,
+    })
   })
 
   it('locker, key, ttl, timeout can be async functions', async () => {
@@ -49,13 +58,20 @@ describe('lock', () => {
     const ttlFn = vi.fn().mockResolvedValueOnce(5000)
     const timeoutFn = vi.fn().mockResolvedValueOnce(1000)
     const mw = lock({ locker: lockerFn, key: keyFn, ttl: ttlFn, timeout: timeoutFn })
-    const procedure = os.input(type<any>()).use(mw).handler(() => 'ok')
+    const procedure = os
+      .input(type<any>())
+      .use(mw)
+      .handler(() => 'ok')
 
     await expect(
       call(procedure, '__input__', { context: { __context__: true }, path: ['__path__'] }),
     ).resolves.toBe('ok')
 
-    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: 5000, timeout: 1000, signal: undefined })
+    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), {
+      ttl: 5000,
+      timeout: 1000,
+      signal: undefined,
+    })
 
     for (const fn of [lockerFn, keyFn, ttlFn, timeoutFn]) {
       expect(fn).toHaveBeenCalledTimes(1)
@@ -72,7 +88,10 @@ describe('lock', () => {
     const handler = vi.fn()
     const procedure = os.use(lock({ locker, key: 'key' })).handler(handler)
 
-    const thrown = await call(procedure, undefined, { context: {} }).then(() => undefined, e => e)
+    const thrown = await call(procedure, undefined, { context: {} }).then(
+      () => undefined,
+      (e) => e,
+    )
 
     expect(thrown).toBeInstanceOf(ORPCError)
     expect(thrown.code).toBe('CONFLICT')
@@ -85,9 +104,7 @@ describe('lock', () => {
     const locker: Locker = { lock: vi.fn().mockRejectedValue(error) }
     const procedure = os.use(lock({ locker, key: 'key' })).handler(() => 'ok')
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    ).rejects.toBe(error)
+    await expect(call(procedure, undefined, { context: {} })).rejects.toBe(error)
   })
 
   it('passes through errors thrown by the handler, even LockTimeoutError', async () => {
@@ -97,23 +114,17 @@ describe('lock', () => {
       throw error
     })
 
-    await expect(
-      call(procedure, undefined, { context: {} }),
-    ).rejects.toBe(error)
+    await expect(call(procedure, undefined, { context: {} })).rejects.toBe(error)
   })
 
   it('communicate with middleware context, and isolated', async () => {
     const locker = createLocker()
     const mw = lock({ locker, key: 'k', dedupe: false })
     const innerHandlerFn = vi.fn().mockReturnValue('in')
-    const inner = os
-      .use(mw)
-      .handler(innerHandlerFn)
-    const outer = os
-      .use(mw)
-      .handler(async ({ context }) => {
-        return `out:${await call(inner, undefined, { context })}:${await call(inner, undefined, { context })}`
-      })
+    const inner = os.use(mw).handler(innerHandlerFn)
+    const outer = os.use(mw).handler(async ({ context }) => {
+      return `out:${await call(inner, undefined, { context })}:${await call(inner, undefined, { context })}`
+    })
 
     await call(outer, undefined, { context: {} })
 
@@ -137,11 +148,12 @@ describe('lock', () => {
     it('deduplicates by default', async () => {
       const locker = createLocker(true)
       const mw = lock({ locker, key: 'k' })
-      const procedure = os.use(mw).use(mw).handler(({ context }) => context['lock/waited'])
+      const procedure = os
+        .use(mw)
+        .use(mw)
+        .handler(({ context }) => context['lock/waited'])
 
-      await expect(
-        call(procedure, undefined, { context: {} }),
-      ).resolves.toBe(true)
+      await expect(call(procedure, undefined, { context: {} })).resolves.toBe(true)
 
       expect(locker.lock).toHaveBeenCalledTimes(1)
     })
@@ -150,7 +162,10 @@ describe('lock', () => {
       const locker = createLocker()
       const mw = lock({ locker, key: 'k', dedupe: false })
       await call(
-        os.use(mw).use(mw).handler(() => 'ok'),
+        os
+          .use(mw)
+          .use(mw)
+          .handler(() => 'ok'),
         undefined,
         { context: {} },
       )
@@ -174,16 +189,10 @@ describe('lock', () => {
     it('dedupes in nested calls', async () => {
       const locker = createLocker(true)
       const mw = lock({ locker, key: 'k' })
-      const inner = os
-        .use(mw)
-        .handler(({ context }) => context['lock/waited'])
-      const outer = os
-        .use(mw)
-        .handler(async ({ context }) => call(inner, undefined, { context }))
+      const inner = os.use(mw).handler(({ context }) => context['lock/waited'])
+      const outer = os.use(mw).handler(async ({ context }) => call(inner, undefined, { context }))
 
-      await expect(
-        call(outer, undefined, { context: {} }),
-      ).resolves.toBe(true)
+      await expect(call(outer, undefined, { context: {} })).resolves.toBe(true)
 
       expect(locker.lock).toHaveBeenCalledTimes(1)
     })
@@ -191,8 +200,10 @@ describe('lock', () => {
     it('respects per-instance dedupe', async () => {
       const locker = createLocker()
       await call(
-        os.use(lock({ locker, key: 'k', dedupe: true }))
-          .use(lock({ locker, key: 'k', dedupe: false })).handler(() => 'ok'),
+        os
+          .use(lock({ locker, key: 'k', dedupe: true }))
+          .use(lock({ locker, key: 'k', dedupe: false }))
+          .handler(() => 'ok'),
         undefined,
         { context: {} },
       )

@@ -2,6 +2,7 @@ import { ORPCError, os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { sleep } from '@standard-server/shared'
 import { z } from 'zod'
+
 import { createCompressionHonoFetchBatchClientServerTest } from './__shared__/client-server.compression-hono-fetch.ts'
 import { createCompressionNodeHttpBatchClientServerTest } from './__shared__/client-server.compression-node-http.ts'
 import { createHonoFetchBatchClientServerTest } from './__shared__/client-server.hono-fetch.ts'
@@ -58,10 +59,7 @@ describe.each([
 
     const { client, fetchSpy } = createClientServer(router)
 
-    const [file, info] = await Promise.all([
-      client.blob(),
-      client.json(),
-    ])
+    const [file, info] = await Promise.all([client.blob(), client.json()])
 
     expect(file).toBeInstanceOf(Blob)
     await expect((file as Blob).text()).resolves.toBe('blob payload')
@@ -76,16 +74,21 @@ describe.each([
     const part2 = promiseWithResolvers<void>()
     const event2 = promiseWithResolvers<void>()
 
-    const streamProcedure = vi.fn(async () => new ReadableStream<Uint8Array>({
-      async start(controller) {
-        controller.enqueue(new TextEncoder().encode('part 1'))
-        await part2.promise
-        controller.enqueue(new TextEncoder().encode('part 2'))
-        controller.close()
-      },
-    }))
+    const streamProcedure = vi.fn(
+      async () =>
+        new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(new TextEncoder().encode('part 1'))
+            await part2.promise
+            controller.enqueue(new TextEncoder().encode('part 2'))
+            controller.close()
+          },
+        }),
+    )
 
-    const blobProcedure = vi.fn(async () => new Blob(['blob payload'], { type: 'application/octet-stream' }))
+    const blobProcedure = vi.fn(
+      async () => new Blob(['blob payload'], { type: 'application/octet-stream' }),
+    )
 
     const jsonProcedure = vi.fn(async () => ({ ok: 'mixed' }))
 
@@ -196,13 +199,16 @@ describe.each([
     const router = {
       json: os.handler(() => 'ok'),
       blob: os.handler(() => new Blob(['blob'])),
-      stream: os.handler(() => new ReadableStream<Uint8Array>({
-        async start(controller) {
-          await release.promise
-          controller.enqueue(new TextEncoder().encode('stream'))
-          controller.close()
-        },
-      })),
+      stream: os.handler(
+        () =>
+          new ReadableStream<Uint8Array>({
+            async start(controller) {
+              await release.promise
+              controller.enqueue(new TextEncoder().encode('stream'))
+              controller.close()
+            },
+          }),
+      ),
       events: os.handler(async function* () {
         await release.promise
         yield 'event'
@@ -213,8 +219,7 @@ describe.each([
             yield i
             await sleep(10)
           }
-        }
-        finally {
+        } finally {
           stopped.resolve()
         }
       }),

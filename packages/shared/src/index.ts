@@ -38,15 +38,6 @@ export {
   toArray,
 } from '@standard-server/shared'
 
-export type {
-  AsyncCleanupFn,
-  AsyncIteratorClassNextFn,
-} from '@standard-server/shared'
+export type { AsyncCleanupFn, AsyncIteratorClassNextFn } from '@standard-server/shared'
 
-export type {
-  Arrayable,
-  IsEqual,
-  PartialDeep,
-  Promisable,
-  Writable,
-} from 'type-fest'
+export type { Arrayable, IsEqual, PartialDeep, Promisable, Writable } from 'type-fest'

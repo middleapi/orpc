@@ -10,9 +10,7 @@ export interface LazyDefinition<T> {
 export class Lazy<T> {
   '~orpc': LazyDefinition<T>
 
-  constructor(
-    def: LazyDefinition<T>,
-  ) {
+  'constructor'(def: LazyDefinition<T>) {
     this['~orpc'] = def
   }
 
@@ -31,17 +29,22 @@ export class Lazy<T> {
     }
 
     return (
-      isTypescriptObject(instance)
-      && isTypescriptObject(instance['~orpc'])
-      && isTypescriptObject(instance['~orpc'].meta)
-      && (instance['~orpc'].metaPlugins === undefined || Array.isArray(instance['~orpc'].metaPlugins))
-      && typeof instance['~orpc'].loader === 'function'
+      isTypescriptObject(instance) &&
+      isTypescriptObject(instance['~orpc']) &&
+      isTypescriptObject(instance['~orpc'].meta) &&
+      (instance['~orpc'].metaPlugins === undefined ||
+        Array.isArray(instance['~orpc'].metaPlugins)) &&
+      typeof instance['~orpc'].loader === 'function'
     )
   }
 }
 
 export type Lazyable<T> = T | Lazy<T>
 
-export function unlazy<T extends Lazyable<any>>(maybeLazy: T): Promise<{ default: T extends Lazy<infer U> ? U : T }> {
-  return maybeLazy instanceof Lazy ? maybeLazy['~orpc'].loader() : Promise.resolve({ default: maybeLazy as T extends Lazy<infer U> ? U : T })
+export function unlazy<T extends Lazyable<any>>(
+  maybeLazy: T,
+): Promise<{ default: T extends Lazy<infer U> ? U : T }> {
+  return maybeLazy instanceof Lazy
+    ? maybeLazy['~orpc'].loader()
+    : Promise.resolve({ default: maybeLazy as T extends Lazy<infer U> ? U : T })
 }

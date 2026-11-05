@@ -31,18 +31,17 @@ export function serializableStreamedQuery<
   TQueryFnData = unknown,
   TQueryKey extends QueryKey = QueryKey,
 >(
-  queryFn: (
-    context: QueryFunctionContext<TQueryKey>,
-  ) => Promisable<AsyncIterable<TQueryFnData>>,
-  { refetchMode = 'reset', maxChunks = Number.POSITIVE_INFINITY }: SerializableStreamedQueryOptions = {},
+  queryFn: (context: QueryFunctionContext<TQueryKey>) => Promisable<AsyncIterable<TQueryFnData>>,
+  {
+    refetchMode = 'reset',
+    maxChunks = Number.POSITIVE_INFINITY,
+  }: SerializableStreamedQueryOptions = {},
 ): QueryFunction<TQueryFnData[], TQueryKey> {
   /**
    * below code is inspired from old `streamedQuery`: https://github.com/TanStack/query/blob/9973e0f1d82acd6ccf5a49d9a0b5e7e401fc5489/packages/query-core/src/streamedQuery.ts#L19
    */
   return async (context) => {
-    const query = context.client
-      .getQueryCache()
-      .find({ queryKey: context.queryKey, exact: true })
+    const query = context.client.getQueryCache().find({ queryKey: context.queryKey, exact: true })
     const hasPreviousData = !!query && query.state.data !== undefined
 
     if (hasPreviousData) {
@@ -53,8 +52,7 @@ export function serializableStreamedQuery<
           error: null,
           fetchStatus: 'fetching',
         })
-      }
-      else {
+      } else {
         // not `setQueryData`: trimming is not new data, so it should not report a success
         query.setState({
           data: limitArraySize(query.state.data as Array<TQueryFnData>, maxChunks),
@@ -67,9 +65,8 @@ export function serializableStreamedQuery<
     const shouldUpdateCacheDuringStream = !hasPreviousData || refetchMode !== 'replace'
 
     // after resolve stream successfully we can treat result as empty array
-    context.client.setQueryData<Array<TQueryFnData>>(
-      context.queryKey,
-      (prev = []) => limitArraySize(prev, maxChunks),
+    context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, (prev = []) =>
+      limitArraySize(prev, maxChunks),
     )
 
     // close without reading, so a generator the query no longer wants never starts
@@ -87,9 +84,8 @@ export function serializableStreamedQuery<
       result = limitArraySize(result, maxChunks)
 
       if (shouldUpdateCacheDuringStream) {
-        context.client.setQueryData<Array<TQueryFnData>>(
-          context.queryKey,
-          (prev = []) => limitArraySize([...prev, chunk], maxChunks),
+        context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, (prev = []) =>
+          limitArraySize([...prev, chunk], maxChunks),
         )
       }
     }

@@ -1,47 +1,65 @@
 import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
-import type { Types } from 'effect'
 import { ORPCError } from '@orpc/client'
 import { getOwn } from '@orpc/shared'
+import type { Types } from 'effect'
 import { Effect, Function } from 'effect'
 
 type AnyEffect = Effect.Effect<any, any, any>
 
-type ORPCErrorsOf<E> = E extends AnyORPCError ? E : AnyORPCError extends E ? ORPCError<ORPCErrorCode, unknown> : never
+type ORPCErrorsOf<E> = E extends AnyORPCError
+  ? E
+  : AnyORPCError extends E
+    ? ORPCError<ORPCErrorCode, unknown>
+    : never
 
 type ORPCErrorCodeOf<E> = ORPCErrorsOf<E>['code']
 
-type ORPCErrorWithCode<E, TCode extends ORPCErrorCode> = E extends ORPCError<infer UCode, infer UData>
-  ? [Exclude<UCode, TCode>] extends [never]
+type ORPCErrorWithCode<E, TCode extends ORPCErrorCode> =
+  E extends ORPCError<infer UCode, infer UData>
+    ? [Exclude<UCode, TCode>] extends [never]
       ? E
-      : [UCode & TCode] extends [never] ? never : ORPCError<TCode extends UCode ? TCode : TCode & UCode, UData>
-  : AnyORPCError extends E ? ORPCError<TCode, unknown> : never
+      : [UCode & TCode] extends [never]
+        ? never
+        : ORPCError<TCode extends UCode ? TCode : TCode & UCode, UData>
+    : AnyORPCError extends E
+      ? ORPCError<TCode, unknown>
+      : never
 
-type ExcludeORPCErrorCode<E, TCode extends string> = E extends ORPCError<infer UCode, any>
-  ? [Exclude<UCode, TCode>] extends [never] ? never : E
-  : E
+type ExcludeORPCErrorCode<E, TCode extends string> =
+  E extends ORPCError<infer UCode, any> ? ([Exclude<UCode, TCode>] extends [never] ? never : E) : E
 
-type LiteralORPCErrorCode<TCode extends string> = Types.IsUnion<TCode> extends true
-  ? never
-  : Record<never, never> extends Record<TCode, unknown> ? never : TCode
+type LiteralORPCErrorCode<TCode extends string> =
+  Types.IsUnion<TCode> extends true
+    ? never
+    : Record<never, never> extends Record<TCode, unknown>
+      ? never
+      : TCode
 
-type ORPCErrorCodeCases<E, TCases> = Types.NoExcessProperties<{
-  [K in ORPCErrorCodeOf<E>]?: Record<never, never> extends Record<K, unknown>
-    ? { bivarianceHack(error: ORPCErrorWithCode<E, K>): AnyEffect }['bivarianceHack']
-    : (error: ORPCErrorWithCode<E, K>) => AnyEffect
-}, TCases>
+type ORPCErrorCodeCases<E, TCases> = Types.NoExcessProperties<
+  {
+    [K in ORPCErrorCodeOf<E>]?: Record<never, never> extends Record<K, unknown>
+      ? { bivarianceHack(error: ORPCErrorWithCode<E, K>): AnyEffect }['bivarianceHack']
+      : (error: ORPCErrorWithCode<E, K>) => AnyEffect
+  },
+  TCases
+>
 
 /**
  * The codes `TCases` surely handles: required keys with a function value.
  */
 type HandledORPCErrorCodes<TCases> = {
   [K in keyof TCases]-?: TCases[K] extends (...args: any[]) => any ? K : never
-}[Types.RequiredKeys<TCases>] & string
+}[Types.RequiredKeys<TCases>] &
+  string
 
-type ORPCErrorCodeCasesEffect<TCases> = ReturnType<Extract<TCases[keyof TCases], (...args: any[]) => any>>
+type ORPCErrorCodeCasesEffect<TCases> = ReturnType<
+  Extract<TCases[keyof TCases], (...args: any[]) => any>
+>
 
 type CatchORPCErrorCodesEffect<A, E, R, TCases> = Effect.Effect<
   A | Effect.Success<ORPCErrorCodeCasesEffect<TCases>>,
-  ExcludeORPCErrorCode<E, HandledORPCErrorCodes<TCases>> | Effect.Error<ORPCErrorCodeCasesEffect<TCases>>,
+  | ExcludeORPCErrorCode<E, HandledORPCErrorCodes<TCases>>
+  | Effect.Error<ORPCErrorCodeCasesEffect<TCases>>,
   R | Effect.Services<ORPCErrorCodeCasesEffect<TCases>>
 >
 
@@ -68,19 +86,15 @@ type CatchORPCErrorCodesEffect<A, E, R, TCases> = Effect.Effect<
 export const catchORPCError: {
   <E, A2, E2, R2>(
     f: (error: ORPCErrorsOf<E>) => Effect.Effect<A2, E2, R2>,
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2, E2 | Exclude<E, AnyORPCError>, R | R2>
+  ): <A, R>(
+    self: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A | A2, E2 | Exclude<E, AnyORPCError>, R | R2>
   <A, E, R, A2, E2, R2>(
     self: Effect.Effect<A, E, R>,
     f: (error: ORPCErrorsOf<E>) => Effect.Effect<A2, E2, R2>,
   ): Effect.Effect<A | A2, E2 | Exclude<E, AnyORPCError>, R | R2>
-} = /* @__PURE__ */ Function.dual(
-  2,
-  (
-    self: AnyEffect,
-    f: (error: AnyORPCError) => AnyEffect,
-  ) => self.pipe(
-    Effect.catchIf((error): error is AnyORPCError => error instanceof ORPCError, f),
-  ),
+} = /* @__PURE__ */ Function.dual(2, (self: AnyEffect, f: (error: AnyORPCError) => AnyEffect) =>
+  self.pipe(Effect.catchIf((error): error is AnyORPCError => error instanceof ORPCError, f)),
 )
 
 /**
@@ -111,7 +125,9 @@ export const catchORPCErrorCode: {
   <const TCode extends ORPCErrorCodeOf<E>, E, A2, E2, R2>(
     code: TCode,
     f: (error: ORPCErrorWithCode<E, TCode>) => Effect.Effect<A2, E2, R2>,
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2, E2 | ExcludeORPCErrorCode<E, LiteralORPCErrorCode<TCode>>, R | R2>
+  ): <A, R>(
+    self: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A | A2, E2 | ExcludeORPCErrorCode<E, LiteralORPCErrorCode<TCode>>, R | R2>
   <A, E, R, const TCode extends ORPCErrorCodeOf<E>, A2, E2, R2>(
     self: Effect.Effect<A, E, R>,
     code: TCode,
@@ -119,13 +135,13 @@ export const catchORPCErrorCode: {
   ): Effect.Effect<A | A2, E2 | ExcludeORPCErrorCode<E, LiteralORPCErrorCode<TCode>>, R | R2>
 } = /* @__PURE__ */ Function.dual(
   3,
-  (
-    self: AnyEffect,
-    code: ORPCErrorCode,
-    f: (error: AnyORPCError) => AnyEffect,
-  ) => self.pipe(
-    Effect.catchIf((error): error is AnyORPCError => error instanceof ORPCError && error.code === code, f),
-  ),
+  (self: AnyEffect, code: ORPCErrorCode, f: (error: AnyORPCError) => AnyEffect) =>
+    self.pipe(
+      Effect.catchIf(
+        (error): error is AnyORPCError => error instanceof ORPCError && error.code === code,
+        f,
+      ),
+    ),
 )
 
 /**
@@ -165,13 +181,12 @@ export const catchORPCErrorCodes: {
   ): CatchORPCErrorCodesEffect<A, E, R, Cases>
 } = /* @__PURE__ */ Function.dual(
   2,
-  (
-    self: AnyEffect,
-    cases: Record<string, ((error: AnyORPCError) => AnyEffect) | undefined>,
-  ) => self.pipe(
-    Effect.catchIf(
-      (error): error is AnyORPCError => error instanceof ORPCError && typeof getOwn(cases, error.code) === 'function',
-      error => getOwn(cases, error.code)!(error),
+  (self: AnyEffect, cases: Record<string, ((error: AnyORPCError) => AnyEffect) | undefined>) =>
+    self.pipe(
+      Effect.catchIf(
+        (error): error is AnyORPCError =>
+          error instanceof ORPCError && typeof getOwn(cases, error.code) === 'function',
+        (error) => getOwn(cases, error.code)!(error),
+      ),
     ),
-  ),
 )

@@ -1,14 +1,27 @@
-import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, InitialInputSchema, InitialOutputSchema, MergedErrorMap, MergedSchema, MetaPlugin, ORPCErrorConstructorMap, Schema } from '@orpc/contract'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  InitialInputSchema,
+  InitialOutputSchema,
+  MergedErrorMap,
+  MergedSchema,
+  MetaPlugin,
+  ORPCErrorConstructorMap,
+  Schema,
+} from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
+
 import type { BuilderDefinition } from './builder.ts'
 import type { Context, MergedContext, MergedInitialContext } from './context.ts'
 import type { Lazy } from './lazy.ts'
-import type { Middleware } from './middleware.ts'
 import type { DecoratedMiddleware } from './middleware-decorated.ts'
-import type { ProcedureHandler } from './procedure.ts'
+import type { Middleware } from './middleware.ts'
 import type { DecoratedProcedure } from './procedure-decorated.ts'
-import type { Router } from './router.ts'
+import type { ProcedureHandler } from './procedure.ts'
 import type { AugmentedRouterWithMiddlewares } from './router-utils.ts'
+import type { Router } from './router.ts'
 
 /**
  * The builder variant returned after `.use` is called.
@@ -49,7 +62,10 @@ export interface BuilderWithMiddlewares<
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
   'use'<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
@@ -73,7 +89,10 @@ export interface BuilderWithMiddlewares<
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
   'middleware'<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $Input,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $Output = any, // $Output = any by default is important to make middleware can be used in any output by default,
@@ -99,7 +118,7 @@ export interface BuilderWithMiddlewares<
    * @see {@link https://orpc.dev/docs/procedure#inputoutput-validation | Procedure - Input/Output Validation}
    */
   'input'<T extends AnySchema>(
-    schema: T
+    schema: T,
   ): BuilderWithInput<TInitialContext, TInjectedContext, T, TErrorMap>
 
   /**
@@ -108,7 +127,7 @@ export interface BuilderWithMiddlewares<
    * @see {@link https://orpc.dev/docs/procedure#inputoutput-validation | Procedure - Input/Output Validation}
    */
   'output'<T extends AnySchema>(
-    schema: T
+    schema: T,
   ): BuilderWithOutput<TInitialContext, TInjectedContext, T, TErrorMap>
 
   /**
@@ -118,14 +137,13 @@ export interface BuilderWithMiddlewares<
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
   'handler'<T>(
-    handler: ProcedureHandler<MergedContext<TInitialContext, TInjectedContext>, InferSchemaOutput<InitialInputSchema>, T, ORPCErrorConstructorMap<TErrorMap>>,
-  ): DecoratedProcedure<
-    TInitialContext,
-    TInjectedContext,
-    InitialInputSchema,
-    Schema<T>,
-    TErrorMap
-  >
+    handler: ProcedureHandler<
+      MergedContext<TInitialContext, TInjectedContext>,
+      InferSchemaOutput<InitialInputSchema>,
+      T,
+      ORPCErrorConstructorMap<TErrorMap>
+    >,
+  ): DecoratedProcedure<TInitialContext, TInjectedContext, InitialInputSchema, Schema<T>, TErrorMap>
 
   /**
    * Applies the builder's middleware, errors, and metadata to every procedure
@@ -188,7 +206,10 @@ export interface BuilderWithInput<
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
   'use'<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
@@ -212,7 +233,7 @@ export interface BuilderWithInput<
    * @see {@link https://orpc.dev/docs/procedure#multiple-schemas | Procedure - Multiple Schemas}
    */
   'input'<T extends AnySchema>(
-    schema: T
+    schema: T,
   ): BuilderWithInput<TInitialContext, TInjectedContext, MergedSchema<T, TInputSchema>, TErrorMap>
 
   /**
@@ -221,7 +242,7 @@ export interface BuilderWithInput<
    * @see {@link https://orpc.dev/docs/procedure#inputoutput-validation | Procedure - Input/Output Validation}
    */
   'output'<T extends AnySchema>(
-    schema: T
+    schema: T,
   ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, T, TErrorMap>
 
   /**
@@ -231,14 +252,13 @@ export interface BuilderWithInput<
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
   'handler'<T>(
-    handler: ProcedureHandler<MergedContext<TInitialContext, TInjectedContext>, InferSchemaOutput<TInputSchema>, T, ORPCErrorConstructorMap<TErrorMap>>,
-  ): DecoratedProcedure<
-    TInitialContext,
-    TInjectedContext,
-    TInputSchema,
-    Schema<T>,
-    TErrorMap
-  >
+    handler: ProcedureHandler<
+      MergedContext<TInitialContext, TInjectedContext>,
+      InferSchemaOutput<TInputSchema>,
+      T,
+      ORPCErrorConstructorMap<TErrorMap>
+    >,
+  ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, Schema<T>, TErrorMap>
 }
 
 /**
@@ -272,7 +292,12 @@ export interface BuilderWithOutput<
    */
   'errors'<T extends ErrorMap>(
     errors: T,
-  ): BuilderWithOutput<TInitialContext, TInjectedContext, TOutputSchema, MergedErrorMap<TErrorMap, T>>
+  ): BuilderWithOutput<
+    TInitialContext,
+    TInjectedContext,
+    TOutputSchema,
+    MergedErrorMap<TErrorMap, T>
+  >
 
   /**
    * Applies a middleware that runs before the handler and can access the
@@ -281,7 +306,10 @@ export interface BuilderWithOutput<
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
   'use'<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
@@ -305,7 +333,7 @@ export interface BuilderWithOutput<
    * @see {@link https://orpc.dev/docs/procedure#inputoutput-validation | Procedure - Input/Output Validation}
    */
   'input'<T extends AnySchema>(
-    schema: T
+    schema: T,
   ): BuilderWithInputOutput<TInitialContext, TInjectedContext, T, TOutputSchema, TErrorMap>
 
   /**
@@ -314,7 +342,7 @@ export interface BuilderWithOutput<
    * @see {@link https://orpc.dev/docs/procedure#multiple-schemas | Procedure - Multiple Schemas}
    */
   'output'<T extends AnySchema>(
-    schema: T
+    schema: T,
   ): BuilderWithOutput<TInitialContext, TInjectedContext, MergedSchema<T, TOutputSchema>, TErrorMap>
 
   /**
@@ -324,8 +352,19 @@ export interface BuilderWithOutput<
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
   'handler'<T extends InferSchemaInput<TOutputSchema>>(
-    handler: ProcedureHandler<MergedContext<TInitialContext, TInjectedContext>, InferSchemaOutput<InitialInputSchema>, T, ORPCErrorConstructorMap<TErrorMap>>,
-  ): DecoratedProcedure<TInitialContext, TInjectedContext, InitialInputSchema, TOutputSchema, TErrorMap>
+    handler: ProcedureHandler<
+      MergedContext<TInitialContext, TInjectedContext>,
+      InferSchemaOutput<InitialInputSchema>,
+      T,
+      ORPCErrorConstructorMap<TErrorMap>
+    >,
+  ): DecoratedProcedure<
+    TInitialContext,
+    TInjectedContext,
+    InitialInputSchema,
+    TOutputSchema,
+    TErrorMap
+  >
 }
 
 /**
@@ -350,7 +389,13 @@ export interface BuilderWithInputOutput<
    */
   'meta'(
     ...plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]
-  ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+  ): BuilderWithInputOutput<
+    TInitialContext,
+    TInjectedContext,
+    TInputSchema,
+    TOutputSchema,
+    TErrorMap
+  >
 
   /**
    * Defines typesafe errors that procedures built from this builder can throw
@@ -360,7 +405,13 @@ export interface BuilderWithInputOutput<
    */
   'errors'<T extends ErrorMap>(
     errors: T,
-  ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, T>>
+  ): BuilderWithInputOutput<
+    TInitialContext,
+    TInjectedContext,
+    TInputSchema,
+    TOutputSchema,
+    MergedErrorMap<TErrorMap, T>
+  >
 
   /**
    * Applies a middleware that runs before the handler and can access the
@@ -369,7 +420,10 @@ export interface BuilderWithInputOutput<
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
   'use'<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
@@ -394,8 +448,14 @@ export interface BuilderWithInputOutput<
    * @see {@link https://orpc.dev/docs/procedure#multiple-schemas | Procedure - Multiple Schemas}
    */
   'input'<T extends AnySchema>(
-    schema: T
-  ): BuilderWithInputOutput<TInitialContext, TInjectedContext, MergedSchema<T, TInputSchema>, TOutputSchema, TErrorMap>
+    schema: T,
+  ): BuilderWithInputOutput<
+    TInitialContext,
+    TInjectedContext,
+    MergedSchema<T, TInputSchema>,
+    TOutputSchema,
+    TErrorMap
+  >
 
   /**
    * Adds an additional output schema, merged with the previously defined one.
@@ -403,8 +463,14 @@ export interface BuilderWithInputOutput<
    * @see {@link https://orpc.dev/docs/procedure#multiple-schemas | Procedure - Multiple Schemas}
    */
   'output'<T extends AnySchema>(
-    schema: T
-  ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, MergedSchema<T, TOutputSchema>, TErrorMap>
+    schema: T,
+  ): BuilderWithInputOutput<
+    TInitialContext,
+    TInjectedContext,
+    TInputSchema,
+    MergedSchema<T, TOutputSchema>,
+    TErrorMap
+  >
 
   /**
    * Defines the function that implements the procedure and completes the
@@ -413,6 +479,11 @@ export interface BuilderWithInputOutput<
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
   'handler'<T extends InferSchemaInput<TOutputSchema>>(
-    handler: ProcedureHandler<MergedContext<TInitialContext, TInjectedContext>, InferSchemaOutput<TInputSchema>, T, ORPCErrorConstructorMap<TErrorMap>>,
+    handler: ProcedureHandler<
+      MergedContext<TInitialContext, TInjectedContext>,
+      InferSchemaOutput<TInputSchema>,
+      T,
+      ORPCErrorConstructorMap<TErrorMap>
+    >,
   ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
 }

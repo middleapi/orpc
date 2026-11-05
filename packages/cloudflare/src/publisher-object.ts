@@ -1,6 +1,6 @@
 import type { PublisherResumeOptions } from '@orpc/publisher'
-import type { EventMeta } from '@standard-server/core'
 import { isPlainObject, stringifyJSON } from '@orpc/shared'
+import type { EventMeta } from '@standard-server/core'
 import { DurableObject } from 'cloudflare:workers'
 
 export interface DurablePublisherObjectResumeOptions extends PublisherResumeOptions {
@@ -54,10 +54,17 @@ export interface DurablePublisherObjectOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
-export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
+export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<
+  Env,
+  Props
+> {
   private readonly resumeStorage: ResumeStorage
 
-  constructor(ctx: DurableObjectState<Props>, env: Env, options: DurablePublisherObjectOptions = {}) {
+  constructor(
+    ctx: DurableObjectState<Props>,
+    env: Env,
+    options: DurablePublisherObjectOptions = {},
+  ) {
     super(ctx, env)
     this.resumeStorage = new ResumeStorage(ctx, options.resume)
   }
@@ -75,8 +82,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
     try {
       stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
-    }
-    catch (e) {
+    } catch (e) {
       return new Response(String(e), { status: 400 })
     }
 
@@ -109,8 +115,12 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     })
   }
 
-  override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
-  }
+  override webSocketClose(
+    _ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean,
+  ): void | Promise<void> {}
 
   override async alarm(): Promise<void> {
     await this.resumeStorage.alarm()
@@ -177,8 +187,7 @@ class ResumeStorage {
 
     try {
       return insertEvent()
-    }
-    catch (e) {
+    } catch (e) {
       if (!isUnusableTableError(e)) {
         throw e
       }
@@ -213,12 +222,15 @@ class ResumeStorage {
      * The alias must not be `id`: SQLite resolves ORDER BY to an output
      * alias before a table column, which would sort ids as text.
      */
-    const result = this.ctx.storage.sql.exec(`
+    const result = this.ctx.storage.sql.exec(
+      `
       SELECT CAST(id AS TEXT) AS event_id, payload
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
-    `, lastEventId)
+    `,
+      lastEventId,
+    )
 
     const events: string[] = []
     for (const record of result.toArray()) {
@@ -245,9 +257,11 @@ class ResumeStorage {
         return true
       }
 
-      const activePayloadsRow = this.ctx.storage.sql.exec(`
+      const activePayloadsRow = this.ctx.storage.sql
+        .exec(`
         SELECT 1 as has FROM "${this.schemaPrefix}events" LIMIT 1
-      `).toArray()
+      `)
+        .toArray()
       if (activePayloadsRow.length) {
         return true
       }
@@ -314,9 +328,12 @@ class ResumeStorage {
     this.lastCleanupTime = now
 
     // `stored_at` is in whole seconds, so round up to never delete an event before its ttl
-    this.ctx.storage.sql.exec(`
+    this.ctx.storage.sql.exec(
+      `
       DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
-    `, Math.ceil(this.ttl / 1000))
+    `,
+      Math.ceil(this.ttl / 1000),
+    )
   }
 
   private async initAlarm(): Promise<void> {
@@ -326,8 +343,7 @@ class ResumeStorage {
      * An alarm from a previous Durable Object instance may fire before the
      * next cleanup is due. In that case, reschedule it instead of reusing it.
      */
-    const alarmFiresTooEarly = currentAlarm !== null
-      && currentAlarm < Date.now() + this.ttl
+    const alarmFiresTooEarly = currentAlarm !== null && currentAlarm < Date.now() + this.ttl
 
     if (currentAlarm === null || alarmFiresTooEarly) {
       await this.scheduleAlarm()
@@ -359,5 +375,7 @@ function isSerializedPayload(value: unknown): value is SerializedPayload {
 }
 
 function isUnusableTableError(error: unknown): boolean {
-  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(String(error))
+  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(
+    String(error),
+  )
 }

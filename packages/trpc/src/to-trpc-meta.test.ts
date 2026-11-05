@@ -1,7 +1,8 @@
-import type { Meta } from '@orpc/server'
 import { getOpenAPIMeta, openapi } from '@orpc/openapi'
+import type { Meta } from '@orpc/server'
 import { defineMeta } from '@orpc/server'
 import { initTRPC } from '@trpc/server'
+
 import { toORPCRouter } from './to-orpc-router.ts'
 import { toTRPCMeta } from './to-trpc-meta.ts'
 
@@ -14,10 +15,9 @@ describe('toTRPCMeta', () => {
   })
 
   it('applies plugin merge logic within a single call', () => {
-    expect(toTRPCMeta(
-      openapi({ method: 'GET', tags: ['a'] }),
-      openapi({ path: '/hello', tags: ['b'] }),
-    )).toEqual({
+    expect(
+      toTRPCMeta(openapi({ method: 'GET', tags: ['a'] }), openapi({ path: '/hello', tags: ['b'] })),
+    ).toEqual({
       '~openapi': { method: 'GET', path: '/hello', tags: ['a', 'b'] },
     })
   })
@@ -58,6 +58,10 @@ describe('toTRPCMeta', () => {
       '~openapi': { path: '/ping', summary: 'Ping procedure', prefix: '/api' },
       'custom': 'value',
     })
-    expect(getOpenAPIMeta(orpcRouter.ping)).toEqual({ path: '/ping', summary: 'Ping procedure', prefix: '/api' })
+    expect(getOpenAPIMeta(orpcRouter.ping)).toEqual({
+      path: '/ping',
+      summary: 'Ping procedure',
+      prefix: '/api',
+    })
   })
 })

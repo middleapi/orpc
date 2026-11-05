@@ -1,30 +1,37 @@
 {
   "name": "@orpc/nest",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "NestJS integration for oRPC: implement typesafe contracts in NestJS controllers",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "contract-first",
+    "nest",
+    "nestjs",
+    "openapi",
+    "orpc",
+    "rpc",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/nest"
   },
-  "keywords": [
-    "orpc",
-    "nestjs",
-    "nest",
-    "contract-first",
-    "rpc",
-    "openapi",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -35,34 +42,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc -p tsconfig.build.json"
-  },
-  "peerDependencies": {
-    "@nestjs/common": ">=11.1.27",
-    "@nestjs/core": ">=11.1.27",
-    "@nestjs/platform-node": ">=12.3.0",
-    "express": ">=5.2.1",
-    "fastify": ">=5.8.5",
-    "rxjs": ">=7.8.2"
-  },
-  "peerDependenciesMeta": {
-    "@nestjs/platform-node": {
-      "optional": true
-    },
-    "express": {
-      "optional": true
-    },
-    "fastify": {
-      "optional": true
-    }
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -86,5 +67,24 @@
     "express": "^5.3.0",
     "fastify": "^5.12.8",
     "rxjs": "^7.8.2"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=11.1.27",
+    "@nestjs/core": ">=11.1.27",
+    "@nestjs/platform-node": ">=12.3.0",
+    "express": ">=5.2.1",
+    "fastify": ">=5.8.5",
+    "rxjs": ">=7.8.2"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/platform-node": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
   }
 }

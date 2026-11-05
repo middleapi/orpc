@@ -1,7 +1,22 @@
 import type { Value } from '@orpc/shared'
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
+import {
+  AbortError,
+  anyAbortSignal,
+  isAsyncIteratorObject,
+  override,
+  toArray,
+  value,
+  wrapAsyncIterator,
+  wrapReadableStream,
+} from '@orpc/shared'
+
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerInterceptorOptions,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+} from '../adapters/standard/index.ts'
 import type { Context } from '../context.ts'
-import { AbortError, anyAbortSignal, isAsyncIteratorObject, override, toArray, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 
 export interface TimeoutHandlerPluginOptions<T extends Context> {
   /**
@@ -22,7 +37,9 @@ export interface TimeoutHandlerPluginOptions<T extends Context> {
    *
    * @default undefined (streaming responses run without limit)
    */
-  streamingTimeout?: Value<number | null | undefined, [options: StandardHandlerInterceptorOptions<T>]> | undefined
+  streamingTimeout?:
+    | Value<number | null | undefined, [options: StandardHandlerInterceptorOptions<T>]>
+    | undefined
 }
 
 /**
@@ -75,7 +92,11 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
           const isIterator = isAsyncIteratorObject(body)
 
           if (isIterator || body instanceof ReadableStream) {
-            const streamingTimeoutId = setTimeout(abortWithTimeout, streamingTimeoutMs, streamingTimeoutMs)
+            const streamingTimeoutId = setTimeout(
+              abortWithTimeout,
+              streamingTimeoutMs,
+              streamingTimeoutMs,
+            )
             const onFinish = () => clearTimeout(streamingTimeoutId)
 
             return {
@@ -88,8 +109,7 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
         }
 
         return response
-      }
-      finally {
+      } finally {
         clearTimeout(timeoutId)
       }
     }

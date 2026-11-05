@@ -1,38 +1,57 @@
 {
   "name": "@orpc/server",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Build typesafe APIs with oRPC: RPC and OpenAPI support, middleware, and adapters for Node.js, Bun, Deno, Fetch, Fastify, WebSocket, AWS Lambda, and more",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "aws-lambda",
+    "bun",
+    "deno",
+    "fastify",
+    "middleware",
+    "nodejs",
+    "openapi",
+    "orpc",
+    "rpc",
+    "server",
+    "typesafe",
+    "typescript",
+    "websocket"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/server"
   },
-  "keywords": [
-    "orpc",
-    "rpc",
-    "api",
-    "typescript",
-    "typesafe",
-    "server",
-    "openapi",
-    "middleware",
-    "nodejs",
-    "bun",
-    "deno",
-    "fastify",
-    "websocket",
-    "aws-lambda"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": [
     "./dist/extensions/callable.js"
   ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./helpers": "./src/helpers/index.ts",
+    "./plugins": "./src/plugins/index.ts",
+    "./standard": "./src/adapters/standard/index.ts",
+    "./standard-peer": "./src/adapters/standard-peer/index.ts",
+    "./fetch": "./src/adapters/fetch/index.ts",
+    "./node": "./src/adapters/node/index.ts",
+    "./aws-lambda": "./src/adapters/aws-lambda/index.ts",
+    "./fastify": "./src/adapters/fastify/index.ts",
+    "./websocket": "./src/adapters/websocket/index.ts",
+    "./message-port": "./src/adapters/message-port/index.ts",
+    "./crossws": "./src/adapters/crossws/index.ts",
+    "./extensions/callable": "./src/extensions/callable.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -103,39 +122,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./helpers": "./src/helpers/index.ts",
-    "./plugins": "./src/plugins/index.ts",
-    "./standard": "./src/adapters/standard/index.ts",
-    "./standard-peer": "./src/adapters/standard-peer/index.ts",
-    "./fetch": "./src/adapters/fetch/index.ts",
-    "./node": "./src/adapters/node/index.ts",
-    "./aws-lambda": "./src/adapters/aws-lambda/index.ts",
-    "./fastify": "./src/adapters/fastify/index.ts",
-    "./websocket": "./src/adapters/websocket/index.ts",
-    "./message-port": "./src/adapters/message-port/index.ts",
-    "./crossws": "./src/adapters/crossws/index.ts",
-    "./extensions/callable": "./src/extensions/callable.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc"
-  },
-  "peerDependencies": {
-    "crossws": ">=0.3.4",
-    "fastify": ">=5.6.1"
-  },
-  "peerDependenciesMeta": {
-    "crossws": {
-      "optional": true
-    },
-    "fastify": {
-      "optional": true
-    }
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -155,5 +143,17 @@
     "supertest": "^7.3.1",
     "ws": "^8.22.1",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "crossws": ">=0.3.4",
+    "fastify": ">=5.6.1"
+  },
+  "peerDependenciesMeta": {
+    "crossws": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
   }
 }

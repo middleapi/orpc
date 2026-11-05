@@ -29,10 +29,5 @@
     "*/*/src/**/*.test-d.ts",
     "*/*/src/**/__tests__"
   ],
-  "exclude": [
-    "packages/bun/**",
-    "packages/cloudflare/**",
-    "packages/nest/**",
-    "playgrounds/**"
-  ]
+  "exclude": ["packages/bun/**", "packages/cloudflare/**", "packages/nest/**", "playgrounds/**"]
 }

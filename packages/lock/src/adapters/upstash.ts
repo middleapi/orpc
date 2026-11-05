@@ -1,4 +1,5 @@
 import type { Redis } from '@upstash/redis'
+
 import type { BaseRedisLockerOptions } from './base-redis.ts'
 import { BaseRedisLocker } from './base-redis.ts'
 

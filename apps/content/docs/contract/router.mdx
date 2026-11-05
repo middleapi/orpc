@@ -1,6 +1,6 @@
 ---
-title: "Router Contract"
-description: "Define router contracts that describe the shape of a router without business logic, useful for documentation, testing, and aligned implementations."
+title: 'Router Contract'
+description: 'Define router contracts that describe the shape of a router without business logic, useful for documentation, testing, and aligned implementations.'
 ---
 
 :::info
@@ -22,7 +22,7 @@ const pong = oc.output(z.string())
 export const router = {
   ping,
   pong,
-  nested: { ping, pong }
+  nested: { ping, pong },
 }
 ```
 
@@ -41,7 +41,7 @@ const router = oc.meta(requireAuthMeta).router({
   nested: {
     ping,
     pong,
-  }
+  },
 })
 ```
 
@@ -55,6 +55,7 @@ const router = base.router({
   list: base.output(z.array(z.string())), // prefix: '/api/api'
 })
 ```
+
 :::
 
 ## Router to Contract

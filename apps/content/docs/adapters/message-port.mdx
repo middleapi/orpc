@@ -1,8 +1,8 @@
 ---
-title: "Message Port Adapter"
-description: "Use oRPC over the Message Port API to communicate between contexts such as iframes, web workers, and service workers."
+title: 'Message Port Adapter'
+description: 'Use oRPC over the Message Port API to communicate between contexts such as iframes, web workers, and service workers.'
 sidebar:
-  label: "Message Port"
+  label: 'Message Port'
 ---
 
 ## Basic Usage
@@ -33,7 +33,7 @@ handler.upgrade(serverPort, {
    * that receives the per-call request as its first argument, and is **not**
    * related to the initial upgrade request.
    */
-  context: request => ({}),
+  context: (request) => ({}),
 })
 
 serverPort.start()
@@ -54,7 +54,7 @@ const link = new RPCLink({
    * Optional headers to attach to each per-call request.
    * These can be accessed in the server context or via the Request Headers Plugin.
    */
-  headers: () => ({})
+  headers: () => ({}),
 })
 
 clientPort.start()
@@ -75,7 +75,7 @@ const handler = new RPCHandler(router, {
   experimental_transfer: (message, port) => {
     const transfer = deepFindTransferableObjects(message) // implement your own logic
     return transfer.length ? transfer : null // only enable when needed
-  }
+  },
 })
 ```
 
@@ -84,7 +84,7 @@ const link = new RPCLink({
   experimental_transfer: (message) => {
     const transfer = deepFindTransferableObjects(message) // implement your own logic
     return transfer.length ? transfer : null // only enable when needed
-  }
+  },
 })
 ```
 

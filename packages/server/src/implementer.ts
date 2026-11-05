@@ -1,21 +1,17 @@
 import type { RouterContract } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
+import { isTypescriptObject } from '@orpc/shared'
+
 import type { DefaultInitialContext } from './builder.ts'
 import type { Context } from './context.ts'
 import type { RouterImplementer } from './implementer-router.ts'
-import type { ProcedureConfig } from './procedure.ts'
-import { isTypescriptObject } from '@orpc/shared'
 import { createRouterImplementer } from './implementer-router.ts'
+import type { ProcedureConfig } from './procedure.ts'
 
-export type Implementer<
-  TContract extends RouterContract,
-  TInitialContext extends Context,
->
-  = & {
-    $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>
-    $config(config: ProcedureConfig): Implementer<TContract, TInitialContext>
-  }
-  & RouterImplementer<TContract, TInitialContext>
+export type Implementer<TContract extends RouterContract, TInitialContext extends Context> = {
+  $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>
+  $config(config: ProcedureConfig): Implementer<TContract, TInitialContext>
+} & RouterImplementer<TContract, TInitialContext>
 
 /**
  * Turns a contract into an implementer, used to implement the contract's
@@ -23,7 +19,10 @@ export type Implementer<
  *
  * @see {@link https://orpc.dev/docs/contract/implementation#implementer | Contract Implementation - Implementer}
  */
-export function implement<TContract extends RouterContract, TInitialContext extends Context = DefaultInitialContext>(
+export function implement<
+  TContract extends RouterContract,
+  TInitialContext extends Context = DefaultInitialContext,
+>(
   contract: TContract,
   config: ProcedureConfig = {},
 ): Implementer<TContract, TInitialContext & object> {
@@ -37,8 +36,7 @@ export function implement<TContract extends RouterContract, TInitialContext exte
       let method: undefined | AnyFunction
       if (p === '$context') {
         method = () => implementer
-      }
-      else if (p === '$config') {
+      } else if (p === '$config') {
         method = (incoming: ProcedureConfig) => implement(contract, { ...config, ...incoming })
       }
 

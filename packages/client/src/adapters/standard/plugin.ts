@@ -1,7 +1,8 @@
 import type { OrderablePlugin } from '@orpc/shared'
+import { sortPlugins } from '@orpc/shared'
+
 import type { ClientContext } from '../../types.ts'
 import type { StandardLinkOptions } from './link.ts'
-import { sortPlugins } from '@orpc/shared'
 
 export interface StandardLinkPlugin<T extends ClientContext> extends OrderablePlugin {
   /**

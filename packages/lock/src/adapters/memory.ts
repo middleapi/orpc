@@ -1,7 +1,8 @@
 import type { Promisable } from '@orpc/shared'
-import type { LockCallbackOptions, Locker, LockOptions } from '../types.ts'
 import { promiseWithResolvers, throwIfAborted } from '@orpc/shared'
+
 import { LockTimeoutError } from '../error.ts'
+import type { LockCallbackOptions, Locker, LockOptions } from '../types.ts'
 
 export interface MemoryLockerOptions {
   /**
@@ -50,7 +51,11 @@ export class MemoryLocker implements Locker {
     this.timeout = options.timeout ?? 10_000
   }
 
-  async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
+  async lock<T>(
+    key: string,
+    fn: (options: LockCallbackOptions) => Promisable<T>,
+    options: LockOptions = {},
+  ): Promise<T> {
     const ttl = options.ttl ?? this.ttl
     const timeout = options.timeout ?? this.timeout
     const token = {}
@@ -62,8 +67,7 @@ export class MemoryLocker implements Locker {
 
     if (entry) {
       await this.wait(key, entry, token, timeout, options.signal)
-    }
-    else {
+    } else {
       entry = { holder: token, waiters: new Set() }
       this.entries.set(key, entry)
     }
@@ -74,13 +78,18 @@ export class MemoryLocker implements Locker {
 
     try {
       return await fn({ waited })
-    }
-    finally {
+    } finally {
       this.release(key, token)
     }
   }
 
-  private wait(key: string, entry: MemoryLockEntry, token: object, timeout: number, signal: AbortSignal | undefined): Promise<void> {
+  private wait(
+    key: string,
+    entry: MemoryLockEntry,
+    token: object,
+    timeout: number,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
     if (timeout <= 0) {
       return Promise.reject(new LockTimeoutError(key))
     }

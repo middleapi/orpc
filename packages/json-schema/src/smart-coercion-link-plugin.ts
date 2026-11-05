@@ -1,15 +1,16 @@
 import type { ClientContext } from '@orpc/client'
+import { cloneORPCError, ORPCError } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { AnySchema, ErrorMap, RouterContract } from '@orpc/contract'
-import type { JsonSchemaCoercerOptions } from './coercer.ts'
-import type { JsonSchemaConverter } from './convert.ts'
-import type { JsonSchema } from './types.ts'
-import { cloneORPCError, ORPCError } from '@orpc/client'
 import { getProcedureContractOrThrow } from '@orpc/contract'
 import { getOwn, toArray } from '@orpc/shared'
+
+import type { JsonSchemaCoercerOptions } from './coercer.ts'
 import { JsonSchemaCoercer } from './coercer.ts'
+import type { JsonSchemaConverter } from './convert.ts'
 import { DelegatingJsonSchemaConverter } from './convert.ts'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter.ts'
+import type { JsonSchema } from './types.ts'
 
 export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions {
   converters?: JsonSchemaConverter[] | undefined
@@ -62,8 +63,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
 
             const coercedOutput = this.coerceValue(outputSchemas, output)
             return coercedOutput
-          }
-          catch (error) {
+          } catch (error) {
             if (!(error instanceof ORPCError) || !error.defined) {
               throw error
             }

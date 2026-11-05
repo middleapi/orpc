@@ -1,6 +1,6 @@
 ---
 name: orpc
-description: "Build, serve, and call end-to-end typesafe APIs with oRPC v2. Use for any task in a project that depends on `@orpc/*` packages, even a one-procedure change: defining procedures with the os builder (.input/.output/.handler, any Standard Schema validator), assembling routers, middleware and context, typesafe errors with ORPCError, serving via RPCHandler on any runtime adapter, calling from server-side clients (call, createRouterClient) or client-side clients (createORPCClient with RPCLink), integrating TanStack Query, or streaming over SSE. Pretrained oRPC knowledge describes v1 and is wrong for v2, so load this skill even when the change looks trivial. Biases toward retrieval from the oRPC docs over pre-trained knowledge. For REST/OpenAPI exposure, prefer the orpc-openapi skill; for contract-first design, the orpc-contract skill; for tRPC or oRPC v1 migrations, the orpc-migrate skill."
+description: 'Build, serve, and call end-to-end typesafe APIs with oRPC v2. Use for any task in a project that depends on `@orpc/*` packages, even a one-procedure change: defining procedures with the os builder (.input/.output/.handler, any Standard Schema validator), assembling routers, middleware and context, typesafe errors with ORPCError, serving via RPCHandler on any runtime adapter, calling from server-side clients (call, createRouterClient) or client-side clients (createORPCClient with RPCLink), integrating TanStack Query, or streaming over SSE. Pretrained oRPC knowledge describes v1 and is wrong for v2, so load this skill even when the change looks trivial. Biases toward retrieval from the oRPC docs over pre-trained knowledge. For REST/OpenAPI exposure, prefer the orpc-openapi skill; for contract-first design, the orpc-contract skill; for tRPC or oRPC v1 migrations, the orpc-migrate skill.'
 license: MIT
 ---
 
@@ -28,8 +28,7 @@ Build a procedure with the `os` builder: describe input with a schema, implement
 import { os } from '@orpc/server'
 import * as z from 'zod'
 
-export const listPlanets = os
-  .handler(async () => [{ id: 1, name: 'Earth' }]) // no .input: takes no arguments
+export const listPlanets = os.handler(async () => [{ id: 1, name: 'Earth' }]) // no .input: takes no arguments
 
 export const findPlanet = os
   .input(z.object({ id: z.number() }))
@@ -88,7 +87,7 @@ Best practice, dedupe expensive middleware: the same middleware can run twice in
 
 ```ts
 const authProvider = os
-  .$context<{ headers: Headers, auth?: { id: string }, authLoaded?: boolean }>()
+  .$context<{ headers: Headers; auth?: { id: string }; authLoaded?: boolean }>()
   .middleware(async ({ context, next }) => {
     const auth = context.authLoaded ? context.auth : await loadAuth(context.headers)
     return next({ context: { auth, authLoaded: true } })
@@ -125,7 +124,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [new CORSHandlerPlugin()],
-  interceptors: [onError(error => console.error(error))],
+  interceptors: [onError((error) => console.error(error))],
 })
 
 export async function fetch(request: Request): Promise<Response> {
@@ -142,14 +141,14 @@ Node HTTP:
 
 ```ts
 import { createServer } from 'node:http'
+
 import { RPCHandler } from '@orpc/server/node'
 
 const handler = new RPCHandler(router)
 
 const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, { prefix: '/rpc', context: {} })
-  if (matched)
-    return
+  if (matched) return
   res.statusCode = 404
   res.end('Not found')
 })
@@ -175,10 +174,11 @@ const planets = await client.planet.list()
 Client side, `RPCLink` turns calls into HTTP requests. Import the router as a type only so no server code reaches the client bundle:
 
 ```ts
-import type { RouterClient } from '@orpc/server'
-import type { router } from '../server/router'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+import type { RouterClient } from '@orpc/server'
+
+import type { router } from '../server/router'
 
 const link = new RPCLink({
   origin: 'http://127.0.0.1:3000',
@@ -199,8 +199,7 @@ import { createSafeClient, isDefinedError, safe } from '@orpc/client'
 const [error, data] = await safe(orpc.planet.find({ id: 1 }))
 if (isDefinedError(error)) {
   console.log(error.code, error.data) // typed from the procedure's .errors
-}
-else if (error) {
+} else if (error) {
   // unknown error
 }
 

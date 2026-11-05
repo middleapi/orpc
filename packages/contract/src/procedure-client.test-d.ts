@@ -1,14 +1,15 @@
 import type { Client, ORPCError, ThrowableError } from '@orpc/client'
-import type { ProcedureContractClient } from './procedure-client.ts'
 import { z } from 'zod'
 
+import type { ProcedureContractClient } from './procedure-client.ts'
+
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.string().transform(s => Number(s)) })
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.string().transform((s) => Number(s)) })
 
 const errorMap = {
   BASE: {
-    data: z.object({ id: z.string().transform(s => Number(s)) }),
+    data: z.object({ id: z.string().transform((s) => Number(s)) }),
     message: 'base',
   },
 }
@@ -16,7 +17,12 @@ const errorMap = {
 describe('ProcedureContractClient', () => {
   it('is a client', () => {
     expectTypeOf<
-      ProcedureContractClient<{ cache?: boolean }, typeof inputSchema, typeof outputSchema, typeof errorMap>
+      ProcedureContractClient<
+        { cache?: boolean },
+        typeof inputSchema,
+        typeof outputSchema,
+        typeof errorMap
+      >
     >().toEqualTypeOf<
       Client<
         { cache?: boolean },

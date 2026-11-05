@@ -1,8 +1,8 @@
 ---
-title: "Implement oRPC contract with NestJS"
-description: "Learn how to implement oRPC contracts in NestJS with the @orpc/nest package while keeping type safety and OpenAPI compatibility."
+title: 'Implement oRPC contract with NestJS'
+description: 'Learn how to implement oRPC contracts in NestJS with the @orpc/nest package while keeping type safety and OpenAPI compatibility.'
 sidebar:
-  label: "NestJS"
+  label: 'NestJS'
 ---
 
 ## Installation
@@ -33,14 +33,16 @@ Before implementation, define your [contract](/docs/contract/procedure) as usual
 import { oc } from '@orpc/contract'
 import { openapi, populateRouterContractOpenAPIPaths } from '@orpc/openapi'
 
-const example = oc.meta(openapi({
-  path: '/example' // [!code highlight]
-}))
+const example = oc.meta(
+  openapi({
+    path: '/example', // [!code highlight]
+  }),
+)
 
 // or using the `populateRouterContractOpenAPIPaths` helper to
 // automatically populate OpenAPI paths for all contracts
 const contract = populateRouterContractOpenAPIPaths({
-  example
+  example,
 })
 ```
 
@@ -218,7 +220,7 @@ Most handler plugins also work in NestJS, for example [Request Headers](/docs/pl
       plugins: [
         new RethrowHandlerPlugin({
           // Bypass oRPC error handling and let NestJS handle the error instead
-          filter: error => !(error instanceof ORPCError)
+          filter: (error) => !(error instanceof ORPCError),
         }),
       ],
     }),

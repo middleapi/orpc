@@ -1,19 +1,22 @@
 import type { Promisable } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
+
 import type { ClientContext, ClientOptions } from '../../types.ts'
 
-export type StandardLinkCodecDecodedResponse = { kind: 'output', output: unknown } | { kind: 'error', error: Error }
+export type StandardLinkCodecDecodedResponse =
+  | { kind: 'output'; output: unknown }
+  | { kind: 'error'; error: Error }
 
 export interface StandardLinkCodec<T extends ClientContext> {
   encodeInput(
     input: unknown,
     path: string[],
-    options: ClientOptions<T>
+    options: ClientOptions<T>,
   ): Promisable<StandardRequest>
 
   decodeResponse(
     response: StandardLazyResponse,
     path: string[],
-    options: ClientOptions<T>
+    options: ClientOptions<T>,
   ): Promisable<StandardLinkCodecDecodedResponse>
 }

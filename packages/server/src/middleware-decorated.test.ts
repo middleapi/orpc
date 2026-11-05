@@ -1,6 +1,7 @@
 import * as ContractModule from '@orpc/contract'
 import { sleep } from '@orpc/shared'
 import { vi } from 'vitest'
+
 import { decorateMiddleware } from './middleware-decorated.ts'
 
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')
@@ -72,7 +73,10 @@ describe('decorateMiddleware', () => {
 
     it('should preserve metadata assigned after decoration', () => {
       const decorated = decorateMiddleware(vi.fn() as any)
-      decorated['~orpc'] = { errorMap: { BASE: { message: 'test' } }, metaPlugins: [{ name: 'test', init: vi.fn() }] }
+      decorated['~orpc'] = {
+        errorMap: { BASE: { message: 'test' } },
+        metaPlugins: [{ name: 'test', init: vi.fn() }],
+      }
 
       expect(decorated.adaptInput((input: any) => input)['~orpc']).toBe(decorated['~orpc'])
     })
@@ -93,7 +97,9 @@ describe('decorateMiddleware', () => {
       const withErrors = decorated.errors({ NEW: { message: 'new' } })
 
       expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(original['~orpc']?.errorMap, { NEW: { message: 'new' } })
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(original['~orpc']?.errorMap, {
+        NEW: { message: 'new' },
+      })
 
       expect(withErrors['~orpc']?.errorMap).toBe(mergeErrorMapSpy.mock.results[0]!.value)
       expect(withErrors['~orpc']?.metaPlugins).toBe(plugins)
@@ -129,22 +135,43 @@ describe('decorateMiddleware', () => {
 
       const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
       const done = vi.fn()
-      const result = await (combined as any)({ context: { i1: true, i2: true, i3: true }, next }, 'input', done)
+      const result = await (combined as any)(
+        { context: { i1: true, i2: true, i3: true }, next },
+        'input',
+        done,
+      )
 
-      expect(result).toEqual({ output: 'final', context: { i2: 'override', i3: 'override', mid1: true, mid11: 'override', mid2: true } })
+      expect(result).toEqual({
+        output: 'final',
+        context: { i2: 'override', i3: 'override', mid1: true, mid11: 'override', mid2: true },
+      })
 
       expect(mid1).toHaveBeenCalledTimes(1)
-      expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ context: { i1: true, i2: true, i3: true } }), 'input', done)
+      expect(mid1).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { i1: true, i2: true, i3: true } }),
+        'input',
+        done,
+      )
       expect(mid1).toHaveResolvedWith(result)
 
       expect(mid2).toHaveBeenCalledTimes(1)
       expect(mid2).toHaveBeenCalledAfter(mid1)
-      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ context: { i1: true, i2: 'override', i3: true, mid1: true, mid11: true } }), 'input', done)
+      expect(mid2).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: { i1: true, i2: 'override', i3: true, mid1: true, mid11: true },
+        }),
+        'input',
+        done,
+      )
       expect(mid2).toHaveResolvedWith(result)
 
       expect(next).toHaveBeenCalledTimes(1)
       expect(next).toHaveBeenCalledAfter(mid2)
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({ context: { i2: 'override', i3: 'override', mid1: true, mid11: 'override', mid2: true } }))
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: { i2: 'override', i3: 'override', mid1: true, mid11: 'override', mid2: true },
+        }),
+      )
       expect(next).toHaveResolvedWith(result)
 
       expect(done).not.toHaveBeenCalled()
@@ -158,19 +185,28 @@ describe('decorateMiddleware', () => {
       [undefined, undefined, outerSignal, outerSignal],
       [signal1, undefined, signal1, signal1],
       [signal1, signal2, signal1, signal2],
-    ])('forwards signal overrides through the combined chain (%#)', async (mid1Signal, mid2Signal, expectedMid2Signal, expectedNextSignal) => {
-      const mid1 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid1Signal }))
-      const mid2 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid2Signal }))
+    ])(
+      'forwards signal overrides through the combined chain (%#)',
+      async (mid1Signal, mid2Signal, expectedMid2Signal, expectedNextSignal) => {
+        const mid1 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid1Signal }))
+        const mid2 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid2Signal }))
 
-      const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
-      const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
-      const done = vi.fn()
+        const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
+        const next = vi
+          .fn()
+          .mockImplementation(async ({ context }) => ({ output: 'final', context }))
+        const done = vi.fn()
 
-      await (combined as any)({ context: {}, signal: outerSignal, next }, 'input', done)
+        await (combined as any)({ context: {}, signal: outerSignal, next }, 'input', done)
 
-      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedMid2Signal }), 'input', done)
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedNextSignal }))
-    })
+        expect(mid2).toHaveBeenCalledWith(
+          expect.objectContaining({ signal: expectedMid2Signal }),
+          'input',
+          done,
+        )
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedNextSignal }))
+      },
+    )
 
     it('can stop early with done', async () => {
       const mid1 = vi.fn().mockImplementation(async ({ next }) => {
@@ -182,7 +218,7 @@ describe('decorateMiddleware', () => {
 
       const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
       const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
-      const done = vi.fn().mockImplementation(opts => ({ ...opts, context: {} }))
+      const done = vi.fn().mockImplementation((opts) => ({ ...opts, context: {} }))
 
       const result = await (combined as any)({ context: { initial: true }, next }, 'input', done)
 
@@ -192,12 +228,20 @@ describe('decorateMiddleware', () => {
       expect(done).toHaveBeenCalledWith({ output: 'early' })
 
       expect(mid1).toHaveBeenCalledTimes(1)
-      expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ context: { initial: true } }), 'input', done)
+      expect(mid1).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { initial: true } }),
+        'input',
+        done,
+      )
       expect(mid1).toHaveResolvedWith(result)
 
       expect(mid2).toHaveBeenCalledTimes(1)
       expect(mid2).toHaveBeenCalledAfter(mid1)
-      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ context: { initial: true, mid1: true } }), 'input', done)
+      expect(mid2).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { initial: true, mid1: true } }),
+        'input',
+        done,
+      )
       expect(mid2).toHaveResolvedWith(done.mock.results[0]!.value)
 
       expect(next).not.toHaveBeenCalled()
@@ -205,18 +249,18 @@ describe('decorateMiddleware', () => {
 
     it('correctly handle multiple next calls', async () => {
       let mid1Result1
-      const mid1 = vi.fn()
-        .mockImplementationOnce(async ({ next }) => {
-          const [result1, result2] = await Promise.all([
-            next({ context: { mid1: 1 } }),
-            next({ context: { mid1: 2 } }),
-          ])
+      const mid1 = vi.fn().mockImplementationOnce(async ({ next }) => {
+        const [result1, result2] = await Promise.all([
+          next({ context: { mid1: 1 } }),
+          next({ context: { mid1: 2 } }),
+        ])
 
-          mid1Result1 = result1
-          return result2
-        })
+        mid1Result1 = result1
+        return result2
+      })
 
-      const mid2 = vi.fn()
+      const mid2 = vi
+        .fn()
         .mockImplementationOnce(async ({ next }, input, done) => {
           await sleep(10) // this ensure they can handle in parallel
           return done({ output: 'done' })
@@ -225,7 +269,7 @@ describe('decorateMiddleware', () => {
 
       const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
       const next = vi.fn().mockImplementation(({ context }) => ({ output: 'ok', context }))
-      const done = vi.fn().mockImplementation(opts => ({ ...opts, context: {} }))
+      const done = vi.fn().mockImplementation((opts) => ({ ...opts, context: {} }))
 
       const result = await (combined as any)({ context: { initial: true }, next }, 'input', done)
 
@@ -236,13 +280,27 @@ describe('decorateMiddleware', () => {
       expect(done).toHaveBeenCalledWith({ output: 'done' })
 
       expect(mid1).toHaveBeenCalledTimes(1)
-      expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ context: { initial: true } }), 'input', done)
+      expect(mid1).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { initial: true } }),
+        'input',
+        done,
+      )
       expect(mid1).toHaveResolvedWith(result)
 
       expect(mid2).toHaveBeenCalledTimes(2)
       expect(mid2).toHaveBeenCalledAfter(mid1)
-      expect(mid2).toHaveBeenNthCalledWith(1, expect.objectContaining({ context: { initial: true, mid1: 1 } }), 'input', done)
-      expect(mid2).toHaveBeenNthCalledWith(2, expect.objectContaining({ context: { initial: true, mid1: 2 } }), 'input', done)
+      expect(mid2).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ context: { initial: true, mid1: 1 } }),
+        'input',
+        done,
+      )
+      expect(mid2).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ context: { initial: true, mid1: 2 } }),
+        'input',
+        done,
+      )
       expect(mid2).toHaveNthResolvedWith(1, done.mock.results[0]!.value)
       expect(mid2).toHaveNthResolvedWith(2, result)
 
@@ -274,7 +332,10 @@ describe('decorateMiddleware', () => {
       const combined = decorated1.use(mid2 as any)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(mid2['~orpc']?.errorMap, mid1['~orpc']?.errorMap)
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
+        mid2['~orpc']?.errorMap,
+        mid1['~orpc']?.errorMap,
+      )
       expect(combined['~orpc']?.errorMap).toEqual(mergeErrorMapSpy.mock.results[0]!.value)
 
       expect(combined.name).toBe('M1 + M2')
@@ -287,7 +348,9 @@ describe('decorateMiddleware', () => {
       const decorated = decorateMiddleware(vi.fn() as any)
       decorated['~orpc'] = { metaPlugins: plugins1 }
 
-      const combined = decorated.use(Object.assign(vi.fn(), { '~orpc': { metaPlugins: plugins2 } }) as any)
+      const combined = decorated.use(
+        Object.assign(vi.fn(), { '~orpc': { metaPlugins: plugins2 } }) as any,
+      )
       expect(combined['~orpc']?.metaPlugins).toEqual([...plugins1, ...plugins2])
     })
   })

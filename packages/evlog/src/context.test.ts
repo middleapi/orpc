@@ -1,4 +1,5 @@
 import { createRequestLogger } from 'evlog'
+
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 
 it('getLogger', async () => {

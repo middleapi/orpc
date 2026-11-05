@@ -15,10 +15,7 @@ import { encodeBase64 } from '@orpc/shared'
  * @see {@link https://orpc.dev/docs/helpers/base64url | Base64Url Helpers}
  */
 export function encodeBase64url(data: Uint8Array): string {
-  return encodeBase64(data)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
+  return encodeBase64(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
 /**
@@ -36,7 +33,9 @@ export function encodeBase64url(data: Uint8Array): string {
  *
  * @see {@link https://orpc.dev/docs/helpers/base64url | Base64Url Helpers}
  */
-export function decodeBase64url(base64url: string | undefined | null): Uint8Array<ArrayBuffer> | undefined {
+export function decodeBase64url(
+  base64url: string | undefined | null,
+): Uint8Array<ArrayBuffer> | undefined {
   try {
     if (typeof base64url !== 'string') {
       return undefined
@@ -56,8 +55,7 @@ export function decodeBase64url(base64url: string | undefined | null): Uint8Arra
     }
 
     return encodeBase64url(bytes) === base64url ? bytes : undefined
-  }
-  catch {
+  } catch {
     return undefined
   }
 }

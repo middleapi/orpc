@@ -41,10 +41,11 @@ export const router = {
 Then call them from a client that knows every input and output, without generating anything:
 
 ```ts
-import type { RouterClient } from '@orpc/server'
-import type { router } from './router'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+import type { RouterClient } from '@orpc/server'
+
+import type { router } from './router'
 
 const link = new RPCLink({ origin: 'http://localhost:3000', url: '/rpc' })
 const client: RouterClient<typeof router> = createORPCClient(link)

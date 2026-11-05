@@ -1,4 +1,5 @@
 import * as ServerModule from '@orpc/server'
+
 import { createServerFormFunction } from './server-form-function.ts'
 
 const createProcedureClientSpy = vi.spyOn(ServerModule, 'createProcedureClient')
@@ -9,7 +10,10 @@ beforeEach(() => {
 })
 
 describe('createServerFormFunction', () => {
-  const procedure = os.input(type<any>()).output(type<any>()).handler(() => 'output')
+  const procedure = os
+    .input(type<any>())
+    .output(type<any>())
+    .handler(() => 'output')
 
   it('deserializes bracket notation form data before calling the client', async () => {
     const client = vi.fn().mockResolvedValue(undefined)

@@ -2,13 +2,12 @@ import { os } from '@orpc/server'
 import { act, renderHook } from '@testing-library/react'
 import { startTransition, useActionState } from 'react'
 import { z } from 'zod'
+
 import { createServerFunction } from './server-function.ts'
 
 describe('createServerFunction with useActionState', () => {
   const fn = createServerFunction(
-    os
-      .input(z.object({ name: z.string().min(3) }))
-      .handler(({ input }) => `Hello ${input.name}!`),
+    os.input(z.object({ name: z.string().min(3) })).handler(({ input }) => `Hello ${input.name}!`),
   )
 
   it('works as a useActionState action', async () => {

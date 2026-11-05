@@ -34,10 +34,6 @@ export {
   type OperationContext as TanstackQueryOperationContext,
 } from './types.ts'
 
-export type {
-  AnyNestedClient,
-} from '@orpc/client'
+export type { AnyNestedClient } from '@orpc/client'
 
-export type {
-  Public,
-} from '@orpc/shared'
+export type { Public } from '@orpc/shared'

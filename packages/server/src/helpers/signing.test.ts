@@ -220,8 +220,7 @@ describe('signing', () => {
 
           if (i === j) {
             expect(unsignedValue).toBe(value)
-          }
-          else {
+          } else {
             expect(unsignedValue).toBeUndefined()
           }
         }
@@ -239,10 +238,10 @@ describe('signing', () => {
 
       // All signed values should be identical
       const firstSigned = results[0]!.signed
-      expect(results.every(r => r.signed === firstSigned)).toBe(true)
+      expect(results.every((r) => r.signed === firstSigned)).toBe(true)
 
       // All unsigned values should be identical and match original
-      expect(results.every(r => r.unsigned === value)).toBe(true)
+      expect(results.every((r) => r.unsigned === value)).toBe(true)
     })
   })
 
@@ -289,7 +288,10 @@ describe('unsign canonical form', () => {
       'user123.oneQsU0r5dvwQFHFEjjV1uOI/IR3gZfkYHij3TRauVA', // standard-base64 char
       'user123.oneQsU0r5dvw\nQFHFEjjV1uOI_IR3gZfkYHij3TRauVA', // whitespace
       // percent-encoded whitespace becomes a real space after getCookie
-      getCookie(new Headers({ cookie: 'sid=user123.oneQsU0r5dvw%20QFHFEjjV1uOI_IR3gZfkYHij3TRauVA' }), 'sid'),
+      getCookie(
+        new Headers({ cookie: 'sid=user123.oneQsU0r5dvw%20QFHFEjjV1uOI_IR3gZfkYHij3TRauVA' }),
+        'sid',
+      ),
     ]
 
     for (const variant of variants) {

@@ -1,12 +1,14 @@
-import type { AddressInfo } from 'node:net'
 import { Buffer } from 'node:buffer'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { brotliCompressSync, brotliDecompressSync, gunzipSync } from 'node:zlib'
+
 import { RPCHandler } from '@orpc/server/node'
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+
 import { StaticFileHandlerPlugin } from '../src/index.ts'
 
 /**
@@ -27,12 +29,15 @@ it('works with the response compression plugin', async ({ onTestFinished }) => {
   writeFileSync(path.join(rootDir, 'bundle.js'), script)
   writeFileSync(path.join(rootDir, 'bundle.js.br'), brotliCompressSync(script))
 
-  const handler = new RPCHandler({}, {
-    plugins: [
-      new StaticFileHandlerPlugin({ rootDir, precompressed: true }),
-      new ResponseCompressionHandlerPlugin({ threshold: 1024 }),
-    ],
-  })
+  const handler = new RPCHandler(
+    {},
+    {
+      plugins: [
+        new StaticFileHandlerPlugin({ rootDir, precompressed: true }),
+        new ResponseCompressionHandlerPlugin({ threshold: 1024 }),
+      ],
+    },
+  )
 
   const server = createServer(async (req, res) => {
     const result = await handler.handle(req, res, { context: {} })
@@ -46,22 +51,25 @@ it('works with the response compression plugin', async ({ onTestFinished }) => {
     server.close()
   })
 
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address() as AddressInfo
 
-  const get = (url: string, headers: Record<string, string> = {}) => new Promise<{
-    status: number | undefined
-    headers: Record<string, string | string[] | undefined>
-    body: Buffer
-  }>((resolve, reject) => {
-    const req = httpRequest({ host: '127.0.0.1', port, path: url, headers }, (res) => {
-      const chunks: Buffer[] = []
-      res.on('data', chunk => chunks.push(chunk))
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }))
+  const get = (url: string, headers: Record<string, string> = {}) =>
+    new Promise<{
+      status: number | undefined
+      headers: Record<string, string | string[] | undefined>
+      body: Buffer
+    }>((resolve, reject) => {
+      const req = httpRequest({ host: '127.0.0.1', port, path: url, headers }, (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk) => chunks.push(chunk))
+        res.on('end', () =>
+          resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }),
+        )
+      })
+      req.on('error', reject)
+      req.end()
     })
-    req.on('error', reject)
-    req.end()
-  })
 
   // A compressible file over the threshold is compressed on the way out
   const compressed = await get('/app.js', { 'accept-encoding': 'gzip' })

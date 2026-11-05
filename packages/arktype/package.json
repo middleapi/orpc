@@ -1,29 +1,36 @@
 {
   "name": "@orpc/arktype",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "ArkType integration for oRPC: convert ArkType schemas into JSON Schema for OpenAPI generation",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "arktype",
+    "json-schema",
+    "openapi",
+    "orpc",
+    "typesafe",
+    "typescript",
+    "validation"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/arktype"
   },
-  "keywords": [
-    "orpc",
-    "arktype",
-    "json-schema",
-    "openapi",
-    "validation",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -34,19 +41,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc"
-  },
-  "peerDependencies": {
-    "@ark/schema": "*",
-    "arktype": "*"
   },
   "dependencies": {
     "@orpc/json-schema": "workspace:*"
@@ -55,5 +51,9 @@
     "@ark/schema": "^0.56.8",
     "arktype": "^2.2.9",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@ark/schema": "*",
+    "arktype": "*"
   }
 }

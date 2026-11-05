@@ -1,8 +1,8 @@
 ---
-title: "React Router Adapter"
+title: 'React Router Adapter'
 description: "Use oRPC inside a React Router or Remix project by mounting a handler in a resource route's loader and action through the Fetch API Adapter."
 sidebar:
-  label: "React Router"
+  label: 'React Router'
 ---
 
 [React Router](https://reactrouter.com/) is a multi-strategy router for React, and the successor to [Remix](https://remix.run/). In framework mode, its resource routes follow the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API), so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -27,7 +27,7 @@ const handler = new RPCHandler(router, {
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -46,10 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
 import type { RouteConfig } from '@react-router/dev/routes'
 import { index, route } from '@react-router/dev/routes'
 
-export default [
-  index('routes/home.tsx'),
-  route('rpc/*', 'routes/rpc.ts'),
-] satisfies RouteConfig
+export default [index('routes/home.tsx'), route('rpc/*', 'routes/rpc.ts')] satisfies RouteConfig
 ```
 
 </CodeGroup>

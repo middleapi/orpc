@@ -1,8 +1,8 @@
 ---
-title: "TanStack Start Adapter"
-description: "Use oRPC inside a TanStack Start project by mounting a handler in a server route, with an isomorphic client for the browser and SSR via createIsomorphicFn."
+title: 'TanStack Start Adapter'
+description: 'Use oRPC inside a TanStack Start project by mounting a handler in a server route, with an isomorphic client for the browser and SSR via createIsomorphicFn.'
 sidebar:
-  label: "TanStack Start"
+  label: 'TanStack Start'
 ---
 
 [TanStack Start](https://tanstack.com/start) is a full-stack React framework built on [Vite](https://vite.dev/) and the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API), so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/api/rpc/$')({
       ANY: async ({ request }) => {
         const { response } = await handler.handle(request, {
           prefix: '/api/rpc',
-          context: {} // Provide initial context if needed, can be an async function
+          context: {}, // Provide initial context if needed, can be an async function
         })
 
         return response ?? new Response('Not found', { status: 404 })
@@ -54,14 +54,20 @@ import { createIsomorphicFn } from '@tanstack/react-start'
 import { getRequest, getRequestHeaders } from '@tanstack/react-start/server'
 
 const getClientLink = createIsomorphicFn()
-  .client(() => new RPCLink({
-    url: '/api/rpc',
-  }))
-  .server(() => new RPCLink({
-    url: '/api/rpc',
-    origin: () => new URL(getRequest().url).origin, // resolve from the incoming request
-    headers: () => getRequestHeaders(),
-  }))
+  .client(
+    () =>
+      new RPCLink({
+        url: '/api/rpc',
+      }),
+  )
+  .server(
+    () =>
+      new RPCLink({
+        url: '/api/rpc',
+        origin: () => new URL(getRequest().url).origin, // resolve from the incoming request
+        headers: () => getRequestHeaders(),
+      }),
+  )
 ```
 
 :::info
@@ -81,18 +87,20 @@ import { createIsomorphicFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
 
 const getORPCClient = createIsomorphicFn()
-  .server(() => createRouterClient(router, {
-    /**
-     * Provide initial context if needed.
-     *
-     * Because this client instance is shared across all requests,
-     * only include context that's safe to reuse globally.
-     * For per-request context, use middleware context or pass a function as the initial context.
-     */
-    context: async () => ({
-      headers: getRequestHeaders(), // provide headers if initial context required
+  .server(() =>
+    createRouterClient(router, {
+      /**
+       * Provide initial context if needed.
+       *
+       * Because this client instance is shared across all requests,
+       * only include context that's safe to reuse globally.
+       * For per-request context, use middleware context or pass a function as the initial context.
+       */
+      context: async () => ({
+        headers: getRequestHeaders(), // provide headers if initial context required
+      }),
     }),
-  }))
+  )
   .client((): RouterClient<typeof router> => {
     const link = new RPCLink({
       url: '/api/rpc',

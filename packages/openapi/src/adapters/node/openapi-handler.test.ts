@@ -1,7 +1,9 @@
-import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+
 import { os } from '@orpc/server'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import request from 'supertest'
+
 import { openapi } from '../../meta.ts'
 import { OpenAPIHandler } from './openapi-handler.ts'
 
@@ -23,7 +25,10 @@ describe('openapiHandler', () => {
         context: { userId: 'u_123' },
         prefix: '/api/v1',
       })
-    }).post('/api/v1/ping/pong').set('content-type', 'application/json').send({ json: null })
+    })
+      .post('/api/v1/ping/pong')
+      .set('content-type', 'application/json')
+      .send({ json: null })
 
     expect(res.status).toBe(200)
     expect(res.text).toContain('u_123')
@@ -38,7 +43,10 @@ describe('openapiHandler', () => {
         response.statusCode = 404
         response.end('not matched')
       }
-    }).post('/invalid/ping').set('content-type', 'application/json').send({ json: null })
+    })
+      .post('/invalid/ping')
+      .set('content-type', 'application/json')
+      .send({ json: null })
 
     expect(mismatchRes.status).toBe(404)
     expect(mismatchRes.text).toBe('not matched')
@@ -51,7 +59,10 @@ describe('openapiHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },

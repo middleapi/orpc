@@ -1,8 +1,8 @@
 ---
-title: "SvelteKit Adapter"
+title: 'SvelteKit Adapter'
 description: "Use oRPC inside a SvelteKit project by mounting a handler in an endpoint, then call it during SSR through SvelteKit's fetch or a server-side client."
 sidebar:
-  label: "SvelteKit"
+  label: 'SvelteKit'
 ---
 
 [SvelteKit](https://svelte.dev/docs/kit/introduction) is a framework for rapidly developing robust, performant web applications using Svelte. Its endpoints follow the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API), so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -25,7 +25,7 @@ const handler = new RPCHandler(router, {
 const handle: RequestHandler = async ({ request }) => {
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   return response ?? new Response('Not found', { status: 404 })

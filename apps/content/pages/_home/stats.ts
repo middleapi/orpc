@@ -43,8 +43,7 @@ async function load(url: string): Promise<unknown> {
       if (response.ok) {
         return await response.json()
       }
-    }
-    catch {
+    } catch {
       // Fall through to the retry.
     }
 
@@ -73,17 +72,17 @@ function readJson(url: string): Promise<unknown> {
 }
 
 async function monthlyDownloads(): Promise<string | null> {
-  const data = await readJson(
+  const data = (await readJson(
     `https://api.npmjs.org/downloads/point/last-month/${NPM_PACKAGE}`,
-  ) as { downloads?: unknown } | null
+  )) as { downloads?: unknown } | null
 
   return typeof data?.downloads === 'number' ? compact.format(data.downloads) : null
 }
 
 async function coverage(): Promise<string | null> {
-  const data = await readJson(
-    'https://codecov.io/api/v2/github/middleapi/repos/orpc/',
-  ) as { totals?: { coverage?: unknown } } | null
+  const data = (await readJson('https://codecov.io/api/v2/github/middleapi/repos/orpc/')) as {
+    totals?: { coverage?: unknown }
+  } | null
 
   const value = data?.totals?.coverage
 
@@ -101,13 +100,11 @@ async function coverage(): Promise<string | null> {
  * differently-rounded versions of the same number.
  */
 export async function githubStars(): Promise<string | null> {
-  const data = await readJson(
-    'https://api.github.com/repos/middleapi/orpc',
-  ) as { stargazers_count?: unknown } | null
+  const data = (await readJson('https://api.github.com/repos/middleapi/orpc')) as {
+    stargazers_count?: unknown
+  } | null
 
-  return typeof data?.stargazers_count === 'number'
-    ? compact.format(data.stargazers_count)
-    : null
+  return typeof data?.stargazers_count === 'number' ? compact.format(data.stargazers_count) : null
 }
 
 export async function landingStats(): Promise<Stat[]> {
@@ -119,25 +116,31 @@ export async function landingStats(): Promise<Stat[]> {
 
   return [
     ...(downloads
-      ? [{
-          value: downloads,
-          label: 'Downloads each month',
-          href: `https://www.npmjs.com/package/${NPM_PACKAGE}`,
-        }]
+      ? [
+          {
+            value: downloads,
+            label: 'Downloads each month',
+            href: `https://www.npmjs.com/package/${NPM_PACKAGE}`,
+          },
+        ]
       : []),
     ...(covered
-      ? [{
-          value: covered,
-          label: 'Test coverage',
-          href: 'https://codecov.io/gh/middleapi/orpc',
-        }]
+      ? [
+          {
+            value: covered,
+            label: 'Test coverage',
+            href: 'https://codecov.io/gh/middleapi/orpc',
+          },
+        ]
       : []),
     ...(starred
-      ? [{
-          value: starred,
-          label: 'GitHub stars',
-          href: 'https://github.com/middleapi/orpc',
-        }]
+      ? [
+          {
+            value: starred,
+            label: 'GitHub stars',
+            href: 'https://github.com/middleapi/orpc',
+          },
+        ]
       : []),
     {
       // Bundle size lives in the comparison section instead, where it has

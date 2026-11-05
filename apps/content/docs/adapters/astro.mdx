@@ -1,8 +1,8 @@
 ---
-title: "Astro Adapter"
-description: "Use oRPC inside an Astro project by mounting a handler in an on-demand API route through the Fetch API Adapter, and call procedures directly during SSR."
+title: 'Astro Adapter'
+description: 'Use oRPC inside an Astro project by mounting a handler in an on-demand API route through the Fetch API Adapter, and call procedures directly during SSR.'
 sidebar:
-  label: "Astro"
+  label: 'Astro'
 ---
 
 [Astro](https://astro.build/) is a JavaScript web framework optimized for building fast, content-driven websites. Its endpoints follow the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API), so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -27,7 +27,7 @@ export const prerender = false
 export const ALL: APIRoute = async ({ request }) => {
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -86,7 +86,7 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 import { createRouterClient } from '@orpc/server'
 
 globalThis.$client = createRouterClient(router, {
-  context: {} // Provide initial context if needed, can be an async function
+  context: {}, // Provide initial context if needed, can be an async function
 })
 ```
 

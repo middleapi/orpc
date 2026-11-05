@@ -1,6 +1,7 @@
-import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { createORPCClient } from '@orpc/client'
 import { os } from '@orpc/server'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
+
 import { openapi } from '../../meta.ts'
 import { OpenAPIHandler } from './openapi-handler.ts'
 import { OpenAPILink } from './openapi-link.ts'
@@ -53,7 +54,9 @@ describe('openapiHandler', () => {
   it('routes an OpenAPILink call with a raw char to its static route, not a dynamic sibling', async () => {
     const router = {
       beta: os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta'),
-      version: os.meta(openapi({ method: 'GET', path: '/{version}/items' })).handler(() => 'version'),
+      version: os
+        .meta(openapi({ method: 'GET', path: '/{version}/items' }))
+        .handler(() => 'version'),
     }
 
     const handler = new OpenAPIHandler(router)
@@ -68,14 +71,21 @@ describe('openapiHandler', () => {
       return response
     })
 
-    const client = createORPCClient<any>(new OpenAPILink(router, {
-      fetch,
-      origin: 'http://localhost:3000',
-      url: '/api',
-    }))
+    const client = createORPCClient<any>(
+      new OpenAPILink(router, {
+        fetch,
+        origin: 'http://localhost:3000',
+        url: '/api',
+      }),
+    )
 
     await expect(client.beta()).resolves.toBe('beta')
-    expect(fetch).toHaveBeenCalledWith('http://localhost:3000/api/v1^beta/items', expect.anything(), expect.anything(), ['beta'])
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/v1^beta/items',
+      expect.anything(),
+      expect.anything(),
+      ['beta'],
+    )
   })
 
   it('supports standard handler plugins', async () => {
@@ -85,7 +95,10 @@ describe('openapiHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },

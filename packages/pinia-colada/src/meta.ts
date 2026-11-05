@@ -1,14 +1,36 @@
-import type { AnyNestedClient, ClientContext, InferClientContext, InferClientError } from '@orpc/client'
-import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, Meta, MetaPlugin, ORPCErrorFromErrorMap, RouterContract } from '@orpc/contract'
+import type {
+  AnyNestedClient,
+  ClientContext,
+  InferClientContext,
+  InferClientError,
+} from '@orpc/client'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  Meta,
+  MetaPlugin,
+  ORPCErrorFromErrorMap,
+  RouterContract,
+} from '@orpc/contract'
+import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
+
 import type { OperationKeyBaseOptions } from './key.ts'
 import type { RouterUtilsPlugin } from './plugin.ts'
 import type { ProcedureUtilsOptions } from './procedure-utils.ts'
-import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
 
-export type PiniaColadaMetaOptions<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, keyof OperationKeyBaseOptions>
+export type PiniaColadaMetaOptions<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Omit<
+  ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
+  keyof OperationKeyBaseOptions
+>
 
 export interface PiniaColadaMetaPlugin<
   TInputSchema extends AnySchema,
@@ -43,7 +65,9 @@ export function piniaColada<
   return {
     name: '~pinia-colada',
     init(meta) {
-      const current = meta['~pinia-colada'] as ProcedureUtilsOptions<ClientContext, any, any, any> | undefined
+      const current = meta['~pinia-colada'] as
+        | ProcedureUtilsOptions<ClientContext, any, any, any>
+        | undefined
 
       return {
         ...meta,
@@ -53,10 +77,12 @@ export function piniaColada<
   }
 }
 
-export function getPiniaColadaMeta(
-  procedureOrLazy: { '~orpc': { meta: Meta } },
-): PiniaColadaMetaOptions<ClientContext, unknown, unknown, ThrowableError> | undefined {
-  return procedureOrLazy['~orpc'].meta['~pinia-colada'] as PiniaColadaMetaOptions<ClientContext, unknown, unknown, ThrowableError> | undefined
+export function getPiniaColadaMeta(procedureOrLazy: {
+  '~orpc': { meta: Meta }
+}): PiniaColadaMetaOptions<ClientContext, unknown, unknown, ThrowableError> | undefined {
+  return procedureOrLazy['~orpc'].meta['~pinia-colada'] as
+    | PiniaColadaMetaOptions<ClientContext, unknown, unknown, ThrowableError>
+    | undefined
 }
 
 /**
@@ -69,12 +95,12 @@ export function getPiniaColadaMeta(
  *
  * @see {@link https://orpc.dev/docs/integrations/pinia-colada#contract-options-plugin | Pinia Colada Integration - Contract Options Plugin}
  */
-export class ContractOptionsUtilsPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
+export class ContractOptionsUtilsPlugin<
+  T extends AnyNestedClient = AnyNestedClient,
+> implements RouterUtilsPlugin<T> {
   readonly name = '~contract-options'
 
-  constructor(
-    private readonly contract: RouterContract,
-  ) {}
+  constructor(private readonly contract: RouterContract) {}
 
   initProcedureOptions(
     path: string[],

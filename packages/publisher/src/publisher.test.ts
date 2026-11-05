@@ -1,5 +1,6 @@
-import type { PublisherSubscribeListenerOptions } from './publisher.ts'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
+
+import type { PublisherSubscribeListenerOptions } from './publisher.ts'
 import { Publisher } from './publisher.ts'
 
 // Concrete implementation for testing
@@ -10,7 +11,7 @@ class TestPublisher<T extends Record<string, object>> extends Publisher<T> {
   async publish<K extends keyof T>(event: K, payload: T[K]): Promise<void> {
     const eventListeners = this.listenersMap.get(event)
     if (eventListeners) {
-      eventListeners.forEach(listener => listener(payload))
+      eventListeners.forEach((listener) => listener(payload))
     }
   }
 
@@ -38,7 +39,7 @@ class TestPublisher<T extends Record<string, object>> extends Publisher<T> {
 type TestEvents = {
   message: { text: string }
   count: { value: number }
-  user: { id: string, name: string }
+  user: { id: string; name: string }
 }
 
 describe('publisher', () => {
@@ -66,11 +67,17 @@ describe('publisher', () => {
 
     const unsubscribe = await publisher.subscribe('message', listener, { lastEventId, onError })
     expect(subscribeListenerSpy).toHaveBeenCalledTimes(1)
-    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(1, 'message', listener, { lastEventId, onError })
+    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(1, 'message', listener, {
+      lastEventId,
+      onError,
+    })
 
     const iterator = publisher.subscribe('message', { lastEventId })
     expect(subscribeListenerSpy).toHaveBeenCalledTimes(2)
-    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(2, 'message', expect.any(Function), { lastEventId, onError: expect.any(Function) })
+    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(2, 'message', expect.any(Function), {
+      lastEventId,
+      onError: expect.any(Function),
+    })
 
     await unsubscribe()
     await iterator.return()
@@ -101,10 +108,7 @@ describe('publisher', () => {
 
       await publisher.publish('message', { text: 'concurrent' })
 
-      const [result1, result2] = await Promise.all([
-        iterator1.next(),
-        iterator2.next(),
-      ])
+      const [result1, result2] = await Promise.all([iterator1.next(), iterator2.next()])
 
       expect(result1.value?.text).toBe('concurrent')
       expect(result2.value?.text).toBe('concurrent')
@@ -200,7 +204,7 @@ describe('publisher', () => {
         await publisher.publish('message', { text: 'dropped' })
 
         const nextPromise = iterator.next()
-        await new Promise(resolve => setTimeout(resolve, 1))
+        await new Promise((resolve) => setTimeout(resolve, 1))
 
         await publisher.publish('message', { text: 'received' })
 
@@ -342,9 +346,18 @@ describe('publisher', () => {
         publisher.optionsMap.get('message')?.[0]?.onError?.(new Error('Test error'))
         await publisher.publish('message', { text: 'third' })
 
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'first' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'second' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'third' } })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'first' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'second' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'third' },
+        })
         await expect(iterator.next()).rejects.toThrow('Test error')
       })
     })
@@ -386,9 +399,18 @@ describe('publisher', () => {
         listener?.({ text: 'third' })
         await sleep(0)
 
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'first' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'second' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'third' } })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'first' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'second' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'third' },
+        })
         await expect(iterator.next()).rejects.toThrow('__TEST__')
       })
     })

@@ -1,6 +1,6 @@
-import type { RequestHeadersHandlerPluginContext } from './request-headers.ts'
 import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
 import { os } from '../builder.ts'
+import type { RequestHeadersHandlerPluginContext } from './request-headers.ts'
 import { RequestHeadersHandlerPlugin } from './request-headers.ts'
 
 beforeEach(() => {
@@ -16,16 +16,18 @@ describe('requestHeadersHandlerPlugin', () => {
       plugins: [new RequestHeadersHandlerPlugin()],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-custom-1': 'value1',
-        'x-custom-2': 'value2',
-        'authorization': 'Bearer token123',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-custom-1': 'value1',
+          'x-custom-2': 'value2',
+          'authorization': 'Bearer token123',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     expect(response).toBeDefined()
     expect(procedureHandler).toHaveBeenCalledOnce()
@@ -38,9 +40,7 @@ describe('requestHeadersHandlerPlugin', () => {
   })
 
   it('preserves existing reqHeaders when already provided in context', async () => {
-    const procedure = os
-      .$context<RequestHeadersHandlerPluginContext>()
-      .handler(() => 'pong')
+    const procedure = os.$context<RequestHeadersHandlerPluginContext>().handler(() => 'pong')
 
     const interceptor = vi.fn(({ next }: any) => next())
 
@@ -50,11 +50,14 @@ describe('requestHeadersHandlerPlugin', () => {
     })
 
     const existingHeaders = new Headers({ 'existing-header': 'existing-value' })
-    await handler.handle(new Request('https://example.com', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ json: null }),
-    }), { context: { reqHeaders: existingHeaders } })
+    await handler.handle(
+      new Request('https://example.com', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: null }),
+      }),
+      { context: { reqHeaders: existingHeaders } },
+    )
 
     expect(interceptor).toHaveBeenCalledOnce()
     expect(interceptor.mock.calls[0]![0].context.reqHeaders).toBe(existingHeaders)

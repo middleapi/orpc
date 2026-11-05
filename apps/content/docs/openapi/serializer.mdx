@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Serializer"
-description: "Learn how OpenAPI Serializer performs one-way serialization of complex types like Date, BigInt, and files into JSON-friendly formats, and how to customize it."
+title: 'OpenAPI Serializer'
+description: 'Learn how OpenAPI Serializer performs one-way serialization of complex types like Date, BigInt, and files into JSON-friendly formats, and how to customize it.'
 ---
 
 ## Supported Data Types
@@ -66,12 +66,14 @@ import { OpenAPISerializer } from '@orpc/openapi'
 
 const serializer = new OpenAPISerializer({
   handlers: {
-    person: { // <- add support for Person
-      condition: v => v instanceof Person,
+    person: {
+      // <- add support for Person
+      condition: (v) => v instanceof Person,
       serialize: (v: Person) => ({ name: v.name, age: v.age }),
     },
-    date: { // <- replace the default Date handler
-      condition: v => v instanceof Date,
+    date: {
+      // <- replace the default Date handler
+      condition: (v) => v instanceof Date,
       serialize: (v: Date) => v.getTime(),
     },
   },

@@ -1,5 +1,9 @@
 import { ProcedureContract } from '@orpc/contract'
-import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils.ts'
+
+import {
+  createContractJsonifiedUtilsFactory,
+  createContractUtilsFactory,
+} from './contract-utils.ts'
 import * as routerUtilsModule from './router-utils.ts'
 
 const createRouterUtilsSpy = vi.spyOn(routerUtilsModule, 'createRouterUtils')

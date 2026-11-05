@@ -1,4 +1,5 @@
 import { getEventMeta, withEventMeta } from '@standard-server/core'
+
 import { MemoryPublisher } from './memory.ts'
 
 type TestEvents = {
@@ -164,18 +165,22 @@ describe('memoryPublisher', () => {
       let activeRegistrations = unsubscribeFns.length
 
       unsubscribeFns.forEach((unsubscribe, index) => {
-        operations.push((async () => {
-          await delayMicrotasks(index * 2)
-          await publisher.publish('message', { text: `burst-${index}` })
-        })())
+        operations.push(
+          (async () => {
+            await delayMicrotasks(index * 2)
+            await publisher.publish('message', { text: `burst-${index}` })
+          })(),
+        )
 
         expectedCalls += activeRegistrations
         activeRegistrations -= 1
 
-        operations.push((async () => {
-          await delayMicrotasks(index * 2 + 1)
-          await Promise.all([unsubscribe(), unsubscribe(), unsubscribe(), unsubscribe()])
-        })())
+        operations.push(
+          (async () => {
+            await delayMicrotasks(index * 2 + 1)
+            await Promise.all([unsubscribe(), unsubscribe(), unsubscribe(), unsubscribe()])
+          })(),
+        )
       })
 
       await Promise.all(operations)
@@ -292,9 +297,13 @@ describe('memoryPublisher', () => {
     const onError = vi.fn()
     const listener = vi.fn()
 
-    const unsubscribe1 = await publisher.subscribe('message', () => {
-      throw error
-    }, { onError })
+    const unsubscribe1 = await publisher.subscribe(
+      'message',
+      () => {
+        throw error
+      },
+      { onError },
+    )
     const unsubscribe2 = await publisher.subscribe('message', listener)
 
     await expect(publisher.publish('message', { text: 'hello' })).resolves.toBeUndefined()
