@@ -18,8 +18,6 @@ updates:
           - '@openapi-spec/*'
       dev-dependencies-minor-patch:
         dependency-type: development
-        exclude-patterns:
-          - compression # inline
         update-types:
           - minor
           - patch

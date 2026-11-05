@@ -84,12 +84,7 @@ export default defineConfig({
       {
         patterns: [
           {
-            group: [
-              '@openapi-spec/types',
-              '@openapi-spec/types/*',
-              '@standard-schema/spec',
-              'compression',
-            ],
+            group: ['@openapi-spec/types', '@openapi-spec/types/*', '@standard-schema/spec'],
             message: 'Please import from @orpc/* instead',
           },
         ],
