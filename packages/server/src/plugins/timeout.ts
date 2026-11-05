@@ -1,6 +1,6 @@
 import type { Value } from '@orpc/shared'
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { AbortError, anyAbortSignal, isAsyncIteratorObject, override, toArray, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 
 export interface TimeoutHandlerPluginOptions<T extends Context> {

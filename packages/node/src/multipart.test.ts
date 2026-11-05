@@ -1,7 +1,7 @@
-import type { MultipartPart } from './multipart'
+import type { MultipartPart } from './multipart.ts'
 import { Buffer } from 'node:buffer'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { parseHeaderParameters, parseMultipart } from './multipart'
+import { parseHeaderParameters, parseMultipart } from './multipart.ts'
 
 interface CollectedPart extends MultipartPart {
   content: Buffer

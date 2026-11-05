@@ -1,9 +1,9 @@
-import type { Context } from '../../context'
-import type { Router } from '../../router'
-import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard'
-import type { FetchHandlerOptions } from './handler'
-import { RPCHandlerCodec, StandardHandler } from '../standard'
-import { FetchHandler } from './handler'
+import type { Context } from '../../context.ts'
+import type { Router } from '../../router.ts'
+import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard/index.ts'
+import type { FetchHandlerOptions } from './handler.ts'
+import { RPCHandlerCodec, StandardHandler } from '../standard/index.ts'
+import { FetchHandler } from './handler.ts'
 
 export interface RPCHandlerOptions<T extends Context>
   extends FetchHandlerOptions<T>, StandardHandlerOptions<T>, RPCHandlerCodecOptions<T> {}

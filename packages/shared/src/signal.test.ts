@@ -1,4 +1,4 @@
-import { allAbortSignal, anyAbortSignal, runWithSignal } from './signal'
+import { allAbortSignal, anyAbortSignal, runWithSignal } from './signal.ts'
 
 describe('allAbortSignal', () => {
   it('should return undefined if contains undefined or empty array', () => {

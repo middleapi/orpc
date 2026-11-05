@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { mcp } from './meta'
+import { mcp } from './meta.ts'
 
 describe('mcp.tool meta', () => {
   it('can be used with contracts and procedures', () => {

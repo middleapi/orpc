@@ -1,6 +1,6 @@
 import type { AnyORPCErrorJSON, SafeResult } from '@orpc/client'
 import type { Interceptor, PromiseWithError } from '@orpc/shared'
-import type { ServerFunction, ServerFunctionError } from '../server-function'
+import type { ServerFunction, ServerFunctionError } from '../server-function.ts'
 import { createORPCErrorFromJson, safe } from '@orpc/client'
 import { intercept, toArray } from '@orpc/shared'
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'

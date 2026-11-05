@@ -2,9 +2,9 @@ import { trace } from '@opentelemetry/api'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
 import { getTracer, setTracer } from '@orpc/shared'
-import pkg from '../package.json'
-import { ORPCInstrumentation } from './instrumentation'
-import { OpenTelemetryTracer } from './tracer'
+import pkg from '../package.json' with { type: 'json' }
+import { ORPCInstrumentation } from './instrumentation.ts'
+import { OpenTelemetryTracer } from './tracer.ts'
 
 const getTracerSpy = vi.spyOn(trace, 'getTracer')
 

@@ -1,8 +1,8 @@
-import type { Locker, LockOptions } from '../types'
+import type { Locker, LockOptions } from '../types.ts'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
-import { LockTimeoutError } from '../error'
-import { UpstashLocker } from './upstash'
+import { LockTimeoutError } from '../error.ts'
+import { UpstashLocker } from './upstash.ts'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN

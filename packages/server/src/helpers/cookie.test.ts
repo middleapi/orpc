@@ -1,4 +1,4 @@
-import { deleteCookie, getCookie, setCookie } from './cookie'
+import { deleteCookie, getCookie, setCookie } from './cookie.ts'
 
 describe('setCookie', () => {
   it('should work with Headers object', () => {

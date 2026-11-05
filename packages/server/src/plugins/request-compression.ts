@@ -1,5 +1,5 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'

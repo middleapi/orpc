@@ -1,5 +1,5 @@
-import type { JsonSchema } from './types'
-import { JsonSchemaCoercer } from './coercer'
+import type { JsonSchema } from './types.ts'
+import { JsonSchemaCoercer } from './coercer.ts'
 
 const coercer = new JsonSchemaCoercer()
 

@@ -1,9 +1,9 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec } from './codec'
-import type { StandardLinkTransport } from './transport'
+import type { StandardLinkCodec } from './codec.ts'
+import type { StandardLinkTransport } from './transport.ts'
 import { getTracer, isAsyncIteratorObject, setTracer } from '@orpc/shared'
-import { ORPCError } from '../../error'
-import { StandardLink } from './link'
+import { ORPCError } from '../../error.ts'
+import { StandardLink } from './link.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

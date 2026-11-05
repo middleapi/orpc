@@ -1,5 +1,5 @@
 import type { JsonSchema, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { OpenAPIV3_2 } from './types'
+import type { OpenAPIV3_2 } from './types.ts'
 import {
   decodeJsonPointerSegment,
   encodeJsonPointerSegment,

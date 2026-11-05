@@ -1,4 +1,4 @@
-import type { experimental_DurableLockObject as DurableLockObject } from './lock-object'
+import type { experimental_DurableLockObject as DurableLockObject } from './lock-object.ts'
 import { sleep } from '@orpc/shared'
 import { evictDurableObject, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'

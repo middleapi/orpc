@@ -1,7 +1,7 @@
-import type { ErrorMap } from './error'
+import type { ErrorMap } from './error.ts'
 import * as ClientModule from '@orpc/client'
 import z from 'zod'
-import { mergeErrorMap, reconcileORPCError } from './error-utils'
+import { mergeErrorMap, reconcileORPCError } from './error-utils.ts'
 
 const ORPCError = ClientModule.ORPCError
 const cloneORPCErrorSpy = vi.spyOn(ClientModule, 'cloneORPCError')

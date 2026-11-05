@@ -1,9 +1,9 @@
 import z from 'zod'
-import { os } from './builder'
-import * as ProcedureClientModule from './procedure-client'
-import * as ProcedureUtilsModule from './procedure-utils'
-import { createRouterClient } from './router-client'
-import * as RouterUtilsModule from './router-utils'
+import { os } from './builder.ts'
+import * as ProcedureClientModule from './procedure-client.ts'
+import * as ProcedureUtilsModule from './procedure-utils.ts'
+import { createRouterClient } from './router-client.ts'
+import * as RouterUtilsModule from './router-utils.ts'
 
 const createProcedureClientSpy = vi.spyOn(ProcedureClientModule, 'createProcedureClient')
 const createGuardedProcedureLazySpy = vi.spyOn(ProcedureUtilsModule, 'createGuardedProcedureLazy')

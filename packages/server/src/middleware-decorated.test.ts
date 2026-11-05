@@ -1,7 +1,7 @@
 import * as ContractModule from '@orpc/contract'
 import { sleep } from '@orpc/shared'
 import { vi } from 'vitest'
-import { decorateMiddleware } from './middleware-decorated'
+import { decorateMiddleware } from './middleware-decorated.ts'
 
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')
 

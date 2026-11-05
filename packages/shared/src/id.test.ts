@@ -1,4 +1,4 @@
-import { compareSequentialIds } from './id'
+import { compareSequentialIds } from './id.ts'
 
 describe('compareSequentialIds', () => {
   it('should return 0 when ids are equal', () => {

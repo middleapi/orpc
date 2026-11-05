@@ -1,6 +1,5 @@
-/* eslint-disable ts/no-empty-object-type */
 
-import type { MergedErrorMap } from './error-utils'
+import type { MergedErrorMap } from './error-utils.ts'
 import { expectTypeOf, it } from 'vitest'
 
 it('MergedErrorMap', () => {

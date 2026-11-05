@@ -1,5 +1,5 @@
 import type { AnyProcedure, Context as ORPCContext, ORPCErrorConstructorMap } from '@orpc/server'
-import type { EffectWrapHandlerOptions, EffectWrapMiddlewareOptions, EffectWrapOptions, InferEffectServices, WithEffectContext } from './context'
+import type { EffectWrapHandlerOptions, EffectWrapMiddlewareOptions, EffectWrapOptions, InferEffectServices, WithEffectContext } from './context.ts'
 import { ORPCError } from '@orpc/server'
 import { Cause, Context, Effect } from 'effect'
 

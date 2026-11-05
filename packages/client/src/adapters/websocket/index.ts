@@ -1,2 +1,2 @@
-export * from './rpc-link'
-export * from './transport'
+export * from './rpc-link.ts'
+export * from './transport.ts'

@@ -1,9 +1,9 @@
-import type { UpstashPublisherOptions } from './upstash'
+import type { UpstashPublisherOptions } from './upstash.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { Redis } from '@upstash/redis'
-import { UpstashPublisher } from './upstash'
+import { UpstashPublisher } from './upstash.ts'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
@@ -545,6 +545,7 @@ describe.concurrent(
     it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
       const publisher = createTestingPublisher()
       const event = 'self-unsubscribe'
+      // eslint-disable-next-line prefer-const -- assigned after the callback that reads it is created
       let unsubscribeFirst: () => Promise<void>
       const first = vi.fn(() => {
         void unsubscribeFirst()

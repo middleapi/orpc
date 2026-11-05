@@ -1,9 +1,9 @@
 import type { RouterContract } from '@orpc/contract'
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { implement } from './implementer'
-import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
-import * as ImplementerRouter from './implementer-router'
+import { implement } from './implementer.ts'
+import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
+import * as ImplementerRouter from './implementer-router.ts'
 
 const createRouterImplementerSpy = vi.spyOn(ImplementerRouter, 'createRouterImplementer')
 

@@ -1,8 +1,8 @@
-import type { AnyNestedClient, Client, ClientRest } from './types'
-import type { SafeResult } from './utils'
+import type { AnyNestedClient, Client, ClientRest } from './types.ts'
+import type { SafeResult } from './utils.ts'
 import { isTypescriptObject } from '@orpc/shared'
-import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts'
-import { safe } from './utils'
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts.ts'
+import { safe } from './utils.ts'
 
 export type SafeClient<T extends AnyNestedClient>
   = T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>

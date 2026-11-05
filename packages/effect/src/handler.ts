@@ -1,7 +1,7 @@
 import type { Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
-import type { InferEffectServices, WithEffectContext } from './context'
+import type { InferEffectServices, WithEffectContext } from './context.ts'
 import { Effect, Context as EffectContext } from 'effect'
-import { runPromise } from './runtime'
+import { runPromise } from './runtime.ts'
 
 export interface HandlerGen<
   TCurrentContext extends Context,

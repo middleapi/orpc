@@ -3,8 +3,8 @@ import { oc, setHiddenMetaPlugins } from '@orpc/contract'
 import { call, os } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
-import * as SchemaModule from '../schema'
-import './schema'
+import * as SchemaModule from '../schema.ts'
+import './schema.ts'
 
 const toStandardSchemaSpy = vi.spyOn(SchemaModule, 'toStandardSchema')
 

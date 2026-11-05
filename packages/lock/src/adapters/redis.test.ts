@@ -1,8 +1,8 @@
-import type { Locker, LockOptions } from '../types'
+import type { Locker, LockOptions } from '../types.ts'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { createClient } from 'redis'
-import { LockTimeoutError } from '../error'
-import { RedisLocker } from './redis'
+import { LockTimeoutError } from '../error.ts'
+import { RedisLocker } from './redis.ts'
 
 const REDIS_URL = process.env.REDIS_URL
 

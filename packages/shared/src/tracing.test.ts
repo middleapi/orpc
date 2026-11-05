@@ -8,7 +8,7 @@ import {
   startSpan,
   toSpanAttributeValue,
   toTracingException,
-} from './tracing'
+} from './tracing.ts'
 
 function createMockSpan() {
   return {

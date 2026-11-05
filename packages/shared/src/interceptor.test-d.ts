@@ -1,6 +1,6 @@
-import type { Interceptor } from './interceptor'
-import type { PromiseWithError } from './types'
-import { onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
+import type { Interceptor } from './interceptor.ts'
+import type { PromiseWithError } from './types.ts'
+import { onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor.ts'
 
 it('onStart, onSuccess, onError, onFinish, onAsyncIteratorObjectError, onReadableStreamError can be used as an interceptor', () => {
   const interceptors: Interceptor<{ foo: string }, PromiseWithError<'success', 'error'>>[] = []

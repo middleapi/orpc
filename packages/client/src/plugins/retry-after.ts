@@ -1,10 +1,10 @@
 import type { Value } from '@orpc/shared'
 import type { StandardLazyResponse } from '@standard-server/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
-import { COMMON_ERROR_STATUS_MAP } from '../error'
+import { COMMON_ERROR_STATUS_MAP } from '../error.ts'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   /**

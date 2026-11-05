@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { SmartCoercionHandlerPlugin } from './smart-coercion-handler-plugin'
+import { SmartCoercionHandlerPlugin } from './smart-coercion-handler-plugin.ts'
 
 describe('smartCoercionHandlerPlugin', () => {
   it('prepends its interceptor and skips coercion when input schemas are missing', async () => {

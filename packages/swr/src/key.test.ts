@@ -1,4 +1,4 @@
-import { generateOperationKey } from './key'
+import { generateOperationKey } from './key.ts'
 
 describe('generateOperationKey', () => {
   it('without prefix', () => {

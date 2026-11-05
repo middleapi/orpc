@@ -1,4 +1,4 @@
-export * from './converter'
+export * from './converter.ts'
 
 export type {
   JsonSchema,

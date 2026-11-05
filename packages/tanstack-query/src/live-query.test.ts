@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/query-core'
-import { liveQuery } from './live-query'
+import { liveQuery } from './live-query.ts'
 
 export const queryClient = new QueryClient({
   defaultOptions: {

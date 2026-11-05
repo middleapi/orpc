@@ -1,6 +1,6 @@
-import type { OperationKey, OperationKeyBaseOptions, OperationKeyOptions } from './key'
-import type { OperationType } from './types'
-import { generateOperationKey } from './key'
+import type { OperationKey, OperationKeyBaseOptions, OperationKeyOptions } from './key.ts'
+import type { OperationType } from './types.ts'
+import { generateOperationKey } from './key.ts'
 
 export class SharedUtils<TInput> {
   constructor(

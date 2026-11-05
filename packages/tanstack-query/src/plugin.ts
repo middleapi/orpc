@@ -1,7 +1,7 @@
 import type { AnyNestedClient, InferClientContext, InferClientError } from '@orpc/client'
 import type { OrderablePlugin } from '@orpc/shared'
-import type { ProcedureUtilsOptions } from './procedure-utils'
-import type { RouterUtilsOptions } from './router-utils'
+import type { ProcedureUtilsOptions } from './procedure-utils.ts'
+import type { RouterUtilsOptions } from './router-utils.ts'
 import { sortPlugins } from '@orpc/shared'
 
 /**

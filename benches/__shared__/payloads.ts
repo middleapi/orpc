@@ -54,8 +54,8 @@ export const PAYLOAD_5MB_WITH_FILES = {
 
 export const EVENTS_1KB = [PAYLOAD_1KB]
 export const EVENTS_10KB = Array.from({ length: 10 }).fill(PAYLOAD_1KB)
-export const EVENTS_100KB = Array.from({ length: 50 }).fill([PAYLOAD_1KB, PAYLOAD_1KB])
-export const EVENTS_5MB = Array.from({ length: 1000 }).fill([PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB])
+export const EVENTS_100KB = Array.from({ length: 50 }, () => [PAYLOAD_1KB, PAYLOAD_1KB])
+export const EVENTS_5MB = Array.from({ length: 1000 }, () => [PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB])
 
 /** Fresh async generator over prebuilt event parts (one-shot per call). */
 export function asSyncIteratorObject(parts: readonly unknown[]): AsyncGenerator<unknown, void, undefined> {

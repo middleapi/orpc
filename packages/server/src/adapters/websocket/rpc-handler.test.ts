@@ -2,8 +2,8 @@ import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import WebSocket, { WebSocketServer } from 'ws'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import { os } from '../../builder.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   beforeEach(() => {

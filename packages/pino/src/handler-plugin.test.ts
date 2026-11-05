@@ -3,8 +3,8 @@ import { ORPCError, os } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { AbortError } from '@orpc/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
-import { PinoHandlerPlugin } from './handler-plugin'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
+import { PinoHandlerPlugin } from './handler-plugin.ts'
 
 const globalSpies = {
   child: vi.fn(),

@@ -1,10 +1,10 @@
 import type { Context, Router } from '@orpc/server'
 import type { FetchHandlerOptions } from '@orpc/server/fetch'
 import type { StandardHandlerOptions } from '@orpc/server/standard'
-import type { OpenAPIHandlerCodecOptions } from '../standard'
+import type { OpenAPIHandlerCodecOptions } from '../standard/index.ts'
 import { FetchHandler } from '@orpc/server/fetch'
 import { StandardHandler } from '@orpc/server/standard'
-import { OpenAPIHandlerCodec } from '../standard'
+import { OpenAPIHandlerCodec } from '../standard/index.ts'
 
 export interface OpenAPIHandlerOptions<T extends Context>
   extends FetchHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}

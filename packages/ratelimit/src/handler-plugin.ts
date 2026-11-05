@@ -1,7 +1,7 @@
 import type { AnyProcedure, Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
 import type { StandardHeaders } from '@standard-server/core'
-import type { RateLimitResult } from './types'
+import type { RateLimitResult } from './types.ts'
 import { toArray } from '@orpc/shared'
 
 export const RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_RATELIMIT_HANDLER_PLUGIN_CONTEXT')

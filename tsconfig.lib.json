@@ -1,13 +1,20 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "./tsconfig.base.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "composite": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
     "declaration": true,
-    "declarationMap": true,
-    "emitDeclarationOnly": true,
+    "isolatedDeclarations": true,
     "noEmit": false,
-    "isolatedDeclarations": true
-  }
+    "rootDir": "${configDir}/src",
+    "outDir": "${configDir}/dist"
+  },
+  "include": ["${configDir}/package.json", "${configDir}/src"],
+  "exclude": [
+    "${configDir}/src/**/*.test.ts",
+    "${configDir}/src/**/*.test.tsx",
+    "${configDir}/src/**/*.test-d.ts",
+    "${configDir}/src/**/__tests__"
+  ]
 }

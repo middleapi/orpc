@@ -1,9 +1,9 @@
 import { ORPCError } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import * as z from 'zod'
-import { ValidationError } from '../error'
-import { ProcedureContract } from '../procedure'
-import { RequestValidationLinkPlugin } from './request-validation'
+import { ValidationError } from '../error.ts'
+import { ProcedureContract } from '../procedure.ts'
+import { RequestValidationLinkPlugin } from './request-validation.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -5,7 +5,7 @@ import { asyncIteratorObject, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { QueryClient } from '@tanstack/react-query'
 import z from 'zod'
-import { createTanstackQueryUtils } from '../../src'
+import { createTanstackQueryUtils } from '../../src/index.ts'
 
 export const router = {
   static: os

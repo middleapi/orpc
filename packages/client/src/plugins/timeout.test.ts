@@ -1,8 +1,8 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
 import { AbortError } from '@orpc/shared'
-import { StandardLink } from '../adapters/standard'
-import { TimeoutLinkPlugin } from './timeout'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { TimeoutLinkPlugin } from './timeout.ts'
 
 function makeCodec(): StandardLinkCodec<any> {
   return {

@@ -1,6 +1,6 @@
-import type { ErrorMap } from './error'
-import type { AnyMetaPlugin, Meta } from './meta'
-import type { AnySchema } from './schema'
+import type { ErrorMap } from './error.ts'
+import type { AnyMetaPlugin, Meta } from './meta.ts'
+import type { AnySchema } from './schema.ts'
 import { getConstructor, isTypescriptObject } from '@orpc/shared'
 
 export interface ProcedureContractDefinition<

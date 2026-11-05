@@ -1,8 +1,8 @@
 import type { InterceptorOptions, Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
@@ -274,9 +274,9 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         const queryItems = items.filter(([options]) => options.request.method === 'QUERY')
         const unsafeItems = items.filter(([options]) => options.request.method !== 'GET' && options.request.method !== 'QUERY')
 
-        this.executeBatchInOwnContext('GET', group, getItems)
-        this.executeBatchInOwnContext('QUERY', group, queryItems)
-        this.executeBatchInOwnContext('POST', group, unsafeItems)
+        void this.executeBatchInOwnContext('GET', group, getItems)
+        void this.executeBatchInOwnContext('QUERY', group, queryItems)
+        void this.executeBatchInOwnContext('POST', group, unsafeItems)
       }
     }
   }
@@ -365,7 +365,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         const sent = promiseWithResolvers<void>()
         markRequestSent = sent.resolve
 
-        peer
+        void peer
           .request(subrequests[index]!)
           .then(subResponse => resolve(this.mapSubresponse(subResponse, batchResponse, subOptions)))
           .catch((error) => {

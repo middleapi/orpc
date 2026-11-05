@@ -1,6 +1,6 @@
 import { sleep } from '@orpc/shared'
 import { QueryClient } from '@tanstack/query-core'
-import { serializableStreamedQuery } from './stream-query'
+import { serializableStreamedQuery } from './stream-query.ts'
 
 describe('serializableStreamedQuery', () => {
   const queryClient = new QueryClient({

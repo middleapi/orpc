@@ -14,7 +14,7 @@ import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
 import { os, type } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
 import { RequestCompressionHandlerPlugin, RequestLimitHandlerPlugin } from '@orpc/server/plugins'
-import { TmpFile, TmpFileUploadHandlerPlugin } from '../src'
+import { TmpFile, TmpFileUploadHandlerPlugin } from '../src/index.ts'
 
 /**
  * Driven through a real http server and `RPCLink`, so uploads take the exact

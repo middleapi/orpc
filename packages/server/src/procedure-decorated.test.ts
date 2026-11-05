@@ -1,10 +1,10 @@
 import type { AnyMetaPlugin, ErrorMap } from '@orpc/contract'
-import type { AnyMiddleware } from './middleware'
+import type { AnyMiddleware } from './middleware.ts'
 import { setHiddenMetaPlugins } from '@orpc/contract'
 import * as ContractModule from '@orpc/contract'
 import z from 'zod'
-import { Procedure } from './procedure'
-import { DecoratedProcedure } from './procedure-decorated'
+import { Procedure } from './procedure.ts'
+import { DecoratedProcedure } from './procedure-decorated.ts'
 
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')

@@ -1,11 +1,11 @@
 import type { RPCJsonSerialization } from '@orpc/client'
 import type { Public, ThrowableError } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
-import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
+import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
-import { Publisher } from '../publisher'
+import { Publisher } from '../publisher.ts'
 
 /**
  * Adds `ARGV[1]` to stream `KEYS[1]` and publishes it with its ID to the channel of the same name,

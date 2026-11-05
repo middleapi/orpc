@@ -1,4 +1,4 @@
-import type { AnySchema, InferSchemaInput, InferSchemaOutput, MergedSchema, Schema } from './schema'
+import type { AnySchema, InferSchemaInput, InferSchemaOutput, MergedSchema, Schema } from './schema.ts'
 import { type as arktypeType } from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'

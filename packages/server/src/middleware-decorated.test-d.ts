@@ -1,7 +1,7 @@
 import type { ErrorMap, MergedErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { MergedContext, MergedInitialContext } from './context'
-import type { Middleware, MiddlewareDone } from './middleware'
-import type { DecoratedMiddleware } from './middleware-decorated'
+import type { MergedContext, MergedInitialContext } from './context.ts'
+import type { Middleware, MiddlewareDone } from './middleware.ts'
+import type { DecoratedMiddleware } from './middleware-decorated.ts'
 
 const errorMap = { BASE: { message: 'bad request' } } satisfies ErrorMap
 

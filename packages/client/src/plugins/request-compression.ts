@@ -1,6 +1,6 @@
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { isAsyncIteratorObject, isCompressibleContentType, toArray } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 import { toFetchBody } from '@standard-server/fetch'

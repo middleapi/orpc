@@ -1,7 +1,7 @@
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard/index.ts'
 import { RPCLink } from '@orpc/client/fetch'
 import { toArray } from '@orpc/shared'
-import { ResponseCompressionLinkPlugin } from './response-compression'
+import { ResponseCompressionLinkPlugin } from './response-compression.ts'
 
 async function compressAsync(data: string, encoding: 'gzip' | 'deflate' | 'deflate-raw'): Promise<Uint8Array<ArrayBuffer>> {
   const stream = new Blob([data]).stream().pipeThrough(new CompressionStream(encoding))

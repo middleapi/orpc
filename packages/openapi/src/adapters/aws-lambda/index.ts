@@ -1,4 +1,4 @@
-export * from './openapi-handler'
+export * from './openapi-handler.ts'
 
 export type {
   AnyAPIGatewayProxyEvent,

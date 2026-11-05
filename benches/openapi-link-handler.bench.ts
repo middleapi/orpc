@@ -6,7 +6,7 @@ import { OpenAPIHandlerCodec, OpenAPILinkCodec } from '@orpc/openapi/standard'
 import { os, type } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
-import { asSyncIteratorObject, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
+import { asSyncIteratorObject, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads.ts'
 
 const serializer = new OpenAPISerializer({ handlers })
 

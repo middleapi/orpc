@@ -1,4 +1,4 @@
-import { decodeBase64url, encodeBase64url } from './base64url'
+import { decodeBase64url, encodeBase64url } from './base64url.ts'
 
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' }
 

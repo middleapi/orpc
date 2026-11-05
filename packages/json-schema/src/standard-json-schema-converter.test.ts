@@ -1,7 +1,7 @@
 import type { AnySchema } from '@orpc/contract'
 import * as arktype from 'arktype'
 import z from 'zod'
-import { isStandardSchemaOptional, StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import { isStandardSchemaOptional, StandardJsonSchemaConverter } from './standard-json-schema-converter.ts'
 
 function withStandardOverrides<TSchema extends AnySchema>(schema: TSchema, overrides: Record<string, unknown>): TSchema {
   Object.defineProperty(schema, '~standard', {

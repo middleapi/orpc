@@ -1,7 +1,7 @@
 import type { PartialDeep, Public } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
-import type { SerializableStreamedQueryOptions } from './stream-query'
-import type { OperationType } from './types'
+import type { SerializableStreamedQueryOptions } from './stream-query.ts'
+import type { OperationType } from './types.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { stringifyJSON } from '@orpc/shared'
 

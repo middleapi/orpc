@@ -1,12 +1,12 @@
 import type { ORPCErrorCode, ORPCErrorOptions } from '@orpc/client'
 import type { MaybeOptionalOptions, Writable } from '@orpc/shared'
-import type { ErrorMap, ErrorMapItem } from './error'
-import type { AnySchema, InferSchemaInput, Schema } from './schema'
+import type { ErrorMap, ErrorMapItem } from './error.ts'
+import type { AnySchema, InferSchemaInput, Schema } from './schema.ts'
 
 import { ORPCError, RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { getOwn, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ValidationError } from './error'
-import { type } from './schema-utils'
+import { ValidationError } from './error.ts'
+import { type } from './schema-utils.ts'
 
 export interface ORPCErrorFactoryOptions<TData> {
   /**

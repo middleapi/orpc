@@ -28,8 +28,6 @@ export function generateOperationKey<TInput>(
   return [
     ...options.prefix !== undefined ? [options.prefix] : [],
     path,
-    {
-      ...options.input !== undefined ? { input: options.input } : {},
-    },
+    options.input !== undefined ? { input: options.input } : {},
   ] as OperationKey<TInput>
 }

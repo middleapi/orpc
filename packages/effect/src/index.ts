@@ -1,9 +1,9 @@
-export * from './client'
-export * from './context'
-export * from './converter'
-export * from './error'
-export * from './handler'
-export * from './middleware'
+export * from './client.ts'
+export * from './context.ts'
+export * from './converter.ts'
+export * from './error.ts'
+export * from './handler.ts'
+export * from './middleware.ts'
 
 export type {
   JsonSchema,

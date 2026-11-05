@@ -1,5 +1,5 @@
 import { intercept } from '@orpc/shared'
-import { onErrorDeferred, onFinishDeferred, onStartDeferred, onSuccessDeferred } from './deferred-interceptors'
+import { onErrorDeferred, onFinishDeferred, onStartDeferred, onSuccessDeferred } from './deferred-interceptors.ts'
 
 describe('onStartDeferred/onSuccessDeferred/onErrorDeferred/onFinishDeferred', async () => {
   it('on success', async () => {

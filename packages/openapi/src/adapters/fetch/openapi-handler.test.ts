@@ -1,9 +1,9 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { createORPCClient } from '@orpc/client'
 import { os } from '@orpc/server'
-import { openapi } from '../../meta'
-import { OpenAPIHandler } from './openapi-handler'
-import { OpenAPILink } from './openapi-link'
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandler } from './openapi-handler.ts'
+import { OpenAPILink } from './openapi-link.ts'
 
 describe('openapiHandler', () => {
   beforeEach(() => {

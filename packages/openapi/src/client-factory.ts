@@ -1,6 +1,6 @@
 import type { ClientContext, ClientLink, ORPCClientOptions } from '@orpc/client'
 import type { RouterContract, RouterContractClient } from '@orpc/contract'
-import type { JsonifiedClient } from './types'
+import type { JsonifiedClient } from './types.ts'
 import { createContractClientFactory } from '@orpc/contract'
 
 export interface ContractJsonifiedClientFactory<

@@ -1,13 +1,13 @@
 import type { ClientOptions } from '@orpc/client'
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorFromErrorMap, ProcedureContract } from '@orpc/contract'
 import type { PromiseWithError, ThrowableError } from '@orpc/shared'
-import type { Context } from './context'
-import type { Lazyable } from './lazy'
-import type { AnyProcedure } from './procedure'
-import type { ProcedureClientOptions } from './procedure-client'
-import { Lazy, unlazy } from './lazy'
-import { Procedure } from './procedure'
-import { createProcedureClient } from './procedure-client'
+import type { Context } from './context.ts'
+import type { Lazyable } from './lazy.ts'
+import type { AnyProcedure } from './procedure.ts'
+import type { ProcedureClientOptions } from './procedure-client.ts'
+import { Lazy, unlazy } from './lazy.ts'
+import { Procedure } from './procedure.ts'
+import { createProcedureClient } from './procedure-client.ts'
 
 export function createGuardedProcedureLazy(lazy: Lazy<unknown>): Lazy<AnyProcedure> {
   const guarded = new Lazy({

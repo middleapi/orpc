@@ -1,9 +1,9 @@
 import type { ORPCError } from '@orpc/client'
 import type { MergedErrorMap, Schema } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
-import type { Lazy, Lazyable } from './lazy'
-import type { Procedure } from './procedure'
-import type { ContractedRouter, InferRouterError, InferRouterErrors, InferRouterFinalContexts, InferRouterInitialContext, InferRouterInitialContexts, InferRouterInputs, InferRouterOutputs, Router } from './router'
+import type { Lazy, Lazyable } from './lazy.ts'
+import type { Procedure } from './procedure.ts'
+import type { ContractedRouter, InferRouterError, InferRouterErrors, InferRouterFinalContexts, InferRouterInitialContext, InferRouterInitialContexts, InferRouterInputs, InferRouterOutputs, Router } from './router.ts'
 import { oc } from '@orpc/contract'
 import z from 'zod'
 

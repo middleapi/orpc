@@ -1,7 +1,7 @@
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, MetaPlugin } from '@orpc/contract'
 import type { Lazy } from '@orpc/server'
 import type { JSONValue, Tool } from 'ai'
-import type { ToolOutput } from './tool'
+import type { ToolOutput } from './tool.ts'
 
 /**
  * The [function tool](https://ai-sdk.dev/docs/foundations/tools) member of the AI SDK `Tool` union,

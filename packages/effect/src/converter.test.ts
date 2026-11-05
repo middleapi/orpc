@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { z } from 'zod'
-import { EffectSchemaToJsonSchemaConverter } from './converter'
-import { toStandardSchema } from './schema'
+import { EffectSchemaToJsonSchemaConverter } from './converter.ts'
+import { toStandardSchema } from './schema.ts'
 
 describe('effectSchemaToJsonSchemaConverter', () => {
   const converter = new EffectSchemaToJsonSchemaConverter()

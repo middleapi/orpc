@@ -26,25 +26,25 @@
     "typesafe"
   ],
   "sideEffects": [
-    "./dist/extensions/actionable.mjs"
+    "./dist/extensions/actionable.js"
   ],
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
       },
       "./hooks": {
-        "types": "./dist/hooks/index.d.mts",
-        "import": "./dist/hooks/index.mjs",
-        "default": "./dist/hooks/index.mjs"
+        "types": "./dist/hooks/index.d.ts",
+        "import": "./dist/hooks/index.js",
+        "default": "./dist/hooks/index.js"
       },
       "./extensions/actionable": {
-        "types": "./dist/extensions/actionable.d.mts",
-        "import": "./dist/extensions/actionable.mjs",
-        "default": "./dist/extensions/actionable.mjs"
+        "types": "./dist/extensions/actionable.d.ts",
+        "import": "./dist/extensions/actionable.js",
+        "default": "./dist/extensions/actionable.js"
       }
     }
   },
@@ -58,8 +58,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc"
   },
   "peerDependencies": {
     "next": ">=16.2.7",

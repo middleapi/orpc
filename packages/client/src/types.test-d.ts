@@ -1,5 +1,5 @@
-import type { ORPCError } from './error'
-import type { Client, ClientContext, InferClientBodyInputs, InferClientBodyOutputs, InferClientContext, InferClientError, InferClientErrors, InferClientInputs, InferClientOutputs } from './types'
+import type { ORPCError } from './error.ts'
+import type { Client, ClientContext, InferClientBodyInputs, InferClientBodyOutputs, InferClientContext, InferClientError, InferClientErrors, InferClientInputs, InferClientOutputs } from './types.ts'
 
 describe('client', () => {
   const client: Client<{ cache?: boolean }, string, number, Error | ORPCError<'OVERRIDE', unknown>> = async (...args) => {

@@ -1,5 +1,5 @@
 import type { Public } from '@orpc/shared'
-import type { SharedUtils } from './shared-utils'
+import type { SharedUtils } from './shared-utils.ts'
 import { mutate } from 'swr'
 
 describe('sharedUtils', () => {

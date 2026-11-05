@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../../src'
-import { zodJsonSchemaConverter } from '../__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src/index.ts'
+import { zodJsonSchemaConverter } from '../__shared__/schema.ts'
 
 describe('openAPIGenerator e2e: typed errors', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
@@ -149,12 +149,12 @@ describe('openAPIGenerator e2e: typed errors', () => {
     }
 
     const first = await generator.generate(sharedRouter)
-    expect(Object.keys(first.components?.schemas ?? {}).sort()).toEqual(['NotFound', 'UndefinedError'])
+    expect(Object.keys(first.components?.schemas ?? {}).toSorted()).toEqual(['NotFound', 'UndefinedError'])
 
     const second = await generator.generate(sharedRouter, {
       base: { components: first.components },
     })
-    expect(Object.keys(second.components?.schemas ?? {}).sort()).toEqual(['NotFound', 'UndefinedError'])
+    expect(Object.keys(second.components?.schemas ?? {}).toSorted()).toEqual(['NotFound', 'UndefinedError'])
   })
 
   it('supports a custom error status map and a custom error body schema', async () => {

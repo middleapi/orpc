@@ -1,7 +1,7 @@
-import type { CloudflareRateLimiterOptions } from './ratelimit'
+import type { CloudflareRateLimiterOptions } from './ratelimit.ts'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { CloudflareRateLimiter } from './ratelimit'
+import { CloudflareRateLimiter } from './ratelimit.ts'
 
 describe('cloudflareRateLimiter', () => {
   const PERIOD_MS = 10_000

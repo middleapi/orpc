@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../../src'
-import { zodJsonSchemaConverter } from '../__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src/index.ts'
+import { zodJsonSchemaConverter } from '../__shared__/schema.ts'
 
 describe('openAPIGenerator e2e: file upload and download', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })

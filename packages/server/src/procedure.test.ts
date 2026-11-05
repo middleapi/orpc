@@ -1,5 +1,5 @@
 import { ProcedureContract } from '@orpc/contract'
-import { Procedure } from './procedure'
+import { Procedure } from './procedure.ts'
 
 describe('procedure', () => {
   const procedure = new Procedure({

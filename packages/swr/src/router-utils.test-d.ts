@@ -1,12 +1,12 @@
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { RouterClient } from '@orpc/server'
 import type { Public } from '@orpc/shared'
-import type { ProcedureUtils } from './procedure-utils'
-import type { RouterUtils } from './router-utils'
-import type { SharedUtils } from './shared-utils'
+import type { ProcedureUtils } from './procedure-utils.ts'
+import type { RouterUtils } from './router-utils.ts'
+import type { SharedUtils } from './shared-utils.ts'
 import { os } from '@orpc/server'
 import z from 'zod'
-import { createRouterUtils } from './router-utils'
+import { createRouterUtils } from './router-utils.ts'
 
 const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })

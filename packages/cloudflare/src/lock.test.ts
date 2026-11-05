@@ -4,7 +4,7 @@ import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { experimental_DurableLocker as DurableLocker } from './lock'
+import { experimental_DurableLocker as DurableLocker } from './lock.ts'
 
 describe('durableLocker', () => {
   function createTestingLocker(

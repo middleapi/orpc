@@ -1,4 +1,4 @@
-import type { McpRegistrar, McpRegistrarRegisterOptions } from '../registrar'
+import type { McpRegistrar, McpRegistrarRegisterOptions } from '../registrar.ts'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { createMcpHandler, InMemoryTransport, McpServer } from '@modelcontextprotocol/server'
 

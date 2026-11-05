@@ -6,8 +6,8 @@ import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import type { ToEventStreamOptions } from '@standard-server/node'
 import { Module } from '@nestjs/common'
-import { ORPC_MODULE_CONFIG_SYMBOL } from './constants'
-import { ImplementInterceptor } from './implement'
+import { ORPC_MODULE_CONFIG_SYMBOL } from './constants.ts'
+import { ImplementInterceptor } from './implement.ts'
 
 /**
  * A standard lazy request extended with NestJS route parameters,
@@ -54,6 +54,7 @@ export type ORPCModuleConfig
  * @see {@link https://orpc.dev/docs/integrations/nest#configuration | Implement oRPC contract with NestJS - Configuration}
  */
 @Module({})
+// eslint-disable-next-line typescript/no-extraneous-class -- NestJS dynamic modules are classes
 export class ORPCModule {
   static forRoot(config: ORPCModuleConfig): DynamicModule {
     return {

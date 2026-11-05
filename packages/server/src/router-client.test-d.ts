@@ -1,8 +1,8 @@
 import type { Schema } from '@orpc/contract'
-import type { ProcedureClient } from './procedure-client'
-import type { RouterClient } from './router-client'
+import type { ProcedureClient } from './procedure-client.ts'
+import type { RouterClient } from './router-client.ts'
 import z from 'zod'
-import { os } from './builder'
+import { os } from './builder.ts'
 
 const errorMap = {
   BASE: {

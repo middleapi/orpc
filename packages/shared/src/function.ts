@@ -33,7 +33,7 @@ export function defer(callback: () => void, delay = 0): void {
     setTimeout(callback, delay)
   }
   else {
-    Promise.resolve()
+    void Promise.resolve()
       .then(() => Promise.resolve()
         .then(() => Promise.resolve()
           .then(callback)))

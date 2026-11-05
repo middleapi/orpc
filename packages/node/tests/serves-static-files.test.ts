@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
-import { StaticFileHandlerPlugin } from '../src'
+import { StaticFileHandlerPlugin } from '../src/index.ts'
 
 it('serves static files', async ({ onTestFinished }) => {
   const rootDir = mkdtempSync(path.join(tmpdir(), 'orpc-node-e2e-'))

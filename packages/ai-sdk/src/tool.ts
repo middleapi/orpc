@@ -4,14 +4,14 @@ import type { JsonSchema } from '@orpc/json-schema'
 import type { Context, ProcedureClientOptions } from '@orpc/server'
 import type { MaybeOptionalOptions, Public } from '@orpc/shared'
 import type { FlexibleSchema, JSONValue, Tool, ToolResultPart } from 'ai'
-import type { FunctionTool } from './tool-meta'
+import type { FunctionTool } from './tool-meta.ts'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { call, Procedure } from '@orpc/server'
 import { encodeBase64, isAsyncGeneratorFunction, loadBytes, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, stringifyJSON, toArray } from '@orpc/shared'
 import { tool } from 'ai'
-import { getAiSdkToolMeta } from './tool-meta'
+import { getAiSdkToolMeta } from './tool-meta.ts'
 
 const ANY_SCHEMA: FlexibleSchema = {
   '~standard': {

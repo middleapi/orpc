@@ -11,7 +11,7 @@ import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
 import { generateContentDisposition } from '@standard-server/core'
 import request from 'supertest'
-import { TmpFile, TmpFileUploadHandlerPlugin } from './tmp-file-upload-handler-plugin'
+import { TmpFile, TmpFileUploadHandlerPlugin } from './tmp-file-upload-handler-plugin.ts'
 
 describe('tmpFileUploadHandlerPlugin', () => {
   let tmpDir: string

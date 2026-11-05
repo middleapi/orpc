@@ -27,7 +27,7 @@ function mockText(): AnyTextAdapter {
       yield { type: EventType.RUN_STARTED, runId, threadId, timestamp: Date.now() }
       yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant', timestamp: Date.now() }
 
-      const lastUser = [...(options.messages ?? [])].reverse().find(m => m.role === 'user')
+      const lastUser = [...(options.messages ?? [])].toReversed().find(m => m.role === 'user')
       const lastContent = typeof lastUser?.content === 'string'
         ? lastUser.content
         : JSON.stringify(lastUser?.content)

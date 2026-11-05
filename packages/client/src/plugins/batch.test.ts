@@ -1,10 +1,10 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { encodePeerMessage } from '@standard-server/peer'
-import { StandardLink } from '../adapters/standard'
-import { BatchLinkPlugin } from './batch'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { BatchLinkPlugin } from './batch.ts'
 
 interface TestContext {
   tag?: string

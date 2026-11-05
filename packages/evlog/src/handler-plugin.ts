@@ -7,7 +7,7 @@ import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 
 export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlogOptions {
   /**

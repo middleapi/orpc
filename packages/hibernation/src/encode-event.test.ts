@@ -2,7 +2,7 @@ import type { RPCJsonSerializerHandler } from '@orpc/client'
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { encodePeerMessage } from '@standard-server/peer'
-import { encodeHibernationRPCEvent } from './encode-event'
+import { encodeHibernationRPCEvent } from './encode-event.ts'
 
 class Planet {
   constructor(public readonly name: string, public readonly diameter: number) {}

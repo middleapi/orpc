@@ -4,8 +4,8 @@ import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { RedisClient } from 'bun'
 import { afterAll, describe, expect, it, vi } from 'bun:test'
 import { createClient } from 'redis'
-import { BunRedisPublisher } from '../src/redis-publisher'
-import { waitFor } from './__shared__/utils'
+import { BunRedisPublisher } from '../src/redis-publisher.ts'
+import { waitFor } from './__shared__/utils.ts'
 
 const REDIS_URL = process.env.REDIS_URL
 

@@ -3,9 +3,9 @@ import { defineConfig } from 'blume'
 import { posthog } from 'blume/analytics'
 import { cloudflare } from 'blume/deploy'
 import { filesystem } from 'blume/sources'
-import { serverSourcemapsPlugin } from './dev/server-sourcemaps'
-import { searchCodeIndexPlugin } from './search/code-index'
-import { sponsorAdsInjectPlugin } from './sponsors/inject'
+import { serverSourcemapsPlugin } from './dev/server-sourcemaps.ts'
+import { searchCodeIndexPlugin } from './search/code-index.ts'
+import { sponsorAdsInjectPlugin } from './sponsors/inject.ts'
 
 export default defineConfig({
   title: 'oRPC',

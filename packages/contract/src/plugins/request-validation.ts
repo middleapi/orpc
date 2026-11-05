@@ -1,10 +1,10 @@
 import type { ClientContext } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
-import type { RouterContract } from '../router'
+import type { RouterContract } from '../router.ts'
 import { ORPCError } from '@orpc/client'
 import { mergeTwoLevels, toArray } from '@orpc/shared'
-import { ValidationError } from '../error'
-import { getProcedureContractOrThrow } from '../router-utils'
+import { ValidationError } from '../error.ts'
+import { getProcedureContractOrThrow } from '../router-utils.ts'
 
 export interface RequestValidationLinkPluginOptions<_T extends ClientContext> {
   /**

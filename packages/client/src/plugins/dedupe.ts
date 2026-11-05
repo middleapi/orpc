@@ -1,7 +1,7 @@
 import type { AsyncIteratorClass, InterceptorOptions, Value } from '@orpc/shared'
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { allAbortSignal, captureAsyncContext, defer, isAsyncIteratorObject, replicateAsyncIterator, replicateReadableStream, runWithSignal, stringifyJSON, throwIfAborted, toArray, value, wrapAsyncIterator } from '@orpc/shared'
 
 export interface DedupeLinkPluginGroup<T extends ClientContext> {

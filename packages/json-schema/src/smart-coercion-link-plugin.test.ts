@@ -2,7 +2,7 @@ import type { AnyORPCError } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { SmartCoercionLinkPlugin } from './smart-coercion-link-plugin'
+import { SmartCoercionLinkPlugin } from './smart-coercion-link-plugin.ts'
 
 describe('smartCoercionLinkPlugin', () => {
   beforeEach(() => {

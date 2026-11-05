@@ -6,7 +6,7 @@ import path from 'node:path'
 import { StaticFileHandlerPlugin } from '@orpc/node'
 import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
-import { drainBody } from './__shared__/payloads'
+import { drainBody } from './__shared__/payloads.ts'
 
 const rootDir = mkdtempSync(path.join(tmpdir(), 'orpc-static-file-bench-'))
 

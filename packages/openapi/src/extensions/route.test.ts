@@ -1,8 +1,8 @@
 import { oc, ProcedureContract } from '@orpc/contract'
 import { DecoratedProcedure, os } from '@orpc/server'
 import z from 'zod'
-import { getOpenAPIMeta } from '../meta'
-import './route'
+import { getOpenAPIMeta } from '../meta.ts'
+import './route.ts'
 
 it('adds .route metadata through contract builder variants', () => {
   const procedure = oc

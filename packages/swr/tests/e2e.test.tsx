@@ -3,7 +3,7 @@ import useSWR, { mutate } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
-import { orpc, streamHandler } from './__shared__/orpc'
+import { orpc, streamHandler } from './__shared__/orpc.ts'
 
 beforeEach(async () => {
   vi.clearAllMocks()

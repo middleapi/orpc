@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, pick, set, setOwn } from './object'
+import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, pick, set, setOwn } from './object.ts'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -215,7 +215,6 @@ describe('set', () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
     expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
     expect(Object.hasOwn(root, '__proto__')).toBe(true)
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toEqual({ polluted: 'yes' })
   })
 
@@ -235,7 +234,6 @@ describe('set', () => {
 
     expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
     expect(Object.hasOwn(root, '__proto__')).toBe(true)
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toBe('value')
   })
 })
@@ -278,7 +276,6 @@ describe('setOwn', () => {
 
     expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
     expect(getOwn(root, '__proto__')).toBe('value')
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toBe('value')
   })
 
@@ -460,13 +457,11 @@ it('nullProtoObj', () => {
   const obj = new NullProtoObj()
 
   obj.a = 1
-  // eslint-disable-next-line no-restricted-properties, no-proto
   obj.__proto__ = 2
 
   expect(obj).toSatisfy(isPlainObject)
 
   expect(obj.a).toBe(1)
-  // eslint-disable-next-line no-restricted-properties, no-proto
   expect(obj.__proto__).toBe(2)
 
   // compatible with common validation libs
@@ -476,7 +471,6 @@ it('nullProtoObj', () => {
 
   const clone = { ...obj }
   expect(Object.getPrototypeOf(clone).constructor).toBe(Object)
-  // eslint-disable-next-line no-restricted-properties, no-proto
   expect(clone.__proto__).toBe(2)
   expect(clone.a).toBe(1)
 })
@@ -548,18 +542,14 @@ describe('clone', () => {
     expect(Object.getPrototypeOf(cloned)).toBe(Object.prototype)
     expect(({} as any).polluted).toBeUndefined()
     expect(cloned.a).toBe(1)
-    // eslint-disable-next-line no-restricted-properties, no-proto
     expect(cloned.__proto__).toEqual({ polluted: true })
-    // eslint-disable-next-line no-restricted-properties, no-proto
     expect(cloned.__proto__).not.toBe(obj.__proto__)
 
     const nullProto = new NullProtoObj<any>()
-    // eslint-disable-next-line no-restricted-properties, no-proto
     nullProto.__proto__ = 2
     const clonedNullProto = clone(nullProto)
 
     expect(Object.getPrototypeOf(clonedNullProto)).toBe(Object.prototype)
-    // eslint-disable-next-line no-restricted-properties, no-proto
     expect(clonedNullProto.__proto__).toBe(2)
   })
 
@@ -718,7 +708,6 @@ describe('bindMethods', () => {
       return 'custom'
     }
 
-    // eslint-disable-next-line no-proto, no-restricted-properties
     obj.__proto__ = function () {
       return 'proto'
     }
@@ -726,7 +715,6 @@ describe('bindMethods', () => {
     const methods = bindMethods(obj)
 
     expect(methods.toString()).toBe('custom')
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect(methods.__proto__()).toBe('proto')
   })
 

@@ -1,8 +1,8 @@
 import type { Value } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
-import type { FetchLinkTransportOptions } from '../adapters/fetch'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { FetchLinkTransportOptions } from '../adapters/fetch/index.ts'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { matchesHttpPathPrefix, toArray, value } from '@orpc/shared'
 
 export interface CookieJarLinkPluginOptions<T extends ClientContext> {

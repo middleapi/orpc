@@ -1,9 +1,9 @@
 import { ORPCError } from '@orpc/client'
-import { RPCHandler } from '../adapters/fetch/rpc-handler'
-import { RPC_DEFAULT_ALLOW_METHODS } from '../adapters/standard'
-import { os } from '../builder'
-import { BatchHandlerPlugin } from './batch'
-import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection'
+import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
+import { RPC_DEFAULT_ALLOW_METHODS } from '../adapters/standard/index.ts'
+import { os } from '../builder.ts'
+import { BatchHandlerPlugin } from './batch.ts'
+import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection.ts'
 
 function makeRequest(headers: Record<string, unknown>, method: string) {
   return {

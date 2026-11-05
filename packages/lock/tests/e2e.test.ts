@@ -1,10 +1,10 @@
-import type { Locker } from '../src'
+import type { Locker } from '../src/index.ts'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { z } from 'zod'
-import { lock } from '../src'
-import { MemoryLocker } from '../src/adapters/memory'
+import { lock } from '../src/index.ts'
+import { MemoryLocker } from '../src/adapters/memory.ts'
 
 it('works', async () => {
   let active = 0

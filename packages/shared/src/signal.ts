@@ -1,5 +1,5 @@
 import { throwIfAborted } from '@standard-server/shared'
-import { promiseWithResolvers } from './promise'
+import { promiseWithResolvers } from './promise.ts'
 
 /**
  * Returns a signal that aborts only after all provided signals are aborted.
@@ -51,9 +51,9 @@ export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
     return realSignals[0]
   }
 
-  // eslint-disable-next-line no-restricted-globals
+  // eslint-disable-next-line no-restricted-globals, no-restricted-properties
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
-    // eslint-disable-next-line ban/ban, no-restricted-globals
+    // eslint-disable-next-line no-restricted-properties, no-restricted-globals
     return AbortSignal.any(realSignals)
   }
 

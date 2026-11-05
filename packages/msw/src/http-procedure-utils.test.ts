@@ -11,7 +11,7 @@ import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
-import { createHTTPUtils } from './index'
+import { createHTTPUtils } from './index.ts'
 
 const contract = {
   planet: {

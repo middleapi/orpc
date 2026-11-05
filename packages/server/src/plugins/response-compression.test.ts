@@ -1,8 +1,8 @@
 import supertest from 'supertest'
-import { RPCHandler } from '../adapters/fetch'
-import { RPCHandler as NodeRPCHandler } from '../adapters/node'
-import { os } from '../builder'
-import { ResponseCompressionHandlerPlugin } from './response-compression'
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
+import { os } from '../builder.ts'
+import { ResponseCompressionHandlerPlugin } from './response-compression.ts'
 
 async function decompressStream(stream: ReadableStream, encoding: 'gzip' | 'deflate' | 'deflate-raw'): Promise<string> {
   const decompressed = stream.pipeThrough(new DecompressionStream(encoding))

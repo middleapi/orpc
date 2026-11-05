@@ -1,12 +1,12 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions, ServerPeerSendMessage } from '@standard-server/peer'
-import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkTransport } from '../standard'
-import type { SupportedMessagePort } from './message-port'
+import type { ClientContext, ClientOptions } from '../../types.ts'
+import type { StandardLinkTransport } from '../standard/index.ts'
+import type { SupportedMessagePort } from './message-port.ts'
 import { AbortError, value } from '@orpc/shared'
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
-import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
+import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port.ts'
 
 type DecodedRequestMessage = ConstructorParameters<typeof ClientPeer>[0] extends (message: infer TMessage) => unknown
   ? TMessage

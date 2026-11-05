@@ -1,5 +1,5 @@
-import type { OrderablePlugin } from './plugin'
-import { sortPlugins } from './plugin'
+import type { OrderablePlugin } from './plugin.ts'
+import { sortPlugins } from './plugin.ts'
 
 describe('sortPlugins', () => {
   it('should handle empty array and single plugin', () => {

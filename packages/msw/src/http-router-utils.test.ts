@@ -6,7 +6,7 @@ import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { setupServer } from 'msw/node'
 import z from 'zod'
-import { createHTTPUtils } from './http-router-utils'
+import { createHTTPUtils } from './http-router-utils.ts'
 
 const contract = {
   ping: oc.input(z.object({ value: z.number() })).output(z.object({ value: z.number() })),

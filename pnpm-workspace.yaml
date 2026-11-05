@@ -28,7 +28,6 @@ allowBuilds:
   msw: false
   protobufjs: false
   sharp: false
-  simple-git-hooks: false
   spawn-sync: false
   tree-sitter: false
   tree-sitter-json: false

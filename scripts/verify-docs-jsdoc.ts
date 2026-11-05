@@ -3,7 +3,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import GithubSlugger from 'github-slugger'
-import ts from 'typescript'
+import ts from 'typescript-6'
 
 /**
  * Verifies that every `@orpc/*` API mentioned in the docs content (apps/content/docs)
@@ -74,7 +74,7 @@ async function findFiles(dir: string, extension: string): Promise<string[]> {
     }
   }
 
-  return result.sort()
+  return result.toSorted()
 }
 
 const FENCE_OPEN_RE = /^\s*(`{3,})(\S*)/
@@ -210,7 +210,7 @@ async function collectDocs(): Promise<{ mentions: Map<string, Mention>, pages: M
   const mentions = new Map<string, Mention>()
   const pages = new Map<string, DocPage>()
 
-  for (const file of [...await findFiles(CONTENT_DIR, '.md'), ...await findFiles(CONTENT_DIR, '.mdx')].sort()) {
+  for (const file of [...await findFiles(CONTENT_DIR, '.md'), ...await findFiles(CONTENT_DIR, '.mdx')].toSorted()) {
     const raw = await readFile(file, 'utf8')
     const relPage = path.relative(CONTENT_DIR, file).replace(/\.mdx?$/, '').replaceAll(path.sep, '/')
     const { code, outside } = extractCodeFences(raw)
@@ -373,7 +373,7 @@ function checkMention(
       group: mention.specifier,
       label: mention.name,
       location,
-      note: `mentioned in: ${[...mention.pages].sort().slice(0, 3).join(', ')}`,
+      note: `mentioned in: ${[...mention.pages].toSorted().slice(0, 3).join(', ')}`,
     })
   }
 
@@ -565,11 +565,11 @@ async function main(): Promise<void> {
   const filterDirs = values.filter ? new Set(values.filter.split(',').map(part => part.trim())) : undefined
   const selected = [...mentions.values()]
     .filter(mention => !filterDirs || filterDirs.has(packageDirOf(mention.specifier) ?? ''))
-    .sort((a, b) => a.specifier.localeCompare(b.specifier) || a.name.localeCompare(b.name))
+    .toSorted((a, b) => a.specifier.localeCompare(b.specifier) || a.name.localeCompare(b.name))
 
   if (values.list) {
     for (const mention of selected) {
-      console.log(`${mention.specifier}#${mention.name}\t${[...mention.pages].sort().join(', ')}`)
+      console.log(`${mention.specifier}#${mention.name}\t${[...mention.pages].toSorted().join(', ')}`)
     }
 
     console.log(`\n${selected.length} docs-mentioned symbols`)
@@ -669,7 +669,7 @@ async function main(): Promise<void> {
     }
 
     const declarations = symbols.flatMap(part => part.declarations ?? [])
-      .sort((a, b) => (ts.isExportSpecifier(a) ? 1 : 0) - (ts.isExportSpecifier(b) ? 1 : 0))
+      .toSorted((a, b) => (ts.isExportSpecifier(a) ? 1 : 0) - (ts.isExportSpecifier(b) ? 1 : 0))
 
     checkMention(context, mention, declarations)
   }
@@ -686,7 +686,7 @@ async function main(): Promise<void> {
     byGroup.set(issue.group, group)
   }
 
-  for (const [group, issues] of [...byGroup.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [group, issues] of [...byGroup.entries()].toSorted(([a], [b]) => a.localeCompare(b))) {
     console.log(`\n${group}`)
 
     for (const issue of issues) {

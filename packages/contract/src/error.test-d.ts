@@ -1,5 +1,5 @@
 import type { ORPCError } from '@orpc/client'
-import type { ORPCErrorFromErrorMap } from './error'
+import type { ORPCErrorFromErrorMap } from './error.ts'
 import z from 'zod'
 
 describe('ORPCErrorFromErrorMap', () => {

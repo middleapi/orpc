@@ -1,10 +1,10 @@
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
-import type { BuilderDefinition } from './builder'
-import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { Middleware } from './middleware'
-import type { ProcedureHandler } from './procedure'
-import { Procedure } from './procedure'
+import type { BuilderDefinition } from './builder.ts'
+import type { Context, MergedContext, MergedInitialContext } from './context.ts'
+import type { Middleware } from './middleware.ts'
+import type { ProcedureHandler } from './procedure.ts'
+import { Procedure } from './procedure.ts'
 
 export class ProcedureImplementer<
   TInitialContext extends Context,

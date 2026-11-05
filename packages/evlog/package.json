@@ -27,14 +27,14 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
       },
       "./node": {
-        "types": "./dist/adapters/node.d.mts",
-        "import": "./dist/adapters/node.mjs",
-        "default": "./dist/adapters/node.mjs"
+        "types": "./dist/adapters/node.d.ts",
+        "import": "./dist/adapters/node.js",
+        "default": "./dist/adapters/node.js"
       }
     }
   },
@@ -47,8 +47,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc"
   },
   "peerDependencies": {
     "evlog": ">=2.18.1"

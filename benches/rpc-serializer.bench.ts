@@ -1,6 +1,6 @@
 import { RPCSerializer } from '@orpc/client'
 import { bench } from 'vitest'
-import { handlers, PAYLOAD_1KB, PAYLOAD_5MB, PAYLOAD_5MB_WITH_FILES, PAYLOAD_100KB } from './__shared__/payloads'
+import { handlers, PAYLOAD_1KB, PAYLOAD_5MB, PAYLOAD_5MB_WITH_FILES, PAYLOAD_100KB } from './__shared__/payloads.ts'
 
 const serializer = new RPCSerializer({ handlers })
 

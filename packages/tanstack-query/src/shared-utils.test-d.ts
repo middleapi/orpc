@@ -1,4 +1,4 @@
-import type { SharedUtils } from './shared-utils'
+import type { SharedUtils } from './shared-utils.ts'
 
 describe('SharedUtils', () => {
   const utils = {} as SharedUtils<{ a: { b: { c: number } } }>

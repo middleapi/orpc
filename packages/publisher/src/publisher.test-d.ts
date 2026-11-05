@@ -1,4 +1,4 @@
-import type { Publisher } from './publisher'
+import type { Publisher } from './publisher.ts'
 
 describe('publisher', () => {
   it('key-value types', async () => {

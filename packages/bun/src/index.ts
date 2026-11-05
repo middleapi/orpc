@@ -1,3 +1,3 @@
-export * from './redis-lock'
-export * from './redis-publisher'
-export * from './redis-ratelimit'
+export * from './redis-lock.ts'
+export * from './redis-publisher.ts'
+export * from './redis-ratelimit.ts'

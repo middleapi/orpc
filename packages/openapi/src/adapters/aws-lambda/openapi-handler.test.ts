@@ -3,8 +3,8 @@ import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
 import { os } from '@orpc/server'
-import { openapi } from '../../meta'
-import { OpenAPIHandler } from './openapi-handler'
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandler } from './openapi-handler.ts'
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []

@@ -4,8 +4,8 @@ import type { Value } from '@orpc/shared'
 import { createPrefixMatcher, Router } from '@openapi-spec/router'
 import { Procedure, resolveContractProcedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
 import { mergeHttpPath, pathToHttpPath, value } from '@orpc/shared'
-import { DEFAULT_OPENAPI_METHOD } from '../../constants'
-import { getOpenAPIMeta } from '../../meta'
+import { DEFAULT_OPENAPI_METHOD } from '../../constants.ts'
+import { getOpenAPIMeta } from '../../meta.ts'
 
 export interface OpenAPIMatcherOptions {
   /**

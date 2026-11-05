@@ -1,7 +1,7 @@
-import type { OperationKey } from './key'
+import type { OperationKey } from './key.ts'
 import { promiseWithResolvers } from '@orpc/shared'
-import { ProcedureUtils } from './procedure-utils'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { ProcedureUtils } from './procedure-utils.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

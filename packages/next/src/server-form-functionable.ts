@@ -1,8 +1,8 @@
 import type { AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions, Schema } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ServerFormFunction } from './server-form-function'
+import type { ServerFormFunction } from './server-form-function.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { createServerFormFunction } from './server-form-function'
+import { createServerFormFunction } from './server-form-function.ts'
 
 export interface ServerFormFunctionable<TInitialContext extends Context> {
   <

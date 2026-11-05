@@ -3,9 +3,9 @@
  * and exclusively use absolute JSON pointers for `$ref` values.
  */
 
-import type { JsonSchema } from './types'
+import type { JsonSchema } from './types.ts'
 import { get, setOwn } from '@orpc/shared'
-import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
+import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_RECORD_KEYWORDS } from './constants.ts'
 
 /**
  * Encodes a JSON Pointer segment according to RFC 6901.

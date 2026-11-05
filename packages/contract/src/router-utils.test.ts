@@ -1,10 +1,10 @@
-import type { AnyMetaPlugin } from './meta'
+import type { AnyMetaPlugin } from './meta.ts'
 import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
-import * as ErrorUtilsModule from './error-utils'
-import * as MetaUtilsModule from './meta-utils'
-import { ProcedureContract } from './procedure'
-import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils'
+import * as ErrorUtilsModule from './error-utils.ts'
+import * as MetaUtilsModule from './meta-utils.ts'
+import { ProcedureContract } from './procedure.ts'
+import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils.ts'
 
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')

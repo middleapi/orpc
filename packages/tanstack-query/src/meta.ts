@@ -1,11 +1,11 @@
 import type { AnyNestedClient, ClientContext, InferClientContext, InferClientError } from '@orpc/client'
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, Meta, MetaPlugin, ORPCErrorFromErrorMap, RouterContract } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
-import type { OperationKeyBaseOptions } from './key'
-import type { RouterUtilsPlugin } from './plugin'
-import type { ProcedureUtilsOptions } from './procedure-utils'
+import type { OperationKeyBaseOptions } from './key.ts'
+import type { RouterUtilsPlugin } from './plugin.ts'
+import type { ProcedureUtilsOptions } from './procedure-utils.ts'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
-import { mergeProcedureUtilsOptions } from './procedure-utils'
+import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
 
 export type TanstackQueryMetaOptions<TClientContext extends ClientContext, TInput, TOutput, TError>
   = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, keyof OperationKeyBaseOptions>

@@ -1,14 +1,14 @@
 import type { AnyMetaPlugin, ErrorMap } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
-import type { AnyMiddleware } from './middleware'
+import type { AnyMiddleware } from './middleware.ts'
 import * as ContractModule from '@orpc/contract'
 import { toArray } from '@orpc/shared'
 import { z } from 'zod'
-import { Builder, os } from './builder'
-import * as LazyModule from './lazy'
-import * as MiddlewareDecoratedModule from './middleware-decorated'
-import * as ProcedureDecoratedModule from './procedure-decorated'
-import * as RouterUtilsModule from './router-utils'
+import { Builder, os } from './builder.ts'
+import * as LazyModule from './lazy.ts'
+import * as MiddlewareDecoratedModule from './middleware-decorated.ts'
+import * as ProcedureDecoratedModule from './procedure-decorated.ts'
+import * as RouterUtilsModule from './router-utils.ts'
 
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')

@@ -1,7 +1,7 @@
 import * as arktype from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { isSchemaIssue, type } from './schema-utils'
+import { isSchemaIssue, type } from './schema-utils.ts'
 
 describe('type', async () => {
   it('without map', async () => {

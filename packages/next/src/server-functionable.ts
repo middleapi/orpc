@@ -1,8 +1,8 @@
 import type { AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions, Schema } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ProcedureServerFunction } from './server-function'
+import type { ProcedureServerFunction } from './server-function.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { createServerFunction } from './server-function'
+import { createServerFunction } from './server-function.ts'
 
 export interface ServerFunctionable<TInitialContext extends Context> {
   <

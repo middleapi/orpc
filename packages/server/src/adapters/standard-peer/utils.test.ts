@@ -1,5 +1,5 @@
 import type { StandardLazyRequest } from '@standard-server/core'
-import { createStandardPeerRequestHandler } from './utils'
+import { createStandardPeerRequestHandler } from './utils.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

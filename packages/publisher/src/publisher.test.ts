@@ -1,6 +1,6 @@
-import type { PublisherSubscribeListenerOptions } from './publisher'
+import type { PublisherSubscribeListenerOptions } from './publisher.ts'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
-import { Publisher } from './publisher'
+import { Publisher } from './publisher.ts'
 
 // Concrete implementation for testing
 class TestPublisher<T extends Record<string, object>> extends Publisher<T> {

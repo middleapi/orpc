@@ -1,6 +1,6 @@
 import type { AnyORPCError } from '@orpc/client'
 import type { Writable } from '@orpc/shared'
-import type { ErrorMap } from './error'
+import type { ErrorMap } from './error.ts'
 import { cloneORPCError } from '@orpc/client'
 import { getOwn } from '@orpc/shared'
 

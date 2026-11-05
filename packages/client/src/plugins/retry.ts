@@ -1,9 +1,9 @@
 import type { Promisable, Value } from '@orpc/shared'
-import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
-import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
+import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error.ts'
 
 export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
   /**
@@ -223,7 +223,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               const asyncIteratorObject = await callNext({ error })
               if (!isAsyncIteratorObject(asyncIteratorObject)) {
                 throw new TypeError(
-                  'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.',
+                  'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.', { cause: error },
                 )
               }
 

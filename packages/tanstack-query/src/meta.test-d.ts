@@ -1,10 +1,10 @@
 import type { ClientContext, ORPCError } from '@orpc/client'
 import type { PromiseWithError } from '@orpc/shared'
 import type { SkipToken } from '@tanstack/query-core'
-import type { OperationContext } from './types'
+import type { OperationContext } from './types.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { oc, type } from '@orpc/contract'
-import { tanstackQuery } from './meta'
+import { tanstackQuery } from './meta.ts'
 
 describe('tanstackQuery', () => {
   it('infers input, output and error types from the contract', () => {

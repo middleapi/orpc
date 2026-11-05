@@ -1,7 +1,7 @@
 import type { Promisable } from '@orpc/shared'
-import type { LockCallbackOptions, Locker, LockOptions } from '../types'
+import type { LockCallbackOptions, Locker, LockOptions } from '../types.ts'
 import { promiseWithResolvers, throwIfAborted } from '@orpc/shared'
-import { LockTimeoutError } from '../error'
+import { LockTimeoutError } from '../error.ts'
 
 export interface MemoryLockerOptions {
   /**

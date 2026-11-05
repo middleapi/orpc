@@ -1,14 +1,14 @@
 import type { RegisteredTool, ServerContext } from '@modelcontextprotocol/server'
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, StandardLazyRequest } from '@orpc/server'
-import type { McpRegistered } from './registrar'
+import type { McpRegistered } from './registrar.ts'
 import { McpServer } from '@modelcontextprotocol/server'
 import { oc } from '@orpc/contract'
 import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
 import { OpenAPIJsonSerializer, OpenAPISerializer } from '@orpc/openapi'
 import { implement, os } from '@orpc/server'
 import { z } from 'zod'
-import { McpRegistrar } from './registrar'
+import { McpRegistrar } from './registrar.ts'
 
 const server = new McpServer({ name: 'test-server', version: '1.0.0' })
 

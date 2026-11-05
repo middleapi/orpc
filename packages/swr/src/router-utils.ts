@@ -1,10 +1,10 @@
 import type { AnyNestedClient, Client } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { OperationKeyPrefixOptions } from './key'
+import type { OperationKeyPrefixOptions } from './key.ts'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, isTypescriptObject, toArray } from '@orpc/shared'
-import { ProcedureUtils } from './procedure-utils'
-import { SharedUtils } from './shared-utils'
+import { ProcedureUtils } from './procedure-utils.ts'
+import { SharedUtils } from './shared-utils.ts'
 
 export type RouterUtils<T extends AnyNestedClient>
   = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>

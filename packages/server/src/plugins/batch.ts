@@ -1,8 +1,8 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { ORPCError } from '@orpc/client'
 import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
@@ -57,7 +57,7 @@ function isClientPeerSendMessages(maybe: unknown): maybe is ClientPeerSendMessag
  * for global logging or error handling.
  */
 function internalError(err: unknown): StandardResponse {
-  Promise.reject(err)
+  void Promise.reject(err)
 
   return { status: 500, headers: {}, body: 'Internal server error' }
 }
@@ -460,7 +460,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         const closePeer = () => peer.close(signal?.reason)
 
         if (signal?.aborted) {
-          closePeer()
+          void closePeer()
         }
 
         signal?.addEventListener('abort', closePeer)

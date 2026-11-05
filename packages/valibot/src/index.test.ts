@@ -1,5 +1,5 @@
 it('exports ValibotToJsonSchemaConverter', async () => {
-  await expect(import('./index')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     ValibotToJsonSchemaConverter: expect.any(Function),
   })
 })

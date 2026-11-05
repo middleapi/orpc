@@ -1,9 +1,9 @@
 import type { RouterContract } from '@orpc/contract'
 import type { Context } from '@orpc/server'
-import type { HTTPProcedureUtilsOptions } from './http-procedure-utils'
+import type { HTTPProcedureUtilsOptions } from './http-procedure-utils.ts'
 import { ProcedureContract } from '@orpc/contract'
 import { isTypescriptObject } from '@orpc/shared'
-import { HTTPProcedureUtils } from './http-procedure-utils'
+import { HTTPProcedureUtils } from './http-procedure-utils.ts'
 
 export type HTTPRouterUtils<T extends RouterContract, TContext extends Context>
   = T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>

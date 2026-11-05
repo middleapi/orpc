@@ -1,10 +1,10 @@
 import type { ClientContext } from '@orpc/client'
 import type { ContractClientFactory, RouterContract, RouterContractClient } from '@orpc/contract'
 import type { ContractJsonifiedClientFactory, JsonifiedClient } from '@orpc/openapi'
-import type { RouterUtils, RouterUtilsOptions } from './router-utils'
+import type { RouterUtils, RouterUtilsOptions } from './router-utils.ts'
 import { resolveBasePathMeta } from '@orpc/contract'
 import { get } from '@orpc/shared'
-import { createRouterUtils } from './router-utils'
+import { createRouterUtils } from './router-utils.ts'
 
 export interface ContractUtilsFactory<TClientContext extends ClientContext> {
   <T extends RouterContract>(contract: T): RouterUtils<RouterContractClient<T, TClientContext>>

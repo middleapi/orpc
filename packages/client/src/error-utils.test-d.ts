@@ -1,5 +1,5 @@
-import type { ORPCError } from './error'
-import { isDefinedError } from './error-utils'
+import type { ORPCError } from './error.ts'
+import { isDefinedError } from './error-utils.ts'
 
 describe('isDefinedError', () => {
   it('normal', () => {

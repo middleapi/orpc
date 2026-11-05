@@ -1,6 +1,6 @@
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { GetNextPageParamFunction, InfiniteData } from '@tanstack/angular-query-experimental'
-import type { ProcedureUtils } from './procedure-utils'
+import type { ProcedureUtils } from './procedure-utils.ts'
 import { injectInfiniteQuery, injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental'
 import { injectQueries } from '@tanstack/angular-query-experimental/inject-queries-experimental'
 import z from 'zod'

@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import type { UseQueryFnContext } from './types'
+import type { UseQueryFnContext } from './types.ts'
 
 export interface SerializableStreamedQueryOptions {
   /**

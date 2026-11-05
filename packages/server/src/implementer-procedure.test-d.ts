@@ -1,7 +1,7 @@
 import type { ORPCErrorConstructorMap, Schema } from '@orpc/contract'
-import type { MergedContext, MergedInitialContext } from './context'
-import type { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
-import type { Middleware, MiddlewareDone } from './middleware'
+import type { MergedContext, MergedInitialContext } from './context.ts'
+import type { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
+import type { Middleware, MiddlewareDone } from './middleware.ts'
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
 

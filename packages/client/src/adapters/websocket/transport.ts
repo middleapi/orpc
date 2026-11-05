@@ -1,8 +1,8 @@
 import type { Promisable } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
-import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkTransport } from '../standard'
+import type { ClientContext, ClientOptions } from '../../types.ts'
+import type { StandardLinkTransport } from '../standard/index.ts'
 import { AbortError, loadBytes, promiseWithResolvers, runWithSignal, sequential, sleep, toStringOrBytes } from '@orpc/shared'
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
@@ -223,7 +223,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         if (result.matched && isServerPeerSendMessage(result.message)) {
           // Not awaited: `peer.message` runs handling message may be slow,
           // and awaiting it would block decoding of subsequent messages.
-          peer.message(result.message)
+          void peer.message(result.message)
         }
       }))
 

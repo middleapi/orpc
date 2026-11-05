@@ -1,21 +1,21 @@
-export * from './async-iterator-object'
-export * from './client'
-export * from './client-safe'
-export * from './consts'
-export * from './dynamic-link'
-export * from './error'
-export * from './error-utils'
-export * from './rpc-json-serializer'
-export * from './rpc-serializer'
-export * from './types'
+export * from './async-iterator-object.ts'
+export * from './client.ts'
+export * from './client-safe.ts'
+export * from './consts.ts'
+export * from './dynamic-link.ts'
+export * from './error.ts'
+export * from './error-utils.ts'
+export * from './rpc-json-serializer.ts'
+export * from './rpc-serializer.ts'
+export * from './types.ts'
 export type {
   /**
    * @deprecated Use `InferClientError` instead.
    */
   InferClientError as InferClientErrorUnion,
-} from './types'
-export { resolveClientRest, safe } from './utils'
-export type { SafeResult } from './utils'
+} from './types.ts'
+export { resolveClientRest, safe } from './utils.ts'
+export type { SafeResult } from './utils.ts'
 
 export type {
   AsyncCleanupFn,

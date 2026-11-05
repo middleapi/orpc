@@ -1,5 +1,5 @@
 import type { AnySchema } from '@orpc/contract'
-import type { JsonSchema } from './types'
+import type { JsonSchema } from './types.ts'
 
 /**
  * The conversion direction: `input` targets the schema's input type, `output` targets its output type.

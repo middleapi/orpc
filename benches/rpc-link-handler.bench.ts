@@ -4,7 +4,7 @@ import { RPCLinkCodec, StandardLink } from '@orpc/client/standard'
 import { os, type } from '@orpc/server'
 import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
-import { asSyncIteratorObject, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
+import { asSyncIteratorObject, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads.ts'
 
 const serializer = new RPCSerializer({ handlers })
 

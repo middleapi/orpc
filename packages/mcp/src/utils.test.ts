@@ -1,7 +1,7 @@
 import type { JsonSchemaConverter } from '@orpc/json-schema'
 import { asyncIteratorObject, type } from '@orpc/contract'
 import { z } from 'zod'
-import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils'
+import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils.ts'
 
 function createConverter(...results: [any, boolean][]): JsonSchemaConverter {
   let index = 0

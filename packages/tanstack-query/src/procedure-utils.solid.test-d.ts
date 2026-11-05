@@ -1,6 +1,6 @@
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { GetNextPageParamFunction, InfiniteData } from '@tanstack/solid-query'
-import type { ProcedureUtils } from './procedure-utils'
+import type { ProcedureUtils } from './procedure-utils.ts'
 import { QueryClient, useInfiniteQuery, useMutation, useQueries, useQuery } from '@tanstack/solid-query'
 import z from 'zod'
 

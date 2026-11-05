@@ -1,7 +1,7 @@
-import type { ResponseHeadersHandlerPluginContext } from './response-headers'
-import { RPCHandler } from '../adapters/fetch/rpc-handler'
-import { os } from '../builder'
-import { ResponseHeadersHandlerPlugin } from './response-headers'
+import type { ResponseHeadersHandlerPluginContext } from './response-headers.ts'
+import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
+import { os } from '../builder.ts'
+import { ResponseHeadersHandlerPlugin } from './response-headers.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

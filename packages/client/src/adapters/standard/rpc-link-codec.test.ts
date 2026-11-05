@@ -1,7 +1,7 @@
 import type { StandardUrl } from '@standard-server/core'
-import { MalformedResponseError, ORPCError, ResponseError } from '../../error'
-import { RPCSerializer } from '../../rpc-serializer'
-import { RPCLinkCodec } from './rpc-link-codec'
+import { MalformedResponseError, ORPCError, ResponseError } from '../../error.ts'
+import { RPCSerializer } from '../../rpc-serializer.ts'
+import { RPCLinkCodec } from './rpc-link-codec.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

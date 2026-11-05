@@ -1,6 +1,6 @@
 import type { Client, ThrowableError } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
-import type { ProcedureClient } from './procedure-client'
+import type { ProcedureClient } from './procedure-client.ts'
 import z from 'zod'
 
 const errorMap = {

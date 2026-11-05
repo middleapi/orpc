@@ -3,7 +3,7 @@ import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { defineComponent } from 'vue'
-import { liveQuery } from './live-query'
+import { liveQuery } from './live-query.ts'
 
 /**
  * Mounts a component that runs a real Pinia Colada `useQuery`,

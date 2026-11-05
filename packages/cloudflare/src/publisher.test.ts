@@ -1,10 +1,10 @@
-import type { DurablePublisherOptions } from './publisher'
+import type { DurablePublisherOptions } from './publisher.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { DurablePublisher } from './publisher'
+import { DurablePublisher } from './publisher.ts'
 
 type MockSocket = WebSocket & EventTarget & {
   accepted: boolean

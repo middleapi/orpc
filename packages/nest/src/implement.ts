@@ -8,7 +8,7 @@ import type { StandardBodyHint, StandardHeaders, StandardLazyRequest, StandardRe
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
-import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
+import type { NestStandardLazyRequest, ORPCModuleConfig } from './module.ts'
 import { Readable } from 'node:stream'
 import * as NestCommon from '@nestjs/common'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
@@ -23,7 +23,7 @@ import { flattenStandardHeader, generateContentDisposition, getRequiredStandardB
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
 
-import { ORPC_MODULE_CONFIG_SYMBOL } from './constants'
+import { ORPC_MODULE_CONFIG_SYMBOL } from './constants.ts'
 
 // Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
 const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined
@@ -192,7 +192,7 @@ export class ImplementInterceptor implements NestInterceptor {
     })
   }
 
-  intercept(ctx: ExecutionContext, next: CallHandler<any>): Observable<any> {
+  intercept(ctx: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       mergeMap(async (impl: unknown) => {
         const { default: procedure } = await unlazy(impl)

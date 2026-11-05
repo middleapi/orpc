@@ -1,6 +1,6 @@
 import * as ServerModule from '@orpc/server'
-import * as ServerFunctionModule from './server-function'
-import { createServerFunctionable } from './server-functionable'
+import * as ServerFunctionModule from './server-function.ts'
+import { createServerFunctionable } from './server-functionable.ts'
 
 const createServerFunctionSpy = vi.spyOn(ServerFunctionModule, 'createServerFunction')
 const { os, type } = ServerModule

@@ -3,7 +3,7 @@ import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '@orpc/
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { OpenAPIMeta } from '../../meta'
+import type { OpenAPIMeta } from '../../meta.ts'
 import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError, ResponseError } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
@@ -14,11 +14,11 @@ import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
-} from '../../constants'
-import { getOpenAPIMeta } from '../../meta'
-import { OpenAPISerializer } from '../../openapi-serializer'
-import { getDynamicPathParams, isBodylessMethod } from '../../utils'
-import { serializeHeaders } from './utils'
+} from '../../constants.ts'
+import { getOpenAPIMeta } from '../../meta.ts'
+import { OpenAPISerializer } from '../../openapi-serializer.ts'
+import { getDynamicPathParams, isBodylessMethod } from '../../utils.ts'
+import { serializeHeaders } from './utils.ts'
 
 export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   /**

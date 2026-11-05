@@ -1,12 +1,12 @@
 import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
 import type { Logger } from 'pino'
-import type { LoggerContext } from './context'
+import type { LoggerContext } from './context.ts'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import pino from 'pino'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 
 export interface PinoHandlerPluginOptions<T extends Context> {
   /**

@@ -1,8 +1,8 @@
-import type { ClientContext } from '../../types'
-import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard'
-import type { MessagePortLinkTransportOptions } from './transport'
-import { RPCLinkCodec, StandardLink } from '../standard'
-import { MessagePortLinkTransport } from './transport'
+import type { ClientContext } from '../../types.ts'
+import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard/index.ts'
+import type { MessagePortLinkTransportOptions } from './transport.ts'
+import { RPCLinkCodec, StandardLink } from '../standard/index.ts'
+import { MessagePortLinkTransport } from './transport.ts'
 
 export interface RPCLinkOptions<T extends ClientContext>
   extends StandardLinkOptions<T>, MessagePortLinkTransportOptions<T>, RPCLinkCodecOptions<T> {

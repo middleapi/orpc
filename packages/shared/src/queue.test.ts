@@ -1,5 +1,5 @@
 import { AbortError } from '@standard-server/shared'
-import { AsyncIdQueue } from './queue'
+import { AsyncIdQueue } from './queue.ts'
 
 describe('asyncIdQueue', () => {
   let queue: AsyncIdQueue<string>

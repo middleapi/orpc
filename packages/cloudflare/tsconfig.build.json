@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    // `cloudflare:*` modules are typed by worker-configuration.d.ts, which imports the tests,
+    // so the build only emits (isolatedDeclarations), type checking runs with tsconfig.json
+    "noCheck": true
+  }
+}

@@ -1,10 +1,10 @@
 import type { AnyProcedureContract, AnySchema } from '@orpc/contract'
 import type { JsonObjectSchemaEntry, JsonSchema, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { Value } from '@orpc/shared'
-import type { OpenAPIMeta } from './meta'
-import type { OpenAPIComponentRegistry } from './openapi-generator-components'
-import type { OpenAPIV3_2 } from './types'
-import type { getDynamicPathParams } from './utils'
+import type { OpenAPIMeta } from './meta.ts'
+import type { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
+import type { OpenAPIV3_2 } from './types.ts'
+import type { getDynamicPathParams } from './utils.ts'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
 import {
   combineJsonObjectSchemaEntries,
@@ -26,8 +26,8 @@ import {
   DEFAULT_OPENAPI_METHOD,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
   DEFAULT_OPENAPI_SUCCESS_DESCRIPTION,
-} from './constants'
-import { isBodylessMethod } from './utils'
+} from './constants.ts'
+import { isBodylessMethod } from './utils.ts'
 
 export type DynamicPathParam = NonNullable<ReturnType<typeof getDynamicPathParams>>[number]
 

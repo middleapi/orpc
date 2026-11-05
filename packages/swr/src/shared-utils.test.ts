@@ -1,4 +1,4 @@
-import { SharedUtils } from './shared-utils'
+import { SharedUtils } from './shared-utils.ts'
 
 describe('sharedUtils', () => {
   const utils = new SharedUtils(['test', 'path'], {})

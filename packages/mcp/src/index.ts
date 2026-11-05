@@ -1,2 +1,2 @@
-export * from './meta'
-export * from './registrar'
+export * from './meta.ts'
+export * from './registrar.ts'

@@ -1,7 +1,7 @@
 import type { Schema } from '@orpc/contract'
 import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, DecoratedProcedure, ORPCErrorConstructorMap } from '@orpc/server'
 import { z } from 'zod'
-import './effect'
+import './effect.ts'
 import '@orpc/server/extensions/callable' // not sure why, but we need import this to make type work
 
 const errorMap = {

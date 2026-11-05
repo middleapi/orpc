@@ -10,20 +10,20 @@ updates:
       default-days: 1
     versioning-strategy: increase
     groups:
-      eslint:
+      oxc:
         patterns:
-          - eslint
-          - '@antfu/eslint-config'
-          - 'eslint-plugin-*'
+          - oxlint
+          - oxlint-tsgolint
+          - oxfmt
       standard-server:
         patterns:
           - '@standard-server/*'
       dev-dependencies-minor-patch:
         dependency-type: development
         exclude-patterns:
-          - eslint
-          - '@antfu/eslint-config'
-          - 'eslint-plugin-*'
+          - oxlint
+          - oxlint-tsgolint
+          - oxfmt
           - compression # inline
         update-types:
           - minor

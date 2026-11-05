@@ -1,6 +1,6 @@
-import type { RPCJsonSerialization } from './rpc-json-serializer'
-import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
-import { RPCJsonSerializer } from './rpc-json-serializer'
+import type { RPCJsonSerialization } from './rpc-json-serializer.ts'
+import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types.ts'
+import { RPCJsonSerializer } from './rpc-json-serializer.ts'
 
 class Person {
   constructor(
@@ -588,7 +588,6 @@ describe('rpcJsonSerializer: security', () => {
       .toThrow('Invalid RPC serialized data: type "url" expects a string.')
   })
 
-  /* eslint-disable no-proto, no-restricted-properties */
   it('serializes own __proto__ keys as plain data', () => {
     // JSON.parse creates own __proto__ properties, exactly like a real request body
     const input = JSON.parse('{"__proto__": {"polluted": true}}')
@@ -647,7 +646,6 @@ describe('rpcJsonSerializer: security', () => {
     expect(restored.__proto__).toBe(blob)
     expect(Object.getPrototypeOf(restored)).toBe(Object.prototype)
   })
-  /* eslint-enable no-proto, no-restricted-properties */
 })
 
 describe('rpcJsonSerializer: meta cannot descend into restored values', () => {

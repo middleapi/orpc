@@ -1,7 +1,7 @@
 import type { MergedErrorMap, MetaPlugin, ORPCErrorConstructorMap, Schema } from '@orpc/contract'
-import type { MergedInitialContext } from './context'
-import type { Middleware, MiddlewareDone } from './middleware'
-import type { DecoratedProcedure } from './procedure-decorated'
+import type { MergedInitialContext } from './context.ts'
+import type { Middleware, MiddlewareDone } from './middleware.ts'
+import type { DecoratedProcedure } from './procedure-decorated.ts'
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
 

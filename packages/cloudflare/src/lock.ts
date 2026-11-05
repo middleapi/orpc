@@ -63,7 +63,6 @@ export class experimental_DurableLocker implements Locker {
    * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
    */
   prefix(prefix: string): experimental_DurableLocker {
-    // eslint-disable-next-line new-cap
     return new experimental_DurableLocker(this.namespace, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
   }
 

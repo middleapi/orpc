@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
-import { ContractOptionsUtilsPlugin, getTanstackQueryMeta, tanstackQuery } from './meta'
-import { createRouterUtils } from './router-utils'
+import { ContractOptionsUtilsPlugin, getTanstackQueryMeta, tanstackQuery } from './meta.ts'
+import { createRouterUtils } from './router-utils.ts'
 
 describe('tanstackQuery', () => {
   it('stores options readable via getTanstackQueryMeta', () => {

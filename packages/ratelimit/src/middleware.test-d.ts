@@ -1,6 +1,6 @@
-import type { RateLimiter } from './types'
+import type { RateLimiter } from './types.ts'
 import { os, type } from '@orpc/server'
-import { ratelimit } from './middleware'
+import { ratelimit } from './middleware.ts'
 
 describe('ratelimit', () => {
   it('can infer context & input & meta types', () => {

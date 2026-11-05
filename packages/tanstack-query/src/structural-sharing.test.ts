@@ -2,7 +2,7 @@ import { RPCJsonSerializer } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { NullProtoObj } from '@orpc/shared'
 import { replaceEqualDeep } from '@tanstack/query-core'
-import { createStructuralSharing } from './structural-sharing'
+import { createStructuralSharing } from './structural-sharing.ts'
 
 const structuralSharing = createStructuralSharing()
 

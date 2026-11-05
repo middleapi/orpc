@@ -1,7 +1,7 @@
 import type { ErrorMap, MergedErrorMap } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
-import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { AnyMiddleware, Middleware, MiddlewareNextOptions, MiddlewareResult } from './middleware'
+import type { Context, MergedContext, MergedInitialContext } from './context.ts'
+import type { AnyMiddleware, Middleware, MiddlewareNextOptions, MiddlewareResult } from './middleware.ts'
 import { mergeErrorMap } from '@orpc/contract'
 import { toArray } from '@orpc/shared'
 

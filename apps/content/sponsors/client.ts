@@ -1,5 +1,5 @@
-import type { AdSponsor } from './ads'
-import { relAttribute, soldSponsors, tintStyle } from './ads'
+import type { AdSponsor } from './ads.ts'
+import { relAttribute, soldSponsors, tintStyle } from './ads.ts'
 
 // Only the inline slots rotate. The grid is static and carries no
 // [data-sponsor-slot], so nothing here touches it.

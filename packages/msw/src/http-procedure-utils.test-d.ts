@@ -3,7 +3,7 @@ import { oc } from '@orpc/contract'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { RPCHandler } from '@orpc/server/fetch'
 import z from 'zod'
-import { createHTTPUtils } from './http-router-utils'
+import { createHTTPUtils } from './http-router-utils.ts'
 
 const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })

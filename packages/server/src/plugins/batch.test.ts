@@ -1,15 +1,15 @@
 import type { StandardResponse } from '@standard-server/core'
-import type { AnyRouter } from '../router'
-import type { ResponseHeadersHandlerPluginContext } from './response-headers'
+import type { AnyRouter } from '../router.ts'
+import type { ResponseHeadersHandlerPluginContext } from './response-headers.ts'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { decodePeerMessage } from '@standard-server/peer'
-import { RPCHandler } from '../adapters/fetch/rpc-handler'
-import { os } from '../builder'
-import { BatchHandlerPlugin } from './batch'
-import { RequestCompressionHandlerPlugin } from './request-compression'
-import { RequestLimitHandlerPlugin } from './request-limit'
-import { ResponseHeadersHandlerPlugin } from './response-headers'
+import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
+import { os } from '../builder.ts'
+import { BatchHandlerPlugin } from './batch.ts'
+import { RequestCompressionHandlerPlugin } from './request-compression.ts'
+import { RequestLimitHandlerPlugin } from './request-limit.ts'
+import { ResponseHeadersHandlerPlugin } from './response-headers.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -1,7 +1,7 @@
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { createServerFunction } from '../server-function'
-import { useOptimisticServerFunction } from './optimistic-server-function'
+import { createServerFunction } from '../server-function.ts'
+import { useOptimisticServerFunction } from './optimistic-server-function.ts'
 
 const inputSchema = z.object({ input: z.number().transform(v => v.toString()) })
 

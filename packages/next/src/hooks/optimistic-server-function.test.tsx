@@ -2,8 +2,8 @@ import { os } from '@orpc/server'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { z } from 'zod'
-import { createServerFunction } from '../server-function'
-import { useOptimisticServerFunction } from './optimistic-server-function'
+import { createServerFunction } from '../server-function.ts'
+import { useOptimisticServerFunction } from './optimistic-server-function.ts'
 
 export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 

@@ -31,7 +31,7 @@ export type JsonifiedValue<T>
     : T extends Date | bigint | URL ? string
       : T extends ReadonlyArray<unknown> ? JsonifiedArray<T>
         // one non-inferring check so plain objects skip the costly `infer` branches below
-        : T extends Blob | ReadonlyMap<any, any> | ReadonlySet<any> | AsyncIteratorObject<any, any, any> | Function // eslint-disable-line ts/no-unsafe-function-type
+        : T extends Blob | ReadonlyMap<any, any> | ReadonlySet<any> | AsyncIteratorObject<any, any, any> | Function
           ? T extends File ? File
             : T extends Blob ? Blob
               : T extends ReadonlyMap<infer K, infer V> ? JsonifiedArray<[K, V][]>

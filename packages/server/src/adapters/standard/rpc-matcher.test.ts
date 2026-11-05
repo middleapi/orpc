@@ -1,11 +1,11 @@
 import { oc } from '@orpc/contract'
 import { z } from 'zod'
-import { os } from '../../builder'
-import { implement } from '../../implementer'
-import { Lazy } from '../../lazy'
-import * as ProcedureUtils from '../../procedure-utils'
-import { withHiddenRouterContract } from '../../router-hidden'
-import { RPCMatcher } from './rpc-matcher'
+import { os } from '../../builder.ts'
+import { implement } from '../../implementer.ts'
+import { Lazy } from '../../lazy.ts'
+import * as ProcedureUtils from '../../procedure-utils.ts'
+import { withHiddenRouterContract } from '../../router-hidden.ts'
+import { RPCMatcher } from './rpc-matcher.ts'
 
 const createContractProcedureSpy = vi.spyOn(ProcedureUtils, 'createContractProcedure')
 

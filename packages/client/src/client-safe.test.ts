@@ -1,4 +1,4 @@
-import { createSafeClient } from './client-safe'
+import { createSafeClient } from './client-safe.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -1,6 +1,6 @@
 import { RPCJsonSerializer } from '@orpc/client'
-import * as KeyModule from './key'
-import { SharedUtils } from './shared-utils'
+import * as KeyModule from './key.ts'
+import { SharedUtils } from './shared-utils.ts'
 
 const generateOperationKeySpy = vi.spyOn(KeyModule, 'generateOperationKey')
 

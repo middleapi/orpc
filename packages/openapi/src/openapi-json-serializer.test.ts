@@ -1,4 +1,4 @@
-import { OpenAPIJsonSerializer } from './openapi-json-serializer'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
 
 class Person {
   constructor(
@@ -353,7 +353,6 @@ describe('openAPIJsonSerializer', () => {
         .toThrowError('Invalid OpenAPI serialized data: blob 1 is not a Blob.')
     })
 
-    /* eslint-disable no-proto, no-restricted-properties */
     it('serializes own __proto__ keys as plain data', () => {
       // JSON.parse creates own __proto__ properties, exactly like a real request body
       const { json } = serializer.serializeJson(JSON.parse('{"__proto__": {"polluted": true}}')) as any
@@ -398,6 +397,5 @@ describe('openAPIJsonSerializer', () => {
 
       expect(result.constructor.prototype.polluted).toBe(blob)
     })
-    /* eslint-enable no-proto, no-restricted-properties */
   })
 })

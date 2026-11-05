@@ -195,7 +195,7 @@ describe('all plugins on one handler and one link', () => {
     ])
 
     expect(exchanges).toHaveLength(1)
-    expect(exchanges[0]!.response.headers.getSetCookie().sort()).toEqual([
+    expect(exchanges[0]!.response.headers.getSetCookie().toSorted()).toEqual([
       'session=alice; HttpOnly',
       'session=bob; HttpOnly',
     ])

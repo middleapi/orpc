@@ -1,10 +1,10 @@
 import type { InitialInputSchema, Schema } from '@orpc/contract'
 import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap, ProcedureHandler } from '@orpc/server'
-import type { WithEffectContext } from './context'
+import type { WithEffectContext } from './context.ts'
 import { ORPCError, os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
-import { handlerGen } from './handler'
+import { handlerGen } from './handler.ts'
 
 class Service1 extends Context.Service<
   Service1,

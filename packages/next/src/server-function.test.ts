@@ -1,7 +1,7 @@
 import { ORPCError } from '@orpc/server'
 import * as ServerModule from '@orpc/server'
-import * as next from 'next/navigation'
-import { createServerFunction } from './server-function'
+import * as next from 'next/navigation.js'
+import { createServerFunction } from './server-function.ts'
 
 const createProcedureClientSpy = vi.spyOn(ServerModule, 'createProcedureClient')
 const { os, type } = ServerModule

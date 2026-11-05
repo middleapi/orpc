@@ -1,5 +1,5 @@
-import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
-import { blockUntilReady, resolveWeight } from '../utils'
+import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types.ts'
+import { blockUntilReady, resolveWeight } from '../utils.ts'
 
 export interface MemoryRateLimiterOptions {
   /**

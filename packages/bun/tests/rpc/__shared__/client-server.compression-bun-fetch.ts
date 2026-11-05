@@ -1,11 +1,11 @@
-import type { CreateClientServerTest } from './client-server'
+import type { CreateClientServerTest } from './client-server.ts'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
 import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import { afterAll } from 'bun:test'
-import { defaultSerializer } from './client-server'
+import { defaultSerializer } from './client-server.ts'
 
 export const createCompressionBunFetchClientServerTest: CreateClientServerTest = (
   router,

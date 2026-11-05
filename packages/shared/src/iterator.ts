@@ -1,10 +1,10 @@
 import type { Promisable } from 'type-fest'
-import type { StartSpanOptions } from './tracing'
-import type { PromiseWithError, ThrowableError } from './types'
+import type { StartSpanOptions } from './tracing.ts'
+import type { PromiseWithError, ThrowableError } from './types.ts'
 import { AsyncIteratorClass } from '@standard-server/shared'
-import { once } from './function'
-import { AsyncIdQueue } from './queue'
-import { recordSpanError, runInSpanContext, startSpan } from './tracing'
+import { once } from './function.ts'
+import { AsyncIdQueue } from './queue.ts'
+import { recordSpanError, runInSpanContext, startSpan } from './tracing.ts'
 
 export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn> {
   /**
@@ -134,7 +134,7 @@ export function replicateAsyncIterator<T, TReturn, TNext>(
 
     return new AsyncIteratorClass(
       async () => {
-        start()
+        void start()
 
         const item = await queue.pull(id)
 

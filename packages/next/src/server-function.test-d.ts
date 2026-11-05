@@ -2,7 +2,7 @@ import type { ORPCErrorCode } from '@orpc/server'
 import { os } from '@orpc/server'
 import { useActionState } from 'react'
 import { z } from 'zod'
-import { createServerFunction } from './server-function'
+import { createServerFunction } from './server-function.ts'
 
 const errorMap = {
   BASE: {
