@@ -50,7 +50,6 @@ describe('rpcLink', () => {
       'http://api.example.com/ping',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
       }),
       expect.objectContaining({
         context: {},
@@ -117,7 +116,6 @@ describe('rpcLink', () => {
       expect.stringContaining('http://api.example.com/api?token=abc'),
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
         headers: expect.toSatisfy((h: Headers) => h.get('x-custom-header') === 'value'),
       }),
       expect.objectContaining({
@@ -157,7 +155,6 @@ describe('rpcLink', () => {
       'http://api.example.com/ping',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
       }),
     )
   })
@@ -194,7 +191,6 @@ describe('rpcLink', () => {
       'http://api.example.com/ping',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
       }),
     )
   })
@@ -248,7 +244,6 @@ describe('rpcLink', () => {
       'http://api.example.com/ping',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
       }),
       expect.objectContaining({ context: {} }),
       ['ping'],
@@ -279,7 +274,6 @@ describe('rpcLink', () => {
       '/ping',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
       }),
       expect.objectContaining({
         context: {},
@@ -313,7 +307,6 @@ describe('rpcLink', () => {
       'http://api.example.com/ping',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'manual',
         duplex: 'half',
       }),
       expect.objectContaining({
@@ -365,7 +358,10 @@ describe('rpcLink', () => {
   })
 
   it.each([
-    ['opaqueredirect', 'Unexpected redirect response: redirects are not followed.'],
+    [
+      'opaqueredirect',
+      "Unexpected opaque redirect response: browsers hide redirect responses requested with `redirect: 'manual'`.",
+    ],
     [
       'opaque',
       'Unexpected opaque response: the response is unreadable, likely due to a no-cors request.',

@@ -94,7 +94,6 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
       headers: toFetchHeaders(standardHeaders),
       method: standardRequest.method,
       signal: options.signal,
-      redirect: 'manual',
     }
 
     if (body instanceof ReadableStream) {
@@ -109,9 +108,11 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     const response = await fetch(url, init, options, path)
 
     // Opaque responses (status 0, no headers or body) would otherwise decode as a successful empty output.
-    // Browsers return them for redirects under `redirect: 'manual'` and for cross-origin `no-cors` requests.
+    // Browsers return them for redirects when a custom `fetch` sets `redirect: 'manual'`, and for cross-origin `no-cors` requests.
     if (response.type === 'opaqueredirect') {
-      throw new TypeError('Unexpected redirect response: redirects are not followed.')
+      throw new TypeError(
+        "Unexpected opaque redirect response: browsers hide redirect responses requested with `redirect: 'manual'`.",
+      )
     }
 
     if (response.type === 'opaque') {

@@ -286,6 +286,25 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
+## Redirect Responses
+
+:::warning
+By default, `fetch` follows redirects, so `OpenAPILink` cannot reflect a [redirect response](/docs/openapi/input-and-output-mapping#redirect-response) and returns the final response instead. To receive the `3xx` response in the link call, override `fetch` with `redirect: 'manual'`:
+
+```ts
+const link = new OpenAPILink(contract, {
+  fetch: (url, init) => {
+    return globalThis.fetch(url, {
+      ...init,
+      redirect: 'manual',
+    })
+  },
+})
+```
+
+This only works in server runtimes like Node.js, Bun, and Deno, which return the `3xx` response as the output. Browsers hide redirect responses requested this way, so the call throws instead.
+:::
+
 ## Event Stream Options
 
 Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the server. Available options depend on the adapter. For example, the fetch adapter supports:
