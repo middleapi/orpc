@@ -1,17 +1,33 @@
 import type { ClientOptions } from '@orpc/client'
-import type { AnySchema, InferSchemaInput, InferSchemaOutput, ProcedureContract, Schema } from '@orpc/contract'
-import type { JsonSchema } from '@orpc/json-schema'
-import type { Context, ProcedureClientOptions } from '@orpc/server'
-import type { MaybeOptionalOptions, Public } from '@orpc/shared'
-import type { FlexibleSchema, JSONValue, Tool, ToolResultPart } from 'ai'
-import type { FunctionTool } from './tool-meta'
+import type {
+  AnySchema,
+  InferSchemaInput,
+  InferSchemaOutput,
+  ProcedureContract,
+  Schema,
+} from '@orpc/contract'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
+import type { JsonSchema } from '@orpc/json-schema'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
+import type { Context, ProcedureClientOptions } from '@orpc/server'
 import { call, Procedure } from '@orpc/server'
-import { encodeBase64, isAsyncGeneratorFunction, loadBytes, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, stringifyJSON, toArray } from '@orpc/shared'
+import type { MaybeOptionalOptions, Public } from '@orpc/shared'
+import {
+  encodeBase64,
+  isAsyncGeneratorFunction,
+  loadBytes,
+  mergeTwoLevels,
+  ORPC_NAME,
+  resolveMaybeOptionalOptions,
+  stringifyJSON,
+  toArray,
+} from '@orpc/shared'
+import type { FlexibleSchema, JSONValue, Tool, ToolResultPart } from 'ai'
 import { tool } from 'ai'
-import { getAiSdkToolMeta } from './tool-meta'
+
+import type { FunctionTool } from './tool-meta.ts'
+import { getAiSdkToolMeta } from './tool-meta.ts'
 
 const ANY_SCHEMA: FlexibleSchema = {
   '~standard': {
@@ -38,7 +54,10 @@ function combineJsonSchemas(jsonSchemas: Record<string, unknown>[]): Record<stri
     return jsonSchema
   })
 
-  const combined = combineJsonSchemasWithComposition('allOf', branches as JsonSchema[]) as Record<string, unknown>
+  const combined = combineJsonSchemasWithComposition('allOf', branches as JsonSchema[]) as Record<
+    string,
+    unknown
+  >
 
   return { $schema, ...combined }
 }
@@ -52,15 +71,23 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
     return schemas[0]!
   }
 
-  type MaybeStandardJsonSchema = AnySchema & Extract<FlexibleSchema, { '~standard': { jsonSchema?: object } }>
+  type MaybeStandardJsonSchema = AnySchema &
+    Extract<FlexibleSchema, { '~standard': { jsonSchema?: object } }>
 
-  const standardJsonSchemas = (schemas as MaybeStandardJsonSchema[])
-    .filter(schema => schema['~standard'].jsonSchema)
+  const standardJsonSchemas = (schemas as MaybeStandardJsonSchema[]).filter(
+    (schema) => schema['~standard'].jsonSchema,
+  )
 
   const jsonSchema: MaybeStandardJsonSchema['~standard']['jsonSchema'] = standardJsonSchemas.length
     ? {
-        input: options => combineJsonSchemas(standardJsonSchemas.map(schema => schema['~standard'].jsonSchema!.input(options))),
-        output: options => combineJsonSchemas(standardJsonSchemas.map(schema => schema['~standard'].jsonSchema!.output(options))),
+        input: (options) =>
+          combineJsonSchemas(
+            standardJsonSchemas.map((schema) => schema['~standard'].jsonSchema!.input(options)),
+          ),
+        output: (options) =>
+          combineJsonSchemas(
+            standardJsonSchemas.map((schema) => schema['~standard'].jsonSchema!.output(options)),
+          ),
       }
     : undefined
 
@@ -74,7 +101,9 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
         // Mirrors the server's stacked input validation, output schemas stay piped.
         for (const [index, schema] of schemas.entries()) {
           const merging = merge && index !== 0
-          const result = await schema['~standard'].validate(merging ? mergeTwoLevels(value, current) : current)
+          const result = await schema['~standard'].validate(
+            merging ? mergeTwoLevels(value, current) : current,
+          )
 
           if (result.issues) {
             return result
@@ -92,6 +121,7 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
 
 function combineOutputSchemas(outputSchemas: AnySchema[]): FlexibleSchema | undefined {
   const yieldSchemas = getAsyncIteratorObjectSchemasDetails(outputSchemas)?.yieldSchemas
+  // oxlint-disable-next-line unicorn/no-array-reverse
   return combineSchemas([...(yieldSchemas ?? outputSchemas)].reverse(), false)
 }
 
@@ -99,7 +129,10 @@ function combineOutputSchemas(outputSchemas: AnySchema[]): FlexibleSchema | unde
  * Serializes an output like an OpenAPI response body. JSON shows a `Blob` as an empty object,
  * so blobs, nested or not, are sent as file parts named by their path, such as `report/q3.pdf`.
  */
-async function toModelOutput(serializer: Public<OpenAPIJsonSerializer>, output: unknown): Promise<ToolResultPart['output']> {
+async function toModelOutput(
+  serializer: Public<OpenAPIJsonSerializer>,
+  output: unknown,
+): Promise<ToolResultPart['output']> {
   const { json, maps, blobs } = serializer.serializeJson(output)
 
   if (typeof json === 'string') {
@@ -110,20 +143,25 @@ async function toModelOutput(serializer: Public<OpenAPIJsonSerializer>, output: 
     return { type: 'json', value: (json ?? null) as JSONValue }
   }
 
-  const files = await Promise.all(blobs.map(async (blob, i) => {
-    const path = maps[i]!
-    const names = blob instanceof File && blob.name !== '' ? [...path, blob.name] : path
+  const files = await Promise.all(
+    blobs.map(async (blob, i) => {
+      const path = maps[i]!
+      const names = blob instanceof File && blob.name !== '' ? [...path, blob.name] : path
 
-    return {
-      type: 'file' as const,
-      mediaType: blob.type || 'application/octet-stream',
-      // base64 is encoded once, providers would otherwise re-encode the bytes on every step
-      data: { type: 'data' as const, data: encodeBase64(await loadBytes(blob)) },
-      ...(names.length === 0 ? {} : { filename: names.join('/') }),
-    }
-  }))
+      return {
+        type: 'file' as const,
+        mediaType: blob.type || 'application/octet-stream',
+        // base64 is encoded once, providers would otherwise re-encode the bytes on every step
+        data: { type: 'data' as const, data: encodeBase64(await loadBytes(blob)) },
+        ...(names.length === 0 ? {} : { filename: names.join('/') }),
+      }
+    }),
+  )
 
-  return { type: 'content', value: json instanceof Blob ? files : [{ type: 'text', text: stringifyJSON(json)! }, ...files] }
+  return {
+    type: 'content',
+    value: json instanceof Blob ? files : [{ type: 'text', text: stringifyJSON(json)! }, ...files],
+  }
 }
 
 /**
@@ -135,9 +173,7 @@ async function toModelOutput(serializer: Public<OpenAPIJsonSerializer>, output: 
  *
  * @see {@link https://orpc.dev/docs/integrations/ai-sdk#streaming-tool-outputs | AI SDK Integration - Streaming Tool Outputs}
  */
-export type ToolOutput<T> = T extends AsyncIteratorObject<infer TYield, any, any>
-  ? TYield
-  : T
+export type ToolOutput<T> = T extends AsyncIteratorObject<infer TYield, any, any> ? TYield : T
 
 export interface ImplementToolFactoryOptions {
   /**
@@ -153,7 +189,12 @@ export interface ImplementToolFactoryOptions {
 export interface ToolImplementer {
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
     contract: ProcedureContract<TInputSchema, TOutputSchema, any>,
-    ...rest: MaybeOptionalOptions<Omit<FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>, 'inputSchema' | 'outputSchema'>>
+    ...rest: MaybeOptionalOptions<
+      Omit<
+        FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
+        'inputSchema' | 'outputSchema'
+      >
+    >
   ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>
 }
 
@@ -202,7 +243,8 @@ export interface ToolImplementer {
  */
 export function implementToolFactory(options: ImplementToolFactoryOptions = {}): ToolImplementer {
   const serializer = options.serializer ?? new OpenAPIJsonSerializer()
-  const defaultToModelOutput: NonNullable<FunctionTool['toModelOutput']> = ({ output }) => toModelOutput(serializer, output)
+  const defaultToModelOutput: NonNullable<FunctionTool['toModelOutput']> = ({ output }) =>
+    toModelOutput(serializer, output)
 
   const factory: ToolImplementer = (contract, ...rest) => {
     const toolOptions = resolveMaybeOptionalOptions(rest)
@@ -224,15 +266,20 @@ export function implementToolFactory(options: ImplementToolFactoryOptions = {}):
   return factory
 }
 
-export type CreateToolFactoryOptions<TInitialContext extends Context>
-  = & ImplementToolFactoryOptions
-    & ProcedureClientOptions<TInitialContext, Schema<unknown>, object, object>
-    & Omit<ClientOptions<object>, 'context' | 'signal'>
+export type CreateToolFactoryOptions<TInitialContext extends Context> =
+  ImplementToolFactoryOptions &
+    ProcedureClientOptions<TInitialContext, Schema<unknown>, object, object> &
+    Omit<ClientOptions<object>, 'context' | 'signal'>
 
 export interface ToolFactory<TInitialContext extends Context> {
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
     procedure: Procedure<TInitialContext, any, TInputSchema, TOutputSchema, any>,
-    ...rest: MaybeOptionalOptions<Omit<FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>, 'inputSchema' | 'outputSchema' | 'execute'>>
+    ...rest: MaybeOptionalOptions<
+      Omit<
+        FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
+        'inputSchema' | 'outputSchema' | 'execute'
+      >
+    >
   ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>
 }
 
@@ -299,11 +346,12 @@ export function createToolFactory<TInitialContext extends Context = object>(
      * Output schemas are the source of truth, but an `async function*` handler always
      * returns an async iterator, so it streams even without an `asyncIteratorObject` schema.
      */
-    const isIteratorOutput = getAsyncIteratorObjectSchemasDetails(procedure['~orpc'].outputSchemas) !== undefined
-      || isAsyncGeneratorFunction(procedure['~orpc'].handler)
+    const isIteratorOutput =
+      getAsyncIteratorObjectSchemasDetails(procedure['~orpc'].outputSchemas) !== undefined ||
+      isAsyncGeneratorFunction(procedure['~orpc'].handler)
 
     return implementTool(procedure, {
-      ...toolOptions as any,
+      ...(toolOptions as any),
       /**
        * For async iterator outputs, the tool streams each event as a
        * [preliminary result](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling#preliminary-tool-results),
@@ -311,10 +359,16 @@ export function createToolFactory<TInitialContext extends Context = object>(
        */
       execute: isIteratorOutput
         ? async function* (input, callingOptions) {
-          yield* await call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal }) as AsyncIterable<any>
-        }
+            yield* (await call(disabledValidation, input as any, {
+              ...options,
+              signal: callingOptions.abortSignal,
+            })) as AsyncIterable<any>
+          }
         : (input, callingOptions) => {
-            return call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal })
+            return call(disabledValidation, input as any, {
+              ...options,
+              signal: callingOptions.abortSignal,
+            })
           },
     }) as any
   }

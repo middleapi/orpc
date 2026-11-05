@@ -1,8 +1,8 @@
 ---
-title: "tRPC Integration"
-description: "Learn how to integrate tRPC with oRPC by converting tRPC routers into oRPC routers and bridging metadata between the two."
+title: 'tRPC Integration'
+description: 'Learn how to integrate tRPC with oRPC by converting tRPC routers into oRPC routers and bridging metadata between the two.'
 sidebar:
-  label: "tRPC"
+  label: 'tRPC'
 ---
 
 ## Installation
@@ -33,12 +33,11 @@ const handler = new OpenAPIHandler(orpcRouter, {
     async ({ next }) => {
       try {
         return await next()
-      }
-      catch (error) {
+      } catch (error) {
         if (
-          error instanceof ORPCError
-          && error.cause instanceof TRPCError
-          && error.cause.cause instanceof z.ZodError
+          error instanceof ORPCError &&
+          error.cause instanceof TRPCError &&
+          error.cause.cause instanceof z.ZodError
         ) {
           throw new ORPCError('UNPROCESSABLE_CONTENT', {
             message: z.prettifyError(error.cause.cause),
@@ -73,7 +72,8 @@ const example = t.procedure
 
 const merged = t.procedure
   .meta({
-    ...toTRPCMeta( // [!code highlight]
+    ...toTRPCMeta(
+      // [!code highlight]
       openapi({ path: '/hello' }), // [!code highlight]
       openapi({ method: 'POST' }), // [!code highlight]
     ), // [!code highlight]

@@ -1,13 +1,18 @@
-import { RPCHandler } from '@orpc/server/fetch'
-import { router } from './routers'
+import {
+  experimental_CloudflareTracer as CloudflareTracer,
+  DurablePublisher,
+  DurablePublisherObject,
+} from '@orpc/cloudflare'
+import { EvlogHandlerPlugin } from '@orpc/evlog'
+import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { OpenAPIReferenceHandlerPlugin } from '@orpc/openapi/plugins'
+import { RPCHandler } from '@orpc/server/fetch'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'
-import { EvlogHandlerPlugin } from '@orpc/evlog'
-import { OpenAPIGenerator } from '@orpc/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
-import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
-import { experimental_CloudflareTracer as CloudflareTracer, DurablePublisher, DurablePublisherObject } from '@orpc/cloudflare'
+
+import { router } from './routers'
 
 new CloudflareTracer().enable()
 
@@ -25,19 +30,20 @@ const openapiHandler = new OpenAPIHandler(router, {
     new EvlogHandlerPlugin({ logAbort: true }),
     new SmartCoercionHandlerPlugin({ converters: [zodConverter] }),
     new OpenAPIReferenceHandlerPlugin({
-      spec: () => openapiGenerator.generate(router, {
-        base: {
-          servers: [{ url: '/api' }],
-          components: {
-            securitySchemes: {
-              bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
+      spec: () =>
+        openapiGenerator.generate(router, {
+          base: {
+            servers: [{ url: '/api' }],
+            components: {
+              securitySchemes: {
+                bearerAuth: {
+                  type: 'http',
+                  scheme: 'bearer',
+                },
               },
             },
           },
-        },
-      }),
+        }),
       providerConfig: {
         authentication: {
           securitySchemes: {
@@ -52,19 +58,22 @@ const openapiHandler = new OpenAPIHandler(router, {
 })
 
 const rpcHandler = new RPCHandler(router, {
-  plugins: [
-    new EvlogHandlerPlugin({ logAbort: true }),
-  ],
+  plugins: [new EvlogHandlerPlugin({ logAbort: true })],
 })
 
 export default {
   async fetch(request, env, _ctx) {
-    if (new URL(request.url).pathname === '/chat-room' && request.headers.get('upgrade') === 'websocket') {
+    if (
+      new URL(request.url).pathname === '/chat-room' &&
+      request.headers.get('upgrade') === 'websocket'
+    ) {
       const id = env.CHAT_ROOM_DON.idFromName('default')
       return env.CHAT_ROOM_DON.get(id).fetch(request)
     }
 
-    const messagePublisher = new DurablePublisher<Record<string, { message: string }>>(env.PUBLISHER_DON)
+    const messagePublisher = new DurablePublisher<Record<string, { message: string }>>(
+      env.PUBLISHER_DON,
+    )
 
     const openapiResult = await openapiHandler.handle(request, {
       prefix: '/api',

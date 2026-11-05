@@ -3,29 +3,30 @@ import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { defineComponent } from 'vue'
-import { liveQuery } from './live-query'
+
+import { liveQuery } from './live-query.ts'
 
 /**
  * Mounts a component that runs a real Pinia Colada `useQuery`,
  * so tests can observe exactly what users see.
  */
 function mountQuery(options: UseQueryOptions<any, any, any>) {
-  return mount(defineComponent({
-    setup() {
-      const queryCache = useQueryCache()
-      const query = useQuery(options)
+  return mount(
+    defineComponent({
+      setup() {
+        const queryCache = useQueryCache()
+        const query = useQuery(options)
 
-      return { query, queryCache }
+        return { query, queryCache }
+      },
+      render: () => null,
+    }),
+    {
+      global: {
+        plugins: [createPinia(), PiniaColada],
+      },
     },
-    render: () => null,
-  }), {
-    global: {
-      plugins: [
-        createPinia(),
-        PiniaColada,
-      ],
-    },
-  })
+  )
 }
 
 /**
@@ -37,7 +38,7 @@ function createChunkController<T>() {
   let notify: (() => void) | undefined
 
   return {
-    async* stream() {
+    async *stream() {
       while (true) {
         while (buffer.length === 0) {
           await new Promise<void>((resolve) => {
@@ -114,7 +115,9 @@ describe('liveQuery', () => {
       })()
     })
 
-    await expect(queryFn({ signal: controller.signal } as any)).rejects.toBe(controller.signal.reason)
+    await expect(queryFn({ signal: controller.signal } as any)).rejects.toBe(
+      controller.signal.reason,
+    )
     expect(started).not.toHaveBeenCalled()
   })
 

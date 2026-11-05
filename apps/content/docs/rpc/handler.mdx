@@ -1,6 +1,6 @@
 ---
-title: "RPC Handler"
-description: "Use RPCHandler to serve procedures over the RPC protocol, with HTTP method control, interceptors, plugins, custom serializers, and error responses."
+title: 'RPC Handler'
+description: 'Use RPCHandler to serve procedures over the RPC protocol, with HTTP method control, interceptors, plugins, custom serializers, and error responses.'
 ---
 
 ## Overview
@@ -15,19 +15,15 @@ const handler = new RPCHandler(router, {
 
       try {
         return await next()
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
-    }
+    },
   ],
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
 })
 ```
 
@@ -38,7 +34,7 @@ The actual usage of `RPCHandler` depends on the [adapter](/docs/rpc/adapters) yo
 export async function fetch(request: Request) {
   const { matched, response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // <- provide initial context if needed
+    context: {}, // <- provide initial context if needed
   })
 
   if (matched) {
@@ -129,15 +125,18 @@ const listPlanets = os
   .meta(openapi({ method: 'GET', path: '/planets' }))
   .handler(() => ['Earth', 'Mars'])
 
-const handler = new RPCHandler({ listPlanets }, {
-  allowMethods: (method, procedure, path) => {
-    if (method === 'GET' && getOpenAPIMeta(procedure)?.method === 'GET') {
-      return true
-    }
+const handler = new RPCHandler(
+  { listPlanets },
+  {
+    allowMethods: (method, procedure, path) => {
+      if (method === 'GET' && getOpenAPIMeta(procedure)?.method === 'GET') {
+        return true
+      }
 
-    return RPC_DEFAULT_ALLOW_METHODS.includes(method)
+      return RPC_DEFAULT_ALLOW_METHODS.includes(method)
+    },
   },
-})
+)
 ```
 
 ## Interceptors
@@ -178,8 +177,7 @@ const handler = new RPCHandler(router, {
       try {
         const response = await next()
         return response
-      }
-      catch (err) {
+      } catch (err) {
         if (err instanceof CustomError) {
           throw new ORPCError('CUSTOM_ERROR', { message: err.message, cause: err })
         }
@@ -193,12 +191,10 @@ const handler = new RPCHandler(router, {
       try {
         const response = await next()
         return response
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
@@ -227,9 +223,7 @@ Plugins package reusable interceptors. For example, [CORS Plugin](/docs/plugins/
 
 ```ts
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
 })
 ```
 

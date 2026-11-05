@@ -1,9 +1,25 @@
-import type { ContractBuilder, MergedErrorMap, MergedSchema, ProcedureContractBuilderWithInput, ProcedureContractBuilderWithInputOutput, ProcedureContractBuilderWithOutput } from '@orpc/contract'
-import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, DecoratedProcedure, Schema } from '@orpc/server'
+import type {
+  ContractBuilder,
+  MergedErrorMap,
+  MergedSchema,
+  ProcedureContractBuilderWithInput,
+  ProcedureContractBuilderWithInputOutput,
+  ProcedureContractBuilderWithOutput,
+} from '@orpc/contract'
 import { error } from '@orpc/contract'
+import type {
+  Builder,
+  BuilderWithInput,
+  BuilderWithInputOutput,
+  BuilderWithMiddlewares,
+  BuilderWithOutput,
+  DecoratedProcedure,
+  Schema,
+} from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
-import './schema'
+
+import './schema.ts'
 
 const errorMap = {
   BASE: {
@@ -12,8 +28,8 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 const NumberFromString = EffectSchema.NumberFromString
 
@@ -27,8 +43,8 @@ const effectErrorMap = {
 }
 
 type ExpectedEffectErrorMap = {
-  STANDARD: { message: string, data: typeof schema1 }
-  EFFECT: { message: string, data: Schema<string, number> }
+  STANDARD: { message: string; data: typeof schema1 }
+  EFFECT: { message: string; data: Schema<string, number> }
   NO_DATA: { message: string }
   FACTORY: typeof FactoryError
 }
@@ -37,23 +53,15 @@ it('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into C
   const builder = {} as ContractBuilder<typeof errorMap>
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
-    ContractBuilder<
-      MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>
-    >
+    ContractBuilder<MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>>
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInput<
-      Schema<string, number>,
-      typeof errorMap
-    >
+    ProcedureContractBuilderWithInput<Schema<string, number>, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithOutput<
-      Schema<string, number>,
-      typeof errorMap
-    >
+    ProcedureContractBuilderWithOutput<Schema<string, number>, typeof errorMap>
   >()
 })
 
@@ -75,11 +83,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<
-      typeof schema1,
-      Schema<string, number>,
-      typeof errorMap
-    >
+    ProcedureContractBuilderWithInputOutput<typeof schema1, Schema<string, number>, typeof errorMap>
   >()
 })
 
@@ -94,11 +98,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<
-      Schema<string, number>,
-      typeof schema2,
-      typeof errorMap
-    >
+    ProcedureContractBuilderWithInputOutput<Schema<string, number>, typeof schema2, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
@@ -110,7 +110,11 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
 })
 
 describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ProcedureContractBuilderWithInputOutput', async () => {
-  const builder = {} as ProcedureContractBuilderWithInputOutput<typeof schema1, typeof schema2, typeof errorMap>
+  const builder = {} as ProcedureContractBuilderWithInputOutput<
+    typeof schema1,
+    typeof schema2,
+    typeof errorMap
+  >
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
     ProcedureContractBuilderWithInputOutput<
@@ -141,33 +145,24 @@ it('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into B
   const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
-    Builder<
-      { auth: boolean },
-      MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>
-    >
+    Builder<{ auth: boolean }, MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>>
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    BuilderWithInput<
-      { auth: boolean },
-      object,
-      Schema<string, number>,
-      typeof errorMap
-    >
+    BuilderWithInput<{ auth: boolean }, object, Schema<string, number>, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    BuilderWithOutput<
-      { auth: boolean },
-      object,
-      Schema<string, number>,
-      typeof errorMap
-    >
+    BuilderWithOutput<{ auth: boolean }, object, Schema<string, number>, typeof errorMap>
   >()
 })
 
 describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into BuilderWithMiddlewares', async () => {
-  const builder = {} as BuilderWithMiddlewares<{ auth: boolean }, { extra: boolean }, typeof errorMap>
+  const builder = {} as BuilderWithMiddlewares<
+    { auth: boolean },
+    { extra: boolean },
+    typeof errorMap
+  >
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
     BuilderWithMiddlewares<
@@ -178,12 +173,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    BuilderWithInput<
-      { auth: boolean },
-      { extra: boolean },
-      Schema<string, number>,
-      typeof errorMap
-    >
+    BuilderWithInput<{ auth: boolean }, { extra: boolean }, Schema<string, number>, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
@@ -197,7 +187,12 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
 })
 
 describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into BuilderWithInput', async () => {
-  const builder = {} as BuilderWithInput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof errorMap>
+  const builder = {} as BuilderWithInput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof errorMap
+  >
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
     BuilderWithInput<
@@ -229,7 +224,12 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
 })
 
 describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into BuilderWithOutput', async () => {
-  const builder = {} as BuilderWithOutput<{ auth: boolean }, { extra: boolean }, typeof schema2, typeof errorMap>
+  const builder = {} as BuilderWithOutput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema2,
+    typeof errorMap
+  >
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
     BuilderWithOutput<
@@ -261,7 +261,13 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
 })
 
 describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into BuilderWithInputOutput', async () => {
-  const builder = {} as BuilderWithInputOutput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof schema2, typeof errorMap>
+  const builder = {} as BuilderWithInputOutput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof schema2,
+    typeof errorMap
+  >
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
     BuilderWithInputOutput<
@@ -295,7 +301,13 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
 })
 
 it('adds .errors<EffectSchema> into DecoratedProcedure', async () => {
-  const procedure = {} as DecoratedProcedure<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof schema2, typeof errorMap>
+  const procedure = {} as DecoratedProcedure<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof schema2,
+    typeof errorMap
+  >
 
   expectTypeOf(procedure.errors(effectErrorMap)).toEqualTypeOf<
     DecoratedProcedure<
@@ -315,10 +327,7 @@ describe('.errors<EffectSchema>', () => {
     const standardErrorMap = { STANDARD: { message: 'standard', data: schema1 } }
 
     expectTypeOf(builder.errors(standardErrorMap)).toEqualTypeOf<
-      Builder<
-        { auth: boolean },
-        MergedErrorMap<typeof errorMap, typeof standardErrorMap>
-      >
+      Builder<{ auth: boolean }, MergedErrorMap<typeof errorMap, typeof standardErrorMap>>
     >()
   })
 

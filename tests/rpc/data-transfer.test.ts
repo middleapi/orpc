@@ -1,20 +1,21 @@
 import { os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
-import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types'
-import { Person } from './__shared__/client-server'
-import { createCompressionCrosswsClientServerTest } from './__shared__/client-server.compression-crossws'
-import { createCompressionHonoFetchClientServerTest } from './__shared__/client-server.compression-hono-fetch'
-import { createCompressionMessagePortClientServerTest } from './__shared__/client-server.compression-message-port'
-import { createCompressionMessagePortTransferClientServerTest } from './__shared__/client-server.compression-message-port-transfer'
-import { createCompressionNodeHttpClientServerTest } from './__shared__/client-server.compression-node-http'
-import { createCompressionNodeWsClientServerTest } from './__shared__/client-server.compression-node-ws'
-import { createCrosswsClientServerTest } from './__shared__/client-server.crossws'
-import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
-import { createMessagePortClientServerTest } from './__shared__/client-server.message-port'
-import { createMessagePortTransferClientServerTest } from './__shared__/client-server.message-port-transfer'
-import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
-import { createNodeWsClientServerTest } from './__shared__/client-server.node-ws'
+
+import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types.ts'
+import { createCompressionCrosswsClientServerTest } from './__shared__/client-server.compression-crossws.ts'
+import { createCompressionHonoFetchClientServerTest } from './__shared__/client-server.compression-hono-fetch.ts'
+import { createCompressionMessagePortTransferClientServerTest } from './__shared__/client-server.compression-message-port-transfer.ts'
+import { createCompressionMessagePortClientServerTest } from './__shared__/client-server.compression-message-port.ts'
+import { createCompressionNodeHttpClientServerTest } from './__shared__/client-server.compression-node-http.ts'
+import { createCompressionNodeWsClientServerTest } from './__shared__/client-server.compression-node-ws.ts'
+import { createCrosswsClientServerTest } from './__shared__/client-server.crossws.ts'
+import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch.ts'
+import { createMessagePortTransferClientServerTest } from './__shared__/client-server.message-port-transfer.ts'
+import { createMessagePortClientServerTest } from './__shared__/client-server.message-port.ts'
+import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http.ts'
+import { createNodeWsClientServerTest } from './__shared__/client-server.node-ws.ts'
+import { Person } from './__shared__/client-server.ts'
 
 describe.each([
   ['crossws', createCrosswsClientServerTest],
@@ -94,7 +95,7 @@ describe.each([
 
     // The source holds everything after its first chunk until the test releases it, so a transport
     // that buffered the stream would hang here instead of resolving.
-    const result = await client.ping(stream) as ReadableStream<Uint8Array>
+    const result = (await client.ping(stream)) as ReadableStream<Uint8Array>
 
     const reader = result.getReader()
 
@@ -131,11 +132,11 @@ describe.each([
       yield new Person('Order 3', 3)
       await completion.promise
       return new Date('2024-01-01')
-    }())
+    })()
 
     // The source holds everything after its first event until the test releases it, so a transport
     // that buffered the stream would hang here instead of resolving.
-    const result = await client.ping(stream) as AsyncIteratorObject<unknown>
+    const result = (await client.ping(stream)) as AsyncIteratorObject<unknown>
     await expect(result.next()).resolves.toEqual({ value: 'order 1', done: false })
 
     order2.resolve()

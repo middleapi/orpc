@@ -1,8 +1,8 @@
 ---
-title: "Browser Adapter"
+title: 'Browser Adapter'
 description: "Use oRPC for typesafe messaging between extension scripts or browser windows via the Message Port Adapter, and relay scripts that can't connect directly."
 sidebar:
-  label: "Browser"
+  label: 'Browser'
 ---
 
 Enable typesafe communication between browser scripts using the [Message Port Adapter](/docs/adapters/message-port).
@@ -36,7 +36,7 @@ browser.runtime.onConnect.addListener((port) => {
      * that receives the per-call request as its first argument, and is **not**
      * related to the initial upgrade request.
      */
-    context: request => ({}),
+    context: (request) => ({}),
   })
 })
 ```
@@ -83,7 +83,7 @@ window.addEventListener('message', (event) => {
        * that receives the per-call request as its first argument, and is **not**
        * related to the initial upgrade request.
        */
-      context: request => ({}),
+      context: (request) => ({}),
     })
 
     event.data.start()
@@ -164,7 +164,7 @@ browser.runtime.onConnect.addListener((port) => {
      * that receives the per-call request as its first argument, and is **not**
      * related to the initial upgrade request.
      */
-    context: request => ({}),
+    context: (request) => ({}),
   })
 })
 ```

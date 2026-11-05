@@ -1,6 +1,6 @@
 ---
-title: "Expanding Type Support for OpenAPI Link"
-description: "Restore native types like Date and bigint on OpenAPI Link clients using the Response Validation or Smart Coercion plugins."
+title: 'Expanding Type Support for OpenAPI Link'
+description: 'Restore native types like Date and bigint on OpenAPI Link clients using the Response Validation or Smart Coercion plugins.'
 ---
 
 Because of [OpenAPI Serializer limitations](/docs/openapi/serializer#limitations), values like `Date` and `bigint` are received by the client in JSON-friendly form. You can convert them back to native types on the client with either [Response Validation Plugin](/docs/plugins/response-validation) or [Smart Coercion Plugin](/docs/plugins/smart-coercion), but only under the conditions described below.
@@ -21,10 +21,12 @@ Nested `Blob` and `File` values are still limited by [Bracket Notation](/docs/op
 Use [Response Validation Plugin](/docs/plugins/response-validation) when you want to manually control how values are converted back to native types. The coercion rules live in your contract schemas, so the behavior stays explicit and predictable.
 
 ```ts
-const contract = oc.output(z.object({
-  date: z.coerce.date<Date>(),
-  bigint: z.coerce.bigint<bigint>(),
-}))
+const contract = oc.output(
+  z.object({
+    date: z.coerce.date<Date>(),
+    bigint: z.coerce.bigint<bigint>(),
+  }),
+)
 
 const procedure = implement(contract).handler(() => ({
   date: new Date(),

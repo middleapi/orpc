@@ -1,12 +1,13 @@
-import { router } from '@/routers'
+import { EvlogHandlerPlugin } from '@orpc/evlog'
+import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { OpenAPIReferenceHandlerPlugin } from '@orpc/openapi/plugins'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'
-import { EvlogHandlerPlugin } from '@orpc/evlog'
-import { messagePublisher } from '@/context'
-import { OpenAPIGenerator } from '@orpc/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
-import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+
+import { messagePublisher } from '@/context'
+import { router } from '@/routers'
 
 const zodConverter = new ZodToJsonSchemaConverter()
 
@@ -22,19 +23,20 @@ const handler = new OpenAPIHandler(router, {
     new EvlogHandlerPlugin({ logAbort: true }),
     new SmartCoercionHandlerPlugin({ converters: [zodConverter] }),
     new OpenAPIReferenceHandlerPlugin({
-      spec: () => generator.generate(router, {
-        base: {
-          servers: [{ url: '/api' }],
-          components: {
-            securitySchemes: {
-              bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
+      spec: () =>
+        generator.generate(router, {
+          base: {
+            servers: [{ url: '/api' }],
+            components: {
+              securitySchemes: {
+                bearerAuth: {
+                  type: 'http',
+                  scheme: 'bearer',
+                },
               },
             },
           },
-        },
-      }),
+        }),
       providerConfig: {
         authentication: {
           securitySchemes: {

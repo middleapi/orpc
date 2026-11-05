@@ -1,13 +1,16 @@
 import type { RouterContract } from '@orpc/contract'
 import { ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { isTypescriptObject, pathToHttpPath, toArray } from '@orpc/shared'
-import { getOpenAPIMeta, openapi } from './meta'
 
-export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract>
-  = T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
+import { getOpenAPIMeta, openapi } from './meta.ts'
+
+export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract> =
+  T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
     ? ProcedureContract<UInputSchema, UOutputSchema, UErrors>
     : {
-        [K in keyof T]: T[K] extends RouterContract ? PopulatedContractRouterOpenAPIPaths<T[K]> : never
+        [K in keyof T]: T[K] extends RouterContract
+          ? PopulatedContractRouterOpenAPIPaths<T[K]>
+          : never
       }
 
 export interface PopulateRouterContractOpenAPIPathsOptions {
@@ -56,10 +59,10 @@ export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
   const populated: Record<string, any> = {}
 
   for (const key of Object.keys(router)) {
-    populated[key] = populateRouterContractOpenAPIPaths(
-      router[key]!,
-      { ...options, path: [...path, key] },
-    )
+    populated[key] = populateRouterContractOpenAPIPaths(router[key]!, {
+      ...options,
+      path: [...path, key],
+    })
   }
 
   return populated as any

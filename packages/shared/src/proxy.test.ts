@@ -1,4 +1,4 @@
-import { override } from './proxy'
+import { override } from './proxy.ts'
 
 describe('override', () => {
   it('should combine properties from both target and overlay (overlay takes precedence)', () => {
@@ -24,12 +24,18 @@ describe('override', () => {
   it('should handle method overriding correctly', () => {
     const target = {
       name: 'target',
-      getName1() { return `target: ${this.name}` },
-      getName2() { return `target: ${this.name}` },
+      getName1() {
+        return `target: ${this.name}`
+      },
+      getName2() {
+        return `target: ${this.name}`
+      },
     }
     const overlay = {
       name: 'overlay',
-      getName2() { return `overlay: ${this.name}` },
+      getName2() {
+        return `overlay: ${this.name}`
+      },
     }
     const proxy = override(target, overlay)
 
@@ -43,14 +49,17 @@ describe('override', () => {
     const target = (async function* () {
       yield 1
       yield 2
-    }())
+    })()
 
     ;(target as any)[Symbol.for('TEST')] = true
 
-    const proxy = override(target, (async function* () {
-      yield 3
-      yield 4
-    }()))
+    const proxy = override(
+      target,
+      (async function* () {
+        yield 3
+        yield 4
+      })(),
+    )
 
     expect((proxy as any)[Symbol.for('TEST')]).toBe(true)
     expect(await proxy.next()).toEqual({ done: false, value: 3 })
@@ -87,12 +96,18 @@ describe('override', () => {
     it('should handle method overriding correctly', () => {
       const target = vi.fn(() => ({
         name: 'target',
-        getName1() { return `target: ${this.name}` },
-        getName2() { return `target: ${this.name}` },
+        getName1() {
+          return `target: ${this.name}`
+        },
+        getName2() {
+          return `target: ${this.name}`
+        },
       }))
       const overlay = {
         name: 'overlay',
-        getName2() { return `overlay: ${this.name}` },
+        getName2() {
+          return `overlay: ${this.name}`
+        },
       }
       const proxy = override(target, overlay)
 
@@ -102,8 +117,12 @@ describe('override', () => {
       expect(target).toHaveBeenCalledTimes(1)
       target.mockReturnValue({
         name: 'target2',
-        getName1() { return `target: ${this.name}` },
-        getName2() { return `target: ${this.name}` },
+        getName1() {
+          return `target: ${this.name}`
+        },
+        getName2() {
+          return `target: ${this.name}`
+        },
       })
 
       expect(proxy.getName1()).toBe('target: target2')

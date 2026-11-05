@@ -1,8 +1,8 @@
 ---
-title: "Evlog Integration"
-description: "Add structured logging to oRPC with the Evlog integration to trace requests, monitor errors, and inspect application behavior."
+title: 'Evlog Integration'
+description: 'Add structured logging to oRPC with the Evlog integration to trace requests, monitor errors, and inspect application behavior.'
 sidebar:
-  label: "Evlog"
+  label: 'Evlog'
 ---
 
 :::warning
@@ -71,18 +71,17 @@ import { createLoggerStorage } from '@orpc/evlog/node'
  */
 export const { storage, useLogger } = createLoggerStorage()
 
-const procedure = os
-  .handler(async () => {
+const procedure = os.handler(async () => {
+  const logger = useLogger() // [!code highlight]
+
+  logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
+
+  await logger.fork('child-procedure', () => {
     const logger = useLogger() // [!code highlight]
-
-    logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
-
-    await logger.fork('child-procedure', () => {
-      const logger = useLogger() // [!code highlight]
-    })
-
-    return { success: true }
   })
+
+  return { success: true }
+})
 ```
 
 ```ts title="handler setup"
@@ -106,13 +105,11 @@ import { getLogger, LoggerContext } from '@orpc/evlog'
 
 interface ServerContext extends LoggerContext {} // [!code highlight]
 
-const procedure = os
-  .$context<ServerContext>()
-  .handler(({ context }) => {
-    const logger = getLogger(context) // [!code highlight]
+const procedure = os.$context<ServerContext>().handler(({ context }) => {
+  const logger = getLogger(context) // [!code highlight]
 
-    logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
+  logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
 
-    return { success: true }
-  })
+  return { success: true }
+})
 ```

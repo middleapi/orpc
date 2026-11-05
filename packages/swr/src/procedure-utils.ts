@@ -1,6 +1,10 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
+import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
+
+import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key.ts'
+import { generateOperationKey } from './key.ts'
+import { SharedUtils } from './shared-utils.ts'
 import type {
   Fetcher,
   FetcherOptions,
@@ -12,16 +16,17 @@ import type {
   OperationContext,
   Subscriber,
   SubscriberOptions,
-} from './types'
-import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { generateOperationKey } from './key'
-import { SharedUtils } from './shared-utils'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+} from './types.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
-export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {
-}
+export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {}
 
-export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
+export class ProcedureUtils<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> extends SharedUtils<TInput> {
   /**
    * Calling corresponding procedure client
    *
@@ -43,12 +48,13 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#data-fetching | SWR Integration - Data Fetching}
    */
-  key(
-    ...rest: MaybeOptionalOptions<KeyOptions<TInput>>
-  ): OperationKey<TInput> {
+  key(...rest: MaybeOptionalOptions<KeyOptions<TInput>>): OperationKey<TInput> {
     const options = resolveMaybeOptionalOptions(rest)
 
-    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix } as OperationKeyOptions<TInput>)
+    return generateOperationKey(this.path, {
+      ...options,
+      prefix: this.options.prefix,
+    } as OperationKeyOptions<TInput>)
   }
 
   /**
@@ -56,9 +62,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#data-fetching | SWR Integration - Data Fetching}
    */
-  fetcher(
-    ...rest: MaybeOptionalOptions<FetcherOptions<TClientContext>>
-  ): Fetcher<TInput, TOutput> {
+  fetcher(...rest: MaybeOptionalOptions<FetcherOptions<TClientContext>>): Fetcher<TInput, TOutput> {
     const options = resolveMaybeOptionalOptions(rest)
 
     return async (key) => {
@@ -119,8 +123,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
           if (refetchMode === 'reset') {
             next(undefined, undefined)
-          }
-          else if (refetchMode === 'replace') {
+          } else if (refetchMode === 'replace') {
             /**
              * The updater is invoked synchronously with the current data,
              * so we can use it to detect whether previous data exists.
@@ -149,8 +152,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
                 return newData as InferSubscriberOutput<TOutput>
               })
-            }
-            else {
+            } else {
               buffer = [...buffer, event]
 
               if (typeof maxChunks === 'number' && buffer.length > maxChunks) {
@@ -162,8 +164,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           if (!shouldUpdateDataDuringStream && !controller.signal.aborted) {
             next(undefined, buffer as InferSubscriberOutput<TOutput>)
           }
-        }
-        catch (error) {
+        } catch (error) {
           /**
            * Only report the error if the controller is not aborted.
            */
@@ -224,8 +225,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
             next(undefined, event as InferLiveSubscriberOutput<TOutput>)
           }
-        }
-        catch (error) {
+        } catch (error) {
           /**
            * Only report the error if the controller is not aborted.
            */
@@ -246,16 +246,15 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#mutations | SWR Integration - Mutations}
    */
-  mutator(
-    ...rest: MaybeOptionalOptions<MutatorOptions<TClientContext>>
-  ): Mutator<TInput, TOutput> {
+  mutator(...rest: MaybeOptionalOptions<MutatorOptions<TClientContext>>): Mutator<TInput, TOutput> {
     const options = resolveMaybeOptionalOptions(rest)
 
-    return (key, { arg }) => this.call(arg, {
-      context: {
-        [OPERATION_CONTEXT_SYMBOL]: { key, type: 'mutator' },
-        ...options.context,
-      } satisfies OperationContext as any,
-    })
+    return (key, { arg }) =>
+      this.call(arg, {
+        context: {
+          [OPERATION_CONTEXT_SYMBOL]: { key, type: 'mutator' },
+          ...options.context,
+        } satisfies OperationContext as any,
+      })
   }
 }

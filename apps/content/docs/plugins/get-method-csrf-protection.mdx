@@ -1,22 +1,22 @@
 ---
-title: "GET Method CSRF Protection Plugin"
-description: "Use GetMethodCsrfProtectionHandlerPlugin to make GET as secure as POST by rejecting cross-site navigations that may carry SameSite=Lax cookies."
+title: 'GET Method CSRF Protection Plugin'
+description: 'Use GetMethodCsrfProtectionHandlerPlugin to make GET as secure as POST by rejecting cross-site navigations that may carry SameSite=Lax cookies.'
 sidebar:
-  label: "GET Method CSRF Protection"
+  label: 'GET Method CSRF Protection'
 ---
 
 ## How It Works
 
 Cross-site, browsers withhold explicitly marked [`SameSite=Lax`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#samesitesamesite-value) cookies from unsafe methods such as `POST`, but still attach them to [safe methods](https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP) like `GET` on top-level navigations, per [RFC 6265bis](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/). The plugin closes that gap by rejecting exactly those navigations with a `403`:
 
-| Request from another site | Sends `SameSite=Lax` cookies | |
-| --- | --- | --- |
-| link click, redirect, `window.open`, GET form | yes | rejected |
-| address bar, bookmark, link from an email or native app | yes | rejected |
-| `fetch`, `XMLHttpRequest` | no | allowed, CORS governs the response |
-| `<img>`, `<script>`, media, prefetch | no | allowed |
-| `<iframe>`, `<embed>`, `<object>`, which are not top-level | no | allowed |
-| any method other than `GET` | no | ignored |
+| Request from another site                                  | Sends `SameSite=Lax` cookies |                                    |
+| ---------------------------------------------------------- | ---------------------------- | ---------------------------------- |
+| link click, redirect, `window.open`, GET form              | yes                          | rejected                           |
+| address bar, bookmark, link from an email or native app    | yes                          | rejected                           |
+| `fetch`, `XMLHttpRequest`                                  | no                           | allowed, CORS governs the response |
+| `<img>`, `<script>`, media, prefetch                       | no                           | allowed                            |
+| `<iframe>`, `<embed>`, `<object>`, which are not top-level | no                           | allowed                            |
+| any method other than `GET`                                | no                           | ignored                            |
 
 The verdict comes from [Fetch Metadata](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers#fetch_metadata_request_headers): a `GET` request is rejected when [`Sec-Fetch-Site`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-Fetch-Site) reports `cross-site` or `none` on a top-level navigation (`Sec-Fetch-Mode: navigate` targeting `Sec-Fetch-Dest: document`). A guarded request stripped of either header is rejected. Only `GET` needs guarding, since [navigations use no method](https://html.spec.whatwg.org/multipage/browsing-the-web.html) besides `GET` and the unsafe `POST`. The result resembles upgrading your cookies to `SameSite=Strict` for safe methods, and also covers links opened from outside the browser, where browsers attach even `Strict` cookies.
 
@@ -35,9 +35,7 @@ import { RPC_DEFAULT_ALLOW_METHODS } from '@orpc/server/standard'
 
 const handler = new RPCHandler(router, {
   allowMethods: ['GET', ...RPC_DEFAULT_ALLOW_METHODS],
-  plugins: [
-    new GetMethodCsrfProtectionHandlerPlugin(),
-  ],
+  plugins: [new GetMethodCsrfProtectionHandlerPlugin()],
 })
 ```
 

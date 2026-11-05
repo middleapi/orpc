@@ -1,5 +1,6 @@
 import { NullProtoObj } from '@orpc/shared'
-import { MalformedResponseError, ORPCError, ResponseError } from './error'
+
+import { MalformedResponseError, ORPCError, ResponseError } from './error.ts'
 
 describe('oRPCError', () => {
   it('works', () => {
@@ -43,6 +44,7 @@ describe('oRPCError', () => {
 
   it('instanceof should behave as normal', () => {
     class ExtendedORPCError extends ORPCError<any, any> {}
+    // oxlint-disable-next-line typescript/no-extraneous-class
     class NotRelated {}
 
     const orpcError = new ORPCError('test')
@@ -113,7 +115,11 @@ describe('oRPCError', () => {
 
 describe('responseError', () => {
   it('works', () => {
-    const response = { status: 404, headers: { 'x-request-id': 'abc' }, body: { message: 'ignored' } }
+    const response = {
+      status: 404,
+      headers: { 'x-request-id': 'abc' },
+      body: { message: 'ignored' },
+    }
     const cause = new Error('cause')
     const error = new ResponseError({ message: 'custom message', response, cause })
 
@@ -127,7 +133,9 @@ describe('responseError', () => {
   })
 
   it('infers message from the response status', () => {
-    const error = new ResponseError({ response: { status: 404, headers: {}, body: { message: 'ignored' } } })
+    const error = new ResponseError({
+      response: { status: 404, headers: {}, body: { message: 'ignored' } },
+    })
 
     expect(error.message).toBe('Received a 404 response.')
     expect('cause' in error).toBe(false)
@@ -136,9 +144,17 @@ describe('responseError', () => {
 
 describe('malformedResponseError', () => {
   it('works', () => {
-    const response = { status: 500, headers: { 'x-header': 'value' }, body: { something: 'unexpected' } }
+    const response = {
+      status: 500,
+      headers: { 'x-header': 'value' },
+      body: { something: 'unexpected' },
+    }
     const cause = new Error('deserialize failed')
-    const error = new MalformedResponseError({ message: 'Invalid RPC response format.', response, cause })
+    const error = new MalformedResponseError({
+      message: 'Invalid RPC response format.',
+      response,
+      cause,
+    })
 
     expect(error).toBeInstanceOf(Error)
     expect(error).toBeInstanceOf(ResponseError)
@@ -150,21 +166,39 @@ describe('malformedResponseError', () => {
   })
 
   it('infers message from a string body', () => {
-    const error = new MalformedResponseError({ response: { status: 500, headers: {}, body: 'upstream exploded' } })
+    const error = new MalformedResponseError({
+      response: { status: 500, headers: {}, body: 'upstream exploded' },
+    })
 
     expect(error.message).toBe('upstream exploded')
   })
 
   it('infers message from body.message', () => {
-    const error = new MalformedResponseError({ response: { status: 500, headers: {}, body: { message: 'upstream exploded', detail: 'ignored' } } })
+    const error = new MalformedResponseError({
+      response: {
+        status: 500,
+        headers: {},
+        body: { message: 'upstream exploded', detail: 'ignored' },
+      },
+    })
 
     expect(error.message).toBe('upstream exploded')
   })
 
   it('infers message from a common error code matching the status', () => {
-    expect(new MalformedResponseError({ response: { status: 404, headers: {}, body: { detail: 'no message here' } } }).message).toBe('Not Found')
-    expect(new MalformedResponseError({ response: { status: 503, headers: {}, body: undefined } }).message).toBe('Service Unavailable')
-    expect(new MalformedResponseError({ response: { status: 411, headers: {}, body: undefined } }).message).toBe('Length Required')
+    expect(
+      new MalformedResponseError({
+        response: { status: 404, headers: {}, body: { detail: 'no message here' } },
+      }).message,
+    ).toBe('Not Found')
+    expect(
+      new MalformedResponseError({ response: { status: 503, headers: {}, body: undefined } })
+        .message,
+    ).toBe('Service Unavailable')
+    expect(
+      new MalformedResponseError({ response: { status: 411, headers: {}, body: undefined } })
+        .message,
+    ).toBe('Length Required')
   })
 
   it.each([
@@ -174,9 +208,12 @@ describe('malformedResponseError', () => {
     ['oversized body.message', { message: 'x'.repeat(257) }],
     ['non-string body.message', { message: 42 }],
     ['non-object body', 42],
-  ])('falls back to the default message when the status is uncommon and the body has no message (%s)', (_, body) => {
-    const error = new MalformedResponseError({ response: { status: 599, headers: {}, body } })
+  ])(
+    'falls back to the default message when the status is uncommon and the body has no message (%s)',
+    (_, body) => {
+      const error = new MalformedResponseError({ response: { status: 599, headers: {}, body } })
 
-    expect(error.message).toBe('Malformed oRPC Response')
-  })
+      expect(error.message).toBe('Malformed oRPC Response')
+    },
+  )
 })

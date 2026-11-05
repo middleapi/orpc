@@ -1,52 +1,48 @@
 {
   "name": "@orpc/zod",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Zod integration for oRPC: convert Zod schemas into JSON Schema for OpenAPI generation",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "json-schema",
+    "openapi",
+    "orpc",
+    "typesafe",
+    "typescript",
+    "validation",
+    "zod"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/zod"
   },
-  "keywords": [
-    "orpc",
-    "zod",
-    "json-schema",
-    "openapi",
-    "validation",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "zod": ">=4.5.0"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@openapi-spec/types": "~0.6.0",
@@ -54,5 +50,8 @@
   },
   "devDependencies": {
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "zod": ">=4.5.0"
   }
 }

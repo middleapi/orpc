@@ -1,32 +1,32 @@
-export * from './batch'
-export * from './cookie-jar'
-export * from './dedupe'
+export * from './batch.ts'
+export * from './cookie-jar.ts'
+export * from './dedupe.ts'
 export {
   /**
    * @deprecated Use `DedupeLinkPlugin` instead.
    */
   DedupeLinkPlugin as DedupeRequestsPlugin,
-} from './dedupe'
-export * from './request-compression'
-export * from './response-compression'
-export * from './retry'
+} from './dedupe.ts'
+export * from './request-compression.ts'
+export * from './response-compression.ts'
+export * from './retry.ts'
 export {
   /**
    * @deprecated Use `RetryLinkPlugin` instead.
    */
   RetryLinkPlugin as ClientRetryPlugin,
-} from './retry'
+} from './retry.ts'
 export type {
   /**
    * @deprecated Use `RetryLinkPluginContext` instead.
    */
   RetryLinkPluginContext as ClientRetryPluginContext,
-} from './retry'
-export * from './retry-after'
+} from './retry.ts'
+export * from './retry-after.ts'
 export {
   /**
    * @deprecated Use `RetryAfterLinkPlugin` instead.
    */
   RetryAfterLinkPlugin as RetryAfterPlugin,
-} from './retry-after'
-export * from './timeout'
+} from './retry-after.ts'
+export * from './timeout.ts'

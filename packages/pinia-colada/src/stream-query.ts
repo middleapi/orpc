@@ -1,5 +1,6 @@
 import type { Promisable } from '@orpc/shared'
-import type { UseQueryFnContext } from './types'
+
+import type { UseQueryFnContext } from './types.ts'
 
 export interface SerializableStreamedQueryOptions {
   /**
@@ -31,10 +32,11 @@ export interface SerializableStreamedQueryOptions {
  * - The output is predictable
  */
 export function serializableStreamedQuery<T>(
-  queryFn: (
-    context: UseQueryFnContext,
-  ) => Promisable<AsyncIterable<T>>,
-  { refetchMode = 'reset', maxChunks = Number.POSITIVE_INFINITY }: SerializableStreamedQueryOptions = {},
+  queryFn: (context: UseQueryFnContext) => Promisable<AsyncIterable<T>>,
+  {
+    refetchMode = 'reset',
+    maxChunks = Number.POSITIVE_INFINITY,
+  }: SerializableStreamedQueryOptions = {},
 ): (context: UseQueryFnContext) => Promise<T[]> {
   return async (context) => {
     const { entry, signal } = context
@@ -55,9 +57,8 @@ export function serializableStreamedQuery<T>(
 
     const shouldUpdateCacheDuringStream = !hasPreviousData || refetchMode !== 'replace'
 
-    let result: T[] = hasPreviousData && refetchMode === 'append'
-      ? limitArraySize(previousData, maxChunks)
-      : []
+    let result: T[] =
+      hasPreviousData && refetchMode === 'append' ? limitArraySize(previousData, maxChunks) : []
 
     if (shouldUpdateCacheDuringStream) {
       entry.state.value = { status: 'success', data: result, error: null } as any

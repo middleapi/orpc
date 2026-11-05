@@ -1,12 +1,17 @@
 import type { AddressInfo } from 'node:net'
-import type { CreateClientServerTest } from './client-server'
+
 import { serve } from '@hono/node-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
-import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
-import { defaultSerializer } from './client-server'
+import {
+  RequestCompressionHandlerPlugin,
+  ResponseCompressionHandlerPlugin,
+} from '@orpc/server/plugins'
+
+import type { CreateClientServerTest } from './client-server.ts'
+import { defaultSerializer } from './client-server.ts'
 
 export const createCompressionHonoFetchClientServerTest: CreateClientServerTest = (
   router,

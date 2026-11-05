@@ -1,9 +1,10 @@
-import z from 'zod'
-import { os } from './builder'
-import * as ProcedureClientModule from './procedure-client'
-import * as ProcedureUtilsModule from './procedure-utils'
-import { createRouterClient } from './router-client'
-import * as RouterUtilsModule from './router-utils'
+import * as z from 'zod'
+
+import { os } from './builder.ts'
+import * as ProcedureClientModule from './procedure-client.ts'
+import * as ProcedureUtilsModule from './procedure-utils.ts'
+import { createRouterClient } from './router-client.ts'
+import * as RouterUtilsModule from './router-utils.ts'
 
 const createProcedureClientSpy = vi.spyOn(ProcedureClientModule, 'createProcedureClient')
 const createGuardedProcedureLazySpy = vi.spyOn(ProcedureUtilsModule, 'createGuardedProcedureLazy')
@@ -16,20 +17,29 @@ const errorMap = {
 }
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
-const schema3 = z.object({ schema3: z.boolean().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
+const schema3 = z.object({ schema3: z.boolean().transform((n) => `${n}`) })
 
 const router = {
-  ping: os.input(schema1).output(schema2).handler(() => ({ schema2: 1 })),
+  ping: os
+    .input(schema1)
+    .output(schema2)
+    .handler(() => ({ schema2: 1 })),
   nested: os.router({
-    pong: os.input(schema3).output(schema2).errors(errorMap).handler(() => ({ schema2: 2 })),
+    pong: os
+      .input(schema3)
+      .output(schema2)
+      .errors(errorMap)
+      .handler(() => ({ schema2: 2 })),
   }),
-  lazy: os.lazy(() => Promise.resolve({
-    default: {
-      peng: os.input(schema1).handler(() => 'output'),
-    },
-  })),
+  lazy: os.lazy(() =>
+    Promise.resolve({
+      default: {
+        peng: os.input(schema1).handler(() => 'output'),
+      },
+    }),
+  ),
 }
 
 beforeEach(() => {
@@ -43,7 +53,10 @@ describe('createRouterClient', () => {
   it('procedure at root level', () => {
     const pingClient = client.ping
     expect(createProcedureClientSpy).toHaveBeenCalledTimes(1)
-    expect(createProcedureClientSpy).toHaveBeenCalledWith(router.ping, { ...options, path: ['ping'] })
+    expect(createProcedureClientSpy).toHaveBeenCalledWith(router.ping, {
+      ...options,
+      path: ['ping'],
+    })
 
     expect(pingClient).toBe(createProcedureClientSpy.mock.results[0]!.value)
   })
@@ -51,7 +64,10 @@ describe('createRouterClient', () => {
   it('procedure inside nested router', () => {
     const pongClient = client.nested.pong
     expect(createProcedureClientSpy).toHaveBeenCalledTimes(1)
-    expect(createProcedureClientSpy).toHaveBeenCalledWith(router.nested.pong, { ...options, path: ['nested', 'pong'] })
+    expect(createProcedureClientSpy).toHaveBeenCalledWith(router.nested.pong, {
+      ...options,
+      path: ['nested', 'pong'],
+    })
 
     expect(pongClient).toBe(createProcedureClientSpy.mock.results[0]!.value)
   })
@@ -67,7 +83,10 @@ describe('createRouterClient', () => {
     expect(getRouterSpy).toHaveBeenNthCalledWith(2, router.lazy, ['peng'])
 
     expect(createGuardedProcedureLazySpy).toHaveBeenCalledTimes(2)
-    expect(createGuardedProcedureLazySpy).toHaveBeenNthCalledWith(2, getRouterSpy.mock.results[1]!.value)
+    expect(createGuardedProcedureLazySpy).toHaveBeenNthCalledWith(
+      2,
+      getRouterSpy.mock.results[1]!.value,
+    )
 
     expect(createProcedureClientSpy).toHaveBeenCalledTimes(2)
     expect(createProcedureClientSpy).toHaveBeenNthCalledWith(

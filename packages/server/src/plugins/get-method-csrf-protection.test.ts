@@ -1,9 +1,10 @@
 import { ORPCError } from '@orpc/client'
-import { RPCHandler } from '../adapters/fetch/rpc-handler'
-import { RPC_DEFAULT_ALLOW_METHODS } from '../adapters/standard'
-import { os } from '../builder'
-import { BatchHandlerPlugin } from './batch'
-import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection'
+
+import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
+import { RPC_DEFAULT_ALLOW_METHODS } from '../adapters/standard/index.ts'
+import { os } from '../builder.ts'
+import { BatchHandlerPlugin } from './batch.ts'
+import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection.ts'
 
 function makeRequest(headers: Record<string, unknown>, method: string) {
   return {
@@ -33,7 +34,8 @@ function invokeInterceptor(headers: Record<string, unknown>, method = 'GET') {
   const next = vi.fn().mockResolvedValue(nextResult)
   const { interceptor } = getPlugin()
 
-  const result = (async () => interceptor({ context: {}, request: makeRequest(headers, method), next } as any))()
+  const result = (async () =>
+    interceptor({ context: {}, request: makeRequest(headers, method), next } as any))()
 
   return { result, next, nextResult }
 }
@@ -48,10 +50,12 @@ async function expectAllowed(headers: Record<string, unknown>, method = 'GET') {
 async function expectBlocked(headers: Record<string, unknown>, method = 'GET') {
   const { result, next } = invokeInterceptor(headers, method)
 
-  await expect(result).rejects.toSatisfy(error =>
-    error instanceof ORPCError
-    && error.code === 'FORBIDDEN'
-    && error.message === 'Request blocked by CSRF protection.')
+  await expect(result).rejects.toSatisfy(
+    (error) =>
+      error instanceof ORPCError &&
+      error.code === 'FORBIDDEN' &&
+      error.message === 'Request blocked by CSRF protection.',
+  )
   expect(next).not.toHaveBeenCalled()
 }
 
@@ -77,13 +81,12 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
   })
 
   describe('guarded methods', () => {
-    it.each([
-      'POST',
-      'HEAD',
-      'QUERY',
-    ])('ignores %s requests, which never carry cross-site SameSite=Lax cookies', async (method) => {
-      await expectAllowed(CROSS_SITE_NAVIGATION, method)
-    })
+    it.each(['POST', 'HEAD', 'QUERY'])(
+      'ignores %s requests, which never carry cross-site SameSite=Lax cookies',
+      async (method) => {
+        await expectAllowed(CROSS_SITE_NAVIGATION, method)
+      },
+    )
 
     it('guards GET requests', async () => {
       await expectBlocked(CROSS_SITE_NAVIGATION, 'GET')
@@ -101,35 +104,53 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
   })
 
   describe('fetch site', () => {
-    it.each([
-      'same-origin',
-      'SAME-ORIGIN',
-      'same-site',
-    ])('trusts even a navigation when sec-fetch-site is %s', async (site) => {
-      await expectAllowed({ ...CROSS_SITE_NAVIGATION, 'sec-fetch-site': site })
-    })
+    it.each(['same-origin', 'SAME-ORIGIN', 'same-site'])(
+      'trusts even a navigation when sec-fetch-site is %s',
+      async (site) => {
+        await expectAllowed({ ...CROSS_SITE_NAVIGATION, 'sec-fetch-site': site })
+      },
+    )
 
     it('judges an unrecognized sec-fetch-site value like a cross-site one', async () => {
       await expectBlocked({ ...CROSS_SITE_NAVIGATION, 'sec-fetch-site': 'future-value' })
     })
 
     it('judges a repeated sec-fetch-site header like a cross-site one', async () => {
-      await expectBlocked({ ...CROSS_SITE_NAVIGATION, 'sec-fetch-site': ['same-site', 'same-site'] })
+      await expectBlocked({
+        ...CROSS_SITE_NAVIGATION,
+        'sec-fetch-site': ['same-site', 'same-site'],
+      })
     })
   })
 
   describe('cross-site and browser-initiated navigations', () => {
     it.each([
       ['a link click or redirect', CROSS_SITE_NAVIGATION],
-      ['a link click matching header casing loosely', { 'sec-fetch-site': 'Cross-Site', 'sec-fetch-mode': 'Navigate', 'sec-fetch-dest': 'Document' }],
-      ['an address-bar, bookmark, email, or native-app navigation', { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }],
+      [
+        'a link click matching header casing loosely',
+        {
+          'sec-fetch-site': 'Cross-Site',
+          'sec-fetch-mode': 'Navigate',
+          'sec-fetch-dest': 'Document',
+        },
+      ],
+      [
+        'an address-bar, bookmark, email, or native-app navigation',
+        { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
+      ],
     ])('blocks %s', async (_, headers) => {
       await expectBlocked(headers)
     })
 
     it.each([
-      ['sec-fetch-mode is stripped', { 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'document' }],
-      ['sec-fetch-dest is stripped', { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' }],
+      [
+        'sec-fetch-mode is stripped',
+        { 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'document' },
+      ],
+      [
+        'sec-fetch-dest is stripped',
+        { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
+      ],
       ['both are stripped', { 'sec-fetch-site': 'cross-site' }],
     ])('treats a stripped header as its dangerous value when %s', async (_, headers) => {
       await expectBlocked(headers)
@@ -138,11 +159,34 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
 
   describe('cross-site requests browsers send without SameSite=Lax cookies', () => {
     it.each([
-      ['a fetch or XMLHttpRequest', { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }],
-      ['an <img>, <script>, media, or prefetch load', { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': 'image' }],
-      ['an <iframe>, <embed>, or <object> load, which is not top-level', { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'iframe' }],
-      ['a WebSocket handshake', { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'websocket', 'sec-fetch-dest': 'empty' }],
-      ['a browser-extension fetch', { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }],
+      [
+        'a fetch or XMLHttpRequest',
+        { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      ],
+      [
+        'an <img>, <script>, media, or prefetch load',
+        { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': 'image' },
+      ],
+      [
+        'an <iframe>, <embed>, or <object> load, which is not top-level',
+        {
+          'sec-fetch-site': 'cross-site',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-dest': 'iframe',
+        },
+      ],
+      [
+        'a WebSocket handshake',
+        {
+          'sec-fetch-site': 'cross-site',
+          'sec-fetch-mode': 'websocket',
+          'sec-fetch-dest': 'empty',
+        },
+      ],
+      [
+        'a browser-extension fetch',
+        { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      ],
     ])('allows %s', async (_, headers) => {
       await expectAllowed(headers)
     })
@@ -152,10 +196,13 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
     const deletePlanet = vi.fn(() => 'deleted')
 
     function createHandler(extraPlugins: any[] = []) {
-      return new RPCHandler({ deletePlanet: os.handler(deletePlanet) }, {
-        allowMethods: ['GET', ...RPC_DEFAULT_ALLOW_METHODS],
-        plugins: [new GetMethodCsrfProtectionHandlerPlugin(), ...extraPlugins],
-      })
+      return new RPCHandler(
+        { deletePlanet: os.handler(deletePlanet) },
+        {
+          allowMethods: ['GET', ...RPC_DEFAULT_ALLOW_METHODS],
+          plugins: [new GetMethodCsrfProtectionHandlerPlugin(), ...extraPlugins],
+        },
+      )
     }
 
     function createGetRequest(headers: Record<string, string>) {
@@ -163,7 +210,9 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
     }
 
     it('blocks a cross-site link or redirect with a parseable FORBIDDEN error', async () => {
-      const { matched, response } = await createHandler().handle(createGetRequest(CROSS_SITE_NAVIGATION))
+      const { matched, response } = await createHandler().handle(
+        createGetRequest(CROSS_SITE_NAVIGATION),
+      )
 
       expect(matched).toBe(true)
       expect(response!.status).toBe(403)
@@ -174,9 +223,22 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
     })
 
     it.each([
-      ['a cross-site fetch, where browsers withhold SameSite=Lax cookies', { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }],
-      ['a same-site fetch from a sibling subdomain', { 'sec-fetch-site': 'same-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }],
-      ['a same-origin navigation', { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }],
+      [
+        'a cross-site fetch, where browsers withhold SameSite=Lax cookies',
+        { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      ],
+      [
+        'a same-site fetch from a sibling subdomain',
+        { 'sec-fetch-site': 'same-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      ],
+      [
+        'a same-origin navigation',
+        {
+          'sec-fetch-site': 'same-origin',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-dest': 'document',
+        },
+      ],
       ['a non-browser client', {}],
     ])('allows %s', async (_, headers) => {
       const { response } = await createHandler().handle(createGetRequest(headers))
@@ -208,40 +270,53 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
     })
 
     describe('batch sub-requests', () => {
-      function createBatchRequest(handler: RPCHandler<any>, transportHeaders: Record<string, string>) {
-        const data = encodeURIComponent(JSON.stringify([{
-          kind: 'request',
-          id: '0',
-          json: {
-            method: 'GET',
-            url: '/deletePlanet',
-            // the client picks these, so they must not be able to overturn the verdict
-            headers: { 'sec-fetch-site': 'same-origin' },
-          },
-          binary: undefined,
-        }]))
+      function createBatchRequest(
+        handler: RPCHandler<any>,
+        transportHeaders: Record<string, string>,
+      ) {
+        const data = encodeURIComponent(
+          JSON.stringify([
+            {
+              kind: 'request',
+              id: '0',
+              json: {
+                method: 'GET',
+                url: '/deletePlanet',
+                // the client picks these, so they must not be able to overturn the verdict
+                headers: { 'sec-fetch-site': 'same-origin' },
+              },
+              binary: undefined,
+            },
+          ]),
+        )
 
-        return handler.handle(new Request(`https://api.example.com/__batch__?data=${data}`, {
-          headers: { 'orpc-batch': '1', ...transportHeaders },
-        }))
+        return handler.handle(
+          new Request(`https://api.example.com/__batch__?data=${data}`, {
+            headers: { 'orpc-batch': '1', ...transportHeaders },
+          }),
+        )
       }
 
       it('judges sub-requests by the transport headers, which override the client-authored ones', async () => {
-        const { response } = await createBatchRequest(createHandler([new BatchHandlerPlugin()]), CROSS_SITE_NAVIGATION)
+        const { response } = await createBatchRequest(
+          createHandler([new BatchHandlerPlugin()]),
+          CROSS_SITE_NAVIGATION,
+        )
 
-        const body = await response!.json() as any
+        const body = (await response!.json()) as any
         expect(body[0]).toMatchObject({ kind: 'response', id: '0' })
         expect(body[0].json.status).toBe(403)
         expect(deletePlanet).not.toHaveBeenCalled()
       })
 
       it('allows sub-requests of a cross-site fetch batch', async () => {
-        const { response } = await createBatchRequest(
-          createHandler([new BatchHandlerPlugin()]),
-          { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
-        )
+        const { response } = await createBatchRequest(createHandler([new BatchHandlerPlugin()]), {
+          'sec-fetch-site': 'cross-site',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-dest': 'empty',
+        })
 
-        const body = await response!.json() as any
+        const body = (await response!.json()) as any
         expect(body[0].json.status).not.toBe(403)
         expect(deletePlanet).toHaveBeenCalledOnce()
       })

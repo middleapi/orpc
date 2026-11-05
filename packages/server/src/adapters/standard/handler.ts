@@ -1,15 +1,32 @@
+import { ORPCError, toORPCError } from '@orpc/client'
 import type { ErrorMap, Schema } from '@orpc/contract'
 import type { Interceptor, Promisable, Value } from '@orpc/shared'
+import {
+  getTracer,
+  intercept,
+  isAsyncIteratorObject,
+  matchesHttpPathPrefix,
+  ORPC_NAME,
+  override,
+  recordSpanError,
+  runWithSpan,
+  toArray,
+  toTracingException,
+  traceAsyncIterator,
+  traceReadableStream,
+  value,
+  wrapAsyncIterator,
+  wrapReadableStream,
+} from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { Context } from '../../context'
-import type { ProcedureClientInterceptor } from '../../procedure-client'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
-import type { StandardHandlerPlugin } from './plugin'
-import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
-import { createProcedureClient } from '../../procedure-client'
-import { CompositeStandardHandlerPlugin } from './plugin'
+
+import type { Context } from '../../context.ts'
+import type { ProcedureClientInterceptor } from '../../procedure-client.ts'
+import { createProcedureClient } from '../../procedure-client.ts'
+import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec.ts'
+import type { StandardHandlerPlugin } from './plugin.ts'
+import { CompositeStandardHandlerPlugin } from './plugin.ts'
 
 export interface StandardHandlerHandleOptions<T extends Context> {
   prefix?: `/${string}` | undefined
@@ -24,21 +41,35 @@ export interface StandardHandlerHandleOptions<T extends Context> {
  * `StandardHandlerHandleOptions` after the context has been resolved,
  * this is what interceptors and codecs receive.
  */
-export interface ResolvedStandardHandlerHandleOptions<T extends Context> extends Omit<StandardHandlerHandleOptions<T>, 'context'> {
+export interface ResolvedStandardHandlerHandleOptions<T extends Context> extends Omit<
+  StandardHandlerHandleOptions<T>,
+  'context'
+> {
   context: T
 }
 
-export type StandardHandlerHandleResult = { matched: true, response: StandardResponse } | { matched: false, response?: undefined }
+export type StandardHandlerHandleResult =
+  | { matched: true; response: StandardResponse }
+  | { matched: false; response?: undefined }
 
-export interface StandardHandlerInterceptorOptions<T extends Context> extends StandardHandlerCodecResolvedProcedure, ResolvedStandardHandlerHandleOptions<T> {
+export interface StandardHandlerInterceptorOptions<T extends Context>
+  extends StandardHandlerCodecResolvedProcedure, ResolvedStandardHandlerHandleOptions<T> {
   request: StandardLazyRequest
 }
-export type StandardHandlerInterceptor<T extends Context> = Interceptor<StandardHandlerInterceptorOptions<T>, Promise<StandardResponse>>
+export type StandardHandlerInterceptor<T extends Context> = Interceptor<
+  StandardHandlerInterceptorOptions<T>,
+  Promise<StandardResponse>
+>
 
-export interface StandardHandlerRoutingInterceptorOptions<T extends Context> extends ResolvedStandardHandlerHandleOptions<T> {
+export interface StandardHandlerRoutingInterceptorOptions<
+  T extends Context,
+> extends ResolvedStandardHandlerHandleOptions<T> {
   request: StandardLazyRequest
 }
-export type StandardHandlerRoutingInterceptor<T extends Context> = Interceptor<StandardHandlerRoutingInterceptorOptions<T>, Promise<StandardHandlerHandleResult>>
+export type StandardHandlerRoutingInterceptor<T extends Context> = Interceptor<
+  StandardHandlerRoutingInterceptorOptions<T>,
+  Promise<StandardHandlerHandleResult>
+>
 
 export interface StandardHandlerOptions<TContext extends Context> {
   /**
@@ -86,14 +117,17 @@ export class StandardHandler<T extends Context> {
     this.clientInterceptors = options.clientInterceptors
   }
 
-  async handle(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerHandleResult> {
+  async handle(
+    request: StandardLazyRequest,
+    options: StandardHandlerHandleOptions<T>,
+  ): Promise<StandardHandlerHandleResult> {
     const { prefix } = options
 
     if (prefix && !matchesHttpPathPrefix(request.url, prefix)) {
       return { matched: false, response: undefined }
     }
 
-    const context = await value(options.context, request) as T
+    const context = (await value(options.context, request)) as T
 
     return intercept(
       this.routingInterceptors,
@@ -103,7 +137,9 @@ export class StandardHandler<T extends Context> {
 
         let step: 'decode_input' | 'call_procedure' | undefined
 
-        const matchedOrNot = await runWithSpan('find_procedure', () => this.codec.resolveProcedure(request, { context, prefix }))
+        const matchedOrNot = await runWithSpan('find_procedure', () =>
+          this.codec.resolveProcedure(request, { context, prefix }),
+        )
 
         if (!matchedOrNot) {
           /**
@@ -140,10 +176,11 @@ export class StandardHandler<T extends Context> {
                  * @warning
                  * Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
-                input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
-              }
-
-              else if (getTracer() && input instanceof ReadableStream) {
+                input = override(
+                  input,
+                  traceAsyncIterator('consume_async_iterator_object_input', input),
+                )
+              } else if (getTracer() && input instanceof ReadableStream) {
                 /**
                  * @warning
                  * Remember use `override` for ReadableStream to remain other special properties
@@ -167,15 +204,17 @@ export class StandardHandler<T extends Context> {
               })
               step = undefined
 
-              const response = await this.codec.encodeOutput(output, procedure, path, { context, prefix })
+              const response = await this.codec.encodeOutput(output, procedure, path, {
+                context,
+                prefix,
+              })
 
               return response
             },
           )
 
           return { matched: true, response }
-        }
-        catch (e) {
+        } catch (e) {
           /**
            * Only errors that happen outside of the `call_procedure` step should be set as an error.
            * Because a business logic error should not be considered as a protocol-level error.
@@ -184,12 +223,13 @@ export class StandardHandler<T extends Context> {
             recordSpanError(span, e)
           }
 
-          const error = step === 'decode_input' && !(e instanceof ORPCError)
-            ? new ORPCError('BAD_REQUEST', {
-                message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                cause: e,
-              })
-            : toORPCError(e)
+          const error =
+            step === 'decode_input' && !(e instanceof ORPCError)
+              ? new ORPCError('BAD_REQUEST', {
+                  message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                  cause: e,
+                })
+              : toORPCError(e)
 
           const response = await this.codec.encodeError(error, procedure, path, { context, prefix })
 
@@ -242,22 +282,25 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                      * @remarks
                      * **Warning**: Remember use `override` for remaining special properties
                      */
-                    body: override(body, wrapAsyncIterator(body, {
-                      runWith: fn => tracer.withActiveSpan(span, fn),
-                      onError(error) {
-                        /**
-                         * Errors here are internal (interceptor/framework) failures,
-                         * except `ErrorEvent`: a business error the protocol delivers
-                         * inside the event stream, already logged by the client interceptor.
-                         */
-                        if (!(error instanceof ErrorEvent)) {
-                          span.recordException('error', toTracingException(error))
-                        }
-                      },
-                      onFinish() {
-                        span.end()
-                      },
-                    })),
+                    body: override(
+                      body,
+                      wrapAsyncIterator(body, {
+                        runWith: (fn) => tracer.withActiveSpan(span, fn),
+                        onError(error) {
+                          /**
+                           * Errors here are internal (interceptor/framework) failures,
+                           * except `ErrorEvent`: a business error the protocol delivers
+                           * inside the event stream, already logged by the client interceptor.
+                           */
+                          if (!(error instanceof ErrorEvent)) {
+                            span.recordException('error', toTracingException(error))
+                          }
+                        },
+                        onFinish() {
+                          span.end()
+                        },
+                      }),
+                    ),
                   },
                 }
               }
@@ -271,27 +314,29 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                      * @remarks
                      * **Warning**: Remember use `override` for remaining special properties
                      */
-                    body: override(body, wrapReadableStream(body, {
-                      runWith: fn => tracer.withActiveSpan(span, fn),
-                      onError(error) {
-                        /**
-                         * Any error here is internal (interceptor/framework), not business logic.
-                         * Indicates unexpected handler failure.
-                         */
-                        span.recordException('error', toTracingException(error))
-                      },
-                      onFinish() {
-                        span.end()
-                      },
-                    })),
+                    body: override(
+                      body,
+                      wrapReadableStream(body, {
+                        runWith: (fn) => tracer.withActiveSpan(span, fn),
+                        onError(error) {
+                          /**
+                           * Any error here is internal (interceptor/framework), not business logic.
+                           * Indicates unexpected handler failure.
+                           */
+                          span.recordException('error', toTracingException(error))
+                        },
+                        onFinish() {
+                          span.end()
+                        },
+                      }),
+                    ),
                   },
                 }
               }
 
               span.end()
               return result
-            }
-            catch (e) {
+            } catch (e) {
               /**
                * Any error here is internal (interceptor/framework), not business logic.
                * Always recorded as an error, even when it is an abort error.

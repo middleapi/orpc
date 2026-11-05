@@ -1,60 +1,33 @@
 {
   "name": "@orpc/ratelimit",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Rate limiting for oRPC procedures, with memory, Redis, and Upstash adapters",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "middleware",
+    "orpc",
+    "rate-limiting",
+    "ratelimit",
+    "redis",
+    "typescript",
+    "upstash"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/ratelimit"
   },
-  "keywords": [
-    "orpc",
-    "ratelimit",
-    "rate-limiting",
-    "redis",
-    "upstash",
-    "middleware",
-    "api",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./base-redis": {
-        "types": "./dist/adapters/base-redis.d.mts",
-        "import": "./dist/adapters/base-redis.mjs",
-        "default": "./dist/adapters/base-redis.mjs"
-      },
-      "./memory": {
-        "types": "./dist/adapters/memory.d.mts",
-        "import": "./dist/adapters/memory.mjs",
-        "default": "./dist/adapters/memory.mjs"
-      },
-      "./redis": {
-        "types": "./dist/adapters/redis.d.mts",
-        "import": "./dist/adapters/redis.mjs",
-        "default": "./dist/adapters/redis.mjs"
-      },
-      "./upstash": {
-        "types": "./dist/adapters/upstash.d.mts",
-        "import": "./dist/adapters/upstash.mjs",
-        "default": "./dist/adapters/upstash.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
@@ -63,12 +36,47 @@
     "./redis": "./src/adapters/redis.ts",
     "./upstash": "./src/adapters/upstash.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./base-redis": {
+        "types": "./dist/adapters/base-redis.d.ts",
+        "import": "./dist/adapters/base-redis.js",
+        "default": "./dist/adapters/base-redis.js"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.ts",
+        "import": "./dist/adapters/memory.js",
+        "default": "./dist/adapters/memory.js"
+      },
+      "./redis": {
+        "types": "./dist/adapters/redis.d.ts",
+        "import": "./dist/adapters/redis.js",
+        "default": "./dist/adapters/redis.js"
+      },
+      "./upstash": {
+        "types": "./dist/adapters/upstash.d.ts",
+        "import": "./dist/adapters/upstash.js",
+        "default": "./dist/adapters/upstash.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc"
+  },
+  "dependencies": {
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standard-server/core": "~0.14.0"
+  },
+  "devDependencies": {
+    "@upstash/redis": "^1.41.0",
+    "redis": "^6.3.1"
   },
   "peerDependencies": {
     "@upstash/redis": ">=1.35.6",
@@ -81,14 +89,5 @@
     "redis": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@orpc/server": "workspace:*",
-    "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.14.0"
-  },
-  "devDependencies": {
-    "@upstash/redis": "^1.41.0",
-    "redis": "^6.3.1"
   }
 }

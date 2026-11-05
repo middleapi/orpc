@@ -36,15 +36,18 @@ export function setCookie(
     return
   }
 
-  const cookieString = stringifySetCookie({
-    // Force path to '/' by default so the cookie is available across the
-    // entire app, not just under the directory of the request that set it
-    // (which is what browsers do per RFC 6265 §5.1.4 when Path is omitted).
-    path: '/',
-    ...options,
-    name, // prioritize
-    value, // prioritize
-  }, options)
+  const cookieString = stringifySetCookie(
+    {
+      // Force path to '/' by default so the cookie is available across the
+      // entire app, not just under the directory of the request that set it
+      // (which is what browsers do per RFC 6265 §5.1.4 when Path is omitted).
+      path: '/',
+      ...options,
+      name, // prioritize
+      value, // prioritize
+    },
+    options,
+  )
 
   headers.append('Set-Cookie', cookieString)
 }

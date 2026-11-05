@@ -1,6 +1,7 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
-import { captureAsyncContext } from '@orpc/shared'
 import { describe, expect, it } from 'bun:test'
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+import { captureAsyncContext } from '@orpc/shared'
 
 describe('captureAsyncContext', () => {
   const storage = new AsyncLocalStorage<number>()
@@ -17,9 +18,11 @@ describe('captureAsyncContext', () => {
   it('keeps each captured async context once the code gets hot', async () => {
     for (let round = 0; round < 100; round++) {
       const ids = Array.from({ length: 100 }, (_, i) => round * 100 + i)
-      const runs = ids.map(id => storage.run(id, () => captureAsyncContext()))
+      const runs = ids.map((id) => storage.run(id, () => captureAsyncContext()))
 
-      const stores = await storage.run(-1, () => Promise.all(runs.map(run => run(async () => storage.getStore()))))
+      const stores = await storage.run(-1, () =>
+        Promise.all(runs.map((run) => run(async () => storage.getStore()))),
+      )
 
       expect(stores).toEqual(ids)
     }

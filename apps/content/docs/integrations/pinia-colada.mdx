@@ -1,8 +1,8 @@
 ---
-title: "Pinia Colada Integration"
-description: "Use oRPC clients with Pinia Colada through utilities for building query and mutation options, keys, and typesafe error handling."
+title: 'Pinia Colada Integration'
+description: 'Use oRPC clients with Pinia Colada through utilities for building query and mutation options, keys, and typesafe error handling.'
 sidebar:
-  label: "Pinia Colada"
+  label: 'Pinia Colada'
 ---
 
 :::warning
@@ -31,11 +31,11 @@ To avoid key conflicts when creating multiple sets of utils, pass a unique `pref
 
 ```ts
 const userORPC = createPiniaColadaUtils(userClient, {
-  prefix: 'user'
+  prefix: 'user',
 })
 
 const postORPC = createPiniaColadaUtils(postClient, {
-  prefix: 'post'
+  prefix: 'post',
 })
 ```
 
@@ -46,11 +46,13 @@ const postORPC = createPiniaColadaUtils(postClient, {
 Use `.queryOptions` to build query options. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
-const query = useQuery(orpc.planet.find.queryOptions({
-  input: { id: 123 }, // Specify input if needed
-  context: { cache: true }, // Provide client context if needed
-  // additional options...
-}))
+const query = useQuery(
+  orpc.planet.find.queryOptions({
+    input: { id: 123 }, // Specify input if needed
+    context: { cache: true }, // Provide client context if needed
+    // additional options...
+  }),
+)
 ```
 
 :::info
@@ -62,15 +64,18 @@ Options accept plain values only. For reactive inputs, pass a callback to `useQu
 Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
-const query = useQuery(orpc.streamed.streamedOptions({
-  input: { id: 123 }, // Specify input if needed
-  context: { cache: true }, // Provide client context if needed
-  fnOptions: { // Configure streamed query behavior
-    refetchMode: 'reset',
-    maxChunks: 3,
-  },
-  // additional options...
-}))
+const query = useQuery(
+  orpc.streamed.streamedOptions({
+    input: { id: 123 }, // Specify input if needed
+    context: { cache: true }, // Provide client context if needed
+    fnOptions: {
+      // Configure streamed query behavior
+      refetchMode: 'reset',
+      maxChunks: 3,
+    },
+    // additional options...
+  }),
+)
 ```
 
 :::info
@@ -87,11 +92,13 @@ const query = useQuery(orpc.streamed.streamedOptions({
 Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
-const query = useQuery(orpc.live.liveOptions({
-  input: { id: 123 }, // Specify input if needed
-  context: { cache: true }, // Provide client context if needed
-  // additional options...
-}))
+const query = useQuery(
+  orpc.live.liveOptions({
+    input: { id: 123 }, // Specify input if needed
+    context: { cache: true }, // Provide client context if needed
+    // additional options...
+  }),
+)
 ```
 
 ## Infinite Query Options Utility
@@ -103,13 +110,15 @@ The `input` option must be a function that receives the page parameter and retur
 :::
 
 ```ts
-const query = useInfiniteQuery(() => orpc.planet.list.infiniteOptions({
-  input: (offset: number) => ({ limit: 10, offset }),
-  context: { cache: true }, // Provide client context if needed
-  initialPageParam: 0,
-  getNextPageParam: lastPage => lastPage.nextOffset,
-  // additional options...
-}))
+const query = useInfiniteQuery(() =>
+  orpc.planet.list.infiniteOptions({
+    input: (offset: number) => ({ limit: 10, offset }),
+    context: { cache: true }, // Provide client context if needed
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    // additional options...
+  }),
+)
 ```
 
 ## Mutation Options
@@ -117,10 +126,12 @@ const query = useInfiniteQuery(() => orpc.planet.list.infiniteOptions({
 Use `.mutationOptions` to build mutation options. It works with `useMutation` and any other API that accepts mutation options.
 
 ```ts
-const mutation = useMutation(orpc.planet.create.mutationOptions({
-  context: { cache: true }, // Provide client context if needed
-  // additional options...
-}))
+const mutation = useMutation(
+  orpc.planet.create.mutationOptions({
+    context: { cache: true }, // Provide client context if needed
+    // additional options...
+  }),
+)
 
 mutation.mutate({ name: 'Earth' })
 ```
@@ -146,12 +157,12 @@ queryCache.invalidateQueries({
 
 // Invalidate only regular (non-infinite) planet queries
 queryCache.invalidateQueries({
-  key: orpc.planet.key({ type: 'query' })
+  key: orpc.planet.key({ type: 'query' }),
 })
 
 // Invalidate the planet find query with id 123
 queryCache.invalidateQueries({
-  key: orpc.planet.find.key({ input: { id: 123 } })
+  key: orpc.planet.find.key({ input: { id: 123 } }),
 })
 
 // Update the planet find query with id 123
@@ -183,9 +194,11 @@ Option utilities accept plain values only. For reactive inputs, pass a callback 
 ```ts
 const id = ref(123)
 
-const query = useQuery(() => orpc.planet.find.queryOptions({
-  input: { id: id.value },
-}))
+const query = useQuery(() =>
+  orpc.planet.find.queryOptions({
+    input: { id: id.value },
+  }),
+)
 ```
 
 ## Default Options
@@ -197,9 +210,9 @@ const orpc = createPiniaColadaUtils(client, {
   scoped: {
     planet: {
       find: {
-        queryKey: options => ({
+        queryKey: (options) => ({
           // Override the auto-generated key for .queryKey and .queryOptions
-          key: options.key ?? ['planet', 'find', options.input]
+          key: options.key ?? ['planet', 'find', options.input],
         }),
         queryOptions: {
           staleTime: 60 * 1000, // 1 minute
@@ -221,10 +234,12 @@ const query = useQuery(orpc.planet.find.queryOptions({ input: { id: 123 } }))
 const mutation = useMutation(orpc.planet.create.mutationOptions())
 
 // User-provided options take precedence
-const customQuery = useQuery(orpc.planet.find.queryOptions({
-  input: { id: 123 },
-  staleTime: 0, // overrides the default staleTime
-}))
+const customQuery = useQuery(
+  orpc.planet.find.queryOptions({
+    input: { id: 123 },
+    staleTime: 0, // overrides the default staleTime
+  }),
+)
 ```
 
 :::info
@@ -256,7 +271,7 @@ const orpc = createPiniaColadaUtils(client, {
       }
 
       return data
-    }
+    },
   ],
 })
 ```
@@ -271,7 +286,7 @@ Plugins package reusable defaults and interceptors for queries and mutations.
 
 ```ts
 const orpc = createPiniaColadaUtils(client, {
-  plugins: []
+  plugins: [],
 })
 ```
 
@@ -284,9 +299,8 @@ import { ContractOptionsUtilsPlugin, piniaColada } from '@orpc/pinia-colada'
 
 export const contract = {
   planet: {
-    find: oc
-      .input(z.object({ id: z.number() }))
-      .meta(piniaColada({
+    find: oc.input(z.object({ id: z.number() })).meta(
+      piniaColada({
         queryOptions: {
           staleTime: 60 * 1000,
         },
@@ -296,7 +310,8 @@ export const contract = {
             return await next()
           },
         ],
-      })),
+      }),
+    ),
   },
 }
 
@@ -328,9 +343,8 @@ declare module '@pinia/colada' {
 export const contract = {
   planet: {
     find: oc.input(z.object({ id: z.number() })),
-    update: oc
-      .input(z.object({ id: z.number(), name: z.string() }))
-      .meta(piniaColada({
+    update: oc.input(z.object({ id: z.number(), name: z.string() })).meta(
+      piniaColada({
         mutationInterceptors: [
           async ({ input, next, fnContext }) => {
             const { utils, queryCache } = fnContext
@@ -347,18 +361,17 @@ export const contract = {
 
             try {
               return await next()
-            }
-            catch (error) {
+            } catch (error) {
               // roll back on error
               queryCache.setQueryData(queryKey, previous)
               throw error
-            }
-            finally {
+            } finally {
               queryCache.invalidateQueries({ key: queryKey })
             }
           },
         ],
-      })),
+      }),
+    ),
   },
 }
 
@@ -385,8 +398,7 @@ import {
 } from '@orpc/pinia-colada'
 import { RPCLink } from '@orpc/client/fetch'
 
-interface ClientContext extends PiniaColadaOperationContext {
-}
+interface ClientContext extends PiniaColadaOperationContext {}
 
 const GET_OPERATION_TYPE = new Set(['query', 'streamed', 'live', 'infinite'])
 
@@ -410,13 +422,15 @@ Use the built-in `isDefinedError` helper to handle [typesafe errors](/docs/error
 ```ts
 import { isDefinedError } from '@orpc/client'
 
-const mutation = useMutation(orpc.planet.create.mutationOptions({
-  onError: (error) => {
-    if (isDefinedError(error)) {
-      // Handle typesafe errors here
-    }
-  }
-}))
+const mutation = useMutation(
+  orpc.planet.create.mutationOptions({
+    onError: (error) => {
+      if (isDefinedError(error)) {
+        // Handle typesafe errors here
+      }
+    },
+  }),
+)
 
 mutation.mutate({ name: 'Earth' })
 

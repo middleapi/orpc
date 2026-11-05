@@ -1,6 +1,6 @@
-import { RPCHandler } from '../adapters/fetch/rpc-handler'
-import { os } from '../builder'
-import { CORSHandlerPlugin } from './cors'
+import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
+import { os } from '../builder.ts'
+import { CORSHandlerPlugin } from './cors.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -17,18 +17,22 @@ describe('corsHandlerPlugin', () => {
       plugins: [new CORSHandlerPlugin()],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'https://example.com',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://example.com',
+        },
+      }),
+    )
 
     expect(handlerFn).toHaveBeenCalledTimes(0)
     expect(response!.status).toBe(204)
     expect(response!.headers.get('access-control-allow-origin')).toBe('*')
     expect(response!.headers.get('vary')).toBeNull()
-    expect(response!.headers.get('access-control-allow-methods')).toBe('GET, HEAD, PUT, POST, DELETE, PATCH, QUERY')
+    expect(response!.headers.get('access-control-allow-methods')).toBe(
+      'GET, HEAD, PUT, POST, DELETE, PATCH, QUERY',
+    )
     expect(response!.headers.get('access-control-max-age')).toBeNull()
   })
 
@@ -42,16 +46,22 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/test', {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'https://example.com',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/test', {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://example.com',
+        },
+      }),
+    )
 
     expect(response!.headers.get('access-control-max-age')).toBe('600')
-    expect(response!.headers.get('access-control-allow-methods')).toBe('GET, HEAD, PUT, POST, DELETE, PATCH, QUERY')
-    expect(response!.headers.get('access-control-allow-headers')).toBe('Content-Type, Authorization')
+    expect(response!.headers.get('access-control-allow-methods')).toBe(
+      'GET, HEAD, PUT, POST, DELETE, PATCH, QUERY',
+    )
+    expect(response!.headers.get('access-control-allow-headers')).toBe(
+      'Content-Type, Authorization',
+    )
   })
 
   it('omits allow-methods and allow-headers when configured as empty', async () => {
@@ -64,13 +74,15 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'OPTIONS',
-      headers: {
-        'origin': 'https://example.com',
-        'access-control-request-headers': 'X-Requested-With',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'OPTIONS',
+        headers: {
+          'origin': 'https://example.com',
+          'access-control-request-headers': 'X-Requested-With',
+        },
+      }),
+    )
 
     expect(response!.headers.get('access-control-allow-methods')).toBeNull()
     expect(response!.headers.get('access-control-allow-headers')).toBeNull()
@@ -81,18 +93,20 @@ describe('corsHandlerPlugin', () => {
       plugins: [new CORSHandlerPlugin({ allowMethods: ['POST'] })],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'https://example.com',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://example.com',
+        },
+      }),
+    )
 
     expect(response!.headers.get('access-control-allow-methods')).toBe('POST')
   })
 
   it('sets allowed origin only when custom origin function approves', async () => {
-    const customOrigin = (origin: string) => origin === 'https://allowed.com' ? origin : null
+    const customOrigin = (origin: string) => (origin === 'https://allowed.com' ? origin : null)
     const customRouter = {
       custom: os.handler(() => 'ok'),
     }
@@ -103,30 +117,34 @@ describe('corsHandlerPlugin', () => {
     })
 
     // Request from allowed origin
-    const { response } = await handler.handle(new Request('https://example.com/custom', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://allowed.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/custom', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://allowed.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('access-control-allow-origin')).toBe('https://allowed.com')
 
     // Request from a disallowed origin should not get the header set
-    const { response: response2 } = await handler.handle(new Request('https://example.com/custom', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://disallowed.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response: response2 } = await handler.handle(
+      new Request('https://example.com/custom', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://disallowed.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
   })
 
   it('handles timingOrigin option correctly', async () => {
-    const customTimingOrigin = (origin: string) => origin === 'https://timing.com' ? origin : null
+    const customTimingOrigin = (origin: string) => (origin === 'https://timing.com' ? origin : null)
     const customRouter = {
       timing: os.handler(() => 'ok'),
     }
@@ -137,27 +155,31 @@ describe('corsHandlerPlugin', () => {
     })
 
     // Request with allowed timing origin
-    const { response } = await handler.handle(new Request('https://example.com/timing', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://timing.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/timing', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://timing.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('timing-allow-origin')).toBe('https://timing.com')
     expect(response!.headers.get('vary')).toBe('Origin')
 
     // Request with not allowed timing origin should not have the header,
     // but a function may answer differently per origin so the response still varies
-    const { response: response2 } = await handler.handle(new Request('https://example.com/timing', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://not-timing.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response: response2 } = await handler.handle(
+      new Request('https://example.com/timing', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://not-timing.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response2!.headers.get('timing-allow-origin')).toBeNull()
     expect(response2!.headers.get('vary')).toBe('Origin')
   })
@@ -172,16 +194,20 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://example.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://example.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('access-control-allow-credentials')).toBe('true')
-    expect(response!.headers.get('access-control-expose-headers')).toBe('X-Custom-Header, X-Another-Header')
+    expect(response!.headers.get('access-control-expose-headers')).toBe(
+      'X-Custom-Header, X-Another-Header',
+    )
   })
 
   it('returns "*" for access-control-allow-origin when origin function returns "*"', async () => {
@@ -190,14 +216,16 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://any-origin.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://any-origin.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('access-control-allow-origin')).toBe('*')
     // a function may answer differently per origin, so the response is always marked as varying
     expect(response!.headers.get('vary')).toBe('Origin')
@@ -209,14 +237,16 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://any-origin.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://any-origin.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('timing-allow-origin')).toBe('*')
     expect(response!.headers.get('vary')).toBe('Origin')
   })
@@ -227,26 +257,30 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://timing.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://timing.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('access-control-allow-origin')).toBe('*')
     expect(response!.headers.get('timing-allow-origin')).toBe('https://timing.com')
     expect(response!.headers.get('vary')).toBe('Origin')
 
     // a request without an origin gets no timing header, but must still be marked as varying by origin
-    const { response: response2 } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response: response2 } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response2!.headers.get('access-control-allow-origin')).toBe('*')
     expect(response2!.headers.get('timing-allow-origin')).toBeNull()
     expect(response2!.headers.get('vary')).toBe('Origin')
@@ -258,14 +292,16 @@ describe('corsHandlerPlugin', () => {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://timing.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://timing.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('timing-allow-origin')).toBeNull()
     expect(response!.headers.get('vary')).toBeNull()
   })
@@ -275,15 +311,19 @@ describe('corsHandlerPlugin', () => {
       plugins: [new CORSHandlerPlugin()],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'OPTIONS',
-      headers: {
-        'origin': 'https://example.com',
-        'access-control-request-headers': 'X-Requested-With, Content-Type',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'OPTIONS',
+        headers: {
+          'origin': 'https://example.com',
+          'access-control-request-headers': 'X-Requested-With, Content-Type',
+        },
+      }),
+    )
 
-    expect(response!.headers.get('access-control-allow-headers')).toBe('X-Requested-With, Content-Type')
+    expect(response!.headers.get('access-control-allow-headers')).toBe(
+      'X-Requested-With, Content-Type',
+    )
   })
 
   it('only runs origin functions for requests that carry an Origin header', async () => {
@@ -293,13 +333,15 @@ describe('corsHandlerPlugin', () => {
       plugins: [new CORSHandlerPlugin({ origin: originFn, timingOrigin: timingOriginFn })],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     // nothing to reflect, but the response still varies by origin so caches keep it apart from allowed origins
     expect(originFn).not.toHaveBeenCalled()
@@ -308,17 +350,25 @@ describe('corsHandlerPlugin', () => {
     expect(response!.headers.get('timing-allow-origin')).toBeNull()
     expect(response!.headers.get('vary')).toBe('Origin')
 
-    const { response: response2 } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://app.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response: response2 } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://app.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
-    expect(originFn).toHaveBeenCalledExactlyOnceWith('https://app.com', expect.objectContaining({ request: expect.any(Object) }))
-    expect(timingOriginFn).toHaveBeenCalledExactlyOnceWith('https://app.com', expect.objectContaining({ request: expect.any(Object) }))
+    expect(originFn).toHaveBeenCalledExactlyOnceWith(
+      'https://app.com',
+      expect.objectContaining({ request: expect.any(Object) }),
+    )
+    expect(timingOriginFn).toHaveBeenCalledExactlyOnceWith(
+      'https://app.com',
+      expect.objectContaining({ request: expect.any(Object) }),
+    )
     expect(response2!.headers.get('access-control-allow-origin')).toBe('https://app.com')
     expect(response2!.headers.get('timing-allow-origin')).toBe('https://app.com')
     expect(response2!.headers.get('vary')).toBe('Origin')
@@ -329,13 +379,15 @@ describe('corsHandlerPlugin', () => {
       plugins: [new CORSHandlerPlugin({ timingOrigin: '*' })],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     expect(response!.headers.get('access-control-allow-origin')).toBe('*')
     expect(response!.headers.get('timing-allow-origin')).toBe('*')
@@ -344,64 +396,72 @@ describe('corsHandlerPlugin', () => {
 
   it('supports an async origin function resolved per request', async () => {
     const plugin = new CORSHandlerPlugin({
-      origin: async origin => origin === 'https://allowed.com' ? origin : null,
+      origin: async (origin) => (origin === 'https://allowed.com' ? origin : null),
     })
     const handler = new RPCHandler(router, {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://allowed.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://allowed.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('access-control-allow-origin')).toBe('https://allowed.com')
 
-    const { response: response2 } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://disallowed.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response: response2 } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://disallowed.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
   })
 
   it('supports an async timingOrigin function resolved per request', async () => {
     const plugin = new CORSHandlerPlugin({
-      timingOrigin: async origin => origin === 'https://timing.com' ? origin : null,
+      timingOrigin: async (origin) => (origin === 'https://timing.com' ? origin : null),
     })
     const handler = new RPCHandler(router, {
       plugins: [plugin],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://timing.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://timing.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('timing-allow-origin')).toBe('https://timing.com')
   })
 
   it('does not copy Vary from the request', async () => {
     const handler = new RPCHandler(router, {
-      plugins: [new CORSHandlerPlugin({ origin: origin => origin })],
+      plugins: [new CORSHandlerPlugin({ origin: (origin) => origin })],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'https://example.com',
-        vary: 'Accept-Encoding',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://example.com',
+          vary: 'Accept-Encoding',
+        },
+      }),
+    )
 
     expect(response!.headers.get('access-control-allow-origin')).toBe('https://example.com')
     expect(response!.headers.get('vary')).toBe('Origin')
@@ -432,23 +492,25 @@ describe('corsHandlerPlugin', () => {
                     },
                   }
                 },
-                ...options.routingInterceptors ?? [],
+                ...(options.routingInterceptors ?? []),
               ],
             }
           },
         },
-        new CORSHandlerPlugin({ origin: origin => origin }),
+        new CORSHandlerPlugin({ origin: (origin) => origin }),
       ],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://example.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://example.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     expect(response!.headers.get('vary')).toBe('Accept-Encoding, Origin')
   })
@@ -478,23 +540,25 @@ describe('corsHandlerPlugin', () => {
                     },
                   }
                 },
-                ...options.routingInterceptors ?? [],
+                ...(options.routingInterceptors ?? []),
               ],
             }
           },
         },
-        new CORSHandlerPlugin({ origin: origin => origin }),
+        new CORSHandlerPlugin({ origin: (origin) => origin }),
       ],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://example.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://example.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     expect(response!.headers.get('vary')).toBe('Accept-Encoding, origin')
   })
@@ -504,14 +568,16 @@ describe('corsHandlerPlugin', () => {
       plugins: [new CORSHandlerPlugin()],
     })
 
-    const { matched, response } = await handler.handle(new Request('https://example.com/nonexistent', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://example.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { matched, response } = await handler.handle(
+      new Request('https://example.com/nonexistent', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://example.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     expect(matched).toBe(false)
     expect(response).toBeUndefined()
@@ -526,25 +592,29 @@ describe('corsHandlerPlugin', () => {
     })
 
     // Allowed origin
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://a.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://a.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response!.headers.get('access-control-allow-origin')).toBe('https://a.com')
 
     // Not allowed origin
-    const { response: response2 } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: {
-        'origin': 'https://c.com',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response: response2 } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: {
+          'origin': 'https://c.com',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
     expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
   })
 })

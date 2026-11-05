@@ -1,8 +1,8 @@
 ---
-title: "WebSocket Adapters"
-description: "Use oRPC over WebSocket for low-latency, full-duplex communication, with adapters for ws, crossws, Bun, Deno, Cloudflare, and uWebSockets."
+title: 'WebSocket Adapters'
+description: 'Use oRPC over WebSocket for low-latency, full-duplex communication, with adapters for ws, crossws, Bun, Deno, Cloudflare, and uWebSockets.'
 sidebar:
-  label: "WebSocket"
+  label: 'WebSocket'
 ---
 
 ## Server Adapters
@@ -36,7 +36,7 @@ wss.on('connection', (ws) => {
      * that receives the per-call request as its first argument, and is **not**
      * related to the initial WebSocket upgrade request.
      */
-    context: request => ({}),
+    context: (request) => ({}),
   })
 })
 ```
@@ -66,7 +66,7 @@ const ws = crossws({
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({}),
+        context: (request) => ({}),
       })
     },
     close: async (peer) => {
@@ -113,13 +113,13 @@ Bun.serve({
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({}),
+        context: (request) => ({}),
       })
     },
     async close(ws) {
       await handler.close(ws)
     },
-  }
+  },
 })
 ```
 
@@ -148,7 +148,7 @@ Deno.serve((req) => {
      * that receives the per-call request as its first argument, and is **not**
      * related to the initial WebSocket upgrade request.
      */
-    context: request => ({}),
+    context: (request) => ({}),
   })
 
   return response
@@ -186,7 +186,7 @@ export class ChatRoom extends DurableObject {
        * that receives the per-call request as its first argument, and is **not**
        * related to the initial WebSocket upgrade request.
        */
-      context: request => ({}),
+      context: (request) => ({}),
     })
   }
 
@@ -218,7 +218,7 @@ const app = App()
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({}),
+        context: (request) => ({}),
       })
     },
     async close(ws, code, message) {
@@ -244,7 +244,7 @@ const app = App()
 import { RPCLink } from '@orpc/client/websocket'
 
 const link = new RPCLink({
-  connect: info => new WebSocket('ws://localhost:3000'),
+  connect: (info) => new WebSocket('ws://localhost:3000'),
   /**
    * Whether to connect immediately on initialization, instead of waiting
    * for the first call. Reduces latency for the first request.
@@ -257,7 +257,7 @@ const link = new RPCLink({
    * Optional headers to attach to each per-call request.
    * These can be accessed in the server context or via the Request Headers Plugin.
    */
-  headers: () => ({})
+  headers: () => ({}),
 })
 ```
 
@@ -284,7 +284,7 @@ const link = new RPCLink({
      *
      * @default info => info.attempt === 1 ? 0 : 2_000
      */
-    delay: info => info.attempt === 1 ? 0 : 2_000,
+    delay: (info) => (info.attempt === 1 ? 0 : 2_000),
 
     /**
      * Maximum number of consecutive failed attempts before giving up.
@@ -320,8 +320,8 @@ const link = new RPCLink({
        *
        * @default 0
        */
-      delay: 0
-    }
-  }
+      delay: 0,
+    },
+  },
 })
 ```

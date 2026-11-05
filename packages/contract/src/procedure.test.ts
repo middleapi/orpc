@@ -1,4 +1,4 @@
-import { ProcedureContract } from './procedure'
+import { ProcedureContract } from './procedure.ts'
 
 describe('procedureContract', () => {
   const procedure = new ProcedureContract({
@@ -15,14 +15,18 @@ describe('procedureContract', () => {
 
       expect({}).not.toBeInstanceOf(ProcedureContract)
       expect({ '~orpc': {} }).not.toBeInstanceOf(ProcedureContract)
-      expect({ '~orpc': {
-        ...procedure['~orpc'],
-        errorMap: 'invalid',
-      } }).not.toBeInstanceOf(ProcedureContract)
-      expect({ '~orpc': {
-        ...procedure['~orpc'],
-        meta: 'invalid',
-      } }).not.toBeInstanceOf(ProcedureContract)
+      expect({
+        '~orpc': {
+          ...procedure['~orpc'],
+          errorMap: 'invalid',
+        },
+      }).not.toBeInstanceOf(ProcedureContract)
+      expect({
+        '~orpc': {
+          ...procedure['~orpc'],
+          meta: 'invalid',
+        },
+      }).not.toBeInstanceOf(ProcedureContract)
     })
 
     it('not support structural for extended class', () => {
@@ -39,8 +43,12 @@ describe('procedureContract', () => {
       expect(new ExtendedProcedureContract()).toBeInstanceOf(ProcedureContract)
       expect(new ExtendedProcedureContract()).toBeInstanceOf(ExtendedProcedureContract)
 
-      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).toBeInstanceOf(ProcedureContract)
-      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).not.toBeInstanceOf(ExtendedProcedureContract)
+      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).toBeInstanceOf(
+        ProcedureContract,
+      )
+      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).not.toBeInstanceOf(
+        ExtendedProcedureContract,
+      )
     })
   })
 })

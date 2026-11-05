@@ -1,10 +1,16 @@
-import type { AnyMetaPlugin } from './meta'
 import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
-import * as ErrorUtilsModule from './error-utils'
-import * as MetaUtilsModule from './meta-utils'
-import { ProcedureContract } from './procedure'
-import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils'
+
+import * as ErrorUtilsModule from './error-utils.ts'
+import * as MetaUtilsModule from './meta-utils.ts'
+import type { AnyMetaPlugin } from './meta.ts'
+import { ProcedureContract } from './procedure.ts'
+import {
+  augmentContractRouter,
+  getProcedureContractOrThrow,
+  getRouterContract,
+  minifyRouterContract,
+} from './router-utils.ts'
 
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
@@ -66,16 +72,18 @@ const router = {
   }),
   invalid: 'invalid' as any,
   nested: callable({
-    ping: callable(new ProcedureContract({
-      errorMap: {
-        NESTED_PING_ERROR: {
-          data: schema2,
+    ping: callable(
+      new ProcedureContract({
+        errorMap: {
+          NESTED_PING_ERROR: {
+            data: schema2,
+          },
         },
-      },
-      meta: { nestedPing: true },
-      inputSchemas: [],
-      outputSchemas: [schema2],
-    })),
+        meta: { nestedPing: true },
+        inputSchemas: [],
+        outputSchemas: [schema2],
+      }),
+    ),
     invalid: 'invalid' as any,
   }),
 }
@@ -103,7 +111,11 @@ describe('augmentContractRouter', () => {
 
     expect(actual).toBeInstanceOf(ProcedureContract)
     expect(actual).not.toBe(original)
-    expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(callIndex, options.errorMap, original['~orpc'].errorMap)
+    expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(
+      callIndex,
+      options.errorMap,
+      original['~orpc'].errorMap,
+    )
     expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
       callIndex,
       options.meta,
@@ -170,7 +182,10 @@ describe('augmentContractRouter', () => {
 
   it('keeps an own `__proto__` key as a route instead of re-parenting the result', () => {
     const options = createAugmentOptions()
-    const protoRouter = Object.fromEntries([['__proto__', router.ping], ['other', router.pong]])
+    const protoRouter = Object.fromEntries([
+      ['__proto__', router.ping],
+      ['other', router.pong],
+    ])
     const augmented = augmentContractRouter(protoRouter, options) as any
 
     expect(Object.getPrototypeOf(augmented)).toBe(Object.prototype)
@@ -223,13 +238,21 @@ describe('getProcedureContractOrThrow', () => {
 
   it('throws for non-procedure or invalid paths', () => {
     function noProcedureError(path: readonly string[]) {
-      return new TypeError(`No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`)
+      return new TypeError(
+        `No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`,
+      )
     }
 
     expect(() => getProcedureContractOrThrow(router, [])).toThrow(noProcedureError([]))
-    expect(() => getProcedureContractOrThrow(router, ['nested'])).toThrow(noProcedureError(['nested']))
-    expect(() => getProcedureContractOrThrow(router, ['notExist'])).toThrow(noProcedureError(['notExist']))
-    expect(() => getProcedureContractOrThrow(router, ['invalid'])).toThrow(noProcedureError(['invalid']))
+    expect(() => getProcedureContractOrThrow(router, ['nested'])).toThrow(
+      noProcedureError(['nested']),
+    )
+    expect(() => getProcedureContractOrThrow(router, ['notExist'])).toThrow(
+      noProcedureError(['notExist']),
+    )
+    expect(() => getProcedureContractOrThrow(router, ['invalid'])).toThrow(
+      noProcedureError(['invalid']),
+    )
     expect(() => getProcedureContractOrThrow('invalid' as any, [])).toThrow(noProcedureError([]))
   })
 })
@@ -282,7 +305,10 @@ describe('minifyRouterContract', () => {
   })
 
   it('keeps an own `__proto__` key as a route instead of re-parenting the result', () => {
-    const protoRouter = Object.fromEntries([['__proto__', router.ping], ['other', router.pong]])
+    const protoRouter = Object.fromEntries([
+      ['__proto__', router.ping],
+      ['other', router.pong],
+    ])
     const minified = minifyRouterContract(protoRouter) as any
 
     expect(Object.getPrototypeOf(minified)).toBe(Object.prototype)

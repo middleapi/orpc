@@ -1,6 +1,6 @@
 ---
-title: "Bracket Notation"
-description: "Learn how bracket notation encodes structured data like nested objects and arrays in flat key-value formats such as query strings and form data."
+title: 'Bracket Notation'
+description: 'Learn how bracket notation encodes structured data like nested objects and arrays in flat key-value formats such as query strings and form data.'
 ---
 
 [OpenAPI Serializer](/docs/openapi/serializer), [OpenAPI Handler](/docs/openapi/handler), and [OpenAPI Link](/docs/openapi/link) use bracket notation whenever nested data must be represented outside plain JSON.
@@ -34,7 +34,7 @@ description: "Learn how bracket notation encodes structured data like nested obj
    const serializer = new OpenAPISerializer({
      bracketNotation: {
        maxDeserializingEmptySlots: 10_000,
-     }
+     },
    })
    ```
 

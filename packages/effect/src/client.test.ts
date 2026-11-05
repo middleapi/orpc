@@ -1,7 +1,8 @@
 import type { Client, ClientContext, ORPCError } from '@orpc/client'
 import { sleep } from '@orpc/shared'
 import { Effect, Exit, Schedule } from 'effect'
-import { createEffectClient } from './client'
+
+import { createEffectClient } from './client.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -42,21 +43,26 @@ describe('createEffectClient', () => {
       context: {},
       signal: expect.any(AbortSignal),
     })
-    expect(pongFn).toHaveBeenCalledWith({ id: 123 }, {
-      context: {},
-      signal: expect.any(AbortSignal),
-    })
+    expect(pongFn).toHaveBeenCalledWith(
+      { id: 123 },
+      {
+        context: {},
+        signal: expect.any(AbortSignal),
+      },
+    )
   })
 
   it('forwards context, lastEventId, and merges the signal', async () => {
     pingFn.mockResolvedValue(42)
     const controller = new AbortController()
 
-    await Effect.runPromise(effectClient.ping('input', {
-      context: { cache: true },
-      lastEventId: 'id-1',
-      signal: controller.signal,
-    }))
+    await Effect.runPromise(
+      effectClient.ping('input', {
+        context: { cache: true },
+        lastEventId: 'id-1',
+        signal: controller.signal,
+      }),
+    )
 
     const options = pingFn.mock.calls[0]![1]
     expect(options.context).toEqual({ cache: true })
@@ -87,9 +93,7 @@ describe('createEffectClient', () => {
     await sleep(0)
     expect(pingFn).not.toHaveBeenCalled()
 
-    await expect(
-      Effect.runPromise(effect.pipe(Effect.retry(Schedule.recurs(2)))),
-    ).resolves.toBe(42)
+    await expect(Effect.runPromise(effect.pipe(Effect.retry(Schedule.recurs(2))))).resolves.toBe(42)
 
     expect(pingFn).toHaveBeenCalledTimes(3)
   })

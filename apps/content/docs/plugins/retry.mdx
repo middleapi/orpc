@@ -1,8 +1,8 @@
 ---
-title: "Retry Plugin"
-description: "Automatically retry failed oRPC requests with customizable strategies controlled through client context options."
+title: 'Retry Plugin'
+description: 'Automatically retry failed oRPC requests with customizable strategies controlled through client context options.'
 sidebar:
-  label: "Retry"
+  label: 'Retry'
 ---
 
 :::warning
@@ -17,9 +17,7 @@ import { RetryLinkPlugin, RetryLinkPluginContext } from '@orpc/client/plugins'
 interface ClientContext extends RetryLinkPluginContext {}
 
 const link = new RPCLink<ClientContext>({
-  plugins: [
-    new RetryLinkPlugin(),
-  ],
+  plugins: [new RetryLinkPlugin()],
 })
 ```
 
@@ -38,20 +36,23 @@ import { RouterClient } from '@orpc/server'
 
 declare const client: RouterClient<typeof router, RetryLinkPluginContext>
 // ---cut---
-const planets = await client.planet.list({ limit: 10 }, {
-  context: {
-    retry: 3, // Maximum retry attempts
-    retryDelay: 2000, // Delay between retries in ms
-    shouldRetry: options => true, // Determines whether to retry based on the error
-    onRetry: (options) => {
-      // Hook executed on each retry
+const planets = await client.planet.list(
+  { limit: 10 },
+  {
+    context: {
+      retry: 3, // Maximum retry attempts
+      retryDelay: 2000, // Delay between retries in ms
+      shouldRetry: (options) => true, // Determines whether to retry based on the error
+      onRetry: (options) => {
+        // Hook executed on each retry
 
-      return (isSuccess) => {
-        // Execute after the retry is complete
-      }
+        return (isSuccess) => {
+          // Execute after the retry is complete
+        }
+      },
     },
-  }
-})
+  },
+)
 ```
 
 :::info
@@ -71,9 +72,9 @@ const link = new RPCLink<ClientContext>({
     new RetryLinkPlugin({
       default: {
         retry: 0,
-        retryDelay: o => o.lastEventRetry ?? 2000,
-        shouldRetry: o => isRetryableError(o.error),
-      }
+        retryDelay: (o) => o.lastEventRetry ?? 2000,
+        shouldRetry: (o) => isRetryableError(o.error),
+      },
     }),
   ],
 })
@@ -89,12 +90,16 @@ By default, errors from a 4xx response other than `408` and `429` are not retrie
 import { ORPCError } from '@orpc/client'
 import { isRetryableError } from '@orpc/client/plugins'
 
-const planets = await client.planet.list({ limit: 10 }, {
-  context: {
-    retry: 3,
-    shouldRetry: ({ error }) => isRetryableError(error) || (error instanceof ORPCError && error.code === 'CONFLICT'),
-  }
-})
+const planets = await client.planet.list(
+  { limit: 10 },
+  {
+    context: {
+      retry: 3,
+      shouldRetry: ({ error }) =>
+        isRetryableError(error) || (error instanceof ORPCError && error.code === 'CONFLICT'),
+    },
+  },
+)
 ```
 
 ## Streamed Input
@@ -114,7 +119,7 @@ const link = new RPCLink<ClientContext>({
   plugins: [
     new RetryLinkPlugin({
       default: {
-        retry: ({ input }) => isStreamedInput(input) ? 0 : 3,
+        retry: ({ input }) => (isStreamedInput(input) ? 0 : 3),
       },
     }),
   ],
@@ -133,7 +138,7 @@ To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/d
 const streaming = await client.streaming('the input', {
   context: {
     retry: Number.POSITIVE_INFINITY,
-  }
+  },
 })
 
 for await (const message of streaming) {

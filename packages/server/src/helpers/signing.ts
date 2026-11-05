@@ -1,4 +1,4 @@
-import { decodeBase64url, encodeBase64url } from './base64url'
+import { decodeBase64url, encodeBase64url } from './base64url.ts'
 
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' }
 
@@ -20,19 +20,11 @@ const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' }
 export async function sign(value: string, secret: string): Promise<string> {
   const encoder = new TextEncoder()
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    ALGORITHM,
-    false,
-    ['sign'],
-  )
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), ALGORITHM, false, [
+    'sign',
+  ])
 
-  const signature = await crypto.subtle.sign(
-    ALGORITHM,
-    key,
-    encoder.encode(value),
-  )
+  const signature = await crypto.subtle.sign(ALGORITHM, key, encoder.encode(value))
 
   return `${value}.${encodeBase64url(new Uint8Array(signature))}`
 }
@@ -53,7 +45,10 @@ export async function sign(value: string, secret: string): Promise<string> {
  *
  * @see {@link https://orpc.dev/docs/helpers/signing | Signing Helpers}
  */
-export async function unsign(signedValue: string | undefined | null, secret: string): Promise<string | undefined> {
+export async function unsign(
+  signedValue: string | undefined | null,
+  secret: string,
+): Promise<string | undefined> {
   if (typeof signedValue !== 'string') {
     return undefined
   }
@@ -73,20 +68,11 @@ export async function unsign(signedValue: string | undefined | null, secret: str
 
   const encoder = new TextEncoder()
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    ALGORITHM,
-    false,
-    ['verify'],
-  )
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), ALGORITHM, false, [
+    'verify',
+  ])
 
-  const isValid = await crypto.subtle.verify(
-    ALGORITHM,
-    key,
-    signature,
-    encoder.encode(value),
-  )
+  const isValid = await crypto.subtle.verify(ALGORITHM, key, signature, encoder.encode(value))
 
   return isValid ? value : undefined
 }

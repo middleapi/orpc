@@ -1,20 +1,22 @@
-import type { RouterClient } from '@orpc/server'
-import type { AddressInfo } from 'node:net'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
+import type { RouterClient } from '@orpc/server'
 import { os, type } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
 import { RequestCompressionHandlerPlugin, RequestLimitHandlerPlugin } from '@orpc/server/plugins'
-import { TmpFile, TmpFileUploadHandlerPlugin } from '../src'
+
+import { TmpFile, TmpFileUploadHandlerPlugin } from '../src/index.ts'
 
 /**
  * Driven through a real http server and `RPCLink`, so uploads take the exact
@@ -40,9 +42,12 @@ describe('uploads large files through tmp files', () => {
         type: file.type,
         size: file.size,
         // Read from disk while the request is still running, in constant memory
-        sha256: createHash('sha256').update(new Uint8Array(await file.arrayBuffer())).digest('hex'),
+        sha256: createHash('sha256')
+          .update(new Uint8Array(await file.arrayBuffer()))
+          .digest('hex'),
         spooledSize: file instanceof TmpFile ? statSync(file.path).size : undefined,
-        spooledInsideTmpDir: file instanceof TmpFile && path.dirname(path.dirname(file.path)) === tmpDir,
+        spooledInsideTmpDir:
+          file instanceof TmpFile && path.dirname(path.dirname(file.path)) === tmpDir,
       }
     }),
   }
@@ -67,7 +72,7 @@ describe('uploads large files through tmp files', () => {
   let url: string
 
   beforeAll(async () => {
-    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
 
@@ -76,7 +81,9 @@ describe('uploads large files through tmp files', () => {
     rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  function createClient(linkPlugins: ConstructorParameters<typeof RPCLink>[0]['plugins'] = []): RouterClient<typeof router> {
+  function createClient(
+    linkPlugins: ConstructorParameters<typeof RPCLink>[0]['plugins'] = [],
+  ): RouterClient<typeof router> {
     return createORPCClient(new RPCLink({ url: '/', origin: url, plugins: linkPlugins }))
   }
 
@@ -149,13 +156,21 @@ describe('uploads large files through tmp files', () => {
   it('runs concurrent uploads in isolated directories and removes them all', async () => {
     const client = createClient()
 
-    const outputs = await Promise.all(Array.from({ length: 5 }, (_, i) => {
-      const content = new Uint8Array(512 * 1024 + i).fill(i)
-      return client.upload({ file: new File([content], `file-${i}.bin`, { type: 'application/octet-stream' }) })
-    }))
+    const outputs = await Promise.all(
+      Array.from({ length: 5 }, (_, i) => {
+        const content = new Uint8Array(512 * 1024 + i).fill(i)
+        return client.upload({
+          file: new File([content], `file-${i}.bin`, { type: 'application/octet-stream' }),
+        })
+      }),
+    )
 
     for (let i = 0; i < outputs.length; i++) {
-      expect(outputs[i]).toMatchObject({ isTmpFile: true, size: 512 * 1024 + i, spooledInsideTmpDir: true })
+      expect(outputs[i]).toMatchObject({
+        isTmpFile: true,
+        size: 512 * 1024 + i,
+        spooledInsideTmpDir: true,
+      })
     }
 
     expect(readdirSync(tmpDir)).toHaveLength(0)
@@ -177,13 +192,15 @@ describe('uploads large files through tmp files', () => {
     })
 
     try {
-      await new Promise<void>(resolve => limitedServer.listen(0, '127.0.0.1', resolve))
+      await new Promise<void>((resolve) => limitedServer.listen(0, '127.0.0.1', resolve))
       const limitedUrl = `http://127.0.0.1:${(limitedServer.address() as AddressInfo).port}`
-      const client: RouterClient<typeof router> = createORPCClient(new RPCLink({
-        url: '/',
-        origin: limitedUrl,
-        plugins: [new RequestCompressionLinkPlugin()],
-      }))
+      const client: RouterClient<typeof router> = createORPCClient(
+        new RPCLink({
+          url: '/',
+          origin: limitedUrl,
+          plugins: [new RequestCompressionLinkPlugin()],
+        }),
+      )
 
       const content = new Uint8Array(2 * 1024 * 1024).fill(7)
       await expect(client.upload({ file: new File([content], 'too-large.bin') })).rejects.toThrow()
@@ -192,8 +209,7 @@ describe('uploads large files through tmp files', () => {
       await vi.waitFor(() => {
         expect(readdirSync(limitedTmpDir)).toHaveLength(0)
       })
-    }
-    finally {
+    } finally {
       limitedServer.close()
       rmSync(limitedTmpDir, { recursive: true, force: true })
     }
@@ -202,7 +218,12 @@ describe('uploads large files through tmp files', () => {
   it('rejects uploads over its own file limit without the request limit plugin', async () => {
     const limitedTmpDir = mkdtempSync(path.join(tmpdir(), 'orpc-upload-e2e-own-limit-'))
     const limitedHandler = new RPCHandler(router, {
-      plugins: [new TmpFileUploadHandlerPlugin({ tmpDir: limitedTmpDir, maxBodySize: { ...UNLIMITED, file: 64 * 1024 } })],
+      plugins: [
+        new TmpFileUploadHandlerPlugin({
+          tmpDir: limitedTmpDir,
+          maxBodySize: { ...UNLIMITED, file: 64 * 1024 },
+        }),
+      ],
     })
 
     const limitedServer = createServer(async (req, res) => {
@@ -210,24 +231,28 @@ describe('uploads large files through tmp files', () => {
     })
 
     try {
-      await new Promise<void>(resolve => limitedServer.listen(0, '127.0.0.1', resolve))
-      const client: RouterClient<typeof router> = createORPCClient(new RPCLink({
-        url: '/',
-        origin: `http://127.0.0.1:${(limitedServer.address() as AddressInfo).port}`,
-      }))
+      await new Promise<void>((resolve) => limitedServer.listen(0, '127.0.0.1', resolve))
+      const client: RouterClient<typeof router> = createORPCClient(
+        new RPCLink({
+          url: '/',
+          origin: `http://127.0.0.1:${(limitedServer.address() as AddressInfo).port}`,
+        }),
+      )
 
       const content = new Uint8Array(2 * 1024 * 1024).fill(7)
       await expect(client.upload({ file: new File([content], 'too-large.bin') })).rejects.toThrow()
 
       // Under the limit the same server accepts the upload
       const small = new Uint8Array(16 * 1024).fill(7)
-      await expect(client.upload({ file: new File([small], 'small.bin') })).resolves.toMatchObject({ isTmpFile: false, size: small.length })
+      await expect(client.upload({ file: new File([small], 'small.bin') })).resolves.toMatchObject({
+        isTmpFile: false,
+        size: small.length,
+      })
 
       await vi.waitFor(() => {
         expect(readdirSync(limitedTmpDir)).toHaveLength(0)
       })
-    }
-    finally {
+    } finally {
       limitedServer.close()
       rmSync(limitedTmpDir, { recursive: true, force: true })
     }
@@ -236,30 +261,35 @@ describe('uploads large files through tmp files', () => {
   it('removes tmp files when the client abandons a streaming response', async () => {
     const streamTmpDir = mkdtempSync(path.join(tmpdir(), 'orpc-upload-e2e-stream-abort-'))
 
-    const streamHandler = new RPCHandler({
-      stream: os.input(type<File>()).handler(async function* ({ input }) {
-        yield await input.text()
-        // In-flight logic the abandoned transfer must still wait for before cleanup
-        await sleep(1500)
-        yield 'never delivered'
-      }),
-    }, {
-      plugins: [new TmpFileUploadHandlerPlugin({ tmpDir: streamTmpDir })],
-    })
+    const streamHandler = new RPCHandler(
+      {
+        stream: os.input(type<File>()).handler(async function* ({ input }) {
+          yield await input.text()
+          // In-flight logic the abandoned transfer must still wait for before cleanup
+          await sleep(1500)
+          yield 'never delivered'
+        }),
+      },
+      {
+        plugins: [new TmpFileUploadHandlerPlugin({ tmpDir: streamTmpDir })],
+      },
+    )
 
     const streamServer = createServer(async (req, res) => {
       await streamHandler.handle(req, res, { context: {} })
     })
 
     try {
-      await new Promise<void>(resolve => streamServer.listen(0, '127.0.0.1', resolve))
+      await new Promise<void>((resolve) => streamServer.listen(0, '127.0.0.1', resolve))
       const { port } = streamServer.address() as AddressInfo
 
       const body = Buffer.from('held by the stream')
 
       await new Promise<void>((resolve, reject) => {
         const socket = connect(port, '127.0.0.1', () => {
-          socket.write(`POST /stream HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/octet-stream\r\nContent-Length: ${body.length}\r\n\r\n`)
+          socket.write(
+            `POST /stream HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/octet-stream\r\nContent-Length: ${body.length}\r\n\r\n`,
+          )
           socket.write(body)
         })
 
@@ -273,60 +303,70 @@ describe('uploads large files through tmp files', () => {
         socket.on('error', reject)
       })
 
-      await vi.waitFor(() => {
-        expect(readdirSync(streamTmpDir)).toHaveLength(0)
-      }, { timeout: 5000 })
-    }
-    finally {
+      await vi.waitFor(
+        () => {
+          expect(readdirSync(streamTmpDir)).toHaveLength(0)
+        },
+        { timeout: 5000 },
+      )
+    } finally {
       streamServer.close()
       rmSync(streamTmpDir, { recursive: true, force: true })
     }
   })
 
-  it('completes drip-fed uploads whose bytes arrive in tiny segments', { timeout: 60_000 }, async () => {
-    const boundary = 'X-DRIP-BOUNDARY'
-    const content = Buffer.alloc(4096, 7)
-    const body = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="data"\r\n\r\n{"json":{"file":{}},"maps":[[["file"]]]}\r\n--${boundary}\r\nContent-Disposition: form-data; name="0"; filename="drip.bin"\r\nContent-Type: application/octet-stream\r\n\r\n`),
-      content,
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ])
+  it(
+    'completes drip-fed uploads whose bytes arrive in tiny segments',
+    { timeout: 60_000 },
+    async () => {
+      const boundary = 'X-DRIP-BOUNDARY'
+      const content = Buffer.alloc(4096, 7)
+      const body = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="data"\r\n\r\n{"json":{"file":{}},"maps":[[["file"]]]}\r\n--${boundary}\r\nContent-Disposition: form-data; name="0"; filename="drip.bin"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+        ),
+        content,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ])
 
-    for (const segmentSize of [3, 61]) {
-      const response = await new Promise<string>((resolve, reject) => {
-        const socket = connect((server.address() as AddressInfo).port, '127.0.0.1', () => {
-          socket.setNoDelay(true)
-          socket.write(`POST /upload HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: multipart/form-data; boundary=${boundary}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`)
+      for (const segmentSize of [3, 61]) {
+        const response = await new Promise<string>((resolve, reject) => {
+          const socket = connect((server.address() as AddressInfo).port, '127.0.0.1', () => {
+            socket.setNoDelay(true)
+            socket.write(
+              `POST /upload HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: multipart/form-data; boundary=${boundary}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`,
+            )
 
-          void (async () => {
-            for (let offset = 0; offset < body.length; offset += segmentSize) {
-              socket.write(body.subarray(offset, offset + segmentSize))
-              await sleep(0)
-            }
-          })()
+            void (async () => {
+              for (let offset = 0; offset < body.length; offset += segmentSize) {
+                socket.write(body.subarray(offset, offset + segmentSize))
+                await sleep(0)
+              }
+            })()
+          })
+
+          const chunks: Buffer[] = []
+          const timer = setTimeout(() => {
+            socket.destroy()
+            reject(new Error(`request wedged at segment size ${segmentSize}`))
+          }, 30_000)
+          socket.on('data', (chunk: Buffer) => chunks.push(chunk))
+          socket.on('close', () => {
+            clearTimeout(timer)
+            resolve(Buffer.concat(chunks).toString())
+          })
+          socket.on('error', reject)
         })
 
-        const chunks: Buffer[] = []
-        const timer = setTimeout(() => {
-          socket.destroy()
-          reject(new Error(`request wedged at segment size ${segmentSize}`))
-        }, 30_000)
-        socket.on('data', (chunk: Buffer) => chunks.push(chunk))
-        socket.on('close', () => {
-          clearTimeout(timer)
-          resolve(Buffer.concat(chunks).toString())
-        })
-        socket.on('error', reject)
+        expect(response, `segment size ${segmentSize}`).toContain('HTTP/1.1 200')
+        expect(response).toContain('"size":4096')
+      }
+
+      await vi.waitFor(() => {
+        expect(readdirSync(tmpDir)).toHaveLength(0)
       })
-
-      expect(response, `segment size ${segmentSize}`).toContain('HTTP/1.1 200')
-      expect(response).toContain('"size":4096')
-    }
-
-    await vi.waitFor(() => {
-      expect(readdirSync(tmpDir)).toHaveLength(0)
-    })
-  })
+    },
+  )
 
   it('removes spooled bytes when the client aborts mid-upload', async () => {
     const controller = new AbortController()

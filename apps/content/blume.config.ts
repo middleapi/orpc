@@ -1,11 +1,13 @@
 import { fileURLToPath } from 'node:url'
+
 import { defineConfig } from 'blume'
 import { posthog } from 'blume/analytics'
 import { cloudflare } from 'blume/deploy'
 import { filesystem } from 'blume/sources'
-import { serverSourcemapsPlugin } from './dev/server-sourcemaps'
-import { searchCodeIndexPlugin } from './search/code-index'
-import { sponsorAdsInjectPlugin } from './sponsors/inject'
+
+import { serverSourcemapsPlugin } from './dev/server-sourcemaps.ts'
+import { searchCodeIndexPlugin } from './search/code-index.ts'
+import { sponsorAdsInjectPlugin } from './sponsors/inject.ts'
 
 export default defineConfig({
   title: 'oRPC',
@@ -20,10 +22,7 @@ export default defineConfig({
     sources: [
       filesystem({
         root: '.',
-        include: [
-          'docs/**/*.{md,mdx}',
-          'blog/**/*.{md,mdx}',
-        ],
+        include: ['docs/**/*.{md,mdx}', 'blog/**/*.{md,mdx}'],
       }),
     ],
   },
@@ -89,10 +88,7 @@ export default defineConfig({
     organization: {
       name: 'middleapi',
       url: 'https://github.com/middleapi',
-      sameAs: [
-        'https://x.com/middleapi',
-        'https://opencollective.com/middleapi',
-      ],
+      sameAs: ['https://x.com/middleapi', 'https://opencollective.com/middleapi'],
     },
     /** The homepage's SoftwareApplication JSON-LD node, which tells search engines and agents what oRPC is. */
     software: {
@@ -122,11 +118,17 @@ export default defineConfig({
     { from: '/docs/advanced/scaling-large-projects', to: '/docs/contract/client-factory' },
     { from: '/docs/openapi/openapi-to-contract', to: '/docs/contract/generate-from-openapi' },
 
-    { from: '/docs/advanced/exceeds-the-maximum-length-problem', to: '/docs/recipes/exceeds-the-maximum-length-problem' },
+    {
+      from: '/docs/advanced/exceeds-the-maximum-length-problem',
+      to: '/docs/recipes/exceeds-the-maximum-length-problem',
+    },
     { from: '/docs/advanced/publish-client-to-npm', to: '/docs/recipes/publish-client-to-npm' },
     { from: '/docs/advanced/testing-mocking', to: '/docs/recipes/testing-and-mocking' },
     { from: '/docs/advanced/validation-errors', to: '/docs/recipes/validation-customization' },
-    { from: '/docs/openapi/advanced/disabling-output-validation', to: '/docs/recipes/validation-customization' },
+    {
+      from: '/docs/openapi/advanced/disabling-output-validation',
+      to: '/docs/recipes/validation-customization',
+    },
     { from: '/docs/best-practices/dedupe-middleware', to: '/docs/recipes/dedupe-middleware' },
     { from: '/docs/best-practices/monorepo-setup', to: '/docs/recipes/monorepo-setup' },
     { from: '/docs/best-practices/no-throw-literal', to: '/docs/recipes/no-throw-literal' },
@@ -145,8 +147,14 @@ export default defineConfig({
     { from: '/docs/openapi/openapi-specification', to: '/docs/openapi/specification' },
     { from: '/docs/openapi/advanced/openapi-json-serializer', to: '/docs/openapi/serializer' },
     { from: '/docs/openapi/input-output-structure', to: '/docs/openapi/input-and-output-mapping' },
-    { from: '/docs/openapi/advanced/redirect-response', to: '/docs/openapi/input-and-output-mapping#redirect-response' },
-    { from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link', to: '/docs/openapi/expanding-type-support-for-link' },
+    {
+      from: '/docs/openapi/advanced/redirect-response',
+      to: '/docs/openapi/input-and-output-mapping#redirect-response',
+    },
+    {
+      from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link',
+      to: '/docs/openapi/expanding-type-support-for-link',
+    },
 
     { from: '/docs/event-iterator', to: '/docs/async-iterator-object' },
     { from: '/docs/client/event-iterator', to: '/docs/client/async-iterator-object' },
@@ -165,10 +173,16 @@ export default defineConfig({
     { from: '/docs/plugins/hibernation', to: '/docs/integrations/hibernation' },
 
     { from: '/docs/integrations/react-swr', to: '/docs/integrations/swr' },
-    { from: '/docs/openapi/integrations/implement-contract-in-nest', to: '/docs/integrations/nest' },
+    {
+      from: '/docs/openapi/integrations/implement-contract-in-nest',
+      to: '/docs/integrations/nest',
+    },
     { from: '/docs/openapi/integrations/trpc', to: '/docs/integrations/trpc' },
     { from: '/docs/server-action', to: '/docs/integrations/next' },
-    { from: '/docs/integrations/tanstack-query-old/:slug*', to: '/docs/integrations/tanstack-query' },
+    {
+      from: '/docs/integrations/tanstack-query-old/:slug*',
+      to: '/docs/integrations/tanstack-query',
+    },
   ],
   export: true,
   integrations: [
@@ -190,7 +204,9 @@ export default defineConfig({
       name: 'header-override',
       hooks: {
         'astro:config:setup': ({ updateConfig }) => {
-          const headerPath = fileURLToPath(new URL('./components/blume/Header.astro', import.meta.url))
+          const headerPath = fileURLToPath(
+            new URL('./components/blume/Header.astro', import.meta.url),
+          )
           updateConfig({
             vite: {
               resolve: {
@@ -207,8 +223,13 @@ export default defineConfig({
       name: 'twoslash-popups',
       hooks: {
         'astro:config:setup': ({ injectScript }) => {
-          const clientPath = fileURLToPath(new URL('./components/blume/twoslash-popups.ts', import.meta.url))
-          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+          const clientPath = fileURLToPath(
+            new URL('./components/blume/twoslash-popups.ts', import.meta.url),
+          )
+          injectScript(
+            'page',
+            `import '${clientPath.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`,
+          )
         },
       },
     },
@@ -221,7 +242,10 @@ export default defineConfig({
           updateConfig({ vite: { plugins: [searchCodeIndexPlugin()] } })
           // Render the matched passage in the preview pane the way the page does.
           const clientPath = fileURLToPath(new URL('./search/page-preview.ts', import.meta.url))
-          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+          injectScript(
+            'page',
+            `import '${clientPath.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`,
+          )
         },
       },
     },
@@ -234,7 +258,10 @@ export default defineConfig({
           // later two-cell slots with a random pick per view.
           updateConfig({ vite: { plugins: [sponsorAdsInjectPlugin()] } })
           const clientPath = fileURLToPath(new URL('./sponsors/client.ts', import.meta.url))
-          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+          injectScript(
+            'page',
+            `import '${clientPath.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`,
+          )
         },
       },
     },

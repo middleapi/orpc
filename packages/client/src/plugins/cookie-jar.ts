@@ -1,9 +1,15 @@
 import type { Value } from '@orpc/shared'
-import type { StandardHeaders } from '@standard-server/core'
-import type { FetchLinkTransportOptions } from '../adapters/fetch'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
 import { matchesHttpPathPrefix, toArray, value } from '@orpc/shared'
+import type { StandardHeaders } from '@standard-server/core'
+
+import type { FetchLinkTransportOptions } from '../adapters/fetch/index.ts'
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+  StandardLinkTransportInterceptorOptions,
+} from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 
 export interface CookieJarLinkPluginOptions<T extends ClientContext> {
   /**
@@ -48,7 +54,10 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
-    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const { path, request } = interceptorOptions
       const origin = await value(this.origin, interceptorOptions, path)
 
@@ -64,7 +73,10 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
       const response = await next(
         cookie === undefined
           ? interceptorOptions
-          : { ...interceptorOptions, request: { ...request, headers: { ...request.headers, cookie } } },
+          : {
+              ...interceptorOptions,
+              request: { ...request, headers: { ...request.headers, cookie } },
+            },
       )
 
       for (const setCookie of toArray(response.headers['set-cookie'])) {
@@ -76,10 +88,7 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
 
     return {
       ...options,
-      transportInterceptors: [
-        ...toArray(options.transportInterceptors),
-        transportInterceptor,
-      ],
+      transportInterceptors: [...toArray(options.transportInterceptors), transportInterceptor],
     }
   }
 }
@@ -136,16 +145,19 @@ export class CookieJar {
     const path = parsed.path ?? defaultPath(target.pathname)
 
     if (
-      !domainMatch(target.hostname, domain)
-      || (/^__(?:secure|host)-/i.test(parsed.name) && !parsed.secure)
-      || (/^__host-/i.test(parsed.name) && (!hostOnly || parsed.path !== '/'))
+      !domainMatch(target.hostname, domain) ||
+      (/^__(?:secure|host)-/i.test(parsed.name) && !parsed.secure) ||
+      (/^__host-/i.test(parsed.name) && (!hostOnly || parsed.path !== '/')) ||
       // Insecure origins can neither set nor overwrite secure cookies, see "leave secure cookies alone" in RFC 6265bis
-      || (!secureUrl && (parsed.secure || [...this.cookies.values()].some(cookie =>
-        cookie.secure
-        && cookie.name === parsed.name
-        && (domainMatch(domain, cookie.domain) || domainMatch(cookie.domain, domain))
-        && matchesHttpPathPrefix(path as `/${string}`, cookie.path as `/${string}`),
-      )))
+      (!secureUrl &&
+        (parsed.secure ||
+          [...this.cookies.values()].some(
+            (cookie) =>
+              cookie.secure &&
+              cookie.name === parsed.name &&
+              (domainMatch(domain, cookie.domain) || domainMatch(cookie.domain, domain)) &&
+              matchesHttpPathPrefix(path as `/${string}`, cookie.path as `/${string}`),
+          )))
     ) {
       return
     }
@@ -173,7 +185,7 @@ export class CookieJar {
       }
     }
 
-    const cookies = [...this.cookies.values()].map(cookie => ({ ...cookie }))
+    const cookies = [...this.cookies.values()].map((cookie) => ({ ...cookie }))
 
     if (url === undefined) {
       return cookies
@@ -182,13 +194,19 @@ export class CookieJar {
     const target = new URL(url)
     const secureUrl = isSecureUrl(target)
 
-    return cookies
-      .filter(cookie =>
-        (cookie.hostOnly ? target.hostname === cookie.domain : domainMatch(target.hostname, cookie.domain))
-        && matchesHttpPathPrefix(target.pathname as `/${string}`, cookie.path as `/${string}`)
-        && (!cookie.secure || secureUrl),
-      )
-      .sort((a, b) => b.path.length - a.path.length)
+    return (
+      cookies
+        .filter(
+          (cookie) =>
+            (cookie.hostOnly
+              ? target.hostname === cookie.domain
+              : domainMatch(target.hostname, cookie.domain)) &&
+            matchesHttpPathPrefix(target.pathname as `/${string}`, cookie.path as `/${string}`) &&
+            (!cookie.secure || secureUrl),
+        )
+        // oxlint-disable-next-line unicorn/no-array-sort
+        .sort((a, b) => b.path.length - a.path.length)
+    )
   }
 
   /**
@@ -203,13 +221,19 @@ export class CookieJar {
  * Appends jar cookies to an existing `cookie` header, skipping names it already has.
  * Returns `undefined` when the jar adds nothing.
  */
-function mergeCookieHeader(header: StandardHeaders[string], cookies: StoredCookie[]): string | undefined {
-  const explicit = toArray(header).flatMap(value => value.split(';')).map(pair => pair.trim()).filter(Boolean)
-  const explicitNames = new Set(explicit.map(pair => splitCookiePair(pair)[0]))
+function mergeCookieHeader(
+  header: StandardHeaders[string],
+  cookies: StoredCookie[],
+): string | undefined {
+  const explicit = toArray(header)
+    .flatMap((value) => value.split(';'))
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+  const explicitNames = new Set(explicit.map((pair) => splitCookiePair(pair)[0]))
 
   const pairs = cookies
-    .filter(cookie => !explicitNames.has(cookie.name))
-    .map(cookie => cookie.name ? `${cookie.name}=${cookie.value}` : cookie.value)
+    .filter((cookie) => !explicitNames.has(cookie.name))
+    .map((cookie) => (cookie.name ? `${cookie.name}=${cookie.value}` : cookie.value))
 
   return pairs.length ? [...explicit, ...pairs].join('; ') : undefined
 }
@@ -228,7 +252,7 @@ function splitCookiePair(pair: string): [name: string, value: string] {
  */
 function parseSetCookie(setCookie: string) {
   // Control characters other than tab make the whole cookie invalid
-  // eslint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0A-\x1F\x7F]/.test(setCookie)) {
     return undefined
   }
@@ -249,7 +273,9 @@ function parseSetCookie(setCookie: string) {
   // A repeated attribute overrides the earlier ones
   for (const attribute of attributes) {
     const index = attribute.indexOf('=')
-    const attributeName = (index === -1 ? attribute : attribute.slice(0, index)).trim().toLowerCase()
+    const attributeName = (index === -1 ? attribute : attribute.slice(0, index))
+      .trim()
+      .toLowerCase()
     const attributeValue = index === -1 ? '' : attribute.slice(index + 1).trim()
 
     switch (attributeName) {
@@ -306,14 +332,11 @@ function parseCookieDate(value: string): number | undefined {
 
     if (time === undefined && timeMatch) {
       time = [Number(timeMatch[1]), Number(timeMatch[2]), Number(timeMatch[3])]
-    }
-    else if (day === undefined && digits.length >= 1 && digits.length <= 2) {
+    } else if (day === undefined && digits.length >= 1 && digits.length <= 2) {
       day = Number(digits)
-    }
-    else if (month === undefined && monthIndex !== -1) {
+    } else if (month === undefined && monthIndex !== -1) {
       month = monthIndex
-    }
-    else if (year === undefined && digits.length >= 2 && digits.length <= 4) {
+    } else if (year === undefined && digits.length >= 2 && digits.length <= 4) {
       year = Number(digits)
       year += year < 70 ? 2000 : year < 100 ? 1900 : 0
     }
@@ -341,12 +364,14 @@ function parseCookieDate(value: string): number | undefined {
 function isSecureUrl(url: URL): boolean {
   const host = url.hostname
 
-  return url.protocol === 'https:'
-    || url.protocol === 'wss:'
-    || host === 'localhost'
-    || host.endsWith('.localhost')
-    || host === '[::1]'
-    || /^127(?:\.\d{1,3}){3}$/.test(host)
+  return (
+    url.protocol === 'https:' ||
+    url.protocol === 'wss:' ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '[::1]' ||
+    /^127(?:\.\d{1,3}){3}$/.test(host)
+  )
 }
 
 /**

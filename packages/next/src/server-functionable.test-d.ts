@@ -1,8 +1,9 @@
 import type { Procedure } from '@orpc/server'
-import type { ProcedureServerFunction } from './server-function'
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { createServerFunctionable } from './server-functionable'
+
+import type { ProcedureServerFunction } from './server-function.ts'
+import { createServerFunctionable } from './server-functionable.ts'
 
 const errorMap = {
   BASE: {
@@ -11,8 +12,8 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 describe('createServerFunctionable', () => {
   const functionable = createServerFunctionable({
@@ -22,11 +23,16 @@ describe('createServerFunctionable', () => {
   it('returns the wrapped server function and preserves the procedure metadata', () => {
     expectTypeOf(
       functionable(
-        os.$context<{ auth: boolean }>().input(schema1).output(schema2).errors(errorMap).handler(() => ({ schema2: 123 })),
+        os
+          .$context<{ auth: boolean }>()
+          .input(schema1)
+          .output(schema2)
+          .errors(errorMap)
+          .handler(() => ({ schema2: 123 })),
       ),
     ).toEqualTypeOf<
-      & ProcedureServerFunction<typeof schema1, typeof schema2, typeof errorMap>
-      & Procedure<{ auth: boolean }, object, typeof schema1, typeof schema2, typeof errorMap>
+      ProcedureServerFunction<typeof schema1, typeof schema2, typeof errorMap> &
+        Procedure<{ auth: boolean }, object, typeof schema1, typeof schema2, typeof errorMap>
     >()
   })
 

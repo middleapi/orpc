@@ -53,7 +53,7 @@ export function joinHref(): string {
 /** Reports name people, so they go to a private inbox rather than GitHub issues. */
 export function feedbackHref(): string {
   return mailto('Feedback on an oRPC expert', [
-    'Expert\'s name: ',
+    "Expert's name: ",
     'When you worked together: ',
     'What happened: ',
   ])

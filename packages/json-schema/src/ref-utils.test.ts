@@ -1,5 +1,13 @@
-import type { JsonSchema } from './types'
-import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaLocalPointer, resolveJsonSchemaRootLocalRef, visitJsonSchemaRefs } from './ref-utils'
+import {
+  decodeJsonPointerSegment,
+  encodeJsonPointerSegment,
+  hoistRecursiveRefToDef,
+  mapJsonSchemaRefs,
+  resolveJsonSchemaLocalPointer,
+  resolveJsonSchemaRootLocalRef,
+  visitJsonSchemaRefs,
+} from './ref-utils.ts'
+import type { JsonSchema } from './types.ts'
 
 describe('visitJsonSchemaRefs', () => {
   it('visits refs under the same keywords mapJsonSchemaRefs rewrites, and skips non-schema keywords', () => {
@@ -13,6 +21,7 @@ describe('visitJsonSchemaRefs', () => {
       prefixItems: [{ $ref: '#/$defs/F' }],
       not: { $ref: '#/$defs/G' },
       if: { $ref: '#/$defs/H' },
+      // oxlint-disable-next-line unicorn/no-thenable
       then: { $ref: '#/$defs/I' },
       else: { $ref: '#/$defs/J' },
       items: { $ref: '#/$defs/K' },
@@ -29,9 +38,9 @@ describe('visitJsonSchemaRefs', () => {
     })
 
     const visited: string[] = []
-    visitJsonSchemaRefs(schema, ref => visited.push(ref))
+    visitJsonSchemaRefs(schema, (ref) => visited.push(ref))
 
-    expect(visited.sort()).toEqual(mapped.sort())
+    expect(visited.toSorted()).toEqual(mapped.toSorted())
     expect(visited).not.toContain('#/$defs/Ignored')
     expect(visited.length).toBe(14)
   })
@@ -42,22 +51,25 @@ describe('visitJsonSchemaRefs', () => {
     cyclic.items = cyclic
 
     const visited: string[] = []
-    visitJsonSchemaRefs({
-      type: 'object',
-      properties: {
-        a: shared,
-        b: shared,
-        c: cyclic as JsonSchema,
+    visitJsonSchemaRefs(
+      {
+        type: 'object',
+        properties: {
+          a: shared,
+          b: shared,
+          c: cyclic as JsonSchema,
+        },
       },
-    }, ref => visited.push(ref))
+      (ref) => visited.push(ref),
+    )
 
     expect(visited).toEqual(['#/$defs/Shared'])
   })
 
   it('ignores non-object schemas', () => {
     const visited: string[] = []
-    visitJsonSchemaRefs(true, ref => visited.push(ref))
-    visitJsonSchemaRefs(false, ref => visited.push(ref))
+    visitJsonSchemaRefs(true, (ref) => visited.push(ref))
+    visitJsonSchemaRefs(false, (ref) => visited.push(ref))
     expect(visited).toEqual([])
   })
 })
@@ -93,33 +105,28 @@ describe('mapJsonSchemaRefs', () => {
   it('passes the structural path to the mapper', () => {
     const visited: Array<[ref: string, path: Array<string | number>]> = []
 
-    const schema = mapJsonSchemaRefs({
-      type: 'object',
-      properties: {
-        child: { $ref: '#/$defs/Node' },
+    const schema = mapJsonSchemaRefs(
+      {
+        type: 'object',
+        properties: {
+          child: { $ref: '#/$defs/Node' },
+        },
+        anyOf: [{ $ref: '#/$defs/Leaf' }],
+        examples: [{ $ref: '#/$defs/Ignored' }],
       },
-      anyOf: [
-        { $ref: '#/$defs/Leaf' },
-      ],
-      examples: [
-        { $ref: '#/$defs/Ignored' },
-      ],
-    }, (ref, path) => {
-      visited.push([ref, path])
-      return ref
-    })
+      (ref, path) => {
+        visited.push([ref, path])
+        return ref
+      },
+    )
 
     expect(schema).toEqual({
       type: 'object',
       properties: {
         child: { $ref: '#/$defs/Node' },
       },
-      anyOf: [
-        { $ref: '#/$defs/Leaf' },
-      ],
-      examples: [
-        { $ref: '#/$defs/Ignored' },
-      ],
+      anyOf: [{ $ref: '#/$defs/Leaf' }],
+      examples: [{ $ref: '#/$defs/Ignored' }],
     })
 
     expect(visited).toEqual([
@@ -131,27 +138,30 @@ describe('mapJsonSchemaRefs', () => {
   it('rewrites refs across schema arrays and schema record keywords', () => {
     const visited: Array<[ref: string, path: Array<string | number>]> = []
 
-    const rewritten = mapJsonSchemaRefs({
-      anyOf: [
-        { $ref: '#/$defs/Node' },
-        {
-          properties: {
-            child: { $ref: '#/$defs/Child' },
+    const rewritten = mapJsonSchemaRefs(
+      {
+        anyOf: [
+          { $ref: '#/$defs/Node' },
+          {
+            properties: {
+              child: { $ref: '#/$defs/Child' },
+            },
+          },
+        ],
+        $defs: {
+          Node: {
+            items: { $ref: '#/$defs/Leaf' },
           },
         },
-      ],
-      $defs: {
-        Node: {
-          items: { $ref: '#/$defs/Leaf' },
+        dependentSchemas: {
+          feature: { $ref: '#/$defs/Feature' },
         },
       },
-      dependentSchemas: {
-        feature: { $ref: '#/$defs/Feature' },
+      (ref, path) => {
+        visited.push([ref, path])
+        return `${ref}?visited=${path.join('.')}`
       },
-    }, (ref, path) => {
-      visited.push([ref, path])
-      return `${ref}?visited=${path.join('.')}`
-    })
+    )
 
     expect(rewritten).toEqual({
       anyOf: [
@@ -183,64 +193,64 @@ describe('mapJsonSchemaRefs', () => {
   it('ignores non-schema metadata while still traversing nested schemas', () => {
     const visited: Array<[ref: string, path: Array<string | number>]> = []
 
-    const rewritten = mapJsonSchemaRefs({
-      type: 'object',
-      title: 'Example',
-      examples: [
-        { $ref: '#/$defs/Ignored' },
-      ],
-      default: {
-        $ref: '#/$defs/AlsoIgnored',
-      },
-      properties: {
-        nested: {
-          allOf: [
-            { $ref: '#/$defs/Tracked' },
-          ],
+    const rewritten = mapJsonSchemaRefs(
+      {
+        type: 'object',
+        title: 'Example',
+        examples: [{ $ref: '#/$defs/Ignored' }],
+        default: {
+          $ref: '#/$defs/AlsoIgnored',
+        },
+        properties: {
+          nested: {
+            allOf: [{ $ref: '#/$defs/Tracked' }],
+          },
         },
       },
-    }, (ref, path) => {
-      visited.push([ref, path])
-      return ref.replace('#/$defs/', '#/$defs/rewritten-')
-    })
+      (ref, path) => {
+        visited.push([ref, path])
+        return ref.replace('#/$defs/', '#/$defs/rewritten-')
+      },
+    )
 
     expect(rewritten).toEqual({
       type: 'object',
       title: 'Example',
-      examples: [
-        { $ref: '#/$defs/Ignored' },
-      ],
+      examples: [{ $ref: '#/$defs/Ignored' }],
       default: {
         $ref: '#/$defs/AlsoIgnored',
       },
       properties: {
         nested: {
-          allOf: [
-            { $ref: '#/$defs/rewritten-Tracked' },
-          ],
+          allOf: [{ $ref: '#/$defs/rewritten-Tracked' }],
         },
       },
     })
 
-    expect(visited).toEqual([
-      ['#/$defs/Tracked', ['properties', 'nested', 'allOf', 0, '$ref']],
-    ])
+    expect(visited).toEqual([['#/$defs/Tracked', ['properties', 'nested', 'allOf', 0, '$ref']]])
   })
 
   it('keeps properties and defs named __proto__ as own keys', () => {
     const rewritten = mapJsonSchemaRefs(
-      JSON.parse('{"properties":{"__proto__":{"$ref":"#/$defs/__proto__"}},"$defs":{"__proto__":{"type":"string"}}}'),
-      ref => ref.replace('#/$defs/', '#/$defs/rewritten-'),
+      JSON.parse(
+        '{"properties":{"__proto__":{"$ref":"#/$defs/__proto__"}},"$defs":{"__proto__":{"type":"string"}}}',
+      ),
+      (ref) => ref.replace('#/$defs/', '#/$defs/rewritten-'),
     )
 
-    expect(JSON.stringify(rewritten)).toBe('{"properties":{"__proto__":{"$ref":"#/$defs/rewritten-__proto__"}},"$defs":{"__proto__":{"type":"string"}}}')
+    expect(JSON.stringify(rewritten)).toBe(
+      '{"properties":{"__proto__":{"$ref":"#/$defs/rewritten-__proto__"}},"$defs":{"__proto__":{"type":"string"}}}',
+    )
   })
 })
 
 describe('resolveJsonSchemaRootLocalRef', () => {
   it('returns unsupported refs unchanged', () => {
     const schemaWithoutRef: JsonSchema = { type: 'string' }
-    const externalRef: JsonSchema = { $ref: '#/components/schemas/User', $defs: { User: { type: 'string' } } }
+    const externalRef: JsonSchema = {
+      $ref: '#/components/schemas/User',
+      $defs: { User: { type: 'string' } },
+    }
     const missingDefs: JsonSchema = { $ref: '#/$defs/User' } as JsonSchema
     const nullDefs: JsonSchema = { $ref: '#/$defs/User', $defs: null as never }
 
@@ -338,10 +348,15 @@ describe('resolveJsonSchemaRootLocalRef', () => {
   })
 
   it('follows chained refs through the $defs arg', () => {
-    expect(resolveJsonSchemaRootLocalRef({ $ref: '#/$defs/outer' }, {
-      outer: { $ref: '#/$defs/inner', title: 'outer' },
-      inner: { type: 'string' },
-    })).toEqual({ type: 'string', title: 'outer' })
+    expect(
+      resolveJsonSchemaRootLocalRef(
+        { $ref: '#/$defs/outer' },
+        {
+          outer: { $ref: '#/$defs/inner', title: 'outer' },
+          inner: { type: 'string' },
+        },
+      ),
+    ).toEqual({ type: 'string', title: 'outer' })
   })
 
   it('prefer $defs arg over schema.$defs even undefined', () => {
@@ -352,9 +367,11 @@ describe('resolveJsonSchemaRootLocalRef', () => {
       },
     }
 
-    expect(resolveJsonSchemaRootLocalRef(schema, {
-      branch: false,
-    })).toEqual(false)
+    expect(
+      resolveJsonSchemaRootLocalRef(schema, {
+        branch: false,
+      }),
+    ).toEqual(false)
     expect(resolveJsonSchemaRootLocalRef(schema, undefined)).toBe(schema)
   })
 })
@@ -388,10 +405,7 @@ describe('hoistRecursiveRefToDef', () => {
       required: ['value', 'child'],
       $defs: {
         Leaf: {
-          anyOf: [
-            { type: 'null' },
-            { $ref: '#' },
-          ],
+          anyOf: [{ type: 'null' }, { $ref: '#' }],
         },
       },
     }
@@ -400,10 +414,7 @@ describe('hoistRecursiveRefToDef', () => {
       $ref: '#/$defs/__schema0',
       $defs: {
         Leaf: {
-          anyOf: [
-            { type: 'null' },
-            { $ref: '#/$defs/__schema0' },
-          ],
+          anyOf: [{ type: 'null' }, { $ref: '#/$defs/__schema0' }],
         },
         __schema0: {
           type: 'object',

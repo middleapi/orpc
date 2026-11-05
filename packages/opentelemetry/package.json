@@ -1,52 +1,47 @@
 {
   "name": "@orpc/opentelemetry",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "OpenTelemetry integration for oRPC: distributed tracing for typesafe APIs",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "observability",
+    "opentelemetry",
+    "orpc",
+    "otel",
+    "tracing",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/opentelemetry"
   },
-  "keywords": [
-    "orpc",
-    "opentelemetry",
-    "otel",
-    "tracing",
-    "observability",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "@opentelemetry/api": ">=1.9.0",
-    "@opentelemetry/instrumentation": ">=0.203.0"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/shared": "workspace:*"
@@ -55,5 +50,9 @@
     "@opentelemetry/api": "^1.10.0",
     "@opentelemetry/instrumentation": "^0.300.0",
     "@opentelemetry/sdk-trace-node": "^2.12.0"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": ">=1.9.0",
+    "@opentelemetry/instrumentation": ">=0.203.0"
   }
 }

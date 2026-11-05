@@ -1,25 +1,44 @@
-import type { AnyORPCErrorJSON, AnySchema, Context, ErrorMap, InferSchemaInput, InferSchemaOutput, Lazyable, ORPCError, ORPCErrorCode, ORPCErrorFromErrorMap, ORPCErrorJSON, Procedure, ProcedureClientOptions, ThrowableError } from '@orpc/server'
-import type { MaybeOptionalOptions } from '@orpc/shared'
 import { parseFormData } from '@orpc/openapi/helpers'
+import type {
+  AnyORPCErrorJSON,
+  AnySchema,
+  Context,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  Lazyable,
+  ORPCError,
+  ORPCErrorCode,
+  ORPCErrorFromErrorMap,
+  ORPCErrorJSON,
+  Procedure,
+  ProcedureClientOptions,
+  ThrowableError,
+} from '@orpc/server'
 import { createProcedureClient, toORPCError } from '@orpc/server'
+import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { unstable_rethrow } from 'next/navigation'
+import { unstable_rethrow } from 'next/navigation.js'
 
-export type ServerFunctionORPCErrorJSON<T>
-  = T extends ORPCError<infer U, infer V>
+export type ServerFunctionORPCErrorJSON<T> =
+  T extends ORPCError<infer U, infer V>
     ? ORPCErrorJSON<U, V> & { defined: true }
     : ORPCErrorJSON<ORPCErrorCode, unknown> & { defined: false }
 
-export type ServerFunctionError<T extends AnyORPCErrorJSON>
-  = T extends ORPCErrorJSON<infer U, infer V> & { defined: true }
-    ? ORPCError<U, V>
-    : ThrowableError
+export type ServerFunctionError<T extends AnyORPCErrorJSON> = T extends ORPCErrorJSON<
+  infer U,
+  infer V
+> & { defined: true }
+  ? ORPCError<U, V>
+  : ThrowableError
 
-export type ServerFunctionRest<TInput>
-  = | [input: TInput]
-    | (undefined extends TInput ? [input?: TInput] : [input: TInput])
+export type ServerFunctionRest<TInput> =
+  | [input: TInput]
+  | (undefined extends TInput ? [input?: TInput] : [input: TInput])
 
-export type ServerFunctionResult<TOutput, TError> = [error: null, data: TOutput] | [error: TError, data: undefined]
+export type ServerFunctionResult<TOutput, TError> =
+  | [error: null, data: TOutput]
+  | [error: TError, data: undefined]
 
 export interface ServerFunction<TInput, TOutput, TError extends AnyORPCErrorJSON> {
   (...rest: ServerFunctionRest<TInput>): Promise<ServerFunctionResult<TOutput, TError>>
@@ -60,20 +79,9 @@ export function createServerFunction<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 >(
-  procedure: Lazyable<Procedure<
-    TInitialContext,
-    any,
-    TInputSchema,
-    TOutputSchema,
-    TErrorMap
-  >>,
+  procedure: Lazyable<Procedure<TInitialContext, any, TInputSchema, TOutputSchema, TErrorMap>>,
   ...rest: MaybeOptionalOptions<
-    ProcedureClientOptions<
-      TInitialContext,
-      TOutputSchema,
-      TErrorMap,
-      object
-    >
+    ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, object>
   >
 ): ProcedureServerFunction<TInputSchema, TOutputSchema, TErrorMap> {
   const options = resolveMaybeOptionalOptions(rest)
@@ -88,13 +96,14 @@ export function createServerFunction<
 
     try {
       return [null, await client(input as any)]
-    }
-    catch (error) {
+    } catch (error) {
       // https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow
       unstable_rethrow(error)
 
       return [
-        toORPCError(error).toJSON() as ServerFunctionORPCErrorJSON<ORPCErrorFromErrorMap<TErrorMap> | ThrowableError>,
+        toORPCError(error).toJSON() as ServerFunctionORPCErrorJSON<
+          ORPCErrorFromErrorMap<TErrorMap> | ThrowableError
+        >,
         undefined,
       ]
     }

@@ -1,8 +1,16 @@
 import type { StandardSchemaWithJSON } from '@modelcontextprotocol/server'
 import type { AnySchema } from '@orpc/contract'
-import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
-import { combineJsonSchemasWithComposition, containsJsonFileSchema, ensureJsonSchemaObject, hoistRecursiveRefToDef, isJsonObjectLikeSchema, isStandardSchemaOptional, isUnconstrainedSchema } from '@orpc/json-schema'
+import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
+import {
+  combineJsonSchemasWithComposition,
+  containsJsonFileSchema,
+  ensureJsonSchemaObject,
+  hoistRecursiveRefToDef,
+  isJsonObjectLikeSchema,
+  isStandardSchemaOptional,
+  isUnconstrainedSchema,
+} from '@orpc/json-schema'
 import { isTypescriptObject, ORPC_NAME } from '@orpc/shared'
 
 type JsonSchemaObject = Exclude<JsonSchema, boolean>
@@ -42,8 +50,7 @@ function rejectsEmptyObject(schema: AnySchema): boolean {
     }
 
     return result.issues !== undefined
-  }
-  catch {
+  } catch {
     return false
   }
 }
@@ -52,7 +59,10 @@ function rejectsEmptyObject(schema: AnySchema): boolean {
  * Probes the schemas themselves, since a JSON Schema cannot tell `z.void()` from a schema the converters do not support.
  */
 function isEmptyAsUndefined(inputSchemas: AnySchema[]): boolean {
-  return inputSchemas.every(schema => isStandardSchemaOptional(schema, 'input')) && inputSchemas.some(rejectsEmptyObject)
+  return (
+    inputSchemas.every((schema) => isStandardSchemaOptional(schema, 'input')) &&
+    inputSchemas.some(rejectsEmptyObject)
+  )
 }
 
 function convertSchema(
@@ -79,7 +89,9 @@ function combineConvertedSchemas(converted: [JsonSchema, boolean][]): [JsonSchem
   }
 
   // an unconstrained schema adds nothing to `allOf`, such as one without JSON Schema support
-  const constrained = converted.map(([jsonSchema]) => jsonSchema).filter(jsonSchema => !isUnconstrainedSchema(jsonSchema))
+  const constrained = converted
+    .map(([jsonSchema]) => jsonSchema)
+    .filter((jsonSchema) => !isUnconstrainedSchema(jsonSchema))
 
   return [
     combineJsonSchemasWithComposition('allOf', constrained),
@@ -98,10 +110,14 @@ export function resolveToolInputJsonSchema(
   inputSchemas: AnySchema[],
 ): ToolInputJsonSchema {
   if (inputSchemas.length === 0) {
-    return { jsonSchema: { type: 'object', properties: {} }, wrapped: false, emptyAsUndefined: false }
+    return {
+      jsonSchema: { type: 'object', properties: {} },
+      wrapped: false,
+      emptyAsUndefined: false,
+    }
   }
 
-  const converted = inputSchemas.map(schema => convertSchema(converter, schema, 'input'))
+  const converted = inputSchemas.map((schema) => convertSchema(converter, schema, 'input'))
   const [combined, optional] = combineConvertedSchemas(converted)
   const jsonSchema = ensureJsonSchemaObject(combined)
 
@@ -129,13 +145,15 @@ export function resolveToolInputJsonSchema(
  * Empty arguments become `undefined` for inputs that accept no object.
  */
 export function resolveToolInput(args: unknown, inputJsonSchema: ToolInputJsonSchema): unknown {
-  if (inputJsonSchema.emptyAsUndefined && isTypescriptObject(args) && Object.keys(args).length === 0) {
+  if (
+    inputJsonSchema.emptyAsUndefined &&
+    isTypescriptObject(args) &&
+    Object.keys(args).length === 0
+  ) {
     return undefined
   }
 
-  return inputJsonSchema.wrapped && isTypescriptObject(args)
-    ? args[WRAPPED_INPUT_KEY]
-    : args
+  return inputJsonSchema.wrapped && isTypescriptObject(args) ? args[WRAPPED_INPUT_KEY] : args
 }
 
 /**
@@ -154,7 +172,9 @@ export function resolveToolOutputJsonSchema(
   }
 
   const yieldSchemas = getAsyncIteratorObjectSchemasDetails(outputSchemas)?.yieldSchemas
-  const converted = (yieldSchemas ?? outputSchemas).map(schema => convertSchema(converter, schema, 'output'))
+  const converted = (yieldSchemas ?? outputSchemas).map((schema) =>
+    convertSchema(converter, schema, 'output'),
+  )
   const [combined, optional] = combineConvertedSchemas(converted)
 
   // an output schema requires structured content matching it in every result, which undefined, unknown, or binary outputs

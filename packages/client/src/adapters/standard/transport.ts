@@ -1,5 +1,6 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { ClientContext, ClientOptions } from '../../types'
+
+import type { ClientContext, ClientOptions } from '../../types.ts'
 
 /**
  * Handles the transport layer for sending requests and receiving responses.
@@ -11,5 +12,9 @@ export interface StandardLinkTransport<T extends ClientContext> {
   /**
    * @throws Transport-level errors (network failures, timeouts, etc.)
    */
-  send(request: StandardRequest, path: string[], options: ClientOptions<T>): Promise<StandardLazyResponse>
+  send(
+    request: StandardRequest,
+    path: string[],
+    options: ClientOptions<T>,
+  ): Promise<StandardLazyResponse>
 }

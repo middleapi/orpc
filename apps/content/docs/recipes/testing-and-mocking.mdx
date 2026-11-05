@@ -1,6 +1,6 @@
 ---
-title: "Testing and Mocking"
-description: "Learn how to test oRPC procedures directly with server-side clients, create mock implementations with the implementer, and mock network requests with MSW."
+title: 'Testing and Mocking'
+description: 'Learn how to test oRPC procedures directly with server-side clients, create mock implementations with the implementer, and mock network requests with MSW.'
 ---
 
 ## Testing
@@ -11,9 +11,7 @@ For fast, focused tests, use [Server-Side Clients](/docs/client/server-side) or 
 import { call } from '@orpc/server'
 
 it('lists planets', async () => {
-  await expect(
-    call(router.planet.list, { page: 1, size: 10 })
-  ).resolves.toEqual([
+  await expect(call(router.planet.list, { page: 1, size: 10 })).resolves.toEqual([
     { id: '1', name: 'Earth' },
     { id: '2', name: 'Mars' },
   ])
@@ -56,10 +54,8 @@ import { RPCHandler } from '@orpc/server/fetch'
 
 const mock = createHTTPUtils(router, {
   prefix: '/rpc',
-  handler: router => new RPCHandler(router),
+  handler: (router) => new RPCHandler(router),
 })
 
-const handlers = [
-  mock.planet.list.handler(() => []),
-]
+const handlers = [mock.planet.list.handler(() => [])]
 ```

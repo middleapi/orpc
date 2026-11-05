@@ -1,11 +1,14 @@
 import { throwIfAborted } from '@standard-server/shared'
-import { promiseWithResolvers } from './promise'
+
+import { promiseWithResolvers } from './promise.ts'
 
 /**
  * Returns a signal that aborts only after all provided signals are aborted.
  */
-export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): AbortSignal | undefined {
-  const realSignals = signals.filter(signal => signal !== undefined)
+export function allAbortSignal(
+  signals: readonly (AbortSignal | undefined)[],
+): AbortSignal | undefined {
+  const realSignals = signals.filter((signal) => signal !== undefined)
 
   if (realSignals.length === 0 || realSignals.length !== signals.length) {
     return undefined
@@ -14,7 +17,7 @@ export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
   const controller = new AbortController()
 
   const abortIfAllAborted = () => {
-    if (realSignals.every(signal => signal.aborted)) {
+    if (realSignals.every((signal) => signal.aborted)) {
       controller.abort()
     }
   }
@@ -22,12 +25,16 @@ export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
   abortIfAllAborted()
 
   for (const signal of realSignals) {
-    signal.addEventListener('abort', () => {
-      abortIfAllAborted()
-    }, {
-      once: true,
-      signal: controller.signal,
-    })
+    signal.addEventListener(
+      'abort',
+      () => {
+        abortIfAllAborted()
+      },
+      {
+        once: true,
+        signal: controller.signal,
+      },
+    )
   }
 
   return controller.signal
@@ -40,8 +47,10 @@ export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
  * Prefers the native `AbortSignal.any` when available, and falls back to a manual
  * implementation otherwise, including in runtimes without the `AbortSignal` global.
  */
-export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): AbortSignal | undefined {
-  const realSignals = signals.filter(signal => signal !== undefined)
+export function anyAbortSignal(
+  signals: readonly (AbortSignal | undefined)[],
+): AbortSignal | undefined {
+  const realSignals = signals.filter((signal) => signal !== undefined)
 
   if (realSignals.length === 0) {
     return undefined
@@ -51,9 +60,9 @@ export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
     return realSignals[0]
   }
 
-  // eslint-disable-next-line no-restricted-globals
+  // oxlint-disable-next-line no-restricted-globals, no-restricted-properties
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
-    // eslint-disable-next-line ban/ban, no-restricted-globals
+    // oxlint-disable-next-line no-restricted-properties, no-restricted-globals
     return AbortSignal.any(realSignals)
   }
 
@@ -65,18 +74,25 @@ export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
       break
     }
 
-    signal.addEventListener('abort', () => {
-      controller.abort(signal.reason)
-    }, {
-      once: true,
-      signal: controller.signal,
-    })
+    signal.addEventListener(
+      'abort',
+      () => {
+        controller.abort(signal.reason)
+      },
+      {
+        once: true,
+        signal: controller.signal,
+      },
+    )
   }
 
   return controller.signal
 }
 
-export async function runWithSignal<T>(signal: AbortSignal | undefined, fn: () => Promise<T>): Promise<T> {
+export async function runWithSignal<T>(
+  signal: AbortSignal | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
   if (!signal) {
     return fn()
   }
@@ -84,16 +100,18 @@ export async function runWithSignal<T>(signal: AbortSignal | undefined, fn: () =
   throwIfAborted(signal)
   const { promise, reject, resolve } = promiseWithResolvers<T>()
   let abortListener
-  signal.addEventListener('abort', abortListener = () => {
-    reject(signal.reason)
-    abortListener = undefined
-  })
+  signal.addEventListener(
+    'abort',
+    (abortListener = () => {
+      reject(signal.reason)
+      abortListener = undefined
+    }),
+  )
 
   try {
     fn().then(resolve, reject)
     return await promise
-  }
-  finally {
+  } finally {
     if (abortListener) {
       signal.removeEventListener('abort', abortListener)
     }

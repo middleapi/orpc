@@ -1,17 +1,18 @@
-import type { ORPCErrorFromErrorMap } from '@orpc/contract'
-import type { RouterClient } from '@orpc/server'
-import type { Public } from '@orpc/shared'
-import type { ProcedureUtils } from './procedure-utils'
-import type { RouterUtils } from './router-utils'
-import type { SharedUtils } from './shared-utils'
 import { RPCSerializer } from '@orpc/client'
+import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import { OpenAPISerializer } from '@orpc/openapi'
+import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
-import z from 'zod'
-import { createRouterUtils } from './router-utils'
+import type { Public } from '@orpc/shared'
+import * as z from 'zod'
 
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+import type { ProcedureUtils } from './procedure-utils.ts'
+import type { RouterUtils } from './router-utils.ts'
+import { createRouterUtils } from './router-utils.ts'
+import type { SharedUtils } from './shared-utils.ts'
+
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 const unknownSchema = z.unknown()
 
 const baseErrorMap = {
@@ -21,8 +22,15 @@ const baseErrorMap = {
   OVERRIDE: {},
 }
 
-const ping = os.input(inputSchema).output(outputSchema).errors(baseErrorMap).handler(() => ({ output: 1 }))
-const pong = os.input(unknownSchema).output(unknownSchema).handler(() => 'pong')
+const ping = os
+  .input(inputSchema)
+  .output(outputSchema)
+  .errors(baseErrorMap)
+  .handler(() => ({ output: 1 }))
+const pong = os
+  .input(unknownSchema)
+  .output(unknownSchema)
+  .handler(() => 'pong')
 
 const router = {
   ping,
@@ -43,10 +51,24 @@ it('RouterUtils', () => {
   expectTypeOf(utils.nested.ping).toExtend<Public<SharedUtils<{ input: number }>>>()
 
   expectTypeOf(utils.ping).toExtend<
-    Public<ProcedureUtils<{ batch?: boolean }, { input: number }, { output: string }, ORPCErrorFromErrorMap<typeof baseErrorMap> | Error>>
+    Public<
+      ProcedureUtils<
+        { batch?: boolean },
+        { input: number },
+        { output: string },
+        ORPCErrorFromErrorMap<typeof baseErrorMap> | Error
+      >
+    >
   >()
   expectTypeOf(utils.nested.ping).toExtend<
-    Public<ProcedureUtils<{ batch?: boolean }, { input: number }, { output: string }, ORPCErrorFromErrorMap<typeof baseErrorMap> | Error>>
+    Public<
+      ProcedureUtils<
+        { batch?: boolean },
+        { input: number },
+        { output: string },
+        ORPCErrorFromErrorMap<typeof baseErrorMap> | Error
+      >
+    >
   >()
 
   expectTypeOf(utils.pong).toExtend<
@@ -94,7 +116,7 @@ it('createRouterUtils', () => {
     plugins: [
       {
         name: 'test-plugin',
-        init: options => options,
+        init: (options) => options,
         initProcedureOptions: (path, options) => {
           expectTypeOf(path).toEqualTypeOf<string[]>()
 

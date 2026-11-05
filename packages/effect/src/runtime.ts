@@ -11,7 +11,10 @@ export interface RunPromiseOptions extends Effect.RunOptions {
 /**
  * Runs an Effect as a Promise and throws the most meaningful errors.
  */
-export async function runPromise<T>(effect: Effect.Effect<T, unknown>, options: RunPromiseOptions = {}): Promise<T> {
+export async function runPromise<T>(
+  effect: Effect.Effect<T, unknown>,
+  options: RunPromiseOptions = {},
+): Promise<T> {
   const exit = await Effect.runPromiseExitWith(options.context ?? Context.empty())(effect, options)
 
   if (Exit.isSuccess(exit)) {

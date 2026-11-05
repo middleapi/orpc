@@ -1,16 +1,16 @@
 ---
-title: "You Might Not Need a Form Library"
-description: "Your API schema already knows what valid input looks like. Reuse it in the browser to parse plain HTML forms and show field errors, without a form library."
+title: 'You Might Not Need a Form Library'
+description: 'Your API schema already knows what valid input looks like. Reuse it in the browser to parse plain HTML forms and show field errors, without a form library.'
 type: blog
 date: 2026-08-22
 search:
   tags:
     - Engineering
 authors:
-    name: Định Lê
-    role: Creator of oRPC
-    url: https://github.com/dinwwwh
-    avatar: https://github.com/dinwwwh.png
+  name: Định Lê
+  role: Creator of oRPC
+  url: https://github.com/dinwwwh
+  avatar: https://github.com/dinwwwh.png
 ai:
   exclude: true
 ---
@@ -60,9 +60,7 @@ The [Request Validation Plugin](/docs/plugins/request-validation) runs your cont
 import { RequestValidationLinkPlugin } from '@orpc/contract/plugins'
 
 const link = new RPCLink({
-  plugins: [
-    new RequestValidationLinkPlugin(contract),
-  ],
+  plugins: [new RequestValidationLinkPlugin(contract)],
 })
 ```
 
@@ -82,8 +80,7 @@ export function ContactForm() {
     try {
       const output = await client.contact.send(parseFormData(form))
       console.log(output)
-    }
-    catch (error) {
+    } catch (error) {
       setError(error)
     }
   }

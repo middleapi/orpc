@@ -1,6 +1,8 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "preserve",
     "types": ["node"]
   },
   "include": [
@@ -11,11 +13,5 @@
     "sponsors",
     ".blume/.astro/types.d.ts"
   ],
-  "exclude": [
-    "**/*.test.*",
-    "**/*.test-d.ts",
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/__snapshots__/**"
-  ]
+  "exclude": []
 }

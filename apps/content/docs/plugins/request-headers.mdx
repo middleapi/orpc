@@ -1,8 +1,8 @@
 ---
-title: "Request Headers Plugin"
-description: "Expose incoming request headers as context.reqHeaders with RequestHeadersHandlerPlugin for easy access in procedures."
+title: 'Request Headers Plugin'
+description: 'Expose incoming request headers as context.reqHeaders with RequestHeadersHandlerPlugin for easy access in procedures.'
 sidebar:
-  label: "Request Headers"
+  label: 'Request Headers'
 ---
 
 ## Context Access
@@ -42,9 +42,7 @@ Combine with [Cookie Helpers](/docs/helpers/cookie) for streamlined cookie manag
 import { RequestHeadersHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new RequestHeadersHandlerPlugin(),
-  ],
+  plugins: [new RequestHeadersHandlerPlugin()],
 })
 ```
 

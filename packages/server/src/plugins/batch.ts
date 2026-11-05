@@ -1,13 +1,24 @@
-import type { Promisable, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
-import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
 import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
+import type { Promisable, Value } from '@orpc/shared'
 import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
+import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
-import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
+import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
+import {
+  encodePeerMessage,
+  isClientPeerSendMessage,
+  isPeerMessage,
+  ServerPeer,
+} from '@standard-server/peer'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
@@ -48,7 +59,10 @@ function isBodyHeader(name: string): boolean {
  * `isPeerMessage` must run first, since `isClientPeerSendMessage` does not check `id` or `binary`.
  */
 function isClientPeerSendMessages(maybe: unknown): maybe is ClientPeerSendMessage[] {
-  return Array.isArray(maybe) && maybe.every((m: unknown) => isPeerMessage(m) && isClientPeerSendMessage(m))
+  return (
+    Array.isArray(maybe) &&
+    maybe.every((m: unknown) => isPeerMessage(m) && isClientPeerSendMessage(m))
+  )
 }
 
 /**
@@ -57,7 +71,7 @@ function isClientPeerSendMessages(maybe: unknown): maybe is ClientPeerSendMessag
  * for global logging or error handling.
  */
 function internalError(err: unknown): StandardResponse {
-  Promise.reject(err)
+  void Promise.reject(err)
 
   return { status: 500, headers: {}, body: 'Internal server error' }
 }
@@ -73,10 +87,12 @@ interface SubresponseHead {
 /**
  * Resolves with the first subresponse head, or `undefined` if none has one.
  */
-function firstSubresponseHead(heads: Promise<SubresponseHead | undefined>[]): Promise<SubresponseHead | undefined> {
+function firstSubresponseHead(
+  heads: Promise<SubresponseHead | undefined>[],
+): Promise<SubresponseHead | undefined> {
   return new Promise((resolve) => {
     for (const promise of heads) {
-      void promise.then(head => head && resolve(head))
+      void promise.then((head) => head && resolve(head))
     }
 
     void Promise.all(heads).then(() => resolve(undefined))
@@ -87,7 +103,7 @@ function firstSubresponseHead(heads: Promise<SubresponseHead | undefined>[]): Pr
  * Sets the distinct cookies of every source on the headers.
  */
 function liftCookies(headers: StandardHeaders, sources: StandardHeaders[]): StandardHeaders {
-  const cookies = new Set(sources.flatMap(source => toArray(source['set-cookie'])))
+  const cookies = new Set(sources.flatMap((source) => toArray(source['set-cookie'])))
 
   return cookies.size > 0 ? { ...headers, 'set-cookie': [...cookies] } : headers
 }
@@ -111,7 +127,7 @@ function liftSubresponseHeaders(
 
     const flattened = flattenStandardHeader(value)
 
-    if (rest.every(other => flattenStandardHeader(other[name]) === flattened)) {
+    if (rest.every((other) => flattenStandardHeader(other[name]) === flattened)) {
       shared[name] = value
     }
   }
@@ -119,7 +135,9 @@ function liftSubresponseHeaders(
   const headers = liftCookies({ ...shared, ...batchHeaders }, [batchHeaders, ...subresponseHeaders])
   const varies = new Map<string, string>()
 
-  for (const value of [batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other.vary))) {
+  for (const value of [batchHeaders, ...subresponseHeaders].flatMap((other) =>
+    toArray(other.vary),
+  )) {
     for (const field of value.split(',')) {
       const name = field.trim()
       const key = name.toLowerCase()
@@ -145,7 +163,9 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default DEFAULT_BATCH_MAX_SIZE (10)
    * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
    */
-  maxSize?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
+  maxSize?:
+    | Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
+    | undefined
 
   /**
    * Map each subrequest in the batch before it is processed.
@@ -153,7 +173,12 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default merges the batch request headers into the subrequest, giving them priority over
    * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
    */
-  mapSubrequest?: ((subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest) | undefined
+  mapSubrequest?:
+    | ((
+        subrequest: StandardLazyRequest,
+        batchOptions: StandardHandlerRoutingInterceptorOptions<T>,
+      ) => StandardLazyRequest)
+    | undefined
 
   /**
    * Map each sub-response in the batch before it is sent.
@@ -161,18 +186,22 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default removes the headers the batch response already has with the same value, which the client
    * merges back, and `set-cookie`, which the browser ignores there and JavaScript could read
    */
-  mapSubresponse?: ((
-    subresponse: StandardResponse,
-    partialBatchResponse: Pick<StandardResponse, 'status' | 'headers'>,
-    batchOptions: StandardHandlerRoutingInterceptorOptions<T>,
-  ) => StandardResponse) | undefined
+  mapSubresponse?:
+    | ((
+        subresponse: StandardResponse,
+        partialBatchResponse: Pick<StandardResponse, 'status' | 'headers'>,
+        batchOptions: StandardHandlerRoutingInterceptorOptions<T>,
+      ) => StandardResponse)
+    | undefined
 
   /**
    * Success batch response status code.
    *
    * @default 207
    */
-  successStatus?: Value<Promisable<number>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
+  successStatus?:
+    | Value<Promisable<number>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
+    | undefined
 
   /**
    * Success batch response headers.
@@ -183,7 +212,12 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * @default {}
    */
-  headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
+  headers?:
+    | Value<
+        Promisable<StandardHeaders>,
+        [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * Keep-alive settings for batch responses that stream.
@@ -193,20 +227,22 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * @default { enabled: true, interval: 15000 }
    */
-  keepAlive?: {
-    /**
-     * If true, a keep-alive frame is sent periodically while the stream is idle.
-     *
-     * @default true
-     */
-    enabled: boolean
-    /**
-     * Interval (in milliseconds) between keep-alive frames after the last message.
-     *
-     * @default 15000
-     */
-    interval?: number | undefined
-  } | undefined
+  keepAlive?:
+    | {
+        /**
+         * If true, a keep-alive frame is sent periodically while the stream is idle.
+         *
+         * @default true
+         */
+        enabled: boolean
+        /**
+         * Interval (in milliseconds) between keep-alive frames after the last message.
+         *
+         * @default 15000
+         */
+        interval?: number | undefined
+      }
+    | undefined
 }
 
 /**
@@ -233,7 +269,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>
-  private readonly mapSubresponse: Exclude<BatchHandlerPluginOptions<T>['mapSubresponse'], undefined>
+  private readonly mapSubresponse: Exclude<
+    BatchHandlerPluginOptions<T>['mapSubresponse'],
+    undefined
+  >
   private readonly successStatus: Exclude<BatchHandlerPluginOptions<T>['successStatus'], undefined>
   private readonly headers: Exclude<BatchHandlerPluginOptions<T>['headers'], undefined>
   private readonly keepAliveEnabled: boolean
@@ -242,31 +281,38 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
   constructor(options: BatchHandlerPluginOptions<T> = {}) {
     this.maxSize = options.maxSize ?? DEFAULT_BATCH_MAX_SIZE
 
-    this.mapSubrequest = options.mapSubrequest ?? ((subRequest, { request: batchRequest }) => ({
-      ...subRequest,
-      headers: {
-        ...subRequest.headers,
-        /**
-         * The batch request headers win over the subrequest ones. They are the only ones the
-         * transport actually saw, so headers the browser injects on its own, such as `cookie`
-         * or `origin`, cannot be overridden by a subrequest, which is just request payload.
-         */
-        ...batchRequest.headers,
-        [BATCH_HEADER]: undefined, // useful in case batch plugin is used multiple times
-      },
-    }))
+    this.mapSubrequest =
+      options.mapSubrequest ??
+      ((subRequest, { request: batchRequest }) => ({
+        ...subRequest,
+        headers: {
+          ...subRequest.headers,
+          /**
+           * The batch request headers win over the subrequest ones. They are the only ones the
+           * transport actually saw, so headers the browser injects on its own, such as `cookie`
+           * or `origin`, cannot be overridden by a subrequest, which is just request payload.
+           */
+          ...batchRequest.headers,
+          [BATCH_HEADER]: undefined, // useful in case batch plugin is used multiple times
+        },
+      }))
 
-    this.mapSubresponse = options.mapSubresponse ?? ((subresponse, { headers: batchHeaders }) => {
-      const headers: StandardHeaders = {}
+    this.mapSubresponse =
+      options.mapSubresponse ??
+      ((subresponse, { headers: batchHeaders }) => {
+        const headers: StandardHeaders = {}
 
-      for (const [name, value] of Object.entries(subresponse.headers)) {
-        if (name !== 'set-cookie' && flattenStandardHeader(value) !== flattenStandardHeader(batchHeaders[name])) {
-          headers[name] = value
+        for (const [name, value] of Object.entries(subresponse.headers)) {
+          if (
+            name !== 'set-cookie' &&
+            flattenStandardHeader(value) !== flattenStandardHeader(batchHeaders[name])
+          ) {
+            headers[name] = value
+          }
         }
-      }
 
-      return { ...subresponse, headers }
-    })
+        return { ...subresponse, headers }
+      })
 
     this.successStatus = options.successStatus ?? 207
     this.headers = options.headers ?? {}
@@ -295,7 +341,11 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           if (!data) {
             return {
               matched: true,
-              response: { status: 400, headers: {}, body: 'Missing data parameter for batch request' },
+              response: {
+                status: 400,
+                headers: {},
+                body: 'Missing data parameter for batch request',
+              },
             }
           }
 
@@ -309,8 +359,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           }
 
           messages = mightBeMessages
-        }
-        else {
+        } else {
           const mightBeMessages = await interceptorOptions.request.resolveBody()
 
           if (!isClientPeerSendMessages(mightBeMessages)) {
@@ -322,8 +371,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           messages = mightBeMessages
         }
-      }
-      catch (error) {
+      } catch (error) {
         return {
           matched: true,
           response: {
@@ -336,12 +384,18 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const outerMethod = interceptorOptions.request.method
       if (
-        (outerMethod === 'GET' || outerMethod === 'QUERY')
-        && messages.some(message => message.kind === 'request' && message.json.method !== outerMethod)
+        (outerMethod === 'GET' || outerMethod === 'QUERY') &&
+        messages.some(
+          (message) => message.kind === 'request' && message.json.method !== outerMethod,
+        )
       ) {
         return {
           matched: true,
-          response: { status: 400, headers: {}, body: `${outerMethod} batch requests only accept ${outerMethod} sub-requests` },
+          response: {
+            status: 400,
+            headers: {},
+            body: `${outerMethod} batch requests only accept ${outerMethod} sub-requests`,
+          },
         }
       }
 
@@ -350,7 +404,11 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       if (messages.length > maxSize) {
         return {
           matched: true,
-          response: { status: 413, headers: {}, body: 'Batch request size exceeds the maximum allowed size' },
+          response: {
+            status: 413,
+            headers: {},
+            body: 'Batch request size exceeds the maximum allowed size',
+          },
         }
       }
 
@@ -366,16 +424,19 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const ready = messages.map(() => promiseWithResolvers<SubresponseHead | undefined>())
       const heads = ready.map(({ promise }) => promise)
       const lifting = streaming
-        ? firstSubresponseHead(heads).then(head => ({
+        ? firstSubresponseHead(heads).then((head) => ({
             batchHeaders: liftCookies(headers, [headers, head?.headers ?? {}]),
             streams: true,
           }))
         : Promise.all(heads).then((all) => {
-            const present = all.filter(head => head !== undefined)
+            const present = all.filter((head) => head !== undefined)
 
             return {
-              batchHeaders: liftSubresponseHeaders(headers, present.map(head => head.headers)),
-              streams: present.some(head => head.stream),
+              batchHeaders: liftSubresponseHeaders(
+                headers,
+                present.map((head) => head.headers),
+              ),
+              streams: present.some((head) => head.stream),
             }
           })
 
@@ -396,8 +457,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           try {
             // Zero-length length-prefixed frame = keep-alive (ignored by clients)
             streamController!.enqueue(encodeLengthPrefix(0))
-          }
-          catch {
+          } catch {
             // Stream may already be closed or errored.
             clearKeepAlive()
           }
@@ -414,8 +474,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const peer = new ServerPeer(async (message) => {
         if (streamController === undefined) {
           bufferedMessages.push(message)
-        }
-        else {
+        } else {
           await enqueueMessage(message)
         }
       })
@@ -429,9 +488,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         try {
           request = this.mapSubrequest(request, interceptorOptions)
           const result = await interceptorOptions.next({ ...interceptorOptions, request })
-          response = result.matched ? result.response : { status: 404, headers: {}, body: 'No procedure matched' }
-        }
-        catch (err) {
+          response = result.matched
+            ? result.response
+            : { status: 404, headers: {}, body: 'No procedure matched' }
+        } catch (err) {
           response = internalError(err)
         }
 
@@ -442,46 +502,55 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         const { batchHeaders } = await lifting
 
         try {
-          return this.mapSubresponse(response, { status, headers: batchHeaders }, interceptorOptions)
-        }
-        catch (err) {
+          return this.mapSubresponse(
+            response,
+            { status, headers: batchHeaders },
+            interceptorOptions,
+          )
+        } catch (err) {
           return internalError(err)
         }
       }
 
       const runSubrequests = async (): Promise<void> => {
-        const promise = Promise.all(messages.map((msg, i) => {
-          const { resolve } = ready[i]!
+        const promise = Promise.all(
+          messages.map((msg, i) => {
+            const { resolve } = ready[i]!
 
-          // Not every message reaches the handler, such as a cancel or a repeated id
-          return peer.message(msg, request => handleIndividualRequest(request, resolve)).finally(() => resolve(undefined))
-        }))
+            // Not every message reaches the handler, such as a cancel or a repeated id
+            return peer
+              .message(msg, (request) => handleIndividualRequest(request, resolve))
+              .finally(() => resolve(undefined))
+          }),
+        )
         const signal = interceptorOptions.request.signal
         const closePeer = () => peer.close(signal?.reason)
 
         if (signal?.aborted) {
-          closePeer()
+          void closePeer()
         }
 
         signal?.addEventListener('abort', closePeer)
 
         try {
           await promise
-        }
-        finally {
+        } finally {
           signal?.removeEventListener('abort', closePeer)
         }
       }
 
       const subrequests = runSubrequests()
       const { batchHeaders, streams } = await lifting
-      const framedHeaders = { ...batchHeaders, 'content-type': batchHeaders['content-type'] ?? BATCH_CONTENT_TYPE }
+      const framedHeaders = {
+        ...batchHeaders,
+        'content-type': batchHeaders['content-type'] ?? BATCH_CONTENT_TYPE,
+      }
 
       if (!streams) {
         await subrequests
         await peer.close()
 
-        if (bufferedMessages.some(msg => msg.binary !== undefined)) {
+        if (bufferedMessages.some((msg) => msg.binary !== undefined)) {
           const chunks = (await Promise.all(bufferedMessages.map(encodeFrame))).flat()
 
           return {

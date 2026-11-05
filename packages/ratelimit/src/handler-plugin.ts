@@ -1,17 +1,24 @@
 import type { AnyProcedure, Context } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import type { StandardHeaders } from '@standard-server/core'
-import type { RateLimitResult } from './types'
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '@orpc/server/standard'
 import { toArray } from '@orpc/shared'
+import type { StandardHeaders } from '@standard-server/core'
 
-export const RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_RATELIMIT_HANDLER_PLUGIN_CONTEXT')
+import type { RateLimitResult } from './types.ts'
+
+export const RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+  'ORPC_RATELIMIT_HANDLER_PLUGIN_CONTEXT',
+)
 
 export interface RateLimitHandlerPluginContext {
   [RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
      * The result of the ratelimiter after applying limits
      */
-    checks: { procedure: AnyProcedure, path: string[], result: RateLimitResult }[]
+    checks: { procedure: AnyProcedure; path: string[]; result: RateLimitResult }[]
   }
 }
 
@@ -25,8 +32,12 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
   name = '~ratelimit'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
-      const pluginContext: Exclude<RateLimitHandlerPluginContext[typeof RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { checks: [] }
+      const pluginContext: Exclude<
+        RateLimitHandlerPluginContext[typeof RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL],
+        undefined
+      > = { checks: [] }
 
       const result = await interceptorOptions.next({
         ...interceptorOptions,
@@ -37,12 +48,14 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
       })
 
       if (result.matched && pluginContext.checks.length) {
-        const exceededChecks = pluginContext.checks.filter(r => !r.result.success)
+        const exceededChecks = pluginContext.checks.filter((r) => !r.result.success)
 
         // Pick the most constrained result: prefer exceeded limits, fall back to all results.
         // Treat undefined remaining as 0 — unknown capacity is assumed fully exhausted.
-        const mostConstrained = (exceededChecks.length ? exceededChecks : pluginContext.checks).reduce(
-          (a, b) => (a.result.remaining ?? Infinity) <= (b.result.remaining ?? Infinity) ? a : b,
+        const mostConstrained = (
+          exceededChecks.length ? exceededChecks : pluginContext.checks
+        ).reduce((a, b) =>
+          (a.result.remaining ?? Infinity) <= (b.result.remaining ?? Infinity) ? a : b,
         )
 
         const headers: StandardHeaders = {
@@ -52,8 +65,15 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
           'ratelimit-reset': mostConstrained.result.reset?.toString(),
         }
 
-        if (result.response.status >= 400 && !mostConstrained.result.success && mostConstrained.result.reset !== undefined) {
-          headers['retry-after'] = Math.max(0, Math.ceil((mostConstrained.result.reset - Date.now()) / 1000)).toString()
+        if (
+          result.response.status >= 400 &&
+          !mostConstrained.result.success &&
+          mostConstrained.result.reset !== undefined
+        ) {
+          headers['retry-after'] = Math.max(
+            0,
+            Math.ceil((mostConstrained.result.reset - Date.now()) / 1000),
+          ).toString()
         }
 
         return {
@@ -70,10 +90,7 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
 
     return {
       ...options,
-      routingInterceptors: [
-        ...toArray(options.routingInterceptors),
-        routingInterceptor,
-      ],
+      routingInterceptors: [...toArray(options.routingInterceptors), routingInterceptor],
     }
   }
 }

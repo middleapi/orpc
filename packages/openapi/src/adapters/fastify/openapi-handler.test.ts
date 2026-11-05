@@ -1,10 +1,11 @@
+import { os } from '@orpc/server'
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { FastifyInstance } from 'fastify'
-import { os } from '@orpc/server'
 import Fastify from 'fastify'
 import request from 'supertest'
-import { openapi } from '../../meta'
-import { OpenAPIHandler } from './openapi-handler'
+
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandler } from './openapi-handler.ts'
 
 describe('openapiHandler', () => {
   let app: FastifyInstance
@@ -41,12 +42,18 @@ describe('openapiHandler', () => {
 
     await app.ready()
 
-    const res = await request(app.server).post('/api/v1/ping/pong').set('content-type', 'application/json').send({ json: null })
+    const res = await request(app.server)
+      .post('/api/v1/ping/pong')
+      .set('content-type', 'application/json')
+      .send({ json: null })
 
     expect(res.status).toBe(200)
     expect(res.text).toContain('u_123')
 
-    const mismatchRes = await request(app.server).post('/invalid/ping').set('content-type', 'application/json').send({ json: null })
+    const mismatchRes = await request(app.server)
+      .post('/invalid/ping')
+      .set('content-type', 'application/json')
+      .send({ json: null })
 
     expect(mismatchRes.status).toBe(404)
     expect(mismatchRes.text).toBe('not matched')
@@ -59,7 +66,10 @@ describe('openapiHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },

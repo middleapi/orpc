@@ -1,4 +1,4 @@
-import { isPlainObject } from './object'
+import { isPlainObject } from './object.ts'
 
 export function isDeepEqual(a: unknown, b: unknown): boolean {
   return isDeepEqualInternal(a, b, new WeakMap())
@@ -17,8 +17,7 @@ function isDeepEqualInternal(
     if (!Array.isArray(b) || a.length !== b.length) {
       return false
     }
-  }
-  else if (!isPlainObject(a) || !isPlainObject(b)) {
+  } else if (!isPlainObject(a) || !isPlainObject(b)) {
     // Anything else (primitives, Date, RegExp, Map, Set, class instances, ...) is only equal when Object.is above matched:
     // non-plain objects keep their state outside own enumerable keys, so they cannot be compared structurally
     return false
@@ -35,13 +34,12 @@ function isDeepEqualInternal(
 
   if (visitedMatches) {
     visitedMatches.add(b)
-  }
-  else {
+  } else {
     visited.set(a, new WeakSet([b]))
   }
 
-  const aKeys = Object.keys(aRecord).filter(k => aRecord[k] !== undefined)
-  const bKeys = Object.keys(bRecord).filter(k => bRecord[k] !== undefined)
+  const aKeys = Object.keys(aRecord).filter((k) => aRecord[k] !== undefined)
+  const bKeys = Object.keys(bRecord).filter((k) => bRecord[k] !== undefined)
 
   if (aKeys.length !== bKeys.length) {
     return false

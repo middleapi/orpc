@@ -9,6 +9,7 @@
 !.claude/
 !.agents/
 !.zed/
+.claude/worktrees/
 
 # Common generated folders
 logs/

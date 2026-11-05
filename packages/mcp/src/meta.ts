@@ -103,7 +103,7 @@ export interface McpMetaFunctions {
  * @see {@link https://orpc.dev/docs/integrations/mcp#tool-meta | MCP Integration - Tool Meta}
  */
 export const mcp: McpMetaFunctions = {
-  tool: incoming => ({
+  tool: (incoming) => ({
     name: '~mcp/tool',
     init(meta) {
       const existing = meta['~mcp/tool'] as undefined | McpToolMeta
@@ -128,6 +128,8 @@ export const mcp: McpMetaFunctions = {
  *
  * @see {@link https://orpc.dev/docs/integrations/mcp#tool-meta | MCP Integration - Tool Meta}
  */
-export function getMcpToolMeta(procedureOrLazy: AnyProcedureContract | Lazy<any>): McpToolMeta | undefined {
+export function getMcpToolMeta(
+  procedureOrLazy: AnyProcedureContract | Lazy<any>,
+): McpToolMeta | undefined {
   return procedureOrLazy['~orpc'].meta['~mcp/tool'] as McpToolMeta | undefined
 }

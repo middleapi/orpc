@@ -1,12 +1,12 @@
 import type { ORPCErrorCode, ORPCErrorOptions } from '@orpc/client'
-import type { MaybeOptionalOptions, Writable } from '@orpc/shared'
-import type { ErrorMap, ErrorMapItem } from './error'
-import type { AnySchema, InferSchemaInput, Schema } from './schema'
-
 import { ORPCError, RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
+import type { MaybeOptionalOptions, Writable } from '@orpc/shared'
 import { getOwn, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ValidationError } from './error'
-import { type } from './schema-utils'
+
+import type { ErrorMap, ErrorMapItem } from './error.ts'
+import { ValidationError } from './error.ts'
+import { type } from './schema-utils.ts'
+import type { AnySchema, InferSchemaInput, Schema } from './schema.ts'
 
 export interface ORPCErrorFactoryOptions<TData> {
   /**
@@ -63,9 +63,7 @@ export function error<TCode extends ORPCErrorCode, TData = unknown>(
     const result = schema['~standard'].validate(value)
 
     if (result instanceof Promise) {
-      throw new TypeError(
-        `Error factory "${code}" does not support async data schemas.`,
-      )
+      throw new TypeError(`Error factory "${code}" does not support async data schemas.`)
     }
 
     return result
@@ -98,7 +96,7 @@ export function error<TCode extends ORPCErrorCode, TData = unknown>(
       super(code, { ...options, message: options.message ?? message, data })
     }
 
-    static override[Symbol.hasInstance](instance: unknown): boolean {
+    static override [Symbol.hasInstance](instance: unknown): boolean {
       if (!(instance instanceof ORPCError)) {
         return false
       }
@@ -119,15 +117,17 @@ export function error<TCode extends ORPCErrorCode, TData = unknown>(
 export type ORPCErrorConstructorMapItemOptions<TData> = Omit<ORPCErrorOptions<TData>, 'status'>
 
 export interface ORPCErrorConstructorMapItem<TCode extends ORPCErrorCode, TInData> {
-  (...rest: MaybeOptionalOptions<ORPCErrorConstructorMapItemOptions<TInData>>): ORPCError<TCode, TInData>
+  (
+    ...rest: MaybeOptionalOptions<ORPCErrorConstructorMapItemOptions<TInData>>
+  ): ORPCError<TCode, TInData>
 }
 
 export type ORPCErrorConstructorMap<T extends ErrorMap> = {
   [K in keyof T]: T[K] extends ErrorMapItem
     ? ORPCErrorConstructorMapItem<
-       K & ORPCErrorCode,
-       T[K]['data'] extends AnySchema ? InferSchemaInput<T[K]['data']> : unknown
-    >
+        K & ORPCErrorCode,
+        T[K]['data'] extends AnySchema ? InferSchemaInput<T[K]['data']> : unknown
+      >
     : never
 }
 
@@ -153,7 +153,9 @@ export type ORPCErrorConstructorMap<T extends ErrorMap> = {
  * throw errorMap.NOT_FOUND()
  * ```
  */
-export function createORPCErrorConstructorMap<T extends ErrorMap>(errorMap: T): ORPCErrorConstructorMap<T> {
+export function createORPCErrorConstructorMap<T extends ErrorMap>(
+  errorMap: T,
+): ORPCErrorConstructorMap<T> {
   const proxy = new Proxy(errorMap, {
     get(target, code) {
       if (typeof code !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(code)) {

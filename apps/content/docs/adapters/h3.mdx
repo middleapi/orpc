@@ -1,8 +1,8 @@
 ---
-title: "H3 Adapter"
-description: "Use oRPC inside an H3 project by mounting a handler on a wildcard route. H3 is built on web standards, so oRPC integrates through the Fetch API Adapter."
+title: 'H3 Adapter'
+description: 'Use oRPC inside an H3 project by mounting a handler on a wildcard route. H3 is built on web standards, so oRPC integrates through the Fetch API Adapter.'
 sidebar:
-  label: "H3"
+  label: 'H3'
 ---
 
 [H3](https://h3.dev/) is a universal, tiny, and fast web framework built on top of web standards, so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -27,7 +27,7 @@ const handler = new RPCHandler(router, {
 app.use('/rpc/**', async (event) => {
   const { matched, response } = await handler.handle(event.req, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

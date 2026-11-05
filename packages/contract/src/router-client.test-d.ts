@@ -1,13 +1,14 @@
 import type { Client, ClientContext, NestedClient, ORPCError, ThrowableError } from '@orpc/client'
-import type { RouterContractClient } from './router-client'
 import { z } from 'zod'
-import { oc } from './builder'
+
+import { oc } from './builder.ts'
+import type { RouterContractClient } from './router-client.ts'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const ping = oc.input(z.object({ input: z.number().transform(n => `${n}`) }))
-const pong = oc.output(z.object({ output: z.string().transform(s => Number(s)) })).errors({
+const ping = oc.input(z.object({ input: z.number().transform((n) => `${n}`) }))
+const pong = oc.output(z.object({ output: z.string().transform((s) => Number(s)) })).errors({
   INTERNAL_SERVER_ERROR: {
-    data: z.object({ id: z.string().transform(s => Number(s)) }),
+    data: z.object({ id: z.string().transform((s) => Number(s)) }),
   },
 })
 
@@ -22,7 +23,9 @@ const router = {
 
 describe('RouterContractClient', () => {
   it('is a NestedClient', () => {
-    expectTypeOf<RouterContractClient<typeof router, ClientContext>>().toExtend<NestedClient<ClientContext>>()
+    expectTypeOf<RouterContractClient<typeof router, ClientContext>>().toExtend<
+      NestedClient<ClientContext>
+    >()
   })
 
   it('maps to ProcedureContractClient', () => {
@@ -41,12 +44,8 @@ describe('RouterContractClient', () => {
       >
     >()
 
-    expectTypeOf<ClientType['nested']['ping']>().toEqualTypeOf<
-      ClientType['ping']
-    >()
+    expectTypeOf<ClientType['nested']['ping']>().toEqualTypeOf<ClientType['ping']>()
 
-    expectTypeOf<ClientType['nested']['pong']>().toEqualTypeOf<
-      ClientType['pong']
-    >()
+    expectTypeOf<ClientType['nested']['pong']>().toEqualTypeOf<ClientType['pong']>()
   })
 })

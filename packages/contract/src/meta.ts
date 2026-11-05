@@ -1,6 +1,7 @@
-import type { ErrorMap } from './error'
-import type { AnySchema } from './schema'
 import { isTypescriptObject } from '@orpc/shared'
+
+import type { ErrorMap } from './error.ts'
+import type { AnySchema } from './schema.ts'
 
 /**
  * Arbitrary metadata attached to a procedure.
@@ -70,6 +71,10 @@ export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | unde
   return container[HIDDEN_META_PLUGINS_SYMBOL] as AnyMetaPlugin[] | undefined
 }
 
-export function setHiddenMetaPlugins<T extends object>(container: T, metaPlugins: AnyMetaPlugin[]): void {
-  (container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
+export function setHiddenMetaPlugins<T extends object>(
+  container: T,
+  metaPlugins: AnyMetaPlugin[],
+): void {
+  ;(container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
 }

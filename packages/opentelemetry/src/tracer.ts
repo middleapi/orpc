@@ -1,6 +1,19 @@
 import type { Context, Tracer as OpenTelemetryApiTracer, Span } from '@opentelemetry/api'
-import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
-import { context, INVALID_SPAN_CONTEXT, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
+import {
+  context,
+  INVALID_SPAN_CONTEXT,
+  propagation,
+  SpanStatusCode,
+  trace,
+} from '@opentelemetry/api'
+import type {
+  Promisable,
+  Tracer,
+  TracingAttributeValue,
+  TracingException,
+  TracingExceptionLevel,
+  TracingSpan,
+} from '@orpc/shared'
 
 export class OpenTelemetrySpan implements TracingSpan {
   readonly span: Span
@@ -87,7 +100,11 @@ export class OpenTelemetryTracer implements Tracer {
     return new OpenTelemetrySpan(trace.setSpan(parentContext, span))
   }
 
-  startActiveSpan<T>(name: string, parent: TracingSpan | undefined, fn: (span: TracingSpan) => Promise<T>): Promise<T> {
+  startActiveSpan<T>(
+    name: string,
+    parent: TracingSpan | undefined,
+    fn: (span: TracingSpan) => Promise<T>,
+  ): Promise<T> {
     // Same as the OpenTelemetry SDK's startActiveSpan, but the stored context does not depend on a context manager
     const span = this.startSpan(name, parent) as OpenTelemetrySpan
     return context.with(span.context, fn, undefined, span)
@@ -122,7 +139,10 @@ function withActiveBaggage(extracted: Context, active: Context): Context {
     return extracted
   }
 
-  return propagation.setBaggage(extracted, propagation.createBaggage(
-    Object.fromEntries([...fromHeaders.getAllEntries(), ...current.getAllEntries()]),
-  ))
+  return propagation.setBaggage(
+    extracted,
+    propagation.createBaggage(
+      Object.fromEntries([...fromHeaders.getAllEntries(), ...current.getAllEntries()]),
+    ),
+  )
 }

@@ -1,8 +1,8 @@
 ---
-title: "Next.js Adapter"
-description: "Use oRPC inside a Next.js project by mounting a handler in an App Router route handler or Pages Router API route, with a client that also works during SSR."
+title: 'Next.js Adapter'
+description: 'Use oRPC inside a Next.js project by mounting a handler in an App Router route handler or Pages Router API route, with a client that also works during SSR.'
 sidebar:
-  label: "Next.js"
+  label: 'Next.js'
 ---
 
 [Next.js](https://nextjs.org/) is a leading React framework for server-rendered apps. oRPC works with both the [App Router](https://nextjs.org/docs/app/getting-started/installation) and [Pages Router](https://nextjs.org/docs/pages/getting-started/installation) through the [Fetch API Adapter](/docs/adapters/fetch-api) and [Node HTTP Adapter](/docs/adapters/node-http) respectively.
@@ -30,7 +30,7 @@ const handler = new RPCHandler(router, {
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -72,7 +72,7 @@ export const config = {
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

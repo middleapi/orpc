@@ -1,19 +1,20 @@
 import type { AnyMetaPlugin, ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
 import type { MaybeOptionalOptions, Promisable } from '@orpc/shared'
-import type { Context } from './context'
-import type { AnyProcedure } from './procedure'
+
+import type { Context } from './context.ts'
+import type { AnyProcedure } from './procedure.ts'
 
 export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<{
   output: TOutput
   context: TOutContext
 }>
 
-export type MiddlewareNextOptions<TOutContext extends Context>
-  = & (object extends TOutContext ? { context?: TOutContext | undefined } : { context: TOutContext })
-    & {
-      /** Overrides the signal for the rest of the chain. */
-      signal?: AbortSignal | undefined
-    }
+export type MiddlewareNextOptions<TOutContext extends Context> = (object extends TOutContext
+  ? { context?: TOutContext | undefined }
+  : { context: TOutContext }) & {
+  /** Overrides the signal for the rest of the chain. */
+  signal?: AbortSignal | undefined
+}
 
 export interface MiddlewareNext<TOutput> {
   <T extends Context = object>(
@@ -21,9 +22,9 @@ export interface MiddlewareNext<TOutput> {
   ): MiddlewareResult<T, TOutput>
 }
 
-export type MiddlewareDoneOptions<TOutContext, TOutput>
-  = & (object extends TOutContext ? { context?: TOutContext | undefined } : { context: TOutContext })
-    & { output: TOutput }
+export type MiddlewareDoneOptions<TOutContext, TOutput> = (object extends TOutContext
+  ? { context?: TOutContext | undefined }
+  : { context: TOutContext }) & { output: TOutput }
 
 export interface MiddlewareDone<TOutput> {
   /**
@@ -70,9 +71,7 @@ export interface Middleware<
     opts: MiddlewareOptions<TInContext, TOutput, ORPCErrorConstructorMap<TErrorMap>>,
     input: TInput,
     done: MiddlewareDone<TOutput>,
-  ): Promisable<
-    MiddlewareResult<TOutContext, TOutput>
-  >
+  ): Promisable<MiddlewareResult<TOutContext, TOutput>>
 }
 
 export type AnyMiddleware = Middleware<any, any, any, any, any>

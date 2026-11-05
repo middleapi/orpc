@@ -17,8 +17,7 @@ body:
     id: reproduction
     attributes:
       label: Reproduction
-      description:
-        Please link to a minimal repository that reproduces the issue.
+      description: Please link to a minimal repository that reproduces the issue.
         A minimal repro is required unless the problem is obvious from your description.
         You can create one with [oRPC Playgrounds](https://orpc.dev/docs/playgrounds).
       placeholder: Reproduction
@@ -28,8 +27,7 @@ body:
     id: bug-description
     attributes:
       label: Describe the bug
-      description:
-        Provide a clear, concise description of the bug.
+      description: Provide a clear, concise description of the bug.
         If you plan to submit a PR to fix it, mention that here. Thanks!
       placeholder: Bug description
     validations:

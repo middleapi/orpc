@@ -1,8 +1,8 @@
 ---
-title: "SWR Integration"
-description: "Use oRPC with SWR through lightweight key, fetcher, subscriber, and mutator helpers for data fetching, subscriptions, and mutations in React."
+title: 'SWR Integration'
+description: 'Use oRPC with SWR through lightweight key, fetcher, subscriber, and mutator helpers for data fetching, subscriptions, and mutations in React.'
 sidebar:
-  label: "SWR"
+  label: 'SWR'
 ---
 
 :::warning
@@ -33,11 +33,11 @@ You can avoid key conflicts by passing a unique prefix when creating your utils:
 
 ```ts
 const userORPC = createSWRUtils(userClient, {
-  prefix: 'user'
+  prefix: 'user',
 })
 
 const postORPC = createSWRUtils(postClient, {
-  prefix: 'post'
+  prefix: 'post',
 })
 ```
 
@@ -139,13 +139,9 @@ const planet = await orpc.planet.find.call({ id: 123 })
 When clients are invoked through the SWR integration, an **operation context** is automatically added to the [client context](/docs/rpc/link#client-context). This context can be used to configure the request behavior, like setting the HTTP method.
 
 ```ts
-import {
-  SWR_OPERATION_CONTEXT_SYMBOL,
-  SWROperationContext,
-} from '@orpc/swr'
+import { SWR_OPERATION_CONTEXT_SYMBOL, SWROperationContext } from '@orpc/swr'
 
-interface ClientContext extends SWROperationContext {
-}
+interface ClientContext extends SWROperationContext {}
 
 const GET_OPERATION_TYPE = new Set(['fetcher', 'subscriber', 'liveSubscriber'])
 

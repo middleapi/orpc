@@ -1,5 +1,6 @@
 import type { Promisable } from 'type-fest'
-import { isAbortError } from './error'
+
+import { isAbortError } from './error.ts'
 
 const TRACER_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_TRACER')
 
@@ -46,7 +47,11 @@ export interface Tracer {
   /**
    * Starts a span, makes it active while `fn` runs, and passes it to `fn`. The caller must end it.
    */
-  startActiveSpan<T>(name: string, parent: TracingSpan | undefined, fn: (span: TracingSpan) => Promise<T>): Promise<T>
+  startActiveSpan<T>(
+    name: string,
+    parent: TracingSpan | undefined,
+    fn: (span: TracingSpan) => Promise<T>,
+  ): Promise<T>
   getActiveSpan(): TracingSpan | undefined
   /**
    * Runs `fn` with `span` as the active span. Backends that cannot activate a span run `fn` directly.
@@ -63,7 +68,7 @@ export interface Tracer {
 }
 
 export function setTracer(tracer: Tracer | undefined): void {
-  (globalThis as Record<symbol, unknown>)[TRACER_SYMBOL] = tracer
+  ;(globalThis as Record<symbol, unknown>)[TRACER_SYMBOL] = tracer
 }
 
 export function getTracer(): Tracer | undefined {
@@ -104,7 +109,11 @@ export function recordSpanError(span: TracingSpan | undefined, error: unknown): 
   span.recordException(isAbortError(error) ? 'info' : 'error', toTracingException(error))
 }
 
-export function setSpanAttributeIfDefined(span: TracingSpan | undefined, key: string, value: TracingAttributeValue | undefined): void {
+export function setSpanAttributeIfDefined(
+  span: TracingSpan | undefined,
+  key: string,
+  value: TracingAttributeValue | undefined,
+): void {
   if (!span || value === undefined) {
     return
   }
@@ -136,7 +145,7 @@ export function toSpanAttributeValue(data: unknown): string {
   }
 
   try {
-    // eslint-disable-next-line ban/ban
+    // oxlint-disable-next-line no-restricted-properties
     return JSON.stringify(data, (_, value) => {
       if (typeof value === 'bigint') {
         return value.toString()
@@ -148,8 +157,8 @@ export function toSpanAttributeValue(data: unknown): string {
 
       return value
     })
-  }
-  catch {
+  } catch {
+    // oxlint-disable-next-line typescript/no-base-to-string
     return String(data)
   }
 }
@@ -170,12 +179,10 @@ export async function runWithSpan<T>(
   return tracer.startActiveSpan(name, parent, async (span) => {
     try {
       return await fn(span)
-    }
-    catch (e) {
+    } catch (e) {
       recordSpanError(span, e)
       throw e
-    }
-    finally {
+    } finally {
       span.end()
     }
   })

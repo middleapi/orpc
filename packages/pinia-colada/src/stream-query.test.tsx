@@ -1,32 +1,33 @@
-import type { UseQueryOptions } from '@pinia/colada'
 import { promiseWithResolvers } from '@orpc/shared'
+import type { UseQueryOptions } from '@pinia/colada'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { defineComponent } from 'vue'
-import { serializableStreamedQuery } from './stream-query'
+
+import { serializableStreamedQuery } from './stream-query.ts'
 
 /**
  * Mounts a component that runs a real Pinia Colada `useQuery`,
  * so tests can observe exactly what users see.
  */
 function mountQuery(options: UseQueryOptions<any, any, any>) {
-  return mount(defineComponent({
-    setup() {
-      const queryCache = useQueryCache()
-      const query = useQuery(options)
+  return mount(
+    defineComponent({
+      setup() {
+        const queryCache = useQueryCache()
+        const query = useQuery(options)
 
-      return { query, queryCache }
+        return { query, queryCache }
+      },
+      render: () => null,
+    }),
+    {
+      global: {
+        plugins: [createPinia(), PiniaColada],
+      },
     },
-    render: () => null,
-  }), {
-    global: {
-      plugins: [
-        createPinia(),
-        PiniaColada,
-      ],
-    },
-  })
+  )
 }
 
 /**
@@ -38,7 +39,7 @@ function createChunkController<T>() {
   let notify: (() => void) | undefined
 
   return {
-    async* stream() {
+    async *stream() {
       while (true) {
         while (buffer.length === 0) {
           await new Promise<void>((resolve) => {
@@ -100,7 +101,8 @@ describe('serializableStreamedQuery', () => {
       releaseSecond = resolve
     })
 
-    const queryFn = vi.fn()
+    const queryFn = vi
+      .fn()
       .mockImplementationOnce(() => first.stream())
       .mockImplementationOnce(async () => {
         await secondReady
@@ -139,7 +141,8 @@ describe('serializableStreamedQuery', () => {
     const first = createChunkController<string>()
     const second = createChunkController<string>()
 
-    const queryFn = vi.fn()
+    const queryFn = vi
+      .fn()
       .mockImplementationOnce(() => first.stream())
       .mockImplementationOnce(() => second.stream())
 
@@ -168,7 +171,8 @@ describe('serializableStreamedQuery', () => {
     const first = createChunkController<string>()
     const second = createChunkController<string>()
 
-    const queryFn = vi.fn()
+    const queryFn = vi
+      .fn()
       .mockImplementationOnce(() => first.stream())
       .mockImplementationOnce(() => second.stream())
 
@@ -214,7 +218,8 @@ describe('serializableStreamedQuery', () => {
     const first = createChunkController<string>()
     const second = createChunkController<string>()
 
-    const queryFn = vi.fn()
+    const queryFn = vi
+      .fn()
       .mockImplementationOnce(() => first.stream())
       .mockImplementationOnce(() => second.stream())
 
@@ -251,7 +256,8 @@ describe('serializableStreamedQuery', () => {
     const firstClosed = vi.spyOn(firstStream, 'return')
     const second = createChunkController<string>()
 
-    const queryFn = vi.fn()
+    const queryFn = vi
+      .fn()
       .mockImplementationOnce(async () => {
         await firstReady.promise
         return firstStream

@@ -1,10 +1,11 @@
-import type { Locker } from '../src'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { z } from 'zod'
-import { lock } from '../src'
-import { MemoryLocker } from '../src/adapters/memory'
+
+import { MemoryLocker } from '../src/adapters/memory.ts'
+import type { Locker } from '../src/index.ts'
+import { lock } from '../src/index.ts'
 
 it('works', async () => {
   let active = 0
@@ -34,13 +35,14 @@ it('works', async () => {
   const handler = new RPCHandler(router)
   const locker = new MemoryLocker()
 
-  const request = (id: string) => new Request('https://example.com/generate', {
-    method: 'POST',
-    body: JSON.stringify({ json: { id } }),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
+  const request = (id: string) =>
+    new Request('https://example.com/generate', {
+      method: 'POST',
+      body: JSON.stringify({ json: { id } }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
 
   const [first, second] = await Promise.all([
     handler.handle(request('1'), { context: { locker } }),

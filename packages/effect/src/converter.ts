@@ -1,5 +1,9 @@
 import type { AnySchema } from '@orpc/contract'
-import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
+import type {
+  JsonSchema,
+  JsonSchemaConverter,
+  JsonSchemaConverterDirection,
+} from '@orpc/json-schema'
 import { isStandardSchemaOptional } from '@orpc/json-schema'
 import { Schema as EffectSchema } from 'effect'
 
@@ -25,7 +29,14 @@ export interface EffectSchemaToJsonSchemaConverterOptions extends EffectSchema.T
  */
 export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
   private readonly toJsonSchemaOptions: EffectSchema.ToJsonSchemaOptions
-  private readonly cache: undefined | { [d in JsonSchemaConverterDirection]: WeakMap<EffectSchema.Top, [jsonSchema: JsonSchema, optional: boolean]> }
+  private readonly cache:
+    | undefined
+    | {
+        [d in JsonSchemaConverterDirection]: WeakMap<
+          EffectSchema.Top,
+          [jsonSchema: JsonSchema, optional: boolean]
+        >
+      }
 
   constructor({ cache, ...toJsonSchemaOptions }: EffectSchemaToJsonSchemaConverterOptions = {}) {
     this.toJsonSchemaOptions = toJsonSchemaOptions
@@ -39,7 +50,10 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
     return schema?.['~standard'].vendor === 'effect' && EffectSchema.isSchema(schema)
   }
 
-  convert(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
+  convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
     const effectSchema = schema as EffectSchema.Top & AnySchema
 
     if (this.cache) {
@@ -58,16 +72,24 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
     return result
   }
 
-  private convertUncached(schema: EffectSchema.Top & AnySchema, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
+  private convertUncached(
+    schema: EffectSchema.Top & AnySchema,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
     return [this.convertEffect(schema, direction), isStandardSchemaOptional(schema, direction)]
   }
 
-  private convertEffect(schema: EffectSchema.Top, direction: JsonSchemaConverterDirection): JsonSchema {
+  private convertEffect(
+    schema: EffectSchema.Top,
+    direction: JsonSchemaConverterDirection,
+  ): JsonSchema {
     const { schema: jsonSchema, definitions } = EffectSchema.toJsonSchemaDocument(
       direction === 'input' ? schema : EffectSchema.toType(schema),
       this.toJsonSchemaOptions,
     )
 
-    return (Object.keys(definitions).length > 0 ? { ...jsonSchema, $defs: definitions } : jsonSchema) as JsonSchema
+    return (
+      Object.keys(definitions).length > 0 ? { ...jsonSchema, $defs: definitions } : jsonSchema
+    ) as JsonSchema
   }
 }

@@ -1,12 +1,11 @@
-import type { ClientContext } from '../../types'
-import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard'
-import type { WebSocketLinkTransportOptions } from './transport'
-import { RPCLinkCodec, StandardLink } from '../standard'
-import { WebSocketLinkTransport } from './transport'
+import type { ClientContext } from '../../types.ts'
+import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard/index.ts'
+import { RPCLinkCodec, StandardLink } from '../standard/index.ts'
+import type { WebSocketLinkTransportOptions } from './transport.ts'
+import { WebSocketLinkTransport } from './transport.ts'
 
 export interface RPCLinkOptions<T extends ClientContext>
-  extends StandardLinkOptions<T>, WebSocketLinkTransportOptions<T>, RPCLinkCodecOptions<T> {
-}
+  extends StandardLinkOptions<T>, WebSocketLinkTransportOptions<T>, RPCLinkCodecOptions<T> {}
 
 /**
  * Client link that communicates with an RPC Handler over a WebSocket connection.

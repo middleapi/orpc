@@ -1,18 +1,21 @@
-import type { ErrorMap } from './error'
-import type { MergedErrorMap } from './error-utils'
-import type { AnyMetaPlugin, Meta } from './meta'
-import type { AnyProcedureContract } from './procedure'
-import type { RouterContract } from './router'
 import { getOwn, isTypescriptObject, setOwn } from '@orpc/shared'
-import { mergeErrorMap } from './error-utils'
-import { resolveMetaPlugins } from './meta-utils'
-import { ProcedureContract } from './procedure'
 
-export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap>
-  = T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
+import type { MergedErrorMap } from './error-utils.ts'
+import { mergeErrorMap } from './error-utils.ts'
+import type { ErrorMap } from './error.ts'
+import { resolveMetaPlugins } from './meta-utils.ts'
+import type { AnyMetaPlugin, Meta } from './meta.ts'
+import type { AnyProcedureContract } from './procedure.ts'
+import { ProcedureContract } from './procedure.ts'
+import type { RouterContract } from './router.ts'
+
+export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap> =
+  T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
     ? ProcedureContract<$InputSchema, $OutputSchema, MergedErrorMap<TErrorMap, $Errors>>
     : {
-        [K in keyof T]: T[K] extends RouterContract ? AugmentedContractRouter<T[K], TErrorMap> : never
+        [K in keyof T]: T[K] extends RouterContract
+          ? AugmentedContractRouter<T[K], TErrorMap>
+          : never
       }
 
 export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {
@@ -58,7 +61,10 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
   return enhanced as any
 }
 
-export function getRouterContract(router: RouterContract, path: readonly string[]): RouterContract | undefined {
+export function getRouterContract(
+  router: RouterContract,
+  path: readonly string[],
+): RouterContract | undefined {
   let current: RouterContract | undefined = router
 
   for (let i = 0; i < path.length; i++) {
@@ -82,11 +88,16 @@ export function getRouterContract(router: RouterContract, path: readonly string[
   return current
 }
 
-export function getProcedureContractOrThrow(router: RouterContract, path: readonly string[]): AnyProcedureContract {
+export function getProcedureContractOrThrow(
+  router: RouterContract,
+  path: readonly string[],
+): AnyProcedureContract {
   const procedure = getRouterContract(router, path)
 
   if (!(procedure instanceof ProcedureContract)) {
-    throw new TypeError(`No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`)
+    throw new TypeError(
+      `No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`,
+    )
   }
 
   return procedure

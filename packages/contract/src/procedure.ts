@@ -1,7 +1,8 @@
-import type { ErrorMap } from './error'
-import type { AnyMetaPlugin, Meta } from './meta'
-import type { AnySchema } from './schema'
 import { getConstructor, isTypescriptObject } from '@orpc/shared'
+
+import type { ErrorMap } from './error.ts'
+import type { AnyMetaPlugin, Meta } from './meta.ts'
+import type { AnySchema } from './schema.ts'
 
 export interface ProcedureContractDefinition<
   TInputSchema extends AnySchema,
@@ -28,7 +29,7 @@ export class ProcedureContract<
 > {
   '~orpc': ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>
 
-  constructor(def: ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>) {
+  'constructor'(def: ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>) {
     this['~orpc'] = def
   }
 
@@ -47,12 +48,14 @@ export class ProcedureContract<
     }
 
     return (
-      isTypescriptObject(instance)
-      && isTypescriptObject(instance['~orpc'])
-      && isTypescriptObject(instance['~orpc'].errorMap)
-      && isTypescriptObject(instance['~orpc'].meta)
-      && (instance['~orpc'].inputSchemas === undefined || Array.isArray(instance['~orpc'].inputSchemas))
-      && (instance['~orpc'].outputSchemas === undefined || Array.isArray(instance['~orpc'].outputSchemas))
+      isTypescriptObject(instance) &&
+      isTypescriptObject(instance['~orpc']) &&
+      isTypescriptObject(instance['~orpc'].errorMap) &&
+      isTypescriptObject(instance['~orpc'].meta) &&
+      (instance['~orpc'].inputSchemas === undefined ||
+        Array.isArray(instance['~orpc'].inputSchemas)) &&
+      (instance['~orpc'].outputSchemas === undefined ||
+        Array.isArray(instance['~orpc'].outputSchemas))
     )
   }
 }

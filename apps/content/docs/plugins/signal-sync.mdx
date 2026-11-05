@@ -1,8 +1,8 @@
 ---
-title: "Signal Sync Plugin"
-description: "Keep the request signal and streaming responses in sync, aborting the signal when the body is cancelled and ending the body when the signal aborts."
+title: 'Signal Sync Plugin'
+description: 'Keep the request signal and streaming responses in sync, aborting the signal when the body is cancelled and ending the body when the signal aborts.'
 sidebar:
-  label: "Signal Sync"
+  label: 'Signal Sync'
 ---
 
 When a client stops reading a streaming response, adapters like [Node.js](/docs/adapters/node-http) abort the request signal, but in-process `fetch` calls and some runtimes behind the [Fetch adapter](/docs/adapters/fetch-api) only cancel the response body, so a procedure waiting on something keeps running. In the other direction, an aborted signal only ends the body once the procedure honors it.
@@ -18,9 +18,7 @@ Use `SignalSyncHandlerPlugin` to keep the request signal and streaming outputs (
 import { SignalSyncHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new SignalSyncHandlerPlugin(),
-  ],
+  plugins: [new SignalSyncHandlerPlugin()],
 })
 ```
 

@@ -1,6 +1,6 @@
 ---
-title: "Publish Client to NPM"
-description: "Learn how to build and publish your oRPC client to NPM with pnpm and tsdown, so users can consume your APIs as a fully typed SDK."
+title: 'Publish Client to NPM'
+description: 'Learn how to build and publish your oRPC client to NPM with pnpm and tsdown, so users can consume your APIs as a fully typed SDK.'
 ---
 
 :::info
@@ -30,7 +30,7 @@ export function createMyApi(apiKey: string): RouterContractClient<typeof contrac
     url: '/rpc',
     headers: {
       'x-api-key': apiKey,
-    }
+    },
   })
 
   return createORPCClient(link)

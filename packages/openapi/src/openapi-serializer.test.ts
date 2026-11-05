@@ -1,7 +1,8 @@
 import { createORPCErrorFromJson, ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
-import { OpenAPISerializer } from './openapi-serializer'
+
+import { OpenAPISerializer } from './openapi-serializer.ts'
 
 describe('openAPISerializer', () => {
   const serializer = new OpenAPISerializer()
@@ -52,19 +53,24 @@ describe('openAPISerializer', () => {
     })
 
     it('omits NaN and ±Infinity from FormData, matching their null JSON form', () => {
-      const result = serializer.serialize({
-        nan: Number.NaN,
-        max: Number.POSITIVE_INFINITY,
-        min: Number.NEGATIVE_INFINITY,
-        count: 1,
-      }, { asFormData: true }) as FormData
+      const result = serializer.serialize(
+        {
+          nan: Number.NaN,
+          max: Number.POSITIVE_INFINITY,
+          min: Number.NEGATIVE_INFINITY,
+          count: 1,
+        },
+        { asFormData: true },
+      ) as FormData
 
       expect(Array.from(result.keys())).toEqual(['count'])
     })
 
     it('skips useFormDataForBlobFields when false', () => {
       const blob = new Blob(['hello'])
-      expect(serializer.serialize({ file: blob }, { useFormDataForBlobFields: false })).not.toBeInstanceOf(FormData)
+      expect(
+        serializer.serialize({ file: blob }, { useFormDataForBlobFields: false }),
+      ).not.toBeInstanceOf(FormData)
     })
 
     it('always returns FormData when asFormData is true, using bracket notation', () => {
@@ -88,14 +94,18 @@ describe('openAPISerializer', () => {
     })
 
     it('call-site options override constructor defaults', () => {
-      const s = new OpenAPISerializer({ serialize: { asFormData: true, useFormDataForBlobFields: false } })
+      const s = new OpenAPISerializer({
+        serialize: { asFormData: true, useFormDataForBlobFields: false },
+      })
 
       expect(s.serialize({ name: 'test' })).toBeInstanceOf(FormData)
       expect(s.serialize({ name: 'test' }, { asFormData: false })).not.toBeInstanceOf(FormData)
 
       const blob = new Blob(['hello'])
       expect(s.serialize({ file: blob }, { asFormData: false })).not.toBeInstanceOf(FormData)
-      expect(s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true })).toBeInstanceOf(FormData)
+      expect(
+        s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true }),
+      ).toBeInstanceOf(FormData)
     })
 
     describe('asyncIteratorObject', () => {
@@ -104,7 +114,9 @@ describe('openAPISerializer', () => {
       }
 
       it('returns an AsyncIteratorObject and serializes yielded values', async () => {
-        const result = serializer.serialize(toAsyncIter([new Date('2023-01-01'), 42n])) as AsyncIteratorObject<unknown>
+        const result = serializer.serialize(
+          toAsyncIter([new Date('2023-01-01'), 42n]),
+        ) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -113,7 +125,9 @@ describe('openAPISerializer', () => {
       })
 
       it('passes through undefined yielded values as-is', async () => {
-        const result = serializer.serialize(toAsyncIter([undefined, 'value'])) as AsyncIteratorObject<unknown>
+        const result = serializer.serialize(
+          toAsyncIter([undefined, 'value']),
+        ) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -133,9 +147,11 @@ describe('openAPISerializer', () => {
 
       it('converts thrown ORPC errors into ErrorEvent payloads', async () => {
         const error = new ORPCError('BAD_GATEWAY', { data: { reason: 'upstream' } })
-        const result = serializer.serialize((async function* () {
-          throw error
-        })()) as AsyncIteratorObject<unknown>
+        const result = serializer.serialize(
+          (async function* () {
+            throw error
+          })(),
+        ) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ErrorEvent)
@@ -151,9 +167,11 @@ describe('openAPISerializer', () => {
 
       it('maps unknown iterator errors into INTERNAL_SERVER_ERROR payloads', async () => {
         const error = new Error('unexpected')
-        const result = serializer.serialize((async function* () {
-          throw error
-        })()) as AsyncIteratorObject<unknown>
+        const result = serializer.serialize(
+          (async function* () {
+            throw error
+          })(),
+        ) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ErrorEvent)
@@ -173,18 +191,24 @@ describe('openAPISerializer', () => {
 
   describe('deserialize', () => {
     it('uses OpenAPIJsonSerializer for deserialization', () => {
-      expect(serializer.deserialize({ name: 'test', value: 42 })).toEqual({ name: 'test', value: 42 })
+      expect(serializer.deserialize({ name: 'test', value: 42 })).toEqual({
+        name: 'test',
+        value: 42,
+      })
     })
 
     it.each([
       ['URLSearchParams', () => new URLSearchParams('user[name]=test&tags[0]=a&tags[1]=b')],
-      ['FormData', () => {
-        const f = new FormData()
-        f.append('user[name]', 'test')
-        f.append('tags[0]', 'a')
-        f.append('tags[1]', 'b')
-        return f
-      }],
+      [
+        'FormData',
+        () => {
+          const f = new FormData()
+          f.append('user[name]', 'test')
+          f.append('tags[0]', 'a')
+          f.append('tags[1]', 'b')
+          return f
+        },
+      ],
     ])('deserializes %s using bracket notation', (_, makeInput) => {
       const result = serializer.deserialize(makeInput()) as any
       expect(result.user.name).toBe('test')
@@ -237,7 +261,9 @@ describe('openAPISerializer', () => {
       }
 
       it('returns an AsyncIteratorObject and passes through yielded values', async () => {
-        const result = serializer.deserialize(toAsyncIter([{ a: 1 }, { b: 2 }])) as AsyncIterable<unknown>
+        const result = serializer.deserialize(
+          toAsyncIter([{ a: 1 }, { b: 2 }]),
+        ) as AsyncIterable<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -246,7 +272,9 @@ describe('openAPISerializer', () => {
       })
 
       it('passes through undefined yielded values as-is', async () => {
-        const result = serializer.deserialize(toAsyncIter([undefined, { a: 1 }])) as AsyncIterable<unknown>
+        const result = serializer.deserialize(
+          toAsyncIter([undefined, { a: 1 }]),
+        ) as AsyncIterable<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -258,9 +286,11 @@ describe('openAPISerializer', () => {
         const error = new ErrorEvent(
           new ORPCError('BAD_GATEWAY', { data: { reason: 'upstream' } }).toJSON(),
         )
-        const result = serializer.deserialize((async function* () {
-          throw error
-        })()) as AsyncIteratorObject<unknown>
+        const result = serializer.deserialize(
+          (async function* () {
+            throw error
+          })(),
+        ) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ORPCError)
@@ -280,12 +310,16 @@ describe('openAPISerializer', () => {
           data: { reason: 'upstream' },
         })
 
-        const serialized = serializer.serialize((async function* () {
-          throw error
-        })()) as AsyncIteratorObject<unknown>
+        const serialized = serializer.serialize(
+          (async function* () {
+            throw error
+          })(),
+        ) as AsyncIteratorObject<unknown>
 
         const event = await serialized.next().then(
-          () => { throw new Error('expected the iterator to reject') },
+          () => {
+            throw new Error('expected the iterator to reject')
+          },
           (e: unknown) => e as ErrorEvent,
         )
 
@@ -309,18 +343,22 @@ describe('openAPISerializer', () => {
 
       it('passes through ErrorEvent instances with non-ORPC payloads', async () => {
         const error = new ErrorEvent({ reason: 'upstream' })
-        const result = serializer.deserialize((async function* () {
-          throw error
-        })()) as AsyncIteratorObject<unknown>
+        const result = serializer.deserialize(
+          (async function* () {
+            throw error
+          })(),
+        ) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toBe(error)
       })
 
       it('passes through non-ErrorEvent errors', async () => {
         const error = new Error('unexpected')
-        const result = serializer.deserialize((async function* () {
-          throw error
-        })()) as AsyncIteratorObject<unknown>
+        const result = serializer.deserialize(
+          (async function* () {
+            throw error
+          })(),
+        ) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toBe(error)
       })
@@ -332,7 +370,7 @@ describe('openAPISerializer', () => {
       const s = new OpenAPISerializer({
         handlers: {
           date: {
-            condition: v => v instanceof Date,
+            condition: (v) => v instanceof Date,
             serialize: (v: Date) => `___TEST___${v.getTime()}`,
           },
         },
@@ -367,7 +405,6 @@ describe('openAPISerializer', () => {
       expect((Function.prototype as any).polluted).toBeUndefined()
     })
 
-    /* eslint-disable no-proto, no-restricted-properties */
     it('deserializes __proto__ query parameters as plain data', () => {
       const result = serializer.deserialize(
         new URLSearchParams('__proto__[polluted]=yes&safe=1'),
@@ -378,7 +415,6 @@ describe('openAPISerializer', () => {
       expect(result.polluted).toBeUndefined()
       expect(result.safe).toBe('1')
     })
-    /* eslint-enable no-proto, no-restricted-properties */
 
     it('deserializes constructor.prototype form fields as plain data', () => {
       const form = new FormData()

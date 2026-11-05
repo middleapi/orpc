@@ -1,10 +1,11 @@
-import type { ErrorMap } from '@orpc/contract'
 import { ORPCError } from '@orpc/client'
+import type { ErrorMap } from '@orpc/contract'
 import * as ContractModule from '@orpc/contract'
 import * as SharedV2Module from '@orpc/shared'
-import z from 'zod'
-import { os } from './builder'
-import { createProcedureClient } from './procedure-client'
+import * as z from 'zod'
+
+import { os } from './builder.ts'
+import { createProcedureClient } from './procedure-client.ts'
 
 const isAsyncIteratorObject = SharedV2Module.isAsyncIteratorObject
 const ValidationError = ContractModule.ValidationError
@@ -109,7 +110,9 @@ describe('createProcedureClient', () => {
       path: ['__PATH__'],
     })
 
-    await expect(client('INPUT', { signal, lastEventId: '__LAST_EVENT_ID__' })).resolves.toBe('__OUTPUT__')
+    await expect(client('INPUT', { signal, lastEventId: '__LAST_EVENT_ID__' })).resolves.toBe(
+      '__OUTPUT__',
+    )
 
     expect(createORPCErrorConstructorMapSpy).toHaveBeenCalledTimes(1)
     expect(createORPCErrorConstructorMapSpy).toHaveBeenCalledWith(errorMap)
@@ -192,7 +195,9 @@ describe('createProcedureClient', () => {
       return `OVERRIDED__${output}`
     })
 
-    await expect(client('INPUT' as any, { signal, lastEventId: '__LAST_EVENT_ID__' })).resolves.toBe('OVERRIDED____OVERRIDED_OUTPUT__')
+    await expect(
+      client('INPUT' as any, { signal, lastEventId: '__LAST_EVENT_ID__' }),
+    ).resolves.toBe('OVERRIDED____OVERRIDED_OUTPUT__')
 
     expect(interceptor).toHaveBeenCalledTimes(1)
     expect(interceptor).toHaveBeenCalledWith(
@@ -275,7 +280,10 @@ describe('createProcedureClient', () => {
       undefined,
       expect.any(Function),
     )
-    expect(mid1).toHaveNthResolvedWith(1, { output: 'MID1__MID2____OUTPUT__', context: { i1: 'mid1', i2: 'i', mid12: 'mid1', mid11: 'mid2', mid21: 'mid2', mid22: 'mid2' } })
+    expect(mid1).toHaveNthResolvedWith(1, {
+      output: 'MID1__MID2____OUTPUT__',
+      context: { i1: 'mid1', i2: 'i', mid12: 'mid1', mid11: 'mid2', mid21: 'mid2', mid22: 'mid2' },
+    })
 
     expect(mid2).toHaveBeenCalledTimes(1)
     expect(mid2).toHaveBeenCalledAfter(mid1)
@@ -286,13 +294,23 @@ describe('createProcedureClient', () => {
       undefined,
       expect.any(Function),
     )
-    expect(mid2).toHaveNthResolvedWith(1, { output: 'MID2____OUTPUT__', context: { i1: 'mid1', i2: 'i', mid12: 'mid1', mid11: 'mid2', mid21: 'mid2', mid22: 'mid2' } })
+    expect(mid2).toHaveNthResolvedWith(1, {
+      output: 'MID2____OUTPUT__',
+      context: { i1: 'mid1', i2: 'i', mid12: 'mid1', mid11: 'mid2', mid21: 'mid2', mid22: 'mid2' },
+    })
 
     expect(handler).toHaveBeenCalledTimes(1)
     expect(handler).toHaveBeenCalledAfter(mid2)
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: { i1: 'mid1', i2: 'i', mid12: 'mid1', mid11: 'mid2', mid21: 'mid2', mid22: 'mid2' },
+        context: {
+          i1: 'mid1',
+          i2: 'i',
+          mid12: 'mid1',
+          mid11: 'mid2',
+          mid21: 'mid2',
+          mid22: 'mid2',
+        },
       }),
       undefined,
     )
@@ -307,9 +325,20 @@ describe('createProcedureClient', () => {
     await expect(client(undefined, { signal })).resolves.toBe('__OUTPUT__')
 
     expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({ signal }))
-    expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ signal }), undefined, expect.any(Function))
-    expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: overrideSignal }), undefined, expect.any(Function))
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ signal: overrideSignal }), undefined)
+    expect(mid1).toHaveBeenCalledWith(
+      expect.objectContaining({ signal }),
+      undefined,
+      expect.any(Function),
+    )
+    expect(mid2).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: overrideSignal }),
+      undefined,
+      expect.any(Function),
+    )
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: overrideSignal }),
+      undefined,
+    )
   })
 
   it('middleware signal override applies to its own next call only', async () => {
@@ -324,11 +353,25 @@ describe('createProcedureClient', () => {
     await expect(client(undefined, { signal })).resolves.toBe('__OUTPUT__')
 
     expect(mid2).toHaveBeenCalledTimes(2)
-    expect(mid2).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal: overrideSignal }), undefined, expect.any(Function))
-    expect(mid2).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal, context: { second: true } }), undefined, expect.any(Function))
+    expect(mid2).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ signal: overrideSignal }),
+      undefined,
+      expect.any(Function),
+    )
+    expect(mid2).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ signal, context: { second: true } }),
+      undefined,
+      expect.any(Function),
+    )
 
     expect(handler).toHaveBeenCalledTimes(2)
-    expect(handler).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal: overrideSignal }), undefined)
+    expect(handler).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ signal: overrideSignal }),
+      undefined,
+    )
     expect(handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal }), undefined)
   })
 
@@ -347,12 +390,12 @@ describe('createProcedureClient', () => {
 
   describe('with multiple standard schemas', () => {
     it('success - input and output schemas that transform during validation', async () => {
-      const inputSchema1 = z.string().transform(value => `inputSchema1__${value}`)
-      const inputSchema2 = z.string().transform(value => `inputSchema2__${value}`)
-      const inputSchema3 = z.string().transform(value => `inputSchema3__${value}`)
-      const outputSchema1 = z.string().transform(value => `outputSchema1__${value}`)
-      const outputSchema2 = z.string().transform(value => `outputSchema2__${value}`)
-      const outputSchema3 = z.string().transform(value => `outputSchema3__${value}`)
+      const inputSchema1 = z.string().transform((value) => `inputSchema1__${value}`)
+      const inputSchema2 = z.string().transform((value) => `inputSchema2__${value}`)
+      const inputSchema3 = z.string().transform((value) => `inputSchema3__${value}`)
+      const outputSchema1 = z.string().transform((value) => `outputSchema1__${value}`)
+      const outputSchema2 = z.string().transform((value) => `outputSchema2__${value}`)
+      const outputSchema3 = z.string().transform((value) => `outputSchema3__${value}`)
 
       const mid3 = vi.fn(({ next }) => next())
 
@@ -370,16 +413,20 @@ describe('createProcedureClient', () => {
 
       const client = createProcedureClient(procedure, { interceptors: [interceptor] })
 
-      await expect(client('INPUT')).resolves.toBe('outputSchema1__outputSchema2__outputSchema3____OUTPUT__')
+      await expect(client('INPUT')).resolves.toBe(
+        'outputSchema1__outputSchema2__outputSchema3____OUTPUT__',
+      )
 
       expect(interceptor).toHaveBeenCalledTimes(1)
       expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({ input: 'INPUT' }))
-      expect(interceptor).toHaveResolvedWith('outputSchema1__outputSchema2__outputSchema3____OUTPUT__')
+      expect(interceptor).toHaveResolvedWith(
+        'outputSchema1__outputSchema2__outputSchema3____OUTPUT__',
+      )
 
       expect(mid1).toHaveBeenCalledTimes(1)
       expect(mid1).toHaveBeenCalledAfter(interceptor)
       expect(mid1).toHaveBeenCalledWith(
-        expect.objectContaining({ }),
+        expect.objectContaining({}),
         'inputSchema1__INPUT',
         expect.any(Function),
       )
@@ -390,7 +437,7 @@ describe('createProcedureClient', () => {
       expect(mid2).toHaveBeenCalledTimes(1)
       expect(mid2).toHaveBeenCalledAfter(mid1)
       expect(mid2).toHaveBeenCalledWith(
-        expect.objectContaining({ }),
+        expect.objectContaining({}),
         'inputSchema2__inputSchema1__INPUT',
         expect.any(Function),
       )
@@ -405,9 +452,7 @@ describe('createProcedureClient', () => {
         'inputSchema3__inputSchema2__inputSchema1__INPUT',
         expect.any(Function),
       )
-      expect(mid3).toHaveResolvedWith(
-        expect.objectContaining({ output: '__OUTPUT__' }),
-      )
+      expect(mid3).toHaveResolvedWith(expect.objectContaining({ output: '__OUTPUT__' }))
 
       expect(handler).toHaveBeenCalledTimes(1)
       expect(handler).toHaveBeenCalledAfter(mid3)
@@ -537,7 +582,9 @@ describe('createProcedureClient', () => {
         const invalidOutput: any = { outputSchema1: 'INVALID', outputSchema2: 2, outputSchema3: 3 }
         handler.mockResolvedValueOnce(invalidOutput)
 
-        await expect(client({ inputSchema1: 1, inputSchema2: 2, inputSchema3: 3 })).rejects.toSatisfy((error) => {
+        await expect(
+          client({ inputSchema1: 1, inputSchema2: 2, inputSchema3: 3 }),
+        ).rejects.toSatisfy((error) => {
           expect(inputSchema1ValidationSpy).toHaveBeenCalledTimes(1)
           expect(inputSchema2ValidationSpy).toHaveBeenCalledTimes(1)
           expect(inputSchema3ValidationSpy).toHaveBeenCalledTimes(1)
@@ -570,7 +617,9 @@ describe('createProcedureClient', () => {
         const invalidOutput: any = { outputSchema1: 1, outputSchema2: 'INVALID', outputSchema3: 3 }
         handler.mockResolvedValueOnce(invalidOutput)
 
-        await expect(client({ inputSchema1: 1, inputSchema2: 2, inputSchema3: 3 })).rejects.toSatisfy((error) => {
+        await expect(
+          client({ inputSchema1: 1, inputSchema2: 2, inputSchema3: 3 }),
+        ).rejects.toSatisfy((error) => {
           expect(inputSchema1ValidationSpy).toHaveBeenCalledTimes(1)
           expect(inputSchema2ValidationSpy).toHaveBeenCalledTimes(1)
           expect(inputSchema3ValidationSpy).toHaveBeenCalledTimes(1)
@@ -603,7 +652,9 @@ describe('createProcedureClient', () => {
         const invalidOutput: any = { outputSchema1: 1, outputSchema2: 2, outputSchema3: 'INVALID' }
         handler.mockResolvedValueOnce(invalidOutput)
 
-        await expect(client({ inputSchema1: 1, inputSchema2: 2, inputSchema3: 3 })).rejects.toSatisfy((error) => {
+        await expect(
+          client({ inputSchema1: 1, inputSchema2: 2, inputSchema3: 3 }),
+        ).rejects.toSatisfy((error) => {
           expect(inputSchema1ValidationSpy).toHaveBeenCalledTimes(1)
           expect(inputSchema2ValidationSpy).toHaveBeenCalledTimes(1)
           expect(inputSchema3ValidationSpy).toHaveBeenCalledTimes(1)
@@ -642,21 +693,33 @@ describe('createProcedureClient', () => {
 
       const procedure = os
         .use(rootMid)
-        .input(z.object({ parent: z.string().transform(value => `parent__${value}`) }))
+        .input(z.object({ parent: z.string().transform((value) => `parent__${value}`) }))
         .use(parentMid)
-        .input(z.object({ child: z.string().transform(value => `child__${value}`) }))
+        .input(z.object({ child: z.string().transform((value) => `child__${value}`) }))
         .use(childMid)
         .handler(({ input }) => input)
 
       const client = createProcedureClient(procedure)
 
-      await expect(client({ parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' } as any))
-        .resolves
-        .toEqual({ parent: 'parent__PARENT', child: 'child__CHILD' })
+      await expect(
+        client({ parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' } as any),
+      ).resolves.toEqual({ parent: 'parent__PARENT', child: 'child__CHILD' })
 
-      expect(rootMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
-      expect(parentMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
-      expect(childMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'child__CHILD' }, expect.any(Function))
+      expect(rootMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' },
+        expect.any(Function),
+      )
+      expect(parentMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' },
+        expect.any(Function),
+      )
+      expect(childMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { parent: 'parent__PARENT', child: 'child__CHILD' },
+        expect.any(Function),
+      )
     })
 
     it('gives middleware between schemas the not-yet-validated rest of the input, validated fields win', async () => {
@@ -666,7 +729,9 @@ describe('createProcedureClient', () => {
 
       const procedure = os
         .use(beforeMid)
-        .input(z.object({ params: z.object({ id: z.string().transform(value => `id__${value}`) }) }))
+        .input(
+          z.object({ params: z.object({ id: z.string().transform((value) => `id__${value}`) }) }),
+        )
         .use(betweenMid)
         .input(z.object({ params: z.object({ slug: z.string() }), page: z.coerce.number() }))
         .use(afterMid)
@@ -674,16 +739,25 @@ describe('createProcedureClient', () => {
 
       const client = createProcedureClient(procedure)
 
-      const rawInput: any = { params: { id: 'ID', slug: 'SLUG', unknown: 'UNKNOWN' }, page: '2', unknown: 'UNKNOWN' }
+      const rawInput: any = {
+        params: { id: 'ID', slug: 'SLUG', unknown: 'UNKNOWN' },
+        page: '2',
+        unknown: 'UNKNOWN',
+      }
 
-      await expect(client(rawInput))
-        .resolves
-        .toEqual({ params: { id: 'id__ID', slug: 'SLUG' }, page: 2 })
+      await expect(client(rawInput)).resolves.toEqual({
+        params: { id: 'id__ID', slug: 'SLUG' },
+        page: 2,
+      })
 
       expect(beforeMid.mock.calls[0]![1]).toBe(rawInput)
       expect(betweenMid).toHaveBeenCalledWith(
         expect.any(Object),
-        { params: { id: 'id__ID', slug: 'SLUG', unknown: 'UNKNOWN' }, page: '2', unknown: 'UNKNOWN' },
+        {
+          params: { id: 'id__ID', slug: 'SLUG', unknown: 'UNKNOWN' },
+          page: '2',
+          unknown: 'UNKNOWN',
+        },
         expect.any(Function),
       )
       expect(afterMid).toHaveBeenCalledWith(
@@ -696,15 +770,22 @@ describe('createProcedureClient', () => {
     it('composes fragments nested one level deep', async () => {
       const procedure = os
         .input(z.object({ params: z.object({ id: z.string() }) }))
-        .input(z.object({ params: z.object({ slug: z.string() }), query: z.object({ page: z.number() }) }))
+        .input(
+          z.object({
+            params: z.object({ slug: z.string() }),
+            query: z.object({ page: z.number() }),
+          }),
+        )
         .handler(({ input }) => input)
 
       const client = createProcedureClient(procedure)
 
-      await expect(client({
-        params: { id: 'ID', slug: 'SLUG', unknown: 'UNKNOWN' },
-        query: { page: 1 },
-      } as any)).resolves.toEqual({
+      await expect(
+        client({
+          params: { id: 'ID', slug: 'SLUG', unknown: 'UNKNOWN' },
+          query: { page: 1 },
+        } as any),
+      ).resolves.toEqual({
         params: { id: 'ID', slug: 'SLUG' },
         query: { page: 1 },
       })
@@ -714,44 +795,60 @@ describe('createProcedureClient', () => {
       const parentMid = vi.fn(({ next }) => next())
 
       const procedure = os
-        .input(z.looseObject({ parent: z.string().transform(value => `parent__${value}`) }))
+        .input(z.looseObject({ parent: z.string().transform((value) => `parent__${value}`) }))
         .use(parentMid)
-        .input(z.object({ child: z.string().transform(value => `child__${value}`) }))
+        .input(z.object({ child: z.string().transform((value) => `child__${value}`) }))
         .handler(({ input }) => input)
 
       const client = createProcedureClient(procedure)
 
-      await expect(client({ parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' } as any))
-        .resolves
-        .toEqual({ parent: 'parent__PARENT', child: 'child__CHILD', unknown: 'UNKNOWN' })
+      await expect(
+        client({ parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' } as any),
+      ).resolves.toEqual({ parent: 'parent__PARENT', child: 'child__CHILD', unknown: 'UNKNOWN' })
 
-      expect(parentMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
+      expect(parentMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' },
+        expect.any(Function),
+      )
     })
 
     it('gives later schemas what earlier ones returned', async () => {
       const procedure = os
         .input(z.object({ id: z.coerce.number(), page: z.coerce.number() }))
         .input(z.looseObject({ name: z.string() }))
-        .input(z.object({ page: z.number().transform(page => page * 2) }))
+        .input(z.object({ page: z.number().transform((page) => page * 2) }))
         .handler(({ input }) => input)
 
       const client = createProcedureClient(procedure)
 
-      await expect(client({ id: '5', page: '1', name: 'NAME' } as any))
-        .resolves
-        .toEqual({ id: 5, page: 2, name: 'NAME' })
+      await expect(client({ id: '5', page: '1', name: 'NAME' } as any)).resolves.toEqual({
+        id: 5,
+        page: 2,
+        name: 'NAME',
+      })
     })
 
     it('keeps piping input schemas that do not validate into a plain object', async () => {
       const procedure = os
-        .input(ContractModule.asyncIteratorObject(ContractModule.type<string, string>(value => `first__${value}`)))
-        .input(ContractModule.asyncIteratorObject(ContractModule.type<string, string>(value => `second__${value}`)))
+        .input(
+          ContractModule.asyncIteratorObject(
+            ContractModule.type<string, string>((value) => `first__${value}`),
+          ),
+        )
+        .input(
+          ContractModule.asyncIteratorObject(
+            ContractModule.type<string, string>((value) => `second__${value}`),
+          ),
+        )
         .handler(({ input }) => input)
 
       const client = createProcedureClient(procedure)
-      const output = await client((async function* () {
-        yield 'INPUT'
-      })())
+      const output = await client(
+        (async function* () {
+          yield 'INPUT'
+        })(),
+      )
 
       expect(isAsyncIteratorObject(output)).toBe(true)
       await expect(output.next()).resolves.toEqual({ done: false, value: 'second__first__INPUT' })
@@ -830,8 +927,8 @@ describe('createProcedureClient', () => {
     })
 
     it('does not apply schema transforms when validations are disabled', async () => {
-      const transformInputSchema = z.string().transform(value => `in__${value}`)
-      const transformOutputSchema = z.string().transform(value => `out__${value}`)
+      const transformInputSchema = z.string().transform((value) => `in__${value}`)
+      const transformOutputSchema = z.string().transform((value) => `out__${value}`)
       const handler = vi.fn(async (opts: any) => {
         expect(opts.input).toBe('raw')
         return 'raw-out'
@@ -848,14 +945,14 @@ describe('createProcedureClient', () => {
   })
 
   it('next method can be called multiple times (with transforming schemas)', async () => {
-    const inputSchema = z.string().transform(v => `inputSchema__${v}`)
-    const outputSchema = z.string().transform(v => `outputSchema__${v}`)
+    const inputSchema = z.string().transform((v) => `inputSchema__${v}`)
+    const outputSchema = z.string().transform((v) => `outputSchema__${v}`)
 
     const inputSchemaValidateSpy = vi.spyOn(inputSchema['~standard'], 'validate')
     const outputSchemaValidateSpy = vi.spyOn(outputSchema['~standard'], 'validate')
 
-    interceptor.mockImplementationOnce(
-      options => Promise.all([
+    interceptor.mockImplementationOnce((options) =>
+      Promise.all([
         options.next({ ...options, context: { auth: 1 } }),
         options.next({ ...options, context: { auth: 2 } }),
       ]).then(([_1, _2]) => _2),
@@ -863,18 +960,20 @@ describe('createProcedureClient', () => {
 
     mid1
       .mockImplementationOnce(({ next }) => next({ context: { auth: 3 } }))
-      .mockImplementationOnce(({ next }) => Promise.all([
-        next({ context: { auth: 4 } }),
-        next({ context: { auth: 5 } }),
-      ]).then(([_1, _2]) => _2))
+      .mockImplementationOnce(({ next }) =>
+        Promise.all([next({ context: { auth: 4 } }), next({ context: { auth: 5 } })]).then(
+          ([_1, _2]) => _2,
+        ),
+      )
 
     mid2
       .mockImplementationOnce(({ next }) => next({ context: { auth: 6 } }))
       .mockImplementationOnce(({ next }) => next({ context: { auth: 7 } }))
-      .mockImplementationOnce(({ next }) => Promise.all([
-        next({ context: { auth: 8 } }),
-        next({ context: { auth: 9 } }),
-      ]).then(([_1, _2]) => _2))
+      .mockImplementationOnce(({ next }) =>
+        Promise.all([next({ context: { auth: 8 } }), next({ context: { auth: 9 } })]).then(
+          ([_1, _2]) => _2,
+        ),
+      )
 
     handler
       .mockResolvedValueOnce('__1__')
@@ -882,7 +981,12 @@ describe('createProcedureClient', () => {
       .mockResolvedValueOnce('__3__')
       .mockResolvedValueOnce('__4__')
 
-    const procedure = os.use(mid1).input(inputSchema).output(outputSchema).use(mid2).handler(handler)
+    const procedure = os
+      .use(mid1)
+      .input(inputSchema)
+      .output(outputSchema)
+      .use(mid2)
+      .handler(handler)
 
     const client = createProcedureClient(procedure, { interceptors: [interceptor] })
 
@@ -892,27 +996,74 @@ describe('createProcedureClient', () => {
     expect(interceptor).toHaveNthResolvedWith(1, 'outputSchema____4__')
 
     expect(mid1).toHaveBeenCalledTimes(2)
-    expect(mid1).toHaveBeenNthCalledWith(1, expect.objectContaining({ context: { auth: 1 } }), 'INPUT', expect.any(Function))
-    expect(mid1).toHaveNthResolvedWith(1, expect.objectContaining({ output: 'outputSchema____1__' }))
-    expect(mid1).toHaveBeenNthCalledWith(2, expect.objectContaining({ context: { auth: 2 } }), 'INPUT', expect.any(Function))
-    expect(mid1).toHaveNthResolvedWith(2, expect.objectContaining({ output: 'outputSchema____4__' }))
+    expect(mid1).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ context: { auth: 1 } }),
+      'INPUT',
+      expect.any(Function),
+    )
+    expect(mid1).toHaveNthResolvedWith(
+      1,
+      expect.objectContaining({ output: 'outputSchema____1__' }),
+    )
+    expect(mid1).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ context: { auth: 2 } }),
+      'INPUT',
+      expect.any(Function),
+    )
+    expect(mid1).toHaveNthResolvedWith(
+      2,
+      expect.objectContaining({ output: 'outputSchema____4__' }),
+    )
 
     expect(inputSchemaValidateSpy).toHaveBeenCalledTimes(3)
     expect(outputSchemaValidateSpy).toHaveBeenCalledTimes(3)
 
     expect(mid2).toHaveBeenCalledTimes(3)
-    expect(mid2).toHaveBeenNthCalledWith(1, expect.objectContaining({ context: { auth: 3 } }), 'inputSchema__INPUT', expect.any(Function))
+    expect(mid2).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ context: { auth: 3 } }),
+      'inputSchema__INPUT',
+      expect.any(Function),
+    )
     expect(mid2).toHaveNthResolvedWith(1, expect.objectContaining({ output: '__1__' }))
-    expect(mid2).toHaveBeenNthCalledWith(2, expect.objectContaining({ context: { auth: 4 } }), 'inputSchema__INPUT', expect.any(Function))
+    expect(mid2).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ context: { auth: 4 } }),
+      'inputSchema__INPUT',
+      expect.any(Function),
+    )
     expect(mid2).toHaveNthResolvedWith(2, expect.objectContaining({ output: '__2__' }))
-    expect(mid2).toHaveBeenNthCalledWith(3, expect.objectContaining({ context: { auth: 5 } }), 'inputSchema__INPUT', expect.any(Function))
+    expect(mid2).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ context: { auth: 5 } }),
+      'inputSchema__INPUT',
+      expect.any(Function),
+    )
     expect(mid2).toHaveNthResolvedWith(3, expect.objectContaining({ output: '__4__' }))
 
     expect(handler).toHaveBeenCalledTimes(4)
-    expect(handler).toHaveBeenNthCalledWith(1, expect.objectContaining({ context: { auth: 6 } }), 'inputSchema__INPUT')
-    expect(handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ context: { auth: 7 } }), 'inputSchema__INPUT')
-    expect(handler).toHaveBeenNthCalledWith(3, expect.objectContaining({ context: { auth: 8 } }), 'inputSchema__INPUT')
-    expect(handler).toHaveBeenNthCalledWith(4, expect.objectContaining({ context: { auth: 9 } }), 'inputSchema__INPUT')
+    expect(handler).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ context: { auth: 6 } }),
+      'inputSchema__INPUT',
+    )
+    expect(handler).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ context: { auth: 7 } }),
+      'inputSchema__INPUT',
+    )
+    expect(handler).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ context: { auth: 8 } }),
+      'inputSchema__INPUT',
+    )
+    expect(handler).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({ context: { auth: 9 } }),
+      'inputSchema__INPUT',
+    )
   })
 
   it('client context', async () => {
@@ -923,7 +1074,10 @@ describe('createProcedureClient', () => {
 
     expect(context).toHaveBeenCalledTimes(1)
     expect(context).toHaveBeenCalledWith({ from: 'client_context' })
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ context: { auth: true } }), undefined)
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { auth: true } }),
+      undefined,
+    )
   })
 
   it('trace output AsyncIteratorObject and use override for proxy', async () => {
@@ -935,7 +1089,7 @@ describe('createProcedureClient', () => {
 
     const client = createProcedureClient(procedure)
 
-    const iterator = await client() as any
+    const iterator = (await client()) as any
     expect(iterator).toSatisfy(isAsyncIteratorObject)
 
     expect(overrideSpy).toHaveBeenCalledTimes(1)
@@ -957,7 +1111,7 @@ describe('createProcedureClient', () => {
 
     const client = createProcedureClient(procedure)
 
-    const stream = await client() as any
+    const stream = (await client()) as any
     expect(stream).toBeInstanceOf(ReadableStream)
 
     expect(overrideSpy).toHaveBeenCalledTimes(1)
@@ -982,12 +1136,12 @@ describe('createProcedureClient', () => {
       const error = new ORPCError('BAD_REQUEST', { data: 'data' })
       const handlerIterator = (async function* () {
         throw error
-      }())
+      })()
       handler.mockResolvedValueOnce(handlerIterator as any)
       const reconciledError = new ORPCError('__reconciled__')
       reconcileErrorSpy.mockResolvedValueOnce(reconciledError)
 
-      const iterator = await createProcedureClient(procedure)() as any
+      const iterator = (await createProcedureClient(procedure)()) as any
       expect(iterator).toSatisfy(isAsyncIteratorObject)
       expect(overrideSpy).toHaveBeenCalledWith(handlerIterator, expect.any(Object))
 
@@ -1026,13 +1180,15 @@ describe('createProcedureClient', () => {
     describe('asyncIteratorObject', () => {
       it('reconcile error event before throw', async () => {
         const error = new ORPCError('BAD_REQUEST', { data: 'data' })
-        handler.mockResolvedValueOnce((async function* () {
-          throw error
-        })() as any)
+        handler.mockResolvedValueOnce(
+          (async function* () {
+            throw error
+          })() as any,
+        )
         const reconciledError = new ORPCError('__reconciled__')
         reconcileErrorSpy.mockResolvedValueOnce(reconciledError)
 
-        const iterator = await client() as any
+        const iterator = (await client()) as any
         expect(iterator).toSatisfy(isAsyncIteratorObject)
 
         await expect(iterator.next()).rejects.toThrow(reconciledError)

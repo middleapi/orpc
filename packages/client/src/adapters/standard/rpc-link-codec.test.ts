@@ -1,7 +1,8 @@
 import type { StandardUrl } from '@standard-server/core'
-import { MalformedResponseError, ORPCError, ResponseError } from '../../error'
-import { RPCSerializer } from '../../rpc-serializer'
-import { RPCLinkCodec } from './rpc-link-codec'
+
+import { MalformedResponseError, ORPCError, ResponseError } from '../../error.ts'
+import { RPCSerializer } from '../../rpc-serializer.ts'
+import { RPCLinkCodec } from './rpc-link-codec.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -120,14 +121,23 @@ describe('rpcLinkCodec', () => {
     })
 
     it.each([
-      ['FormData', () => {
-        const f = new FormData()
-        f.set('k', 'v')
-        return f
-      }],
+      [
+        'FormData',
+        () => {
+          const f = new FormData()
+          f.set('k', 'v')
+          return f
+        },
+      ],
       ['Blob', () => new Blob(['data'])],
       ['ReadableStream', () => new ReadableStream()],
-      ['AsyncIteratorObject', () => (async function* () { yield 1 })()],
+      [
+        'AsyncIteratorObject',
+        () =>
+          (async function* () {
+            yield 1
+          })(),
+      ],
     ] as const)('falls back to POST when GET with %s', async (_, factory) => {
       const codec = new RPCLinkCodec({ url: '/api', method: 'GET', serializer })
       const value = factory()
@@ -288,7 +298,10 @@ describe('rpcLinkCodec', () => {
     })
 
     it('decodes ORPCError JSON from error response', async () => {
-      const error = new ORPCError('NOT_FOUND', { message: 'Resource not found', data: { id: '123' } })
+      const error = new ORPCError('NOT_FOUND', {
+        message: 'Resource not found',
+        data: { id: '123' },
+      })
       const serialized = serializer.serialize(error.toJSON())
 
       const result: any = await codec.decodeResponse({
@@ -299,36 +312,58 @@ describe('rpcLinkCodec', () => {
 
       expect(result).toEqual({
         kind: 'error',
-        error: expect.objectContaining({ code: 'NOT_FOUND', message: 'Resource not found', data: { id: '123' } }),
+        error: expect.objectContaining({
+          code: 'NOT_FOUND',
+          message: 'Resource not found',
+          data: { id: '123' },
+        }),
       })
 
       expect(result.error).toBeInstanceOf(ORPCError)
       expect(result.error.cause).toBeInstanceOf(ResponseError)
       expect(result.error.cause).not.toBeInstanceOf(MalformedResponseError)
       expect(result.error.cause.message).toBe('Received a 404 response.')
-      expect(result.error.cause.response).toEqual({ status: 404, headers: { 'x-request-id': 'abc' }, body: serialized })
+      expect(result.error.cause.response).toEqual({
+        status: 404,
+        headers: { 'x-request-id': 'abc' },
+        body: serialized,
+      })
     })
 
     it('throws MalformedResponseError on non-ORPCError error responses', async () => {
       const serialized = serializer.serialize({ something: 'unexpected' })
 
-      const error: any = await codec.decodeResponse({
-        status: 403,
-        headers: { 'x-header': 'value' },
-        resolveBody: () => Promise.resolve(serialized),
-      }).then(() => null, e => e)
+      const error: any = await codec
+        .decodeResponse({
+          status: 403,
+          headers: { 'x-header': 'value' },
+          resolveBody: () => Promise.resolve(serialized),
+        })
+        .then(
+          () => null,
+          (e) => e,
+        )
 
       expect(error).toBeInstanceOf(MalformedResponseError)
       expect(error.message).toBe('Forbidden')
-      expect(error.response).toEqual({ status: 403, headers: { 'x-header': 'value' }, body: serialized })
+      expect(error.response).toEqual({
+        status: 403,
+        headers: { 'x-header': 'value' },
+        body: serialized,
+      })
     })
 
     it('throws MalformedResponseError on invalid RPC response format', async () => {
-      const error: any = await codec.decodeResponse({
-        status: 200,
-        headers: {},
-        resolveBody: () => Promise.resolve({ meta: 123 }),
-      }).then(() => null, e => e)
+      const error: any = await codec
+        .decodeResponse({
+          status: 200,
+          headers: {},
+          resolveBody: () => Promise.resolve({ meta: 123 }),
+        })
+        .then(
+          () => null,
+          (e) => e,
+        )
 
       expect(error).toBeInstanceOf(MalformedResponseError)
       expect(error.message).toBe('Invalid RPC response format.')

@@ -1,7 +1,7 @@
 import { openapi } from '@orpc/openapi'
 
 export const bearAuthMeta = openapi({
-  spec: current => ({
+  spec: (current) => ({
     ...current,
     security: [{ bearerAuth: [] }],
   }),

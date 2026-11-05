@@ -1,4 +1,4 @@
-import { resolveFriendlyStandardHandlerHandleOptions } from './utils'
+import { resolveFriendlyStandardHandlerHandleOptions } from './utils.ts'
 
 describe('resolveFriendlyStandardHandlerHandleOptions', () => {
   it('defaults context to empty object', () => {
@@ -12,10 +12,12 @@ describe('resolveFriendlyStandardHandlerHandleOptions', () => {
   })
 
   it('preserves provided context and prefix', () => {
-    expect(resolveFriendlyStandardHandlerHandleOptions({
-      prefix: '/api/v1',
-      context: { userId: 'u_123' },
-    })).toEqual({
+    expect(
+      resolveFriendlyStandardHandlerHandleOptions({
+        prefix: '/api/v1',
+        context: { userId: 'u_123' },
+      }),
+    ).toEqual({
       prefix: '/api/v1',
       context: { userId: 'u_123' },
     })

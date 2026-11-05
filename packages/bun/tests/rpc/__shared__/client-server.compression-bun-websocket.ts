@@ -1,11 +1,16 @@
-import type { CreateClientServerTest } from './client-server'
+import { afterAll } from 'bun:test'
+
 import { createORPCClient } from '@orpc/client'
 import { RequestCompressionLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCLink } from '@orpc/client/websocket'
-import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+import {
+  RequestCompressionHandlerPlugin,
+  ResponseCompressionHandlerPlugin,
+} from '@orpc/server/plugins'
 import { RPCHandler } from '@orpc/server/websocket'
-import { afterAll } from 'bun:test'
-import { defaultSerializer } from './client-server'
+
+import type { CreateClientServerTest } from './client-server.ts'
+import { defaultSerializer } from './client-server.ts'
 
 export const createCompressionBunWebSocketClientServerTest: CreateClientServerTest = (
   router,
@@ -27,7 +32,7 @@ export const createCompressionBunWebSocketClientServerTest: CreateClientServerTe
   const server = Bun.serve({
     fetch(req, server) {
       if (server.upgrade(req)) {
-        return
+        return undefined
       }
       return new Response('Upgrade failed', { status: 500 })
     },
@@ -46,7 +51,7 @@ export const createCompressionBunWebSocketClientServerTest: CreateClientServerTe
   })
 
   afterAll(() => {
-    server.stop(true)
+    void server.stop(true)
   })
 
   const link = new RPCLink({

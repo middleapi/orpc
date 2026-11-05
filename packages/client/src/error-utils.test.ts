@@ -1,12 +1,13 @@
 import type { Writable } from '@orpc/shared'
-import { ORPCError } from './error'
+
 import {
   cloneORPCError,
   createORPCErrorFromJson,
   isDefinedError,
   isORPCErrorJson,
   toORPCError,
-} from './error-utils'
+} from './error-utils.ts'
+import { ORPCError } from './error.ts'
 
 it('isDefinedError', () => {
   const definedError = new ORPCError('BAD_REQUEST')
@@ -49,7 +50,11 @@ describe('toORPCError', () => {
 })
 
 describe('isORPCErrorJson', () => {
-  const error = new ORPCError('BAD_REQUEST', { message: 'Bad request', cause: 'cause', data: 'data' })
+  const error = new ORPCError('BAD_REQUEST', {
+    message: 'Bad request',
+    cause: 'cause',
+    data: 'data',
+  })
   ;(error as any).defined = true as any
 
   it('returns true for valid ORPC error JSON', () => {
@@ -124,7 +129,11 @@ describe('isORPCErrorJson', () => {
 })
 
 describe('createORPCErrorFromJson', () => {
-  const error = new ORPCError('BAD_REQUEST', { message: 'Bad request', cause: 'cause', data: 'data' })
+  const error = new ORPCError('BAD_REQUEST', {
+    message: 'Bad request',
+    cause: 'cause',
+    data: 'data',
+  })
   ;(error as any).defined = true as any
 
   it('creates ORPCError from valid JSON', () => {
@@ -238,6 +247,7 @@ describe('cloneORPCError', () => {
 
     expect(Object.prototype.toString.call(cloned)).toBe('[object Error]')
     expect(Object.keys(cloned)).toEqual(Object.keys(original))
+    // oxlint-disable-next-line typescript/no-misused-spread
     expect({ ...cloned }).toEqual({ ...original })
   })
 })

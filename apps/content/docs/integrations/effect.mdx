@@ -1,8 +1,8 @@
 ---
-title: "Effect Integration"
-description: "Write effectful oRPC handlers with Effect generators, call oRPC clients as effects, provide services through context, and validate with Effect Schema."
+title: 'Effect Integration'
+description: 'Write effectful oRPC handlers with Effect generators, call oRPC clients as effects, provide services through context, and validate with Effect Schema.'
 sidebar:
-  label: "Effect"
+  label: 'Effect'
 ---
 
 :::warning
@@ -25,11 +25,13 @@ import { os } from '@orpc/server'
 import { handlerGen } from '@orpc/effect'
 import { Effect } from 'effect'
 
-const procedure = os.handler(handlerGen(function* ({ input, context }) {
-  // You can use Effect's features here, such as concurrency, error handling, etc.
-  const result = yield* Effect.promise(() => Promise.resolve(5))
-  return result
-}))
+const procedure = os.handler(
+  handlerGen(function* ({ input, context }) {
+    // You can use Effect's features here, such as concurrency, error handling, etc.
+    const result = yield* Effect.promise(() => Promise.resolve(5))
+    return result
+  }),
+)
 ```
 
 ### `.effect` extension
@@ -83,13 +85,13 @@ class Random extends Context.Service<
 
 interface ServerContext extends WithEffectContext<Random> {}
 
-const procedure = os
-  .$context<ServerContext>()
-  .handler(handlerGen(function* ({ input, context }) {
+const procedure = os.$context<ServerContext>().handler(
+  handlerGen(function* ({ input, context }) {
     const random = yield* Random
     const result = yield* random.next
     return result
-  }))
+  }),
+)
 
 const random = await call(procedure, undefined, {
   context: {
@@ -97,8 +99,8 @@ const random = await call(procedure, undefined, {
       Context.add(Random, {
         next: Effect.sync(() => Math.random()),
       }),
-    )
-  }
+    ),
+  },
 })
 ```
 
@@ -111,15 +113,15 @@ const procedure = os
   .use(({ context, next }) => {
     return next({
       context: {
-        'effect/context': context['effect/context'].pipe(
-          Context.add(AdditionService, {}),
-        )
-      }
+        'effect/context': context['effect/context'].pipe(Context.add(AdditionService, {})),
+      },
     })
   })
-  .handler(handlerGen(function* ({ input, context }) {
-    const additionService = yield* AdditionService
-  }))
+  .handler(
+    handlerGen(function* ({ input, context }) {
+      const additionService = yield* AdditionService
+    }),
+  )
 ```
 
 :::
@@ -153,20 +155,23 @@ export async function fetch(request: Request) {
   const { matched, response } = await handler.handle(request, {
     context: {
       'effect/context': Context.empty(),
-      'effect/wrap': effect => effect.pipe(
-        Effect.catchCause((cause) => {
-          const error = Cause.squash(cause)
+      'effect/wrap': (effect) =>
+        effect.pipe(
+          Effect.catchCause((cause) => {
+            const error = Cause.squash(cause)
 
-          if (error instanceof NotFoundError) {
-            return Effect.fail(new ORPCError('NOT_FOUND', {
-              message: `${error.resource} not found`,
-              cause: error,
-            }))
-          }
+            if (error instanceof NotFoundError) {
+              return Effect.fail(
+                new ORPCError('NOT_FOUND', {
+                  message: `${error.resource} not found`,
+                  cause: error,
+                }),
+              )
+            }
 
-          return Effect.failCause(cause)
-        }),
-      ),
+            return Effect.failCause(cause)
+          }),
+        ),
     },
   })
 
@@ -195,13 +200,15 @@ const procedure = os
       message: 'The resource you are looking for does not exist',
     },
   })
-  .handler(handlerGen(function* ({ errors }) {
-    if (resourceNotFound) {
-      return yield* Effect.fail(errors.NOT_FOUND())
-    }
+  .handler(
+    handlerGen(function* ({ errors }) {
+      if (resourceNotFound) {
+        return yield* Effect.fail(errors.NOT_FOUND())
+      }
 
-    return 'Success'
-  }))
+      return 'Success'
+    }),
+  )
 
 const [error, result] = await safe(call(procedure))
 
@@ -218,18 +225,14 @@ Use `catchORPCError` to recover from every `ORPCError` failure in the error chan
 import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from '@orpc/effect'
 import { Effect } from 'effect'
 
-const recovered = program.pipe(
-  catchORPCError(error => Effect.succeed(`caught ${error.code}`)),
-)
+const recovered = program.pipe(catchORPCError((error) => Effect.succeed(`caught ${error.code}`)))
 
-const fallback = program.pipe(
-  catchORPCErrorCode('NOT_FOUND', error => Effect.succeed(null)),
-)
+const fallback = program.pipe(catchORPCErrorCode('NOT_FOUND', (error) => Effect.succeed(null)))
 
 const handled = program.pipe(
   catchORPCErrorCodes({
-    NOT_FOUND: error => Effect.succeed(null),
-    CONFLICT: error => Effect.succeed(error.message),
+    NOT_FOUND: (error) => Effect.succeed(null),
+    CONFLICT: (error) => Effect.succeed(error.message),
   }),
 )
 ```
@@ -256,10 +259,12 @@ import { Clock } from 'effect'
 
 const procedure = os
   .$context<{ auth: boolean }>()
-  .use(middlewareGen(function* ({ context, next }) {
-    const startedAt = yield* Clock.currentTimeMillis
-    return yield* next({ context: { startedAt } })
-  }))
+  .use(
+    middlewareGen(function* ({ context, next }) {
+      const startedAt = yield* Clock.currentTimeMillis
+      return yield* next({ context: { startedAt } })
+    }),
+  )
   .handler(({ context }) => context.startedAt)
 ```
 
@@ -278,7 +283,7 @@ const program = Effect.gen(function* () {
   return planet.name
 }).pipe(
   catchORPCErrorCodes({
-    NOT_FOUND: error => Effect.succeed('unknown'),
+    NOT_FOUND: (error) => Effect.succeed('unknown'),
   }),
 )
 ```
@@ -310,9 +315,11 @@ import { Schema } from 'effect'
 
 const procedure = os
   .input(Schema.toStandardSchemaV1(Schema.Struct({ name: Schema.String })))
-  .handler(handlerGen(function* ({ input, context }) {
-    return `Hello ${input.name}!`
-  }))
+  .handler(
+    handlerGen(function* ({ input, context }) {
+      return `Hello ${input.name}!`
+    }),
+  )
 ```
 
 ### Schema Extension
@@ -330,13 +337,15 @@ const procedure = base
   })
   .input(Schema.Struct({ name: Schema.String }))
   .output(Schema.Struct({ greeting: Schema.String }))
-  .handler(handlerGen(function* ({ input, errors }) {
-    if (input.name === 'admin') {
-      return yield* Effect.fail(errors.FORBIDDEN({ data: { reason: 'Reserved name' } }))
-    }
+  .handler(
+    handlerGen(function* ({ input, errors }) {
+      if (input.name === 'admin') {
+        return yield* Effect.fail(errors.FORBIDDEN({ data: { reason: 'Reserved name' } }))
+      }
 
-    return { greeting: `Hello ${input.name}!` }
-  }))
+      return { greeting: `Hello ${input.name}!` }
+    }),
+  )
 ```
 
 ```ts setup

@@ -1,11 +1,11 @@
-import type { AnyMetaPlugin } from './meta'
-import { getHiddenMetaPlugins, setHiddenMetaPlugins } from './meta'
+import type { AnyMetaPlugin } from './meta.ts'
+import { getHiddenMetaPlugins, setHiddenMetaPlugins } from './meta.ts'
 
 describe('getHiddenMetaPlugins', () => {
   const metaPlugins: AnyMetaPlugin[] = [
     {
       name: 'plugin',
-      init: meta => ({ ...meta, enabled: true }),
+      init: (meta) => ({ ...meta, enabled: true }),
     },
   ]
 

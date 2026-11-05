@@ -22,18 +22,16 @@ export function ReferenceLinks() {
       <div className="module-head">
         <div>
           <span className="module-id">REF · LINKS</span>
-          <h2 className="module-title" id="reference-links-title">Reference links</h2>
+          <h2 className="module-title" id="reference-links-title">
+            Reference links
+          </h2>
         </div>
       </div>
 
       <ul className="ref-list">
-        {referenceLinks.map(link => (
+        {referenceLinks.map((link) => (
           <li key={link.href}>
-            <a
-              href={link.href}
-              className="ref-link-row"
-              target="_blank"
-            >
+            <a href={link.href} className="ref-link-row" target="_blank">
               <span className="ref-link-text">
                 <span className="ref-link-label">{link.label}</span>
                 <span className="ref-link-desc">{link.description}</span>

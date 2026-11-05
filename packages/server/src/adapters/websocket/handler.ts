@@ -1,10 +1,16 @@
 import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
-import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
+import {
+  decodePeerMessage,
+  encodePeerMessage,
+  isClientPeerSendMessage,
+  ServerPeer,
+} from '@standard-server/peer'
+
+import type { Context } from '../../context.ts'
+import { createStandardPeerRequestHandler } from '../standard-peer/index.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
 
 /**
  * Supports standard WebSocket instances, Bun ServerWebSocket, "ws" ServerWebSocket,
@@ -56,7 +62,9 @@ export class WebSocketHandler<T extends Context> {
    */
   async message(
     ws: WebSocketLike,
-    data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
+    data: Arrayable<
+      string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>
+    >,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
     /**
@@ -74,10 +82,13 @@ export class WebSocketHandler<T extends Context> {
     }
 
     if (!peer) {
-      this.peers.set(ws, peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
-        await ws.send(encoded)
-      }))
+      this.peers.set(
+        ws,
+        (peer = new ServerPeer(async (message) => {
+          const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
+          await ws.send(encoded)
+        })),
+      )
     }
 
     if (result.matched && isClientPeerSendMessage(result.message)) {
@@ -115,14 +126,17 @@ export class WebSocketHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    ws.addEventListener('message', sequential(async (event) => {
-      // For better compatibility avoid control or depend on websocket.binaryType
-      const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
+    ws.addEventListener(
+      'message',
+      sequential(async (event) => {
+        // For better compatibility avoid control or depend on websocket.binaryType
+        const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
 
-      // Not awaited: `this.message` runs business logic that may be slow,
-      // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
-    }))
+        // Not awaited: `this.message` runs business logic that may be slow,
+        // and awaiting it would block decoding of subsequent messages.
+        void this.message(ws, data, ...rest)
+      }),
+    )
     ws.addEventListener('close', () => this.close(ws))
 
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,

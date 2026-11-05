@@ -1,11 +1,13 @@
-import type { AddressInfo } from 'node:net'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
-import { StaticFileHandlerPlugin } from '../src'
+
+import { StaticFileHandlerPlugin } from '../src/index.ts'
 
 it('serves static files', async ({ onTestFinished }) => {
   const rootDir = mkdtempSync(path.join(tmpdir(), 'orpc-node-e2e-'))
@@ -15,14 +17,15 @@ it('serves static files', async ({ onTestFinished }) => {
 
   writeFileSync(path.join(rootDir, 'hello.txt'), 'hello world')
 
-  const handler = new RPCHandler({
-    ping: os.handler(() => 'pong'),
-  }, {
-    allowMethods: ['GET'],
-    plugins: [
-      new StaticFileHandlerPlugin({ rootDir }),
-    ],
-  })
+  const handler = new RPCHandler(
+    {
+      ping: os.handler(() => 'pong'),
+    },
+    {
+      allowMethods: ['GET'],
+      plugins: [new StaticFileHandlerPlugin({ rootDir })],
+    },
+  )
 
   const server = createServer(async (req, res) => {
     const result = await handler.handle(req, res, { context: {} })
@@ -36,7 +39,7 @@ it('serves static files', async ({ onTestFinished }) => {
     server.close()
   })
 
-  await new Promise<void>(resolve => server.listen(0, resolve))
+  await new Promise<void>((resolve) => server.listen(0, resolve))
   const url = `http://localhost:${(server.address() as AddressInfo).port}`
 
   const fileRes = await fetch(`${url}/hello.txt`)
@@ -56,7 +59,9 @@ it('serves static files', async ({ onTestFinished }) => {
   expect(cachedRes.status).toBe(304)
   expect(await cachedRes.text()).toBe('')
 
-  const procedureRes = await fetch(`${url}/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`)
+  const procedureRes = await fetch(
+    `${url}/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+  )
   expect(procedureRes.status).toBe(200)
   expect(await procedureRes.text()).toContain('pong')
 

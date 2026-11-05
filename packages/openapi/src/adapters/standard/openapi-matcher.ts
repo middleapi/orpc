@@ -1,11 +1,17 @@
+import { createPrefixMatcher, Router } from '@openapi-spec/router'
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
+import {
+  Procedure,
+  resolveContractProcedure,
+  unlazy,
+  walkProcedureContractsSync,
+} from '@orpc/server'
 import type { Value } from '@orpc/shared'
-import { createPrefixMatcher, Router } from '@openapi-spec/router'
-import { Procedure, resolveContractProcedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
 import { mergeHttpPath, pathToHttpPath, value } from '@orpc/shared'
-import { DEFAULT_OPENAPI_METHOD } from '../../constants'
-import { getOpenAPIMeta } from '../../meta'
+
+import { DEFAULT_OPENAPI_METHOD } from '../../constants.ts'
+import { getOpenAPIMeta } from '../../meta.ts'
 
 export interface OpenAPIMatcherOptions {
   /**
@@ -13,7 +19,9 @@ export interface OpenAPIMatcherOptions {
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
+  filter?:
+    | Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+    | undefined
 }
 
 interface TreeEntry {
@@ -42,22 +50,26 @@ export class OpenAPIMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
-    const lazyResults = walkProcedureContractsSync(router, (contract, path) => {
-      if (!value(this.filter, contract, path)) {
-        return
-      }
+    const lazyResults = walkProcedureContractsSync(
+      router,
+      (contract, path) => {
+        if (!value(this.filter, contract, path)) {
+          return
+        }
 
-      const meta = getOpenAPIMeta(contract)
-      const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
-      const postHttpPath = meta?.path ?? pathToHttpPath(path)
-      const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
+        const meta = getOpenAPIMeta(contract)
+        const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
+        const postHttpPath = meta?.path ?? pathToHttpPath(path)
+        const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
 
-      this.tree.add(method, httpPath, {
-        path,
-        contract,
-        procedure: contract instanceof Procedure ? contract : undefined,
-      })
-    }, path)
+        this.tree.add(method, httpPath, {
+          path,
+          contract,
+          procedure: contract instanceof Procedure ? contract : undefined,
+        })
+      },
+      path,
+    )
 
     for (const result of lazyResults) {
       const prefix = getOpenAPIMeta(result.router)?.prefix
@@ -73,7 +85,10 @@ export class OpenAPIMatcher {
     method: string,
     pathname: `/${string}`,
     prefix: `/${string}` | undefined,
-  ): Promise<{ path: string[], procedure: AnyProcedure, params?: Record<string, string> | undefined } | undefined> {
+  ): Promise<
+    | { path: string[]; procedure: AnyProcedure; params?: Record<string, string> | undefined }
+    | undefined
+  > {
     if (prefix) {
       if (!pathname.startsWith(prefix)) {
         return undefined
@@ -83,14 +98,11 @@ export class OpenAPIMatcher {
 
       if (charAfterPrefix === '/') {
         pathname = pathname.slice(prefix.length) as `/${string}`
-      }
-      else if (charAfterPrefix === undefined) {
+      } else if (charAfterPrefix === undefined) {
         pathname = '/'
-      }
-      else if (prefix[prefix.length - 1] === '/') {
+      } else if (prefix[prefix.length - 1] === '/') {
         pathname = pathname.slice(prefix.length - 1) as `/${string}`
-      }
-      else {
+      } else {
         return undefined
       }
     }
@@ -111,7 +123,7 @@ export class OpenAPIMatcher {
 
     return {
       path: entry.path,
-      procedure: entry.procedure ?? await this.resolveProcedure(entry),
+      procedure: entry.procedure ?? (await this.resolveProcedure(entry)),
       params: match.params,
     }
   }

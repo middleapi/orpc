@@ -2,13 +2,24 @@ import type { Client, ORPCError } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { PromiseWithError, Public } from '@orpc/shared'
 import type { UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
-import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
-import type { InfiniteOptionsIn, MutationKeyOptions, MutationOptionsIn, QueryKeyOptions, QueryOptionsIn, StreamedKeyOptions, StreamedOptionsIn, UseMutationFnContext, UseQueryFnContext } from './types'
 import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
-import z from 'zod'
+import * as z from 'zod'
 
-const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
+import type {
+  InfiniteOptionsIn,
+  MutationKeyOptions,
+  MutationOptionsIn,
+  QueryKeyOptions,
+  QueryOptionsIn,
+  StreamedKeyOptions,
+  StreamedOptionsIn,
+  UseMutationFnContext,
+  UseQueryFnContext,
+} from './types.ts'
+
+const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 const baseErrorMap = {
   BASE: {
@@ -18,25 +29,17 @@ const baseErrorMap = {
 }
 
 describe('ProcedureUtils', () => {
-  type UtilsInput = { search?: string, cursor?: number } | undefined
+  type UtilsInput = { search?: string; cursor?: number } | undefined
   type UtilsOutput = { title: string }[]
   type UtilsError = ORPCErrorFromErrorMap<typeof baseErrorMap>
 
-  const utils = {} as Public<ProcedureUtils<
-    { batch?: boolean },
-    UtilsInput,
-    UtilsOutput,
-    UtilsError
-  >>
+  const utils = {} as Public<
+    ProcedureUtils<{ batch?: boolean }, UtilsInput, UtilsOutput, UtilsError>
+  >
 
   it('.call', () => {
     expectTypeOf(utils.call).toEqualTypeOf<
-      Client<
-        { batch?: boolean },
-        UtilsInput,
-        UtilsOutput,
-        UtilsError
-      >
+      Client<{ batch?: boolean }, UtilsInput, UtilsOutput, UtilsError>
     >()
   })
 
@@ -55,7 +58,9 @@ describe('ProcedureUtils', () => {
       // @ts-expect-error invalid input
       utils.queryKey({ input: 'invalid' })
 
-      const requiredUtils = {} as Public<ProcedureUtils<{ batch?: boolean }, 'input', UtilsOutput, Error>>
+      const requiredUtils = {} as Public<
+        ProcedureUtils<{ batch?: boolean }, 'input', UtilsOutput, Error>
+      >
       requiredUtils.queryKey({ input: 'input' })
       // @ts-expect-error input is required
       requiredUtils.queryKey()
@@ -63,18 +68,22 @@ describe('ProcedureUtils', () => {
   })
 
   describe('.streamedOptions & .liveOptions', () => {
-    const streamUtils = {} as Public<ProcedureUtils<
-      { batch?: boolean },
-      UtilsInput,
-      AsyncIterable<UtilsOutput[number]>,
-      UtilsError
-    >>
+    const streamUtils = {} as Public<
+      ProcedureUtils<
+        { batch?: boolean },
+        UtilsInput,
+        AsyncIterable<UtilsOutput[number]>,
+        UtilsError
+      >
+    >
 
     it('works with useQuery', () => {
-      const streamed = useQuery(streamUtils.streamedOptions({
-        input: { search: 'search' },
-        fnOptions: { refetchMode: 'append', maxChunks: 3 },
-      }))
+      const streamed = useQuery(
+        streamUtils.streamedOptions({
+          input: { search: 'search' },
+          fnOptions: { refetchMode: 'append', maxChunks: 3 },
+        }),
+      )
 
       expectTypeOf(streamed.data.value).toEqualTypeOf<UtilsOutput | undefined>()
       expectTypeOf(streamed.error.value).toEqualTypeOf<UtilsError | null>()
@@ -112,7 +121,9 @@ describe('ProcedureUtils', () => {
       const queryCache = useQueryCache()
 
       expectTypeOf(
-        queryCache.getQueryData(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 })),
+        queryCache.getQueryData(
+          utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 }),
+        ),
       ).toEqualTypeOf<UseInfiniteQueryData<UtilsOutput, number> | undefined>()
 
       utils.infiniteKey({ key: ['__custom__'] })
@@ -135,13 +146,15 @@ describe('ProcedureUtils', () => {
 
       utils.mutationKey({})
       utils.mutationKey({ key: ['__custom__'] })
-      utils.mutationKey({ key: input => [{ input }] as any })
+      utils.mutationKey({ key: (input) => [{ input }] as any })
     })
   })
 
   describe('.queryOptions', () => {
     it('can optional options', () => {
-      const requiredUtils = {} as Public<ProcedureUtils<{ batch?: boolean }, 'input', UtilsOutput, Error>>
+      const requiredUtils = {} as Public<
+        ProcedureUtils<{ batch?: boolean }, 'input', UtilsOutput, Error>
+      >
 
       utils.queryOptions()
       utils.queryOptions({ context: { batch: true } })
@@ -194,9 +207,11 @@ describe('ProcedureUtils', () => {
       })
 
       it('with initial data', () => {
-        const query = useQuery(utils.queryOptions({
-          initialData: () => [{ title: 'title' }],
-        }))
+        const query = useQuery(
+          utils.queryOptions({
+            initialData: () => [{ title: 'title' }],
+          }),
+        )
 
         expectTypeOf(query.data.value).toEqualTypeOf<UtilsOutput>()
         expectTypeOf(query.error.value).toEqualTypeOf<UtilsError | null>()
@@ -246,21 +261,25 @@ describe('ProcedureUtils', () => {
     })
 
     it('works with useInfiniteQuery', () => {
-      const query = useInfiniteQuery(utils.infiniteOptions({
-        input: (cursor: number) => ({ cursor }),
-        initialPageParam: 0,
-        getNextPageParam: () => 1,
-      }))
+      const query = useInfiniteQuery(
+        utils.infiniteOptions({
+          input: (cursor: number) => ({ cursor }),
+          initialPageParam: 0,
+          getNextPageParam: () => 1,
+        }),
+      )
 
       expectTypeOf(query.data.value?.pages).toEqualTypeOf<UtilsOutput[] | undefined>()
       expectTypeOf(query.data.value?.pageParams).toEqualTypeOf<number[] | undefined>()
       expectTypeOf(query.error.value).toEqualTypeOf<UtilsError | null>()
 
-      const lazyQuery = useInfiniteQuery(() => utils.infiniteOptions({
-        input: (cursor: number) => ({ cursor }),
-        initialPageParam: 0,
-        getNextPageParam: () => 1,
-      }))
+      const lazyQuery = useInfiniteQuery(() =>
+        utils.infiniteOptions({
+          input: (cursor: number) => ({ cursor }),
+          initialPageParam: 0,
+          getNextPageParam: () => 1,
+        }),
+      )
 
       expectTypeOf(lazyQuery.data.value?.pages).toEqualTypeOf<UtilsOutput[] | undefined>()
     })
@@ -268,7 +287,9 @@ describe('ProcedureUtils', () => {
 
   describe('.mutationOptions', () => {
     it('can optional options', () => {
-      const requiredUtils = {} as Public<ProcedureUtils<{ batch: boolean }, 'input', UtilsOutput, Error>>
+      const requiredUtils = {} as Public<
+        ProcedureUtils<{ batch: boolean }, 'input', UtilsOutput, Error>
+      >
 
       utils.mutationOptions()
       utils.mutationOptions({})
@@ -296,15 +317,17 @@ describe('ProcedureUtils', () => {
     })
 
     it('works with useMutation', () => {
-      const mutation = useMutation(utils.mutationOptions({
-        onSuccess: (data, input) => {
-          expectTypeOf(data).toEqualTypeOf<UtilsOutput>()
-          expectTypeOf(input).toEqualTypeOf<UtilsInput>()
-        },
-        onError: (error) => {
-          expectTypeOf(error).toEqualTypeOf<UtilsError>()
-        },
-      }))
+      const mutation = useMutation(
+        utils.mutationOptions({
+          onSuccess: (data, input) => {
+            expectTypeOf(data).toEqualTypeOf<UtilsOutput>()
+            expectTypeOf(input).toEqualTypeOf<UtilsInput>()
+          },
+          onError: (error) => {
+            expectTypeOf(error).toEqualTypeOf<UtilsError>()
+          },
+        }),
+      )
 
       expectTypeOf<Parameters<typeof mutation.mutate>[0]>().toEqualTypeOf<UtilsInput>()
       expectTypeOf(mutation.data.value).toEqualTypeOf<UtilsOutput | undefined>()
@@ -336,7 +359,12 @@ describe('ProcedureUtilsOptions', () => {
   type TestOptions = ProcedureUtilsOptions<TestClientContext, TestInput, TestOutput, TestError>
 
   type TestStreamedOutput = AsyncIterable<TestOutput>
-  type TestStreamedOptions = ProcedureUtilsOptions<TestClientContext, TestInput, TestStreamedOutput, TestError>
+  type TestStreamedOptions = ProcedureUtilsOptions<
+    TestClientContext,
+    TestInput,
+    TestStreamedOutput,
+    TestError
+  >
 
   it('should have all keys that ProcedureUtils provides', () => {
     // Ensures every utility method in ProcedureUtils (except 'call') has a corresponding key in ProcedureUtilsOptions
@@ -419,7 +447,15 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       queryOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<QueryOptionsIn<TestClientContext, TestInput, TestOutput, TestError, TestOutput | undefined>>()
+        expectTypeOf(options).toEqualTypeOf<
+          QueryOptionsIn<
+            TestClientContext,
+            TestInput,
+            TestOutput,
+            TestError,
+            TestOutput | undefined
+          >
+        >()
 
         return {
           ...options,
@@ -432,7 +468,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      queryOptions: options => ({
+      queryOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -504,7 +540,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       streamedOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<StreamedOptionsIn<TestClientContext, TestInput, never, TestError, undefined>>()
+        expectTypeOf(options).toEqualTypeOf<
+          StreamedOptionsIn<TestClientContext, TestInput, never, TestError, undefined>
+        >()
 
         return {
           ...options,
@@ -516,7 +554,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      streamedOptions: options => ({
+      streamedOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -549,7 +587,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      liveKey: options => ({
+      liveKey: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -587,7 +625,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       liveOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<QueryOptionsIn<TestClientContext, TestInput, never, TestError, undefined>>()
+        expectTypeOf(options).toEqualTypeOf<
+          QueryOptionsIn<TestClientContext, TestInput, never, TestError, undefined>
+        >()
 
         return {
           ...options,
@@ -599,7 +639,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      liveOptions: options => ({
+      liveOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -633,7 +673,9 @@ describe('ProcedureUtilsOptions', () => {
         (opts) => {
           expectTypeOf(opts.input).toEqualTypeOf<TestInput>()
           expectTypeOf(opts.next()).toEqualTypeOf<PromiseWithError<TestOutput, TestError>>()
-          expectTypeOf(opts.fnContext).toEqualTypeOf<UseInfiniteQueryFnContext<any, any, any, any>>()
+          expectTypeOf(opts.fnContext).toEqualTypeOf<
+            UseInfiniteQueryFnContext<any, any, any, any>
+          >()
 
           return opts.next()
         },
@@ -657,7 +699,16 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       infiniteOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<InfiniteOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown, UseInfiniteQueryData<TestOutput, unknown> | undefined>>()
+        expectTypeOf(options).toEqualTypeOf<
+          InfiniteOptionsIn<
+            TestClientContext,
+            TestInput,
+            TestOutput,
+            TestError,
+            unknown,
+            UseInfiniteQueryData<TestOutput, unknown> | undefined
+          >
+        >()
 
         return {
           ...options,
@@ -668,7 +719,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid input type
-      infiniteOptions: options => ({
+      infiniteOptions: (options) => ({
         ...options,
         input: { invalid: 'test' },
       }),
@@ -701,7 +752,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid key type
-      mutationKey: options => ({
+      mutationKey: (options) => ({
         key: 1,
       }),
     }
@@ -740,7 +791,9 @@ describe('ProcedureUtilsOptions', () => {
 
     const _defaults2: TestOptions = {
       mutationOptions: (options) => {
-        expectTypeOf(options).toEqualTypeOf<MutationOptionsIn<TestClientContext, TestInput, TestOutput, TestError, Record<any, any>>>()
+        expectTypeOf(options).toEqualTypeOf<
+          MutationOptionsIn<TestClientContext, TestInput, TestOutput, TestError, Record<any, any>>
+        >()
 
         return {
           ...options,
@@ -754,7 +807,7 @@ describe('ProcedureUtilsOptions', () => {
 
     const _invalid2: TestOptions = {
       // @ts-expect-error - invalid context type
-      mutationOptions: options => ({
+      mutationOptions: (options) => ({
         ...options,
         context: { batch: 'invalid' },
       }),

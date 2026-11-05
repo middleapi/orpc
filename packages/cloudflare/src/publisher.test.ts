@@ -1,18 +1,20 @@
-import type { DurablePublisherOptions } from './publisher'
 import { RPCJsonSerializer } from '@orpc/client'
 import { sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { DurablePublisher } from './publisher'
 
-type MockSocket = WebSocket & EventTarget & {
-  accepted: boolean
-  closeCalls: Array<{ code: number | undefined, reason: string | undefined }>
-  sendMessage: (data: string) => void
-  sendClose: (code: number, reason?: string) => void
-  sendError: () => void
-}
+import type { DurablePublisherOptions } from './publisher.ts'
+import { DurablePublisher } from './publisher.ts'
+
+type MockSocket = WebSocket &
+  EventTarget & {
+    accepted: boolean
+    closeCalls: Array<{ code: number | undefined; reason: string | undefined }>
+    sendMessage: (data: string) => void
+    sendClose: (code: number, reason?: string) => void
+    sendError: () => void
+  }
 
 function makeSocket(): MockSocket {
   const socket = new EventTarget() as MockSocket
@@ -40,10 +42,13 @@ function makeSocket(): MockSocket {
 
 function makeNamespace(socket: MockSocket, headers: HeadersInit = {}): DurableObjectNamespace {
   const stub = {
-    fetch: vi.fn(async () => ({
-      webSocket: socket as unknown as WebSocket,
-      headers: new Headers(headers),
-    } as Response)),
+    fetch: vi.fn(
+      async () =>
+        ({
+          webSocket: socket as unknown as WebSocket,
+          headers: new Headers(headers),
+        }) as Response,
+    ),
   } as unknown as DurableObjectStub
 
   return {
@@ -57,9 +62,12 @@ function setup(headers: HeadersInit = {}) {
 }
 
 async function waitForAccept(socket: MockSocket) {
-  await vi.waitFor(() => {
-    expect(socket.accepted).toBe(true)
-  }, { interval: 1 })
+  await vi.waitFor(
+    () => {
+      expect(socket.accepted).toBe(true)
+    },
+    { interval: 1 },
+  )
 }
 
 const serializer = new RPCJsonSerializer()
@@ -69,7 +77,10 @@ function sendEvent(socket: MockSocket, text: string) {
 }
 
 describe('durable publisher', () => {
-  function createTestingPublisher(namespace: DurableObjectNamespace<any>, options: DurablePublisherOptions = {}) {
+  function createTestingPublisher(
+    namespace: DurableObjectNamespace<any>,
+    options: DurablePublisherOptions = {},
+  ) {
     const prefix = `${crypto.randomUUID()}:`
 
     return { prefix, publisher: new DurablePublisher(namespace, { ...options, prefix }) }
@@ -83,10 +94,16 @@ describe('durable publisher', () => {
 
     await publisher.publish('notice', { text: 'ignore me' })
     await publisher.publish('message', { text: 'first' })
-    await publisher.publish('message', withEventMeta({ text: 'second' }, {
-      id: 'client-id',
-      comments: ['keep me'],
-    }))
+    await publisher.publish(
+      'message',
+      withEventMeta(
+        { text: 'second' },
+        {
+          id: 'client-id',
+          comments: ['keep me'],
+        },
+      ),
+    )
 
     await vi.waitFor(() => {
       expect(live).toHaveBeenCalledTimes(2)
@@ -132,10 +149,16 @@ describe('durable publisher', () => {
 
     await publisher.publish('notice', { text: 'ignore me' })
     await publisher.publish('message', { text: 'first' })
-    await publisher.publish('message', withEventMeta({ text: 'second' }, {
-      id: 'client-id',
-      comments: ['keep me'],
-    }))
+    await publisher.publish(
+      'message',
+      withEventMeta(
+        { text: 'second' },
+        {
+          id: 'client-id',
+          comments: ['keep me'],
+        },
+      ),
+    )
 
     await vi.waitFor(() => {
       expect(live).toHaveBeenCalledTimes(2)
@@ -183,13 +206,15 @@ describe('durable publisher', () => {
       expect(listener).toHaveBeenCalledTimes(4)
     })
 
-    expect(listener.mock.calls.map(call => call[0].order)).toEqual([1, 2, 3, 4])
+    expect(listener.mock.calls.map((call) => call[0].order)).toEqual([1, 2, 3, 4])
 
     await unsubscribe()
   })
 
   it('caps resumed events at maxBufferedEvents for a slow iterator consumer', async () => {
-    const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON, { maxBufferedEvents: 2 })
+    const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON, {
+      maxBufferedEvents: 2,
+    })
     const subscribeListener = vi.spyOn(publisher as any, 'subscribeListener')
 
     for (let i = 0; i < 5; i++) {
@@ -233,7 +258,7 @@ describe('durable publisher', () => {
     const serializer = new RPCJsonSerializer({
       handlers: {
         person: {
-          condition: p => p instanceof Person,
+          condition: (p) => p instanceof Person,
           serialize: (p: Person) => ({ name: p.name, age: p.age }),
           deserialize: (data: any) => new Person(data.name, data.age),
         },
@@ -284,10 +309,13 @@ describe('durable publisher', () => {
 
   it('throws when publish fails', async () => {
     const stub = {
-      fetch: vi.fn(async () => new Response(null, {
-        status: 503,
-        statusText: 'Service Unavailable',
-      })),
+      fetch: vi.fn(
+        async () =>
+          new Response(null, {
+            status: 503,
+            statusText: 'Service Unavailable',
+          }),
+      ),
     } as unknown as DurableObjectStub
 
     const namespace = {
@@ -343,7 +371,9 @@ describe('durable publisher', () => {
       expect(onError).toHaveBeenCalledTimes(3)
     })
 
-    expect(onError.mock.calls[0]![0].message).toBe('Failed to deserialize message from publisher durable object')
+    expect(onError.mock.calls[0]![0].message).toBe(
+      'Failed to deserialize message from publisher durable object',
+    )
     expect(onError.mock.calls[1]![0].message).toBe('WebSocket closed unexpectedly: 1011 crashed')
     expect(onError.mock.calls[2]![0].message).toBe('Subscription websocket error')
 
@@ -359,10 +389,12 @@ describe('durable publisher', () => {
       const onError = vi.fn()
 
       let resolved = false
-      const subscription = publisher.subscribe('message', listener, { lastEventId: '0', onError }).then((unsubscribe) => {
-        resolved = true
-        return unsubscribe
-      })
+      const subscription = publisher
+        .subscribe('message', listener, { lastEventId: '0', onError })
+        .then((unsubscribe) => {
+          resolved = true
+          return unsubscribe
+        })
 
       await waitForAccept(socket)
 
@@ -374,14 +406,18 @@ describe('durable publisher', () => {
       sendEvent(socket, 'missed 2')
       const unsubscribe = await subscription
 
-      expect(listener.mock.calls.map(call => call[0].text)).toEqual(['missed 1', 'missed 2'])
+      expect(listener.mock.calls.map((call) => call[0].text)).toEqual(['missed 1', 'missed 2'])
       expect(onError).toHaveBeenCalledTimes(1)
 
       await unsubscribe()
     })
 
     it.each([
-      ['closes normally', (socket: MockSocket) => socket.sendClose(1000, 'done'), 'WebSocket closed unexpectedly: 1000 done'],
+      [
+        'closes normally',
+        (socket: MockSocket) => socket.sendClose(1000, 'done'),
+        'WebSocket closed unexpectedly: 1000 done',
+      ],
       ['errors', (socket: MockSocket) => socket.sendError(), 'Subscription websocket error'],
     ])('rejects when the socket %s before the replay finishes', async (_, fail, message) => {
       const { socket, publisher } = setup({ 'orpc-replayed-events': '2' })

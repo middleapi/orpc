@@ -1,11 +1,12 @@
 import type { AnyMetaPlugin } from '@orpc/contract'
 import { oc } from '@orpc/contract'
-import z from 'zod'
-import { os } from './builder'
-import { Lazy, unlazy } from './lazy'
-import { Procedure } from './procedure'
-import * as ProcedureClient from './procedure-client'
-import { call, createContractProcedure, createGuardedProcedureLazy } from './procedure-utils'
+import * as z from 'zod'
+
+import { os } from './builder.ts'
+import { Lazy, unlazy } from './lazy.ts'
+import * as ProcedureClient from './procedure-client.ts'
+import { call, createContractProcedure, createGuardedProcedureLazy } from './procedure-utils.ts'
+import { Procedure } from './procedure.ts'
 
 const createProcedureClientSpy = vi.spyOn(ProcedureClient, 'createProcedureClient')
 
@@ -49,8 +50,14 @@ it('createGuardedProcedureLazy', async () => {
 })
 
 it('createContractProcedure', () => {
-  const metaPlugin1: AnyMetaPlugin = { name: 'plugin1', init: meta => ({ ...meta, plugin1: true }) }
-  const metaPlugin2: AnyMetaPlugin = { name: 'plugin2', init: meta => ({ ...meta, plugin2: true }) }
+  const metaPlugin1: AnyMetaPlugin = {
+    name: 'plugin1',
+    init: (meta) => ({ ...meta, plugin1: true }),
+  }
+  const metaPlugin2: AnyMetaPlugin = {
+    name: 'plugin2',
+    init: (meta) => ({ ...meta, plugin2: true }),
+  }
 
   const procedure = os
     .errors({ CONFLICT: {}, NOT_FOUND: {} })
@@ -88,7 +95,11 @@ it('call', async () => {
   const client = vi.fn(async () => '__output__')
   vi.mocked(createProcedureClientSpy).mockReturnValueOnce(client as any)
 
-  const options = { context: { db: 'postgres' }, signal: AbortSignal.timeout(1000), lastEventId: '123' }
+  const options = {
+    context: { db: 'postgres' },
+    signal: AbortSignal.timeout(1000),
+    lastEventId: '123',
+  }
   const input = { input: 123 }
   const output = await call(procedure, input, options)
 

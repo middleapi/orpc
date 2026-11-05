@@ -1,6 +1,6 @@
-import type { OperationKey, OperationKeyBaseOptions, OperationKeyOptions } from './key'
-import type { OperationType } from './types'
-import { generateOperationKey } from './key'
+import type { OperationKey, OperationKeyBaseOptions, OperationKeyOptions } from './key.ts'
+import { generateOperationKey } from './key.ts'
+import type { OperationType } from './types.ts'
 
 export class SharedUtils<TInput> {
   constructor(
@@ -11,7 +11,13 @@ export class SharedUtils<TInput> {
   /**
    * Generate a **partial matching** key for actions like revalidating queries, checking mutation status, etc.
    */
-  key<TType extends OperationType>(options: Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> = {}): OperationKey<TType, TInput> {
-    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix, serializer: this.options.serializer })
+  key<TType extends OperationType>(
+    options: Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> = {},
+  ): OperationKey<TType, TInput> {
+    return generateOperationKey(this.path, {
+      ...options,
+      prefix: this.options.prefix,
+      serializer: this.options.serializer,
+    })
   }
 }

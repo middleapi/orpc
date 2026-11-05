@@ -1,8 +1,8 @@
 ---
-title: "Retry After Plugin"
-description: "Automatically retry requests based on the Retry-After response header, useful for rate limits and temporary server unavailability."
+title: 'Retry After Plugin'
+description: 'Automatically retry requests based on the Retry-After response header, useful for rate limits and temporary server unavailability.'
 sidebar:
-  label: "Retry After"
+  label: 'Retry After'
 ---
 
 ## Usage
@@ -11,9 +11,7 @@ sidebar:
 import { RetryAfterLinkPlugin } from '@orpc/client/plugins'
 
 const link = new RPCLink({
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
+  plugins: [new RetryAfterLinkPlugin()],
 })
 ```
 
@@ -33,7 +31,7 @@ By default, the plugin retries only requests that receive a `429` (Too Many Requ
 const link = new RPCLink({
   plugins: [
     new RetryAfterLinkPlugin({
-      condition: response => [429, 503].includes(response.status),
+      condition: (response) => [429, 503].includes(response.status),
       timeout: 5 * 60 * 1000, // 5 minutes
       maxAttempts: 3,
     }),

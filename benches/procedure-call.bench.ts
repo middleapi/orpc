@@ -44,7 +44,7 @@ const fullClient = createProcedureClient(full, {
 describe('procedure call', () => {
   const input = {
     id: 1,
-    name: `1tem-${1}`,
+    name: `1tem-1`,
     active: true,
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
     largeInt: 9007199254740993n + BigInt(1),

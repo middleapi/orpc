@@ -1,6 +1,6 @@
 ---
-title: "Scalar (Swagger)"
-description: "Use Scalar to serve an interactive API reference UI for your oRPC API generated from its OpenAPI specification."
+title: 'Scalar (Swagger)'
+description: 'Use Scalar to serve an interactive API reference UI for your oRPC API generated from its OpenAPI specification.'
 ---
 
 :::info
@@ -19,15 +19,11 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 const openAPIHandler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin(),
-  ],
+  plugins: [new CORSHandlerPlugin()],
 })
 
 const openAPIGenerator = new OpenAPIGenerator({
-  converters: [
-    new ZodToJsonSchemaConverter(),
-  ],
+  converters: [new ZodToJsonSchemaConverter()],
 })
 
 const server = createServer(async (req, res) => {
@@ -46,9 +42,7 @@ const server = createServer(async (req, res) => {
           title: 'My Playground',
           version: '1.0.0',
         },
-        servers: [
-          { url: '/api' }, /** Use an absolute URL in production. */
-        ],
+        servers: [{ url: '/api' } /** Use an absolute URL in production. */],
         security: [{ bearerAuth: [] }],
         components: {
           securitySchemes: {

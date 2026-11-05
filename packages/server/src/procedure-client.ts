@@ -1,14 +1,41 @@
 import type { Client, ClientContext } from '@orpc/client'
-import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap, ORPCErrorFromErrorMap } from '@orpc/contract'
-import type { Interceptor, MaybeOptionalOptions, Promisable, PromiseWithError, ThrowableError, Value } from '@orpc/shared'
-import type { Context } from './context'
-import type { Lazyable } from './lazy'
-import type { MiddlewareDone } from './middleware'
-import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  ORPCErrorConstructorMap,
+  ORPCErrorFromErrorMap,
+} from '@orpc/contract'
 import { createORPCErrorConstructorMap, reconcileORPCError, ValidationError } from '@orpc/contract'
-import { getTracer, intercept, isAsyncIteratorObject, mergeTwoLevels, override, resolveMaybeOptionalOptions, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
-import { unlazy } from './lazy'
+import type {
+  Interceptor,
+  MaybeOptionalOptions,
+  Promisable,
+  PromiseWithError,
+  ThrowableError,
+  Value,
+} from '@orpc/shared'
+import {
+  getTracer,
+  intercept,
+  isAsyncIteratorObject,
+  mergeTwoLevels,
+  override,
+  resolveMaybeOptionalOptions,
+  runWithSpan,
+  toArray,
+  traceAsyncIterator,
+  traceReadableStream,
+  value,
+} from '@orpc/shared'
+
+import type { Context } from './context.ts'
+import type { Lazyable } from './lazy.ts'
+import { unlazy } from './lazy.ts'
+import type { MiddlewareDone } from './middleware.ts'
+import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure.ts'
 
 export type ProcedureClient<
   TClientContext extends ClientContext,
@@ -22,11 +49,20 @@ export type ProcedureClient<
   ORPCErrorFromErrorMap<TErrorMap> | ThrowableError
 >
 
-export interface ProcedureClientInterceptorOptions<TInitialContext extends Context, TErrorMap extends ErrorMap> extends ProcedureHandlerOptions<TInitialContext, unknown, ORPCErrorConstructorMap<TErrorMap>> {
-}
-export type ProcedureClientInterceptor<TInitialContext extends Context, TOutputSchema extends AnySchema, TErrorMap extends ErrorMap> = Interceptor<
+export interface ProcedureClientInterceptorOptions<
+  TInitialContext extends Context,
+  TErrorMap extends ErrorMap,
+> extends ProcedureHandlerOptions<TInitialContext, unknown, ORPCErrorConstructorMap<TErrorMap>> {}
+export type ProcedureClientInterceptor<
+  TInitialContext extends Context,
+  TOutputSchema extends AnySchema,
+  TErrorMap extends ErrorMap,
+> = Interceptor<
   ProcedureClientInterceptorOptions<TInitialContext, TErrorMap>,
-  PromiseWithError<InferSchemaOutput<TOutputSchema>, ORPCErrorFromErrorMap<TErrorMap> | ThrowableError>
+  PromiseWithError<
+    InferSchemaOutput<TOutputSchema>,
+    ORPCErrorFromErrorMap<TErrorMap> | ThrowableError
+  >
 >
 
 export type ProcedureClientOptions<
@@ -34,16 +70,12 @@ export type ProcedureClientOptions<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TClientContext extends ClientContext,
->
-  = & {
-    path?: string[] | undefined
-    interceptors?: ProcedureClientInterceptor<TInitialContext, TOutputSchema, TErrorMap>[] | undefined
-  }
-  & (
-    object extends TInitialContext
-      ? { context?: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> | undefined }
-      : { context: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> }
-  )
+> = {
+  path?: string[] | undefined
+  interceptors?: ProcedureClientInterceptor<TInitialContext, TOutputSchema, TErrorMap>[] | undefined
+} & (object extends TInitialContext
+  ? { context?: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> | undefined }
+  : { context: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> })
 
 export function createProcedureClient<
   TInitialContext extends Context,
@@ -52,14 +84,11 @@ export function createProcedureClient<
   TErrorMap extends ErrorMap,
   TClientContext extends ClientContext = object,
 >(
-  lazyableProcedure: Lazyable<Procedure<TInitialContext, any, TInputSchema, TOutputSchema, TErrorMap>>,
+  lazyableProcedure: Lazyable<
+    Procedure<TInitialContext, any, TInputSchema, TOutputSchema, TErrorMap>
+  >,
   ...rest: MaybeOptionalOptions<
-    ProcedureClientOptions<
-      TInitialContext,
-      TOutputSchema,
-      TErrorMap,
-      TClientContext
-    >
+    ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, TClientContext>
   >
 ): ProcedureClient<TClientContext, TInputSchema, TOutputSchema, TErrorMap> {
   const options = resolveMaybeOptionalOptions(rest)
@@ -69,9 +98,11 @@ export function createProcedureClient<
     const { default: procedure } = await unlazy(lazyableProcedure)
 
     // callerOptions.context can be undefined when all field is optional
-    const clientContext = callerOptions?.context ?? {} as TClientContext
+    const clientContext = callerOptions?.context ?? ({} as TClientContext)
     // options.context can be undefined when all field is optional
-    const context = await value(options.context, clientContext) as TInitialContext | undefined ?? {} as TInitialContext
+    const context =
+      ((await value(options.context, clientContext)) as TInitialContext | undefined) ??
+      ({} as TInitialContext)
     const errors = createORPCErrorConstructorMap(procedure['~orpc'].errorMap)
 
     const reconcileError = async (e: ThrowableError) => {
@@ -98,7 +129,8 @@ export function createProcedureClient<
             signal: callerOptions?.signal,
             lastEventId: callerOptions?.lastEventId,
           },
-          interceptorOptions => executeProcedureInternal(interceptorOptions.procedure, interceptorOptions),
+          (interceptorOptions) =>
+            executeProcedureInternal(interceptorOptions.procedure, interceptorOptions),
         )
       })
 
@@ -114,23 +146,28 @@ export function createProcedureClient<
          * @warning
          * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        return override(output, wrapAsyncIteratorPreservingEventMeta(
-          getTracer() ? traceAsyncIterator('consume_async_iterator_object_output', output) : output,
-          { mapError: reconcileError },
-        )) as typeof output
-      }
-
-      else if (getTracer() && (output as unknown) instanceof ReadableStream) {
+        return override(
+          output,
+          wrapAsyncIteratorPreservingEventMeta(
+            getTracer()
+              ? traceAsyncIterator('consume_async_iterator_object_output', output)
+              : output,
+            { mapError: reconcileError },
+          ),
+        ) as typeof output
+      } else if (getTracer() && (output as unknown) instanceof ReadableStream) {
         /**
          * @warning
          * Remember use `override` for ReadableStream to remain other special properties
          */
-        return override(output, traceReadableStream('consume_octet_stream_output', output)) as typeof output
+        return override(
+          output,
+          traceReadableStream('consume_octet_stream_output', output),
+        ) as typeof output
       }
 
       return output
-    }
-    catch (e) {
+    } catch (e) {
       throw await reconcileError(e as ThrowableError)
     }
   }
@@ -187,11 +224,14 @@ const middlewareDone: MiddlewareDone<any> = (...rest) => {
   return {
     output: options.output,
     // context can be undefined when all field is optional
-    context: options.context ?? {} as any,
+    context: options.context ?? ({} as any),
   }
 }
 
-async function executeProcedureInternal(procedure: AnyProcedure, options: ProcedureHandlerOptions<any, any, any>): Promise<any> {
+async function executeProcedureInternal(
+  procedure: AnyProcedure,
+  options: ProcedureHandlerOptions<any, any, any>,
+): Promise<any> {
   const inputSchemas = toArray(procedure['~orpc'].inputSchemas)
   const outputSchemas = toArray(procedure['~orpc'].outputSchemas)
   const orderedMiddlewares = procedure['~orpc'].orderedMiddlewares
@@ -201,16 +241,16 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
     context: Context,
     input: unknown,
     signal: AbortSignal | undefined,
-  ): Promise<{ output: unknown, context: Record<any, any> }> => {
+  ): Promise<{ output: unknown; context: Record<any, any> }> => {
     let currentInput = input
     let middlewareInput = input
 
-    const startInputIndex = midIndex === 0
-      ? 0
-      : orderedMiddlewares[midIndex - 1]!.inputSchemasLengthAtUse ?? 0
-    const endInputIndex = midIndex === orderedMiddlewares.length
-      ? inputSchemas.length
-      : orderedMiddlewares[midIndex]!.inputSchemasLengthAtUse ?? 0
+    const startInputIndex =
+      midIndex === 0 ? 0 : (orderedMiddlewares[midIndex - 1]!.inputSchemasLengthAtUse ?? 0)
+    const endInputIndex =
+      midIndex === orderedMiddlewares.length
+        ? inputSchemas.length
+        : (orderedMiddlewares[midIndex]!.inputSchemasLengthAtUse ?? 0)
 
     /**
      * Each schema after the first validates the original input with the results so far applied, then
@@ -228,9 +268,10 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
         currentInput = i !== 0 ? mergeTwoLevels(currentInput, validated) : validated
       }
 
-      middlewareInput = endInputIndex > 0 && endInputIndex < inputSchemas.length
-        ? mergeTwoLevels(options.input, currentInput)
-        : currentInput
+      middlewareInput =
+        endInputIndex > 0 && endInputIndex < inputSchemas.length
+          ? mergeTwoLevels(options.input, currentInput)
+          : currentInput
     }
 
     let currentOutput: unknown
@@ -250,7 +291,7 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
             next: (...rest) => {
               const nextOptions = resolveMaybeOptionalOptions(rest)
               // context can be undefined when all field is optional
-              const nextContext = nextOptions.context ?? {} as any
+              const nextContext = nextOptions.context ?? ({} as any)
 
               return next(
                 midIndex + 1,
@@ -268,20 +309,21 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
 
       currentOutput = result.output
       currentContext = { ...context, ...result.context }
-    }
-    else {
-      currentOutput = await runWithSpan(
-        'handler',
-        () => procedure['~orpc'].handler({ ...options, context, input: currentInput, signal }, currentInput),
+    } else {
+      currentOutput = await runWithSpan('handler', () =>
+        procedure['~orpc'].handler(
+          { ...options, context, input: currentInput, signal },
+          currentInput,
+        ),
       )
     }
 
-    const startOutputIndex = midIndex === 0
-      ? 0
-      : orderedMiddlewares[midIndex - 1]!.outputSchemasLengthAtUse ?? 0
-    const endOutputIndex = midIndex === orderedMiddlewares.length
-      ? outputSchemas.length
-      : orderedMiddlewares[midIndex]!.outputSchemasLengthAtUse ?? 0
+    const startOutputIndex =
+      midIndex === 0 ? 0 : (orderedMiddlewares[midIndex - 1]!.outputSchemasLengthAtUse ?? 0)
+    const endOutputIndex =
+      midIndex === orderedMiddlewares.length
+        ? outputSchemas.length
+        : (orderedMiddlewares[midIndex]!.outputSchemasLengthAtUse ?? 0)
 
     if (!procedure['~orpc'].disableOutputValidation) {
       for (let i = endOutputIndex - 1; i >= startOutputIndex; i--) {

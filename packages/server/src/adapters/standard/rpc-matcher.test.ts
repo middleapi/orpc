@@ -1,11 +1,12 @@
 import { oc } from '@orpc/contract'
 import { z } from 'zod'
-import { os } from '../../builder'
-import { implement } from '../../implementer'
-import { Lazy } from '../../lazy'
-import * as ProcedureUtils from '../../procedure-utils'
-import { withHiddenRouterContract } from '../../router-hidden'
-import { RPCMatcher } from './rpc-matcher'
+
+import { os } from '../../builder.ts'
+import { implement } from '../../implementer.ts'
+import { Lazy } from '../../lazy.ts'
+import * as ProcedureUtils from '../../procedure-utils.ts'
+import { withHiddenRouterContract } from '../../router-hidden.ts'
+import { RPCMatcher } from './rpc-matcher.ts'
 
 const createContractProcedureSpy = vi.spyOn(ProcedureUtils, 'createContractProcedure')
 
@@ -22,13 +23,15 @@ describe('rpcMatcher', () => {
   const procedure3 = os.errors({ BAD_GATEWAY: {} }).handler(() => {})
 
   const lazyLazyLoader = vi.fn(async () => ({ default: { deep: procedure1 } }))
-  const lazyLoader = vi.fn(async () => ({ default: {
-    info: procedure3,
-    lazy: new Lazy({
-      loader: lazyLazyLoader,
-      meta: {},
-    }),
-  } }))
+  const lazyLoader = vi.fn(async () => ({
+    default: {
+      info: procedure3,
+      lazy: new Lazy({
+        loader: lazyLazyLoader,
+        meta: {},
+      }),
+    },
+  }))
 
   const router = {
     ping: procedure1,
@@ -182,7 +185,9 @@ describe('rpcMatcher', () => {
             await Promise.resolve()
           }
 
-          return { default: depth === 3 ? { leaf } : { leaf, [`l${depth + 1}`]: lazyLevel(depth + 1) } }
+          return {
+            default: depth === 3 ? { leaf } : { leaf, [`l${depth + 1}`]: lazyLevel(depth + 1) },
+          }
         },
       })
     }
@@ -191,13 +196,13 @@ describe('rpcMatcher', () => {
 
     const paths = ['/l1/leaf', '/l1/l2/leaf', '/l1/l2/l3/leaf'] as const
     const results = await Promise.all(
-      paths.flatMap(path => [
+      paths.flatMap((path) => [
         matcher.match('POST', path, undefined),
         matcher.match('POST', path, undefined),
       ]),
     )
 
-    expect(results.map(result => result?.path.join('/'))).toEqual([
+    expect(results.map((result) => result?.path.join('/'))).toEqual([
       'l1/leaf',
       'l1/leaf',
       'l1/l2/leaf',
@@ -221,7 +226,9 @@ describe('rpcMatcher', () => {
     const hasSpy = vi.spyOn(pending, 'has')
     const getSpy = vi.spyOn(pending, 'get')
 
-    await expect(matcher.match('POST', `/${'/'.repeat(16_000)}%25`, undefined)).resolves.toBeUndefined()
+    await expect(
+      matcher.match('POST', `/${'/'.repeat(16_000)}%25`, undefined),
+    ).resolves.toBeUndefined()
 
     // max pending depth is 1, and there are two passes (raw + normalized)
     expect(hasSpy.mock.calls.length + getSpy.mock.calls.length).toBeLessThanOrEqual(2)
@@ -253,28 +260,23 @@ describe('rpcMatcher', () => {
   })
 
   describe('allowMethods', () => {
-    it.each([
-      'POST',
-      'PUT',
-      'PATCH',
-      'DELETE',
-    ] as const)('matches %s requests by default', async (method) => {
-      const matcher = new RPCMatcher(router)
+    it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+      'matches %s requests by default',
+      async (method) => {
+        const matcher = new RPCMatcher(router)
 
-      await expect(matcher.match(method, '/ping', undefined)).resolves.toBeDefined()
-    })
+        await expect(matcher.match(method, '/ping', undefined)).resolves.toBeDefined()
+      },
+    )
 
-    it.each([
-      'GET',
-      'HEAD',
-      'OPTIONS',
-      'QUERY',
-      'TRACE',
-    ] as const)('treats %s requests as unmatched by default', async (method) => {
-      const matcher = new RPCMatcher(router)
+    it.each(['GET', 'HEAD', 'OPTIONS', 'QUERY', 'TRACE'] as const)(
+      'treats %s requests as unmatched by default',
+      async (method) => {
+        const matcher = new RPCMatcher(router)
 
-      await expect(matcher.match(method, '/ping', undefined)).resolves.toBeUndefined()
-    })
+        await expect(matcher.match(method, '/ping', undefined)).resolves.toBeUndefined()
+      },
+    )
 
     it('replaces the default allowlist entirely when a list is provided', async () => {
       const matcher = new RPCMatcher(router, { allowMethods: ['GET', 'QUERY'] })
@@ -285,7 +287,10 @@ describe('rpcMatcher', () => {
     })
 
     it('decides per request with the method, matched procedure, and path', async () => {
-      const allowMethods = vi.fn((method: string, _procedure: unknown, path: string[]) => method === 'GET' && path[0] === 'ping')
+      const allowMethods = vi.fn(
+        (method: string, _procedure: unknown, path: string[]) =>
+          method === 'GET' && path[0] === 'ping',
+      )
       const matcher = new RPCMatcher(router, { allowMethods })
 
       const matched = await matcher.match('GET', '/ping', undefined)
@@ -388,8 +393,14 @@ describe('rpcMatcher', () => {
     it('strips trailing slash after prefix stripping', async () => {
       const matcher = new RPCMatcher(router)
 
-      await expect(matcher.match('POST', '/api/ping/', '/api/')).resolves.toEqual({ path: ['ping'], procedure: procedure1 })
-      await expect(matcher.match('POST', '/api/ping/', '/api')).resolves.toEqual({ path: ['ping'], procedure: procedure1 })
+      await expect(matcher.match('POST', '/api/ping/', '/api/')).resolves.toEqual({
+        path: ['ping'],
+        procedure: procedure1,
+      })
+      await expect(matcher.match('POST', '/api/ping/', '/api')).resolves.toEqual({
+        path: ['ping'],
+        procedure: procedure1,
+      })
     })
   })
 
@@ -416,7 +427,11 @@ describe('rpcMatcher', () => {
       expect(r2).toBeDefined()
       expect(r2!.path).toEqual(['nested', 'echo'])
       expect(createContractProcedureSpy).toHaveBeenCalledTimes(2)
-      expect(createContractProcedureSpy).toHaveBeenNthCalledWith(2, router.nested.echo, contract.nested.echo)
+      expect(createContractProcedureSpy).toHaveBeenNthCalledWith(
+        2,
+        router.nested.echo,
+        contract.nested.echo,
+      )
       expect(r2!.procedure).not.toBe(procedure2)
       expect(r2!.procedure).toBe(createContractProcedureSpy.mock.results[1]!.value)
 
@@ -441,15 +456,22 @@ describe('rpcMatcher', () => {
       }
 
       const matcher = new RPCMatcher(withHiddenRouterContract(router, contract))
-      await expect(matcher.match('POST', '/missing', undefined)).rejects.toThrowError('[Contract-First] Missing or invalid implementation for procedure at path: "missing"')
+      await expect(matcher.match('POST', '/missing', undefined)).rejects.toThrowError(
+        '[Contract-First] Missing or invalid implementation for procedure at path: "missing"',
+      )
     })
 
     it('uses the implemented handler and config when implementing a server router', async () => {
       const original = {
-        ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'original'),
+        ping: os
+          .$config({ disableInputValidation: true })
+          .input(z.string())
+          .handler(() => 'original'),
       }
       const implementer = implement(original, { disableInputValidation: false })
-      const matcher = new RPCMatcher(implementer.router({ ping: implementer.ping.handler(() => 'implemented') }))
+      const matcher = new RPCMatcher(
+        implementer.router({ ping: implementer.ping.handler(() => 'implemented') }),
+      )
 
       const { procedure } = (await matcher.match('POST', '/ping', undefined))!
 
@@ -490,7 +512,11 @@ describe('rpcMatcher', () => {
       const matcher = new RPCMatcher({ 'v1^beta': { 'items:batchGet': procedure1 } })
 
       // WHATWG URL and Node's req.url keep "^" raw, while procedure paths are stored as "%5E"
-      for (const pathname of ['/v1^beta/items:batchGet', '/v1%5Ebeta/items%3AbatchGet', '/v1%5ebeta/items:batchGet'] as const) {
+      for (const pathname of [
+        '/v1^beta/items:batchGet',
+        '/v1%5Ebeta/items%3AbatchGet',
+        '/v1%5ebeta/items:batchGet',
+      ] as const) {
         const result = await matcher.match('POST', pathname, undefined)
 
         expect(result).toBeDefined()
@@ -498,7 +524,9 @@ describe('rpcMatcher', () => {
         expect(result!.procedure).toBe(procedure1)
       }
 
-      await expect(matcher.match('POST', '/v1beta/items:batchGet', undefined)).resolves.toBeUndefined()
+      await expect(
+        matcher.match('POST', '/v1beta/items:batchGet', undefined),
+      ).resolves.toBeUndefined()
     })
 
     it('resolves lazy routers found only after normalizing a raw character in the pathname', async () => {

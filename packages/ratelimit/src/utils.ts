@@ -1,6 +1,7 @@
 import type { Promisable } from '@orpc/shared'
-import type { RateLimitOptions, RateLimitResult } from './types'
 import { sleep } from '@orpc/shared'
+
+import type { RateLimitOptions, RateLimitResult } from './types.ts'
 
 /**
  * Reads the request weight, defaulting to 1.

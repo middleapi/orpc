@@ -1,6 +1,6 @@
 ---
 name: orpc-openapi
-description: "Expose an oRPC router as a spec-compliant OpenAPI HTTP API. Use when a project depends on @orpc/openapi, or for defining REST-style routes on oRPC procedures (openapi() metadata or .route with method, path, successStatus), serving them with OpenAPIHandler alongside RPCHandler, coercing query and path strings with Smart Coercion, calling an OpenAPI-shaped API with OpenAPILink, generating an OpenAPI 3.2 (or 3.1, 3.0) document with OpenAPIGenerator, or serving Scalar or Swagger docs with the OpenAPI Reference plugin. Biases toward retrieval from the oRPC docs over pre-trained knowledge. For contract-first work (defining contracts with oc, implementing them with implement, or generating a contract from an existing OpenAPI spec), use the orpc-contract skill; for plain RPC serving, core builder, middleware, or client work with no REST exposure, use the orpc skill instead."
+description: 'Expose an oRPC router as a spec-compliant OpenAPI HTTP API. Use when a project depends on @orpc/openapi, or for defining REST-style routes on oRPC procedures (openapi() metadata or .route with method, path, successStatus), serving them with OpenAPIHandler alongside RPCHandler, coercing query and path strings with Smart Coercion, calling an OpenAPI-shaped API with OpenAPILink, generating an OpenAPI 3.2 (or 3.1, 3.0) document with OpenAPIGenerator, or serving Scalar or Swagger docs with the OpenAPI Reference plugin. Biases toward retrieval from the oRPC docs over pre-trained knowledge. For contract-first work (defining contracts with oc, implementing them with implement, or generating a contract from an existing OpenAPI spec), use the orpc-contract skill; for plain RPC serving, core builder, middleware, or client work with no REST exposure, use the orpc skill instead.'
 license: MIT
 ---
 
@@ -62,9 +62,7 @@ import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new SmartCoercionHandlerPlugin({ converters: [new ZodToJsonSchemaConverter()] }),
-  ],
+  plugins: [new SmartCoercionHandlerPlugin({ converters: [new ZodToJsonSchemaConverter()] })],
 })
 
 export async function fetch(request: Request): Promise<Response> {
@@ -84,9 +82,9 @@ Other handler options: `interceptors`/`routingInterceptors`/`clientInterceptors`
 `OpenAPILink` calls an OpenAPI-shaped oRPC API (or any spec-compliant server) through a typesafe client. It needs the contract or router type to know each procedure's route:
 
 ```ts
+import { createORPCClient } from '@orpc/client'
 import type { RouterContractClient } from '@orpc/contract'
 import type { JsonifiedClient } from '@orpc/openapi'
-import { createORPCClient } from '@orpc/client'
 import { OpenAPILink } from '@orpc/openapi/fetch'
 
 const link = new OpenAPILink(contract, {
@@ -118,12 +116,13 @@ const generator = new OpenAPIGenerator({ converters: [new ZodToJsonSchemaConvert
 const handler = new OpenAPIHandler(router, {
   plugins: [
     new OpenAPIReferenceHandlerPlugin({
-      spec: () => generator.generate(router, {
-        base: {
-          info: { title: 'Planet API', version: '1.0.0' },
-          servers: [{ url: '/api' }], // absolute URL in production
-        },
-      }),
+      spec: () =>
+        generator.generate(router, {
+          base: {
+            info: { title: 'Planet API', version: '1.0.0' },
+            servers: [{ url: '/api' }], // absolute URL in production
+          },
+        }),
     }),
   ],
 })

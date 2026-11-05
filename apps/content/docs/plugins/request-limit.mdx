@@ -1,8 +1,8 @@
 ---
-title: "Request Limit Plugin"
-description: "Restrict the size of incoming request bodies with RequestLimitHandlerPlugin to protect your server from oversized payloads."
+title: 'Request Limit Plugin'
+description: 'Restrict the size of incoming request bodies with RequestLimitHandlerPlugin to protect your server from oversized payloads.'
 sidebar:
-  label: "Request Limit"
+  label: 'Request Limit'
 ---
 
 ## Setup
@@ -38,7 +38,7 @@ This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adap
 
 ```ts
 const MAX_BYTES_PER_MINUTE = 10 * 1024 * 1024 // 10MB
-const usage = new WeakMap<object, { bytes: number, resetAt: number }>()
+const usage = new WeakMap<object, { bytes: number; resetAt: number }>()
 
 Bun.serve({
   websocket: {
@@ -46,7 +46,7 @@ Bun.serve({
     async message(ws, message) {
       let entry = usage.get(ws)
       if (!entry || Date.now() >= entry.resetAt) {
-        usage.set(ws, entry = { bytes: 0, resetAt: Date.now() + 60_000 })
+        usage.set(ws, (entry = { bytes: 0, resetAt: Date.now() + 60_000 }))
       }
 
       entry.bytes += Buffer.byteLength(message)

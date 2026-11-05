@@ -1,12 +1,13 @@
 import type { StandardResponse } from '@standard-server/core'
 import { toFetchResponse } from '@standard-server/fetch'
 import supertest from 'supertest'
-import { RPCHandler } from '../adapters/fetch'
-import { RPCHandler as NodeRPCHandler } from '../adapters/node'
-import { os } from '../builder'
-import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection'
-import { HeadMethodHandlerPlugin } from './head-method'
-import { ResponseCompressionHandlerPlugin } from './response-compression'
+
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
+import { os } from '../builder.ts'
+import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection.ts'
+import { HeadMethodHandlerPlugin } from './head-method.ts'
+import { ResponseCompressionHandlerPlugin } from './response-compression.ts'
 
 function getInterceptors() {
   const existingInterceptor = vi.fn()
@@ -74,12 +75,17 @@ describe('headMethodHandlerPlugin', () => {
   describe('routing', () => {
     it.each(['GET', 'POST'])('ignores %s requests', async (method) => {
       const { bodyInterceptor, fallbackInterceptor } = getInterceptors()
-      const nextResult = { matched: true, response: { status: 200, headers: {}, body: { value: 1 } } }
+      const nextResult = {
+        matched: true,
+        response: { status: 200, headers: {}, body: { value: 1 } },
+      }
 
       for (const interceptor of [bodyInterceptor, fallbackInterceptor]) {
         const next = vi.fn().mockResolvedValue(nextResult)
 
-        await expect(interceptor({ context: {}, request: { method, url: '/' }, next } as any)).resolves.toBe(nextResult)
+        await expect(
+          interceptor({ context: {}, request: { method, url: '/' }, next } as any),
+        ).resolves.toBe(nextResult)
         expect(next).toHaveBeenCalledExactlyOnceWith()
       }
     })
@@ -89,14 +95,17 @@ describe('headMethodHandlerPlugin', () => {
       const nextResult = { matched: true, response: 'head' }
       const next = vi.fn().mockResolvedValue(nextResult)
 
-      await expect(fallbackInterceptor({ context: {}, request: { method: 'HEAD', url: '/' }, next } as any)).resolves.toBe(nextResult)
+      await expect(
+        fallbackInterceptor({ context: {}, request: { method: 'HEAD', url: '/' }, next } as any),
+      ).resolves.toBe(nextResult)
       expect(next).toHaveBeenCalledExactlyOnceWith()
     })
 
     it('falls back to GET when no procedure is routed as HEAD', async () => {
       const { fallbackInterceptor } = getInterceptors()
       const nextResult = { matched: true, response: 'get' }
-      const next = vi.fn()
+      const next = vi
+        .fn()
         .mockResolvedValueOnce({ matched: false })
         .mockResolvedValueOnce(nextResult)
 
@@ -104,7 +113,9 @@ describe('headMethodHandlerPlugin', () => {
       const signal = AbortSignal.timeout(1000)
       const request = { method: 'HEAD', url: '/ping?x=1', headers: { 'x-custom': '1' }, signal }
 
-      await expect(fallbackInterceptor({ context, prefix: '/api', request, next } as any)).resolves.toBe(nextResult)
+      await expect(
+        fallbackInterceptor({ context, prefix: '/api', request, next } as any),
+      ).resolves.toBe(nextResult)
       expect(next).toHaveBeenCalledTimes(2)
       expect(next).toHaveBeenNthCalledWith(1)
       expect(next).toHaveBeenNthCalledWith(2, {
@@ -119,7 +130,9 @@ describe('headMethodHandlerPlugin', () => {
       const { fallbackInterceptor } = getInterceptors()
       const next = vi.fn().mockResolvedValue({ matched: false })
 
-      await expect(fallbackInterceptor({ context: {}, request: { method: 'HEAD', url: '/' }, next } as any)).resolves.toEqual({ matched: false })
+      await expect(
+        fallbackInterceptor({ context: {}, request: { method: 'HEAD', url: '/' }, next } as any),
+      ).resolves.toEqual({ matched: false })
       expect(next).toHaveBeenCalledTimes(2)
     })
   })
@@ -129,7 +142,13 @@ describe('headMethodHandlerPlugin', () => {
       const { bodyInterceptor } = getInterceptors()
       const nextResult = { matched: false }
 
-      await expect(bodyInterceptor({ context: {}, request: { method: 'HEAD', url: '/' }, next: async () => nextResult } as any)).resolves.toBe(nextResult)
+      await expect(
+        bodyInterceptor({
+          context: {},
+          request: { method: 'HEAD', url: '/' },
+          next: async () => nextResult,
+        } as any),
+      ).resolves.toBe(nextResult)
     })
 
     it('leaves a response without a body as is', async () => {
@@ -140,12 +159,18 @@ describe('headMethodHandlerPlugin', () => {
 
     it.each([
       ['json', {}, () => ({ name: 'Ελλάδα' })],
-      ['json with a custom content type', { 'content-type': 'application/vnd.api+json' }, () => ({ a: 1 })],
+      [
+        'json with a custom content type',
+        { 'content-type': 'application/vnd.api+json' },
+        () => ({ a: 1 }),
+      ],
       ['string', {}, () => 'ő'],
       ['null', {}, () => null],
       ['url-search-params', {}, () => new URLSearchParams({ name: 'Ελλάδα' })],
     ])('keeps the headers of a %s body and reports its size', async (_, headers, createBody) => {
-      const size = (await toFetchResponse({ status: 200, headers, body: createBody() }).arrayBuffer()).byteLength
+      const size = (
+        await toFetchResponse({ status: 200, headers, body: createBody() }).arrayBuffer()
+      ).byteLength
 
       await expectHeadersOfGet(
         () => ({ status: 201, headers: { ...headers, 'x-custom': '1' }, body: createBody() }),
@@ -176,7 +201,11 @@ describe('headMethodHandlerPlugin', () => {
         }
       }
 
-      const headers = await expectHeadersOfGet(() => ({ status: 200, headers: {}, body: new UnknownSizeBlob([], { type: 'text/plain' }) }))
+      const headers = await expectHeadersOfGet(() => ({
+        status: 200,
+        headers: {},
+        body: new UnknownSizeBlob([], { type: 'text/plain' }),
+      }))
 
       expect(headers).not.toHaveProperty('content-length')
       expect(cancel).toHaveBeenCalledOnce()
@@ -195,12 +224,12 @@ describe('headMethodHandlerPlugin', () => {
       expect(cancel).toHaveBeenCalledOnce()
     })
 
-    it.each([
-      [{}],
-      [{ 'content-type': 'text/plain' }],
-    ])('keeps the headers of an event iterator body with headers %o', async (headers) => {
-      await expectHeadersOfGet(() => ({ status: 200, headers, body: (async function* () {})() }))
-    })
+    it.each([[{}], [{ 'content-type': 'text/plain' }]])(
+      'keeps the headers of an event iterator body with headers %o',
+      async (headers) => {
+        await expectHeadersOfGet(() => ({ status: 200, headers, body: (async function* () {})() }))
+      },
+    )
 
     it('ends an event iterator body without starting it', async () => {
       let started = false
@@ -219,7 +248,11 @@ describe('headMethodHandlerPlugin', () => {
       const body = new FormData()
       body.set('file', new File(['hello'], 'hello.txt'))
 
-      const response = await toHeadResponse({ status: 200, headers: { 'x-custom': '1', 'content-length': '1' }, body })
+      const response = await toHeadResponse({
+        status: 200,
+        headers: { 'x-custom': '1', 'content-length': '1' },
+        body,
+      })
 
       expect(getSentHeaders(response)).toEqual({
         'x-custom': '1',
@@ -255,16 +288,21 @@ describe('headMethodHandlerPlugin', () => {
     })
 
     it('answers HEAD with the error of GET', async () => {
-      const handler = new RPCHandler({
-        ping: os.handler(() => {
-          throw new Error('boom')
-        }),
-      }, {
-        allowMethods: ['GET'],
-        plugins: [new HeadMethodHandlerPlugin()],
-      })
+      const handler = new RPCHandler(
+        {
+          ping: os.handler(() => {
+            throw new Error('boom')
+          }),
+        },
+        {
+          allowMethods: ['GET'],
+          plugins: [new HeadMethodHandlerPlugin()],
+        },
+      )
 
-      const { response } = await handler.handle(new Request('https://example.com/ping', { method: 'HEAD' }))
+      const { response } = await handler.handle(
+        new Request('https://example.com/ping', { method: 'HEAD' }),
+      )
 
       expect(response!.status).toBe(500)
       expect(response!.headers.get('content-type')).toBe('application/json')
@@ -276,14 +314,18 @@ describe('headMethodHandlerPlugin', () => {
       const methods: string[] = []
       const handler = new RPCHandler(router, {
         allowMethods: ['GET', 'HEAD'],
-        interceptors: [({ request, next }) => {
-          methods.push(request.method)
-          return next()
-        }],
+        interceptors: [
+          ({ request, next }) => {
+            methods.push(request.method)
+            return next()
+          },
+        ],
         plugins: [new HeadMethodHandlerPlugin()],
       })
 
-      const { matched, response } = await handler.handle(new Request('https://example.com/ping', { method: 'HEAD' }))
+      const { matched, response } = await handler.handle(
+        new Request('https://example.com/ping', { method: 'HEAD' }),
+      )
 
       expect(matched).toBe(true)
       await expect(response!.text()).resolves.toBe('')
@@ -295,7 +337,9 @@ describe('headMethodHandlerPlugin', () => {
         plugins: [new HeadMethodHandlerPlugin()],
       })
 
-      await expect(handler.handle(new Request('https://example.com/ping', { method: 'HEAD' }))).resolves.toEqual({ matched: false })
+      await expect(
+        handler.handle(new Request('https://example.com/ping', { method: 'HEAD' })),
+      ).resolves.toEqual({ matched: false })
       expect(procedure).not.toHaveBeenCalled()
     })
 
@@ -305,45 +349,64 @@ describe('headMethodHandlerPlugin', () => {
         plugins: [new HeadMethodHandlerPlugin(), new GetMethodCsrfProtectionHandlerPlugin()],
       })
 
-      const { response } = await handler.handle(new Request('https://example.com/ping', {
-        method: 'HEAD',
-        headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
-      }))
+      const { response } = await handler.handle(
+        new Request('https://example.com/ping', {
+          method: 'HEAD',
+          headers: {
+            'sec-fetch-site': 'cross-site',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-dest': 'document',
+          },
+        }),
+      )
 
       expect(response!.status).toBe(403)
       expect(procedure).not.toHaveBeenCalled()
     })
 
     it('reports the encoding of a compressed GET response', async () => {
-      const handler = new RPCHandler({ ping: os.handler(() => 'x'.repeat(2000)) }, {
-        allowMethods: ['GET'],
-        // listed first to show the order does not matter
-        plugins: [new HeadMethodHandlerPlugin(), new ResponseCompressionHandlerPlugin()],
-      })
+      const handler = new RPCHandler(
+        { ping: os.handler(() => 'x'.repeat(2000)) },
+        {
+          allowMethods: ['GET'],
+          // listed first to show the order does not matter
+          plugins: [new HeadMethodHandlerPlugin(), new ResponseCompressionHandlerPlugin()],
+        },
+      )
 
       const init = { headers: { 'accept-encoding': 'gzip' } }
-      const { response: getResponse } = await handler.handle(new Request('https://example.com/ping', init))
-      const { response } = await handler.handle(new Request('https://example.com/ping', { ...init, method: 'HEAD' }))
+      const { response: getResponse } = await handler.handle(
+        new Request('https://example.com/ping', init),
+      )
+      const { response } = await handler.handle(
+        new Request('https://example.com/ping', { ...init, method: 'HEAD' }),
+      )
 
       expect(getResponse!.headers.get('content-encoding')).toBe('gzip')
-      expect(Object.fromEntries(response!.headers)).toEqual(Object.fromEntries(getResponse!.headers))
+      expect(Object.fromEntries(response!.headers)).toEqual(
+        Object.fromEntries(getResponse!.headers),
+      )
       await expect(response!.text()).resolves.toBe('')
     })
 
     it('ends an event iterator without running it', async () => {
       let started = false
-      const handler = new RPCHandler({
+      const handler = new RPCHandler(
+        {
+          stream: os.handler(async function* () {
+            started = true
+            await new Promise(() => {})
+          }),
+        },
+        {
+          allowMethods: ['GET'],
+          plugins: [new HeadMethodHandlerPlugin()],
+        },
+      )
 
-        stream: os.handler(async function* () {
-          started = true
-          await new Promise(() => {})
-        }),
-      }, {
-        allowMethods: ['GET'],
-        plugins: [new HeadMethodHandlerPlugin()],
-      })
-
-      const { response } = await handler.handle(new Request('https://example.com/stream', { method: 'HEAD' }))
+      const { response } = await handler.handle(
+        new Request('https://example.com/stream', { method: 'HEAD' }),
+      )
 
       expect(response!.headers.get('content-type')).toBe('text/event-stream')
       await expect(response!.text()).resolves.toBe('')
@@ -357,7 +420,7 @@ describe('headMethodHandlerPlugin', () => {
       })
 
       const server = supertest((req: any, res: any) => {
-        handler.handle(req, res)
+        void handler.handle(req, res)
       })
 
       const getResponse = await server.get('/ping')

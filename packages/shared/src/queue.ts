@@ -8,7 +8,10 @@ export interface AsyncIdQueueCloseOptions {
 export class AsyncIdQueue<T> {
   private readonly openIds = new Set<string>()
   private readonly queues = new Map<string, T[]>()
-  private readonly waiters = new Map<string, (readonly [resolve: (item: T) => void, reject: (err: unknown) => void])[]>()
+  private readonly waiters = new Map<
+    string,
+    (readonly [resolve: (item: T) => void, reject: (err: unknown) => void])[]
+  >()
 
   get size(): number {
     return this.openIds.size
@@ -33,14 +36,12 @@ export class AsyncIdQueue<T> {
       if (pending.length === 0) {
         this.waiters.delete(id)
       }
-    }
-    else {
+    } else {
       const items = this.queues.get(id)
 
       if (items) {
         items.push(item)
-      }
-      else {
+      } else {
         this.queues.set(id, [item])
       }
     }
@@ -68,8 +69,7 @@ export class AsyncIdQueue<T> {
 
       if (waitingPulls) {
         waitingPulls.push(pending)
-      }
-      else {
+      } else {
         this.waiters.set(id, [pending])
       }
     })
@@ -78,7 +78,11 @@ export class AsyncIdQueue<T> {
   close({ id, reason }: AsyncIdQueueCloseOptions = {}): void {
     if (id === undefined) {
       this.waiters.forEach((pendingPulls, id) => {
-        const error = reason ?? new AbortError(`[AsyncIdQueue] Queue[${id}] was closed or aborted while waiting for pulling.`)
+        const error =
+          reason ??
+          new AbortError(
+            `[AsyncIdQueue] Queue[${id}] was closed or aborted while waiting for pulling.`,
+          )
         pendingPulls.forEach(([, reject]) => reject(error))
       })
 
@@ -88,7 +92,9 @@ export class AsyncIdQueue<T> {
       return
     }
 
-    const error = reason ?? new AbortError(`[AsyncIdQueue] Queue[${id}] was closed or aborted while waiting for pulling.`)
+    const error =
+      reason ??
+      new AbortError(`[AsyncIdQueue] Queue[${id}] was closed or aborted while waiting for pulling.`)
     this.waiters.get(id)?.forEach(([, reject]) => reject(error))
 
     this.waiters.delete(id)
@@ -98,7 +104,9 @@ export class AsyncIdQueue<T> {
 
   private assertOpen(id: string): void {
     if (!this.isOpen(id)) {
-      throw new Error(`[AsyncIdQueue] Cannot access queue[${id}] because it is not open or aborted.`)
+      throw new Error(
+        `[AsyncIdQueue] Cannot access queue[${id}] because it is not open or aborted.`,
+      )
     }
   }
 }

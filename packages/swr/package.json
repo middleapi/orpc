@@ -1,53 +1,49 @@
 {
   "name": "@orpc/swr",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "SWR integration for oRPC: typesafe React data fetching hooks",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "data-fetching",
+    "hooks",
+    "orpc",
+    "query",
+    "react",
+    "swr",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/swr"
   },
-  "keywords": [
-    "orpc",
-    "swr",
-    "react",
-    "hooks",
-    "data-fetching",
-    "query",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "swr": ">=2.4.2"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -56,5 +52,8 @@
   "devDependencies": {
     "swr": "^2.5.0",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "swr": ">=2.4.2"
   }
 }

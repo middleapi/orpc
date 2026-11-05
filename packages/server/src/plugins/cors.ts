@@ -1,9 +1,15 @@
 import type { Promisable, Value } from '@orpc/shared'
-import type { StandardHeaders } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
-import type { Context } from '../context'
 import { toArray } from '@orpc/shared'
+import type { StandardHeaders } from '@standard-server/core'
 import { flattenStandardHeader } from '@standard-server/core'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 export interface CORSHandlerPluginOptions<T extends Context> {
   /**
@@ -15,13 +21,23 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    *
    * @default '*'
    */
-  origin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
+  origin?:
+    | Value<
+        Promisable<string | readonly string[] | null | undefined>,
+        [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * Configures the `Timing-Allow-Origin` header.
    * Can be a string, an array of allowed origins, or a function (optionally async) that returns the allowed origin(s).
    */
-  timingOrigin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
+  timingOrigin?:
+    | Value<
+        Promisable<string | readonly string[] | null | undefined>,
+        [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * Configures the `Access-Control-Allow-Methods` header for preflight requests.
@@ -88,7 +104,9 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const corsHeadersInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
+    const corsHeadersInterceptor: StandardHandlerRoutingInterceptor<T> = async (
+      interceptorOptions,
+    ) => {
       const result = await interceptorOptions.next()
 
       if (!result.matched) {
@@ -100,7 +118,11 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
       const origin = flattenStandardHeader(interceptorOptions.request.headers.origin)
 
       const allowOrigin = await this.resolveOrigin(this.options.origin, origin, interceptorOptions)
-      const timingAllowOrigin = await this.resolveOrigin(this.options.timingOrigin, origin, interceptorOptions)
+      const timingAllowOrigin = await this.resolveOrigin(
+        this.options.timingOrigin,
+        origin,
+        interceptorOptions,
+      )
 
       if (allowOrigin.value !== undefined) {
         resHeaders['access-control-allow-origin'] = allowOrigin.value
@@ -112,7 +134,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
       if (allowOrigin.varies || timingAllowOrigin.varies) {
         const existingVary = flattenStandardHeader(resHeaders.vary)
-        if (!existingVary?.split(',').some(v => v.trim().toLowerCase() === 'origin')) {
+        if (!existingVary?.split(',').some((v) => v.trim().toLowerCase() === 'origin')) {
           resHeaders.vary = existingVary ? `${existingVary}, Origin` : 'Origin'
         }
       }
@@ -122,13 +144,17 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
       }
 
       if (this.options.exposeHeaders?.length) {
-        resHeaders['access-control-expose-headers'] = flattenStandardHeader(this.options.exposeHeaders)
+        resHeaders['access-control-expose-headers'] = flattenStandardHeader(
+          this.options.exposeHeaders,
+        )
       }
 
       return { ...result, response: { ...result.response, headers: resHeaders } }
     }
 
-    const preflightInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
+    const preflightInterceptor: StandardHandlerRoutingInterceptor<T> = async (
+      interceptorOptions,
+    ) => {
       if (interceptorOptions.request.method === 'OPTIONS') {
         const resHeaders: StandardHeaders = {}
 
@@ -137,10 +163,14 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
         }
 
         if (this.options.allowMethods?.length) {
-          resHeaders['access-control-allow-methods'] = flattenStandardHeader(this.options.allowMethods)
+          resHeaders['access-control-allow-methods'] = flattenStandardHeader(
+            this.options.allowMethods,
+          )
         }
 
-        const allowHeaders = this.options.allowHeaders ?? interceptorOptions.request.headers['access-control-request-headers']
+        const allowHeaders =
+          this.options.allowHeaders ??
+          interceptorOptions.request.headers['access-control-request-headers']
 
         if (typeof allowHeaders === 'string' || allowHeaders?.length) {
           resHeaders['access-control-allow-headers'] = flattenStandardHeader(allowHeaders)
@@ -173,7 +203,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
     option: CORSHandlerPluginOptions<T>['origin'],
     origin: string | undefined,
     interceptorOptions: StandardHandlerRoutingInterceptorOptions<T>,
-  ): Promise<{ value: string | undefined, varies: boolean }> {
+  ): Promise<{ value: string | undefined; varies: boolean }> {
     if (typeof option === 'function') {
       if (origin === undefined) {
         return { value: undefined, varies: true }

@@ -1,9 +1,11 @@
 import { oc } from '@orpc/contract'
 import { call, DecoratedProcedure, implement, ImplementedProcedure, os } from '@orpc/server'
 import { z } from 'zod'
-import * as Handler from '../handler'
+
+import * as Handler from '../handler.ts'
 import '@orpc/server/extensions/callable' // not sure why, but we need import this to make type work
-import './effect'
+
+import './effect.ts'
 
 const handlerGen = vi.spyOn(Handler, 'handlerGen')
 
@@ -16,10 +18,7 @@ it('adds .effect into Builder', async () => {
   const handler = vi.fn(function* ({ input, context }) {
     return { output: true, auth: context.auth, input }
   })
-  const procedure = os
-    .$context<{ auth: boolean }>()
-    .input(InputSchema)
-    .effect(handler)
+  const procedure = os.$context<{ auth: boolean }>().input(InputSchema).effect(handler)
 
   expect(handlerGen).toHaveBeenCalledTimes(1)
   expect(handlerGen).toHaveBeenNthCalledWith(1, handler)
@@ -28,7 +27,11 @@ it('adds .effect into Builder', async () => {
   expect(procedure['~orpc'].handler).toBe(handlerGen.mock.results[0]?.value)
   expect(procedure['~orpc'].inputSchemas).toEqual([InputSchema])
 
-  await expect(call(procedure, 'input', { context: { auth: false } })).resolves.toEqual({ output: true, auth: false, input: 'input' })
+  await expect(call(procedure, 'input', { context: { auth: false } })).resolves.toEqual({
+    output: true,
+    auth: false,
+    input: 'input',
+  })
 })
 
 it('adds .effect into ProcedureImplementer', async () => {
@@ -41,10 +44,7 @@ it('adds .effect into ProcedureImplementer', async () => {
     ping: oc.input(InputSchema),
   })
 
-  const procedure = os
-    .$context<{ auth: boolean }>()
-    .ping
-    .effect(handler)
+  const procedure = os.$context<{ auth: boolean }>().ping.effect(handler)
 
   expect(handlerGen).toHaveBeenCalledTimes(1)
   expect(handlerGen).toHaveBeenNthCalledWith(1, handler)
@@ -53,5 +53,9 @@ it('adds .effect into ProcedureImplementer', async () => {
   expect(procedure['~orpc'].handler).toBe(handlerGen.mock.results[0]?.value)
   expect(procedure['~orpc'].inputSchemas).toEqual([InputSchema])
 
-  await expect(call(procedure, 'input', { context: { auth: false } })).resolves.toEqual({ output: true, auth: false, input: 'input' })
+  await expect(call(procedure, 'input', { context: { auth: false } })).resolves.toEqual({
+    output: true,
+    auth: false,
+    input: 'input',
+  })
 })

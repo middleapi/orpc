@@ -1,13 +1,13 @@
-export * from './contract-utils'
+export * from './contract-utils.ts'
 export type {
   OperationKey,
   OperationKeyBaseOptions,
   OperationKeyOptions,
   OperationKeyPrefixOptions,
-} from './key'
-export * from './meta'
-export type { RouterUtilsPlugin } from './plugin'
-export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
+} from './key.ts'
+export * from './meta.ts'
+export type { RouterUtilsPlugin } from './plugin.ts'
+export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils.ts'
 export type {
   ProcedureUtilsInfiniteInterceptor,
   ProcedureUtilsInfiniteInterceptorOptions,
@@ -21,23 +21,19 @@ export type {
   ProcedureUtilsQueryInterceptorOptions,
   ProcedureUtilsStreamedInterceptor,
   ProcedureUtilsStreamedInterceptorOptions,
-} from './procedure-utils'
-export * from './router-utils'
-export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
-export { SharedUtils } from './shared-utils'
-export * from './ssr'
-export type { SerializableStreamedQueryOptions } from './stream-query'
-export * from './structural-sharing'
-export * from './types'
+} from './procedure-utils.ts'
+export * from './router-utils.ts'
+export { createRouterUtils as createTanstackQueryUtils } from './router-utils.ts'
+export { SharedUtils } from './shared-utils.ts'
+export * from './ssr.ts'
+export type { SerializableStreamedQueryOptions } from './stream-query.ts'
+export * from './structural-sharing.ts'
+export * from './types.ts'
 export {
   OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
   type OperationContext as TanstackQueryOperationContext,
-} from './types'
+} from './types.ts'
 
-export type {
-  AnyNestedClient,
-} from '@orpc/client'
+export type { AnyNestedClient } from '@orpc/client'
 
-export type {
-  Public,
-} from '@orpc/shared'
+export type { Public } from '@orpc/shared'

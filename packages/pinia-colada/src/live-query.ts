@@ -1,15 +1,14 @@
 import type { Promisable } from '@orpc/shared'
-import type { UseQueryFnContext } from './types'
 import { stringifyJSON } from '@orpc/shared'
+
+import type { UseQueryFnContext } from './types.ts'
 
 /**
  * A Pinia Colada query function that publishes each streamed chunk to the
  * cache entry as it arrives, replacing the previous value.
  */
 export function liveQuery<T>(
-  queryFn: (
-    context: UseQueryFnContext,
-  ) => Promisable<AsyncIterable<T>>,
+  queryFn: (context: UseQueryFnContext) => Promisable<AsyncIterable<T>>,
 ): (context: UseQueryFnContext) => Promise<T> {
   return async (context) => {
     const { entry, signal } = context

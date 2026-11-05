@@ -8,7 +8,7 @@ import {
   startSpan,
   toSpanAttributeValue,
   toTracingException,
-} from './tracing'
+} from './tracing.ts'
 
 function createMockSpan() {
   return {
@@ -203,7 +203,10 @@ describe('tracing', () => {
       const fn = vi.fn().mockRejectedValue(error)
 
       await expect(runWithSpan('test', fn)).rejects.toThrow('fail')
-      expect(mockSpan.recordException).toHaveBeenCalledWith('error', expect.objectContaining({ message: 'fail' }))
+      expect(mockSpan.recordException).toHaveBeenCalledWith(
+        'error',
+        expect.objectContaining({ message: 'fail' }),
+      )
       expect(mockSpan.end).toHaveBeenCalledTimes(1)
     })
 

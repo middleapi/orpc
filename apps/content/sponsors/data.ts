@@ -1,6 +1,6 @@
 // The GitHub Sponsors wall behind the landing page and the /sponsors table.
 // Paid ad slots are a separate concern and live in ads.ts.
-import sponsors from './sponsors'
+import sponsors from './sponsors.ts'
 
 export const GITHUB_SPONSORS_URL = 'https://github.com/sponsors/dinwwwh'
 export const OPEN_COLLECTIVE_URL = 'https://opencollective.com/middleapi'
@@ -10,8 +10,7 @@ export function avatarSrc(src: string, px: number): string {
 
   if (url.hostname === 'avatars.githubusercontent.com') {
     url.searchParams.set('s', String(px * 2))
-  }
-  else if (url.hostname === 'github.com') {
+  } else if (url.hostname === 'github.com') {
     url.searchParams.set('size', String(px * 2))
   }
 
@@ -73,7 +72,12 @@ export function sponsorTiers(): SponsorTier[] {
       continue
     }
 
-    tiers.push({ title: sponsor.tierTitle, level: sponsor.tierLevel, total: sponsor.amount, sponsors: [sponsor] })
+    tiers.push({
+      title: sponsor.tierTitle,
+      level: sponsor.tierLevel,
+      total: sponsor.amount,
+      sponsors: [sponsor],
+    })
   }
 
   return tiers
@@ -81,5 +85,5 @@ export function sponsorTiers(): SponsorTier[] {
 
 /** Sponsors whose sponsorship has ended, still worth thanking. */
 export function pastSponsors(): Sponsor[] {
-  return allSponsors.filter(sponsor => !isActive(sponsor))
+  return allSponsors.filter((sponsor) => !isActive(sponsor))
 }

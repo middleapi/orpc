@@ -1,5 +1,5 @@
 it('exports os, ORPCError, createRouterClient, RPCJsonSerializer, RPCSerializer', async () => {
-  await expect(import('.')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     os: expect.any(Object),
     ORPCError: expect.any(Function),
     createRouterClient: expect.any(Function),

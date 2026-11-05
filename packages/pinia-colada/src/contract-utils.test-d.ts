@@ -1,12 +1,16 @@
 import type { ORPCError } from '@orpc/client'
 import type { ContractClientFactory } from '@orpc/contract'
+import { meta, oc, type } from '@orpc/contract'
 import type { ContractJsonifiedClientFactory } from '@orpc/openapi'
 import type { PromiseWithError } from '@orpc/shared'
-import type { ProcedureUtils } from './procedure-utils'
-import type { SharedUtils } from './shared-utils'
-import type { OperationContext } from './types'
-import { meta, oc, type } from '@orpc/contract'
-import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils'
+
+import {
+  createContractJsonifiedUtilsFactory,
+  createContractUtilsFactory,
+} from './contract-utils.ts'
+import type { ProcedureUtils } from './procedure-utils.ts'
+import type { SharedUtils } from './shared-utils.ts'
+import type { OperationContext } from './types.ts'
 
 const contract = {
   ping: oc.meta(meta.path(['ping'])),
@@ -32,9 +36,7 @@ describe('createContractUtilsFactory', () => {
 
           const result = next()
 
-          expectTypeOf(result).toEqualTypeOf<
-            PromiseWithError<unknown, unknown>
-          >()
+          expectTypeOf(result).toEqualTypeOf<PromiseWithError<unknown, unknown>>()
 
           return result
         },
@@ -83,7 +85,10 @@ describe('createContractUtilsFactory', () => {
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>,
+        'path' | 'options'
+      >
     >()
   })
 
@@ -92,7 +97,10 @@ describe('createContractUtilsFactory', () => {
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>,
+        'path' | 'options'
+      >
     >()
 
     expectTypeOf(utils.key).toEqualTypeOf<SharedUtils<unknown>['key']>()
@@ -109,9 +117,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
 
           const result = next()
 
-          expectTypeOf(result).toEqualTypeOf<
-            PromiseWithError<unknown, unknown>
-          >()
+          expectTypeOf(result).toEqualTypeOf<PromiseWithError<unknown, unknown>>()
 
           return result
         },
@@ -160,7 +166,15 @@ describe('createContractJsonifiedUtilsFactory', () => {
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<
+          { cache?: boolean },
+          string,
+          string,
+          Error | ORPCError<'BAD_GATEWAY', string>
+        >,
+        'path' | 'options'
+      >
     >()
   })
 
@@ -169,7 +183,15 @@ describe('createContractJsonifiedUtilsFactory', () => {
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<
+          { cache?: boolean },
+          string,
+          string,
+          Error | ORPCError<'BAD_GATEWAY', string>
+        >,
+        'path' | 'options'
+      >
     >()
   })
 })

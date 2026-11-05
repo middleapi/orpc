@@ -1,8 +1,8 @@
 ---
-title: "Timeout Plugin"
-description: "Abort requests that exceed a timeout on the client or the server, using a static value or a per-request dynamic timeout."
+title: 'Timeout Plugin'
+description: 'Abort requests that exceed a timeout on the client or the server, using a static value or a per-request dynamic timeout.'
 sidebar:
-  label: "Timeout"
+  label: 'Timeout'
 ---
 
 ## Client
@@ -88,7 +88,7 @@ const link = new RPCLink({
 const handler = new RPCHandler(router, {
   plugins: [
     new TimeoutHandlerPlugin({
-      timeout: ({ path }) => path[0] === 'reports' ? 60_000 : 10_000,
+      timeout: ({ path }) => (path[0] === 'reports' ? 60_000 : 10_000),
     }),
   ],
 })

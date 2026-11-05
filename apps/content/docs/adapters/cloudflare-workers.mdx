@@ -1,8 +1,8 @@
 ---
-title: "Cloudflare Workers Adapter"
-description: "Use oRPC on Cloudflare Workers through the Fetch API Adapter, with the compatibility flags that make request cancellation and unhandled rejections behave."
+title: 'Cloudflare Workers Adapter'
+description: 'Use oRPC on Cloudflare Workers through the Fetch API Adapter, with the compatibility flags that make request cancellation and unhandled rejections behave.'
 sidebar:
-  label: "Cloudflare Workers"
+  label: 'Cloudflare Workers'
 ---
 
 [Cloudflare Workers](https://developers.cloudflare.com/workers/) follow the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API), so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -17,9 +17,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -31,7 +29,7 @@ export default {
   async fetch(request, env, ctx) {
     const { matched, response } = await handler.handle(request, {
       prefix: '/rpc',
-      context: { env, ctx } // Provide initial context if needed, can be an async function
+      context: { env, ctx }, // Provide initial context if needed, can be an async function
     })
 
     if (matched) {
@@ -49,9 +47,7 @@ import { onError } from '@orpc/server'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -63,7 +59,7 @@ export default {
   async fetch(request, env, ctx) {
     const { matched, response } = await handler.handle(request, {
       prefix: '/api',
-      context: { env, ctx } // Provide initial context if needed, can be an async function
+      context: { env, ctx }, // Provide initial context if needed, can be an async function
     })
 
     if (matched) {
@@ -83,7 +79,7 @@ Use a `compatibility_date` of `2026-11-17` or later:
 
 ```jsonc title="wrangler.jsonc"
 {
-  "compatibility_date": "2026-11-17"
+  "compatibility_date": "2026-11-17",
 }
 ```
 

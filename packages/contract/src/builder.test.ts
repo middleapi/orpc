@@ -1,12 +1,13 @@
-import type { ErrorMap } from './error'
-import type { AnyMetaPlugin } from './meta'
-import z from 'zod'
-import { ContractBuilder, oc } from './builder'
-import * as ErrorUtilsModule from './error-utils'
-import { setHiddenMetaPlugins } from './meta'
-import * as MetaUtilsModule from './meta-utils'
-import { ProcedureContract } from './procedure'
-import * as RouterUtilsModule from './router-utils'
+import * as z from 'zod'
+
+import { ContractBuilder, oc } from './builder.ts'
+import * as ErrorUtilsModule from './error-utils.ts'
+import type { ErrorMap } from './error.ts'
+import * as MetaUtilsModule from './meta-utils.ts'
+import type { AnyMetaPlugin } from './meta.ts'
+import { setHiddenMetaPlugins } from './meta.ts'
+import { ProcedureContract } from './procedure.ts'
+import * as RouterUtilsModule from './router-utils.ts'
 
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
@@ -22,26 +23,22 @@ describe('contractBuilder', () => {
     errorMap: {
       BASE: { status: 400 },
     },
-    inputSchemas: [
-      z.object({ init: z.string() }),
-    ],
-    outputSchemas: [
-      z.object({ init: z.string() }),
-    ],
+    inputSchemas: [z.object({ init: z.string() })],
+    outputSchemas: [z.object({ init: z.string() })],
     meta: {
       base: true,
     },
     metaPlugins: [
       {
         name: 'test1',
-        init: m => m,
+        init: (m) => m,
       },
     ],
   }
 
   const metaPlugin: AnyMetaPlugin = {
     name: 'test2',
-    init: m => ({ ...m, metaPlugin: true }),
+    init: (m) => ({ ...m, metaPlugin: true }),
   }
 
   it('is a procedure contract', () => {
@@ -86,10 +83,7 @@ describe('contractBuilder', () => {
       expect(applied).not.toBe(builder)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledOnce()
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
-        builder['~orpc'].errorMap,
-        errors,
-      )
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(builder['~orpc'].errorMap, errors)
 
       expect(applied['~orpc']).toEqual({
         ...builder['~orpc'],
@@ -109,10 +103,7 @@ describe('contractBuilder', () => {
       expect(applied).not.toBe(builder)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledOnce()
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
-        builder['~orpc'].errorMap,
-        errors,
-      )
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(builder['~orpc'].errorMap, errors)
 
       expect(resolveMetaPluginsSpy).toHaveBeenCalledOnce()
       expect(resolveMetaPluginsSpy).toHaveBeenCalledWith(

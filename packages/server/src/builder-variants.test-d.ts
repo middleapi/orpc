@@ -1,14 +1,26 @@
-import type { MergedErrorMap, MergedSchema, MetaPlugin, ORPCErrorConstructorMap, Schema } from '@orpc/contract'
-import type { BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput } from './builder-variants'
-import type { MergedContext, MergedInitialContext } from './context'
-import type { Lazy } from './lazy'
-import type { Middleware, MiddlewareDone } from './middleware'
-import type { DecoratedMiddleware } from './middleware-decorated'
-import type { Procedure } from './procedure'
-import type { DecoratedProcedure } from './procedure-decorated'
-import type { AugmentedRouterWithMiddlewares } from './router-utils'
+import type {
+  MergedErrorMap,
+  MergedSchema,
+  MetaPlugin,
+  ORPCErrorConstructorMap,
+  Schema,
+} from '@orpc/contract'
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
+
+import type {
+  BuilderWithInput,
+  BuilderWithInputOutput,
+  BuilderWithMiddlewares,
+  BuilderWithOutput,
+} from './builder-variants.ts'
+import type { MergedContext, MergedInitialContext } from './context.ts'
+import type { Lazy } from './lazy.ts'
+import type { DecoratedMiddleware } from './middleware-decorated.ts'
+import type { Middleware, MiddlewareDone } from './middleware.ts'
+import type { DecoratedProcedure } from './procedure-decorated.ts'
+import type { Procedure } from './procedure.ts'
+import type { AugmentedRouterWithMiddlewares } from './router-utils.ts'
 
 const errorMap = {
   BASE: {
@@ -17,11 +29,15 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 describe('BuilderWithMiddlewares', () => {
-  const builder = {} as BuilderWithMiddlewares<{ auth: boolean }, { extra: boolean }, typeof errorMap>
+  const builder = {} as BuilderWithMiddlewares<
+    { auth: boolean },
+    { extra: boolean },
+    typeof errorMap
+  >
 
   it('.meta', () => {
     const plugin = { name: 'test', init: (m: any) => m }
@@ -77,11 +93,21 @@ describe('BuilderWithMiddlewares', () => {
     })
 
     it('outline middleware', () => {
-      const middleware = {} as Middleware<{ auth: boolean, extra: boolean, g?: boolean }, { more: string }, unknown, any, { SOME_ERROR: { message: string } }>
+      const middleware = {} as Middleware<
+        { auth: boolean; extra: boolean; g?: boolean },
+        { more: string },
+        unknown,
+        any,
+        { SOME_ERROR: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithMiddlewares<
-          MergedInitialContext<{ auth: boolean }, { extra: boolean }, { auth: boolean, extra: boolean, g?: boolean }>,
+          MergedInitialContext<
+            { auth: boolean },
+            { extra: boolean },
+            { auth: boolean; extra: boolean; g?: boolean }
+          >,
           MergedContext<{ extra: boolean }, { more: string }>,
           MergedErrorMap<{ SOME_ERROR: { message: string } }, typeof errorMap>
         >
@@ -94,7 +120,9 @@ describe('BuilderWithMiddlewares', () => {
       void middleware.use({} as Middleware<object, object, unknown, 'invalid', object>)
 
       // @ts-expect-error - TInContext is not satisfy expected
-      void middleware.use({} as Middleware<{ does_not_satisfy: string }, object, unknown, any, object>)
+      void middleware.use(
+        {} as Middleware<{ does_not_satisfy: string }, object, unknown, any, object>,
+      )
 
       // @ts-expect-error - conflict with TInitialContext
       void builder.use({} as Middleware<object, { auth: 'invalid' }, unknown, any, object>)
@@ -103,8 +131,14 @@ describe('BuilderWithMiddlewares', () => {
       void builder.use({} as Middleware<object, { extra: 'invalid' }, unknown, any, object>)
     })
 
-    it('low-priority mid\'s errors and ignore conflicts', () => {
-      const middleware = {} as Middleware<{ auth: boolean, extra: boolean }, object, unknown, any, { BASE: { message: 'CONFLICT' }, EXTRA: { message: string } }>
+    it("low-priority mid's errors and ignore conflicts", () => {
+      const middleware = {} as Middleware<
+        { auth: boolean; extra: boolean },
+        object,
+        unknown,
+        any,
+        { BASE: { message: 'CONFLICT' }; EXTRA: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithMiddlewares<
@@ -120,21 +154,33 @@ describe('BuilderWithMiddlewares', () => {
     it('pure', () => {
       // default expected TOutput should = any to ensure this middleware can be used in any procedure
 
-      expectTypeOf(builder.middleware(({ next, context, errors }, input, done) => {
-        expectTypeOf(input).toEqualTypeOf<unknown>()
-        expectTypeOf(done).toEqualTypeOf<MiddlewareDone<any>>()
-        expectTypeOf(context).toEqualTypeOf<MergedContext<{ auth: boolean }, { extra: boolean }>>()
-        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+      expectTypeOf(
+        builder.middleware(({ next, context, errors }, input, done) => {
+          expectTypeOf(input).toEqualTypeOf<unknown>()
+          expectTypeOf(done).toEqualTypeOf<MiddlewareDone<any>>()
+          expectTypeOf(context).toEqualTypeOf<
+            MergedContext<{ auth: boolean }, { extra: boolean }>
+          >()
+          expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
 
-        return next()
-      })).toEqualTypeOf<
+          return next()
+        }),
+      ).toEqualTypeOf<
         DecoratedMiddleware<{ auth: boolean }, { extra: boolean }, unknown, any, typeof errorMap>
       >()
     })
 
     it('with TOutContext', () => {
-      expectTypeOf(builder.middleware(({ next }) => next({ context: { more: 'yes' } }))).toEqualTypeOf<
-        DecoratedMiddleware<{ auth: boolean }, MergedContext<{ extra: boolean }, { more: string }>, unknown, any, typeof errorMap>
+      expectTypeOf(
+        builder.middleware(({ next }) => next({ context: { more: 'yes' } })),
+      ).toEqualTypeOf<
+        DecoratedMiddleware<
+          { auth: boolean },
+          MergedContext<{ extra: boolean }, { more: string }>,
+          unknown,
+          any,
+          typeof errorMap
+        >
       >()
 
       // @ts-expect-error - conflict with TInitialContext
@@ -145,14 +191,32 @@ describe('BuilderWithMiddlewares', () => {
     })
 
     it('with expected input', () => {
-      expectTypeOf(builder.middleware(({ next }, input: { schema1: number }) => next({}))).toEqualTypeOf<
-        DecoratedMiddleware<{ auth: boolean }, { extra: boolean }, { schema1: number }, any, typeof errorMap>
+      expectTypeOf(
+        builder.middleware(({ next }, input: { schema1: number }) => next({})),
+      ).toEqualTypeOf<
+        DecoratedMiddleware<
+          { auth: boolean },
+          { extra: boolean },
+          { schema1: number },
+          any,
+          typeof errorMap
+        >
       >()
     })
 
     it('with expected output', () => {
-      expectTypeOf(builder.middleware(({ next }, input, done: MiddlewareDone<{ schema2: number }>) => next({}))).toEqualTypeOf<
-        DecoratedMiddleware<{ auth: boolean }, { extra: boolean }, unknown, { schema2: number }, typeof errorMap>
+      expectTypeOf(
+        builder.middleware(({ next }, input, done: MiddlewareDone<{ schema2: number }>) =>
+          next({}),
+        ),
+      ).toEqualTypeOf<
+        DecoratedMiddleware<
+          { auth: boolean },
+          { extra: boolean },
+          unknown,
+          { schema2: number },
+          typeof errorMap
+        >
       >()
     })
   })
@@ -177,13 +241,17 @@ describe('BuilderWithMiddlewares', () => {
 
   describe('.handler', () => {
     it('simple', () => {
-      expectTypeOf(builder.handler(async ({ errors, context }, input) => {
-        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-        expectTypeOf(context).toEqualTypeOf<MergedContext<{ auth: boolean }, { extra: boolean }>>()
-        expectTypeOf(input).toEqualTypeOf<unknown>()
+      expectTypeOf(
+        builder.handler(async ({ errors, context }, input) => {
+          expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+          expectTypeOf(context).toEqualTypeOf<
+            MergedContext<{ auth: boolean }, { extra: boolean }>
+          >()
+          expectTypeOf(input).toEqualTypeOf<unknown>()
 
-        return 'out'
-      })).toEqualTypeOf<
+          return 'out'
+        }),
+      ).toEqualTypeOf<
         DecoratedProcedure<
           { auth: boolean },
           { extra: boolean },
@@ -197,44 +265,109 @@ describe('BuilderWithMiddlewares', () => {
 
   it('.router', () => {
     const router = {
-      ping: {} as Procedure<{ auth: boolean, extra: boolean }, object, Schema<void, unknown>, Schema<unknown>, object>,
-      ping2: {} as Procedure<{ auth: boolean, extra: boolean, something?: boolean }, object, Schema<void, unknown>, Schema<unknown>, object>,
+      ping: {} as Procedure<
+        { auth: boolean; extra: boolean },
+        object,
+        Schema<void, unknown>,
+        Schema<unknown>,
+        object
+      >,
+      ping2: {} as Procedure<
+        { auth: boolean; extra: boolean; something?: boolean },
+        object,
+        Schema<void, unknown>,
+        Schema<unknown>,
+        object
+      >,
     }
 
     expectTypeOf(builder.router(router)).toEqualTypeOf<
-      AugmentedRouterWithMiddlewares<typeof router, { auth: boolean }, { extra: boolean }, typeof errorMap>
+      AugmentedRouterWithMiddlewares<
+        typeof router,
+        { auth: boolean },
+        { extra: boolean },
+        typeof errorMap
+      >
     >()
 
     builder.router({
       // @ts-expect-error - extra is invalid
-      ping: {} as Procedure<{ auth: boolean, extra: 'invalid' }, object, Schema<void, unknown>, Schema<unknown>, object>,
+      ping: {} as Procedure<
+        { auth: boolean; extra: 'invalid' },
+        object,
+        Schema<void, unknown>,
+        Schema<unknown>,
+        object
+      >,
       // @ts-expect-error - something is required but missing in builder
-      ping2: {} as Procedure<{ auth: boolean, something: boolean }, object, Schema<void, unknown>, Schema<unknown>, object>,
+      ping2: {} as Procedure<
+        { auth: boolean; something: boolean },
+        object,
+        Schema<void, unknown>,
+        Schema<unknown>,
+        object
+      >,
     })
   })
 
   it('.lazy', () => {
     const router = {
-      ping: {} as Procedure<{ auth: boolean, extra: boolean }, object, Schema<void, unknown>, Schema<unknown>, object>,
-      ping2: {} as Procedure<{ auth: boolean, extra: boolean, something?: boolean }, object, Schema<void, unknown>, Schema<unknown>, object>,
+      ping: {} as Procedure<
+        { auth: boolean; extra: boolean },
+        object,
+        Schema<void, unknown>,
+        Schema<unknown>,
+        object
+      >,
+      ping2: {} as Procedure<
+        { auth: boolean; extra: boolean; something?: boolean },
+        object,
+        Schema<void, unknown>,
+        Schema<unknown>,
+        object
+      >,
     }
 
     expectTypeOf(builder.lazy(async () => ({ default: router }))).toEqualTypeOf<
-      Lazy<AugmentedRouterWithMiddlewares<typeof router, { auth: boolean }, { extra: boolean }, typeof errorMap>>
+      Lazy<
+        AugmentedRouterWithMiddlewares<
+          typeof router,
+          { auth: boolean },
+          { extra: boolean },
+          typeof errorMap
+        >
+      >
     >()
 
     // @ts-expect-error - extra is invalid and something is required but missing in builder
     builder.lazy(async () => ({
       default: {
-        ping: {} as Procedure<{ auth: boolean, extra: 'invalid' }, object, Schema<void, unknown>, Schema<unknown>, object>,
-        ping2: {} as Procedure<{ auth: boolean, something: boolean }, object, Schema<void, unknown>, Schema<unknown>, object>,
+        ping: {} as Procedure<
+          { auth: boolean; extra: 'invalid' },
+          object,
+          Schema<void, unknown>,
+          Schema<unknown>,
+          object
+        >,
+        ping2: {} as Procedure<
+          { auth: boolean; something: boolean },
+          object,
+          Schema<void, unknown>,
+          Schema<unknown>,
+          object
+        >,
       },
     }))
   })
 })
 
 describe('BuilderWithInput', () => {
-  const builder = {} as BuilderWithInput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof errorMap>
+  const builder = {} as BuilderWithInput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof errorMap
+  >
 
   it('.meta', () => {
     const plugin = { name: 'test', init: (m: any) => m }
@@ -296,11 +429,21 @@ describe('BuilderWithInput', () => {
     })
 
     it('outline middleware', () => {
-      const middleware = {} as Middleware<{ auth: boolean, extra: boolean, g?: boolean }, { more: boolean }, unknown, any, { SOME_ERROR: { message: string } }>
+      const middleware = {} as Middleware<
+        { auth: boolean; extra: boolean; g?: boolean },
+        { more: boolean },
+        unknown,
+        any,
+        { SOME_ERROR: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithInput<
-          MergedInitialContext<{ auth: boolean }, { extra: boolean }, { auth: boolean, extra: boolean, g?: boolean }>,
+          MergedInitialContext<
+            { auth: boolean },
+            { extra: boolean },
+            { auth: boolean; extra: boolean; g?: boolean }
+          >,
           MergedContext<{ extra: boolean }, { more: boolean }>,
           typeof schema1,
           MergedErrorMap<{ SOME_ERROR: { message: string } }, typeof errorMap>
@@ -323,8 +466,14 @@ describe('BuilderWithInput', () => {
       void builder.use({} as Middleware<object, { extra: 'invalid' }, unknown, any, object>)
     })
 
-    it('low-priority mid\'s errors and ignore conflicts', () => {
-      const middleware = {} as Middleware<{ auth: boolean }, object, unknown, any, { BASE: { message: 'CONFLICT' }, EXTRA: { message: string } }>
+    it("low-priority mid's errors and ignore conflicts", () => {
+      const middleware = {} as Middleware<
+        { auth: boolean },
+        object,
+        unknown,
+        any,
+        { BASE: { message: 'CONFLICT' }; EXTRA: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithInput<
@@ -353,7 +502,13 @@ describe('BuilderWithInput', () => {
 
   it('.output', () => {
     expectTypeOf(builder.output(schema2)).toEqualTypeOf<
-      BuilderWithInputOutput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof schema2, typeof errorMap>
+      BuilderWithInputOutput<
+        { auth: boolean },
+        { extra: boolean },
+        typeof schema1,
+        typeof schema2,
+        typeof errorMap
+      >
     >()
 
     // @ts-expect-error - invalid schema
@@ -362,13 +517,17 @@ describe('BuilderWithInput', () => {
 
   describe('.handler', () => {
     it('simple', () => {
-      expectTypeOf(builder.handler(async ({ errors, context }, input) => {
-        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-        expectTypeOf(context).toEqualTypeOf<MergedContext<{ auth: boolean }, { extra: boolean }>>()
-        expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
+      expectTypeOf(
+        builder.handler(async ({ errors, context }, input) => {
+          expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+          expectTypeOf(context).toEqualTypeOf<
+            MergedContext<{ auth: boolean }, { extra: boolean }>
+          >()
+          expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
 
-        return 'out'
-      })).toEqualTypeOf<
+          return 'out'
+        }),
+      ).toEqualTypeOf<
         DecoratedProcedure<
           { auth: boolean },
           { extra: boolean },
@@ -382,7 +541,12 @@ describe('BuilderWithInput', () => {
 })
 
 describe('BuilderWithOutput', () => {
-  const builder = {} as BuilderWithOutput<{ auth: boolean }, { extra: boolean }, typeof schema2, typeof errorMap>
+  const builder = {} as BuilderWithOutput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema2,
+    typeof errorMap
+  >
 
   it('.meta', () => {
     const plugin = { name: 'test', init: (m: any) => m }
@@ -444,11 +608,21 @@ describe('BuilderWithOutput', () => {
     })
 
     it('outline middleware', () => {
-      const middleware = {} as Middleware<{ auth: boolean, extra: boolean, g?: boolean }, { more: boolean }, unknown, any, { SOME_ERROR: { message: string } }>
+      const middleware = {} as Middleware<
+        { auth: boolean; extra: boolean; g?: boolean },
+        { more: boolean },
+        unknown,
+        any,
+        { SOME_ERROR: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithOutput<
-          MergedInitialContext<{ auth: boolean }, { extra: boolean }, { auth: boolean, extra: boolean, g?: boolean }>,
+          MergedInitialContext<
+            { auth: boolean },
+            { extra: boolean },
+            { auth: boolean; extra: boolean; g?: boolean }
+          >,
           MergedContext<{ extra: boolean }, { more: boolean }>,
           typeof schema2,
           MergedErrorMap<{ SOME_ERROR: { message: string } }, typeof errorMap>
@@ -471,8 +645,14 @@ describe('BuilderWithOutput', () => {
       void builder.use({} as Middleware<object, { extra: 'invalid' }, unknown, any, object>)
     })
 
-    it('low-priority mid\'s errors and ignore conflicts', () => {
-      const middleware = {} as Middleware<{ auth: boolean }, object, unknown, any, { BASE: { message: 'CONFLICT' }, EXTRA: { message: string } }>
+    it("low-priority mid's errors and ignore conflicts", () => {
+      const middleware = {} as Middleware<
+        { auth: boolean },
+        object,
+        unknown,
+        any,
+        { BASE: { message: 'CONFLICT' }; EXTRA: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithOutput<
@@ -487,7 +667,13 @@ describe('BuilderWithOutput', () => {
 
   it('.input', () => {
     expectTypeOf(builder.input(schema1)).toEqualTypeOf<
-      BuilderWithInputOutput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof schema2, typeof errorMap>
+      BuilderWithInputOutput<
+        { auth: boolean },
+        { extra: boolean },
+        typeof schema1,
+        typeof schema2,
+        typeof errorMap
+      >
     >()
 
     // @ts-expect-error - invalid schema
@@ -537,7 +723,13 @@ describe('BuilderWithOutput', () => {
 })
 
 describe('BuilderWithInputOutput', () => {
-  const builder = {} as BuilderWithInputOutput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof schema2, typeof errorMap>
+  const builder = {} as BuilderWithInputOutput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof schema2,
+    typeof errorMap
+  >
 
   it('.meta', () => {
     const plugin = { name: 'test', init: (m: any) => m }
@@ -601,11 +793,21 @@ describe('BuilderWithInputOutput', () => {
     })
 
     it('outline middleware', () => {
-      const middleware = {} as Middleware<{ auth: boolean, extra: boolean, g?: boolean }, { more: boolean }, unknown, any, { SOME_ERROR: { message: string } }>
+      const middleware = {} as Middleware<
+        { auth: boolean; extra: boolean; g?: boolean },
+        { more: boolean },
+        unknown,
+        any,
+        { SOME_ERROR: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithInputOutput<
-          MergedInitialContext<{ auth: boolean }, { extra: boolean }, { auth: boolean, extra: boolean, g?: boolean }>,
+          MergedInitialContext<
+            { auth: boolean },
+            { extra: boolean },
+            { auth: boolean; extra: boolean; g?: boolean }
+          >,
           MergedContext<{ extra: boolean }, { more: boolean }>,
           typeof schema1,
           typeof schema2,
@@ -629,8 +831,14 @@ describe('BuilderWithInputOutput', () => {
       void builder.use({} as Middleware<object, { extra: 'invalid' }, unknown, any, object>)
     })
 
-    it('low-priority mid\'s errors and ignore conflicts', () => {
-      const middleware = {} as Middleware<{ auth: boolean }, object, unknown, any, { BASE: { message: 'CONFLICT' }, EXTRA: { message: string } }>
+    it("low-priority mid's errors and ignore conflicts", () => {
+      const middleware = {} as Middleware<
+        { auth: boolean },
+        object,
+        unknown,
+        any,
+        { BASE: { message: 'CONFLICT' }; EXTRA: { message: string } }
+      >
 
       expectTypeOf(builder.use(middleware)).toEqualTypeOf<
         BuilderWithInputOutput<

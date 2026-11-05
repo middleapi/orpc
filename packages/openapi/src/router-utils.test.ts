@@ -1,11 +1,12 @@
 import { oc } from '@orpc/contract'
-import z from 'zod'
-import { getOpenAPIMeta, openapi } from './meta'
-import { populateRouterContractOpenAPIPaths } from './router-utils'
+import * as z from 'zod'
 
-export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+import { getOpenAPIMeta, openapi } from './meta.ts'
+import { populateRouterContractOpenAPIPaths } from './router-utils.ts'
 
-export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+export const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+
+export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 describe('populateRouterContractOpenAPIPaths', () => {
   it('preserves existing defs and populates missing ones from the router shape', () => {
@@ -21,12 +22,18 @@ describe('populateRouterContractOpenAPIPaths', () => {
     const populated = populateRouterContractOpenAPIPaths(contract)
 
     expect(getOpenAPIMeta(populated.pong)).toEqual({ summary: 'pong', path: '/pong/{id}' })
-    expect(getOpenAPIMeta(populated.nested.pong)).toEqual({ summary: 'nested.pong', path: '/pong2/{id}' })
+    expect(getOpenAPIMeta(populated.nested.pong)).toEqual({
+      summary: 'nested.pong',
+      path: '/pong2/{id}',
+    })
 
     expect(getOpenAPIMeta(populated.ping)).toEqual({ summary: 'ping', path: '/ping' })
     expect(populated.ping['~orpc'].inputSchemas).toEqual([inputSchema])
 
-    expect(getOpenAPIMeta(populated.nested.ping)).toEqual({ summary: 'nested.ping', path: '/nested/ping' })
+    expect(getOpenAPIMeta(populated.nested.ping)).toEqual({
+      summary: 'nested.ping',
+      path: '/nested/ping',
+    })
     expect(populated.nested.ping['~orpc'].outputSchemas).toEqual([outputSchema])
   })
 

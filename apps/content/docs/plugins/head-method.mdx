@@ -1,8 +1,8 @@
 ---
-title: "HEAD Method Plugin"
-description: "Use HeadMethodHandlerPlugin to answer HEAD requests with the status and headers of the matching GET procedure, without sending its body."
+title: 'HEAD Method Plugin'
+description: 'Use HeadMethodHandlerPlugin to answer HEAD requests with the status and headers of the matching GET procedure, without sending its body.'
 sidebar:
-  label: "HEAD Method"
+  label: 'HEAD Method'
 ---
 
 ## How It Works
@@ -21,9 +21,7 @@ import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { HeadMethodHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new HeadMethodHandlerPlugin(),
-  ],
+  plugins: [new HeadMethodHandlerPlugin()],
 })
 ```
 

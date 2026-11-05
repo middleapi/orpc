@@ -1,15 +1,17 @@
 import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
-import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL, RateLimitHandlerPlugin } from './handler-plugin'
+
+import {
+  RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL,
+  RateLimitHandlerPlugin,
+} from './handler-plugin.ts'
 
 describe('ratelimitHandlerPlugin', () => {
   const handlerFn = vi.fn()
   const procedure = os.handler(handlerFn)
   const handler = new RPCHandler(procedure, {
     allowMethods: ['GET'], // tests below send GET requests
-    plugins: [
-      new RateLimitHandlerPlugin(),
-    ],
+    plugins: [new RateLimitHandlerPlugin()],
   })
 
   it('adds rate limit headers to a successful response after a limit check', async () => {

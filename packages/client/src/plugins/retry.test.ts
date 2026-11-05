@@ -1,11 +1,12 @@
-import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
-import type { RetryLinkPluginContext } from './retry'
 import { promiseWithResolvers } from '@orpc/shared'
+import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import { withEventMeta } from '@standard-server/core'
-import { StandardLink } from '../adapters/standard'
-import { MalformedResponseError, ORPCError, ResponseError } from '../error'
-import { isRetryableError, RetryLinkPlugin } from './retry'
+
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { MalformedResponseError, ORPCError, ResponseError } from '../error.ts'
+import type { RetryLinkPluginContext } from './retry.ts'
+import { isRetryableError, RetryLinkPlugin } from './retry.ts'
 
 interface TestContext extends RetryLinkPluginContext {
   tag?: string
@@ -17,23 +18,29 @@ function makeResponse(status: number) {
 
 function makeCodec(): StandardLinkCodec<TestContext> {
   return {
-    encodeInput: vi.fn(async () => ({
-      method: 'POST',
-      url: '/test',
-      headers: {},
-      body: undefined,
-    } satisfies StandardRequest)),
+    encodeInput: vi.fn(
+      async () =>
+        ({
+          method: 'POST',
+          url: '/test',
+          headers: {},
+          body: undefined,
+        }) satisfies StandardRequest,
+    ),
     decodeResponse: vi.fn(),
   }
 }
 
 function makeTransport(): StandardLinkTransport<TestContext> {
   return {
-    send: vi.fn(async () => ({
-      status: 200,
-      headers: {},
-      resolveBody: async () => undefined,
-    } satisfies StandardLazyResponse)),
+    send: vi.fn(
+      async () =>
+        ({
+          status: 200,
+          headers: {},
+          resolveBody: async () => undefined,
+        }) satisfies StandardLazyResponse,
+    ),
   }
 }
 
@@ -53,17 +60,18 @@ describe('isRetryableError', () => {
   ])('errors from a %i response -> %s', (status, expected) => {
     const response = makeResponse(status)
 
-    expect(isRetryableError(new ORPCError('ERROR', { cause: new ResponseError({ response }) }))).toBe(expected)
+    expect(
+      isRetryableError(new ORPCError('ERROR', { cause: new ResponseError({ response }) })),
+    ).toBe(expected)
     expect(isRetryableError(new MalformedResponseError({ response }))).toBe(expected)
   })
 
-  it.each([
-    new ORPCError('BAD_REQUEST'),
-    new TypeError('Failed to fetch'),
-    'FAIL',
-  ])('errors without a response -> true (%s)', (error) => {
-    expect(isRetryableError(error)).toBe(true)
-  })
+  it.each([new ORPCError('BAD_REQUEST'), new TypeError('Failed to fetch'), 'FAIL'])(
+    'errors without a response -> true (%s)',
+    (error) => {
+      expect(isRetryableError(error)).toBe(true)
+    },
+  )
 })
 
 describe('retryLinkPlugin', () => {
@@ -77,7 +85,9 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: {} })).rejects.toThrow('FAIL')
+    await expect(
+      link.call(['planet', 'create'], { name: 'Earth' }, { context: {} }),
+    ).rejects.toThrow('FAIL')
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
   })
@@ -92,7 +102,9 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } })).rejects.toThrow('FAIL')
+    await expect(
+      link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }),
+    ).rejects.toThrow('FAIL')
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
   })
@@ -109,7 +121,13 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 5, retryDelay: 0, shouldRetry } })).rejects.toThrow('FAIL')
+    await expect(
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 5, retryDelay: 0, shouldRetry } },
+      ),
+    ).rejects.toThrow('FAIL')
 
     expect(shouldRetry).toHaveBeenCalledTimes(1)
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
@@ -119,14 +137,18 @@ describe('retryLinkPlugin', () => {
     const codec = makeCodec()
     const transport = makeTransport()
 
-    const error = new ORPCError('BAD_REQUEST', { cause: new ResponseError({ response: makeResponse(400) }) })
+    const error = new ORPCError('BAD_REQUEST', {
+      cause: new ResponseError({ response: makeResponse(400) }),
+    })
     vi.mocked(codec.decodeResponse).mockRejectedValue(error)
 
     const link = new StandardLink(codec, transport, {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0 } })).rejects.toBe(error)
+    await expect(
+      link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0 } }),
+    ).rejects.toBe(error)
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
   })
@@ -136,14 +158,22 @@ describe('retryLinkPlugin', () => {
     const transport = makeTransport()
 
     vi.mocked(codec.decodeResponse)
-      .mockRejectedValueOnce(new ORPCError('NOT_FOUND', { cause: new ResponseError({ response: makeResponse(404) }) }))
+      .mockRejectedValueOnce(
+        new ORPCError('NOT_FOUND', { cause: new ResponseError({ response: makeResponse(404) }) }),
+      )
       .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
 
     const link = new StandardLink(codec, transport, {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0, shouldRetry: true } })).resolves.toBe('OK')
+    await expect(
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 3, retryDelay: 0, shouldRetry: true } },
+      ),
+    ).resolves.toBe('OK')
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
   })
@@ -170,7 +200,13 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0, onRetry } })).resolves.toBe('OK')
+    await expect(
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 3, retryDelay: 0, onRetry } },
+      ),
+    ).resolves.toBe('OK')
 
     expect(onRetry).toHaveBeenCalledTimes(2)
     expect(clean).toHaveBeenCalledTimes(2)
@@ -191,7 +227,13 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0 }, signal: controller.signal })).rejects.toThrow('AbortError')
+    await expect(
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 3, retryDelay: 0 }, signal: controller.signal },
+      ),
+    ).rejects.toThrow('AbortError')
 
     expect(transport.send).toHaveBeenCalledTimes(1)
   })
@@ -208,7 +250,9 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin({ default: { retry: 1, retryDelay: 0 } })],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: {} })).resolves.toBe('OK')
+    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: {} })).resolves.toBe(
+      'OK',
+    )
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
   })
@@ -286,7 +330,13 @@ describe('retryLinkPlugin', () => {
       plugins: [new RetryLinkPlugin()],
     })
 
-    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay, onRetry } })).rejects.toThrow('DELAY_FAIL')
+    await expect(
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 1, retryDelay, onRetry } },
+      ),
+    ).rejects.toThrow('DELAY_FAIL')
 
     expect(retryDelay).toHaveBeenCalledTimes(1)
     expect(onRetry).not.toHaveBeenCalled()
@@ -326,13 +376,21 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, shouldRetry }, lastEventId: 'init-id' }) as AsyncIterator<any>
+      const iterator = (await link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 1, shouldRetry }, lastEventId: 'init-id' },
+      )) as AsyncIterator<any>
 
       await expect(iterator.next()).resolves.toEqual({ done: false, value: { phase: 'first' } })
       await expect(iterator.next()).resolves.toEqual({ done: false, value: { phase: 'second' } })
 
-      expect(vi.mocked(codec.encodeInput).mock.calls[0]?.[2]).toMatchObject({ lastEventId: 'init-id' })
-      expect(vi.mocked(codec.encodeInput).mock.calls[1]?.[2]).toMatchObject({ lastEventId: 'evt-2' })
+      expect(vi.mocked(codec.encodeInput).mock.calls[0]?.[2]).toMatchObject({
+        lastEventId: 'init-id',
+      })
+      expect(vi.mocked(codec.encodeInput).mock.calls[1]?.[2]).toMatchObject({
+        lastEventId: 'evt-2',
+      })
 
       expect(shouldRetry).toHaveBeenCalledTimes(1)
       expect(shouldRetry).toHaveBeenCalledWith(expect.objectContaining({ lastEventRetry: 0 }))
@@ -362,7 +420,11 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
+      const iterator = (await link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 1, retryDelay: 0 } },
+      )) as AsyncIterator<any>
 
       await expect(iterator.next()).rejects.toBeInstanceOf(TypeError)
     })
@@ -379,8 +441,7 @@ describe('retryLinkPlugin', () => {
           try {
             yield 1
             yield 2
-          }
-          finally {
+          } finally {
             cleanup()
           }
         })(),
@@ -390,7 +451,11 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
+      const iterator = (await link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 1, retryDelay: 0 } },
+      )) as AsyncIterator<any>
 
       await iterator.next()
       await iterator.return?.()
@@ -420,8 +485,7 @@ describe('retryLinkPlugin', () => {
             output: (async function* () {
               try {
                 throw new Error('ITER_FAIL')
-              }
-              finally {
+              } finally {
                 cleanup()
               }
             })(),
@@ -448,7 +512,11 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 50 } }) as AsyncIterator<any>
+      const iterator = (await link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 1, retryDelay: 50 } },
+      )) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
       const nextExpectation = expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
@@ -486,7 +554,9 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['stream'], undefined, { context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry } }) as AsyncIterator<any>
+      const iterator = (await link.call(['stream'], undefined, {
+        context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry },
+      })) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
 
@@ -525,7 +595,9 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['stream'], undefined, { context: { retry: 3, retryDelay: 1000, onRetry } }) as AsyncIterator<any>
+      const iterator = (await link.call(['stream'], undefined, {
+        context: { retry: 3, retryDelay: 1000, onRetry },
+      })) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
 
@@ -570,7 +642,11 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
+      const iterator = (await link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { retry: 1, retryDelay: 0 } },
+      )) as AsyncIterator<any>
 
       expect((iterator as any).specialProperty).toEqual('specialValue:1')
       await expect(iterator.next()).rejects.toThrow('ITER_FAIL')

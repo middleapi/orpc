@@ -1,24 +1,27 @@
-import type { RouterUtilsPlugin } from './plugin'
 import { RPCJsonSerializer } from '@orpc/client'
-import * as KeyModule from './key'
-import { ProcedureUtils } from './procedure-utils'
-import { createRouterUtils } from './router-utils'
 
-vi.mock('./procedure-utils', async (importOriginal) => {
-  const { SharedUtils } = await import('./shared-utils')
+import * as KeyModule from './key.ts'
+import type { RouterUtilsPlugin } from './plugin.ts'
+import { ProcedureUtils } from './procedure-utils.ts'
+import { createRouterUtils } from './router-utils.ts'
+
+vi.mock('./procedure-utils.ts', async (importOriginal) => {
+  const { SharedUtils } = await import('./shared-utils.ts')
 
   return {
-    ...await importOriginal<typeof import('./procedure-utils')>(),
-    ProcedureUtils: vi.fn(class extends SharedUtils<unknown> {
-      call = vi.fn()
-      override key = SharedUtils.prototype.key
-      queryOptions = vi.fn(() => ({ queryOptions: true }))
-      mutationOptions = vi.fn(() => ({ mutationOptions: true }))
+    ...(await importOriginal<typeof import('./procedure-utils.ts')>()),
+    ProcedureUtils: vi.fn(
+      class extends SharedUtils<unknown> {
+        call = vi.fn()
+        override key = SharedUtils.prototype.key
+        queryOptions = vi.fn(() => ({ queryOptions: true }))
+        mutationOptions = vi.fn(() => ({ mutationOptions: true }))
 
-      constructor(path: string[], _client: unknown, options: any = {}) {
-        super(path, options)
-      }
-    }),
+        constructor(path: string[], _client: unknown, options: any = {}) {
+          super(path, options)
+        }
+      },
+    ),
   }
 })
 
@@ -43,24 +46,48 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith([], client, { prefix: '__prefix__', serializer })
     expect(utils.key({ type: 'infinite' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, [], { type: 'infinite', prefix: '__prefix__', serializer })
-    expect(utils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, [], {
+      type: 'infinite',
+      prefix: '__prefix__',
+      serializer,
+    })
+    expect(utils.queryOptions()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value,
+    )
 
     const keyUtils = utils.key
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(2)
-    expect(ProcedureUtils).toHaveBeenNthCalledWith(2, ['key'], client.key, { prefix: '__prefix__', serializer })
+    expect(ProcedureUtils).toHaveBeenNthCalledWith(2, ['key'], client.key, {
+      prefix: '__prefix__',
+      serializer,
+    })
     expect(keyUtils.key({ type: 'live' })).toBe(generateOperationKeySpy.mock.results[1]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['key'], { type: 'live', prefix: '__prefix__', serializer })
-    expect(keyUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[1]?.value.queryOptions.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['key'], {
+      type: 'live',
+      prefix: '__prefix__',
+      serializer,
+    })
+    expect(keyUtils.queryOptions()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[1]?.value.queryOptions.mock.results[0]?.value,
+    )
 
     const pongUtils = keyUtils.pong
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(3)
-    expect(ProcedureUtils).toHaveBeenNthCalledWith(3, ['key', 'pong'], client.key.pong, { prefix: '__prefix__', serializer })
+    expect(ProcedureUtils).toHaveBeenNthCalledWith(3, ['key', 'pong'], client.key.pong, {
+      prefix: '__prefix__',
+      serializer,
+    })
     expect(pongUtils.key({ type: 'query' })).toBe(generateOperationKeySpy.mock.results[2]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['key', 'pong'], { type: 'query', prefix: '__prefix__', serializer })
-    expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[2]?.value.queryOptions.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['key', 'pong'], {
+      type: 'query',
+      prefix: '__prefix__',
+      serializer,
+    })
+    expect(pongUtils.queryOptions()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[2]?.value.queryOptions.mock.results[0]?.value,
+    )
   })
 
   it('returns strictly equal utils on repeated access', () => {
@@ -79,14 +106,20 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith(['__base__'], client, {})
     expect(utils.key({ type: 'infinite' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['__base__'], { type: 'infinite', prefix: undefined })
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['__base__'], {
+      type: 'infinite',
+      prefix: undefined,
+    })
 
     const keyUtils = utils.key
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(2)
     expect(ProcedureUtils).toHaveBeenNthCalledWith(2, ['__base__', 'key'], client.key, {})
     expect(keyUtils.key({ type: 'live' })).toBe(generateOperationKeySpy.mock.results[1]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['__base__', 'key'], { type: 'live', prefix: undefined })
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['__base__', 'key'], {
+      type: 'live',
+      prefix: undefined,
+    })
   })
 
   it('stops recursive on symbol', async () => {
@@ -200,42 +233,86 @@ describe('createRouterUtils', () => {
     }) as any
 
     expect(plugin.init).toHaveBeenCalledOnce()
-    expect(plugin.init).toHaveBeenCalledWith(expect.objectContaining({
-      queryInterceptors: [queryInterceptors.root],
-      streamedInterceptors: [streamedInterceptors.root],
-      liveInterceptors: [liveInterceptors.root],
-      infiniteInterceptors: [infiniteInterceptors.root],
-      mutationInterceptors: [mutationInterceptors.root],
-    }))
+    expect(plugin.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryInterceptors: [queryInterceptors.root],
+        streamedInterceptors: [streamedInterceptors.root],
+        liveInterceptors: [liveInterceptors.root],
+        infiniteInterceptors: [infiniteInterceptors.root],
+        mutationInterceptors: [mutationInterceptors.root],
+      }),
+    )
 
     const routeUtils = utils.route
 
     expect(plugin.initProcedureOptions).toHaveBeenCalledOnce()
-    expect(plugin.initProcedureOptions).toHaveBeenCalledWith(['route'], expect.objectContaining({
-      queryInterceptors: [queryInterceptors.root, queryInterceptors.init, queryInterceptors.scoped],
-      streamedInterceptors: [streamedInterceptors.root, streamedInterceptors.init, streamedInterceptors.scoped],
-      liveInterceptors: [liveInterceptors.root, liveInterceptors.init, liveInterceptors.scoped],
-      infiniteInterceptors: [infiniteInterceptors.root, infiniteInterceptors.init, infiniteInterceptors.scoped],
-      mutationInterceptors: [mutationInterceptors.root, mutationInterceptors.init, mutationInterceptors.scoped],
-      queryOptions: {
-        gcTime: 1000,
-      },
-    }))
+    expect(plugin.initProcedureOptions).toHaveBeenCalledWith(
+      ['route'],
+      expect.objectContaining({
+        queryInterceptors: [
+          queryInterceptors.root,
+          queryInterceptors.init,
+          queryInterceptors.scoped,
+        ],
+        streamedInterceptors: [
+          streamedInterceptors.root,
+          streamedInterceptors.init,
+          streamedInterceptors.scoped,
+        ],
+        liveInterceptors: [liveInterceptors.root, liveInterceptors.init, liveInterceptors.scoped],
+        infiniteInterceptors: [
+          infiniteInterceptors.root,
+          infiniteInterceptors.init,
+          infiniteInterceptors.scoped,
+        ],
+        mutationInterceptors: [
+          mutationInterceptors.root,
+          mutationInterceptors.init,
+          mutationInterceptors.scoped,
+        ],
+        queryOptions: {
+          gcTime: 1000,
+        },
+      }),
+    )
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['route'], client.route, expect.objectContaining({
-      queryInterceptors: [queryInterceptors.root, queryInterceptors.init, queryInterceptors.scoped, queryInterceptors.procedure],
-      streamedInterceptors: [streamedInterceptors.root, streamedInterceptors.init, streamedInterceptors.scoped],
-      liveInterceptors: [liveInterceptors.root, liveInterceptors.init, liveInterceptors.scoped],
-      infiniteInterceptors: [infiniteInterceptors.root, infiniteInterceptors.init, infiniteInterceptors.scoped],
-      mutationInterceptors: [mutationInterceptors.root, mutationInterceptors.init, mutationInterceptors.scoped],
-      queryOptions: {
-        gcTime: 1000,
-        staleTime: 100,
-      },
-    }))
+    expect(ProcedureUtils).toHaveBeenCalledWith(
+      ['route'],
+      client.route,
+      expect.objectContaining({
+        queryInterceptors: [
+          queryInterceptors.root,
+          queryInterceptors.init,
+          queryInterceptors.scoped,
+          queryInterceptors.procedure,
+        ],
+        streamedInterceptors: [
+          streamedInterceptors.root,
+          streamedInterceptors.init,
+          streamedInterceptors.scoped,
+        ],
+        liveInterceptors: [liveInterceptors.root, liveInterceptors.init, liveInterceptors.scoped],
+        infiniteInterceptors: [
+          infiniteInterceptors.root,
+          infiniteInterceptors.init,
+          infiniteInterceptors.scoped,
+        ],
+        mutationInterceptors: [
+          mutationInterceptors.root,
+          mutationInterceptors.init,
+          mutationInterceptors.scoped,
+        ],
+        queryOptions: {
+          gcTime: 1000,
+          staleTime: 100,
+        },
+      }),
+    )
 
-    expect(routeUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
+    expect(routeUtils.queryOptions()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value,
+    )
   })
 
   it('does not create procedure utils when scoped options are not procedure utils options', () => {
@@ -260,9 +337,13 @@ describe('createRouterUtils', () => {
     const childUtils = utils.child
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['child'], client.child, expect.objectContaining({
-      queryOptions: { staleTime: 1000 },
-    }))
+    expect(ProcedureUtils).toHaveBeenCalledWith(
+      ['child'],
+      client.child,
+      expect.objectContaining({
+        queryOptions: { staleTime: 1000 },
+      }),
+    )
     expect(typeof childUtils.queryOptions).toBe('function')
   })
 

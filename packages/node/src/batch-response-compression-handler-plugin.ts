@@ -1,10 +1,19 @@
-import type { Context } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { Duplex } from 'node:stream'
 import { constants, createDeflate, createDeflateRaw, createGzip } from 'node:zlib'
-import { BATCH_HEADER, negotiateResponseCompressionEncoding, toCompressedHeaders } from '@orpc/server/plugins'
+
+import type { Context } from '@orpc/server'
+import {
+  BATCH_HEADER,
+  negotiateResponseCompressionEncoding,
+  toCompressedHeaders,
+} from '@orpc/server/plugins'
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '@orpc/server/standard'
 import { toArray } from '@orpc/shared'
+import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchBody } from '@standard-server/fetch'
 
@@ -42,7 +51,9 @@ export interface BatchResponseCompressionHandlerPluginOptions {
  *
  * @see {@link https://orpc.dev/docs/plugins/batch-response-compression | Batch Response Compression Plugin}
  */
-export class BatchResponseCompressionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+export class BatchResponseCompressionHandlerPlugin<
+  T extends Context,
+> implements StandardHandlerPlugin<T> {
   name = '~batch-response-compression'
 
   /**
@@ -51,8 +62,14 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
    */
   after: string[] = ['~batch']
 
-  private readonly encodings: Exclude<BatchResponseCompressionHandlerPluginOptions['encodings'], undefined>
-  private readonly threshold: Exclude<BatchResponseCompressionHandlerPluginOptions['threshold'], undefined>
+  private readonly encodings: Exclude<
+    BatchResponseCompressionHandlerPluginOptions['encodings'],
+    undefined
+  >
+  private readonly threshold: Exclude<
+    BatchResponseCompressionHandlerPluginOptions['threshold'],
+    undefined
+  >
 
   constructor(options: BatchResponseCompressionHandlerPluginOptions = {}) {
     this.encodings = options.encodings ?? ['gzip', 'deflate']
@@ -60,7 +77,10 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const result = await next()
 
       if (!result.matched) {
@@ -88,7 +108,11 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
         return result
       }
 
-      const encoding = negotiateResponseCompressionEncoding(response, interceptorOptions.request.headers, this.encodings)
+      const encoding = negotiateResponseCompressionEncoding(
+        response,
+        interceptorOptions.request.headers,
+        this.encodings,
+      )
 
       if (encoding === undefined) {
         return result
@@ -130,8 +154,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
 
         stream = body instanceof Blob ? body.stream() : body
         bodyHeaders = { 'standard-server': 'octet-stream' satisfies StandardBodyHint }
-      }
-      else {
+      } else {
         return result
       }
 
@@ -150,10 +173,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
 }
@@ -173,11 +193,12 @@ function createFlushingCompressionStream(
 ): CompressionStreamPair {
   const zlibOptions = { flush: constants.Z_SYNC_FLUSH }
 
-  const compressor = encoding === 'gzip'
-    ? createGzip(zlibOptions)
-    : encoding === 'deflate'
-      ? createDeflate(zlibOptions)
-      : createDeflateRaw(zlibOptions)
+  const compressor =
+    encoding === 'gzip'
+      ? createGzip(zlibOptions)
+      : encoding === 'deflate'
+        ? createDeflate(zlibOptions)
+        : createDeflateRaw(zlibOptions)
 
   return Duplex.toWeb(compressor) as CompressionStreamPair
 }

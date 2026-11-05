@@ -1,13 +1,19 @@
 import type { Client, ClientContext, ORPCError } from '@orpc/client'
-import type { EffectClient } from './client'
 import { isDefinedError } from '@orpc/client'
 import { Effect } from 'effect'
-import { createEffectClient } from './client'
-import { catchORPCErrorCodes } from './error'
+
+import type { EffectClient } from './client.ts'
+import { createEffectClient } from './client.ts'
+import { catchORPCErrorCodes } from './error.ts'
 
 describe('createEffectClient', () => {
   const client = {} as {
-    ping: Client<ClientContext, string, number, Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>>
+    ping: Client<
+      ClientContext,
+      string,
+      number,
+      Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>
+    >
     optional: Client<ClientContext, string | undefined, number, Error>
     nested: {
       pong: Client<{ cache: boolean }, { id: number }, { result: string }, Error>
@@ -18,7 +24,10 @@ describe('createEffectClient', () => {
 
   it('procedures return effects with output and error types preserved', () => {
     expectTypeOf(effectClient.ping('test')).toEqualTypeOf<
-      Effect.Effect<number, Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>>
+      Effect.Effect<
+        number,
+        Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>
+      >
     >()
 
     expectTypeOf(effectClient.nested.pong({ id: 123 }, { context: { cache: true } })).toEqualTypeOf<

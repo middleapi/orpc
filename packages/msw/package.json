@@ -1,48 +1,44 @@
 {
   "name": "@orpc/msw",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "MSW integration for oRPC: mock procedures at the network level with typed MSW request handlers",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "mock-service-worker",
+    "msw",
+    "orpc"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/msw"
   },
-  "keywords": [
-    "orpc",
-    "msw",
-    "mock-service-worker"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "msw": ">=2.12.3"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -55,5 +51,8 @@
     "msw": "^3.0.3",
     "msw-v2": "npm:msw@^2.15.0",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "msw": ">=2.12.3"
   }
 }

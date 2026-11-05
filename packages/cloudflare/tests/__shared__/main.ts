@@ -1,8 +1,7 @@
-import { experimental_DurableLockObject as DurableLockObject } from '../../src/lock-object'
-import { DurablePublisherObject } from '../../src/publisher-object'
+import { experimental_DurableLockObject as DurableLockObject } from '../../src/lock-object.ts'
+import { DurablePublisherObject } from '../../src/publisher-object.ts'
 
-export class PublisherDO extends DurablePublisherObject {
-}
+export class PublisherDO extends DurablePublisherObject {}
 
 export class PublisherResume3sDO extends DurablePublisherObject {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -17,5 +16,4 @@ export class PublisherResume3sDO extends DurablePublisherObject {
   }
 }
 
-export class LockDO extends DurableLockObject {
-}
+export class LockDO extends DurableLockObject {}

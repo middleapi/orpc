@@ -1,8 +1,8 @@
 ---
-title: "Hono Adapter"
-description: "Use oRPC inside a Hono project by mounting a handler as a middleware through the Fetch API Adapter, with a fix for middleware that reads the body first."
+title: 'Hono Adapter'
+description: 'Use oRPC inside a Hono project by mounting a handler as a middleware through the Fetch API Adapter, with a fix for middleware that reads the body first.'
 sidebar:
-  label: "Hono"
+  label: 'Hono'
 ---
 
 [Hono](https://hono.dev/) is a high-performance web framework built on top of the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API), so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -27,7 +27,7 @@ const handler = new RPCHandler(router, {
 app.use('/rpc/*', async (c, next) => {
   const { matched, response } = await handler.handle(c.req.raw, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -59,12 +59,12 @@ app.use('/rpc/*', async (c, next) => {
         return () => c.req[prop as BodyParserMethod]()
       }
       return Reflect.get(target, prop, target)
-    }
+    },
   })
 
   const { matched, response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

@@ -1,15 +1,16 @@
 import { oc, ProcedureContract } from '@orpc/contract'
 import { getOwn } from '@orpc/shared'
-import z from 'zod'
-import { os } from './builder'
-import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
-import { createRouterImplementer } from './implementer-router'
-import { Lazy } from './lazy'
-import * as MiddlewareDecoratedModule from './middleware-decorated'
-import { Procedure } from './procedure'
-import * as RouterHiddenModule from './router-hidden'
-import { getHiddenRouterContract } from './router-hidden'
-import * as RouterUtilsModule from './router-utils'
+import * as z from 'zod'
+
+import { os } from './builder.ts'
+import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
+import { createRouterImplementer } from './implementer-router.ts'
+import { Lazy } from './lazy.ts'
+import * as MiddlewareDecoratedModule from './middleware-decorated.ts'
+import { Procedure } from './procedure.ts'
+import * as RouterHiddenModule from './router-hidden.ts'
+import { getHiddenRouterContract } from './router-hidden.ts'
+import * as RouterUtilsModule from './router-utils.ts'
 
 const decorateMiddlewareSpy = vi.spyOn(MiddlewareDecoratedModule, 'decorateMiddleware')
 const augmentImplementedRouterSpy = vi.spyOn(RouterUtilsModule, 'augmentImplementedRouter')
@@ -88,7 +89,9 @@ describe('createRouterImplementer', () => {
         const mid = vi.fn()
         const applied = implementer.router.use(mid)
 
-        expect(applied.router.handler(vi.fn())['~orpc'].orderedMiddlewares).toEqual([{ middleware: mid }])
+        expect(applied.router.handler(vi.fn())['~orpc'].orderedMiddlewares).toEqual([
+          { middleware: mid },
+        ])
       })
     })
 
@@ -159,7 +162,10 @@ describe('createRouterImplementer', () => {
         })
 
         expect(withHiddenRouterContractSpy).toHaveBeenCalledTimes(1)
-        expect(withHiddenRouterContractSpy).toHaveBeenCalledWith(augmentImplementedRouterSpy.mock.results[0]!.value, contract)
+        expect(withHiddenRouterContractSpy).toHaveBeenCalledWith(
+          augmentImplementedRouterSpy.mock.results[0]!.value,
+          contract,
+        )
 
         expect(applied).toBe(withHiddenRouterContractSpy.mock.results[0]!.value)
       })
@@ -180,7 +186,9 @@ describe('createRouterImplementer', () => {
           middlewares: [mid],
         })
 
-        expect((applied as any).nested).toBe(augmentImplementedRouterSpy.mock.results[0]!.value.nested)
+        expect((applied as any).nested).toBe(
+          augmentImplementedRouterSpy.mock.results[0]!.value.nested,
+        )
         expect(getHiddenRouterContract(applied)).toBe(contract)
       })
 
@@ -188,7 +196,10 @@ describe('createRouterImplementer', () => {
         const middleware = vi.fn()
         const applied = implementer.router.use(middleware)
 
-        expect(applied.router.handler(vi.fn())['~orpc'].orderedMiddlewares).toEqual([{ middleware: mid }, { middleware }])
+        expect(applied.router.handler(vi.fn())['~orpc'].orderedMiddlewares).toEqual([
+          { middleware: mid },
+          { middleware },
+        ])
       })
     })
 
@@ -237,7 +248,10 @@ describe('createRouterImplementer', () => {
     })
 
     it('keeps __proto__ keys as own procedure implementers', () => {
-      const contract = Object.fromEntries([['__proto__', oc.output(z.string())], ['other', oc.output(z.string())]])
+      const contract = Object.fromEntries([
+        ['__proto__', oc.output(z.string())],
+        ['other', oc.output(z.string())],
+      ])
 
       const implementer = createRouterImplementer(contract, config) as any
 
@@ -248,17 +262,26 @@ describe('createRouterImplementer', () => {
     it('strips server procedures down to plain contracts, keeping contract-first routers as is', () => {
       const contractFirst = { ping: oc.errors({ BAD_GATEWAY: {} }) }
       const real = {
-        ping: os.$config({ disableInputValidation: true }).input(z.string()).handler(() => 'REAL'),
+        ping: os
+          .$config({ disableInputValidation: true })
+          .input(z.string())
+          .handler(() => 'REAL'),
         nested: { pong: os.handler(() => 'REAL') },
         contractFirst,
       }
 
-      const hidden = getHiddenRouterContract(createRouterImplementer(real, config).router({} as any)) as any
+      const hidden = getHiddenRouterContract(
+        createRouterImplementer(real, config).router({} as any),
+      ) as any
 
-      for (const [procedure, original] of [[hidden.ping, real.ping], [hidden.nested.pong, real.nested.pong]] as const) {
+      for (const [procedure, original] of [
+        [hidden.ping, real.ping],
+        [hidden.nested.pong, real.nested.pong],
+      ] as const) {
         expect(procedure).toBeInstanceOf(ProcedureContract)
         expect(procedure).not.toBeInstanceOf(Procedure)
-        const { handler, orderedMiddlewares, disableInputValidation, ...contractDef } = original['~orpc']
+        const { handler, orderedMiddlewares, disableInputValidation, ...contractDef } =
+          original['~orpc']
         expect(procedure['~orpc']).toEqual(contractDef)
       }
 

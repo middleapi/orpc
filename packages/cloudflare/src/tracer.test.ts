@@ -1,7 +1,11 @@
 import type { Tracer } from '@orpc/shared'
 import { getTracer, setTracer } from '@orpc/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { experimental_CloudflareSpan as CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer'
+
+import {
+  experimental_CloudflareSpan as CloudflareSpan,
+  experimental_CloudflareTracer as CloudflareTracer,
+} from './tracer.ts'
 
 function createFakeSpan() {
   return {
@@ -11,7 +15,11 @@ function createFakeSpan() {
     recordException: vi.fn(),
     updateName: vi.fn().mockReturnThis(),
     setStatus: vi.fn().mockReturnThis(),
-    spanContext: vi.fn(() => ({ traceId: '4bf92f3577b34da6a3ce929d0e0e4736', spanId: '00f067aa0ba902b7', traceFlags: 0 })),
+    spanContext: vi.fn(() => ({
+      traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+      spanId: '00f067aa0ba902b7',
+      traceFlags: 0,
+    })),
     end: vi.fn(),
   }
 }
@@ -100,7 +108,11 @@ describe('cloudflareTracer', () => {
 
   it('injects nothing when the span context is invalid', () => {
     const fake = createFakeTracing()
-    fake.span.spanContext.mockReturnValue({ traceId: '00000000000000000000000000000000', spanId: '0000000000000000', traceFlags: 0 })
+    fake.span.spanContext.mockReturnValue({
+      traceId: '00000000000000000000000000000000',
+      spanId: '0000000000000000',
+      traceFlags: 0,
+    })
     const tracer = new CloudflareTracer({ tracing: fake as any })
     const headers = {}
 
@@ -110,7 +122,10 @@ describe('cloudflareTracer', () => {
   })
 
   it('has no inject method when propagation is disabled', () => {
-    const tracer: Tracer = new CloudflareTracer({ tracing: createFakeTracing() as any, propagationEnabled: false })
+    const tracer: Tracer = new CloudflareTracer({
+      tracing: createFakeTracing() as any,
+      propagationEnabled: false,
+    })
     expect(tracer.inject).toBeUndefined()
   })
 
@@ -226,9 +241,11 @@ describe('cloudflareTracer', () => {
     it('rethrows errors from active spans', async () => {
       const tracer = new CloudflareTracer()
 
-      await expect(tracer.startActiveSpan('failing', undefined, async () => {
-        throw new Error('boom')
-      })).rejects.toThrow('boom')
+      await expect(
+        tracer.startActiveSpan('failing', undefined, async () => {
+          throw new Error('boom')
+        }),
+      ).rejects.toThrow('boom')
     })
   })
 })

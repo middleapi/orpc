@@ -1,8 +1,8 @@
 ---
-title: "Cookie Helpers"
-description: "Set, read, and delete HTTP cookies from fetch Headers with oRPC cookie helpers, and secure them with signing or encryption."
+title: 'Cookie Helpers'
+description: 'Set, read, and delete HTTP cookies from fetch Headers with oRPC cookie helpers, and secure them with signing or encryption.'
 sidebar:
-  label: "Cookie"
+  label: 'Cookie'
 ---
 
 ## Basic Usage
@@ -15,7 +15,7 @@ const resHeaders = new Headers()
 
 setCookie(resHeaders, 'sessionId', 'abc123', {
   secure: true,
-  maxAge: 3600
+  maxAge: 3600,
 })
 
 deleteCookie(resHeaders, 'sessionId')
@@ -42,7 +42,7 @@ const resHeaders = new Headers()
 setCookie(resHeaders, 'sessionId', await sign('abc123', secret), {
   httpOnly: true,
   secure: true,
-  maxAge: 3600
+  maxAge: 3600,
 })
 
 const signedSessionId = await unsign(getCookie(reqHeaders, 'sessionId'), secret)

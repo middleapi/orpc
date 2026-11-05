@@ -1,57 +1,56 @@
 {
   "name": "@orpc/contract",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Define typesafe API contracts as the single source of truth for oRPC, powered by Standard Schema",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "contract",
+    "contract-first",
+    "openapi",
+    "orpc",
+    "rpc",
+    "standard-schema",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/contract"
   },
-  "keywords": [
-    "orpc",
-    "rpc",
-    "api",
-    "typescript",
-    "typesafe",
-    "contract",
-    "contract-first",
-    "standard-schema",
-    "openapi"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./plugins": {
-        "types": "./dist/plugins/index.d.mts",
-        "import": "./dist/plugins/index.mjs",
-        "default": "./dist/plugins/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./plugins": "./src/plugins/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./plugins": {
+        "types": "./dist/plugins/index.d.ts",
+        "import": "./dist/plugins/index.js",
+        "default": "./dist/plugins/index.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

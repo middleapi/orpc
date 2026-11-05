@@ -1,8 +1,8 @@
 ---
-title: "Fastify Adapter"
-description: "Use oRPC with Fastify servers via RPCHandler or OpenAPIHandler, with content type parser tips and event stream options."
+title: 'Fastify Adapter'
+description: 'Use oRPC with Fastify servers via RPCHandler or OpenAPIHandler, with content type parser tips and event stream options.'
 sidebar:
-  label: "Fastify"
+  label: 'Fastify'
 ---
 
 ## Server Usage
@@ -16,9 +16,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import Fastify from 'fastify'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -31,7 +29,7 @@ const app = Fastify()
 app.all('/rpc/*', async (req, reply) => {
   const { matched } = await handler.handle(req, reply, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -51,9 +49,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import Fastify from 'fastify'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -66,7 +62,7 @@ const app = Fastify()
 app.all('/api/*', async (req, reply) => {
   const { matched } = await handler.handle(req, reply, {
     prefix: '/api',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

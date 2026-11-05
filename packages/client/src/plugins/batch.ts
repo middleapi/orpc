@@ -1,11 +1,39 @@
 import type { InterceptorOptions, Promisable, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
-import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
+import {
+  captureAsyncContext,
+  defer,
+  isAsyncIteratorObject,
+  loadBytes,
+  once,
+  promiseWithResolvers,
+  safeEncodeURIComponent,
+  splitInHalf,
+  stringifyJSON,
+  toArray,
+  value,
+} from '@orpc/shared'
+import type {
+  StandardHeaders,
+  StandardLazyResponse,
+  StandardRequest,
+  StandardUrl,
+} from '@standard-server/core'
 import { parseStandardUrl } from '@standard-server/core'
-import { ClientPeer, decodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
+import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
+import {
+  ClientPeer,
+  decodePeerMessage,
+  isPeerMessage,
+  isServerPeerSendMessage,
+} from '@standard-server/peer'
+
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+  StandardLinkTransportInterceptorOptions,
+} from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 
 /**
  * Header that marks a request as a batch, set by the Batch Link Plugin and detected by the Batch Handler Plugin.
@@ -39,14 +67,32 @@ export interface BatchLinkPluginGroup<T extends ClientContext> {
   /**
    * The client context applied to requests in this batch group for the remainder of the link chain.
    */
-  context: Value<T, [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  context: Value<
+    T,
+    [
+      items: [
+        StandardLinkTransportInterceptorOptions<T>,
+        ...StandardLinkTransportInterceptorOptions<T>[],
+      ],
+    ]
+  >
 
   /**
    * The path segments applied to requests in this batch group for the remainder of the link chain.
    *
    * @default []
    */
-  path?: Value<string[], [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+  path?:
+    | Value<
+        string[],
+        [
+          items: [
+            StandardLinkTransportInterceptorOptions<T>,
+            ...StandardLinkTransportInterceptorOptions<T>[],
+          ],
+        ]
+      >
+    | undefined
 }
 
 export interface BatchLinkPluginOptions<T extends ClientContext> {
@@ -74,7 +120,17 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    * @default DEFAULT_BATCH_MAX_SIZE (10)
    * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
    */
-  maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+  maxSize?:
+    | Value<
+        Promisable<number>,
+        [
+          subOptionsList: [
+            StandardLinkTransportInterceptorOptions<T>,
+            ...StandardLinkTransportInterceptorOptions<T>[],
+          ],
+        ]
+      >
+    | undefined
 
   /**
    * How long (in ms) to wait for more requests before sending the batch,
@@ -95,14 +151,34 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    * @default 'buffered'
    * @see {@link https://orpc.dev/docs/plugins/batch#response-modes | Batch Plugin - Response Modes}
    */
-  mode?: Value<Promisable<BatchLinkPluginMode>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+  mode?:
+    | Value<
+        Promisable<BatchLinkPluginMode>,
+        [
+          subOptionsList: [
+            StandardLinkTransportInterceptorOptions<T>,
+            ...StandardLinkTransportInterceptorOptions<T>[],
+          ],
+        ]
+      >
+    | undefined
 
   /**
    * URL for the batch request.
    *
    * @default URL of the first subrequest in the batch + '/__batch__'
    */
-  url?: Value<Promisable<StandardUrl>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+  url?:
+    | Value<
+        Promisable<StandardUrl>,
+        [
+          subOptionsList: [
+            StandardLinkTransportInterceptorOptions<T>,
+            ...StandardLinkTransportInterceptorOptions<T>[],
+          ],
+        ]
+      >
+    | undefined
 
   /**
    * The maximum length of the URL that runtime supports,
@@ -112,28 +188,59 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default 2083
    */
-  maxUrlLength?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+  maxUrlLength?:
+    | Value<
+        Promisable<number>,
+        [
+          subOptionsList: [
+            StandardLinkTransportInterceptorOptions<T>,
+            ...StandardLinkTransportInterceptorOptions<T>[],
+          ],
+        ]
+      >
+    | undefined
 
   /**
    * Headers used for the batch request.
    *
    * @default Common headers among all subrequests in the batch.
    */
-  headers?: Value<Promisable<StandardHeaders>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
+  headers?:
+    | Value<
+        Promisable<StandardHeaders>,
+        [
+          subOptionsList: [
+            StandardLinkTransportInterceptorOptions<T>,
+            ...StandardLinkTransportInterceptorOptions<T>[],
+          ],
+        ]
+      >
+    | undefined
 
   /**
    * Map each subrequest in the batch before it is sent.
    *
    * @default Removes headers that are duplicated with the batch headers
    */
-  mapSubrequest?: ((subOptions: StandardLinkTransportInterceptorOptions<T>, partialBatchRequest: Pick<StandardRequest, 'url' | 'headers'>) => StandardRequest) | undefined
+  mapSubrequest?:
+    | ((
+        subOptions: StandardLinkTransportInterceptorOptions<T>,
+        partialBatchRequest: Pick<StandardRequest, 'url' | 'headers'>,
+      ) => StandardRequest)
+    | undefined
 
   /**
    * Maps each subresponse before returning the final response.
    *
    * @default Low-priority merges headers from the batch response into each subresponse.
    */
-  mapSubresponse?: ((subResponse: StandardLazyResponse, batchResponse: StandardLazyResponse, subOptions: StandardLinkTransportInterceptorOptions<T>) => StandardLazyResponse) | undefined
+  mapSubresponse?:
+    | ((
+        subResponse: StandardLazyResponse,
+        batchResponse: StandardLazyResponse,
+        subOptions: StandardLinkTransportInterceptorOptions<T>,
+      ) => StandardLazyResponse)
+    | undefined
 }
 
 /**
@@ -160,7 +267,8 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
   private readonly mapSubrequest: Exclude<BatchLinkPluginOptions<T>['mapSubrequest'], undefined>
   private readonly mapSubresponse: Exclude<BatchLinkPluginOptions<T>['mapSubresponse'], undefined>
 
-  private readonly queue: Map<unknown, Map<BatchLinkPluginGroup<T>, BatchLinkPluginItem<T>[]>> = new Map()
+  private readonly queue: Map<unknown, Map<BatchLinkPluginGroup<T>, BatchLinkPluginItem<T>[]>> =
+    new Map()
 
   constructor(options: NoInfer<BatchLinkPluginOptions<T>>) {
     this.groups = options.groups
@@ -169,66 +277,76 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     this.maxSize = options.maxSize ?? DEFAULT_BATCH_MAX_SIZE
     this.wait = options.wait ?? 0
     this.mode = options.mode ?? 'buffered'
-    this.batchUrl = options.url ?? ((options) => {
-      const [pathname] = parseStandardUrl(options[0].request.url)
-      return `${pathname}/__batch__`
-    })
+    this.batchUrl =
+      options.url ??
+      ((options) => {
+        const [pathname] = parseStandardUrl(options[0].request.url)
+        return `${pathname}/__batch__`
+      })
     this.maxUrlLength = options.maxUrlLength ?? 2083
-    this.batchHeaders = options.headers ?? (async (options) => {
-      const headersList = options.map(o => o.request.headers)
-      const commonHeaders: StandardHeaders = {}
-      for (const headers of headersList) {
-        for (const key of Object.keys(headers)) {
-          const value = headers[key]
-          if (headersList.every(h => h[key] === value)) {
-            commonHeaders[key] = value
+    this.batchHeaders =
+      options.headers ??
+      (async (options) => {
+        const headersList = options.map((o) => o.request.headers)
+        const commonHeaders: StandardHeaders = {}
+        for (const headers of headersList) {
+          for (const key of Object.keys(headers)) {
+            const value = headers[key]
+            if (headersList.every((h) => h[key] === value)) {
+              commonHeaders[key] = value
+            }
           }
         }
-      }
 
-      return commonHeaders
-    })
-    this.mapSubrequest = options.mapSubrequest ?? (({ request }, { headers }) => {
-      const subHeaders = { ...request.headers }
-      for (const key of Object.keys(headers)) {
-        const value = headers[key]
-        if (subHeaders[key] === value) {
-          subHeaders[key] = undefined
+        return commonHeaders
+      })
+    this.mapSubrequest =
+      options.mapSubrequest ??
+      (({ request }, { headers }) => {
+        const subHeaders = { ...request.headers }
+        for (const key of Object.keys(headers)) {
+          const value = headers[key]
+          if (subHeaders[key] === value) {
+            subHeaders[key] = undefined
+          }
         }
-      }
 
-      return {
-        ...request,
-        headers: subHeaders,
-      }
-    })
-    this.mapSubresponse = options.mapSubresponse ?? ((subResponse, batchResponse) => {
-      return {
-        ...subResponse,
-        headers: {
-          ...batchResponse.headers, // low-priority
-          ...subResponse.headers,
-        },
-      }
-    })
+        return {
+          ...request,
+          headers: subHeaders,
+        }
+      })
+    this.mapSubresponse =
+      options.mapSubresponse ??
+      ((subResponse, batchResponse) => {
+        return {
+          ...subResponse,
+          headers: {
+            ...batchResponse.headers, // low-priority
+            ...subResponse.headers,
+          },
+        }
+      })
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
-    const transportInterceptor: StandardLinkTransportInterceptor<T> = async (interceptorOptions) => {
+    const transportInterceptor: StandardLinkTransportInterceptor<T> = async (
+      interceptorOptions,
+    ) => {
       const { body, signal } = interceptorOptions.request
 
       if (
-        body instanceof Blob
-        || body instanceof FormData
-        || body instanceof ReadableStream
-        || isAsyncIteratorObject(body)
-        || signal?.aborted
-        || !value(this.filter, interceptorOptions)
+        body instanceof Blob ||
+        body instanceof FormData ||
+        body instanceof ReadableStream ||
+        isAsyncIteratorObject(body) ||
+        signal?.aborted ||
+        !value(this.filter, interceptorOptions)
       ) {
         return interceptorOptions.next()
       }
 
-      const group = this.groups.find(group => value(group.condition, interceptorOptions))
+      const group = this.groups.find((group) => value(group.condition, interceptorOptions))
 
       if (!group) {
         return interceptorOptions.next()
@@ -272,11 +390,13 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       for (const [group, items] of groups) {
         const getItems = items.filter(([options]) => options.request.method === 'GET')
         const queryItems = items.filter(([options]) => options.request.method === 'QUERY')
-        const unsafeItems = items.filter(([options]) => options.request.method !== 'GET' && options.request.method !== 'QUERY')
+        const unsafeItems = items.filter(
+          ([options]) => options.request.method !== 'GET' && options.request.method !== 'QUERY',
+        )
 
-        this.executeBatchInOwnContext('GET', group, getItems)
-        this.executeBatchInOwnContext('QUERY', group, queryItems)
-        this.executeBatchInOwnContext('POST', group, unsafeItems)
+        void this.executeBatchInOwnContext('GET', group, getItems)
+        void this.executeBatchInOwnContext('QUERY', group, queryItems)
+        void this.executeBatchInOwnContext('POST', group, unsafeItems)
       }
     }
   }
@@ -307,8 +427,14 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       }
 
       const subOptionsList = groupItems.map(([options]) => options) as [
-        InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>,
-        ...InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>[],
+        InterceptorOptions<
+          StandardLinkTransportInterceptorOptions<T>,
+          Promise<StandardLazyResponse>
+        >,
+        ...InterceptorOptions<
+          StandardLinkTransportInterceptorOptions<T>,
+          Promise<StandardLazyResponse>
+        >[],
       ]
 
       const maxSize = await value(this.maxSize, subOptionsList)
@@ -330,7 +456,9 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
       const controller = new AbortController()
       const pendingMessages: ClientPeerSendMessage[] = []
-      const subrequests = groupItems.map(([subOptions]) => this.mapSubrequest(subOptions, { url, headers }))
+      const subrequests = groupItems.map(([subOptions]) =>
+        this.mapSubrequest(subOptions, { url, headers }),
+      )
       let batchResponse: StandardLazyResponse
       let markRequestSent: (() => void) | undefined
       const openRequestIds = new Set<string>()
@@ -349,8 +477,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         if (message.kind === 'request') {
           openRequestIds.add(message.id)
           markRequestSent?.()
-        }
-        else if (message.kind === 'cancel' && openRequestIds.delete(message.id) && isBatchSent) {
+        } else if (message.kind === 'cancel' && openRequestIds.delete(message.id) && isBatchSent) {
           cancelledRunningRequestIds.add(message.id)
           abortIfOnlyCancelledRemain()
         }
@@ -365,9 +492,11 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         const sent = promiseWithResolvers<void>()
         markRequestSent = sent.resolve
 
-        peer
+        void peer
           .request(subrequests[index]!)
-          .then(subResponse => resolve(this.mapSubresponse(subResponse, batchResponse, subOptions)))
+          .then((subResponse) =>
+            resolve(this.mapSubresponse(subResponse, batchResponse, subOptions)),
+          )
           .catch((error) => {
             if (!suppressErrorFromCurrentBatch) {
               reject(error)
@@ -388,7 +517,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
        * Leave out subrequests aborted before the batch is sent: the server counts their request and cancel
        * against its batch size limit and would still run calls the client already rejected.
        */
-      const outgoingMessages = pendingMessages.filter(message => openRequestIds.has(message.id))
+      const outgoingMessages = pendingMessages.filter((message) => openRequestIds.has(message.id))
 
       try {
         const request: StandardRequest = {
@@ -420,8 +549,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
           }
 
           request.url = newUrl
-        }
-        else {
+        } else {
           request.body = outgoingMessages
         }
 
@@ -453,15 +581,16 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
         const body = await batchResponse.resolveBody()
 
-        if (Array.isArray(body) && body.every((v: unknown) => isPeerMessage(v) && isServerPeerSendMessage(v))) {
+        if (
+          Array.isArray(body) &&
+          body.every((v: unknown) => isPeerMessage(v) && isServerPeerSendMessage(v))
+        ) {
           for (const message of body) {
             await peer.message(message)
           }
-        }
-        else if (body instanceof Blob) {
+        } else if (body instanceof Blob) {
           await decodeLengthPrefixedBlob(body, peer)
-        }
-        else if (body instanceof ReadableStream) {
+        } else if (body instanceof ReadableStream) {
           await decodeLengthPrefixedStream(body, async (message) => {
             await peer.message(message)
 
@@ -471,25 +600,25 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
               abortIfOnlyCancelledRemain()
             }
           })
-        }
-        else {
+        } else {
           throw new TypeError('Invalid batch response format.')
         }
 
         await peer.close(new TypeError('Batch response is incomplete.'))
-      }
-      catch (error) {
+      } catch (error) {
         await peer.close(error)
       }
-    }
-    catch (error) {
+    } catch (error) {
       groupItems.forEach(([, , reject]) => reject(error))
     }
   }
 }
 
 type BatchLinkPluginItem<T extends ClientContext> = [
-  options: InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>,
+  options: InterceptorOptions<
+    StandardLinkTransportInterceptorOptions<T>,
+    Promise<StandardLazyResponse>
+  >,
   resolve: (response: StandardLazyResponse) => void,
   reject: (e: unknown) => void,
   runInOwnContext: ReturnType<typeof captureAsyncContext>,
@@ -502,9 +631,12 @@ function isLastServerMessage(message: ServerPeerSendMessage): boolean {
   switch (message.kind) {
     case 'response':
       // A body-less response with a content type or body hint is followed by stream messages
-      return message.json.body !== undefined
-        || message.binary !== undefined
-        || (message.json.headers?.['content-type'] === undefined && message.json.headers?.['standard-server'] === undefined)
+      return (
+        message.json.body !== undefined ||
+        message.binary !== undefined ||
+        (message.json.headers?.['content-type'] === undefined &&
+          message.json.headers?.['standard-server'] === undefined)
+      )
     case 'event-stream':
       return message.json.event === 'close' || message.json.event === 'error'
     case 'octet-stream':
@@ -545,7 +677,10 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
   }
 }
 
-async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, receive: (message: ServerPeerSendMessage) => Promise<void>): Promise<void> {
+async function decodeLengthPrefixedStream(
+  stream: ReadableStream<Uint8Array>,
+  receive: (message: ServerPeerSendMessage) => Promise<void>,
+): Promise<void> {
   const reader = stream.getReader()
   let buffer = new Uint8Array(0)
 
@@ -590,8 +725,7 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, re
         break
       }
     }
-  }
-  finally {
+  } finally {
     reader.releaseLock()
   }
 }

@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Link"
-description: "Use OpenAPILink to call HTTP endpoints served by OpenAPI Handler or any OpenAPI-compliant server through a typesafe oRPC client."
+title: 'OpenAPI Link'
+description: 'Use OpenAPILink to call HTTP endpoints served by OpenAPI Handler or any OpenAPI-compliant server through a typesafe oRPC client.'
 ---
 
 ## Overview
@@ -18,16 +18,14 @@ const link = new OpenAPILink(contract, {
 
       try {
         return await next()
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
   ],
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
-  fetch: (url, init) => { // <- only available in fetch adapter
+  plugins: [new RetryAfterLinkPlugin()],
+  fetch: (url, init) => {
+    // <- only available in fetch adapter
     return globalThis.fetch(url, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests
@@ -59,7 +57,8 @@ import { JsonifiedClient } from '@orpc/openapi'
 import { RouterClient } from '@orpc/server'
 
 // if you are following contract-first approach
-const contractClient: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(link)
+const contractClient: JsonifiedClient<RouterContractClient<typeof contract>> =
+  createORPCClient(link)
 
 // if you are following normal approach
 const routerClient: JsonifiedClient<RouterClient<typeof router>> = createORPCClient(link)
@@ -159,12 +158,10 @@ const link = new OpenAPILink(contract, {
       try {
         const output = await next()
         return output
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
@@ -203,9 +200,7 @@ Plugins package reusable interceptors. For example, [Retry After Plugin](/docs/p
 
 ```ts
 const link = new OpenAPILink(contract, {
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
+  plugins: [new RetryAfterLinkPlugin()],
 })
 ```
 
@@ -262,7 +257,11 @@ const link = new OpenAPILink(contract, {
   interceptors: [
     onError((error) => {
       if (error instanceof ORPCError && error.cause instanceof ResponseError) {
-        console.error('Request failed:', error.cause.response.status, error.cause.response.headers['x-request-id'])
+        console.error(
+          'Request failed:',
+          error.cause.response.status,
+          error.cause.response.headers['x-request-id'],
+        )
       }
     }),
   ],

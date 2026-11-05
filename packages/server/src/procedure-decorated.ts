@@ -1,9 +1,17 @@
-import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, MergedErrorMap, MetaPlugin } from '@orpc/contract'
-import type { IntersectPick } from '@orpc/shared'
-import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { Middleware } from './middleware'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  MergedErrorMap,
+  MetaPlugin,
+} from '@orpc/contract'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
-import { Procedure } from './procedure'
+import type { IntersectPick } from '@orpc/shared'
+
+import type { Context, MergedContext, MergedInitialContext } from './context.ts'
+import type { Middleware } from './middleware.ts'
+import { Procedure } from './procedure.ts'
 
 export class DecoratedProcedure<
   TInitialContext extends Context,
@@ -15,7 +23,11 @@ export class DecoratedProcedure<
   meta(
     ...plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]
   ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap> {
-    const [meta, metaPlugins] = resolveMetaPlugins(this['~orpc'].meta, this['~orpc'].metaPlugins, plugins)
+    const [meta, metaPlugins] = resolveMetaPlugins(
+      this['~orpc'].meta,
+      this['~orpc'].metaPlugins,
+      plugins,
+    )
 
     return new DecoratedProcedure({
       ...this['~orpc'],
@@ -47,16 +59,19 @@ export class DecoratedProcedure<
   }
 
   use<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
     middleware: Middleware<
-        $InContext | MergedContext<TInitialContext, TInjectedContext>,
-        $OutContext,
-        InferSchemaOutput<TInputSchema>,
-        InferSchemaInput<TOutputSchema>,
-        $ErrorMap
+      $InContext | MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext,
+      InferSchemaOutput<TInputSchema>,
+      InferSchemaInput<TOutputSchema>,
+      $ErrorMap
     >,
   ): DecoratedProcedure<
     MergedInitialContext<TInitialContext, TInjectedContext, $InContext>,
@@ -72,11 +87,14 @@ export class DecoratedProcedure<
     let procedure = new DecoratedProcedure({
       ...this['~orpc'],
       errorMap: mergeErrorMap(middleware['~orpc']?.errorMap, this['~orpc'].errorMap),
-      orderedMiddlewares: [...this['~orpc'].orderedMiddlewares, {
-        middleware,
-        inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
-        outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
-      }],
+      orderedMiddlewares: [
+        ...this['~orpc'].orderedMiddlewares,
+        {
+          middleware,
+          inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
+          outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
+        },
+      ],
     })
 
     if (middleware['~orpc']?.metaPlugins) {

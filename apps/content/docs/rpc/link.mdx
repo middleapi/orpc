@@ -1,6 +1,6 @@
 ---
-title: "RPC Link"
-description: "Use RPCLink to call RPC Handler servers or any server implementing the RPC protocol, with headers, interceptors, plugins, and custom serializers."
+title: 'RPC Link'
+description: 'Use RPCLink to call RPC Handler servers or any server implementing the RPC protocol, with headers, interceptors, plugins, and custom serializers.'
 ---
 
 ## Overview
@@ -20,20 +20,17 @@ const link = new RPCLink({
 
       try {
         return await next()
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
   ],
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
-  fetch: (url, init) => { // <- only available in fetch adapter
+  plugins: [new RetryAfterLinkPlugin()],
+  fetch: (url, init) => {
+    // <- only available in fetch adapter
     return globalThis.fetch(url, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests
@@ -168,12 +165,10 @@ const link = new RPCLink({
       try {
         const output = await next()
         return output
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
@@ -212,9 +207,7 @@ Plugins package reusable interceptors. For example, [Retry After Plugin](/docs/p
 
 ```ts
 const link = new RPCLink({
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
+  plugins: [new RetryAfterLinkPlugin()],
 })
 ```
 
@@ -278,7 +271,11 @@ const link = new RPCLink({
   interceptors: [
     onError((error) => {
       if (error instanceof ORPCError && error.cause instanceof ResponseError) {
-        console.error('Request failed:', error.cause.response.status, error.cause.response.headers['x-request-id'])
+        console.error(
+          'Request failed:',
+          error.cause.response.status,
+          error.cause.response.headers['x-request-id'],
+        )
       }
     }),
   ],

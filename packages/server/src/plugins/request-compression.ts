@@ -1,9 +1,14 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 /**
  * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
@@ -17,7 +22,9 @@ const MAX_CONTENT_ENCODINGS = 5
  *
  * @see {@link https://orpc.dev/docs/plugins/request-compression | Request Compression Plugin}
  */
-export class RequestCompressionHandlerPlugin<T extends Context> implements StandardHandlerPlugin <T> {
+export class RequestCompressionHandlerPlugin<
+  T extends Context,
+> implements StandardHandlerPlugin<T> {
   name = '~request-compression'
 
   /**
@@ -26,7 +33,11 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
   after: string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const encodings = parseContentEncodings(
         flattenStandardHeader(interceptorOptions.request.headers['content-encoding']),
       )
@@ -55,7 +66,9 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
             }
 
             if (encodings.length > MAX_CONTENT_ENCODINGS) {
-              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', { message: 'Too many content encodings.' })
+              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', {
+                message: 'Too many content encodings.',
+              })
             }
 
             let decompressedStream = stream
@@ -77,10 +90,7 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
 }
@@ -101,7 +111,5 @@ function parseContentEncodings(header: string | undefined): string[] {
     return []
   }
 
-  return header
-    .split(',')
-    .map(part => part.trim().toLowerCase())
+  return header.split(',').map((part) => part.trim().toLowerCase())
 }

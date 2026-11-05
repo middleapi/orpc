@@ -1,8 +1,8 @@
 ---
-title: "Optimizing Server-Side Rendering (SSR) for Fullstack Frameworks"
-description: "Optimize server-side rendering with oRPC in Next.js, Nuxt, and SvelteKit by calling API logic directly and avoiding extra HTTP requests."
+title: 'Optimizing Server-Side Rendering (SSR) for Fullstack Frameworks'
+description: 'Optimize server-side rendering with oRPC in Next.js, Nuxt, and SvelteKit by calling API logic directly and avoiding extra HTTP requests.'
 sidebar:
-  label: "Optimizing SSR"
+  label: 'Optimizing SSR'
 ---
 
 ## The Problem with Standard SSR Data Fetching
@@ -83,7 +83,8 @@ const internalLink = new RPCLink({
 
     // Use a fetch handler here
     const { response } = await handler.handle(request, {
-      context: { // provide initial context if needed
+      context: {
+        // provide initial context if needed
         headers: await headers(),
       },
     })
@@ -139,7 +140,7 @@ export default async function PlanetListPage() {
 
   return (
     <div>
-      {planets.map(planet => (
+      {planets.map((planet) => (
         <div key={planet.id}>{planet.name}</div>
       ))}
     </div>

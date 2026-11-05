@@ -1,8 +1,8 @@
 ---
-title: "Publisher Helpers"
-description: "Publish and subscribe to events across storage backends in oRPC, with adapters, dynamic event names, and resume support for missed events."
+title: 'Publisher Helpers'
+description: 'Publish and subscribe to events across storage backends in oRPC, with adapters, dynamic event names, and resume support for missed events.'
 sidebar:
-  label: "Publisher"
+  label: 'Publisher'
 ---
 
 ## Installation
@@ -26,20 +26,17 @@ const publisher = new MemoryPublisher<{
   }
 }>()
 
-const live = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
-    for await (const payload of iterator) {
-      // Handle payload here or yield directly to client
-      yield payload
-    }
-  })
+const live = os.handler(async function* ({ input, signal, lastEventId }) {
+  const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
+  for await (const payload of iterator) {
+    // Handle payload here or yield directly to client
+    yield payload
+  }
+})
 
-const publish = os
-  .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
-    await publisher.publish('something-updated', { id: input.id })
-  })
+const publish = os.input(z.object({ id: z.string() })).handler(async ({ input }) => {
+  await publisher.publish('something-updated', { id: input.id })
+})
 ```
 
 :::tip
@@ -86,8 +83,8 @@ const publisher = new MemoryPublisher<Events>({
      *
      * @default 300000 (5 min)
      */
-    ttl: 300_000
-  }
+    ttl: 300_000,
+  },
 })
 ```
 
@@ -97,7 +94,7 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const client = createClient({ url: 'redis://localhost:6379' })
 
-client.on('error', error => console.error('Redis client error', error))
+client.on('error', (error) => console.error('Redis client error', error))
 
 // RedisPublisher lazily connects to Redis when needed.
 // You can still call `client.connect()` manually, but it is optional.
@@ -147,8 +144,8 @@ const publisher = new RedisPublisher<Events>(client, {
      *
      * @default 300000 (5 min)
      */
-    ttl: 300_000
-  }
+    ttl: 300_000,
+  },
 })
 
 // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
@@ -196,8 +193,8 @@ const publisher = new UpstashPublisher<Events>(redis, {
      *
      * @default 300000 (5 min)
      */
-    ttl: 300_000
-  }
+    ttl: 300_000,
+  },
 })
 
 // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
@@ -256,8 +253,8 @@ const publisher = new BunRedisPublisher<Events>(redis, {
      *
      * @default 300000 (5 min)
      */
-    ttl: 300_000
-  }
+    ttl: 300_000,
+  },
 })
 
 // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
@@ -310,8 +307,8 @@ export class PublisherDO extends DurablePublisherObject {
          *
          * @default 'orpc:'
          */
-        schemaPrefix: 'orpc:'
-      }
+        schemaPrefix: 'orpc:',
+      },
     })
   }
 }
@@ -338,7 +335,7 @@ export default {
        *
        * @default ((namespace, event) => namespace.getByName(event))
        */
-      getStubByName: (namespace, event) => namespace.getByName(event)
+      getStubByName: (namespace, event) => namespace.getByName(event),
     })
 
     // Creates a publisher with an extra prefix that shares this namespace, e.g. per tenant
@@ -358,7 +355,7 @@ const publisher = new MemoryPublisher({
   resume: {
     enabled: true, // Enable resuming missed events
     ttl: 5 * 60 * 1000, // How long to retain events, in milliseconds
-  }
+  },
 })
 
 const iterator = publisher.subscribe('something-updated', {
@@ -376,25 +373,22 @@ When resume is enabled, the publisher manages event ids automatically. This mean
 ```ts
 import { getEventMeta, withEventMeta } from '@orpc/server'
 
-const live = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
-    for await (const payload of iterator) {
-      // Preserve event id when yielding custom payloads
-      const id = getEventMeta(payload)?.id
-      yield withEventMeta({ custom: 'value' }, { id })
-    }
-  })
+const live = os.handler(async function* ({ input, signal, lastEventId }) {
+  const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
+  for await (const payload of iterator) {
+    // Preserve event id when yielding custom payloads
+    const id = getEventMeta(payload)?.id
+    yield withEventMeta({ custom: 'value' }, { id })
+  }
+})
 
-const publish = os
-  .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
-    // The event id 'this-will-be-ignored' will be replaced by the publisher
-    await publisher.publish(
-      'something-updated',
-      withEventMeta({ id: input.id }, { id: 'this-will-be-ignored' })
-    )
-  })
+const publish = os.input(z.object({ id: z.string() })).handler(async ({ input }) => {
+  // The event id 'this-will-be-ignored' will be replaced by the publisher
+  await publisher.publish(
+    'something-updated',
+    withEventMeta({ id: input.id }, { id: 'this-will-be-ignored' }),
+  )
+})
 ```
 
 :::
@@ -417,9 +411,8 @@ while (true) {
 
       console.log(payload)
     }
-  }
-  catch {
-    await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retrying
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait 1 second before retrying
   }
 }
 ```

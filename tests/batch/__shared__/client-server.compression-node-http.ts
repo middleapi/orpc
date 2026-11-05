@@ -1,13 +1,15 @@
-import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
 import * as http from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/node'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
-import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
+
+import type { CreateBatchClientServerTest } from './client-server.ts'
+import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
 
 /**
  * The same suite as the plain node-http one, with batch responses compressed on the wire.
@@ -51,7 +53,8 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
   const fetchSpy = vi.fn(async (url: string, init: RequestInit) => {
     const response = await fetch(url, init)
 
-    if (response.status === 207) { // every batch response, framed or json, travels compressed here
+    if (response.status === 207) {
+      // every batch response, framed or json, travels compressed here
       expect(response.headers.get('content-encoding')).toBe('gzip')
     }
 

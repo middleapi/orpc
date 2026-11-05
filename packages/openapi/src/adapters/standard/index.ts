@@ -1,3 +1,3 @@
-export * from './openapi-handler-codec'
-export * from './openapi-link-codec'
-export * from './openapi-matcher'
+export * from './openapi-handler-codec.ts'
+export * from './openapi-link-codec.ts'
+export * from './openapi-matcher.ts'

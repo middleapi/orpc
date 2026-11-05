@@ -1,5 +1,4 @@
 import type { JsonSchema, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { OpenAPIV3_2 } from './types'
 import {
   decodeJsonPointerSegment,
   encodeJsonPointerSegment,
@@ -7,6 +6,8 @@ import {
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
 import { getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
+
+import type { OpenAPIV3_2 } from './types.ts'
 
 const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
@@ -20,7 +21,9 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 export class OpenAPIComponentRegistry {
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
-    private readonly componentName: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined,
+    private readonly componentName:
+      | ((defName: string, defSchema: JsonSchema) => string | undefined)
+      | undefined,
   ) {}
 
   /**
@@ -73,7 +76,8 @@ export class OpenAPIComponentRegistry {
 
     const componentsSchemas = this.doc.components.schemas
     const renameMap = new Map<string, string>()
-    const pendingSchemas: { cleanSchema: Exclude<JsonSchema, boolean>, componentName: string }[] = []
+    const pendingSchemas: { cleanSchema: Exclude<JsonSchema, boolean>; componentName: string }[] =
+      []
 
     for (const [defName, cleanSchema] of defs) {
       const [componentName, reuseExisting] = resolveComponentName(
@@ -99,7 +103,10 @@ export class OpenAPIComponentRegistry {
     return rewriteComponentSchemaRefs(rest, renameMap)
   }
 
-  toOpenAPISchema(schema: JsonSchema, direction?: JsonSchemaConverterDirection): OpenAPIV3_2.SchemaObject {
+  toOpenAPISchema(
+    schema: JsonSchema,
+    direction?: JsonSchemaConverterDirection,
+  ): OpenAPIV3_2.SchemaObject {
     return ensureJsonSchemaObject(this.hoistDefs(schema, direction))
   }
 }
@@ -141,11 +148,19 @@ function resolveComponentName(
       continue
     }
 
-    if (areSchemaRefsEquivalentForReuse(
-      DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
-      COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(componentName),
-      { defs, componentsSchemas, candidateToExistingKeys: new Map(), pairedExistingKeys: new Set(), visited: new WeakMap() },
-    )) {
+    if (
+      areSchemaRefsEquivalentForReuse(
+        DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
+        COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(componentName),
+        {
+          defs,
+          componentsSchemas,
+          candidateToExistingKeys: new Map(),
+          pairedExistingKeys: new Set(),
+          visited: new WeakMap(),
+        },
+      )
+    ) {
       return [componentName, true]
     }
   }
@@ -179,7 +194,12 @@ function componentNameCandidate(
 function definedKeysOf(object: Record<string, unknown>): string[] {
   // `undefined`-valued keys (e.g. `default: undefined`) are stripped during serialization,
   // so they must not affect equivalence against components from serialized documents
-  return Object.keys(object).filter(key => object[key] !== undefined).sort()
+  return (
+    Object.keys(object)
+      .filter((key) => object[key] !== undefined)
+      // oxlint-disable-next-line unicorn/no-array-sort
+      .sort()
+  )
 }
 
 interface ReuseComparisonContext {
@@ -195,7 +215,11 @@ function isSchemaContainer(value: unknown): value is unknown[] | Record<Property
   return Array.isArray(value) || isPlainObject(value)
 }
 
-function areSchemasEquivalentForReuse(candidate: unknown, existing: unknown, ctx: ReuseComparisonContext): boolean {
+function areSchemasEquivalentForReuse(
+  candidate: unknown,
+  existing: unknown,
+  ctx: ReuseComparisonContext,
+): boolean {
   if (candidate === existing) {
     return true
   }
@@ -213,17 +237,22 @@ function areSchemasEquivalentForReuse(candidate: unknown, existing: unknown, ctx
 
   if (seenExisting) {
     seenExisting.add(existing)
-  }
-  else {
+  } else {
     ctx.visited.set(candidate, new WeakSet([existing]))
   }
 
   if (Array.isArray(candidate) || Array.isArray(existing)) {
-    if (!Array.isArray(candidate) || !Array.isArray(existing) || candidate.length !== existing.length) {
+    if (
+      !Array.isArray(candidate) ||
+      !Array.isArray(existing) ||
+      candidate.length !== existing.length
+    ) {
       return false
     }
 
-    return candidate.every((item, index) => areSchemasEquivalentForReuse(item, existing[index], ctx))
+    return candidate.every((item, index) =>
+      areSchemasEquivalentForReuse(item, existing[index], ctx),
+    )
   }
 
   const candidateObject = candidate as Record<string, unknown>
@@ -259,7 +288,7 @@ function resolveNamedRef(
   ref: string,
   prefix: string,
   getNamed: (name: string) => unknown,
-): { key: string, schema: JsonSchema } | undefined {
+): { key: string; schema: JsonSchema } | undefined {
   const name = parseRefName(ref, prefix)
 
   if (name === undefined) {
@@ -271,10 +300,15 @@ function resolveNamedRef(
   return schema === undefined ? undefined : { key: prefix + name, schema }
 }
 
-function areSchemaRefsEquivalentForReuse(candidateRef: string, existingRef: string, ctx: ReuseComparisonContext): boolean {
+function areSchemaRefsEquivalentForReuse(
+  candidateRef: string,
+  existingRef: string,
+  ctx: ReuseComparisonContext,
+): boolean {
   const getComponent = (name: string) => getOwn(ctx.componentsSchemas, name)
-  const candidate = resolveNamedRef(candidateRef, DEFS_REF_PREFIX, name => ctx.defs.get(name))
-    ?? resolveNamedRef(candidateRef, COMPONENTS_REF_PREFIX, getComponent)
+  const candidate =
+    resolveNamedRef(candidateRef, DEFS_REF_PREFIX, (name) => ctx.defs.get(name)) ??
+    resolveNamedRef(candidateRef, COMPONENTS_REF_PREFIX, getComponent)
   const existing = resolveNamedRef(existingRef, COMPONENTS_REF_PREFIX, getComponent)
 
   if (candidate === undefined || existing === undefined) {
@@ -295,7 +329,10 @@ function areSchemaRefsEquivalentForReuse(candidateRef: string, existingRef: stri
   return areSchemasEquivalentForReuse(candidate.schema, existing.schema, ctx)
 }
 
-function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: ReadonlyMap<string, string>): JsonSchema {
+function rewriteComponentSchemaRefs(
+  schema: JsonSchema,
+  renameMap: ReadonlyMap<string, string>,
+): JsonSchema {
   return mapJsonSchemaRefs(schema, (ref) => {
     const refName = parseRefName(ref, DEFS_REF_PREFIX)
 

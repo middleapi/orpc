@@ -1,7 +1,8 @@
 import { AbortError, sleep } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
-import { createORPCClient } from '../../client'
-import { RPCLink } from './rpc-link'
+
+import { createORPCClient } from '../../client.ts'
+import { RPCLink } from './rpc-link.ts'
 
 describe('rpcLink', () => {
   beforeEach(() => {
@@ -14,10 +15,8 @@ describe('rpcLink', () => {
   const createPort = () => {
     const port = {
       addEventListener: vi.fn((event: string, callback: any) => {
-        if (event === 'message')
-          onMessage = callback
-        if (event === 'close')
-          onClose = callback
+        if (event === 'message') onMessage = callback
+        if (event === 'close') onClose = callback
       }),
       postMessage: vi.fn(),
     }
@@ -30,18 +29,26 @@ describe('rpcLink', () => {
     body = { json: 'pong' },
     status = 200,
     prefix,
-  }: { id: string, body?: unknown, status?: number, prefix?: string }) => {
-    return encodePeerMessage({
-      id,
-      kind: 'response',
-      json: { body, status, headers: {} },
-    }, prefix ? { prefix } : undefined)
+  }: {
+    id: string
+    body?: unknown
+    status?: number
+    prefix?: string
+  }) => {
+    return encodePeerMessage(
+      {
+        id,
+        kind: 'response',
+        json: { body, status, headers: {} },
+      },
+      prefix ? { prefix } : undefined,
+    )
   }
 
   const decodeRequest = (sent: any, prefix?: string) => {
     return decodePeerMessage(sent, prefix ? { prefix } : undefined) as {
       matched: true
-      message: { id: string, kind: string, json: any }
+      message: { id: string; kind: string; json: any }
     }
   }
 
@@ -97,10 +104,12 @@ describe('rpcLink', () => {
 
   it('can encode messages with prefix', async () => {
     const port = createPort()
-    const orpc = createORPCClient(new RPCLink({
-      port,
-      encodePeerMessage: { prefix: 'orpc:' },
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        port,
+        encodePeerMessage: { prefix: 'orpc:' },
+      }),
+    ) as any
 
     const promise = expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -118,10 +127,12 @@ describe('rpcLink', () => {
 
   it('can decode messages with prefix and ignore messages with mismatched prefix', async () => {
     const port = createPort()
-    const orpc = createORPCClient(new RPCLink({
-      port,
-      decodePeerMessage: { prefix: 'orpc:' },
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        port,
+        decodePeerMessage: { prefix: 'orpc:' },
+      }),
+    ) as any
 
     const promise = expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -143,10 +154,12 @@ describe('rpcLink', () => {
     const port = createPort()
     const transferable = new Uint8Array([1, 2, 3]).buffer
     const transfer = vi.fn(async () => [transferable])
-    const orpc = createORPCClient(new RPCLink({
-      port,
-      experimental_transfer: transfer,
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        port,
+        experimental_transfer: transfer,
+      }),
+    ) as any
 
     const promise = expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -154,10 +167,7 @@ describe('rpcLink', () => {
 
     const message = port.postMessage.mock.calls[0]![0]
 
-    expect(port.postMessage).toHaveBeenCalledWith(
-      message,
-      [transferable],
-    )
+    expect(port.postMessage).toHaveBeenCalledWith(message, [transferable])
 
     onMessage({
       data: {

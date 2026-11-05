@@ -1,9 +1,9 @@
 import type { Segment } from '@orpc/shared'
 import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
 
-export type OpenAPIJsonSerialization
-  = | { json: unknown, maps?: undefined, blobs?: undefined }
-    | { json: unknown, maps: Segment[][], blobs: Blob[] }
+export type OpenAPIJsonSerialization =
+  | { json: unknown; maps?: undefined; blobs?: undefined }
+  | { json: unknown; maps: Segment[][]; blobs: Blob[] }
 
 export interface OpenAPIJsonSerializerHandler {
   condition(value: unknown): boolean
@@ -181,7 +181,10 @@ export class OpenAPIJsonSerializer {
 
     if (!inlineBuiltInHandlers) {
       handlerEntries = []
-      for (const handler of Object.values({ ...DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS, ...customHandlers })) {
+      for (const handler of Object.values({
+        ...DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS,
+        ...customHandlers,
+      })) {
         if (handler !== undefined) {
           handlerEntries.push(handler)
         }
@@ -206,7 +209,12 @@ export class OpenAPIJsonSerializer {
    * `segments` is a shared mutable stack (push/pop while walking),
    * so it must be copied before being stored in `maps`.
    */
-  private serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[]): unknown {
+  private serializeValue(
+    data: unknown,
+    segments: Segment[],
+    maps: Segment[][],
+    blobs: Blob[],
+  ): unknown {
     const handlerEntries = this.handlerEntries
 
     /**
@@ -353,7 +361,9 @@ export class OpenAPIJsonSerializer {
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw new TypeError(`Invalid OpenAPI serialized data: segment "${preSegment}" does not exist.`)
+            throw new TypeError(
+              `Invalid OpenAPI serialized data: segment "${preSegment}" does not exist.`,
+            )
           }
         }
 

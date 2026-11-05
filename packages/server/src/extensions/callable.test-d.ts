@@ -1,6 +1,7 @@
 import type { DecoratedProcedure, Procedure, ProcedureClient } from '@orpc/server'
 import { z } from 'zod'
-import './callable'
+
+import './callable.ts'
 
 const errorMap = {
   BASE: {
@@ -9,8 +10,8 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 it('adds .callable method to DecoratedProcedure', async () => {
   const procedure = {} as DecoratedProcedure<
@@ -21,20 +22,17 @@ it('adds .callable method to DecoratedProcedure', async () => {
     typeof errorMap
   >
 
-  expectTypeOf(procedure.callable({ context: (cx: { cache?: boolean }) => ({ auth: true }) })).toEqualTypeOf<
-    & ProcedureClient<
-      { cache?: boolean },
+  expectTypeOf(
+    procedure.callable({ context: (cx: { cache?: boolean }) => ({ auth: true }) }),
+  ).toEqualTypeOf<
+    ProcedureClient<{ cache?: boolean }, typeof schema1, typeof schema2, typeof errorMap> &
+      Procedure<
+        { auth: boolean },
+        { extra: string },
         typeof schema1,
         typeof schema2,
         typeof errorMap
-    >
-    & Procedure<
-      { auth: boolean },
-      { extra: string },
-        typeof schema1,
-        typeof schema2,
-        typeof errorMap
-    >
+      >
   >()
 
   // @ts-expect-error - invalid initial context

@@ -1,6 +1,6 @@
 ---
-title: "Migrating from tRPC"
-description: "Migrate an existing tRPC app to oRPC step by step. Most tRPC concepts map directly, so routers, procedures, and middleware feel familiar."
+title: 'Migrating from tRPC'
+description: 'Migrate an existing tRPC app to oRPC step by step. Most tRPC concepts map directly, so routers, procedures, and middleware feel familiar.'
 ---
 
 :::info
@@ -85,8 +85,7 @@ const timingMiddleware = o.middleware(async ({ next, path }) => {
 
   try {
     return await next()
-  }
-  finally {
+  } finally {
     console.log(`[oRPC] ${path} took ${Date.now() - start}ms to execute`)
   }
 })
@@ -100,8 +99,8 @@ export const protectedProcedure = publicProcedure.use(({ context, next }) => {
 
   return next({
     context: {
-      session: { ...context.session, user: context.session.user }
-    }
+      session: { ...context.session, user: context.session.user },
+    },
   })
 })
 ```
@@ -138,19 +137,17 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 
 export const publicProcedure = t.procedure.use(timingMiddleware)
 
-export const protectedProcedure = t.procedure
-  .use(timingMiddleware)
-  .use(({ ctx, next }) => {
-    if (!ctx.session?.user) {
-      throw new TRPCError({ code: 'UNAUTHORIZED' })
-    }
+export const protectedProcedure = t.procedure.use(timingMiddleware).use(({ ctx, next }) => {
+  if (!ctx.session?.user) {
+    throw new TRPCError({ code: 'UNAUTHORIZED' })
+  }
 
-    return next({
-      ctx: {
-        session: { ...ctx.session, user: ctx.session.user },
-      },
-    })
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session.user },
+    },
   })
+})
 ```
 
 </CodeGroup>
@@ -177,17 +174,19 @@ export const planetRouter = {
           {
             name: 'Earth',
             distanceFromSun: 149.6,
-          }
+          },
         ],
         nextCursor: input.cursor + 1,
       }
     }),
 
   create: protectedProcedure
-    .input(z.object({
-      name: z.string().min(1),
-      distanceFromSun: z.number().positive()
-    }))
+    .input(
+      z.object({
+        name: z.string().min(1),
+        distanceFromSun: z.number().positive(),
+      }),
+    )
     .handler(async ({ context, input }) => {
       // Logic here
     }),
@@ -206,17 +205,19 @@ export const planetRouter = createTRPCRouter({
           {
             name: 'Earth',
             distanceFromSun: 149.6,
-          }
+          },
         ],
         nextCursor: input.cursor + 1,
       }
     }),
 
   create: protectedProcedure
-    .input(z.object({
-      name: z.string().min(1),
-      distanceFromSun: z.number().positive()
-    }))
+    .input(
+      z.object({
+        name: z.string().min(1),
+        distanceFromSun: z.number().positive(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       // Logic here
     }),
@@ -267,7 +268,7 @@ Error handling is similar, but `ORPCError` takes the error code as its first arg
 throw new ORPCError('BAD_REQUEST', {
   message: 'Invalid input',
   data: 'some data',
-  cause: validationError
+  cause: validationError,
 })
 ```
 
@@ -275,7 +276,7 @@ throw new ORPCError('BAD_REQUEST', {
 throw new TRPCError({
   code: 'BAD_REQUEST',
   message: 'Invalid input',
-  cause: validationError
+  cause: validationError,
 })
 ```
 
@@ -299,19 +300,18 @@ const handler = new RPCHandler(appRouter, {
     async ({ next, path }) => {
       try {
         return await next()
-      }
-      catch (error) {
+      } catch (error) {
         console.error(`❌ oRPC failed on ${path.join('.')}: `, error)
         throw error
       }
-    }
-  ]
+    },
+  ],
 })
 
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
     prefix: '/api/orpc',
-    context: await createORPCContext({ headers: request.headers })
+    context: await createORPCContext({ headers: request.headers }),
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -331,10 +331,8 @@ function handler(req: Request) {
     router: appRouter,
     createContext: () => createTRPCContext({ headers: req.headers }),
     onError: ({ path, error }) => {
-      console.error(
-        `❌ tRPC failed on ${path ?? '<no-path>'}: ${error.message}`
-      )
-    }
+      console.error(`❌ tRPC failed on ${path ?? '<no-path>'}: ${error.message}`)
+    },
   })
 }
 
@@ -360,7 +358,7 @@ const link = new RPCLink({
   interceptors: [
     onError((error) => {
       console.error(error)
-    })
+    }),
   ],
 })
 
@@ -380,8 +378,8 @@ export const client = createTRPCClient<typeof appRouter>({
     httpLink({
       url: 'http://localhost:3000/api/trpc',
       transformer: superjson,
-    })
-  ]
+    }),
+  ],
 })
 
 // ---------------- Usage ----------------
@@ -408,15 +406,19 @@ export const orpc = createTanstackQueryUtils(client)
 
 // ---------------- Usage in React Components ----------------
 
-const query = useQuery(orpc.planet.list.queryOptions({
-  input: { cursor: 0 },
-}))
+const query = useQuery(
+  orpc.planet.list.queryOptions({
+    input: { cursor: 0 },
+  }),
+)
 
-const infinite = useInfiniteQuery(orpc.planet.list.infiniteOptions({
-  input: (page: number) => ({ cursor: page }),
-  initialPageParam: 0,
-  getNextPageParam: lastPage => lastPage.nextCursor,
-}))
+const infinite = useInfiniteQuery(
+  orpc.planet.list.infiniteOptions({
+    input: (page: number) => ({ cursor: page }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  }),
+)
 
 const mutation = useMutation(orpc.planet.create.mutationOptions())
 ```
@@ -432,13 +434,15 @@ const trpc = useTRPC()
 
 const query = useQuery(trpc.planet.list.queryOptions({ cursor: 0 }))
 
-const infinite = useInfiniteQuery(trpc.planet.list.infiniteQueryOptions(
-  {},
-  {
-    initialCursor: 0,
-    getNextPageParam: lastPage => lastPage.nextCursor,
-  }
-))
+const infinite = useInfiniteQuery(
+  trpc.planet.list.infiniteQueryOptions(
+    {},
+    {
+      initialCursor: 0,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    },
+  ),
+)
 
 const mutation = useMutation(trpc.planet.create.mutationOptions())
 ```
