@@ -1,10 +1,10 @@
 import type { ErrorMap } from '@orpc/contract'
 import type { Context, Middleware, MiddlewareDone, MiddlewareNextOptions, MiddlewareOptions, MiddlewareResult, ORPCErrorConstructorMap } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { InferEffectServices, WithEffectContext } from './context'
+import type { InferEffectServices, WithEffectContext } from './context.ts'
 import { anyAbortSignal, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
-import { runPromise } from './runtime'
+import { runPromise } from './runtime.ts'
 
 export interface MiddlewareGenNext<TOutput> {
   <U extends Context = object>(

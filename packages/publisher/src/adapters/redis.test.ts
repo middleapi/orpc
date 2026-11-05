@@ -1,11 +1,11 @@
 import type { RedisClientType } from 'redis'
-import type { RedisPublisherOptions } from './redis'
+import type { RedisPublisherOptions } from './redis.ts'
 import { Buffer } from 'node:buffer'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { createClient } from 'redis'
-import { RedisPublisher } from './redis'
+import { RedisPublisher } from './redis.ts'
 
 const REDIS_URL = process.env.REDIS_URL
 

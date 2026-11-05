@@ -1,11 +1,11 @@
-import { ProcedureUtils } from './procedure-utils'
-import { createRouterUtils } from './router-utils'
+import { ProcedureUtils } from './procedure-utils.ts'
+import { createRouterUtils } from './router-utils.ts'
 
-vi.mock('./procedure-utils', async (importOriginal) => {
-  const { SharedUtils } = await import('./shared-utils')
+vi.mock('./procedure-utils.ts', async (importOriginal) => {
+  const { SharedUtils } = await import('./shared-utils.ts')
 
   return {
-    ...await importOriginal<typeof import('./procedure-utils')>(),
+    ...await importOriginal<typeof import('./procedure-utils.ts')>(),
     ProcedureUtils: vi.fn(class extends SharedUtils<unknown> {
       call = vi.fn()
       override matcher = SharedUtils.prototype.matcher

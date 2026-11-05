@@ -3,9 +3,9 @@
  * and exclusively use absolute JSON pointers for `$ref` values.
  */
 
-import type { JsonSchema } from './types'
-import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
-import { resolveJsonSchemaLocalPointer } from './ref-utils'
+import type { JsonSchema } from './types.ts'
+import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES, JSON_SCHEMA_RECORD_KEYWORDS } from './constants.ts'
+import { resolveJsonSchemaLocalPointer } from './ref-utils.ts'
 
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
   if (typeof schema === 'boolean') {

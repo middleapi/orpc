@@ -2,12 +2,12 @@ import { os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
-import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types'
-import { Person } from './__shared__/client-server'
-import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch'
-import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket'
-import { createCompressionBunFetchClientServerTest } from './__shared__/client-server.compression-bun-fetch'
-import { createCompressionBunWebSocketClientServerTest } from './__shared__/client-server.compression-bun-websocket'
+import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types.ts'
+import { Person } from './__shared__/client-server.ts'
+import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch.ts'
+import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket.ts'
+import { createCompressionBunFetchClientServerTest } from './__shared__/client-server.compression-bun-fetch.ts'
+import { createCompressionBunWebSocketClientServerTest } from './__shared__/client-server.compression-bun-websocket.ts'
 
 describe.each([
   ['bun-fetch', createBunFetchClientServerTest],

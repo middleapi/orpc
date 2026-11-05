@@ -1,5 +1,5 @@
-import type { OpenAPIDocument, OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2, OpenAPIVersion } from './types'
-import { OpenAPIGenerator } from './openapi-generator'
+import type { OpenAPIDocument, OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2, OpenAPIVersion } from './types.ts'
+import { OpenAPIGenerator } from './openapi-generator.ts'
 
 describe('openAPIGenerator.generate', () => {
   const generator = new OpenAPIGenerator()

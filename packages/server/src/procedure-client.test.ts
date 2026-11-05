@@ -3,8 +3,8 @@ import { ORPCError } from '@orpc/client'
 import * as ContractModule from '@orpc/contract'
 import * as SharedV2Module from '@orpc/shared'
 import z from 'zod'
-import { os } from './builder'
-import { createProcedureClient } from './procedure-client'
+import { os } from './builder.ts'
+import { createProcedureClient } from './procedure-client.ts'
 
 const isAsyncIteratorObject = SharedV2Module.isAsyncIteratorObject
 const ValidationError = ContractModule.ValidationError

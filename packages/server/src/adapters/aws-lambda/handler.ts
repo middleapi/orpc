@@ -1,10 +1,10 @@
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { AnyAPIGatewayProxyEvent, HttpResponseStream, SendStandardResponseOptions } from '@standard-server/aws-lambda'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
+import type { Context } from '../../context.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 import { sendStandardResponse, toStandardLazyRequest } from '@standard-server/aws-lambda'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index.ts'
 
 export type AwsLambdaHandlerHandleResult = { matched: true } | { matched: false }
 

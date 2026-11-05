@@ -1,8 +1,8 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { ToFetchBodyOptions } from '@standard-server/fetch'
-import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkTransport } from '../standard'
+import type { ClientContext, ClientOptions } from '../../types.ts'
+import type { StandardLinkTransport } from '../standard/index.ts'
 import { once, value } from '@orpc/shared'
 import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standard-server/fetch'
 

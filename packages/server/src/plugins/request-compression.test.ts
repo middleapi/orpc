@@ -1,10 +1,10 @@
 import { Buffer } from 'node:buffer'
 import zlib from 'node:zlib'
 import supertest from 'supertest'
-import { RPCHandler } from '../adapters/fetch'
-import { RPCHandler as NodeRPCHandler } from '../adapters/node'
-import { os } from '../builder'
-import { RequestCompressionHandlerPlugin } from './request-compression'
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
+import { os } from '../builder.ts'
+import { RequestCompressionHandlerPlugin } from './request-compression.ts'
 
 function compress(data: string | Uint8Array, encoding: 'gzip' | 'deflate' | 'deflate-raw'): Buffer {
   const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data)

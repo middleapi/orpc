@@ -1,6 +1,6 @@
 import type { ClientContext, ClientLink } from '@orpc/client'
 import { createContractClientFactory } from '@orpc/contract'
-import { createContractJsonifiedClientFactory } from './client-factory'
+import { createContractJsonifiedClientFactory } from './client-factory.ts'
 
 vi.mock('@orpc/contract', () => ({
   createContractClientFactory: vi.fn(),

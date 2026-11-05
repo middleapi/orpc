@@ -1,4 +1,4 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
 import { toArray } from '@orpc/shared'
 import { mergeStandardHeaders } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'

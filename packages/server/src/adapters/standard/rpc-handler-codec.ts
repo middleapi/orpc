@@ -1,16 +1,16 @@
 import type { AnyORPCError } from '@orpc/client'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { Context } from '../../context'
-import type { AnyProcedure } from '../../procedure'
-import type { AnyRouter } from '../../router'
-import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '../standard'
-import type { RPCMatcherOptions } from './rpc-matcher'
+import type { Context } from '../../context.ts'
+import type { AnyProcedure } from '../../procedure.ts'
+import type { AnyRouter } from '../../router.ts'
+import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '../standard/index.ts'
+import type { RPCMatcherOptions } from './rpc-matcher.ts'
 import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
 import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
-import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
-import { RPCMatcher } from './rpc-matcher'
+import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants.ts'
+import { RPCMatcher } from './rpc-matcher.ts'
 
 export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOptions {
   /**

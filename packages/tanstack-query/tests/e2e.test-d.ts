@@ -2,7 +2,7 @@ import type { AsyncIteratorClass } from '@orpc/client'
 import type { InfiniteData } from '@tanstack/react-query'
 import { isDefinedError } from '@orpc/client'
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useSuspenseInfiniteQuery, useSuspenseQueries, useSuspenseQuery } from '@tanstack/react-query'
-import { client, orpc, queryClient } from './__shared__/orpc'
+import { client, orpc, queryClient } from './__shared__/orpc.tsx'
 
 it('.key', () => {
   queryClient.invalidateQueries({

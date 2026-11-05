@@ -1,7 +1,7 @@
 import type { Writable } from '@orpc/shared'
-import type { AnyORPCError, ORPCErrorCode, ORPCErrorJSON } from './error'
+import type { AnyORPCError, ORPCErrorCode, ORPCErrorJSON } from './error.ts'
 import { isPlainObject } from '@orpc/shared'
-import { ORPCError } from './error'
+import { ORPCError } from './error.ts'
 
 /**
  * Checks if an error is an `ORPCError` that matches a definition in the procedure's `.errors` map,

@@ -1,9 +1,9 @@
 import type { AnySchema, ErrorMap } from '@orpc/contract'
 import type { Context } from '@orpc/server'
-import type { OpenAPIMeta } from '../meta'
+import type { OpenAPIMeta } from '../meta.ts'
 import { ContractBuilder } from '@orpc/contract'
 import { Builder, DecoratedProcedure } from '@orpc/server'
-import { openapi } from '../meta'
+import { openapi } from '../meta.ts'
 
 declare module '@orpc/contract' {
   interface ContractBuilder<

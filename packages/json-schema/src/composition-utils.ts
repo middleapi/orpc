@@ -3,12 +3,12 @@
  * and exclusively use absolute JSON pointers for `$ref` values.
  */
 
-import type { JsonSchema } from './types'
-import type { JsonArraySchema, JsonObjectSchema } from './utils'
+import type { JsonSchema } from './types.ts'
+import type { JsonArraySchema, JsonObjectSchema } from './utils.ts'
 import { get, isDeepEqual, omit, toArray } from '@orpc/shared'
-import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants'
-import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef } from './ref-utils'
-import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils'
+import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants.ts'
+import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef } from './ref-utils.ts'
+import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils.ts'
 
 /**
  * Moves a schema's `$defs` into the shared root map, renaming only the names whose bodies

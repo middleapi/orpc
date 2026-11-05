@@ -5,8 +5,6 @@ import { contract } from '../contracts'
 
 @Controller()
 export class MessageController {
-  constructor() {}
-
   @Implement(contract.message.publish)
   publish() {
     return implement(contract.message.publish).handler(async ({ context }, { channel, message }) => {

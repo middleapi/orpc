@@ -1,6 +1,6 @@
-import { RPCHandler } from '../adapters/fetch/rpc-handler'
-import { os } from '../builder'
-import { CORSHandlerPlugin } from './cors'
+import { RPCHandler } from '../adapters/fetch/rpc-handler.ts'
+import { os } from '../builder.ts'
+import { CORSHandlerPlugin } from './cors.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

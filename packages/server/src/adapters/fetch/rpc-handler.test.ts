@@ -1,6 +1,6 @@
-import type { StandardHandlerPlugin } from '../standard'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
+import { os } from '../../builder.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   beforeEach(() => {

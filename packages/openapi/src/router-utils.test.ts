@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { getOpenAPIMeta, openapi } from './meta'
-import { populateRouterContractOpenAPIPaths } from './router-utils'
+import { getOpenAPIMeta, openapi } from './meta.ts'
+import { populateRouterContractOpenAPIPaths } from './router-utils.ts'
 
 export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 

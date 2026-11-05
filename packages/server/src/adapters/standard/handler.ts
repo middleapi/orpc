@@ -1,15 +1,15 @@
 import type { ErrorMap, Schema } from '@orpc/contract'
 import type { Interceptor, Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { Context } from '../../context'
-import type { ProcedureClientInterceptor } from '../../procedure-client'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
-import type { StandardHandlerPlugin } from './plugin'
+import type { Context } from '../../context.ts'
+import type { ProcedureClientInterceptor } from '../../procedure-client.ts'
+import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec.ts'
+import type { StandardHandlerPlugin } from './plugin.ts'
 import { ORPCError, toORPCError } from '@orpc/client'
 import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
-import { createProcedureClient } from '../../procedure-client'
-import { CompositeStandardHandlerPlugin } from './plugin'
+import { createProcedureClient } from '../../procedure-client.ts'
+import { CompositeStandardHandlerPlugin } from './plugin.ts'
 
 export interface StandardHandlerHandleOptions<T extends Context> {
   prefix?: `/${string}` | undefined

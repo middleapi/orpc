@@ -1,10 +1,10 @@
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, InitialInputSchema, Schema } from '@orpc/contract'
 import type { Context, DecoratedProcedure, ImplementedProcedure, MergedContext, ORPCErrorConstructorMap } from '@orpc/server'
 import type { Effect } from 'effect'
-import type { InferEffectServices } from '../context'
-import type { HandlerGen } from '../handler'
+import type { InferEffectServices } from '../context.ts'
+import type { HandlerGen } from '../handler.ts'
 import { Builder, ProcedureImplementer } from '@orpc/server'
-import { handlerGen } from '../handler'
+import { handlerGen } from '../handler.ts'
 
 declare module '@orpc/server' {
   interface Builder<

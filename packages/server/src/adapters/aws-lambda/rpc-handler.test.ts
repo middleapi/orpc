@@ -1,9 +1,9 @@
 import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from '@standard-server/aws-lambda'
-import type { StandardHandlerPlugin } from '../standard'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import { os } from '../../builder.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []

@@ -1,5 +1,5 @@
 import type { Promisable } from 'type-fest'
-import { isAbortError } from './error'
+import { isAbortError } from './error.ts'
 
 const TRACER_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_TRACER')
 
@@ -136,7 +136,7 @@ export function toSpanAttributeValue(data: unknown): string {
   }
 
   try {
-    // eslint-disable-next-line ban/ban
+    // oxlint-disable-next-line no-restricted-properties
     return JSON.stringify(data, (_, value) => {
       if (typeof value === 'bigint') {
         return value.toString()

@@ -2,19 +2,19 @@ export type {
   OperationKey,
   OperationKeyOptions,
   OperationKeyPrefixOptions,
-} from './key'
-export { ProcedureUtils } from './procedure-utils'
-export type { ProcedureUtilsOptions } from './procedure-utils'
-export * from './router-utils'
+} from './key.ts'
+export { ProcedureUtils } from './procedure-utils.ts'
+export type { ProcedureUtilsOptions } from './procedure-utils.ts'
+export * from './router-utils.ts'
 export {
   createRouterUtils as createSWRUtils,
-} from './router-utils'
-export { SharedUtils } from './shared-utils'
-export * from './types'
+} from './router-utils.ts'
+export { SharedUtils } from './shared-utils.ts'
+export * from './types.ts'
 export {
   OPERATION_CONTEXT_SYMBOL as SWR_OPERATION_CONTEXT_SYMBOL,
   type OperationContext as SWROperationContext,
-} from './types'
+} from './types.ts'
 
 export type {
   Public,

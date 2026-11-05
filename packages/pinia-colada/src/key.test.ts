@@ -2,7 +2,7 @@ import { RPCJsonSerializer } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { useQueryCache } from '@pinia/colada'
 import { createPinia } from 'pinia'
-import { generateOperationKey } from './key'
+import { generateOperationKey } from './key.ts'
 
 it('generateOperationKey', () => {
   expect(generateOperationKey(['path'])).toEqual([['path'], {}])

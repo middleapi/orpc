@@ -1,6 +1,6 @@
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { GetNextPageParamFunction, InfiniteData } from '@tanstack/svelte-query'
-import type { ProcedureUtils } from './procedure-utils'
+import type { ProcedureUtils } from './procedure-utils.ts'
 import { createInfiniteQuery, createMutation, createQueries, createQuery, QueryClient } from '@tanstack/svelte-query'
 import z from 'zod'
 

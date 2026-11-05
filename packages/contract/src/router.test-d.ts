@@ -1,9 +1,9 @@
 import type { ORPCError } from '@orpc/client'
 import type { ThrowableError } from '@orpc/shared'
-import type { InferRouterContractError, InferRouterContractErrorMap, InferRouterContractErrors, InferRouterContractInputs, InferRouterContractOutputs } from './router'
+import type { InferRouterContractError, InferRouterContractErrorMap, InferRouterContractErrors, InferRouterContractInputs, InferRouterContractOutputs } from './router.ts'
 import { expectTypeOf, it } from 'vitest'
 import { z } from 'zod'
-import { oc } from './builder'
+import { oc } from './builder.ts'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
 const schema1 = z.object({ schema1: z.string().transform(n => Number(n)) })

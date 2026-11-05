@@ -8,6 +8,8 @@
     "rootDir": "src",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "resolvePackageJsonExports": true,
     "types": ["node"],
     "strict": true,

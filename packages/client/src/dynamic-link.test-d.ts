@@ -1,5 +1,5 @@
-import type { ClientLink } from './types'
-import { DynamicLink } from './dynamic-link'
+import type { ClientLink } from './types.ts'
+import { DynamicLink } from './dynamic-link.ts'
 
 describe('dynamicLink', () => {
   it('pass correct context', () => {

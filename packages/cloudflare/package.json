@@ -31,9 +31,9 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
       }
     }
   },
@@ -46,8 +46,7 @@
   ],
   "scripts": {
     "prepare": "wrangler types",
-    "prepack": "obuild",
-    "type:check": "wrangler types && tsc -b",
+    "prepack": "tsc -p tsconfig.build.json && node ../../scripts/verify-dist.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

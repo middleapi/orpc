@@ -1,7 +1,7 @@
 import type { TracingHeaders } from '@orpc/shared'
 import { context, propagation, trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
-import { OpenTelemetryTracer } from './tracer'
+import { OpenTelemetryTracer } from './tracer.ts'
 
 /**
  * Some setups (e.g. browsers or React Native without a context manager) cannot activate spans,

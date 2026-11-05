@@ -1,15 +1,15 @@
 import type { ClientContext } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { AnySchema, ErrorMap, RouterContract } from '@orpc/contract'
-import type { JsonSchemaCoercerOptions } from './coercer'
-import type { JsonSchemaConverter } from './convert'
-import type { JsonSchema } from './types'
+import type { JsonSchemaCoercerOptions } from './coercer.ts'
+import type { JsonSchemaConverter } from './convert.ts'
+import type { JsonSchema } from './types.ts'
 import { cloneORPCError, ORPCError } from '@orpc/client'
 import { getProcedureContractOrThrow } from '@orpc/contract'
 import { getOwn, toArray } from '@orpc/shared'
-import { JsonSchemaCoercer } from './coercer'
-import { DelegatingJsonSchemaConverter } from './convert'
-import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import { JsonSchemaCoercer } from './coercer.ts'
+import { DelegatingJsonSchemaConverter } from './convert.ts'
+import { StandardJsonSchemaConverter } from './standard-json-schema-converter.ts'
 
 export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions {
   converters?: JsonSchemaConverter[] | undefined

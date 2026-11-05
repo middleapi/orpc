@@ -1,9 +1,9 @@
 import { RPCJsonSerializer } from '@orpc/client'
-import * as KeyModule from './key'
-import * as LiveQueryModule from './live-query'
-import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
-import * as StreamQueryModule from './stream-query'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import * as KeyModule from './key.ts'
+import * as LiveQueryModule from './live-query.ts'
+import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils.ts'
+import * as StreamQueryModule from './stream-query.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
 const generateOperationKeySpy = vi.spyOn(KeyModule, 'generateOperationKey')
 const streamedQuerySpy = vi.spyOn(StreamQueryModule, 'serializableStreamedQuery')

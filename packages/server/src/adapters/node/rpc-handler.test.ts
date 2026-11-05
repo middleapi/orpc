@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { StandardHandlerPlugin } from '../standard'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
 import request from 'supertest'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import { os } from '../../builder.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   beforeEach(() => {

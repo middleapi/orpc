@@ -1,11 +1,11 @@
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { getEventListeners } from 'node:events'
 import * as SharedExperimentalV2Module from '@orpc/shared'
 import { AsyncIteratorClass, asyncIteratorToStream, promiseWithResolvers, sleep } from '@orpc/shared'
-import { StandardLink } from '../adapters/standard'
-import { DedupeLinkPlugin } from './dedupe'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { DedupeLinkPlugin } from './dedupe.ts'
 
 interface TestContext {
   group?: boolean

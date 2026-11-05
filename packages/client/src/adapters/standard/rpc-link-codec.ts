@@ -1,13 +1,13 @@
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard'
+import type { ClientContext, ClientOptions } from '../../types.ts'
+import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard/index.ts'
 import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
-import { MalformedResponseError, ResponseError } from '../../error'
-import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils'
-import { RPCSerializer } from '../../rpc-serializer'
+import { MalformedResponseError, ResponseError } from '../../error.ts'
+import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils.ts'
+import { RPCSerializer } from '../../rpc-serializer.ts'
 
 export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**

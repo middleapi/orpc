@@ -4,8 +4,8 @@ import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import { RPCHandler } from '@orpc/server/websocket'
 import { decodePeerMessage, encodePeerMessage, HibernationAsyncIteratorClass } from '@standard-server/peer'
 import * as z from 'zod'
-import { encodeHibernationRPCEvent } from './encode-event'
-import { HibernationHandlerPlugin } from './handler-plugin'
+import { encodeHibernationRPCEvent } from './encode-event.ts'
+import { HibernationHandlerPlugin } from './handler-plugin.ts'
 
 beforeEach(() => {
   vi.resetAllMocks()

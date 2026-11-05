@@ -1,7 +1,7 @@
 import type { AnySchema, ErrorMap, ORPCErrorConstructorMap, ProcedureContractDefinition } from '@orpc/contract'
 import type { Promisable } from '@orpc/shared'
-import type { Context } from './context'
-import type { AnyMiddleware } from './middleware'
+import type { Context } from './context.ts'
+import type { AnyMiddleware } from './middleware.ts'
 import { ProcedureContract } from '@orpc/contract'
 import { getConstructor } from '@orpc/shared'
 

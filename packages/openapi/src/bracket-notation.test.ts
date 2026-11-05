@@ -1,5 +1,5 @@
 import { setFlagsFromString } from 'node:v8'
-import { BracketNotationSerializer } from './bracket-notation'
+import { BracketNotationSerializer } from './bracket-notation.ts'
 
 describe('bracket notation serializer', () => {
   const serializer = new BracketNotationSerializer()
@@ -392,7 +392,7 @@ describe('bracket notation serializer', () => {
 
     it('stores integer keys that leave gaps in objects sparsely, without a trace', () => {
       setFlagsFromString('--allow-natives-syntax')
-      // eslint-disable-next-line no-new-func
+      // oxlint-disable-next-line no-new-func
       const hasSparseIntegerKeys = new Function('o', 'return %HasDictionaryElements(o)') as (o: object) => boolean
 
       const result = serializer.deserialize([['a[x]', 1], ['a[999]', 2], ['b[x]', 3], ['b[0]', 4], ['b[1]', 5], ['999', 6]]) as any
@@ -411,7 +411,7 @@ describe('bracket notation serializer', () => {
     })
 
     it('can prevent prototype pollution attack', () => {
-      /* eslint-disable no-proto, no-restricted-properties */
+      /* oxlint-disable no-proto, no-restricted-properties */
       const result = serializer.deserialize([
         ['__proto__[polluted]', '1'],
         ['constructor[polluted]', '2'],
@@ -440,7 +440,7 @@ describe('bracket notation serializer', () => {
       expect(({} as any).__proto__.polluted).toBeUndefined()
       expect(({} as any).constructor.polluted).toBeUndefined()
       expect(({} as any).polluted).toBeUndefined()
-      /* eslint-enable no-proto, no-restricted-properties */
+      /* oxlint-enable no-proto, no-restricted-properties */
     })
 
     it('can prevent constructor.prototype pollution attack', () => {
@@ -459,7 +459,7 @@ describe('bracket notation serializer', () => {
     })
 
     it('can prevent prototype pollution attack through object values', () => {
-      /* eslint-disable no-proto, no-restricted-properties */
+      /* oxlint-disable no-proto, no-restricted-properties */
       const result = serializer.deserialize([
         ['a', {}],
         ['a[__proto__][polluted]', '1'],
@@ -476,7 +476,7 @@ describe('bracket notation serializer', () => {
       expect(result.b.c).toBe('2')
       expect(result.b.constructor.prototype.polluted).toBe('3')
       expect(result.b.polluted).toBeUndefined()
-      /* eslint-enable no-proto, no-restricted-properties */
+      /* oxlint-enable no-proto, no-restricted-properties */
     })
   })
 

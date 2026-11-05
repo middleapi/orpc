@@ -1,4 +1,4 @@
-export * from './publisher'
+export * from './publisher.ts'
 
 export type {
   AsyncIteratorClass,

@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify'
-import type { StandardHandlerPlugin } from '../standard'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
 import Fastify from 'fastify'
 import request from 'supertest'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import { os } from '../../builder.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   let app: FastifyInstance

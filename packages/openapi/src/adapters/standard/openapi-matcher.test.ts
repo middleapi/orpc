@@ -1,8 +1,8 @@
 import { oc } from '@orpc/contract'
 import { call, implement, os } from '@orpc/server'
 import { z } from 'zod'
-import { getOpenAPIMeta, openapi } from '../../meta'
-import { OpenAPIMatcher } from './openapi-matcher'
+import { getOpenAPIMeta, openapi } from '../../meta.ts'
+import { OpenAPIMatcher } from './openapi-matcher.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

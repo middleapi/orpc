@@ -1,7 +1,7 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { DataTag, InfiniteData, MutationFunctionContext, QueryFunctionContext, QueryKey, SkipToken } from '@tanstack/query-core'
-import type { OperationKeyBaseOptions } from './key'
+import type { OperationKeyBaseOptions } from './key.ts'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
@@ -18,14 +18,14 @@ import type {
   StreamedKeyOptions,
   StreamedOptionsIn,
   StreamedOptionsOut,
-} from './types'
+} from './types.ts'
 import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
-import { liveQuery } from './live-query'
-import { SharedUtils } from './shared-utils'
-import { serializableStreamedQuery } from './stream-query'
-import { createStructuralSharing } from './structural-sharing'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { liveQuery } from './live-query.ts'
+import { SharedUtils } from './shared-utils.ts'
+import { serializableStreamedQuery } from './stream-query.ts'
+import { createStructuralSharing } from './structural-sharing.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
 export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput> {
   path: string[]

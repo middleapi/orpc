@@ -1,7 +1,7 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 

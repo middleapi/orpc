@@ -1,5 +1,5 @@
 it('exports helpers', async () => {
-  await expect(import('.')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     parseFormData: expect.any(Function),
   })
 })

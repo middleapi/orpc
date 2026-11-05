@@ -1,6 +1,6 @@
 import type { RedisClientType } from 'redis'
-import type { BaseRedisLockerOptions } from './base-redis'
-import { BaseRedisLocker } from './base-redis'
+import type { BaseRedisLockerOptions } from './base-redis.ts'
+import { BaseRedisLocker } from './base-redis.ts'
 
 /**
  * Locker adapter for Redis. Acquires locks with `SET NX PX` and releases them

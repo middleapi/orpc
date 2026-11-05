@@ -1,13 +1,13 @@
 import type { AnySchema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
-import type { JsonSchemaCoercerOptions } from './coercer'
-import type { JsonSchemaConverter } from './convert'
-import type { JsonSchema } from './types'
+import type { JsonSchemaCoercerOptions } from './coercer.ts'
+import type { JsonSchemaConverter } from './convert.ts'
+import type { JsonSchema } from './types.ts'
 import { toArray } from '@orpc/shared'
-import { JsonSchemaCoercer } from './coercer'
-import { DelegatingJsonSchemaConverter } from './convert'
-import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import { JsonSchemaCoercer } from './coercer.ts'
+import { DelegatingJsonSchemaConverter } from './convert.ts'
+import { StandardJsonSchemaConverter } from './standard-json-schema-converter.ts'
 
 export interface SmartCoercionHandlerPluginOptions extends JsonSchemaCoercerOptions {
   converters?: JsonSchemaConverter[] | undefined

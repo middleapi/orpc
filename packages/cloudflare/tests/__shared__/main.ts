@@ -1,5 +1,5 @@
-import { experimental_DurableLockObject as DurableLockObject } from '../../src/lock-object'
-import { DurablePublisherObject } from '../../src/publisher-object'
+import { experimental_DurableLockObject as DurableLockObject } from '../../src/lock-object.ts'
+import { DurablePublisherObject } from '../../src/publisher-object.ts'
 
 export class PublisherDO extends DurablePublisherObject {
 }

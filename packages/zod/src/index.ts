@@ -1,5 +1,5 @@
-export * from './converter'
-export * from './registries'
+export * from './converter.ts'
+export * from './registries.ts'
 
 export type {
   JsonSchema,

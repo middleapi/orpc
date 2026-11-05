@@ -9,7 +9,7 @@ import {
   parseAcceptEncodingQualities,
   pathToHttpPath,
   varyByAcceptEncoding,
-} from './http'
+} from './http.ts'
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {

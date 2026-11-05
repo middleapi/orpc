@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client'
 import { Cause, Effect, Exit } from 'effect'
-import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from './error'
+import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from './error.ts'
 
 describe('catchORPCError', () => {
   it('catches any ORPCError failure (data-last)', async () => {

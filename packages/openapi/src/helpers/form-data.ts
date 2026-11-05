@@ -1,6 +1,6 @@
 import { isSchemaIssue } from '@orpc/contract'
 import { isTypescriptObject } from '@orpc/shared'
-import { BracketNotationSerializer } from '../bracket-notation'
+import { BracketNotationSerializer } from '../bracket-notation.ts'
 
 /**
  * Parse a form data with [bracket notation](https://orpc.dev/docs/openapi/bracket-notation) syntax

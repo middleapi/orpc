@@ -1,9 +1,9 @@
 import type { Promisable } from 'type-fest'
-import type { PromiseWithError, ThrowableError } from './types'
+import type { PromiseWithError, ThrowableError } from './types.ts'
 import { isAsyncIteratorObject } from '@standard-server/shared'
-import { wrapAsyncIterator } from './iterator'
-import { override } from './proxy'
-import { wrapReadableStream } from './stream'
+import { wrapAsyncIterator } from './iterator.ts'
+import { override } from './proxy.ts'
+import { wrapReadableStream } from './stream.ts'
 
 export type InterceptableOptions = Record<string, any>
 

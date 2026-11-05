@@ -4,7 +4,7 @@ import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { defineComponent } from 'vue'
-import { serializableStreamedQuery } from './stream-query'
+import { serializableStreamedQuery } from './stream-query.ts'
 
 /**
  * Mounts a component that runs a real Pinia Colada `useQuery`,

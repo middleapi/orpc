@@ -1,7 +1,7 @@
 import type { ErrorMap, Schema } from '@orpc/contract'
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
-import type { Context } from '../context'
-import type { ProcedureClientInterceptor } from '../procedure-client'
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
+import type { ProcedureClientInterceptor } from '../procedure-client.ts'
 import { AbortError, anyAbortSignal, AsyncIteratorClass, isAsyncIteratorObject, override, runWithSignal, toArray } from '@orpc/shared'
 
 /**

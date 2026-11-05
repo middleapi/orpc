@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
+import type { CreateBatchClientServerTest } from './client-server.ts'
 import { serve } from '@hono/node-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
@@ -7,7 +7,7 @@ import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
-import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
+import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
 
 /**
  * Compressed batches over the fetch adapter, which the plugin serves as readily as the node one

@@ -1,5 +1,5 @@
-import { getCookie } from './cookie'
-import { getSignedValue, sign, unsign } from './signing'
+import { getCookie } from './cookie.ts'
+import { getSignedValue, sign, unsign } from './signing.ts'
 
 describe('signing', () => {
   const secret = 'test-secret-key'

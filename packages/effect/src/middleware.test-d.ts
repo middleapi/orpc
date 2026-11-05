@@ -1,9 +1,9 @@
 import type { Middleware, ORPCErrorConstructorMap } from '@orpc/server'
-import type { WithEffectContext } from './context'
+import type { WithEffectContext } from './context.ts'
 import { os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
-import { middlewareGen } from './middleware'
+import { middlewareGen } from './middleware.ts'
 
 class Service1 extends Context.Service<
   Service1,

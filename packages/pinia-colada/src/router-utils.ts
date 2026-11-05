@@ -1,13 +1,13 @@
 import type { AnyNestedClient, Client, InferClientContext, InferClientError } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { OperationKeyBaseOptions } from './key'
-import type { RouterUtilsPlugin } from './plugin'
-import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
+import type { OperationKeyBaseOptions } from './key.ts'
+import type { RouterUtilsPlugin } from './plugin.ts'
+import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils.ts'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, isTypescriptObject, pick, toArray } from '@orpc/shared'
-import { CompositeRouterUtilsPlugin } from './plugin'
-import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
-import { SharedUtils } from './shared-utils'
+import { CompositeRouterUtilsPlugin } from './plugin.ts'
+import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils.ts'
+import { SharedUtils } from './shared-utils.ts'
 
 /**
  * The utils shape derived from a client: procedure clients map to procedure

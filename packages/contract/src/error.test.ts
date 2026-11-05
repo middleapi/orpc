@@ -1,4 +1,4 @@
-import { ValidationError } from './error'
+import { ValidationError } from './error.ts'
 
 it('validationError', () => {
   const issues = [{ path: ['a'], message: 'invalid' }] as any

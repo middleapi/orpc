@@ -29,9 +29,9 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
       }
     }
   },
@@ -43,8 +43,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc && node ../../scripts/verify-dist.ts"
   },
   "peerDependencies": {
     "ai": ">=7.0.31"

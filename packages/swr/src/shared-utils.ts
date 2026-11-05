@@ -1,9 +1,9 @@
 import type { MaybeOptionalOptions, PartialDeep } from '@orpc/shared'
-import type { OperationKeyPrefixOptions } from './key'
-import type { Matcher, MatcherOptions, MatcherStrategy } from './types'
+import type { OperationKeyPrefixOptions } from './key.ts'
+import type { Matcher, MatcherOptions, MatcherStrategy } from './types.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { generateOperationKey } from './key'
-import { isSubsetOf } from './utils'
+import { generateOperationKey } from './key.ts'
+import { isSubsetOf } from './utils.ts'
 
 export class SharedUtils<TInput> {
   constructor(

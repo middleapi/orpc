@@ -1,10 +1,10 @@
 {
-  "extends": "../../tsconfig.lib.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2022"],
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "types": ["node"]
+    "experimentalDecorators": true
   },
-  "include": ["./package.json", "src", "tests"]
+  "include": ["src"],
+  "exclude": []
 }

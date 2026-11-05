@@ -1,4 +1,4 @@
-import { resolveMaybeOptionalOptions } from './args'
+import { resolveMaybeOptionalOptions } from './args.ts'
 
 it('resolveMaybeOptionalOptions', () => {
   expect(resolveMaybeOptionalOptions([{ a: 1 }])).toEqual({ a: 1 })

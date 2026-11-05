@@ -3,7 +3,7 @@ import { asyncIteratorObject, oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { generateText } from 'ai'
 import { z } from 'zod'
-import { createToolFactory, implementToolFactory } from './tool'
+import { createToolFactory, implementToolFactory } from './tool.ts'
 
 describe('implementToolFactory', () => {
   it('can use as a tool', () => {

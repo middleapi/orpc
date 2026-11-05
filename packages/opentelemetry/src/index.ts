@@ -1,1 +1,1 @@
-export * from './instrumentation'
+export * from './instrumentation.ts'

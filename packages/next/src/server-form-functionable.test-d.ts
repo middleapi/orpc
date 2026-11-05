@@ -1,8 +1,8 @@
 import type { Procedure } from '@orpc/server'
-import type { ServerFormFunction } from './server-form-function'
+import type { ServerFormFunction } from './server-form-function.ts'
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { createServerFormFunctionable } from './server-form-functionable'
+import { createServerFormFunctionable } from './server-form-functionable.ts'
 
 const errorMap = {
   BASE: {

@@ -2,29 +2,29 @@ import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/cont
 import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
-import type { OpenAPIMeta } from './meta'
-import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation'
-import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types'
+import type { OpenAPIMeta } from './meta.ts'
+import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation.ts'
+import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types.ts'
 import { downgradeSpecV31ToV30, downgradeSpecV32ToV31 } from '@openapi-spec/downgrader'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter, hoistRecursiveRefToDef, StandardJsonSchemaConverter } from '@orpc/json-schema'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { clone, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
-import { DEFAULT_OPENAPI_METHOD } from './constants'
-import { getOpenAPIMeta } from './meta'
-import { OpenAPIComponentRegistry } from './openapi-generator-components'
+import { DEFAULT_OPENAPI_METHOD } from './constants.ts'
+import { getOpenAPIMeta } from './meta.ts'
+import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
 import {
   buildErrorResponse,
   buildRequest,
   buildSuccessResponse,
   OpenAPIGeneratorError,
   toOpenAPIPath,
-} from './openapi-generator-operation'
-import { OpenAPIJsonSerializer } from './openapi-json-serializer'
-import { getDynamicPathParams } from './utils'
+} from './openapi-generator-operation.ts'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
+import { getDynamicPathParams } from './utils.ts'
 
-export { OpenAPIGeneratorError } from './openapi-generator-operation'
-export type { OpenAPIErrorBodyDefinition } from './openapi-generator-operation'
+export { OpenAPIGeneratorError } from './openapi-generator-operation.ts'
+export type { OpenAPIErrorBodyDefinition } from './openapi-generator-operation.ts'
 
 export interface OpenAPIGeneratorOptions {
   converters?: JsonSchemaConverter[] | undefined

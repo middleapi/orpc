@@ -1,7 +1,7 @@
 import type { ClientLink, ORPCError } from '@orpc/client'
 import type { PromiseWithError } from '@orpc/shared'
 import { oc, type } from '@orpc/contract'
-import { createContractJsonifiedClientFactory } from './client-factory'
+import { createContractJsonifiedClientFactory } from './client-factory.ts'
 
 const contract = {
   ping: oc,

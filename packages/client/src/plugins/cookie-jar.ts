@@ -1,8 +1,8 @@
 import type { Value } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
-import type { FetchLinkTransportOptions } from '../adapters/fetch'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
+import type { FetchLinkTransportOptions } from '../adapters/fetch/index.ts'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 import { matchesHttpPathPrefix, toArray, value } from '@orpc/shared'
 
 export interface CookieJarLinkPluginOptions<T extends ClientContext> {
@@ -228,7 +228,7 @@ function splitCookiePair(pair: string): [name: string, value: string] {
  */
 function parseSetCookie(setCookie: string) {
   // Control characters other than tab make the whole cookie invalid
-  // eslint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0A-\x1F\x7F]/.test(setCookie)) {
     return undefined
   }

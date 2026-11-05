@@ -1,7 +1,7 @@
 import { eventIterator, oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../../src'
-import { zodJsonSchemaConverter } from '../__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src/index.ts'
+import { zodJsonSchemaConverter } from '../__shared__/schema.ts'
 
 describe('openAPIGenerator e2e: reusable component schemas', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
@@ -54,7 +54,7 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
   it('hoists mutually recursive entities that reference each other', async () => {
     const User: z._ZodType = z.looseObject({
       name: z.string(),
-      // eslint-disable-next-line ts/no-use-before-define
+      // oxlint-disable-next-line typescript/no-use-before-define
       posts: z.array(z.lazy(() => Post)).optional(),
     }).meta({ id: 'User' })
 

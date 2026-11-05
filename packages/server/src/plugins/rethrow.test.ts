@@ -1,8 +1,8 @@
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
-import { RPCHandler } from '../adapters/fetch'
-import { os } from '../builder'
-import { RethrowHandlerPlugin } from './rethrow'
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { os } from '../builder.ts'
+import { RethrowHandlerPlugin } from './rethrow.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

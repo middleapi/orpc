@@ -1,8 +1,8 @@
-import type { Schema } from './schema'
+import type { Schema } from './schema.ts'
 import { ORPCError } from '@orpc/client'
 import z from 'zod'
-import { ValidationError } from './error'
-import { createORPCErrorConstructorMap, error } from './error-factory'
+import { ValidationError } from './error.ts'
+import { createORPCErrorConstructorMap, error } from './error-factory.ts'
 
 describe('error factory', () => {
   const dataSchema = z.object({ value: z.number() })

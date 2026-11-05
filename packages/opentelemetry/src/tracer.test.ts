@@ -1,7 +1,7 @@
 import type { TracingHeaders } from '@orpc/shared'
 import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
-import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer'
+import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer.ts'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({

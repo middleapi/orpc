@@ -1,6 +1,6 @@
 import { sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
-import { UpstashRateLimiter } from './upstash'
+import { UpstashRateLimiter } from './upstash.ts'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN

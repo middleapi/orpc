@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createLoggerStorage } from './node'
+import { createLoggerStorage } from './node.ts'
 
 describe('createLoggerStorage', () => {
   it('exposes useLogger backed by the storage', () => {

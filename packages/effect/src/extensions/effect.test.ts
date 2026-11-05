@@ -1,9 +1,9 @@
 import { oc } from '@orpc/contract'
 import { call, DecoratedProcedure, implement, ImplementedProcedure, os } from '@orpc/server'
 import { z } from 'zod'
-import * as Handler from '../handler'
+import * as Handler from '../handler.ts'
 import '@orpc/server/extensions/callable' // not sure why, but we need import this to make type work
-import './effect'
+import './effect.ts'
 
 const handlerGen = vi.spyOn(Handler, 'handlerGen')
 

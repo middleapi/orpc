@@ -20,8 +20,6 @@ const DB: Planet[] = [
 
 @Controller()
 export class PlanetController {
-  constructor() {}
-
   @Implement(contract.planet.list)
   list() {
     return implement(contract.planet.list).handler(async (_, { keyword, cursor, limit }) => {

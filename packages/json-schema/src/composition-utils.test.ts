@@ -1,5 +1,5 @@
-import type { JsonSchema } from './types'
-import type { JsonObjectSchema } from './utils'
+import type { JsonSchema } from './types.ts'
+import type { JsonObjectSchema } from './utils.ts'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
@@ -9,7 +9,7 @@ import {
   flattenJsonUnionSchema,
   isJsonObjectLikeSchema,
   matchArrayableJsonSchema,
-} from './composition-utils'
+} from './composition-utils.ts'
 
 describe('extractJsonObjectSchemaEntries', () => {
   it('returns undefined for non object-able schemas', () => {

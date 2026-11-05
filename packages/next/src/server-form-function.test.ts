@@ -1,5 +1,5 @@
 import * as ServerModule from '@orpc/server'
-import { createServerFormFunction } from './server-form-function'
+import { createServerFormFunction } from './server-form-function.ts'
 
 const createProcedureClientSpy = vi.spyOn(ServerModule, 'createProcedureClient')
 const { os, type } = ServerModule

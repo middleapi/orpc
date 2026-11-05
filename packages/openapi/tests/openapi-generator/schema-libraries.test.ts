@@ -1,8 +1,8 @@
 import { oc } from '@orpc/contract'
 import * as arktype from 'arktype'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../../src'
-import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src/index.ts'
+import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../__shared__/schema.ts'
 
 describe('openAPIGenerator e2e: schema library agnosticism', () => {
   const generator = new OpenAPIGenerator({ converters: [testSchemaConverter, zodJsonSchemaConverter] })

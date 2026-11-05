@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import type { RateLimitOptions, RateLimitResult } from './types'
+import type { RateLimitOptions, RateLimitResult } from './types.ts'
 import { sleep } from '@orpc/shared'
 
 /**

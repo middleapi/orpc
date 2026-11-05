@@ -1,5 +1,5 @@
-import type { OpenAPIDocument, OpenAPIVersion } from '../types'
-import { OpenAPIReferenceHandlerPlugin } from './openapi-reference'
+import type { OpenAPIDocument, OpenAPIVersion } from '../types.ts'
+import { OpenAPIReferenceHandlerPlugin } from './openapi-reference.ts'
 
 describe('openAPIReferenceHandlerPlugin', () => {
   beforeEach(() => {
@@ -75,7 +75,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
     })
     const window: { onload?: () => void } = { SwaggerUIBundle, ...globals } as any
 
-    // eslint-disable-next-line no-new-func
+    // oxlint-disable-next-line no-new-func
     new Function('window', 'SwaggerUIBundle', script)(window, SwaggerUIBundle)
     window.onload!()
 

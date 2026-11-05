@@ -4,7 +4,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import { asyncIteratorObject, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import z from 'zod'
-import { createSWRUtils } from '../../src'
+import { createSWRUtils } from '../../src/index.ts'
 
 const staticProcedure = os
   .errors({ STATIC_ERROR: { data: z.object({ static: z.string() }) } })

@@ -1,10 +1,10 @@
 import { RPCJsonSerializer } from '@orpc/client'
 import { InfiniteQueryObserver, QueryClient, QueryObserver, skipToken } from '@tanstack/query-core'
-import * as KeyModule from './key'
-import * as LiveQuery from './live-query'
-import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
-import * as streamQueryModule from './stream-query'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import * as KeyModule from './key.ts'
+import * as LiveQuery from './live-query.ts'
+import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils.ts'
+import * as streamQueryModule from './stream-query.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
 const streamedQuerySpy = vi.spyOn(streamQueryModule, 'serializableStreamedQuery')
 

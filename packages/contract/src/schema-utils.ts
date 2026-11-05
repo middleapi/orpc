@@ -1,5 +1,5 @@
 import type { IsEqual, Promisable } from '@orpc/shared'
-import type { Schema, SchemaIssue } from './schema'
+import type { Schema, SchemaIssue } from './schema.ts'
 import { isPropertyKey, isTypescriptObject, ORPC_NAME } from '@orpc/shared'
 
 export type TypeRest<TInput, TOutput>

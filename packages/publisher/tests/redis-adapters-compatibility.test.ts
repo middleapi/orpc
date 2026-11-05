@@ -1,9 +1,9 @@
-import type { Publisher } from '../src'
+import type { Publisher } from '../src/index.ts'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { Redis } from '@upstash/redis'
 import { createClient } from 'redis'
-import { RedisPublisher } from '../src/adapters/redis'
-import { UpstashPublisher } from '../src/adapters/upstash'
+import { RedisPublisher } from '../src/adapters/redis.ts'
+import { UpstashPublisher } from '../src/adapters/upstash.ts'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN

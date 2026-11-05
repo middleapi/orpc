@@ -3,8 +3,8 @@ import { ORPCError, RPCSerializer } from '@orpc/client'
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LOGGER_CONTEXT_SYMBOL } from './context'
-import { EvlogHandlerPlugin } from './handler-plugin'
+import { LOGGER_CONTEXT_SYMBOL } from './context.ts'
+import { EvlogHandlerPlugin } from './handler-plugin.ts'
 
 const mocks = vi.hoisted(() => ({
   defineFrameworkIntegration: vi.fn(),
@@ -279,7 +279,7 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger } = mockIntegration()
 
     async function* source() {
-      // eslint-disable-next-line no-throw-literal
+      // oxlint-disable-next-line no-throw-literal
       throw 'iterator-failure'
     }
 

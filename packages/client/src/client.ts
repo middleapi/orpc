@@ -1,8 +1,8 @@
 import type { Interceptor, PromiseWithError } from '@orpc/shared'
-import type { AnyNestedClient, Client, ClientContext, ClientLink, ClientOptions, InferClientContext, InferClientError } from './types'
+import type { AnyNestedClient, Client, ClientContext, ClientLink, ClientOptions, InferClientContext, InferClientError } from './types.ts'
 import { intercept, toArray } from '@orpc/shared'
-import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts'
-import { resolveClientRest } from './utils'
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts.ts'
+import { resolveClientRest } from './utils.ts'
 
 export interface ORPCClientInterceptorOptions<TClientContext extends ClientContext, TInput> extends ClientOptions<TClientContext> {
   path: string[]

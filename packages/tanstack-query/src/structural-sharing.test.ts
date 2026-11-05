@@ -2,7 +2,7 @@ import { RPCJsonSerializer } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { NullProtoObj } from '@orpc/shared'
 import { replaceEqualDeep } from '@tanstack/query-core'
-import { createStructuralSharing } from './structural-sharing'
+import { createStructuralSharing } from './structural-sharing.ts'
 
 const structuralSharing = createStructuralSharing()
 
@@ -57,7 +57,7 @@ describe('structuralSharing', () => {
     ['different prototypes', new Map(), new Set()],
     ['subclass and parent', new Date(0), new (class extends Date {})(0)],
     ['class instances', new Planet(), new Planet()],
-    ['sparse arrays', [1, , 3], [1, , 3]], // eslint-disable-line no-sparse-arrays
+    ['sparse arrays', [1, , 3], [1, , 3]], // oxlint-disable-line no-sparse-arrays
   ])('takes new data when %s differs', (_, old, next) => {
     expect(structuralSharing({ value: old }, { value: next }).value).toBe(next)
   })
@@ -188,7 +188,7 @@ describe('structuralSharing', () => {
     })
 
     it('ignores inherited enumerable keys of dates', () => {
-      // eslint-disable-next-line no-extend-native -- simulates a polluted prototype
+      // oxlint-disable-next-line no-extend-native -- simulates a polluted prototype
       Object.defineProperty(Date.prototype, 'polluted', { value: 1, enumerable: true, configurable: true })
 
       try {

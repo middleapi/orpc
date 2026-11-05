@@ -1,7 +1,7 @@
 import type { Promisable } from '@orpc/shared'
-import type { LockCallbackOptions, Locker, LockOptions } from '../types'
+import type { LockCallbackOptions, Locker, LockOptions } from '../types.ts'
 import { sleep, throwIfAborted } from '@orpc/shared'
-import { LockTimeoutError } from '../error'
+import { LockTimeoutError } from '../error.ts'
 
 const RELEASE_LOCK_SCRIPT = `
 if redis.call('GET', KEYS[1]) == ARGV[1] then

@@ -1,6 +1,6 @@
-import type { ErrorMap } from './error'
-import type { AnyMetaPlugin, Meta, MetaPlugin } from './meta'
-import type { AnySchema } from './schema'
+import type { ErrorMap } from './error.ts'
+import type { AnyMetaPlugin, Meta, MetaPlugin } from './meta.ts'
+import type { AnySchema } from './schema.ts'
 import { toArray } from '@orpc/shared'
 
 export function resolveMetaPlugins<

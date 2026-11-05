@@ -3,7 +3,7 @@ import type { AsyncIteratorClass } from '@orpc/shared'
 import type { TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
-import { toORPCRouter } from './to-orpc-router'
+import { toORPCRouter } from './to-orpc-router.ts'
 
 type TRPCContext = { a: string }
 

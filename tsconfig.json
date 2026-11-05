@@ -1,29 +1,36 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node", "vitest/globals"]
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true,
+    "types": ["node", "vitest/globals"],
+
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
   },
   "include": [
-    "playground",
+    "*",
     "scripts",
     "benches",
     "tests",
-    "*",
-
-    "*/*/src/**/*.bench.*",
-    "*/*/src/**/*.test.*",
-    "*/*/src/**/*.test-d.ts",
-    "*/*/src/**/__tests__",
-    "*/*/src/**/__mocks__",
-    "*/*/src/**/__snapshots__",
-    "*/*/playground",
-    "*/*/scripts",
-    "*/*/benches",
+    "*/*/*",
     "*/*/tests",
-    "*/*/*"
+    "*/*/src/**/__tests__",
+    "*/*/src/**/*.test.ts",
+    "*/*/src/**/*.test.tsx",
+    "*/*/src/**/*.test-d.ts"
   ],
   "exclude": [
+    "apps/**",
     "packages/bun/**",
     "packages/cloudflare/**",
     "packages/nest/**",

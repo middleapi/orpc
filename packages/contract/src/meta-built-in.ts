@@ -1,9 +1,9 @@
-import type { ErrorMap } from './error'
-import type { Meta, MetaPlugin } from './meta'
-import type { RouterContract } from './router'
-import type { AnySchema } from './schema'
+import type { ErrorMap } from './error.ts'
+import type { Meta, MetaPlugin } from './meta.ts'
+import type { RouterContract } from './router.ts'
+import type { AnySchema } from './schema.ts'
 import { isTypescriptObject } from '@orpc/shared'
-import { ProcedureContract } from './procedure'
+import { ProcedureContract } from './procedure.ts'
 
 export interface PathMetaPlugin<
   TInputSchema extends AnySchema,

@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
-import { getMcpToolMeta, mcp } from './meta'
+import { getMcpToolMeta, mcp } from './meta.ts'
 
 describe('mcp.tool meta', () => {
   it('returns a plugin with name ~mcp/tool', () => {

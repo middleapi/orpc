@@ -4,7 +4,7 @@ import type { Context } from '@orpc/server'
 import { ContractBuilder } from '@orpc/contract'
 import { Builder, DecoratedProcedure } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
-import { toStandardSchema } from '../schema'
+import { toStandardSchema } from '../schema.ts'
 
 /**
  * Like `ErrorMapItem`, but `data` can also be an Effect Schema.

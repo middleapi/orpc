@@ -2,7 +2,7 @@ import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDir
 import type { $ZodType, $ZodTypes, ToJSONSchemaContext, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
 import { isStandardSchemaOptional, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { process as processZodSchema, toJSONSchema } from 'zod/v4/core'
-import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
+import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries.ts'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {
   /**

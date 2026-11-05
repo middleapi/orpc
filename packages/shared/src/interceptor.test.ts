@@ -1,5 +1,5 @@
-import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
-import { promiseWithResolvers } from './promise'
+import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor.ts'
+import { promiseWithResolvers } from './promise.ts'
 
 describe('intercept', () => {
   const interceptor1 = vi.fn(({ next }) => next())

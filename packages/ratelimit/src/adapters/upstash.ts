@@ -1,6 +1,6 @@
 import type { Redis } from '@upstash/redis'
-import type { BaseRedisRateLimiterOptions } from './base-redis'
-import { BaseRedisRateLimiter } from './base-redis'
+import type { BaseRedisRateLimiterOptions } from './base-redis.ts'
+import { BaseRedisRateLimiter } from './base-redis.ts'
 
 export interface UpstashRateLimiterOptions extends BaseRedisRateLimiterOptions {}
 

@@ -1,3 +1,3 @@
 it('exports RPCLink', async () => {
-  await expect(import('.')).resolves.toHaveProperty('RPCLink')
+  await expect(import('./index.ts')).resolves.toHaveProperty('RPCLink')
 })

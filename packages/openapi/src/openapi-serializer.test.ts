@@ -1,7 +1,7 @@
 import { createORPCErrorFromJson, ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
-import { OpenAPISerializer } from './openapi-serializer'
+import { OpenAPISerializer } from './openapi-serializer.ts'
 
 describe('openAPISerializer', () => {
   const serializer = new OpenAPISerializer()
@@ -367,7 +367,7 @@ describe('openAPISerializer', () => {
       expect((Function.prototype as any).polluted).toBeUndefined()
     })
 
-    /* eslint-disable no-proto, no-restricted-properties */
+    /* oxlint-disable no-proto, no-restricted-properties */
     it('deserializes __proto__ query parameters as plain data', () => {
       const result = serializer.deserialize(
         new URLSearchParams('__proto__[polluted]=yes&safe=1'),
@@ -378,7 +378,7 @@ describe('openAPISerializer', () => {
       expect(result.polluted).toBeUndefined()
       expect(result.safe).toBe('1')
     })
-    /* eslint-enable no-proto, no-restricted-properties */
+    /* oxlint-enable no-proto, no-restricted-properties */
 
     it('deserializes constructor.prototype form fields as plain data', () => {
       const form = new FormData()

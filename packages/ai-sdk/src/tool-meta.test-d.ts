@@ -1,7 +1,7 @@
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { aiSdkTool } from './tool-meta'
+import { aiSdkTool } from './tool-meta.ts'
 
 describe('aiSdkTool meta', () => {
   it('infer input and output types from the contract', () => {

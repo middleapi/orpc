@@ -1,11 +1,11 @@
 import type { Interceptor } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { ClientContext, ClientLink, ClientOptions } from '../../types'
-import type { StandardLinkCodec } from './codec'
-import type { StandardLinkPlugin } from './plugin'
-import type { StandardLinkTransport } from './transport'
+import type { ClientContext, ClientLink, ClientOptions } from '../../types.ts'
+import type { StandardLinkCodec } from './codec.ts'
+import type { StandardLinkPlugin } from './plugin.ts'
+import type { StandardLinkTransport } from './transport.ts'
 import { getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
-import { CompositeStandardLinkPlugin } from './plugin'
+import { CompositeStandardLinkPlugin } from './plugin.ts'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
   path: string[]

@@ -2,8 +2,8 @@ import type { Client } from '@orpc/client'
 import { RPCJsonSerializer } from '@orpc/client'
 import { sleep } from '@orpc/shared'
 import { dehydrate, hydrate, QueryCache, QueryClient } from '@tanstack/query-core'
-import { createRouterUtils } from './router-utils'
-import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr'
+import { createRouterUtils } from './router-utils.ts'
+import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr.ts'
 
 describe('createHydrationOptions', () => {
   function roundTrip(data: unknown, options = createHydrationOptions()): unknown {

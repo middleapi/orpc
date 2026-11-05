@@ -1,13 +1,13 @@
-import type { ContractBuilder } from './builder'
-import type { ProcedureContractBuilderWithInput, ProcedureContractBuilderWithOutput } from './builder-variants'
-import type { MergedErrorMap } from './error-utils'
-import type { Meta, MetaPlugin } from './meta'
-import type { ProcedureContract } from './procedure'
-import type { AugmentedContractRouter } from './router-utils'
-import type { Schema } from './schema'
+import type { ContractBuilder } from './builder.ts'
+import type { ProcedureContractBuilderWithInput, ProcedureContractBuilderWithOutput } from './builder-variants.ts'
+import type { MergedErrorMap } from './error-utils.ts'
+import type { Meta, MetaPlugin } from './meta.ts'
+import type { ProcedureContract } from './procedure.ts'
+import type { AugmentedContractRouter } from './router-utils.ts'
+import type { Schema } from './schema.ts'
 import { describe, expectTypeOf, it } from 'vitest'
 import { z } from 'zod'
-import { oc } from './builder'
+import { oc } from './builder.ts'
 
 const errorMap = {
   BASE: {

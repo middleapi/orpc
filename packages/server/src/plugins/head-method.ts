@@ -1,6 +1,6 @@
 import type { StandardBody, StandardHeaders, StandardResponse } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { isAsyncIteratorObject, toArray } from '@orpc/shared'
 import { cancelStandardBody, getRequiredStandardBodyHint } from '@standard-server/core'
 import { toFetchBody } from '@standard-server/fetch'

@@ -1,14 +1,14 @@
-export * from './request-validation'
+export * from './request-validation.ts'
 export {
   /**
    * @deprecated Use `RequestValidationLinkPlugin` instead.
    */
   RequestValidationLinkPlugin as RequestValidationPlugin,
-} from './request-validation'
-export * from './response-validation'
+} from './request-validation.ts'
+export * from './response-validation.ts'
 export {
   /**
    * @deprecated Use `ResponseValidationLinkPlugin` instead.
    */
   ResponseValidationLinkPlugin as ResponseValidationPlugin,
-} from './response-validation'
+} from './response-validation.ts'

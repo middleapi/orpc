@@ -1,7 +1,7 @@
 import type { PromiseWithError, ThrowableError } from '@orpc/shared'
-import type { AnyORPCError } from './error'
-import type { ClientContext, ClientOptions, ClientRest, FriendlyClientOptions } from './types'
-import { isDefinedError } from './error-utils'
+import type { AnyORPCError } from './error.ts'
+import type { ClientContext, ClientOptions, ClientRest, FriendlyClientOptions } from './types.ts'
+import { isDefinedError } from './error-utils.ts'
 
 export function resolveFriendlyClientOptions<T extends ClientContext>(options: FriendlyClientOptions<T>): ClientOptions<T> {
   return {

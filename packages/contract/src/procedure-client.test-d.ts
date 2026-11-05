@@ -1,5 +1,5 @@
 import type { Client, ORPCError, ThrowableError } from '@orpc/client'
-import type { ProcedureContractClient } from './procedure-client'
+import type { ProcedureContractClient } from './procedure-client.ts'
 import { z } from 'zod'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.

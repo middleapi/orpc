@@ -3,7 +3,7 @@ import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMidd
 import { error } from '@orpc/contract'
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
-import './schema'
+import './schema.ts'
 
 const errorMap = {
   BASE: {

@@ -1,9 +1,9 @@
 import type { AnyNestedClient, InferClientContext, InferClientError, RPCJsonSerialization } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { RouterUtilsPlugin } from './plugin'
-import type { ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils'
+import type { RouterUtilsPlugin } from './plugin.ts'
+import type { ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils.ts'
 import { RPCJsonSerializer } from '@orpc/client'
-import { mergeProcedureUtilsOptions } from './procedure-utils'
+import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
 
 /**
  * Creates `dehydrate` and `hydrate` query client defaults that preserve oRPC types.

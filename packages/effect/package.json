@@ -23,26 +23,26 @@
     "typesafe"
   ],
   "sideEffects": [
-    "./dist/extensions/effect.mjs",
-    "./dist/extensions/schema.mjs"
+    "./dist/extensions/effect.js",
+    "./dist/extensions/schema.js"
   ],
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
       },
       "./extensions/effect": {
-        "types": "./dist/extensions/effect.d.mts",
-        "import": "./dist/extensions/effect.mjs",
-        "default": "./dist/extensions/effect.mjs"
+        "types": "./dist/extensions/effect.d.ts",
+        "import": "./dist/extensions/effect.js",
+        "default": "./dist/extensions/effect.js"
       },
       "./extensions/schema": {
-        "types": "./dist/extensions/schema.d.mts",
-        "import": "./dist/extensions/schema.mjs",
-        "default": "./dist/extensions/schema.mjs"
+        "types": "./dist/extensions/schema.d.ts",
+        "import": "./dist/extensions/schema.js",
+        "default": "./dist/extensions/schema.js"
       }
     }
   },
@@ -56,8 +56,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc && node ../../scripts/verify-dist.ts"
   },
   "peerDependencies": {
     "effect": ">=4.0.0"

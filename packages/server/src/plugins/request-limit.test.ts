@@ -1,10 +1,10 @@
 import zlib from 'node:zlib'
 import supertest from 'supertest'
-import { RPCHandler } from '../adapters/fetch'
-import { RPCHandler as NodeRPCHandler } from '../adapters/node'
-import { os } from '../builder'
-import { RequestCompressionHandlerPlugin } from './request-compression'
-import { RequestLimitHandlerPlugin } from './request-limit'
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
+import { os } from '../builder.ts'
+import { RequestCompressionHandlerPlugin } from './request-compression.ts'
+import { RequestLimitHandlerPlugin } from './request-limit.ts'
 
 describe('requestLimitHandlerPlugin', () => {
   const size22Json = { json: { foo: 'bar' } }

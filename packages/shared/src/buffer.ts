@@ -6,8 +6,9 @@ import type { Arrayable } from 'type-fest'
  * Prefers the newer `.bytes` method when available as it more efficient but not widely supported yet.
  */
 export async function loadBytes(source: Pick<Blob, 'arrayBuffer' | 'bytes'>): ReturnType<Blob['bytes']> {
+  // oxlint-disable-next-line no-restricted-properties
   if (typeof source.bytes === 'function') {
-    // eslint-disable-next-line ban/ban
+    // oxlint-disable-next-line no-restricted-properties
     return source.bytes()
   }
 
@@ -89,7 +90,6 @@ export function encodeBase64(bytes: Uint8Array): string {
   }
 
   // loaded at runtime, so the package keeps working on runtimes without Node.js built-ins
-  // eslint-disable-next-line node/prefer-global/process
   const NodeBuffer = (globalThis as NodeBuiltinModulesGlobal).process?.getBuiltinModule?.('node:buffer')?.Buffer
 
   if (NodeBuffer !== undefined) {

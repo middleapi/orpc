@@ -1,8 +1,8 @@
 import type { ThrowableError } from '@orpc/shared'
-import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
+import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher.ts'
 import { compareSequentialIds, once, SequentialIdGenerator } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
-import { Publisher } from '../publisher'
+import { Publisher } from '../publisher.ts'
 
 export interface MemoryPublisherOptions extends PublisherOptions {
   /**

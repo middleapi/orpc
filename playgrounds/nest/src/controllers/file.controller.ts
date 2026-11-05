@@ -5,8 +5,6 @@ import { deleteFile, findFile, uploadFile } from '../routers/file'
 
 @Controller()
 export class FileController {
-  constructor() {}
-
   @Implement(contract.file.upload)
   upload() {
     return uploadFile

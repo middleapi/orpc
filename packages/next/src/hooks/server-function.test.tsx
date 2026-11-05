@@ -1,8 +1,8 @@
 import { ORPCError, os } from '@orpc/server'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { z } from 'zod'
-import { createServerFunction } from '../server-function'
-import { useServerFunction } from './server-function'
+import { createServerFunction } from '../server-function.ts'
+import { useServerFunction } from './server-function.ts'
 
 export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 

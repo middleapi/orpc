@@ -1,4 +1,4 @@
-import type { DistributiveOmit, IntersectPick, PromiseWithError, Public } from './types'
+import type { DistributiveOmit, IntersectPick, PromiseWithError, Public } from './types.ts'
 
 interface Empty {}
 

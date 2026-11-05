@@ -30,34 +30,34 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
       },
       "./plugins": {
-        "types": "./dist/plugins/index.d.mts",
-        "import": "./dist/plugins/index.mjs",
-        "default": "./dist/plugins/index.mjs"
+        "types": "./dist/plugins/index.d.ts",
+        "import": "./dist/plugins/index.js",
+        "default": "./dist/plugins/index.js"
       },
       "./standard": {
-        "types": "./dist/adapters/standard/index.d.mts",
-        "import": "./dist/adapters/standard/index.mjs",
-        "default": "./dist/adapters/standard/index.mjs"
+        "types": "./dist/adapters/standard/index.d.ts",
+        "import": "./dist/adapters/standard/index.js",
+        "default": "./dist/adapters/standard/index.js"
       },
       "./fetch": {
-        "types": "./dist/adapters/fetch/index.d.mts",
-        "import": "./dist/adapters/fetch/index.mjs",
-        "default": "./dist/adapters/fetch/index.mjs"
+        "types": "./dist/adapters/fetch/index.d.ts",
+        "import": "./dist/adapters/fetch/index.js",
+        "default": "./dist/adapters/fetch/index.js"
       },
       "./websocket": {
-        "types": "./dist/adapters/websocket/index.d.mts",
-        "import": "./dist/adapters/websocket/index.mjs",
-        "default": "./dist/adapters/websocket/index.mjs"
+        "types": "./dist/adapters/websocket/index.d.ts",
+        "import": "./dist/adapters/websocket/index.js",
+        "default": "./dist/adapters/websocket/index.js"
       },
       "./message-port": {
-        "types": "./dist/adapters/message-port/index.d.mts",
-        "import": "./dist/adapters/message-port/index.mjs",
-        "default": "./dist/adapters/message-port/index.mjs"
+        "types": "./dist/adapters/message-port/index.d.ts",
+        "import": "./dist/adapters/message-port/index.js",
+        "default": "./dist/adapters/message-port/index.js"
       }
     }
   },
@@ -74,8 +74,7 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc && node ../../scripts/verify-dist.ts"
   },
   "dependencies": {
     "@orpc/shared": "workspace:*",

@@ -6,8 +6,8 @@ import type { OpenAPIMeta } from '@orpc/openapi'
 import type { AnyProcedure, AnyRouter, Context, InferRouterInitialContext, StandardHeaders, StandardLazyRequest, StandardResponse } from '@orpc/server'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerOptions } from '@orpc/server/standard'
 import type { MaybeOptionalOptions, Promisable, Public, Value } from '@orpc/shared'
-import type { McpToolMeta } from './meta'
-import type { ToolInputJsonSchema } from './utils'
+import type { McpToolMeta } from './meta.ts'
+import type { ToolInputJsonSchema } from './utils.ts'
 import { BAGGAGE_META_KEY, TRACEPARENT_META_KEY, TRACESTATE_META_KEY } from '@modelcontextprotocol/server'
 import { COMMON_ERROR_STATUS_MAP, ORPCError, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { DelegatingJsonSchemaConverter, StandardJsonSchemaConverter } from '@orpc/json-schema'
@@ -16,8 +16,8 @@ import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS, ErrorEvent, resolveContra
 import { StandardHandler } from '@orpc/server/standard'
 import { encodeBase64, getOwn, isAsyncIteratorObject, isPlainObject, loadBytes, pathToHttpPath, resolveMaybeOptionalOptions, safeEncodeURIComponent, stringifyJSON, throwIfAborted, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
-import { getMcpToolMeta } from './meta'
-import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils'
+import { getMcpToolMeta } from './meta.ts'
+import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils.ts'
 
 /**
  * Options for {@link McpRegistrar}. Tool calls run through a standard handler,

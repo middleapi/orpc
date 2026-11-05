@@ -2,7 +2,7 @@ import { os } from '@orpc/server'
 import { act, renderHook } from '@testing-library/react'
 import { startTransition, useActionState } from 'react'
 import { z } from 'zod'
-import { createServerFunction } from './server-function'
+import { createServerFunction } from './server-function.ts'
 
 describe('createServerFunction with useActionState', () => {
   const fn = createServerFunction(

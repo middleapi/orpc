@@ -4,7 +4,7 @@ import { promiseWithResolvers } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { createClient } from 'redis'
-import { experimental_BunRedisLocker as BunRedisLocker } from '../src'
+import { experimental_BunRedisLocker as BunRedisLocker } from '../src/index.ts'
 
 const REDIS_URL = Bun.env.REDIS_URL
 

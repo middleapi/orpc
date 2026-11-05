@@ -2,10 +2,10 @@ import { ORPCError, os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { sleep } from '@standard-server/shared'
 import { z } from 'zod'
-import { createCompressionHonoFetchBatchClientServerTest } from './__shared__/client-server.compression-hono-fetch'
-import { createCompressionNodeHttpBatchClientServerTest } from './__shared__/client-server.compression-node-http'
-import { createHonoFetchBatchClientServerTest } from './__shared__/client-server.hono-fetch'
-import { createNodeHttpBatchClientServerTest } from './__shared__/client-server.node-http'
+import { createCompressionHonoFetchBatchClientServerTest } from './__shared__/client-server.compression-hono-fetch.ts'
+import { createCompressionNodeHttpBatchClientServerTest } from './__shared__/client-server.compression-node-http.ts'
+import { createHonoFetchBatchClientServerTest } from './__shared__/client-server.hono-fetch.ts'
+import { createNodeHttpBatchClientServerTest } from './__shared__/client-server.node-http.ts'
 
 describe.each([
   ['node-http', createNodeHttpBatchClientServerTest],

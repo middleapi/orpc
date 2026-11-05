@@ -3,8 +3,8 @@ import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable, Public } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { OpenAPIMeta } from '../../meta'
-import type { OpenAPIMatcherOptions } from './openapi-matcher'
+import type { OpenAPIMeta } from '../../meta.ts'
+import type { OpenAPIMatcherOptions } from './openapi-matcher.ts'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import { getOwn, isPlainObject, isTypescriptObject, NullProtoObj, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
@@ -12,12 +12,12 @@ import { parseStandardUrl } from '@standard-server/core'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
-} from '../../constants'
-import { getOpenAPIMeta } from '../../meta'
-import { OpenAPISerializer } from '../../openapi-serializer'
-import { isBodylessMethod } from '../../utils'
-import { OpenAPIMatcher } from './openapi-matcher'
-import { serializeHeaders } from './utils'
+} from '../../constants.ts'
+import { getOpenAPIMeta } from '../../meta.ts'
+import { OpenAPISerializer } from '../../openapi-serializer.ts'
+import { isBodylessMethod } from '../../utils.ts'
+import { OpenAPIMatcher } from './openapi-matcher.ts'
+import { serializeHeaders } from './utils.ts'
 
 export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**

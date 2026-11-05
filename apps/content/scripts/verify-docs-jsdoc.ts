@@ -9,7 +9,7 @@ import ts from 'typescript'
  * Verifies that every `@orpc/*` API mentioned in the docs content (apps/content/docs)
  * carries a JSDoc comment with a valid backlink to https://orpc.dev on its declaration.
  *
- * Usage: node scripts/verify-docs-jsdoc.ts [--filter server,client] [--strict] [--list]
+ * Usage: node apps/content/scripts/verify-docs-jsdoc.ts [--filter server,client] [--strict] [--list]
  */
 
 const ROOT_DIR = process.cwd()

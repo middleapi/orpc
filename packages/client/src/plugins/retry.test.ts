@@ -1,11 +1,11 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
-import type { RetryLinkPluginContext } from './retry'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
+import type { RetryLinkPluginContext } from './retry.ts'
 import { promiseWithResolvers } from '@orpc/shared'
 import { withEventMeta } from '@standard-server/core'
-import { StandardLink } from '../adapters/standard'
-import { MalformedResponseError, ORPCError, ResponseError } from '../error'
-import { isRetryableError, RetryLinkPlugin } from './retry'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { MalformedResponseError, ORPCError, ResponseError } from '../error.ts'
+import { isRetryableError, RetryLinkPlugin } from './retry.ts'
 
 interface TestContext extends RetryLinkPluginContext {
   tag?: string

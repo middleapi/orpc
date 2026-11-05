@@ -1,9 +1,9 @@
-import type { InitialInputSchema, InitialOutputSchema } from './builder'
-import type { ErrorMap } from './error'
-import type { MergedErrorMap } from './error-utils'
-import type { MetaPlugin } from './meta'
-import type { ProcedureContract } from './procedure'
-import type { AnySchema, MergedSchema } from './schema'
+import type { InitialInputSchema, InitialOutputSchema } from './builder.ts'
+import type { ErrorMap } from './error.ts'
+import type { MergedErrorMap } from './error-utils.ts'
+import type { MetaPlugin } from './meta.ts'
+import type { ProcedureContract } from './procedure.ts'
+import type { AnySchema, MergedSchema } from './schema.ts'
 
 /**
  * The contract builder variant returned after `.input` is called.

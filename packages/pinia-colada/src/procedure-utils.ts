@@ -1,13 +1,13 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
-import type { OperationKeyBaseOptions } from './key'
-import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, StreamedKeyOptions, StreamedOptionsIn, StreamedOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
+import type { OperationKeyBaseOptions } from './key.ts'
+import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, StreamedKeyOptions, StreamedOptionsIn, StreamedOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types.ts'
 import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { liveQuery } from './live-query'
-import { SharedUtils } from './shared-utils'
-import { serializableStreamedQuery } from './stream-query'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { liveQuery } from './live-query.ts'
+import { SharedUtils } from './shared-utils.ts'
+import { serializableStreamedQuery } from './stream-query.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
 export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput> {
   path: string[]

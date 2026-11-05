@@ -1,6 +1,6 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
+import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key.ts'
 import type {
   Fetcher,
   FetcherOptions,
@@ -12,11 +12,11 @@ import type {
   OperationContext,
   Subscriber,
   SubscriberOptions,
-} from './types'
+} from './types.ts'
 import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { generateOperationKey } from './key'
-import { SharedUtils } from './shared-utils'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { generateOperationKey } from './key.ts'
+import { SharedUtils } from './shared-utils.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
 export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {
 }

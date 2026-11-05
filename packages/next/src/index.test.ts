@@ -1,5 +1,5 @@
 it('exports server function and server functionable, deferred interceptors, form helpers', async () => {
-  await expect(import('./index')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     createServerFunction: expect.any(Function),
     createServerFunctionable: expect.any(Function),
     createServerFormFunction: expect.any(Function),

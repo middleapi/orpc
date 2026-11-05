@@ -1,4 +1,4 @@
-import { decodeBase64url, encodeBase64url } from './base64url'
+import { decodeBase64url, encodeBase64url } from './base64url.ts'
 
 describe('encodeBase64url / decodeBase64url', () => {
   it('should encode and decode Uint8Array correctly', () => {

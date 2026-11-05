@@ -1,10 +1,10 @@
 import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
-import type { RateLimitHandlerPluginContext } from './handler-plugin'
-import type { RateLimiter } from './types'
+import type { RateLimitHandlerPluginContext } from './handler-plugin.ts'
+import type { RateLimiter } from './types.ts'
 import { ORPCError } from '@orpc/server'
 import { toArray, value } from '@orpc/shared'
-import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
+import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin.ts'
 
 export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for('ORPC_RATELIMIT_MIDDLEWARE_CONTEXT')
 

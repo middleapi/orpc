@@ -2,8 +2,8 @@ import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { os } from '@orpc/server'
 import request from 'supertest'
-import { openapi } from '../../meta'
-import { OpenAPIHandler } from './openapi-handler'
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandler } from './openapi-handler.ts'
 
 describe('openapiHandler', () => {
   beforeEach(() => {

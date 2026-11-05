@@ -1,7 +1,7 @@
 import { toJsonSchema } from '@valibot/to-json-schema'
 import * as v from 'valibot'
 import * as z from 'zod'
-import { ValibotToJsonSchemaConverter } from './converter'
+import { ValibotToJsonSchemaConverter } from './converter.ts'
 
 vi.mock('@valibot/to-json-schema', async (original) => {
   const mod = await original<typeof import('@valibot/to-json-schema')>()

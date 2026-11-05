@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  lint_and_typecheck:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -19,9 +19,7 @@ jobs:
 
       - run: pnpm i
 
-      - run: pnpm run lint
-
-      - run: pnpm run type:check
+      - run: pnpm run check
 
       - run: pnpm run docs:validate
 

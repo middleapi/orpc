@@ -2,7 +2,7 @@ import type { AnyProcedureContract, AnySchema, ErrorMap, MetaPlugin } from '@orp
 import type { Lazy } from '@orpc/server'
 import type { Value } from '@orpc/shared'
 import type { StandardBodyHint } from '@standard-server/core'
-import type { OpenAPIV3_2 } from './types'
+import type { OpenAPIV3_2 } from './types.ts'
 import { mergeHttpPath } from '@orpc/shared'
 
 export interface OpenAPIMeta {

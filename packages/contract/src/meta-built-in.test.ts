@@ -1,5 +1,5 @@
-import { getPathMeta, meta, resolveBasePathMeta } from './meta-built-in'
-import { ProcedureContract } from './procedure'
+import { getPathMeta, meta, resolveBasePathMeta } from './meta-built-in.ts'
+import { ProcedureContract } from './procedure.ts'
 
 describe('meta.path', () => {
   it('returns plugin with correct name', () => {

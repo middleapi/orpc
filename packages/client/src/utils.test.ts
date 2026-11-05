@@ -1,5 +1,5 @@
-import { ORPCError } from './error'
-import { resolveClientRest, resolveFriendlyClientOptions, safe } from './utils'
+import { ORPCError } from './error.ts'
+import { resolveClientRest, resolveFriendlyClientOptions, safe } from './utils.ts'
 
 describe('resolveFriendlyClientOptions', () => {
   it('works', () => {

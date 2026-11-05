@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
+import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin.ts'
 import { Buffer } from 'node:buffer'
 import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
@@ -14,7 +14,7 @@ import { RPCHandler } from '@orpc/server/node'
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
-import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
+import { StaticFileHandlerPlugin } from './static-file-handler-plugin.ts'
 
 describe('staticFileHandlerPlugin', () => {
   let baseDir: string

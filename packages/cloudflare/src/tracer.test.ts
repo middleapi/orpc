@@ -1,7 +1,7 @@
 import type { Tracer } from '@orpc/shared'
 import { getTracer, setTracer } from '@orpc/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { experimental_CloudflareSpan as CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer'
+import { experimental_CloudflareSpan as CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer.ts'
 
 function createFakeSpan() {
   return {

@@ -1,4 +1,4 @@
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 /**

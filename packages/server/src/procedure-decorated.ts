@@ -1,9 +1,9 @@
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, MergedErrorMap, MetaPlugin } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
-import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { Middleware } from './middleware'
+import type { Context, MergedContext, MergedInitialContext } from './context.ts'
+import type { Middleware } from './middleware.ts'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
-import { Procedure } from './procedure'
+import { Procedure } from './procedure.ts'
 
 export class DecoratedProcedure<
   TInitialContext extends Context,

@@ -1,8 +1,8 @@
 import * as v from 'valibot'
 import * as z from 'zod'
 import { $ZodRegistry, toJSONSchema } from 'zod/v4/core'
-import { ZodToJsonSchemaConverter } from './converter'
-import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
+import { ZodToJsonSchemaConverter } from './converter.ts'
+import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries.ts'
 
 vi.mock('zod/v4/core', async (original) => {
   const mod = await original<typeof import('zod/v4/core')>()

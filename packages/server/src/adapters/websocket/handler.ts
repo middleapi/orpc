@@ -1,10 +1,10 @@
 import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
+import type { Context } from '../../context.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
 import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler } from '../standard-peer/index.ts'
 
 /**
  * Supports standard WebSocket instances, Bun ServerWebSocket, "ws" ServerWebSocket,

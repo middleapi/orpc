@@ -1,5 +1,5 @@
-import type { ClientOptions } from './types'
-import { DynamicLink } from './dynamic-link'
+import type { ClientOptions } from './types.ts'
+import { DynamicLink } from './dynamic-link.ts'
 
 it('dynamicLink', async () => {
   const mockedLink = { call: vi.fn().mockResolvedValue('__mocked__') }

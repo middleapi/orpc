@@ -1,6 +1,6 @@
 import type { Redis } from '@upstash/redis'
-import type { BaseRedisLockerOptions } from './base-redis'
-import { BaseRedisLocker } from './base-redis'
+import type { BaseRedisLockerOptions } from './base-redis.ts'
+import { BaseRedisLocker } from './base-redis.ts'
 
 /**
  * Locker adapter for Upstash Redis. Acquires locks with `SET NX PX` and releases

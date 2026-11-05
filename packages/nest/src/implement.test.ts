@@ -1,7 +1,7 @@
 import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
-import type { NestStandardLazyRequest } from './module'
+import type { NestStandardLazyRequest } from './module.ts'
 import { Buffer } from 'node:buffer'
 import { once } from 'node:events'
 import { request as httpRequest } from 'node:http'
@@ -20,8 +20,8 @@ import { catchError, tap } from 'rxjs'
 import supertest from 'supertest'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
-import { Implement } from './implement'
-import { ORPCModule } from './module'
+import { Implement } from './implement.ts'
+import { ORPCModule } from './module.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -58,7 +58,7 @@ describe('requirements', () => {
     })
 
     try {
-      const { Implement: ImplementWithoutQueryMethod } = await import('./implement')
+      const { Implement: ImplementWithoutQueryMethod } = await import('./implement.ts')
 
       const contract = oc.meta(openapi({
         path: '/procedure',

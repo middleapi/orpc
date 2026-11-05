@@ -1,6 +1,6 @@
 import type { ThrowableError } from '@orpc/shared'
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { toArray } from '@orpc/shared'
 
 export interface RethrowHandlerPluginOptions<T extends Context> {

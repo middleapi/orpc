@@ -1,6 +1,6 @@
 import type { ClientContext } from '@orpc/client'
 import type { DefineInfiniteQueryOptions, DefineInfiniteQueryOptionsTagged, DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseInfiniteQueryData, UseMutationOptions, UseMutationOptionsGlobal, UseQueryOptions } from '@pinia/colada'
-import type { SerializableStreamedQueryOptions } from './stream-query'
+import type { SerializableStreamedQueryOptions } from './stream-query.ts'
 
 export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
 export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never

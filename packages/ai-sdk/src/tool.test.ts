@@ -4,8 +4,8 @@ import { os } from '@orpc/server'
 import { generateText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import z from 'zod'
-import { createToolFactory, implementToolFactory } from './tool'
-import { aiSdkTool } from './tool-meta'
+import { createToolFactory, implementToolFactory } from './tool.ts'
+import { aiSdkTool } from './tool-meta.ts'
 
 function toolCallModel(toolName: string, args: unknown) {
   return new MockLanguageModelV4({

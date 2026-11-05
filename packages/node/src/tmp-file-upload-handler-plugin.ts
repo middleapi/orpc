@@ -12,7 +12,7 @@ import { ORPCError } from '@orpc/server'
 import { isAsyncIteratorObject, override, toArray, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader, getFilenameFromContentDisposition, resolveStandardBodyHint } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
-import { parseHeaderParameters, parseMultipart } from './multipart'
+import { parseHeaderParameters, parseMultipart } from './multipart.ts'
 
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**

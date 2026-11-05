@@ -1,5 +1,5 @@
 import { getEventMeta, withEventMeta } from '@standard-server/core'
-import { MemoryPublisher } from './memory'
+import { MemoryPublisher } from './memory.ts'
 
 type TestEvents = {
   message: { text: string }
@@ -262,13 +262,12 @@ describe('memoryPublisher', () => {
     it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
       const publisher = new MemoryPublisher<TestEvents>()
 
-      let unsubscribeFirst: () => Promise<void>
       const first = vi.fn(() => {
         void unsubscribeFirst()
       })
       const second = vi.fn()
 
-      unsubscribeFirst = await publisher.subscribe('message', first)
+      const unsubscribeFirst = await publisher.subscribe('message', first)
       const unsubscribeSecond = await publisher.subscribe('message', second)
 
       await publisher.publish('message', { text: 'first' })

@@ -1,11 +1,11 @@
 import type { ClientContext } from '@orpc/client'
 import type { AnySchema, ErrorMap } from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { Context } from '../context'
-import type { Procedure } from '../procedure'
-import type { ProcedureClient, ProcedureClientOptions } from '../procedure-client'
-import { createProcedureClient } from '../procedure-client'
-import { DecoratedProcedure } from '../procedure-decorated'
+import type { Context } from '../context.ts'
+import type { Procedure } from '../procedure.ts'
+import type { ProcedureClient, ProcedureClientOptions } from '../procedure-client.ts'
+import { createProcedureClient } from '../procedure-client.ts'
+import { DecoratedProcedure } from '../procedure-decorated.ts'
 
 declare module '@orpc/server' {
   interface DecoratedProcedure<

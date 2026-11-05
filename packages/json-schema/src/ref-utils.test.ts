@@ -1,5 +1,5 @@
-import type { JsonSchema } from './types'
-import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaLocalPointer, resolveJsonSchemaRootLocalRef, visitJsonSchemaRefs } from './ref-utils'
+import type { JsonSchema } from './types.ts'
+import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaLocalPointer, resolveJsonSchemaRootLocalRef, visitJsonSchemaRefs } from './ref-utils.ts'
 
 describe('visitJsonSchemaRefs', () => {
   it('visits refs under the same keywords mapJsonSchemaRefs rewrites, and skips non-schema keywords', () => {

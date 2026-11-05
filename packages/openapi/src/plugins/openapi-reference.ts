@@ -4,7 +4,7 @@ import type { Promisable, Value } from '@orpc/shared'
 import type { ApiReferenceConfiguration as ScalarProviderConfig } from '@scalar/api-reference'
 import type { StandardUrl } from '@standard-server/core'
 import type { SwaggerUIOptions } from 'swagger-ui'
-import type { OpenAPIDocument, OpenAPIVersion } from '../types'
+import type { OpenAPIDocument, OpenAPIVersion } from '../types.ts'
 import { getTracer, matchesHttpPath, mergeHttpPath, stringifyJSON, toArray, value } from '@orpc/shared'
 
 export type OpenAPIReferenceHandlerPluginProvider = 'scalar' | 'swagger'

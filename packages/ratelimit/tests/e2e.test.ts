@@ -1,9 +1,9 @@
-import type { RateLimiter } from '../src'
+import type { RateLimiter } from '../src/index.ts'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { z } from 'zod'
-import { ratelimit, RateLimitHandlerPlugin } from '../src'
-import { MemoryRateLimiter } from '../src/adapters/memory'
+import { ratelimit, RateLimitHandlerPlugin } from '../src/index.ts'
+import { MemoryRateLimiter } from '../src/adapters/memory.ts'
 
 it('works', async () => {
   const router = {

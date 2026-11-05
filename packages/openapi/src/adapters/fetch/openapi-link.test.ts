@@ -1,9 +1,9 @@
 import type { StandardLinkPlugin } from '@orpc/client/standard'
 import { createORPCClient } from '@orpc/client'
 import { os } from '@orpc/server'
-import { openapi } from '../../meta'
-import { OpenAPIHandler } from './openapi-handler'
-import { OpenAPILink } from './openapi-link'
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandler } from './openapi-handler.ts'
+import { OpenAPILink } from './openapi-link.ts'
 
 describe('openapiLink', () => {
   const date = new Date('2024-01-02T03:04:05.000Z')

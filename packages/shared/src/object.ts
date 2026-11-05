@@ -1,4 +1,4 @@
-import type { AnyFunction } from './function'
+import type { AnyFunction } from './function.ts'
 import { getOrBind, isTypescriptObject } from '@standard-server/shared'
 
 export type Segment = string | number
@@ -32,7 +32,7 @@ export function findDeepMatches(
  * Get constructor of the value
  *
  */
-export function getConstructor(value: unknown): Function | null | undefined { // eslint-disable-line ts/no-unsafe-function-type
+export function getConstructor(value: unknown): Function | null | undefined { // oxlint-disable-line typescript/no-unsafe-function-type
   // Object.getPrototypeOf require object in node.js
   if (!isTypescriptObject(value)) {
     return null
@@ -41,7 +41,7 @@ export function getConstructor(value: unknown): Function | null | undefined { //
   return Object.getPrototypeOf(value)?.constructor
 }
 
-export function* getConstructors(value: unknown): Generator<Function> { // eslint-disable-line ts/no-unsafe-function-type
+export function* getConstructors(value: unknown): Generator<Function> { // oxlint-disable-line typescript/no-unsafe-function-type
   if (!isTypescriptObject(value)) {
     return
   }

@@ -1,8 +1,8 @@
 import { isDefinedError, ORPCError } from '@orpc/client'
 import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { defineComponent, ref } from 'vue'
-import { createPiniaColadaUtils, PINIA_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src'
-import { client, mount, orpc, router } from './__shared__/orpc'
+import { createPiniaColadaUtils, PINIA_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src/index.ts'
+import { client, mount, orpc, router } from './__shared__/orpc.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()

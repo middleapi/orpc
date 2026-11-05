@@ -1,11 +1,11 @@
-import type { BunRedisPublisherOptions } from './redis-publisher'
+import type { BunRedisPublisherOptions } from './redis-publisher.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { RedisClient } from 'bun'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'bun:test'
-import { waitFor } from '../tests/__shared__/utils'
-import { BunRedisPublisher } from './redis-publisher'
+import { waitFor } from '../tests/__shared__/utils.ts'
+import { BunRedisPublisher } from './redis-publisher.ts'
 
 const REDIS_URL = process.env.REDIS_URL
 

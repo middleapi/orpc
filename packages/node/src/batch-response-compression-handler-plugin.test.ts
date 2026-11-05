@@ -1,11 +1,11 @@
 import type { AnyRouter } from '@orpc/server'
-import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin'
+import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin.ts'
 import { Buffer } from 'node:buffer'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BATCH_CONTENT_TYPE, BatchHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import { promiseWithResolvers } from '@orpc/shared'
-import { BatchResponseCompressionHandlerPlugin } from './batch-response-compression-handler-plugin'
+import { BatchResponseCompressionHandlerPlugin } from './batch-response-compression-handler-plugin.ts'
 
 // Long enough that a compressed body is unmistakably smaller than the identity one
 const largeValue = 'batched-payload-'.repeat(64)

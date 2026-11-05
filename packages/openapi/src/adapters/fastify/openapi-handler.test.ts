@@ -3,8 +3,8 @@ import type { FastifyInstance } from 'fastify'
 import { os } from '@orpc/server'
 import Fastify from 'fastify'
 import request from 'supertest'
-import { openapi } from '../../meta'
-import { OpenAPIHandler } from './openapi-handler'
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandler } from './openapi-handler.ts'
 
 describe('openapiHandler', () => {
   let app: FastifyInstance

@@ -1,4 +1,4 @@
-import { decrypt, encrypt } from './encryption'
+import { decrypt, encrypt } from './encryption.ts'
 
 describe('encrypt/decrypt', () => {
   const secret = 'test-secret-key'

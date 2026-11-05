@@ -1,8 +1,8 @@
 import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
-import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
+import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis.ts'
 import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
-import { BaseRedisPublisher } from './base-redis'
+import { BaseRedisPublisher } from './base-redis.ts'
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 

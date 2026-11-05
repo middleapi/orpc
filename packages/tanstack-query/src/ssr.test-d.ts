@@ -1,7 +1,7 @@
 import type { Client } from '@orpc/client'
 import { RPCSerializer } from '@orpc/client'
-import { createRouterUtils } from './router-utils'
-import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr'
+import { createRouterUtils } from './router-utils.ts'
+import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr.ts'
 
 it('accepts an RPCSerializer', () => {
   createHydrationOptions(new RPCSerializer())

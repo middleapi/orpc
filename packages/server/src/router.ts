@@ -1,7 +1,7 @@
 import type { InferSchemaInput, InferSchemaOutput, ORPCErrorFromErrorMap, ProcedureContract, RouterContract, ThrowableError } from '@orpc/contract'
-import type { Context, MergedContext } from './context'
-import type { Lazyable } from './lazy'
-import type { Procedure } from './procedure'
+import type { Context, MergedContext } from './context.ts'
+import type { Lazyable } from './lazy.ts'
+import type { Procedure } from './procedure.ts'
 
 export type Router<TInitialContext extends Context>
   = | Procedure<TInitialContext, any, any, any, any>

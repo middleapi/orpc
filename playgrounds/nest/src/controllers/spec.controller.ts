@@ -9,8 +9,6 @@ const generator = new OpenAPIGenerator({
 
 @Controller()
 export class SpecController {
-  constructor() {}
-
   @Get('/')
   @Header('Content-Type', 'text/html')
   scalar() {

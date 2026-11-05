@@ -1,8 +1,8 @@
-import type { CreateClientServerTest } from './client-server'
+import type { CreateClientServerTest } from './client-server.ts'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/message-port'
 import { RPCHandler } from '@orpc/server/message-port'
-import { defaultSerializer } from './client-server'
+import { defaultSerializer } from './client-server.ts'
 
 export const createMessagePortClientServerTest: CreateClientServerTest = (
   router,

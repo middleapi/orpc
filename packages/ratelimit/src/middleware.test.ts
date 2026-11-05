@@ -1,7 +1,7 @@
-import type { RateLimiter, RateLimitResult } from './types'
+import type { RateLimiter, RateLimitResult } from './types.ts'
 import { call, os, type } from '@orpc/server'
-import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
-import { ratelimit, RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
+import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin.ts'
+import { ratelimit, RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware.ts'
 
 describe('ratelimit', () => {
   const createLimiter = (result: RateLimitResult): RateLimiter => ({

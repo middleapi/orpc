@@ -1,9 +1,9 @@
 import type { ORPCError } from '@orpc/client'
-import type { ErrorMap, ORPCErrorFromErrorMap } from './error'
-import type { ORPCErrorConstructorMap, ORPCErrorFactory } from './error-factory'
-import type { Schema } from './schema'
+import type { ErrorMap, ORPCErrorFromErrorMap } from './error.ts'
+import type { ORPCErrorConstructorMap, ORPCErrorFactory } from './error-factory.ts'
+import type { Schema } from './schema.ts'
 import z from 'zod'
-import { error } from './error-factory'
+import { error } from './error-factory.ts'
 
 describe('error factory', () => {
   const TestError = error('TEST', {

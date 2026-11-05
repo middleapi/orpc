@@ -3,7 +3,7 @@ import type { MaybeOptionalOptions } from '@orpc/shared'
 import { parseFormData } from '@orpc/openapi/helpers'
 import { createProcedureClient, toORPCError } from '@orpc/server'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { unstable_rethrow } from 'next/navigation'
+import { unstable_rethrow } from 'next/navigation.js'
 
 export type ServerFunctionORPCErrorJSON<T>
   = T extends ORPCError<infer U, infer V>

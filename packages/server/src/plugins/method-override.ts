@@ -1,6 +1,6 @@
 import type { StandardMethod, StandardUrl } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 import { toArray } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 

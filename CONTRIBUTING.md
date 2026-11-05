@@ -14,7 +14,9 @@ This repository uses:
 - **Node.js** v22+ (use [`pnpm env`](https://pnpm.io/cli/env) for quick setup)
 - **pnpm** and **pnpm workspaces** for dependency management
 - **Vitest** for testing
-- **ESLint** with [@antfu/eslint-config](https://github.com/antfu/eslint-config) for linting and formatting
+- **TypeScript 7** for builds (`tsc`)
+- **[Oxlint](https://oxc.rs/docs/guide/usage/linter)** for linting and type checking (`pnpm check`, `pnpm fix`)
+- **[Oxfmt](https://oxc.rs/docs/guide/usage/formatter)** for formatting (`pnpm format`)
 
 ## Workflow
 
@@ -51,7 +53,7 @@ This repository uses:
 Every public API mentioned in the documentation (`apps/content/docs`) must carry a JSDoc comment with a backlink to the official website. This is enforced in CI:
 
 ```bash
-pnpm docs:validate # runs scripts/verify-docs-jsdoc.ts (accepts [--filter server,client] [--strict] [--list] via node) and `blume validate --strict`
+pnpm docs:validate # runs apps/content/scripts/verify-docs-jsdoc.ts (accepts [--filter server,client] [--strict] [--list] via node) and `blume validate --strict`
 ```
 
 JSDoc blocks follow this template:

@@ -1,4 +1,4 @@
-import { getIssueMessage, parseFormData } from './form-data'
+import { getIssueMessage, parseFormData } from './form-data.ts'
 
 it('parseFormData', () => {
   expect(parseFormData(new FormData())).toEqual({})

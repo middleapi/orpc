@@ -1,12 +1,12 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
 import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
+import type { Context } from '../../context.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler } from '../standard-peer/index.ts'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (message: infer TMessage) => unknown
   ? TMessage

@@ -1,7 +1,7 @@
-import type { JsonSchema } from './types'
+import type { JsonSchema } from './types.ts'
 import { DEFAULT_MAX_BIGINT_DIGITS, getOwn, isPlainObject, isTypescriptObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
-import { resolveJsonSchemaLocalPointer } from './ref-utils'
-import { JsonSchemaXNativeType } from './types'
+import { resolveJsonSchemaLocalPointer } from './ref-utils.ts'
+import { JsonSchemaXNativeType } from './types.ts'
 
 /**
  * How well a value matches a schema, used to pick the best union branch.

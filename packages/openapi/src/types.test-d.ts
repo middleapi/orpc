@@ -1,7 +1,7 @@
 import type { Client, ORPCError } from '@orpc/client'
 import type { RouterContractClient } from '@orpc/contract'
 import type { AsyncIteratorClass } from '@orpc/shared'
-import type { JsonifiedClient, JsonifiedValue, OpenAPIDocument, OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2 } from './types'
+import type { JsonifiedClient, JsonifiedValue, OpenAPIDocument, OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2 } from './types.ts'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import z from 'zod'
 

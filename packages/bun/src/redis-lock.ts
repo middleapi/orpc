@@ -22,7 +22,7 @@ export class experimental_BunRedisLocker extends BaseRedisLocker {
    * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
    */
   prefix(prefix: string): experimental_BunRedisLocker {
-    // eslint-disable-next-line new-cap
+    // oxlint-disable-next-line new-cap
     return new experimental_BunRedisLocker(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
   }
 

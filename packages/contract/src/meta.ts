@@ -1,5 +1,5 @@
-import type { ErrorMap } from './error'
-import type { AnySchema } from './schema'
+import type { ErrorMap } from './error.ts'
+import type { AnySchema } from './schema.ts'
 import { isTypescriptObject } from '@orpc/shared'
 
 /**

@@ -1,7 +1,7 @@
 import type { AnyMetaPlugin, ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
 import type { MaybeOptionalOptions, Promisable } from '@orpc/shared'
-import type { Context } from './context'
-import type { AnyProcedure } from './procedure'
+import type { Context } from './context.ts'
+import type { AnyProcedure } from './procedure.ts'
 
 export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<{
   output: TOutput
