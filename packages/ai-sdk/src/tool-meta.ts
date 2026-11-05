@@ -16,7 +16,9 @@ import type { ToolOutput } from './tool.ts'
  * which is the kind of tool this package produces.
  */
 export type FunctionTool<
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
   INPUT extends JSONValue | unknown | never = any,
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
   OUTPUT extends JSONValue | unknown | never = any,
 > = Extract<Tool<INPUT, OUTPUT>, { type?: 'function' | undefined }>
 

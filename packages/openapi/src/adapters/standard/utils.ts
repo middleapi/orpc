@@ -62,6 +62,7 @@ function serializeHeaderValue(
   }
 
   if (serialized !== undefined && serialized !== null) {
+    // oxlint-disable-next-line typescript/no-base-to-string
     return String(serialized)
   }
 

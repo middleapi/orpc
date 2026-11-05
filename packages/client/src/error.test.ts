@@ -44,6 +44,7 @@ describe('oRPCError', () => {
 
   it('instanceof should behave as normal', () => {
     class ExtendedORPCError extends ORPCError<any, any> {}
+    // oxlint-disable-next-line typescript/no-extraneous-class
     class NotRelated {}
 
     const orpcError = new ORPCError('test')

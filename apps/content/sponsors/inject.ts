@@ -29,6 +29,10 @@ export const GRID_SLOT_TAG = '<SponsorSlot grid />'
  * before `WORDS_PER_AD + EXTRA_WORDS_AFTER_GRID_AD` words, which only binds
  * on pages short enough to still be using the unwidened gap.
  */
+function countWords(text: string): number {
+  return text.match(/\S+/g)?.length ?? 0
+}
+
 export function injectSlots(source: string): string {
   const lines = source.split('\n')
 
@@ -40,7 +44,6 @@ export function injectSlots(source: string): string {
     }
   }
 
-  const countWords = (text: string) => text.match(/\S+/g)?.length ?? 0
   const gap = Math.max(
     WORDS_PER_AD,
     countWords(lines.slice(bodyStart).join('\n')) / MAX_ADS_PER_PAGE,

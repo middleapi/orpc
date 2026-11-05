@@ -158,6 +158,7 @@ export function toSpanAttributeValue(data: unknown): string {
       return value
     })
   } catch {
+    // oxlint-disable-next-line typescript/no-base-to-string
     return String(data)
   }
 }

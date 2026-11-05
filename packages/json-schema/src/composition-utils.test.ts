@@ -1519,6 +1519,7 @@ describe('combineJsonSchemasWithComposition', () => {
           additionalProperties: { $ref: '#/$defs/Shared' },
           not: { $ref: '#/$defs/Shared' },
           if: { $ref: '#/$defs/Shared' },
+          // oxlint-disable-next-line unicorn/no-thenable
           then: { $ref: '#/$defs/Shared' },
           else: { $ref: '#/$defs/Shared' },
           prefixItems: [{ $ref: '#/$defs/Shared' }],
@@ -1589,6 +1590,7 @@ describe('combineJsonSchemasWithComposition', () => {
           additionalProperties: { $ref: '#/$defs/Shared2' },
           not: { $ref: '#/$defs/Shared2' },
           if: { $ref: '#/$defs/Shared2' },
+          // oxlint-disable-next-line unicorn/no-thenable
           then: { $ref: '#/$defs/Shared2' },
           else: { $ref: '#/$defs/Shared2' },
           prefixItems: [{ $ref: '#/$defs/Shared2' }],

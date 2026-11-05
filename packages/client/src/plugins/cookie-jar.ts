@@ -194,16 +194,19 @@ export class CookieJar {
     const target = new URL(url)
     const secureUrl = isSecureUrl(target)
 
-    return cookies
-      .filter(
-        (cookie) =>
-          (cookie.hostOnly
-            ? target.hostname === cookie.domain
-            : domainMatch(target.hostname, cookie.domain)) &&
-          matchesHttpPathPrefix(target.pathname as `/${string}`, cookie.path as `/${string}`) &&
-          (!cookie.secure || secureUrl),
-      )
-      .sort((a, b) => b.path.length - a.path.length)
+    return (
+      cookies
+        .filter(
+          (cookie) =>
+            (cookie.hostOnly
+              ? target.hostname === cookie.domain
+              : domainMatch(target.hostname, cookie.domain)) &&
+            matchesHttpPathPrefix(target.pathname as `/${string}`, cookie.path as `/${string}`) &&
+            (!cookie.secure || secureUrl),
+        )
+        // oxlint-disable-next-line unicorn/no-array-sort
+        .sort((a, b) => b.path.length - a.path.length)
+    )
   }
 
   /**

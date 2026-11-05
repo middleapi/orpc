@@ -89,6 +89,7 @@ const MethodDecoratorMap = {
  */
 export function Implement<T extends RouterContract>(
   contract: T,
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 ): <U extends Promisable<ContractedRouter<T, DefaultInitialContext>>>(
   target: Record<PropertyKey, any>,
   propertyKey: string,

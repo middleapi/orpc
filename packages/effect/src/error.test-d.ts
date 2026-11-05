@@ -298,6 +298,7 @@ describe('catchORPCErrorCode', () => {
     )
 
     expectTypeOf(recovered).toEqualTypeOf<
+      // oxlint-disable-next-line typescript/no-redundant-type-constituents
       Effect.Effect<'output' | string, ORPCError<'NOT_FOUND' | 'CONFLICT', { id: string }>>
     >()
   })

@@ -1348,6 +1348,7 @@ describe('openAPILinkCodec', () => {
 
     it('throws when the deserialized response body has an invalid format', async () => {
       const badSerializer: any = {
+        // oxlint-disable-next-line typescript/no-misused-spread
         ...serializer,
         deserialize: () => {
           throw new Error('bad format')

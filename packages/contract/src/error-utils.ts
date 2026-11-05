@@ -6,8 +6,8 @@ import { getOwn } from '@orpc/shared'
 import type { ErrorMap } from './error.ts'
 
 export type MergedErrorMap<T1 extends ErrorMap, T2 extends ErrorMap> = keyof T1 extends
-  | never
-  | keyof T2
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
+  never | keyof T2
   ? T2
   : Omit<T1, keyof T2> & T2
 

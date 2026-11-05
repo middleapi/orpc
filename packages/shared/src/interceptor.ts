@@ -22,6 +22,7 @@ export type Interceptor<TOptions extends InterceptableOptions, TResult> = (
 /**
  * Can used for interceptors or middlewares
  */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function onStart<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<(options: TOptions, ...rest: TRest) => Promisable<void>>,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
@@ -34,6 +35,7 @@ export function onStart<T, TOptions extends { next: () => any }, TRest extends a
 /**
  * Can used for interceptors or middlewares
  */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function onSuccess<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
@@ -56,6 +58,7 @@ export function onSuccess<T, TOptions extends { next: () => any }, TRest extends
  *
  * @see {@link https://orpc.dev/docs/adapters/fetch-api | Fetch API Adapter}
  */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function onError<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
@@ -84,6 +87,7 @@ export type OnFinishState<TResult, TError> =
 /**
  * Can used for interceptors or middlewares
  */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function onFinish<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
@@ -122,6 +126,7 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
  * catch all possible errors.
  */
 export function onAsyncIteratorObjectError<
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
   T,
   TOptions extends { next: () => any },
   TRest extends any[],
@@ -173,6 +178,7 @@ export function onAsyncIteratorObjectError<
  * callback only fires while consuming the stream. Use both together to catch
  * all possible errors.
  */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function onReadableStreamError<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (

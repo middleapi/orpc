@@ -33,4 +33,5 @@ declare module '@orpc/server' {
   controllers: [SpecController, PlanetController, FileController, MessageController],
   providers: [],
 })
+// oxlint-disable-next-line typescript/no-extraneous-class
 export class AppModule {}

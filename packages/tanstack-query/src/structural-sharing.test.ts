@@ -7,6 +7,7 @@ import { createStructuralSharing } from './structural-sharing.ts'
 
 const structuralSharing = createStructuralSharing()
 
+// oxlint-disable-next-line typescript/no-extraneous-class
 class Planet {}
 
 class Person {
@@ -64,7 +65,8 @@ describe('structuralSharing', () => {
     ['different prototypes', new Map(), new Set()],
     ['subclass and parent', new Date(0), new (class extends Date {})(0)],
     ['class instances', new Planet(), new Planet()],
-    ['sparse arrays', [1, , 3], [1, , 3]], // oxlint-disable-line no-sparse-arrays
+    // oxlint-disable-next-line no-sparse-arrays
+    ['sparse arrays', [1, , 3], [1, , 3]],
   ])('takes new data when %s differs', (_, old, next) => {
     expect(structuralSharing({ value: old }, { value: next }).value).toBe(next)
   })

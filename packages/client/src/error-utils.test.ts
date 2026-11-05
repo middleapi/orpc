@@ -247,6 +247,7 @@ describe('cloneORPCError', () => {
 
     expect(Object.prototype.toString.call(cloned)).toBe('[object Error]')
     expect(Object.keys(cloned)).toEqual(Object.keys(original))
+    // oxlint-disable-next-line typescript/no-misused-spread
     expect({ ...cloned }).toEqual({ ...original })
   })
 })

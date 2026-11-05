@@ -13,17 +13,12 @@ export default defineConfig({
   rules: {
     'typescript/no-unsafe-type-assertion': 'off',
     'no-underscore-dangle': 'off',
-    // fixing these would change public types
+    // fixing it would change public types
     'typescript/no-generated-empty-object-type': 'off',
-    'typescript/no-unnecessary-type-parameters': 'off',
-    'typescript/no-redundant-type-constituents': 'off',
     // its fixes break type checking on generic code
     'typescript/no-unnecessary-type-assertion': 'off',
     'typescript/unbound-method': 'off',
-    'typescript/no-base-to-string': 'off',
-    'import/no-unassigned-import': 'off',
     'no-shadow': 'off',
-    'unicorn/consistent-function-scoping': 'off',
 
     'eqeqeq': 'error',
     'guard-for-in': 'error',
@@ -105,9 +100,6 @@ export default defineConfig({
               'decodeURIComponent throws on malformed input, use safeDecodeURIComponent from @orpc/shared instead',
           },
         ],
-        // packages target ES2022
-        'unicorn/no-array-sort': 'off',
-        'unicorn/no-array-reverse': 'off',
       },
     },
     {
@@ -117,15 +109,13 @@ export default defineConfig({
         'no-restricted-properties': 'off',
         'no-restricted-globals': 'off',
         'no-console': 'off',
-        'unicorn/no-array-sort': 'error',
-        'unicorn/no-array-reverse': 'error',
+        'no-shadow': 'off',
+        'unicorn/consistent-function-scoping': 'off',
+        'import/no-unassigned-import': 'off',
         // intentional in test fixtures
         'require-yield': 'off',
         'no-unsafe-optional-chaining': 'off',
-        'unicorn/no-thenable': 'off',
         'typescript/await-thenable': 'off',
-        'typescript/no-extraneous-class': 'off',
-        'typescript/no-misused-spread': 'off',
       },
     },
   ],

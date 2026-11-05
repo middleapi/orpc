@@ -27,5 +27,6 @@ const { src, name, px, class: className } = Astro.props
 
 {/* Astro emits this once per page, and only on pages that render an avatar. */}
 <script>
+  // oxlint-disable-next-line import/no-unassigned-import
   import './avatar-fallback'
 </script>

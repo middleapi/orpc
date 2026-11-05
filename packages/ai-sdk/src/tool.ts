@@ -121,6 +121,7 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
 
 function combineOutputSchemas(outputSchemas: AnySchema[]): FlexibleSchema | undefined {
   const yieldSchemas = getAsyncIteratorObjectSchemasDetails(outputSchemas)?.yieldSchemas
+  // oxlint-disable-next-line unicorn/no-array-reverse
   return combineSchemas([...(yieldSchemas ?? outputSchemas)].reverse(), false)
 }
 

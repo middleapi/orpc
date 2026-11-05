@@ -272,6 +272,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       encoded = val
         .map((val) => this.serializeURLValue(val))
         .filter((val) => val !== undefined && val !== null)
+        // oxlint-disable-next-line typescript/no-base-to-string
         .map((val) => safeEncodeURIComponent(String(val)))
         .join(',')
     } else if (style === 'comma-delimited-object' && isTypescriptObject(val)) {
@@ -288,8 +289,10 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       if (serialized !== undefined && serialized !== null) {
         if (param.allowsSlash) {
+          // oxlint-disable-next-line typescript/no-base-to-string
           encoded = String(serialized).split('/').map(safeEncodeURIComponent).join('/')
         } else {
+          // oxlint-disable-next-line typescript/no-base-to-string
           encoded = safeEncodeURIComponent(String(serialized))
         }
       }
@@ -347,6 +350,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       if (style === 'primitive') {
         const serialized = this.serializeURLValue(value)
         if (serialized !== undefined && serialized !== null) {
+          // oxlint-disable-next-line typescript/no-base-to-string
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(String(serialized))}`
         }
       } else if (style === 'array' && Array.isArray(value)) {
@@ -355,6 +359,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         value.forEach((v) => {
           const s = this.serializeURLValue(v)
           if (s !== undefined && s !== null) {
+            // oxlint-disable-next-line typescript/no-base-to-string
             query += `&${encodedKey}=${encodeURLSearchParamComponent(String(s))}`
           }
         })
@@ -421,6 +426,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       } else {
         const serialized = this.serializeURLValue(value)
         if (serialized !== undefined && serialized !== null) {
+          // oxlint-disable-next-line typescript/no-base-to-string
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(String(serialized))}`
         }
       }
@@ -590,6 +596,7 @@ function encodeURLSearchParamComponent(value: string): string {
 function toURLSearchParams(form: FormData): URLSearchParams {
   const params = new URLSearchParams()
   for (const [key, value] of form) {
+    // oxlint-disable-next-line typescript/no-base-to-string
     params.append(key, String(value))
   }
   return params

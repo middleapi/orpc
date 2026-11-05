@@ -111,6 +111,7 @@ export class OpenAPISerializer extends OpenAPIJsonSerializer {
       if (value instanceof Blob) {
         form.append(path, value)
       } else if (value !== undefined && value !== null) {
+        // oxlint-disable-next-line typescript/no-base-to-string
         form.append(path, String(value))
       }
     }

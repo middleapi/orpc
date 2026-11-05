@@ -75,6 +75,7 @@ describe('getConstructors', () => {
   })
 
   it('returns the full chain for class inheritance', () => {
+    // oxlint-disable-next-line typescript/no-extraneous-class
     class GrandParent {}
     class Parent extends GrandParent {}
     class Child extends Parent {}
@@ -103,6 +104,7 @@ describe('getConstructors', () => {
   })
 
   it('is lazy', () => {
+    // oxlint-disable-next-line typescript/no-extraneous-class
     class Parent {}
     class Child extends Parent {}
 
@@ -733,6 +735,7 @@ describe('bindMethods', () => {
 
     const methods = bindMethods(obj)
 
+    // oxlint-disable-next-line typescript/no-base-to-string
     expect(methods.toString()).toBe('custom')
     expect(methods.__proto__()).toBe('proto')
   })

@@ -21,6 +21,7 @@ describe('visitJsonSchemaRefs', () => {
       prefixItems: [{ $ref: '#/$defs/F' }],
       not: { $ref: '#/$defs/G' },
       if: { $ref: '#/$defs/H' },
+      // oxlint-disable-next-line unicorn/no-thenable
       then: { $ref: '#/$defs/I' },
       else: { $ref: '#/$defs/J' },
       items: { $ref: '#/$defs/K' },

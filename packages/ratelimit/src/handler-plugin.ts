@@ -32,6 +32,7 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
   name = '~ratelimit'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
       const pluginContext: Exclude<
         RateLimitHandlerPluginContext[typeof RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL],

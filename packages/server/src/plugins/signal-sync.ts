@@ -24,6 +24,7 @@ export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandl
   name = '~signal-sync'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async (
       interceptorOptions,
     ) => {

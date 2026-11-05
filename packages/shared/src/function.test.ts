@@ -100,6 +100,7 @@ describe('isAsyncGeneratorFunction', () => {
     expect(isAsyncGeneratorFunction(function* () {})).toBe(false)
     expect(isAsyncGeneratorFunction(async () => {})).toBe(false)
     expect(isAsyncGeneratorFunction(() => {})).toBe(false)
+    // oxlint-disable-next-line typescript/no-extraneous-class
     expect(isAsyncGeneratorFunction(class {})).toBe(false)
     expect(isAsyncGeneratorFunction((async function* () {})())).toBe(false)
     expect(isAsyncGeneratorFunction({})).toBe(false)

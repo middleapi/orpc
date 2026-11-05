@@ -722,6 +722,7 @@ describe('rpcLink', () => {
       const refusedUrl = await getRefusedUrl()
       const url = listen((ws) => {
         ws.on('message', async (data) => {
+          // oxlint-disable-next-line typescript/no-base-to-string
           const request = decodeRequest(data.toString())
           ws.send(await createResponseMessage({ id: request.message.id }))
         })

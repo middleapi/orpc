@@ -308,8 +308,6 @@ function renderQueryParameters(
       delete parameter.schema
       delete parameter.allowReserved
     } else if (style === undefined) {
-      const isPrimitive = (s: JsonSchema) => isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(s))
-
       if (!flattenJsonUnionSchema(schema).every(isPrimitive)) {
         const arrayable = matchArrayableJsonSchema(schema)
 
@@ -727,4 +725,8 @@ function toBodyContent(
   }
 
   return content
+}
+
+function isPrimitive(schema: JsonSchema): boolean {
+  return isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(schema))
 }

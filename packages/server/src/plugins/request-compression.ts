@@ -33,6 +33,7 @@ export class RequestCompressionHandlerPlugin<
   after: string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
       next,
       ...interceptorOptions

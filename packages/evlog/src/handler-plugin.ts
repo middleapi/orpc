@@ -31,6 +31,7 @@ export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlog
   /**
    * AsyncLocalStorage instance backing `useLogger()`.
    */
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
   storage?: FrameworkIntegrationSpec<{ request: StandardRequest }>['storage'] | undefined
 
   /**

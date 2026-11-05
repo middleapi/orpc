@@ -119,6 +119,7 @@ describe('createRouterUtils', () => {
   })
 
   it('stops recursive on RECURSIVE_CLIENT_UNWRAP_KEYS', () => {
+    // oxlint-disable-next-line unicorn/no-thenable
     client.then = vi.fn()
 
     try {

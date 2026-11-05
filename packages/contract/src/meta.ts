@@ -71,6 +71,7 @@ export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | unde
   return container[HIDDEN_META_PLUGINS_SYMBOL] as AnyMetaPlugin[] | undefined
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function setHiddenMetaPlugins<T extends object>(
   container: T,
   metaPlugins: AnyMetaPlugin[],

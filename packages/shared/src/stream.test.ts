@@ -207,6 +207,7 @@ describe('wrapReadableStream', () => {
   it('runs reads inside runWith, maps results, skips cancellation after completion, and finishes once', async () => {
     const storage = new AsyncLocalStorage<string>()
     const stores: string[] = []
+    // oxlint-disable-next-line typescript/no-redundant-type-constituents
     const mapped: Array<string | 'done'> = []
     let step = 0
     let cancelCount = 0

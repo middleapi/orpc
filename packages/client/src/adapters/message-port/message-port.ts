@@ -2,6 +2,7 @@
  * The message port used by electron in main process
  */
 export interface MessagePortMainLike {
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
   on: <T extends string>(event: T, callback: (event?: { data: any }) => void) => void
   postMessage: (data: any, transfer?: any[]) => void
 }

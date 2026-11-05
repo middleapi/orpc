@@ -34,6 +34,7 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
   after: string[] = ['~response-compression']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const bodyInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, request }) => {
       if (request.method !== 'HEAD') {
         return next()
@@ -51,6 +52,7 @@ export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandl
     /**
      * Placed last, so falling back to `GET` repeats routing rather than the routing interceptors before this one.
      */
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const fallbackInterceptor: StandardHandlerRoutingInterceptor<T> = async (
       interceptorOptions,
     ) => {

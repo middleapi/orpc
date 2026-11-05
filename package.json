@@ -73,5 +73,5 @@
     "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
-  "packageManager": "pnpm@12.4.2"
+  "packageManager": "pnpm@12.16.1"
 }

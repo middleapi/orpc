@@ -259,6 +259,7 @@ export function isPropertyKey(value: unknown): value is PropertyKey {
 }
 
 export const NullProtoObj = /* @__PURE__ */ (() => {
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
   const e = function () {}
   e.prototype = Object.create(null)
   Object.freeze(e.prototype)

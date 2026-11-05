@@ -7,6 +7,7 @@ it('value', async () => {
 
   expect(
     await value(async () => ({
+      // oxlint-disable-next-line unicorn/no-thenable
       then: (resolve: (value: PromiseLike<number>) => void) => resolve(Promise.resolve(42)),
     })),
   ).toBe(42)

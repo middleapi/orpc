@@ -194,9 +194,12 @@ function componentNameCandidate(
 function definedKeysOf(object: Record<string, unknown>): string[] {
   // `undefined`-valued keys (e.g. `default: undefined`) are stripped during serialization,
   // so they must not affect equivalence against components from serialized documents
-  return Object.keys(object)
-    .filter((key) => object[key] !== undefined)
-    .sort()
+  return (
+    Object.keys(object)
+      .filter((key) => object[key] !== undefined)
+      // oxlint-disable-next-line unicorn/no-array-sort
+      .sort()
+  )
 }
 
 interface ReuseComparisonContext {
