@@ -1,6 +1,7 @@
 # Hidden folders and files
 .*
 !.gitignore
+!.git-blame-ignore-revs
 !.npmrc
 !.*.example
 !.vscode/
