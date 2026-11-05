@@ -9,3 +9,17 @@ updates:
       # pnpm requires minimumReleaseAge of 1, so the value below should be 1 or more
       default-days: 1
     versioning-strategy: increase
+    groups:
+      standard-server:
+        patterns:
+          - '@standard-server/*'
+      openapi-spec:
+        patterns:
+          - '@openapi-spec/*'
+      dev-dependencies-minor-patch:
+        dependency-type: development
+        exclude-patterns:
+          - compression # inline
+        update-types:
+          - minor
+          - patch

@@ -19,6 +19,7 @@ pnpm vitest run <path>       # one test file
 pnpm check                   # lint and type check, including *.test-d.ts
 pnpm fix                     # check, applying fixes
 pnpm format                  # format with oxfmt
+pnpm repo:fix                # fix monorepo issues with sherif
 pnpm docs:validate           # JSDoc backlinks + docs links
 pnpm bench
 pnpm --filter @orpc/server prepack  # build one package; tests don't need a build
