@@ -1,14 +1,16 @@
+import { afterAll, describe, expect, it } from 'bun:test'
+
 import type { RateLimiter } from '@orpc/ratelimit'
 import { RedisRateLimiter } from '@orpc/ratelimit/redis'
 import { RedisClient } from 'bun'
-import { afterAll, describe, expect, it } from 'bun:test'
 import { createClient } from 'redis'
+
 import { BunRedisRateLimiter } from '../src/index.ts'
 
 const REDIS_URL = Bun.env.REDIS_URL
 
 describe.concurrent('ratelimit redis adapters compatibility', async () => {
-  const limiters: Array<{ name: string, limiter: RateLimiter }> = []
+  const limiters: Array<{ name: string; limiter: RateLimiter }> = []
   const prefix = `redis-adapters:${crypto.randomUUID()}`
 
   if (REDIS_URL) {

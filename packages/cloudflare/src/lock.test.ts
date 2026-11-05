@@ -4,6 +4,7 @@ import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
+
 import { experimental_DurableLocker as DurableLocker } from './lock.ts'
 
 describe('durableLocker', () => {
@@ -29,11 +30,15 @@ describe('durableLocker', () => {
   async function hold(locker: DurableLocker, key = 'key', options?: LockOptions) {
     const started = promiseWithResolvers<void>()
     const finished = promiseWithResolvers<void>()
-    const done = locker.lock(key, async ({ waited }) => {
-      started.resolve()
-      await finished.promise
-      return waited
-    }, options)
+    const done = locker.lock(
+      key,
+      async ({ waited }) => {
+        started.resolve()
+        await finished.promise
+        return waited
+      },
+      options,
+    )
 
     await Promise.race([started.promise, done])
 
@@ -46,27 +51,34 @@ describe('durableLocker', () => {
   }
 
   async function waitForSockets(prefix: string, count: number) {
-    await vi.waitFor(async () => {
-      const open = await runInDurableObject(
-        env.LOCK_DON.getByName(`${prefix}key`),
-        (_, ctx) => ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN).length,
-      )
+    await vi.waitFor(
+      async () => {
+        const open = await runInDurableObject(
+          env.LOCK_DON.getByName(`${prefix}key`),
+          (_, ctx) => ctx.getWebSockets().filter((ws) => ws.readyState === WebSocket.OPEN).length,
+        )
 
-      expect(open).toBe(count)
-    }, { interval: 10 })
+        expect(open).toBe(count)
+      },
+      { interval: 10 },
+    )
   }
 
   it('runs the callback immediately when the lock is free and releases afterwards', async () => {
     const { locker } = createTestingLocker()
     const fn = vi.fn(async () => {
-      await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+      await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(
+        LockTimeoutError,
+      )
       return 'ok'
     })
 
     await expect(locker.lock('key', fn)).resolves.toBe('ok')
 
     expect(fn).toHaveBeenCalledExactlyOnceWith({ waited: false })
-    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
+    await vi.waitFor(() =>
+      expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'),
+    )
   })
 
   it('waits for the holder to release', async () => {
@@ -87,7 +99,9 @@ describe('durableLocker', () => {
     const { locker: other } = createTestingLocker({ prefix })
     const holder = await hold(locker)
 
-    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(
+      LockTimeoutError,
+    )
 
     await holder.release()
     await expect(other.lock('key', () => 'ok')).resolves.toBe('ok')
@@ -97,8 +111,12 @@ describe('durableLocker', () => {
     const { locker } = createTestingLocker()
     const holder = await hold(locker, 'tenant:key')
 
-    await expect(locker.prefix('tenant:').lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
-    await expect(locker.prefix('other:').lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+    await expect(
+      locker.prefix('tenant:').lock('key', () => 'never', { timeout: 0 }),
+    ).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(locker.prefix('other:').lock('key', () => 'ok', { timeout: 0 })).resolves.toBe(
+      'ok',
+    )
 
     await holder.release()
   })
@@ -117,23 +135,32 @@ describe('durableLocker', () => {
   it('releases the lock when the callback throws', async () => {
     const { locker } = createTestingLocker()
 
-    await expect(locker.lock('key', () => {
-      throw new Error('boom')
-    })).rejects.toThrow('boom')
+    await expect(
+      locker.lock('key', () => {
+        throw new Error('boom')
+      }),
+    ).rejects.toThrow('boom')
 
-    await vi.waitFor(() => expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok'))
+    await vi.waitFor(() =>
+      expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok'),
+    )
   })
 
   it.each([
     {
       case: 'gives up immediately',
       attempt: (locker: DurableLocker, fn: () => unknown) => locker.lock('key', fn, { timeout: 0 }),
-      rejection: { name: 'LockTimeoutError', key: 'key', message: 'Timed out waiting for the lock of key "key"' },
+      rejection: {
+        name: 'LockTimeoutError',
+        key: 'key',
+        message: 'Timed out waiting for the lock of key "key"',
+      },
       minWait: 0,
     },
     {
       case: 'times out while waiting',
-      attempt: (locker: DurableLocker, fn: () => unknown) => locker.lock('key', fn, { timeout: 200 }),
+      attempt: (locker: DurableLocker, fn: () => unknown) =>
+        locker.lock('key', fn, { timeout: 200 }),
       rejection: { name: 'LockTimeoutError', key: 'key' },
       minWait: 150,
     },
@@ -148,23 +175,26 @@ describe('durableLocker', () => {
       rejection: { message: 'aborted' },
       minWait: 50,
     },
-  ])('releases the socket of a waiter that $case, so the next waiter still gets the lock', async ({ attempt, rejection, minWait }) => {
-    const { prefix, locker } = createTestingLocker()
-    const holder = await hold(locker)
-    const fn = vi.fn()
-    const start = Date.now()
+  ])(
+    'releases the socket of a waiter that $case, so the next waiter still gets the lock',
+    async ({ attempt, rejection, minWait }) => {
+      const { prefix, locker } = createTestingLocker()
+      const holder = await hold(locker)
+      const fn = vi.fn()
+      const start = Date.now()
 
-    await expect(attempt(locker, fn)).rejects.toMatchObject(rejection)
-    expect(Date.now() - start).toBeGreaterThanOrEqual(minWait)
-    expect(fn).not.toHaveBeenCalled()
-    await waitForSockets(prefix, 1)
+      await expect(attempt(locker, fn)).rejects.toMatchObject(rejection)
+      expect(Date.now() - start).toBeGreaterThanOrEqual(minWait)
+      expect(fn).not.toHaveBeenCalled()
+      await waitForSockets(prefix, 1)
 
-    const waiter = locker.lock('key', ({ waited }) => waited, { timeout: 1000 })
+      const waiter = locker.lock('key', ({ waited }) => waited, { timeout: 1000 })
 
-    await waitForSockets(prefix, 2)
-    await holder.release()
-    await expect(waiter).resolves.toBe(true)
-  })
+      await waitForSockets(prefix, 2)
+      await holder.release()
+      await expect(waiter).resolves.toBe(true)
+    },
+  )
 
   it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
     const { locker } = createTestingLocker({ ttl: 200 })
@@ -172,21 +202,29 @@ describe('durableLocker', () => {
     const next = await hold(locker, 'key', { ttl: 10_000 })
 
     await expect(expired.release()).resolves.toBe(false)
-    await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(
+      LockTimeoutError,
+    )
 
     await expect(next.release()).resolves.toBe(true)
-    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
+    await vi.waitFor(() =>
+      expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'),
+    )
   })
 
   it('releases the lock when the ttl expires while the callback is still running', async () => {
     const { locker } = createTestingLocker({ ttl: 100 })
 
-    await expect(locker.lock('key', async () => {
-      await sleep(300)
-      return 'ok'
-    })).resolves.toBe('ok')
+    await expect(
+      locker.lock('key', async () => {
+        await sleep(300)
+        return 'ok'
+      }),
+    ).resolves.toBe('ok')
 
-    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
+    await vi.waitFor(() =>
+      expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'),
+    )
   })
 
   it('makes one request per lock and never polls', async () => {
@@ -215,13 +253,19 @@ describe('durableLocker', () => {
   })
 
   it('throws when the object does not return a socket', async () => {
-    const getStubByName = vi.fn(() => ({
-      fetch: async () => new Response(null, { status: 500, statusText: 'Internal Server Error' }),
-    }) as unknown as DurableObjectStub)
+    const getStubByName = vi.fn(
+      () =>
+        ({
+          fetch: async () =>
+            new Response(null, { status: 500, statusText: 'Internal Server Error' }),
+        }) as unknown as DurableObjectStub,
+    )
     const { locker } = createTestingLocker({ getStubByName })
     const fn = vi.fn()
 
-    await expect(locker.lock('key', fn)).rejects.toThrow('Failed to acquire the lock: 500 Internal Server Error')
+    await expect(locker.lock('key', fn)).rejects.toThrow(
+      'Failed to acquire the lock: 500 Internal Server Error',
+    )
     expect(fn).not.toHaveBeenCalled()
   })
 
@@ -230,7 +274,9 @@ describe('durableLocker', () => {
     const holder = await hold(locker)
     const fn = vi.fn()
     // Assert before closing the socket, so the rejection never sits unobserved
-    const rejected = expect(locker.lock('key', fn)).rejects.toThrow('The lock durable object closed the socket before handing the lock over')
+    const rejected = expect(locker.lock('key', fn)).rejects.toThrow(
+      'The lock durable object closed the socket before handing the lock over',
+    )
 
     await waitForSockets(prefix, 2)
     await runInDurableObject(env.LOCK_DON.getByName(`${prefix}key`), (_, ctx) => {
@@ -264,14 +310,18 @@ describe('durableLocker', () => {
     let maxActive = 0
     let count = 0
 
-    await Promise.all(Array.from({ length: 5 }, () => locker.lock('key', async () => {
-      active++
-      maxActive = Math.max(maxActive, active)
-      const current = count
-      await sleep(5)
-      count = current + 1
-      active--
-    })))
+    await Promise.all(
+      Array.from({ length: 5 }, () =>
+        locker.lock('key', async () => {
+          active++
+          maxActive = Math.max(maxActive, active)
+          const current = count
+          await sleep(5)
+          count = current + 1
+          active--
+        }),
+      ),
+    )
 
     expect(maxActive).toBe(1)
     expect(count).toBe(5)

@@ -1,4 +1,5 @@
 import { getEventMeta, withEventMeta } from '@standard-server/core'
+
 import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object.ts'
 
 describe('wrapAsyncIteratorPreservingEventMeta', () => {
@@ -49,7 +50,7 @@ describe('wrapAsyncIteratorPreservingEventMeta', () => {
       return returned
     })()
 
-    const mapResult = vi.fn(async result => result)
+    const mapResult = vi.fn(async (result) => result)
 
     const mapped = wrapAsyncIteratorPreservingEventMeta(iterator, {
       mapResult,
@@ -69,7 +70,7 @@ describe('wrapAsyncIteratorPreservingEventMeta', () => {
   it('preserves metadata when mapping errors', async () => {
     const error = withEventMeta(new Error('TEST'), { id: 'error-1' })
     const onError = vi.fn()
-    const mapError = vi.fn(async cause => ({ mapped: cause } as any))
+    const mapError = vi.fn(async (cause) => ({ mapped: cause }) as any)
 
     const iterator = (async function* () {
       throw error
@@ -96,19 +97,25 @@ describe('wrapAsyncIteratorPreservingEventMeta', () => {
   it('does not reattach metadata when mapped errors stay the same or become non-objects', async () => {
     const error = withEventMeta(new Error('TEST'), { id: 'error-1' })
 
-    const sameError = wrapAsyncIteratorPreservingEventMeta((async function* () {
-      throw error
-    })(), {
-      mapError: async cause => cause,
-    })
+    const sameError = wrapAsyncIteratorPreservingEventMeta(
+      (async function* () {
+        throw error
+      })(),
+      {
+        mapError: async (cause) => cause,
+      },
+    )
 
     await expect(sameError.next()).rejects.toBe(error)
 
-    const primitiveError = wrapAsyncIteratorPreservingEventMeta((async function* () {
-      throw error
-    })(), {
-      mapError: async () => 'mapped error' as any,
-    })
+    const primitiveError = wrapAsyncIteratorPreservingEventMeta(
+      (async function* () {
+        throw error
+      })(),
+      {
+        mapError: async () => 'mapped error' as any,
+      },
+    )
 
     await expect(primitiveError.next()).rejects.toBe('mapped error')
   })

@@ -1,4 +1,5 @@
 import type { Redis } from '@upstash/redis'
+
 import type { BaseRedisRateLimiterOptions } from './base-redis.ts'
 import { BaseRedisRateLimiter } from './base-redis.ts'
 
@@ -24,7 +25,10 @@ export class UpstashRateLimiter extends BaseRedisRateLimiter {
    * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
    */
   prefix(prefix: string): UpstashRateLimiter {
-    return new UpstashRateLimiter(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
+    return new UpstashRateLimiter(this.redis, {
+      ...this.options,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
   protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {

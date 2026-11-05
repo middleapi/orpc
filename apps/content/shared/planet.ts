@@ -1,8 +1,9 @@
-import * as z from 'zod'
+import type { IncomingHttpHeaders } from 'node:http'
+
 import { oc } from '@orpc/contract'
 import type { RouterClient } from '@orpc/server'
 import { implement } from '@orpc/server'
-import type { IncomingHttpHeaders } from 'node:http'
+import * as z from 'zod'
 
 export const PlanetSchema = z.object({
   id: z.number().int().min(1),
@@ -19,13 +20,9 @@ export const listPlanetContract = oc
   )
   .output(z.array(PlanetSchema))
 
-export const findPlanetContract = oc
-  .input(PlanetSchema.pick({ id: true }))
-  .output(PlanetSchema)
+export const findPlanetContract = oc.input(PlanetSchema.pick({ id: true })).output(PlanetSchema)
 
-export const createPlanetContract = oc
-  .input(PlanetSchema.omit({ id: true }))
-  .output(PlanetSchema)
+export const createPlanetContract = oc.input(PlanetSchema.omit({ id: true })).output(PlanetSchema)
 
 export const contract = {
   planet: { list: listPlanetContract, find: findPlanetContract, create: createPlanetContract },
@@ -33,21 +30,20 @@ export const contract = {
 
 const os = implement(contract).$context<{ headers?: IncomingHttpHeaders }>()
 
-export const listPlanet = os.planet.list
-  .handler(({ input }) => {
-    return []
-  })
+export const listPlanet = os.planet.list.handler(({ input }) => {
+  return []
+})
 
-export const findPlanet = os.planet.find
-  .handler(({ input }) => {
-    return { id: 123, name: 'name' }
-  })
+export const findPlanet = os.planet.find.handler(({ input }) => {
+  return { id: 123, name: 'name' }
+})
 
-export const createPlanet = os.planet.create
-  .handler(({ input }) => {
-    return { id: 123, name: 'name' }
-  })
+export const createPlanet = os.planet.create.handler(({ input }) => {
+  return { id: 123, name: 'name' }
+})
 
-export const router = os.router({ planet: { list: listPlanet, find: findPlanet, create: createPlanet } })
+export const router = os.router({
+  planet: { list: listPlanet, find: findPlanet, create: createPlanet },
+})
 
 export const client = {} as RouterClient<typeof router>

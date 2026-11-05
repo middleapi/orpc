@@ -1,11 +1,17 @@
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
-import type { Message, Peer } from 'crossws'
-import type { Context } from '../../context.ts'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
+import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
+import {
+  decodePeerMessage,
+  encodePeerMessage,
+  isClientPeerSendMessage,
+  ServerPeer,
+} from '@standard-server/peer'
+import type { Message, Peer } from 'crossws'
+
+import type { Context } from '../../context.ts'
 import { createStandardPeerRequestHandler } from '../standard-peer/index.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
 
 export type CrosswsPeerLike = Pick<Peer, 'send'>
 export type CrosswsMessageLike = Pick<Message, 'rawData' | 'uint8Array'>
@@ -55,7 +61,10 @@ export class experimental_CrosswsHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
+    const encodedMessage =
+      typeof message.rawData === 'string'
+        ? message.rawData
+        : (message.uint8Array() as Uint8Array<ArrayBuffer>)
     const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
 
     let peer = this.peers.get(ws)
@@ -66,9 +75,12 @@ export class experimental_CrosswsHandler<T extends Context> {
     }
 
     if (!peer) {
-      this.peers.set(ws, peer = new ServerPeer(async (message) => {
-        ws.send(await encodePeerMessage(message, this.encodePeerMessageOptions))
-      }))
+      this.peers.set(
+        ws,
+        (peer = new ServerPeer(async (message) => {
+          ws.send(await encodePeerMessage(message, this.encodePeerMessageOptions))
+        })),
+      )
     }
 
     if (result.matched && isClientPeerSendMessage(result.message)) {

@@ -1,15 +1,20 @@
 import type { AnyORPCError } from '@orpc/client'
-import type { Writable } from '@orpc/shared'
-import type { ErrorMap } from './error.ts'
 import { cloneORPCError } from '@orpc/client'
+import type { Writable } from '@orpc/shared'
 import { getOwn } from '@orpc/shared'
 
-export type MergedErrorMap<T1 extends ErrorMap, T2 extends ErrorMap>
-  = keyof T1 extends never | keyof T2
-    ? T2
-    : Omit<T1, keyof T2> & T2
+import type { ErrorMap } from './error.ts'
 
-export function mergeErrorMap<T1 extends ErrorMap = object, T2 extends ErrorMap = object>(errorMap1: T1 | undefined, errorMap2: T2 | undefined): MergedErrorMap<T1, T2> {
+export type MergedErrorMap<T1 extends ErrorMap, T2 extends ErrorMap> = keyof T1 extends
+  | never
+  | keyof T2
+  ? T2
+  : Omit<T1, keyof T2> & T2
+
+export function mergeErrorMap<T1 extends ErrorMap = object, T2 extends ErrorMap = object>(
+  errorMap1: T1 | undefined,
+  errorMap2: T2 | undefined,
+): MergedErrorMap<T1, T2> {
   return { ...errorMap1, ...errorMap2 } as any
 }
 

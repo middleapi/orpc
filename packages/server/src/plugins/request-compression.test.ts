@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer'
 import zlib from 'node:zlib'
+
 import supertest from 'supertest'
+
 import { RPCHandler } from '../adapters/fetch/index.ts'
 import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
 import { os } from '../builder.ts'
@@ -9,11 +11,12 @@ import { RequestCompressionHandlerPlugin } from './request-compression.ts'
 function compress(data: string | Uint8Array, encoding: 'gzip' | 'deflate' | 'deflate-raw'): Buffer {
   const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data)
 
-  const compressFn = encoding === 'gzip'
-    ? zlib.gzipSync
-    : encoding === 'deflate'
-      ? zlib.deflateSync
-      : zlib.deflateRawSync
+  const compressFn =
+    encoding === 'gzip'
+      ? zlib.gzipSync
+      : encoding === 'deflate'
+        ? zlib.deflateSync
+        : zlib.deflateRawSync
 
   return compressFn(buffer)
 }
@@ -26,49 +29,54 @@ describe('requestCompressionHandlerPlugin', () => {
   const procedureHandler = vi.fn()
   const procedure = os.handler(procedureHandler)
   const handler = new RPCHandler(procedure, {
-    plugins: [
-      new RequestCompressionHandlerPlugin(),
-    ],
+    plugins: [new RequestCompressionHandlerPlugin()],
   })
 
-  it.each(
-    ['gzip', 'deflate', 'deflate-raw'] as const,
-  )('should decompress request body when content-encoding is %s', async (encoding) => {
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-encoding': encoding,
-        'content-type': 'application/json',
-      },
-      body: compress(JSON.stringify({ json: 'input' }), encoding),
-    }))
+  it.each(['gzip', 'deflate', 'deflate-raw'] as const)(
+    'should decompress request body when content-encoding is %s',
+    async (encoding) => {
+      const { response } = await handler.handle(
+        new Request('http://localhost', {
+          method: 'POST',
+          headers: {
+            'content-encoding': encoding,
+            'content-type': 'application/json',
+          },
+          body: compress(JSON.stringify({ json: 'input' }), encoding),
+        }),
+      )
 
-    expect(response?.status).toBe(200)
-    expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
-  })
+      expect(response?.status).toBe(200)
+      expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
+    },
+  )
 
   it('should not decompress request body when content-encoding is not supported', async () => {
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-encoding': 'unsupported-encoding',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: 'input' }),
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-encoding': 'unsupported-encoding',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: 'input' }),
+      }),
+    )
 
     expect(response?.status).toBe(200)
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
   })
 
   it('should not decompress request body when content-encoding is not set', async () => {
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ json: 'input' }),
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ json: 'input' }),
+      }),
+    )
 
     expect(response?.status).toBe(200)
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
@@ -78,14 +86,16 @@ describe('requestCompressionHandlerPlugin', () => {
     const payload = JSON.stringify({ json: 'input' })
     const body = compress(compress(payload, 'deflate'), 'gzip')
 
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-encoding': 'deflate, gzip',
-        'content-type': 'application/json',
-      },
-      body,
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-encoding': 'deflate, gzip',
+          'content-type': 'application/json',
+        },
+        body,
+      }),
+    )
 
     expect(response?.status).toBe(200)
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
@@ -97,14 +107,16 @@ describe('requestCompressionHandlerPlugin', () => {
       body = compress(body, 'gzip')
     }
 
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-encoding': Array.from({ length: 5 }).fill('gzip').join(', '),
-        'content-type': 'application/json',
-      },
-      body,
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-encoding': Array.from({ length: 5 }).fill('gzip').join(', '),
+          'content-type': 'application/json',
+        },
+        body,
+      }),
+    )
 
     expect(response?.status).toBe(200)
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
@@ -116,14 +128,16 @@ describe('requestCompressionHandlerPlugin', () => {
       body = compress(body, 'gzip')
     }
 
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-encoding': Array.from({ length: 6 }).fill('gzip').join(', '),
-        'content-type': 'application/json',
-      },
-      body,
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-encoding': Array.from({ length: 6 }).fill('gzip').join(', '),
+          'content-type': 'application/json',
+        },
+        body,
+      }),
+    )
 
     expect(response?.status).toBe(415)
     await expect(response!.text()).resolves.toContain('Too many content encodings.')
@@ -134,14 +148,16 @@ describe('requestCompressionHandlerPlugin', () => {
     const payload = JSON.stringify({ json: 'input' })
     const body = compress(payload, 'gzip')
 
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-encoding': 'gzip, br',
-        'content-type': 'application/json',
-      },
-      body,
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-encoding': 'gzip, br',
+          'content-type': 'application/json',
+        },
+        body,
+      }),
+    )
 
     // Body stays gzip-compressed; JSON parsing fails rather than partial decode.
     expect(response?.status).not.toBe(200)
@@ -169,7 +185,7 @@ describe('requestCompressionHandlerPlugin', () => {
                     },
                   })
                 },
-                ...options.routingInterceptors ?? [],
+                ...(options.routingInterceptors ?? []),
               ],
             }
           },
@@ -177,13 +193,15 @@ describe('requestCompressionHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(new Request('http://localhost', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'content-encoding': 'gzip',
-      },
-    }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-encoding': 'gzip',
+        },
+      }),
+    )
 
     expect(response?.status).toBe(200)
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), '__MOCKED__')
@@ -191,16 +209,15 @@ describe('requestCompressionHandlerPlugin', () => {
 
   it('should work with Node.js adapter', async () => {
     const nodeHandler = new NodeRPCHandler(procedure, {
-      plugins: [
-        new RequestCompressionHandlerPlugin(),
-      ],
+      plugins: [new RequestCompressionHandlerPlugin()],
     })
 
     const server = supertest((req: any, res: any) => {
       nodeHandler.handle(req, res)
     })
 
-    const response = await server.post('/')
+    const response = await server
+      .post('/')
       .set('content-encoding', 'gzip')
       .set('content-type', 'application/octet-stream')
       .set('standard-server', 'json')

@@ -1,7 +1,16 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { AsyncIteratorClass, sleep } from '@standard-server/shared'
+
 import { promiseWithResolvers } from './promise.ts'
-import { asyncIteratorToStream, asyncIteratorToUnproxiedDataStream, replicateReadableStream, streamToAsyncIteratorObject, traceReadableStream, wrapReadableStream } from './stream.ts'
+import {
+  asyncIteratorToStream,
+  asyncIteratorToUnproxiedDataStream,
+  replicateReadableStream,
+  streamToAsyncIteratorObject,
+  traceReadableStream,
+  wrapReadableStream,
+} from './stream.ts'
 import * as Tracing from './tracing.ts'
 
 const runInSpanContextSpy = vi.spyOn(Tracing, 'runInSpanContext')
@@ -229,14 +238,13 @@ describe('wrapReadableStream', () => {
           async cancel() {
             cancelCount += 1
           },
-          releaseLock() {
-          },
+          releaseLock() {},
         }
       },
     } as ReadableStream<number>
 
     const reader = wrapReadableStream(stream, {
-      runWith: run => storage.run('read-context', run),
+      runWith: (run) => storage.run('read-context', run),
       mapResult: (result) => {
         mapped.push(result.done ? 'done' : `map:${result.value}`)
 
@@ -284,7 +292,7 @@ describe('wrapReadableStream', () => {
 
     const reader = wrapReadableStream(stream, {
       onError,
-      mapError: received => new TypeError(`mapped ${(received as Error).message}`),
+      mapError: (received) => new TypeError(`mapped ${(received as Error).message}`),
       onFinish: () => {
         finishCount += 1
       },
@@ -311,7 +319,7 @@ describe('wrapReadableStream', () => {
     })
 
     const reader = wrapReadableStream(stream, {
-      runWith: run => storage.run('cancel-context', run),
+      runWith: (run) => storage.run('cancel-context', run),
       onFinish: () => {
         finishCount += 1
       },
@@ -339,8 +347,7 @@ async function readAll<T>(stream: ReadableStream<T>): Promise<T[]> {
 
       values.push(result.value)
     }
-  }
-  finally {
+  } finally {
     reader.releaseLock()
   }
 }
@@ -360,7 +367,7 @@ describe('streamToAsyncIteratorObject', () => {
     const values = [1, 2, 3, 4, 5]
     const stream = new ReadableStream<number>({
       start(controller) {
-        values.forEach(value => controller.enqueue(value))
+        values.forEach((value) => controller.enqueue(value))
         controller.close()
       },
     })
@@ -408,8 +415,7 @@ describe('streamToAsyncIteratorObject', () => {
         // Should not reach here
       }
       expect.fail('Should have thrown an error')
-    }
-    catch (err) {
+    } catch (err) {
       expect(err).toBe(error)
     }
   })
@@ -514,7 +520,7 @@ describe('streamToAsyncIteratorObject', () => {
 
       const stream = new ReadableStream<number>({
         start(c) {
-          values.forEach(v => c.enqueue(v))
+          values.forEach((v) => c.enqueue(v))
           c.close()
         },
         cancel,
@@ -597,16 +603,17 @@ describe('asyncIteratorToStream', () => {
   it('should call iterator.return when stream is cancelled', async () => {
     let cleanupCalled = false
 
-    const stream = asyncIteratorToStream(async function* () {
-      try {
-        yield 1
-        yield 2
-        await new Promise(resolve => setTimeout(resolve, 100)) // Simulate async operation
-      }
-      finally {
-        cleanupCalled = true
-      }
-    }())
+    const stream = asyncIteratorToStream(
+      (async function* () {
+        try {
+          yield 1
+          yield 2
+          await new Promise((resolve) => setTimeout(resolve, 100)) // Simulate async operation
+        } finally {
+          cleanupCalled = true
+        }
+      })(),
+    )
 
     const reader = stream.getReader()
     await reader.read()
@@ -685,15 +692,7 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
       result = await reader.read()
     }
 
-    expect(results).toEqual([
-      1,
-      { order: 2 },
-      { order: 3 },
-      [4],
-      [5],
-      date,
-      set,
-    ])
+    expect(results).toEqual([1, { order: 2 }, { order: 3 }, [4], [5], date, set])
 
     expect(results.some(isProxied)).toBe(false)
   })
@@ -737,16 +736,17 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
   it('should call iterator.return when stream is cancelled', async () => {
     let cleanupCalled = false
 
-    const stream = asyncIteratorToUnproxiedDataStream(async function* () {
-      try {
-        yield 1
-        yield 2
-        await new Promise(resolve => setTimeout(resolve, 100)) // Simulate async operation
-      }
-      finally {
-        cleanupCalled = true
-      }
-    }())
+    const stream = asyncIteratorToUnproxiedDataStream(
+      (async function* () {
+        try {
+          yield 1
+          yield 2
+          await new Promise((resolve) => setTimeout(resolve, 100)) // Simulate async operation
+        } finally {
+          cleanupCalled = true
+        }
+      })(),
+    )
 
     const reader = stream.getReader()
     await reader.read()
@@ -763,10 +763,12 @@ describe.each([
   it('should not start the iterator before the first read', async () => {
     let started = false
 
-    const stream = toStream(async function* () {
-      started = true
-      yield 1
-    }())
+    const stream = toStream(
+      (async function* () {
+        started = true
+        yield 1
+      })(),
+    )
 
     await sleep(0)
     expect(started).toBe(false)
@@ -779,15 +781,16 @@ describe.each([
   it('should call iterator.return promptly on cancel while the iterator is pending', async () => {
     const cleanup = vi.fn()
 
-    const stream = toStream(async function* () {
-      try {
-        yield 1
-        await new Promise(() => {})
-      }
-      finally {
-        cleanup()
-      }
-    }())
+    const stream = toStream(
+      (async function* () {
+        try {
+          yield 1
+          await new Promise(() => {})
+        } finally {
+          cleanup()
+        }
+      })(),
+    )
 
     const reader = stream.getReader()
     expect(await reader.read()).toEqual({ done: false, value: 1 })

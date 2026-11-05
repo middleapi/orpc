@@ -1,15 +1,20 @@
 import type { AnyORPCError } from '@orpc/client'
+import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
 import type { Promisable, Public, Value } from '@orpc/shared'
+import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import { parseStandardUrl } from '@standard-server/core'
+
+import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants.ts'
 import type { Context } from '../../context.ts'
 import type { AnyProcedure } from '../../procedure.ts'
 import type { AnyRouter } from '../../router.ts'
-import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '../standard/index.ts'
+import type {
+  ResolvedStandardHandlerHandleOptions,
+  StandardHandlerCodec,
+  StandardHandlerCodecResolvedProcedure,
+} from '../standard/index.ts'
 import type { RPCMatcherOptions } from './rpc-matcher.ts'
-import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
-import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
-import { parseStandardUrl } from '@standard-server/core'
-import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants.ts'
 import { RPCMatcher } from './rpc-matcher.ts'
 
 export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOptions {
@@ -26,7 +31,17 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
    *
    * @default DEFAULT_SUCCESS_STATUS (200)
    */
-  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]> | undefined
+  outputStatus?:
+    | Value<
+        number | undefined | null,
+        [
+          output: unknown,
+          procedure: AnyProcedure,
+          path: string[],
+          options: ResolvedStandardHandlerHandleOptions<T>,
+        ]
+      >
+    | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
@@ -51,7 +66,10 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     this.outputStatus = options.outputStatus
   }
 
-  async resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+  async resolveProcedure(
+    request: StandardLazyRequest,
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const [pathname, query] = parseStandardUrl(request.url)
 
     const matched = await this.matcher.match(request.method, pathname, options.prefix)
@@ -64,7 +82,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
       path: matched.path,
       decodeInput: async () => {
         if (request.method === 'GET') {
-          const dataString = (new URLSearchParams(query)).getAll('data').at(-1)
+          const dataString = new URLSearchParams(query).getAll('data').at(-1)
           return this.serializer.deserialize(parseEmptyableJSON(dataString))
         }
 
@@ -74,7 +92,12 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     }
   }
 
-  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeOutput(
+    output: unknown,
+    procedure: AnyProcedure,
+    path: string[],
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promisable<StandardResponse> {
     return {
       headers: {},
       status: value(this.outputStatus, output, procedure, path, options) ?? DEFAULT_SUCCESS_STATUS,
@@ -82,7 +105,12 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     }
   }
 
-  encodeError(error: AnyORPCError, _procedure: AnyProcedure, _path: string[], _options: ResolvedStandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeError(
+    error: AnyORPCError,
+    _procedure: AnyProcedure,
+    _path: string[],
+    _options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {

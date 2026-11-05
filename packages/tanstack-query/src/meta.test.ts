@@ -1,14 +1,17 @@
 import { oc } from '@orpc/contract'
+
 import { ContractOptionsUtilsPlugin, getTanstackQueryMeta, tanstackQuery } from './meta.ts'
 import { createRouterUtils } from './router-utils.ts'
 
 describe('tanstackQuery', () => {
   it('stores options readable via getTanstackQueryMeta', () => {
     const interceptor = vi.fn()
-    const contract = oc.meta(tanstackQuery({
-      queryOptions: { staleTime: 1000 },
-      queryInterceptors: [interceptor],
-    }))
+    const contract = oc.meta(
+      tanstackQuery({
+        queryOptions: { staleTime: 1000 },
+        queryInterceptors: [interceptor],
+      }),
+    )
 
     expect(getTanstackQueryMeta(contract)).toEqual({
       queryOptions: { staleTime: 1000 },
@@ -24,15 +27,19 @@ describe('tanstackQuery', () => {
     const keyModifier = vi.fn()
 
     const contract = oc
-      .meta(tanstackQuery({
-        queryKey: keyModifier,
-        queryOptions: { staleTime: 1000, retry: 1 },
-        queryInterceptors: [interceptor1],
-      }))
-      .meta(tanstackQuery({
-        queryOptions: { retry: 2 },
-        mutationInterceptors: [interceptor2],
-      }))
+      .meta(
+        tanstackQuery({
+          queryKey: keyModifier,
+          queryOptions: { staleTime: 1000, retry: 1 },
+          queryInterceptors: [interceptor1],
+        }),
+      )
+      .meta(
+        tanstackQuery({
+          queryOptions: { retry: 2 },
+          mutationInterceptors: [interceptor2],
+        }),
+      )
 
     expect(getTanstackQueryMeta(contract)).toEqual({
       queryKey: keyModifier,
@@ -43,12 +50,10 @@ describe('tanstackQuery', () => {
   })
 
   it('propagates base meta to procedures via .router', () => {
-    const router = oc
-      .meta(tanstackQuery({ queryOptions: { staleTime: 1000 } }))
-      .router({
-        ping: oc.meta(tanstackQuery({ queryOptions: { retry: 2 } })),
-        pong: oc,
-      })
+    const router = oc.meta(tanstackQuery({ queryOptions: { staleTime: 1000 } })).router({
+      ping: oc.meta(tanstackQuery({ queryOptions: { retry: 2 } })),
+      pong: oc,
+    })
 
     expect(getTanstackQueryMeta(router.ping)).toEqual({
       queryOptions: { staleTime: 1000, retry: 2 },
@@ -76,10 +81,12 @@ describe('contractMetaPlugin', () => {
 
     const plugin = new ContractOptionsUtilsPlugin({
       planet: {
-        find: oc.meta(tanstackQuery({
-          queryOptions: { staleTime: 1000, retry: 1 },
-          queryInterceptors: [metaInterceptor],
-        })),
+        find: oc.meta(
+          tanstackQuery({
+            queryOptions: { staleTime: 1000, retry: 1 },
+            queryInterceptors: [metaInterceptor],
+          }),
+        ),
       },
     })
 
@@ -109,10 +116,12 @@ describe('contractMetaPlugin', () => {
 
     const contract = {
       planet: {
-        find: oc.meta(tanstackQuery({
-          queryOptions: { staleTime: 1000, retry: 1 },
-          queryInterceptors: [metaInterceptor],
-        })),
+        find: oc.meta(
+          tanstackQuery({
+            queryOptions: { staleTime: 1000, retry: 1 },
+            queryInterceptors: [metaInterceptor],
+          }),
+        ),
       },
     }
 
@@ -148,9 +157,11 @@ describe('contractMetaPlugin', () => {
   it('lets object utils options beat defaults of a function meta modifier', () => {
     const contract = {
       planet: {
-        find: oc.meta(tanstackQuery({
-          queryOptions: (options: any) => ({ staleTime: 1000, retry: 1, ...options }),
-        })),
+        find: oc.meta(
+          tanstackQuery({
+            queryOptions: (options: any) => ({ staleTime: 1000, retry: 1, ...options }),
+          }),
+        ),
       },
     }
 
@@ -177,20 +188,26 @@ describe('contractMetaPlugin', () => {
 
   it('keeps contract meta interceptors when utils define none', async () => {
     const metaInterceptor = vi.fn(({ next }: any) => next())
-    const contract = { planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) } }
+    const contract = {
+      planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) },
+    }
     const client = { planet: { find: vi.fn(async () => '__found__') } }
 
     const utils = createRouterUtils(client as any, {
       plugins: [new ContractOptionsUtilsPlugin(contract)],
     }) as any
 
-    await expect(utils.planet.find.queryOptions({ input: { id: 1 } }).queryFn({ signal: undefined })).resolves.toBe('__found__')
+    await expect(
+      utils.planet.find.queryOptions({ input: { id: 1 } }).queryFn({ signal: undefined }),
+    ).resolves.toBe('__found__')
     expect(metaInterceptor).toHaveBeenCalledTimes(1)
   })
 
   it('resets contract meta interceptors when utils set them to undefined explicitly', async () => {
     const metaInterceptor = vi.fn(({ next }: any) => next())
-    const contract = { planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) } }
+    const contract = {
+      planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) },
+    }
     const client = { planet: { find: vi.fn(async () => '__found__') } }
 
     const utils = createRouterUtils(client as any, {
@@ -198,7 +215,9 @@ describe('contractMetaPlugin', () => {
       plugins: [new ContractOptionsUtilsPlugin(contract)],
     }) as any
 
-    await expect(utils.planet.find.queryOptions({ input: { id: 1 } }).queryFn({ signal: undefined })).resolves.toBe('__found__')
+    await expect(
+      utils.planet.find.queryOptions({ input: { id: 1 } }).queryFn({ signal: undefined }),
+    ).resolves.toBe('__found__')
     expect(metaInterceptor).not.toHaveBeenCalled()
   })
 })

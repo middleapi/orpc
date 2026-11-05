@@ -1,4 +1,5 @@
 import type { ClientContext, ClientLink } from '@orpc/client'
+
 import { createContractClientFactory } from './client-factory.ts'
 import { ProcedureContract } from './procedure.ts'
 
@@ -53,7 +54,9 @@ describe('createContractClientFactory', () => {
 
     expect(mockedLink.call).not.toHaveBeenCalled()
 
-    expect(await (client as any)({ value: 'hello' }, { context: { requestId: 'request_1' }, signal })).toBe('__mocked__')
+    expect(
+      await (client as any)({ value: 'hello' }, { context: { requestId: 'request_1' }, signal }),
+    ).toBe('__mocked__')
 
     expect(mockedLink.call).toHaveBeenCalledTimes(1)
     expect(mockedLink.call).toHaveBeenCalledWith(
@@ -121,7 +124,9 @@ describe('createContractClientFactory', () => {
 
     const client = factory(createContract(['users', 'find']) as any) as any
 
-    expect(await client({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe('__mocked__')
+    expect(await client({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe(
+      '__mocked__',
+    )
 
     expect(interceptor).toHaveBeenCalledTimes(1)
     expect(mockedLink.call).toHaveBeenCalledTimes(1)
@@ -159,7 +164,9 @@ describe('createContractClientFactory', () => {
       find: createContract(['users', 'find']),
     } as any) as any
 
-    expect(await client.find({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe('__mocked__')
+    expect(await client.find({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe(
+      '__mocked__',
+    )
 
     expect(interceptor).toHaveBeenCalledTimes(1)
     expect(mockedLink.call).toHaveBeenCalledTimes(1)

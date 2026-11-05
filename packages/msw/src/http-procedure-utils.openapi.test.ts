@@ -1,12 +1,13 @@
-import type { RouterContractClient } from '@orpc/contract'
-import type { JsonifiedClient } from '@orpc/openapi'
 import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
+import type { RouterContractClient } from '@orpc/contract'
 import { oc } from '@orpc/contract'
+import type { JsonifiedClient } from '@orpc/openapi'
 import { openapi } from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
+
 import { createHTTPUtils } from './index.ts'
 
 const contract = {
@@ -38,13 +39,15 @@ afterAll(() => server.close())
 const mock = createHTTPUtils(contract, {
   origin: 'http://localhost:3000',
   prefix: '/api',
-  handler: router => new OpenAPIHandler(router),
+  handler: (router) => new OpenAPIHandler(router),
 })
 
-const client: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(new OpenAPILink(contract, {
-  origin: 'http://localhost:3000',
-  url: '/api',
-}))
+const client: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(
+  new OpenAPILink(contract, {
+    origin: 'http://localhost:3000',
+    url: '/api',
+  }),
+)
 
 it('mocks custom routes with path parameters', async () => {
   const fn = vi.fn(({ input }: { input: { id: number } }) => ({ id: input.id, name: 'Earth' }))
@@ -72,7 +75,9 @@ it('mocks default routes', async () => {
 it('mocks routes with greedy path parameters', async () => {
   server.use(mock.file.handler(({ input }) => input.path))
 
-  await expect(client.file({ path: 'images/planets/earth.png' })).resolves.toBe('images/planets/earth.png')
+  await expect(client.file({ path: 'images/planets/earth.png' })).resolves.toBe(
+    'images/planets/earth.png',
+  )
 })
 
 it('responds with defined errors', async () => {
@@ -81,8 +86,7 @@ it('responds with defined errors', async () => {
   try {
     await client.planet.find({ id: 42 })
     expect.unreachable()
-  }
-  catch (error) {
+  } catch (error) {
     expect(error).toBeInstanceOf(ORPCError)
     expect(isDefinedError(error)).toBe(true)
     expect((error as any).code).toBe('NOT_FOUND')
@@ -95,28 +99,38 @@ it('supports wildcard base urls', async () => {
   const wildcardMock = createHTTPUtils(contract, {
     origin: '*',
     prefix: '/api',
-    handler: router => new OpenAPIHandler(router),
+    handler: (router) => new OpenAPIHandler(router),
   })
 
   server.use(wildcardMock.planet.create.handler(({ input }) => ({ id: 1, name: input.name })))
 
-  const wildcardClient: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(new OpenAPILink(contract, {
-    origin: 'http://example.com',
-    url: '/api',
-  }))
+  const wildcardClient: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(
+    new OpenAPILink(contract, {
+      origin: 'http://example.com',
+      url: '/api',
+    }),
+  )
 
-  await expect(wildcardClient.planet.create({ name: 'Pluto' })).resolves.toEqual({ id: 1, name: 'Pluto' })
+  await expect(wildcardClient.planet.create({ name: 'Pluto' })).resolves.toEqual({
+    id: 1,
+    name: 'Pluto',
+  })
 })
 
 it('leaves requests with unmatched methods to other msw handlers', async () => {
   server.use(
     mock.planet.find.handler(({ input }) => ({ id: input.id, name: 'Earth' })),
-    http.all('http://localhost:3000/*', async ({ request }) => HttpResponse.text(`fallback: ${await request.text()}`)),
+    http.all('http://localhost:3000/*', async ({ request }) =>
+      HttpResponse.text(`fallback: ${await request.text()}`),
+    ),
   )
 
   // the find route only accepts GET, so a POST should fall through
   // with its body untouched, since matching never reads the body
-  const response = await fetch('http://localhost:3000/api/planets/42', { method: 'POST', body: 'raw-body' })
+  const response = await fetch('http://localhost:3000/api/planets/42', {
+    method: 'POST',
+    body: 'raw-body',
+  })
 
   await expect(response.text()).resolves.toBe('fallback: raw-body')
 })

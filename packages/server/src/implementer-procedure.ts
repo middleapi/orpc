@@ -1,5 +1,12 @@
-import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  ORPCErrorConstructorMap,
+} from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
+
 import type { BuilderDefinition } from './builder.ts'
 import type { Context, MergedContext, MergedInitialContext } from './context.ts'
 import type { Middleware } from './middleware.ts'
@@ -15,12 +22,15 @@ export class ProcedureImplementer<
 > {
   '~orpc': BuilderDefinition<TInputSchema, TOutputSchema, TErrorMap>
 
-  constructor(definition: BuilderDefinition<TInputSchema, TOutputSchema, TErrorMap>) {
+  'constructor'(definition: BuilderDefinition<TInputSchema, TOutputSchema, TErrorMap>) {
     this['~orpc'] = definition
   }
 
   'use'<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
@@ -40,11 +50,14 @@ export class ProcedureImplementer<
   > {
     return new ProcedureImplementer({
       ...this['~orpc'],
-      orderedMiddlewares: [...this['~orpc'].orderedMiddlewares, {
-        middleware,
-        inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
-        outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
-      }],
+      orderedMiddlewares: [
+        ...this['~orpc'].orderedMiddlewares,
+        {
+          middleware,
+          inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
+          outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
+        },
+      ],
     })
   }
 
@@ -77,7 +90,10 @@ export class ImplementedProcedure<
   TErrorMap extends ErrorMap,
 > extends Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap> {
   use<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = TErrorMap,
   >(
@@ -101,11 +117,14 @@ export class ImplementedProcedure<
 
     return new ImplementedProcedure({
       ...this['~orpc'],
-      orderedMiddlewares: [...this['~orpc'].orderedMiddlewares, {
-        middleware,
-        inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
-        outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
-      }],
+      orderedMiddlewares: [
+        ...this['~orpc'].orderedMiddlewares,
+        {
+          middleware,
+          inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
+          outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
+        },
+      ],
     }) as any
   }
 }

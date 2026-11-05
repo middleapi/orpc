@@ -1,31 +1,39 @@
 {
   "name": "@orpc/contract",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Define typesafe API contracts as the single source of truth for oRPC, powered by Standard Schema",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "contract",
+    "contract-first",
+    "openapi",
+    "orpc",
+    "rpc",
+    "standard-schema",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/contract"
   },
-  "keywords": [
-    "orpc",
-    "rpc",
-    "api",
-    "typescript",
-    "typesafe",
-    "contract",
-    "contract-first",
-    "standard-schema",
-    "openapi"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./plugins": "./src/plugins/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -41,14 +49,6 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./plugins": "./src/plugins/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc && node ../../scripts/verify-dist.ts"
   },

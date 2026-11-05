@@ -1,9 +1,10 @@
 import type { RouterContract } from '@orpc/contract'
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { implement } from './implementer.ts'
+
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
 import * as ImplementerRouter from './implementer-router.ts'
+import { implement } from './implementer.ts'
 
 const createRouterImplementerSpy = vi.spyOn(ImplementerRouter, 'createRouterImplementer')
 
@@ -28,7 +29,9 @@ describe('implement', () => {
   it('crate with router implementer', () => {
     void implement(contract, { disableInputValidation: false })
     expect(createRouterImplementerSpy).toHaveBeenCalledTimes(1)
-    expect(createRouterImplementerSpy).toHaveBeenCalledWith(contract, { disableInputValidation: false })
+    expect(createRouterImplementerSpy).toHaveBeenCalledWith(contract, {
+      disableInputValidation: false,
+    })
   })
 
   describe('.$context', () => {
@@ -75,7 +78,9 @@ describe('implement', () => {
 
     expect(implementer.$context.use(mid)).toBeInstanceOf(ProcedureImplementer)
     expect(implementer.$context.use(mid)['~orpc']).toMatchObject(contract.$context['~orpc'])
-    expect(implementer.$context.use(mid)['~orpc'].orderedMiddlewares).toEqual([expect.objectContaining({ middleware: mid })])
+    expect(implementer.$context.use(mid)['~orpc'].orderedMiddlewares).toEqual([
+      expect.objectContaining({ middleware: mid }),
+    ])
 
     expect(implementer.$context.handler(vi.fn())).toBeInstanceOf(ImplementedProcedure)
     expect(implementer.$context.handler(vi.fn())['~orpc']).toMatchObject(contract.$context['~orpc'])
@@ -88,6 +93,8 @@ describe('implement', () => {
     const mid = vi.fn()
     expect(implementer.use(mid)).toBeInstanceOf(ProcedureImplementer)
     expect(implementer.use(mid)['~orpc']).toMatchObject(contract.ping['~orpc'])
-    expect(implementer.use(mid)['~orpc'].orderedMiddlewares).toEqual([expect.objectContaining({ middleware: mid })])
+    expect(implementer.use(mid)['~orpc'].orderedMiddlewares).toEqual([
+      expect.objectContaining({ middleware: mid }),
+    ])
   })
 })

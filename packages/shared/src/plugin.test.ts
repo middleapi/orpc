@@ -22,10 +22,18 @@ describe('sortPlugins', () => {
 
   it('should handle multiple before/after constraints', () => {
     const multipleBefore = [{ name: 'c' }, { name: 'b' }, { name: 'a', before: ['b', 'c'] }]
-    expect(sortPlugins(multipleBefore)).toEqual([multipleBefore[2], multipleBefore[0], multipleBefore[1]])
+    expect(sortPlugins(multipleBefore)).toEqual([
+      multipleBefore[2],
+      multipleBefore[0],
+      multipleBefore[1],
+    ])
 
     const multipleAfter = [{ name: 'c', after: ['a', 'b'] }, { name: 'a' }, { name: 'b' }]
-    expect(sortPlugins(multipleAfter)).toEqual([multipleAfter[1], multipleAfter[2], multipleAfter[0]])
+    expect(sortPlugins(multipleAfter)).toEqual([
+      multipleAfter[1],
+      multipleAfter[2],
+      multipleAfter[0],
+    ])
   })
 
   it('should handle mixed before and after constraints', () => {
@@ -45,7 +53,13 @@ describe('sortPlugins', () => {
       { name: 'logging', after: ['handler'] },
       { name: 'cors', before: ['auth', 'validation'] },
     ]
-    expect(sortPlugins(plugins)).toEqual([plugins[4], plugins[0], plugins[2], plugins[1], plugins[3]])
+    expect(sortPlugins(plugins)).toEqual([
+      plugins[4],
+      plugins[0],
+      plugins[2],
+      plugins[1],
+      plugins[3],
+    ])
   })
 
   it('should handle diamond dependency pattern', () => {
@@ -67,7 +81,13 @@ describe('sortPlugins', () => {
       { name: 'b', after: ['a'] },
       { name: 'a' },
     ]
-    expect(sortPlugins(plugins)).toEqual([plugins[4], plugins[3], plugins[2], plugins[1], plugins[0]])
+    expect(sortPlugins(plugins)).toEqual([
+      plugins[4],
+      plugins[3],
+      plugins[2],
+      plugins[1],
+      plugins[0],
+    ])
   })
 
   it('should handle partial ordering with independent groups', () => {
@@ -107,10 +127,7 @@ describe('sortPlugins', () => {
   })
 
   it('should ignore unknown plugin ids without throwing', () => {
-    const plugins = [
-      { name: 'a', before: ['unknown1'], after: ['unknown2'] },
-      { name: 'b' },
-    ]
+    const plugins = [{ name: 'a', before: ['unknown1'], after: ['unknown2'] }, { name: 'b' }]
     expect(() => sortPlugins(plugins)).not.toThrow()
   })
 
@@ -129,11 +146,7 @@ describe('sortPlugins', () => {
 
   it('should support a plugin used multiple times', () => {
     const plugin1 = { name: 'plugin1' }
-    const plugins = [
-      plugin1,
-      { name: 'plugin2', before: ['plugin1'] },
-      plugin1,
-    ]
+    const plugins = [plugin1, { name: 'plugin2', before: ['plugin1'] }, plugin1]
 
     const result = sortPlugins(plugins)
     expect(result).toEqual([plugins[1], plugins[0], plugins[2]])
@@ -141,13 +154,35 @@ describe('sortPlugins', () => {
 
   it('should keep registration order among plugins with no relative constraints', () => {
     const declaredOutOfOrder = [{ name: 'c', after: ['b', 'a'] }, { name: 'a' }, { name: 'b' }]
-    expect(sortPlugins(declaredOutOfOrder)).toEqual([declaredOutOfOrder[1], declaredOutOfOrder[2], declaredOutOfOrder[0]])
+    expect(sortPlugins(declaredOutOfOrder)).toEqual([
+      declaredOutOfOrder[1],
+      declaredOutOfOrder[2],
+      declaredOutOfOrder[0],
+    ])
 
-    const beforeDeclaredOutOfOrder = [{ name: 'a' }, { name: 'b' }, { name: 'c', before: ['b', 'a'] }]
-    expect(sortPlugins(beforeDeclaredOutOfOrder)).toEqual([beforeDeclaredOutOfOrder[2], beforeDeclaredOutOfOrder[0], beforeDeclaredOutOfOrder[1]])
+    const beforeDeclaredOutOfOrder = [
+      { name: 'a' },
+      { name: 'b' },
+      { name: 'c', before: ['b', 'a'] },
+    ]
+    expect(sortPlugins(beforeDeclaredOutOfOrder)).toEqual([
+      beforeDeclaredOutOfOrder[2],
+      beforeDeclaredOutOfOrder[0],
+      beforeDeclaredOutOfOrder[1],
+    ])
 
-    const unrelatedAfterMovedPlugin = [{ name: 'b' }, { name: 'c' }, { name: 'a', before: ['b'] }, { name: 'd' }]
-    expect(sortPlugins(unrelatedAfterMovedPlugin)).toEqual([unrelatedAfterMovedPlugin[1], unrelatedAfterMovedPlugin[2], unrelatedAfterMovedPlugin[0], unrelatedAfterMovedPlugin[3]])
+    const unrelatedAfterMovedPlugin = [
+      { name: 'b' },
+      { name: 'c' },
+      { name: 'a', before: ['b'] },
+      { name: 'd' },
+    ]
+    expect(sortPlugins(unrelatedAfterMovedPlugin)).toEqual([
+      unrelatedAfterMovedPlugin[1],
+      unrelatedAfterMovedPlugin[2],
+      unrelatedAfterMovedPlugin[0],
+      unrelatedAfterMovedPlugin[3],
+    ])
   })
 
   it('should not depend on where an unrelated plugin sits in the array', () => {
@@ -155,8 +190,16 @@ describe('sortPlugins', () => {
     const optOut = { name: 'opt-out', after: ['tracing'] }
     const plain = { name: 'plain' }
 
-    expect(sortPlugins([plain, optOut, tracing]).map(p => p.name)).toEqual(['plain', 'tracing', 'opt-out'])
-    expect(sortPlugins([optOut, plain, tracing]).map(p => p.name)).toEqual(['plain', 'tracing', 'opt-out'])
+    expect(sortPlugins([plain, optOut, tracing]).map((p) => p.name)).toEqual([
+      'plain',
+      'tracing',
+      'opt-out',
+    ])
+    expect(sortPlugins([optOut, plain, tracing]).map((p) => p.name)).toEqual([
+      'plain',
+      'tracing',
+      'opt-out',
+    ])
   })
 
   it('should detect circular dependencies', () => {

@@ -1,6 +1,6 @@
 import type { MaybeOptionalOptions, Registry } from '@orpc/shared'
-import type { StandardResponse } from '@standard-server/core'
 import { getConstructors, isPlainObject, resolveMaybeOptionalOptions } from '@orpc/shared'
+import type { StandardResponse } from '@standard-server/core'
 
 /**
  * Default mapping between common oRPC error codes and HTTP status codes.
@@ -35,15 +35,13 @@ export const COMMON_ERROR_STATUS_MAP = {
   GATEWAY_TIMEOUT: 504,
 }
 
-export type ORPCErrorCode
-  = Registry extends { ORPCErrorCode: infer T extends string }
-    ? T
-    : (keyof typeof COMMON_ERROR_STATUS_MAP) | (string & {})
+export type ORPCErrorCode = Registry extends { ORPCErrorCode: infer T extends string }
+  ? T
+  : keyof typeof COMMON_ERROR_STATUS_MAP | (string & {})
 
-export type ORPCErrorOptions<TData>
-  = & ErrorOptions
-    & { message?: string | undefined }
-    & (undefined extends TData ? { data?: TData } : { data: TData })
+export type ORPCErrorOptions<TData> = ErrorOptions & {
+  message?: string | undefined
+} & (undefined extends TData ? { data?: TData } : { data: TData })
 
 let ORPCErrorConstructors: WeakSet<object>
 
@@ -128,7 +126,7 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
    *
    * @todo Remove this and related code if Next.js resolves the multiple dependency graph issue.
    */
-  static override[Symbol.hasInstance](instance: unknown): boolean {
+  static override [Symbol.hasInstance](instance: unknown): boolean {
     if (!ORPCErrorConstructors.has(this)) {
       // not applicable to extended classes
       return super[Symbol.hasInstance](instance)
@@ -144,7 +142,10 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
   }
 }
 
-export interface ORPCErrorJSON<TCode extends string, TData> extends Pick<ORPCError<TCode, TData>, 'code' | 'message' | 'data'> {
+export interface ORPCErrorJSON<TCode extends string, TData> extends Pick<
+  ORPCError<TCode, TData>,
+  'code' | 'message' | 'data'
+> {
   /**
    * remove readonly
    */
@@ -205,7 +206,10 @@ export class MalformedResponseError extends ResponseError {
   override readonly name = 'MalformedResponseError'
 
   constructor(options: MalformedResponseErrorOptions) {
-    super({ ...options, message: options.message ?? inferMalformedResponseMessage(options.response) })
+    super({
+      ...options,
+      message: options.message ?? inferMalformedResponseMessage(options.response),
+    })
   }
 }
 
@@ -218,15 +222,24 @@ const INFERRED_MESSAGE_MAX_LENGTH = 256
 function inferMalformedResponseMessage(response: StandardResponse): string {
   const candidate = isPlainObject(response.body) ? response.body.message : response.body
 
-  if (typeof candidate === 'string' && candidate.length > 0 && candidate.length <= INFERRED_MESSAGE_MAX_LENGTH) {
+  if (
+    typeof candidate === 'string' &&
+    candidate.length > 0 &&
+    candidate.length <= INFERRED_MESSAGE_MAX_LENGTH
+  ) {
     return candidate
   }
 
-  const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(([, status]) => status === response.status)?.[0]
+  const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(
+    ([, status]) => status === response.status,
+  )?.[0]
 
   return commonCode ? codeToMessage(commonCode) : 'Malformed oRPC Response'
 }
 
 function codeToMessage(code: string): string {
-  return code.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
+  return code
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 }

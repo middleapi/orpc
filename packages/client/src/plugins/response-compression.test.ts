@@ -1,9 +1,17 @@
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard/index.ts'
 import { RPCLink } from '@orpc/client/fetch'
 import { toArray } from '@orpc/shared'
+
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+} from '../adapters/standard/index.ts'
 import { ResponseCompressionLinkPlugin } from './response-compression.ts'
 
-async function compressAsync(data: string, encoding: 'gzip' | 'deflate' | 'deflate-raw'): Promise<Uint8Array<ArrayBuffer>> {
+async function compressAsync(
+  data: string,
+  encoding: 'gzip' | 'deflate' | 'deflate-raw',
+): Promise<Uint8Array<ArrayBuffer>> {
   const stream = new Blob([data]).stream().pipeThrough(new CompressionStream(encoding))
   const buffer = await new Response(stream).arrayBuffer()
   return new Uint8Array(buffer)
@@ -13,15 +21,20 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-function createLink(options: {
-  pluginOptions?: ConstructorParameters<typeof ResponseCompressionLinkPlugin>[0]
-  plugins?: StandardLinkPlugin<any>[]
-  transportInterceptors?: StandardLinkTransportInterceptor<any>[]
-  fetchImpl?: (url: string, init: { body: any, headers: Headers }) => Promise<Response>
-} = {}) {
+function createLink(
+  options: {
+    pluginOptions?: ConstructorParameters<typeof ResponseCompressionLinkPlugin>[0]
+    plugins?: StandardLinkPlugin<any>[]
+    transportInterceptors?: StandardLinkTransportInterceptor<any>[]
+    fetchImpl?: (url: string, init: { body: any; headers: Headers }) => Promise<Response>
+  } = {},
+) {
   const fetch = vi.fn(
-    options.fetchImpl ?? (async (_url: string, _init: { body: any, headers: Headers }) =>
-      new Response(JSON.stringify({ json: 'OK' }), { headers: { 'content-type': 'application/json' } })),
+    options.fetchImpl ??
+      (async (_url: string, _init: { body: any; headers: Headers }) =>
+        new Response(JSON.stringify({ json: 'OK' }), {
+          headers: { 'content-type': 'application/json' },
+        })),
   )
 
   const link = new RPCLink({
@@ -60,38 +73,43 @@ describe('responseCompressionLinkPlugin', () => {
     expect(init.headers?.get('accept-encoding')).toBe('deflate, gzip')
   })
 
-  it.each(
-    ['gzip', 'deflate', 'deflate-raw'] as const,
-  )('decompresses response body when content-encoding is %s', async (encoding) => {
-    const payload = JSON.stringify({ json: 'OK' })
-    const compressed = await compressAsync(payload, encoding)
+  it.each(['gzip', 'deflate', 'deflate-raw'] as const)(
+    'decompresses response body when content-encoding is %s',
+    async (encoding) => {
+      const payload = JSON.stringify({ json: 'OK' })
+      const compressed = await compressAsync(payload, encoding)
 
-    const { link } = createLink({
-      fetchImpl: async () => new Response(compressed, {
-        headers: {
-          'content-type': 'application/json',
-          'content-encoding': encoding,
-        },
-      }),
-    })
+      const { link } = createLink({
+        fetchImpl: async () =>
+          new Response(compressed, {
+            headers: {
+              'content-type': 'application/json',
+              'content-encoding': encoding,
+            },
+          }),
+      })
 
-    await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
-  })
+      await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
+    },
+  )
 
   it('decompresses response body when multiple content-encodings are applied', async () => {
     const payload = JSON.stringify({ json: 'OK' })
     // Content-Encoding: deflate, gzip means gzip applied last
     const deflatedBytes = await compressAsync(payload, 'deflate')
-    const gzippedStream = new Blob([deflatedBytes]).stream().pipeThrough(new CompressionStream('gzip'))
+    const gzippedStream = new Blob([deflatedBytes])
+      .stream()
+      .pipeThrough(new CompressionStream('gzip'))
     const multiCompressed = new Uint8Array(await new Response(gzippedStream).arrayBuffer())
 
     const { link } = createLink({
-      fetchImpl: async () => new Response(multiCompressed, {
-        headers: {
-          'content-type': 'application/json',
-          'content-encoding': 'deflate, gzip',
-        },
-      }),
+      fetchImpl: async () =>
+        new Response(multiCompressed, {
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'deflate, gzip',
+          },
+        }),
     })
 
     await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
@@ -100,16 +118,21 @@ describe('responseCompressionLinkPlugin', () => {
   it('decompresses response body when 5 content-encodings are applied', async () => {
     let body: Uint8Array<ArrayBuffer> = await compressAsync(JSON.stringify({ json: 'OK' }), 'gzip')
     for (let i = 1; i < 5; i++) {
-      body = new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())
+      body = new Uint8Array(
+        await new Response(
+          new Blob([body]).stream().pipeThrough(new CompressionStream('gzip')),
+        ).arrayBuffer(),
+      )
     }
 
     const { link } = createLink({
-      fetchImpl: async () => new Response(body, {
-        headers: {
-          'content-type': 'application/json',
-          'content-encoding': Array.from({ length: 5 }).fill('gzip').join(', '),
-        },
-      }),
+      fetchImpl: async () =>
+        new Response(body, {
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': Array.from({ length: 5 }).fill('gzip').join(', '),
+          },
+        }),
     })
 
     await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
@@ -117,12 +140,13 @@ describe('responseCompressionLinkPlugin', () => {
 
   it('rejects response body when more than 5 content-encodings are applied', async () => {
     const { link } = createLink({
-      fetchImpl: async () => new Response('irrelevant', {
-        headers: {
-          'content-type': 'application/json',
-          'content-encoding': Array.from({ length: 6 }).fill('gzip').join(', '),
-        },
-      }),
+      fetchImpl: async () =>
+        new Response('irrelevant', {
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': Array.from({ length: 6 }).fill('gzip').join(', '),
+          },
+        }),
     })
 
     const promise = link.call(['test'], undefined, { context: {} })
@@ -135,12 +159,13 @@ describe('responseCompressionLinkPlugin', () => {
     const payload = JSON.stringify({ json: 'OK' })
 
     const { link } = createLink({
-      fetchImpl: async () => new Response(payload, {
-        headers: {
-          'content-type': 'application/json',
-          'content-encoding': 'br',
-        },
-      }),
+      fetchImpl: async () =>
+        new Response(payload, {
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'br',
+          },
+        }),
     })
 
     // Body is not decompressed; JSON parse still works because body was never compressed
@@ -158,12 +183,13 @@ describe('responseCompressionLinkPlugin', () => {
     const compressed = await compressAsync(payload, 'gzip')
 
     const { link } = createLink({
-      fetchImpl: async () => new Response(compressed, {
-        headers: {
-          'content-type': 'application/json',
-          'content-encoding': 'gzip, br',
-        },
-      }),
+      fetchImpl: async () =>
+        new Response(compressed, {
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'gzip, br',
+          },
+        }),
     })
 
     // Partial decode is skipped; body stays compressed → deserialize fails

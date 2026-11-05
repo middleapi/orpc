@@ -1,27 +1,50 @@
 import type { Interceptor, PromiseWithError } from '@orpc/shared'
-import type { AnyNestedClient, Client, ClientContext, ClientLink, ClientOptions, InferClientContext, InferClientError } from './types.ts'
 import { intercept, toArray } from '@orpc/shared'
+
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts.ts'
+import type {
+  AnyNestedClient,
+  Client,
+  ClientContext,
+  ClientLink,
+  ClientOptions,
+  InferClientContext,
+  InferClientError,
+} from './types.ts'
 import { resolveClientRest } from './utils.ts'
 
-export interface ORPCClientInterceptorOptions<TClientContext extends ClientContext, TInput> extends ClientOptions<TClientContext> {
+export interface ORPCClientInterceptorOptions<
+  TClientContext extends ClientContext,
+  TInput,
+> extends ClientOptions<TClientContext> {
   path: string[]
   input: TInput
 }
 
-export type ORPCClientInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ORPCClientInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+export type ORPCClientInterceptor<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Interceptor<
+  ORPCClientInterceptorOptions<TClientContext, TInput>,
+  PromiseWithError<TOutput, TError>
+>
 
-export interface ORPCClientScopedOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
-
+export interface ORPCClientScopedOptions<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> {
   /**
    * Interceptors that wrap the entire client call lifecycle.
    */
   interceptors?: ORPCClientInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 }
 
-export type ORPCClientScoped<T extends AnyNestedClient>
-  = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
+export type ORPCClientScoped<T extends AnyNestedClient> =
+  T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ORPCClientScopedOptions<UClientContext, UInput, UOutput, UError>
     : {
         [K in keyof T]?: (T[K] extends AnyNestedClient ? ORPCClientScoped<T[K]> : never) | undefined
@@ -36,7 +59,9 @@ export interface ORPCClientOptions<T extends AnyNestedClient> {
   /**
    * Interceptors that wrap the entire client call lifecycle, applied to every procedure call.
    */
-  interceptors?: ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
+  interceptors?:
+    | ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+    | undefined
 
   /**
    * Per-procedure options following the shape of the router.
@@ -57,11 +82,18 @@ export function createORPCClient<T extends AnyNestedClient>(
   link: ClientLink<InferClientContext<T>>,
   { path = [], ...options }: NoInfer<ORPCClientOptions<T>> = {},
 ): T {
-  const procedureClient: Client<InferClientContext<T>, unknown, unknown, InferClientError<T>> = (...rest) => {
+  const procedureClient: Client<InferClientContext<T>, unknown, unknown, InferClientError<T>> = (
+    ...rest
+  ) => {
     const [input, callOptions] = resolveClientRest(rest)
     const interceptors = [
       ...toArray(options.interceptors),
-      ...toArray(options.scoped?.interceptors) as ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[],
+      ...(toArray(options.scoped?.interceptors) as ORPCClientInterceptor<
+        InferClientContext<T>,
+        unknown,
+        unknown,
+        InferClientError<T>
+      >[]),
     ]
 
     return intercept(
@@ -85,7 +117,9 @@ export function createORPCClient<T extends AnyNestedClient>(
         client = createORPCClient(link, {
           ...options,
           path: [...path, key],
-          scoped: (options.scoped as undefined | Record<string, ORPCClientOptions<T>['scoped']>)?.[key],
+          scoped: (options.scoped as undefined | Record<string, ORPCClientOptions<T>['scoped']>)?.[
+            key
+          ],
         })
 
         cache.set(key, client)

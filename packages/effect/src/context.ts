@@ -1,4 +1,9 @@
-import type { Context, MiddlewareOptions, ORPCErrorConstructorMap, ProcedureHandlerOptions } from '@orpc/server'
+import type {
+  Context,
+  MiddlewareOptions,
+  ORPCErrorConstructorMap,
+  ProcedureHandlerOptions,
+} from '@orpc/server'
 import type { Effect, Context as EffectContext } from 'effect'
 
 /**
@@ -6,7 +11,10 @@ import type { Effect, Context as EffectContext } from 'effect'
  *
  * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
  */
-export interface EffectWrapMiddlewareOptions extends Omit<MiddlewareOptions<Context, unknown, ORPCErrorConstructorMap<any>>, 'next'> {
+export interface EffectWrapMiddlewareOptions extends Omit<
+  MiddlewareOptions<Context, unknown, ORPCErrorConstructorMap<any>>,
+  'next'
+> {
   kind: 'middleware'
   /**
    * The middleware's input, validated by the schemas defined before it.
@@ -19,7 +27,11 @@ export interface EffectWrapMiddlewareOptions extends Omit<MiddlewareOptions<Cont
  *
  * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
  */
-export interface EffectWrapHandlerOptions extends ProcedureHandlerOptions<Context, unknown, ORPCErrorConstructorMap<any>> {
+export interface EffectWrapHandlerOptions extends ProcedureHandlerOptions<
+  Context,
+  unknown,
+  ORPCErrorConstructorMap<any>
+> {
   kind: 'handler'
 }
 
@@ -93,10 +105,9 @@ export interface WithEffectContext<Services> {
    * }
    * ```
    */
-  ['effect/wrap']?: (<A>(
-    effect: Effect.Effect<A, unknown>,
-    opts: EffectWrapOptions,
-  ) => Effect.Effect<A, unknown>) | undefined
+  ['effect/wrap']?:
+    | (<A>(effect: Effect.Effect<A, unknown>, opts: EffectWrapOptions) => Effect.Effect<A, unknown>)
+    | undefined
 }
 
 /**
@@ -105,4 +116,8 @@ export interface WithEffectContext<Services> {
  *
  * @see {@link https://orpc.dev/docs/integrations/effect#effect-services | Effect Integration - Effect Services}
  */
-export type InferEffectServices<T extends Context> = [T] extends [{ 'effect/context': EffectContext.Context<infer Services> }] ? Services : never
+export type InferEffectServices<T extends Context> = [T] extends [
+  { 'effect/context': EffectContext.Context<infer Services> },
+]
+  ? Services
+  : never

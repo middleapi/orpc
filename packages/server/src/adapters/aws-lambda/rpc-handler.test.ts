@@ -1,13 +1,19 @@
-import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from '@standard-server/aws-lambda'
-import type { StandardHandlerPlugin } from '../standard/index.ts'
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
+
+import type {
+  APIGatewayProxyEventV2,
+  AwsLambdaGlobal,
+  HttpResponseStream,
+} from '@standard-server/aws-lambda'
+
 import { os } from '../../builder.ts'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
 import { RPCHandler } from './rpc-handler.ts'
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []
-  metadata: { statusCode: number, headers: Record<string, string>, cookies: string[] } | undefined
+  metadata: { statusCode: number; headers: Record<string, string>; cookies: string[] } | undefined
 
   get text(): string {
     return Buffer.concat(this.chunks).toString()
@@ -42,10 +48,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 
   vi.stubGlobal('awslambda', {
-    streamifyResponse: handler => handler,
+    streamifyResponse: (handler) => handler,
     HttpResponseStream: {
       from(responseStream, metadata) {
-        (responseStream as TestResponseStream).metadata = metadata
+        ;(responseStream as TestResponseStream).metadata = metadata
         return responseStream
       },
     },
@@ -59,9 +65,7 @@ afterEach(() => {
 describe('rpcHandler', () => {
   it('accepts context and prefix options in handle method', async () => {
     const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     const responseStream = new TestResponseStream()
@@ -75,10 +79,14 @@ describe('rpcHandler', () => {
     expect(responseStream.text).toContain('u_123')
 
     const mismatchStream = new TestResponseStream()
-    const mismatchResult = await handler.handle(createEvent({ rawPath: '/invalid/ping' }), mismatchStream, {
-      context: { userId: 'u_123' },
-      prefix: '/api/v1',
-    })
+    const mismatchResult = await handler.handle(
+      createEvent({ rawPath: '/invalid/ping' }),
+      mismatchStream,
+      {
+        context: { userId: 'u_123' },
+        prefix: '/api/v1',
+      },
+    )
 
     expect(mismatchResult.matched).toBe(false)
     expect(mismatchStream.metadata).toBeUndefined()
@@ -92,7 +100,10 @@ describe('rpcHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },
@@ -101,7 +112,10 @@ describe('rpcHandler', () => {
     const handler = new RPCHandler({}, { plugins: [plugin] })
 
     const responseStream = new TestResponseStream()
-    const result = await handler.handle(createEvent({ requestContext: { http: { method: 'GET' } }, body: undefined }), responseStream)
+    const result = await handler.handle(
+      createEvent({ requestContext: { http: { method: 'GET' } }, body: undefined }),
+      responseStream,
+    )
 
     expect(result.matched).toBe(true)
     expect(responseStream.text).toBe('"intercepted"')
@@ -113,11 +127,14 @@ describe('rpcHandler', () => {
     })
 
     const responseStream = new TestResponseStream()
-    const result = await handler.handle(createEvent({
-      requestContext: { http: { method: 'GET' } },
-      rawQueryString: `data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
-      body: undefined,
-    }), responseStream)
+    const result = await handler.handle(
+      createEvent({
+        requestContext: { http: { method: 'GET' } },
+        rawQueryString: `data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+        body: undefined,
+      }),
+      responseStream,
+    )
 
     expect(result.matched).toBe(false)
   })
@@ -133,11 +150,14 @@ describe('rpcHandler', () => {
     )
 
     const responseStream = new TestResponseStream()
-    const result = await handler.handle(createEvent({
-      requestContext: { http: { method: 'GET' } },
-      rawQueryString: `data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
-      body: undefined,
-    }), responseStream)
+    const result = await handler.handle(
+      createEvent({
+        requestContext: { http: { method: 'GET' } },
+        rawQueryString: `data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+        body: undefined,
+      }),
+      responseStream,
+    )
 
     expect(result.matched).toBe(true)
     expect(responseStream.metadata?.statusCode).toBe(200)

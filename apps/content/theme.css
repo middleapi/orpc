@@ -149,7 +149,9 @@
    layout, stretching the page sideways and adding thousands of pixels
    of phantom height below the content on narrow viewports. Keep them
    out of layout entirely until their trigger is hovered. */
-.prose .twoslash-hover:not(:hover):not(.twoslash-open) :is(.twoslash-popup-container, .twoslash-bridge) {
+.prose
+  .twoslash-hover:not(:hover):not(.twoslash-open)
+  :is(.twoslash-popup-container, .twoslash-bridge) {
   display: none;
 }
 
@@ -339,7 +341,10 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-image: radial-gradient(color-mix(in oklch, var(--blume-foreground) 14%, transparent) 1px, transparent 1px);
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--blume-foreground) 14%, transparent) 1px,
+    transparent 1px
+  );
   background-size: 22px 22px;
   mask-image: radial-gradient(ellipse 75% 60% at 50% 0%, #000 10%, transparent 70%);
   pointer-events: none;
@@ -576,7 +581,13 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 }
 
 .orpc-tablist[data-overflow-start='true'][data-overflow-end='true'] {
-  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 2.5rem,
+    #000 calc(100% - 2.5rem),
+    transparent
+  );
 }
 
 .orpc-tablist::-webkit-scrollbar {

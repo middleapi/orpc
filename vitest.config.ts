@@ -1,4 +1,5 @@
 import process from 'node:process'
+
 import codspeedPlugin from '@codspeed/vitest-plugin'
 import { loadEnv } from 'vite'
 import { defaultExclude, defineConfig } from 'vitest/config'

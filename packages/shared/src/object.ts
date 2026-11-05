@@ -1,5 +1,6 @@
-import type { AnyFunction } from './function.ts'
 import { getOrBind, isTypescriptObject } from '@standard-server/shared'
+
+import type { AnyFunction } from './function.ts'
 
 export type Segment = string | number
 
@@ -9,17 +10,15 @@ export function findDeepMatches(
   segments: Segment[] = [],
   maps: Segment[][] = [],
   values: unknown[] = [],
-): { maps: Segment[][], values: unknown[] } {
+): { maps: Segment[][]; values: unknown[] } {
   if (check(payload)) {
     maps.push(segments)
     values.push(payload)
-  }
-  else if (Array.isArray(payload)) {
+  } else if (Array.isArray(payload)) {
     payload.forEach((v, i) => {
       findDeepMatches(check, v, [...segments, i], maps, values)
     })
-  }
-  else if (isPlainObject(payload)) {
+  } else if (isPlainObject(payload)) {
     for (const key of Object.keys(payload)) {
       findDeepMatches(check, payload[key], [...segments, key], maps, values)
     }
@@ -32,7 +31,8 @@ export function findDeepMatches(
  * Get constructor of the value
  *
  */
-export function getConstructor(value: unknown): Function | null | undefined { // oxlint-disable-line typescript/no-unsafe-function-type
+export function getConstructor(value: unknown): Function | null | undefined {
+  // oxlint-disable-line typescript/no-unsafe-function-type
   // Object.getPrototypeOf require object in node.js
   if (!isTypescriptObject(value)) {
     return null
@@ -41,7 +41,8 @@ export function getConstructor(value: unknown): Function | null | undefined { //
   return Object.getPrototypeOf(value)?.constructor
 }
 
-export function* getConstructors(value: unknown): Generator<Function> { // oxlint-disable-line typescript/no-unsafe-function-type
+export function* getConstructors(value: unknown): Generator<Function> {
+  // oxlint-disable-line typescript/no-unsafe-function-type
   if (!isTypescriptObject(value)) {
     return
   }
@@ -96,7 +97,7 @@ export function get(object: unknown, path: readonly PropertyKey[]): unknown {
  */
 export function set(
   root: object,
-  path: [PropertyKey, ...PropertyKey[]] | [ ...PropertyKey[], PropertyKey],
+  path: [PropertyKey, ...PropertyKey[]] | [...PropertyKey[], PropertyKey],
   value: unknown,
 ): void {
   let current: object = root
@@ -109,8 +110,7 @@ export function set(
       const child = {}
       setOwn(current, key, child)
       current = child
-    }
-    else {
+    } else {
       current = next
     }
   }
@@ -129,9 +129,8 @@ export function setOwn(object: object, key: PropertyKey, value: unknown): void {
       enumerable: true,
       configurable: true,
     })
-  }
-  else {
-    (object as Record<PropertyKey, unknown>)[key] = value
+  } else {
+    ;(object as Record<PropertyKey, unknown>)[key] = value
   }
 }
 
@@ -163,10 +162,7 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
   return result
 }
 
-export function omit<T extends object, K extends keyof T>(
-  obj: T,
-  keys: readonly K[],
-): Omit<T, K> {
+export function omit<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Omit<T, K> {
   const result = { ...obj }
 
   for (const key of keys) {
@@ -176,10 +172,7 @@ export function omit<T extends object, K extends keyof T>(
   return result
 }
 
-export function pick<T extends object, K extends keyof T>(
-  obj: T,
-  keys: readonly K[],
-): Pick<T, K> {
+export function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Pick<T, K> {
   const result = {} as Pick<T, K>
 
   for (const key of keys) {
@@ -251,11 +244,9 @@ export function copyOnWrite(parent: object, key: PropertyKey, original: unknown)
 
   if (Array.isArray(value)) {
     copy = value.slice()
-  }
-  else if (isPlainObject(value)) {
+  } else if (isPlainObject(value)) {
     copy = { ...value }
-  }
-  else {
+  } else {
     return value
   }
 
@@ -270,11 +261,11 @@ export function isPropertyKey(value: unknown): value is PropertyKey {
 }
 
 export const NullProtoObj = /* @__PURE__ */ (() => {
-  const e = function () { }
+  const e = function () {}
   e.prototype = Object.create(null)
   Object.freeze(e.prototype)
   return e
-})() as unknown as ({ new<T extends Record<PropertyKey, unknown>>(): T })
+})() as unknown as { new <T extends Record<PropertyKey, unknown>>(): T }
 
 /**
  * Returns an object containing all methods of the given object, with each
@@ -286,7 +277,7 @@ export const NullProtoObj = /* @__PURE__ */ (() => {
 export function bindMethods<T extends object>(
   obj: T,
   options: { unbound?: (keyof T)[] } = {},
-): Pick<T, { [K in keyof T]: T[K] extends AnyFunction ? K : never; }[keyof T]> {
+): Pick<T, { [K in keyof T]: T[K] extends AnyFunction ? K : never }[keyof T]> {
   const unbound = new Set<PropertyKey>(options.unbound)
 
   // Use NullProtoObj so special methods like toString and __proto__ are supported.

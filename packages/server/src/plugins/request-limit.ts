@@ -1,9 +1,14 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
 import { ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 export interface RequestLimitHandlerPluginOptions {
   /**
@@ -42,7 +47,10 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const maxBodySize = this.maxBodySize
 
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       return next({
         ...interceptorOptions,
         request: {
@@ -91,10 +99,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
 }

@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
+
 import { openapi, OpenAPIGenerator } from '../../src/index.ts'
 import { zodJsonSchemaConverter } from '../__shared__/schema.ts'
 
@@ -59,18 +60,20 @@ describe('openAPIGenerator e2e: typed errors', () => {
       },
     })
 
-    expect(doc.paths?.['/planets/{id}']?.get?.responses?.['404']).toEqual(expect.objectContaining({
-      content: {
-        'application/json': {
-          schema: {
-            oneOf: [
-              { $ref: '#/components/schemas/NotFound' },
-              { $ref: '#/components/schemas/UndefinedError' },
-            ],
+    expect(doc.paths?.['/planets/{id}']?.get?.responses?.['404']).toEqual(
+      expect.objectContaining({
+        content: {
+          'application/json': {
+            schema: {
+              oneOf: [
+                { $ref: '#/components/schemas/NotFound' },
+                { $ref: '#/components/schemas/UndefinedError' },
+              ],
+            },
           },
         },
-      },
-    }))
+      }),
+    )
   })
 
   it('builds error components with defined, code, message, and data', async () => {
@@ -107,40 +110,48 @@ describe('openAPIGenerator e2e: typed errors', () => {
     })
   })
 
-  it.each(['3.2.0', '3.1.0', '3.0.3'] as const)('titles error components after their codes so oneOf branches sharing a status stay distinguishable in OpenAPI %s', async (version) => {
-    const doc = await generator.generate({
-      createPlanet: oc
-        .meta(openapi({ method: 'POST', path: '/planets' }))
-        .errors({
-          PLANET_NAME_TAKEN: { data: z.object({ existingId: z.string() }) },
-          PLANET_QUOTA_EXCEEDED: {},
-        })
-        .input(z.object({ name: z.string() })),
-    }, {
-      version,
-      errorStatusMap: { PLANET_NAME_TAKEN: 409, PLANET_QUOTA_EXCEEDED: 409 },
-    })
-
-    expect(doc.paths?.['/planets']?.post?.responses?.['409']).toEqual(expect.objectContaining({
-      content: {
-        'application/json': {
-          schema: {
-            oneOf: [
-              { $ref: '#/components/schemas/PlanetNameTaken' },
-              { $ref: '#/components/schemas/PlanetQuotaExceeded' },
-              { $ref: '#/components/schemas/UndefinedError' },
-            ],
-          },
+  it.each(['3.2.0', '3.1.0', '3.0.3'] as const)(
+    'titles error components after their codes so oneOf branches sharing a status stay distinguishable in OpenAPI %s',
+    async (version) => {
+      const doc = await generator.generate(
+        {
+          createPlanet: oc
+            .meta(openapi({ method: 'POST', path: '/planets' }))
+            .errors({
+              PLANET_NAME_TAKEN: { data: z.object({ existingId: z.string() }) },
+              PLANET_QUOTA_EXCEEDED: {},
+            })
+            .input(z.object({ name: z.string() })),
         },
-      },
-    }))
+        {
+          version,
+          errorStatusMap: { PLANET_NAME_TAKEN: 409, PLANET_QUOTA_EXCEEDED: 409 },
+        },
+      )
 
-    expect(doc.components?.schemas).toEqual({
-      PlanetNameTaken: expect.objectContaining({ title: 'PLANET_NAME_TAKEN' }),
-      PlanetQuotaExceeded: expect.objectContaining({ title: 'PLANET_QUOTA_EXCEEDED' }),
-      UndefinedError: expect.objectContaining({ title: 'UndefinedError' }),
-    })
-  })
+      expect(doc.paths?.['/planets']?.post?.responses?.['409']).toEqual(
+        expect.objectContaining({
+          content: {
+            'application/json': {
+              schema: {
+                oneOf: [
+                  { $ref: '#/components/schemas/PlanetNameTaken' },
+                  { $ref: '#/components/schemas/PlanetQuotaExceeded' },
+                  { $ref: '#/components/schemas/UndefinedError' },
+                ],
+              },
+            },
+          },
+        }),
+      )
+
+      expect(doc.components?.schemas).toEqual({
+        PlanetNameTaken: expect.objectContaining({ title: 'PLANET_NAME_TAKEN' }),
+        PlanetQuotaExceeded: expect.objectContaining({ title: 'PLANET_QUOTA_EXCEEDED' }),
+        UndefinedError: expect.objectContaining({ title: 'UndefinedError' }),
+      })
+    },
+  )
 
   it('shares error components between procedures and across regenerations from a base document', async () => {
     const sharedRouter = {
@@ -149,38 +160,47 @@ describe('openAPIGenerator e2e: typed errors', () => {
     }
 
     const first = await generator.generate(sharedRouter)
-    expect(Object.keys(first.components?.schemas ?? {}).sort()).toEqual(['NotFound', 'UndefinedError'])
+    expect(Object.keys(first.components?.schemas ?? {}).sort()).toEqual([
+      'NotFound',
+      'UndefinedError',
+    ])
 
     const second = await generator.generate(sharedRouter, {
       base: { components: first.components },
     })
-    expect(Object.keys(second.components?.schemas ?? {}).sort()).toEqual(['NotFound', 'UndefinedError'])
+    expect(Object.keys(second.components?.schemas ?? {}).sort()).toEqual([
+      'NotFound',
+      'UndefinedError',
+    ])
   })
 
   it('supports a custom error status map and a custom error body schema', async () => {
-    const doc = await generator.generate({
-      getPlanet: oc
-        .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
-        .errors({ PLANET_GONE: { message: 'Planet is gone' } })
-        .input(z.object({ id: z.string() })),
-    }, {
-      errorStatusMap: { PLANET_GONE: 410 },
-      errorResponseBodySchema: (definedErrors, status) => {
-        expect(definedErrors).toEqual([
-          expect.objectContaining({ code: 'PLANET_GONE', defaultMessage: 'Planet is gone' }),
-        ])
-
-        return {
-          type: 'object',
-          properties: {
-            code: { type: 'string' },
-            message: { type: 'string' },
-            status: { const: status },
-          },
-          required: ['code', 'message'],
-        }
+    const doc = await generator.generate(
+      {
+        getPlanet: oc
+          .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+          .errors({ PLANET_GONE: { message: 'Planet is gone' } })
+          .input(z.object({ id: z.string() })),
       },
-    })
+      {
+        errorStatusMap: { PLANET_GONE: 410 },
+        errorResponseBodySchema: (definedErrors, status) => {
+          expect(definedErrors).toEqual([
+            expect.objectContaining({ code: 'PLANET_GONE', defaultMessage: 'Planet is gone' }),
+          ])
+
+          return {
+            type: 'object',
+            properties: {
+              code: { type: 'string' },
+              message: { type: 'string' },
+              status: { const: status },
+            },
+            required: ['code', 'message'],
+          }
+        },
+      },
+    )
 
     expect(doc.paths?.['/planets/{id}']?.get?.responses?.['410']).toEqual({
       description: 'Planet is gone',
@@ -203,15 +223,18 @@ describe('openAPIGenerator e2e: typed errors', () => {
   })
 
   it('supports a custom error response content type', async () => {
-    const doc = await generator.generate({
-      getPlanet: oc
-        .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
-        .errors({ NOT_FOUND: {} })
-        .input(z.object({ id: z.string() }))
-        .output(z.object({ name: z.string() })),
-    }, {
-      errorResponseContentType: 'application/problem+json',
-    })
+    const doc = await generator.generate(
+      {
+        getPlanet: oc
+          .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+          .errors({ NOT_FOUND: {} })
+          .input(z.object({ id: z.string() }))
+          .output(z.object({ name: z.string() })),
+      },
+      {
+        errorResponseContentType: 'application/problem+json',
+      },
+    )
 
     const responses = doc.paths?.['/planets/{id}']?.get?.responses as any
     expect(Object.keys(responses['200'].content)).toEqual(['application/json'])

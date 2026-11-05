@@ -1,11 +1,12 @@
-import type { RateLimiter } from './types.ts'
 import { os, type } from '@orpc/server'
+
 import { ratelimit } from './middleware.ts'
+import type { RateLimiter } from './types.ts'
 
 describe('ratelimit', () => {
   it('can infer context & input & meta types', () => {
     const procedure = os
-      .$context<{ userId: string, rateLimiter: RateLimiter }>()
+      .$context<{ userId: string; rateLimiter: RateLimiter }>()
       .input(type<{ amount: number }>())
       .use(({ next }) => {
         return next({

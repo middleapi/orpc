@@ -1,6 +1,7 @@
-import type { StandardLinkPlugin } from '@orpc/client/standard'
 import { createORPCClient } from '@orpc/client'
+import type { StandardLinkPlugin } from '@orpc/client/standard'
 import { os } from '@orpc/server'
+
 import { openapi } from '../../meta.ts'
 import { OpenAPIHandler } from './openapi-handler.ts'
 import { OpenAPILink } from './openapi-link.ts'
@@ -10,13 +11,9 @@ describe('openapiLink', () => {
   const blob = new Blob(['hello'], { type: 'text/plain' })
 
   const router = {
-    get: os
-      .meta(openapi({ method: 'GET', path: '/ping/{pong}' }))
-      .handler(({ input }) => input),
+    get: os.meta(openapi({ method: 'GET', path: '/ping/{pong}' })).handler(({ input }) => input),
     post: os.handler(({ input }) => input),
-    query: os
-      .meta(openapi({ method: 'QUERY', path: '/query' }))
-      .handler(({ input }) => input),
+    query: os.meta(openapi({ method: 'QUERY', path: '/query' })).handler(({ input }) => input),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -39,20 +36,24 @@ describe('openapiLink', () => {
       return response
     })
 
-    const client = createORPCClient(new OpenAPILink(router, {
-      fetch,
-      origin: 'http://localhost:3000',
-      url: '/api',
-    })) as any
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        fetch,
+        origin: 'http://localhost:3000',
+        url: '/api',
+      }),
+    ) as any
 
-    await expect(client.get({
-      pong: 'pong',
-      a: 1,
-      nested: {
-        date,
-        arr: [3, date],
-      },
-    })).resolves.toEqual({
+    await expect(
+      client.get({
+        pong: 'pong',
+        a: 1,
+        nested: {
+          date,
+          arr: [3, date],
+        },
+      }),
+    ).resolves.toEqual({
       pong: 'pong',
       a: '1',
       nested: {
@@ -74,31 +75,35 @@ describe('openapiLink', () => {
   })
 
   it('calls a POST OpenAPI endpoint with JSON payloads', async () => {
-    const client = createORPCClient(new OpenAPILink(router, {
-      origin: 'http://localhost:3000',
-      url: '/api',
-      fetch: async (url, init) => {
-        const request = new Request(url, init)
-        const { matched, response } = await handler.handle(request, {
-          prefix: '/api',
-        })
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        origin: 'http://localhost:3000',
+        url: '/api',
+        fetch: async (url, init) => {
+          const request = new Request(url, init)
+          const { matched, response } = await handler.handle(request, {
+            prefix: '/api',
+          })
 
-        if (!matched || !response) {
-          throw new Error('No procedure match')
-        }
+          if (!matched || !response) {
+            throw new Error('No procedure match')
+          }
 
-        return response
-      },
-    })) as any
+          return response
+        },
+      }),
+    ) as any
 
-    await expect(client.post({
-      a: 1,
-      b: 2,
-      nested: {
-        date,
-        arr: [3, date],
-      },
-    })).resolves.toEqual({
+    await expect(
+      client.post({
+        a: 1,
+        b: 2,
+        nested: {
+          date,
+          arr: [3, date],
+        },
+      }),
+    ).resolves.toEqual({
       a: 1,
       b: 2,
       nested: {
@@ -125,11 +130,13 @@ describe('openapiLink', () => {
       return response
     })
 
-    const client = createORPCClient(new OpenAPILink(router, {
-      fetch,
-      origin: 'http://localhost:3000',
-      url: '/api',
-    })) as any
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        fetch,
+        origin: 'http://localhost:3000',
+        url: '/api',
+      }),
+    ) as any
 
     await expect(client.query({ search: 'earth' })).resolves.toEqual({ search: 'earth' })
 
@@ -142,31 +149,35 @@ describe('openapiLink', () => {
   })
 
   it('calls a POST OpenAPI endpoint with multipart payloads', async () => {
-    const client = createORPCClient(new OpenAPILink(router, {
-      origin: 'http://localhost:3000',
-      url: '/api',
-      fetch: async (url, init) => {
-        const request = new Request(url, init)
-        const { matched, response } = await handler.handle(request, {
-          prefix: '/api',
-        })
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        origin: 'http://localhost:3000',
+        url: '/api',
+        fetch: async (url, init) => {
+          const request = new Request(url, init)
+          const { matched, response } = await handler.handle(request, {
+            prefix: '/api',
+          })
 
-        if (!matched || !response) {
-          throw new Error('No procedure match')
-        }
+          if (!matched || !response) {
+            throw new Error('No procedure match')
+          }
 
-        return response
-      },
-    })) as any
+          return response
+        },
+      }),
+    ) as any
 
-    await expect(client.post({
-      a: 1,
-      nested: {
-        date,
-        arr: [3, date],
-      },
-      blob,
-    })).resolves.toEqual({
+    await expect(
+      client.post({
+        a: 1,
+        nested: {
+          date,
+          arr: [3, date],
+        },
+        blob,
+      }),
+    ).resolves.toEqual({
       a: '1',
       nested: {
         date: date.toISOString(),
@@ -192,9 +203,11 @@ describe('openapiLink', () => {
       },
     }
 
-    const client = createORPCClient(new OpenAPILink(router, {
-      plugins: [plugin],
-    })) as any
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        plugins: [plugin],
+      }),
+    ) as any
 
     await expect(client.post('ignored')).resolves.toBe('intercepted')
   })

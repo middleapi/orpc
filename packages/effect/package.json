@@ -1,31 +1,40 @@
 {
   "name": "@orpc/effect",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Effect integration for oRPC: build typesafe procedures with Effect",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "orpc",
+    "rpc",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/effect"
   },
-  "keywords": [
-    "orpc",
-    "effect",
-    "effect-ts",
-    "rpc",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": [
     "./dist/extensions/effect.js",
     "./dist/extensions/schema.js"
   ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./extensions/effect": "./src/extensions/effect.ts",
+    "./extensions/schema": "./src/extensions/schema.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -46,20 +55,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./extensions/effect": "./src/extensions/effect.ts",
-    "./extensions/schema": "./src/extensions/schema.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc && node ../../scripts/verify-dist.ts"
-  },
-  "peerDependencies": {
-    "effect": ">=4.0.0"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -70,5 +67,8 @@
   },
   "devDependencies": {
     "effect": "^4.1.2"
+  },
+  "peerDependencies": {
+    "effect": ">=4.0.0"
   }
 }

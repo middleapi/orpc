@@ -1,10 +1,19 @@
 import * as ContractModule from '@orpc/contract'
 import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
+
 import { Lazy, unlazy } from './lazy.ts'
 import { Procedure } from './procedure.ts'
 import { withHiddenRouterContract } from './router-hidden.ts'
-import { augmentImplementedRouter, augmentRouter, getRouter, resolveContractProcedure, unlazyRouter, walkProcedureContractsAsync, walkProcedureContractsSync } from './router-utils.ts'
+import {
+  augmentImplementedRouter,
+  augmentRouter,
+  getRouter,
+  resolveContractProcedure,
+  unlazyRouter,
+  walkProcedureContractsAsync,
+  walkProcedureContractsSync,
+} from './router-utils.ts'
 
 const oc = ContractModule.oc
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
@@ -22,7 +31,7 @@ function callable<T extends object>(value: T): T {
 }
 
 function middlewareEntries(middlewares: readonly unknown[]) {
-  return middlewares.map(middleware => ({
+  return middlewares.map((middleware) => ({
     middleware,
     inputSchemasLengthAtUse: 0,
     outputSchemasLengthAtUse: 0,
@@ -51,7 +60,9 @@ const procedure2 = new Procedure({
   inputSchemas: [schema2],
   outputSchemas: [],
   handler: vi.fn(),
-  orderedMiddlewares: [{ middleware: vi.fn() as any, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 }],
+  orderedMiddlewares: [
+    { middleware: vi.fn() as any, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 },
+  ],
   disableOutputValidation: undefined,
 })
 
@@ -111,7 +122,11 @@ describe('augmentRouter', () => {
 
     expect(actual).toBeInstanceOf(Procedure)
     expect(actual).not.toBe(original)
-    expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(mergeCallIndex, options.errorMap, original['~orpc'].errorMap)
+    expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(
+      mergeCallIndex,
+      options.errorMap,
+      original['~orpc'].errorMap,
+    )
     expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
       resolveCallIndex,
       options.meta,
@@ -354,7 +369,9 @@ describe('resolveContractProcedure', () => {
     expect(resolved).toBeInstanceOf(Procedure)
     expect(resolved['~orpc'].handler).toBe(procedure1['~orpc'].handler)
 
-    expect(await resolveContractProcedure(router, contract, ['lazy', 'p1'])).toBeInstanceOf(Procedure)
+    expect(await resolveContractProcedure(router, contract, ['lazy', 'p1'])).toBeInstanceOf(
+      Procedure,
+    )
   })
 
   it('throws when an implementation is missing or invalid', async () => {
@@ -426,8 +443,7 @@ describe('walkProcedureContractsAsync', () => {
         const lazied = getRouter(router, path)
         expect(lazied).toBeInstanceOf(Lazy)
         expect(contract).toBe(await unlazyDefault(lazied))
-      }
-      else {
+      } else {
         expect(contract).toBe(getRouter(router, path))
       }
     })
@@ -477,7 +493,12 @@ describe('walkProcedureContractsAsync', () => {
     expect(entries).toHaveBeenNthCalledWith(2, router.p2, ['custom', 'p2'])
     expect(entries).toHaveBeenNthCalledWith(3, router.nested.p1, ['custom', 'nested', 'p1'])
     expect(entries).toHaveBeenNthCalledWith(4, routerLazy.p1, ['custom', 'lazy', 'p1'])
-    expect(entries).toHaveBeenNthCalledWith(5, routerLazy.nested.p1, ['custom', 'lazy', 'nested', 'p1'])
+    expect(entries).toHaveBeenNthCalledWith(5, routerLazy.nested.p1, [
+      'custom',
+      'lazy',
+      'nested',
+      'p1',
+    ])
   })
 })
 
@@ -529,7 +550,11 @@ describe('__proto__ keys are kept as own routes instead of re-parenting the rebu
     handler: () => {},
   })
 
-  const withProto = <T>(value: T): Record<string, T> => Object.fromEntries([['__proto__', value], ['other', value]])
+  const withProto = <T>(value: T): Record<string, T> =>
+    Object.fromEntries([
+      ['__proto__', value],
+      ['other', value],
+    ])
 
   function expectOwnRoutes(router: any): void {
     expect(Object.getPrototypeOf(router)).toBe(Object.prototype)
@@ -538,14 +563,22 @@ describe('__proto__ keys are kept as own routes instead of re-parenting the rebu
   }
 
   it('augmentRouter', () => {
-    expectOwnRoutes(augmentRouter(withProto(procedure), { errorMap: {}, meta: {}, middlewares: [] }))
+    expectOwnRoutes(
+      augmentRouter(withProto(procedure), { errorMap: {}, meta: {}, middlewares: [] }),
+    )
   })
 
   it('augmentImplementedRouter', () => {
-    expectOwnRoutes(augmentImplementedRouter(withProto(procedure), { middlewares: [({ next }) => next()] }))
+    expectOwnRoutes(
+      augmentImplementedRouter(withProto(procedure), { middlewares: [({ next }) => next()] }),
+    )
   })
 
   it('unlazyRouter', async () => {
-    expectOwnRoutes(await unlazyRouter(withProto(new Lazy({ meta: {}, loader: async () => ({ default: procedure }) }))))
+    expectOwnRoutes(
+      await unlazyRouter(
+        withProto(new Lazy({ meta: {}, loader: async () => ({ default: procedure }) })),
+      ),
+    )
   })
 })

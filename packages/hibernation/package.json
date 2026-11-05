@@ -1,28 +1,35 @@
 {
   "name": "@orpc/hibernation",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Hibernation API support for oRPC, including Cloudflare Durable Objects' WebSocket Hibernation",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "cloudflare",
+    "durable-objects",
+    "hibernation",
+    "orpc",
+    "typescript",
+    "websocket"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/hibernation"
   },
-  "keywords": [
-    "orpc",
-    "hibernation",
-    "websocket",
-    "cloudflare",
-    "durable-objects",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -33,13 +40,6 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc && node ../../scripts/verify-dist.ts"
   },

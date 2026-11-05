@@ -1,11 +1,13 @@
-import { orpc } from '@/lib/orpc'
 import { useMutation, useQueryClient, useSuspenseInfiniteQuery } from '@tanstack/react-query'
+
+import { orpc } from '@/lib/orpc'
 
 export function PlanetTable() {
   const { data, refetch, fetchNextPage, hasNextPage, status } = useSuspenseInfiniteQuery(
     orpc.planet.list.infiniteOptions({
-      input: cursor => ({ cursor, limit: 5 }),
-      getNextPageParam: (lastPage, _, lastCursor) => lastPage.length === 5 ? lastCursor + 5 : null,
+      input: (cursor) => ({ cursor, limit: 5 }),
+      getNextPageParam: (lastPage, _, lastCursor) =>
+        lastPage.length === 5 ? lastCursor + 5 : null,
       initialPageParam: 0,
     }),
   )
@@ -67,25 +69,30 @@ export function PlanetTable() {
           <tbody>
             {data.pages.flatMap((page, i) =>
               page.map((planet) => {
-                const isDeleting = deleteMutation.isPending && deleteMutation.variables?.id === planet.id
+                const isDeleting =
+                  deleteMutation.isPending && deleteMutation.variables?.id === planet.id
 
                 return (
                   <tr key={`${planet.id}-${i}`}>
-                    <td className="cell-id" data-label="ID" title={planet.id}>{planet.id}</td>
+                    <td className="cell-id" data-label="ID" title={planet.id}>
+                      {planet.id}
+                    </td>
                     <td data-label="Name">{planet.name}</td>
-                    <td className="cell-desc" data-label="Description">{planet.description}</td>
+                    <td className="cell-desc" data-label="Description">
+                      {planet.description}
+                    </td>
                     <td data-label="Image">
-                      {planet.image
-                        ? (
-                            <img
-                              className="cell-image-thumb"
-                              width={32}
-                              height={32}
-                              src={`/api/files/${planet.image}`}
-                              alt={planet.name}
-                            />
-                          )
-                        : <span className="img-ph">—</span>}
+                      {planet.image ? (
+                        <img
+                          className="cell-image-thumb"
+                          width={32}
+                          height={32}
+                          src={`/api/files/${planet.image}`}
+                          alt={planet.name}
+                        />
+                      ) : (
+                        <span className="img-ph">—</span>
+                      )}
                     </td>
                     <td data-label="Actions">
                       <button
@@ -113,12 +120,8 @@ export function PlanetTable() {
               <td colSpan={5}>
                 <div className="table-actions">
                   <span className="registry-count">
-                    {planetCount}
-                    {' '}
-                    planet
-                    {planetCount === 1 ? '' : 's'}
-                    {' '}
-                    loaded
+                    {planetCount} planet
+                    {planetCount === 1 ? '' : 's'} loaded
                   </span>
                   <div className="btn-group">
                     <button

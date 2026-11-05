@@ -1,12 +1,11 @@
 import type { ClientContext } from '../../types.ts'
 import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard/index.ts'
-import type { FetchLinkTransportOptions } from './transport.ts'
 import { RPCLinkCodec, StandardLink } from '../standard/index.ts'
+import type { FetchLinkTransportOptions } from './transport.ts'
 import { FetchLinkTransport } from './transport.ts'
 
 export interface RPCLinkOptions<T extends ClientContext>
-  extends StandardLinkOptions<T>, FetchLinkTransportOptions<T>, RPCLinkCodecOptions<T> {
-}
+  extends StandardLinkOptions<T>, FetchLinkTransportOptions<T>, RPCLinkCodecOptions<T> {}
 
 /**
  * Client link that communicates with an RPC Handler over the Fetch API (HTTP).

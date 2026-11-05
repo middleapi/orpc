@@ -1,9 +1,10 @@
-import type { Publisher } from '../src/index.ts'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { Redis } from '@upstash/redis'
 import { createClient } from 'redis'
+
 import { RedisPublisher } from '../src/adapters/redis.ts'
 import { UpstashPublisher } from '../src/adapters/upstash.ts'
+import type { Publisher } from '../src/index.ts'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
@@ -17,11 +18,13 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
  * all adapters must connect to the same server.
  */
 describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
-  const publishers: Array<{ name: string, publisher: Publisher<any> }> = []
+  const publishers: Array<{ name: string; publisher: Publisher<any> }> = []
   const prefix = `redis-adapters:${crypto.randomUUID()}`
 
   if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
-    const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
+    const redis = createClient({
+      url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379`,
+    })
     const publisher = new RedisPublisher(redis, {
       prefix,
       resume: { enabled: true, ttl: 10_000 },
@@ -30,7 +33,11 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
   }
 
   // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
-  if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN && !process.versions.node.startsWith('26.')) {
+  if (
+    UPSTASH_REDIS_REST_URL &&
+    UPSTASH_REDIS_REST_TOKEN &&
+    !process.versions.node.startsWith('26.')
+  ) {
     const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
     const publisher = new UpstashPublisher(upstashRedis, {
       prefix,
@@ -52,7 +59,10 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
 
           const unsubscribeLive = await target.publisher.subscribe(event, liveListener)
 
-          await source.publisher.publish(event, withEventMeta({ order: 1 }, { id: 'client-id', comments: ['cross-adapter'] }))
+          await source.publisher.publish(
+            event,
+            withEventMeta({ order: 1 }, { id: 'client-id', comments: ['cross-adapter'] }),
+          )
           await source.publisher.publish(event, { order: 2 })
 
           await vi.waitFor(() => {

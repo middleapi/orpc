@@ -5,17 +5,19 @@ vi.mock('./procedure-utils.ts', async (importOriginal) => {
   const { SharedUtils } = await import('./shared-utils.ts')
 
   return {
-    ...await importOriginal<typeof import('./procedure-utils.ts')>(),
-    ProcedureUtils: vi.fn(class extends SharedUtils<unknown> {
-      call = vi.fn()
-      override matcher = SharedUtils.prototype.matcher
-      key = vi.fn(() => ({ key: true }))
-      fetcher = vi.fn(() => ({ fetcher: true }))
+    ...(await importOriginal<typeof import('./procedure-utils.ts')>()),
+    ProcedureUtils: vi.fn(
+      class extends SharedUtils<unknown> {
+        call = vi.fn()
+        override matcher = SharedUtils.prototype.matcher
+        key = vi.fn(() => ({ key: true }))
+        fetcher = vi.fn(() => ({ fetcher: true }))
 
-      constructor(path: string[], _client: unknown, options: any = {}) {
-        super(path, options)
-      }
-    }),
+        constructor(path: string[], _client: unknown, options: any = {}) {
+          super(path, options)
+        }
+      },
+    ),
   }
 })
 
@@ -37,7 +39,9 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledWith([], client, { prefix: '__prefix__' })
     expect(utils.matcher()(['__prefix__', [], {}])).toBe(true)
     expect(utils.matcher()([[], {}])).toBe(false)
-    expect(utils.fetcher()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value)
+    expect(utils.fetcher()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value,
+    )
 
     vi.clearAllMocks()
     const keyUtils = utils.key
@@ -45,15 +49,21 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith(['key'], client.key, { prefix: '__prefix__' })
     expect(keyUtils.matcher()(['__prefix__', ['key'], {}])).toBe(true)
-    expect(keyUtils.fetcher()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value)
+    expect(keyUtils.fetcher()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value,
+    )
 
     vi.clearAllMocks()
     const pongUtils = keyUtils.pong
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, { prefix: '__prefix__' })
+    expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, {
+      prefix: '__prefix__',
+    })
     expect(pongUtils.matcher()(['__prefix__', ['key', 'pong'], {}])).toBe(true)
-    expect(pongUtils.fetcher()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value)
+    expect(pongUtils.fetcher()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value,
+    )
   })
 
   it('returns strictly equal utils on repeated access', () => {
@@ -82,8 +92,12 @@ describe('createRouterUtils', () => {
     const pingUtils = nestedUtils.ping
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, { prefix: undefined })
-    expect(pingUtils.fetcher()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value)
+    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, {
+      prefix: undefined,
+    })
+    expect(pingUtils.fetcher()).toBe(
+      vi.mocked(ProcedureUtils).mock.results[0]?.value.fetcher.mock.results[0]?.value,
+    )
   })
 
   it('stops recursive on symbol', () => {
@@ -112,8 +126,7 @@ describe('createRouterUtils', () => {
 
       expect(utils.then).toBe(undefined)
       expect(ProcedureUtils).toHaveBeenCalledTimes(1) // only the root utils
-    }
-    finally {
+    } finally {
       delete client.then
     }
   })

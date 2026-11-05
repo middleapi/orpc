@@ -1,23 +1,23 @@
-import type { Promisable } from 'type-fest'
-import type { PromiseWithError, ThrowableError } from './types.ts'
 import { isAsyncIteratorObject } from '@standard-server/shared'
+import type { Promisable } from 'type-fest'
+
 import { wrapAsyncIterator } from './iterator.ts'
 import { override } from './proxy.ts'
 import { wrapReadableStream } from './stream.ts'
+import type { PromiseWithError, ThrowableError } from './types.ts'
 
 export type InterceptableOptions = Record<string, any>
 
-export type InterceptorOptions<
-  TOptions extends InterceptableOptions,
-  TResult,
-> = Omit<TOptions, 'next'> & {
+export type InterceptorOptions<TOptions extends InterceptableOptions, TResult> = Omit<
+  TOptions,
+  'next'
+> & {
   next(options?: TOptions): TResult
 }
 
-export type Interceptor<
-  TOptions extends InterceptableOptions,
-  TResult,
-> = (options: InterceptorOptions<TOptions, TResult>) => TResult
+export type Interceptor<TOptions extends InterceptableOptions, TResult> = (
+  options: InterceptorOptions<TOptions, TResult>,
+) => TResult
 
 /**
  * Can used for interceptors or middlewares
@@ -35,7 +35,13 @@ export function onStart<T, TOptions extends { next: () => any }, TRest extends a
  * Can used for interceptors or middlewares
  */
 export function onSuccess<T, TOptions extends { next: () => any }, TRest extends any[]>(
-  callback: NoInfer<(result: Awaited<ReturnType<TOptions['next']>>, options: TOptions, ...rest: TRest) => Promisable<void>>,
+  callback: NoInfer<
+    (
+      result: Awaited<ReturnType<TOptions['next']>>,
+      options: TOptions,
+      ...rest: TRest
+    ) => Promisable<void>
+  >,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     const result = await options.next()
@@ -51,39 +57,44 @@ export function onSuccess<T, TOptions extends { next: () => any }, TRest extends
  * @see {@link https://orpc.dev/docs/adapters/fetch-api | Fetch API Adapter}
  */
 export function onError<T, TOptions extends { next: () => any }, TRest extends any[]>(
-  callback: NoInfer<(
-    error: ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError,
-    options: TOptions,
-    ...rest: TRest
-  ) => Promisable<void>>,
+  callback: NoInfer<
+    (
+      error: ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
+        ? E
+        : ThrowableError,
+      options: TOptions,
+      ...rest: TRest
+    ) => Promisable<void>
+  >,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     try {
       return await options.next()
-    }
-    catch (error) {
+    } catch (error) {
       await callback(error as any, options, ...rest)
       throw error
     }
   }
 }
 
-export type OnFinishState<TResult, TError>
-  = | [error: TError, data: undefined, isSuccess: false]
-    | [error: null, data: TResult, isSuccess: true]
+export type OnFinishState<TResult, TError> =
+  | [error: TError, data: undefined, isSuccess: false]
+  | [error: null, data: TResult, isSuccess: true]
 
 /**
  * Can used for interceptors or middlewares
  */
 export function onFinish<T, TOptions extends { next: () => any }, TRest extends any[]>(
-  callback: NoInfer<(
-    state: OnFinishState<
-      Awaited<ReturnType<TOptions['next']>>,
-      ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError
-    >,
-    options: TOptions,
-    ...rest: TRest
-  ) => Promisable<void>>,
+  callback: NoInfer<
+    (
+      state: OnFinishState<
+        Awaited<ReturnType<TOptions['next']>>,
+        ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError
+      >,
+      options: TOptions,
+      ...rest: TRest
+    ) => Promisable<void>
+  >,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     let state: any
@@ -92,12 +103,10 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
       const result = await options.next()
       state = [null, result, true]
       return result
-    }
-    catch (error) {
+    } catch (error) {
       state = [error, undefined, false]
       throw error
-    }
-    finally {
+    } finally {
       await callback(state, options, ...rest)
     }
   }
@@ -117,11 +126,17 @@ export function onAsyncIteratorObjectError<
   TOptions extends { next: () => any },
   TRest extends any[],
 >(
-  callback: NoInfer<(
-    error: ThrowableError | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError),
-    options: TOptions,
-    ...rest: TRest
-  ) => Promisable<void>>,
+  callback: NoInfer<
+    (
+      error:
+        | ThrowableError
+        | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
+            ? E
+            : ThrowableError),
+      options: TOptions,
+      ...rest: TRest
+    ) => Promisable<void>
+  >,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   // The typed error should always be combined with `ThrowableError`
   // because an AsyncIterator can throw any error during iteration,
@@ -140,9 +155,12 @@ export function onAsyncIteratorObjectError<
      * @warning
      * Remember use `override` for AsyncIteratorObject to remain other special properties
      */
-    return override(output, wrapAsyncIterator(output, {
-      onError: error => callback(error, options, ...rest),
-    }))
+    return override(
+      output,
+      wrapAsyncIterator(output, {
+        onError: (error) => callback(error, options, ...rest),
+      }),
+    )
   }
 }
 
@@ -155,16 +173,18 @@ export function onAsyncIteratorObjectError<
  * callback only fires while consuming the stream. Use both together to catch
  * all possible errors.
  */
-export function onReadableStreamError<
-  T,
-  TOptions extends { next: () => any },
-  TRest extends any[],
->(
-  callback: NoInfer<(
-    error: ThrowableError | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError),
-    options: TOptions,
-    ...rest: TRest
-  ) => Promisable<void>>,
+export function onReadableStreamError<T, TOptions extends { next: () => any }, TRest extends any[]>(
+  callback: NoInfer<
+    (
+      error:
+        | ThrowableError
+        | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
+            ? E
+            : ThrowableError),
+      options: TOptions,
+      ...rest: TRest
+    ) => Promisable<void>
+  >,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   // The typed error should always be combined with `ThrowableError`
   // because a ReadableStream can throw any error during iteration,
@@ -183,9 +203,12 @@ export function onReadableStreamError<
      * @warning
      * Remember use `override` for ReadableStream to remain other special properties
      */
-    return override(output, wrapReadableStream(output, {
-      onError: error => callback(error, options, ...rest),
-    }))
+    return override(
+      output,
+      wrapReadableStream(output, {
+        onError: (error) => callback(error, options, ...rest),
+      }),
+    )
   }
 }
 

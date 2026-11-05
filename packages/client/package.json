@@ -1,31 +1,43 @@
 {
   "name": "@orpc/client",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Consume oRPC and OpenAPI APIs with end-to-end type safety over HTTP, WebSocket, or message ports",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "client",
+    "fetch",
+    "openapi",
+    "orpc",
+    "rpc",
+    "typesafe",
+    "typescript",
+    "websocket"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/client"
   },
-  "keywords": [
-    "orpc",
-    "rpc",
-    "api",
-    "typescript",
-    "typesafe",
-    "client",
-    "fetch",
-    "websocket",
-    "openapi"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./plugins": "./src/plugins/index.ts",
+    "./standard": "./src/adapters/standard/index.ts",
+    "./fetch": "./src/adapters/fetch/index.ts",
+    "./websocket": "./src/adapters/websocket/index.ts",
+    "./message-port": "./src/adapters/message-port/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -61,18 +73,6 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./plugins": "./src/plugins/index.ts",
-    "./standard": "./src/adapters/standard/index.ts",
-    "./fetch": "./src/adapters/fetch/index.ts",
-    "./websocket": "./src/adapters/websocket/index.ts",
-    "./message-port": "./src/adapters/message-port/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc && node ../../scripts/verify-dist.ts"
   },

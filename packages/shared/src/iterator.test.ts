@@ -1,6 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { AsyncIteratorClass, sleep } from '@standard-server/shared'
-import { consumeAsyncIterator, replicateAsyncIterator, traceAsyncIterator, wrapAsyncIterator } from './iterator.ts'
+
+import {
+  consumeAsyncIterator,
+  replicateAsyncIterator,
+  traceAsyncIterator,
+  wrapAsyncIterator,
+} from './iterator.ts'
 import { promiseWithResolvers } from './promise.ts'
 import * as Tracing from './tracing.ts'
 
@@ -41,7 +48,7 @@ describe('wrapAsyncIterator', () => {
     }
 
     const wrapped = wrapAsyncIterator(iterator, {
-      runWith: run => storage.run('iterator-context', run),
+      runWith: (run) => storage.run('iterator-context', run),
       mapResult: (result) => {
         calls.push(`map:${result.done ? 'done' : 'yield'}`)
         return { done: result.done, value: `mapped:${result.value}` }
@@ -56,13 +63,7 @@ describe('wrapAsyncIterator', () => {
     expect(await wrapped.next()).toEqual({ done: true, value: 'mapped:2' })
     expect(await wrapped.next()).toEqual({ done: true, value: undefined })
 
-    expect(calls).toEqual([
-      'next:0',
-      'map:yield',
-      'next:1',
-      'map:done',
-      'finish',
-    ])
+    expect(calls).toEqual(['next:0', 'map:yield', 'next:1', 'map:done', 'finish'])
     expect(stores).toEqual(['iterator-context', 'iterator-context'])
     expect(returnCount).toBe(0)
     expect(finishCount).toBe(1)
@@ -87,7 +88,7 @@ describe('wrapAsyncIterator', () => {
       onError: (error) => {
         seen.push((error as Error).message)
       },
-      mapError: error => new TypeError(`mapped:${(error as Error).message}`),
+      mapError: (error) => new TypeError(`mapped:${(error as Error).message}`),
       onFinish: () => {
         finishCount += 1
       },
@@ -139,7 +140,7 @@ describe('wrapAsyncIterator', () => {
     }
 
     const wrapped = wrapAsyncIterator(iterator, {
-      runWith: run => storage.run('cleanup-context', run),
+      runWith: (run) => storage.run('cleanup-context', run),
       onError: (error) => {
         calls.push(`error:${(error as Error).message}`)
       },
@@ -152,12 +153,7 @@ describe('wrapAsyncIterator', () => {
     expect(await wrapped.next()).toEqual({ done: false, value: 1 })
     await expect(wrapped.return()).rejects.toThrow('cleanup failed')
 
-    expect(calls).toEqual([
-      'next',
-      'return',
-      'error:cleanup failed',
-      'finish',
-    ])
+    expect(calls).toEqual(['next', 'return', 'error:cleanup failed', 'finish'])
     expect(cleanupStore).toBe('cleanup-context')
     expect(finishCount).toBe(1)
   })
@@ -199,7 +195,7 @@ describe('traceAsyncIterator', () => {
     const iterator = (async function* () {
       yield 1
       yield 2
-    }())
+    })()
 
     const withSpan = traceAsyncIterator('name', iterator)
 
@@ -220,11 +216,10 @@ describe('traceAsyncIterator', () => {
       try {
         yield 1
         yield 2
-      }
-      finally {
+      } finally {
         cleanup = true
       }
-    }())
+    })()
 
     const withSpan = traceAsyncIterator({ name: 'name' }, iterator)
 
@@ -237,7 +232,7 @@ describe('traceAsyncIterator', () => {
   it('when error while yielding', async () => {
     const iterator = (async function* () {
       throw new Error('Forced error')
-    }())
+    })()
 
     const withSpan = traceAsyncIterator({ name: 'name' }, iterator)
 
@@ -249,12 +244,11 @@ describe('traceAsyncIterator', () => {
     const iterator = (async function* () {
       try {
         yield 1
-      }
-      finally {
+      } finally {
         // oxlint-disable-next-line no-unsafe-finally
         throw new Error('Forced error')
       }
-    }())
+    })()
 
     const withSpan = traceAsyncIterator({ name: 'name' }, iterator)
 
@@ -266,13 +260,10 @@ describe('traceAsyncIterator', () => {
   it('can be cancelled while an iteration is pending', async () => {
     const cleanup = vi.fn()
     const pull = promiseWithResolvers<void>()
-    const iterator = new AsyncIteratorClass(
-      async () => {
-        await pull.promise
-        return { done: true, value: 'done' }
-      },
-      cleanup,
-    )
+    const iterator = new AsyncIteratorClass(async () => {
+      await pull.promise
+      return { done: true, value: 'done' }
+    }, cleanup)
 
     const withSpan = traceAsyncIterator({ name: 'name' }, iterator)
 
@@ -292,7 +283,7 @@ describe('replicateAsyncIterator', async () => {
   it('on success', async () => {
     const gen = async function* () {
       yield 1
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       yield 2
       yield 3
       return 4
@@ -336,7 +327,7 @@ describe('replicateAsyncIterator', async () => {
 
     const gen = async function* () {
       yield 1
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       throw error
     }
 
@@ -367,14 +358,13 @@ describe('replicateAsyncIterator', async () => {
     const gen = async function* () {
       try {
         yield 1
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
         yield 2
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
         yield 3
-        await new Promise(resolve => setTimeout(resolve, Number.MIN_SAFE_INTEGER))
+        await new Promise((resolve) => setTimeout(resolve, Number.MIN_SAFE_INTEGER))
         return 4
-      }
-      finally {
+      } finally {
         cleanup = true
       }
     }
@@ -403,7 +393,7 @@ describe('consumeAsyncIterator', () => {
       yield 1
       yield 2
       return 3
-    }())
+    })()
 
     const onEvent = vi.fn()
     const onError = vi.fn()
@@ -437,7 +427,7 @@ describe('consumeAsyncIterator', () => {
       yield 1
       yield 2
       throw error
-    }())
+    })()
 
     const onEvent = vi.fn()
     const onError = vi.fn()
@@ -474,11 +464,10 @@ describe('consumeAsyncIterator', () => {
         yield 1
         yield 2
         return 3
-      }
-      finally {
+      } finally {
         cleanup = true
       }
-    }())
+    })()
 
     const onEvent = vi.fn(() => {
       throw error
@@ -547,15 +536,14 @@ describe('consumeAsyncIterator', () => {
     let cleanup = false
     const iterator = (async function* () {
       try {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
         yield 1
         yield 2
         return 3
-      }
-      finally {
+      } finally {
         cleanup = true
       }
-    }())
+    })()
 
     const onEvent = vi.fn()
     const onSuccess = vi.fn()
@@ -569,7 +557,7 @@ describe('consumeAsyncIterator', () => {
       onFinish,
     })
 
-    await new Promise(resolve => setTimeout(resolve, 1))
+    await new Promise((resolve) => setTimeout(resolve, 1))
     await unsubscribe()
     expect(cleanup).toBe(true)
     // side-effect of async generator - waiting for .next resolve before .return effect
@@ -589,17 +577,16 @@ describe('consumeAsyncIterator', () => {
     let cleanup = false
     const iterator = (async function* () {
       try {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
         yield 1
         yield 2
         return 3
-      }
-      finally {
+      } finally {
         cleanup = true
         // oxlint-disable-next-line no-unsafe-finally
         throw error
       }
-    }())
+    })()
 
     const onEvent = vi.fn()
     const onError = vi.fn()
@@ -613,7 +600,7 @@ describe('consumeAsyncIterator', () => {
       onFinish,
     })
 
-    await new Promise(resolve => setTimeout(resolve, 1))
+    await new Promise((resolve) => setTimeout(resolve, 1))
     await expect(unsubscribe()).rejects.toThrow(error)
     expect(cleanup).toBe(true)
     // side-effect of async generator - waiting for .next resolve before .return effect

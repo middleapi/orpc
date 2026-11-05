@@ -1,8 +1,28 @@
-import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { $ZodType, $ZodTypes, ToJSONSchemaContext, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
-import { isStandardSchemaOptional, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
+import type {
+  AnySchema,
+  JsonSchema,
+  JsonSchemaConverter,
+  JsonSchemaConverterDirection,
+} from '@orpc/json-schema'
+import {
+  isStandardSchemaOptional,
+  JsonSchemaFormat,
+  JsonSchemaXNativeType,
+} from '@orpc/json-schema'
+import type {
+  $ZodType,
+  $ZodTypes,
+  ToJSONSchemaContext,
+  ToJSONSchemaParams,
+  JSONSchema as ZodJsonSchema,
+} from 'zod/v4/core'
 import { process as processZodSchema, toJSONSchema } from 'zod/v4/core'
-import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries.ts'
+
+import {
+  JSON_SCHEMA_INPUT_REGISTRY,
+  JSON_SCHEMA_OUTPUT_REGISTRY,
+  JSON_SCHEMA_REGISTRY,
+} from './registries.ts'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {
   /**
@@ -25,11 +45,16 @@ export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams
  */
 export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   private readonly toJSONSchemaParams: ToJSONSchemaParams
-  private readonly cache: undefined | { [d in JsonSchemaConverterDirection]: WeakMap<$ZodType, [jsonSchema: JsonSchema, optional: boolean]> }
+  private readonly cache:
+    | undefined
+    | {
+        [d in JsonSchemaConverterDirection]: WeakMap<
+          $ZodType,
+          [jsonSchema: JsonSchema, optional: boolean]
+        >
+      }
 
-  constructor(
-    { cache, ...toJSONSchemaParams }: ZodToJsonSchemaConverterOptions = {},
-  ) {
+  constructor({ cache, ...toJSONSchemaParams }: ZodToJsonSchemaConverterOptions = {}) {
     this.toJSONSchemaParams = toJSONSchemaParams
 
     if (cache) {
@@ -41,7 +66,10 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     return schema?.['~standard'].vendor === 'zod'
   }
 
-  convert(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
+  convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
     const zodSchema = schema as $ZodType
 
     if (this.cache) {
@@ -60,13 +88,19 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     return result
   }
 
-  private convertUncached(zodSchema: $ZodType, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
+  private convertUncached(
+    zodSchema: $ZodType,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
     const jsonSchema = this.convertZod(zodSchema, direction)
 
     return [jsonSchema as JsonSchema, isStandardSchemaOptional(zodSchema, direction)]
   }
 
-  private convertZod(schema: $ZodType, direction: JsonSchemaConverterDirection): ZodJsonSchema.JSONSchema {
+  private convertZod(
+    schema: $ZodType,
+    direction: JsonSchemaConverterDirection,
+  ): ZodJsonSchema.JSONSchema {
     const { unrepresentable = 'any' } = this.toJSONSchemaParams
 
     const jsonSchema = toJSONSchema(schema, {
@@ -74,8 +108,10 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
       target: 'draft-2020-12',
       io: direction,
       unrepresentable(this: ToJSONSchemaContext, info) {
-        return convertNativeType(this, info.zodSchema, info.path)
-          ?? (typeof unrepresentable === 'function' ? unrepresentable(info) : unrepresentable)
+        return (
+          convertNativeType(this, info.zodSchema, info.path) ??
+          (typeof unrepresentable === 'function' ? unrepresentable(info) : unrepresentable)
+        )
       },
       override: (ctx) => {
         const customJsonSchema = this.getCustomJsonSchema(ctx.zodSchema, direction)
@@ -95,11 +131,15 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     return rest
   }
 
-  private getCustomJsonSchema(schema: $ZodType, direction: JsonSchemaConverterDirection): Exclude<JsonSchema, boolean> | undefined {
+  private getCustomJsonSchema(
+    schema: $ZodType,
+    direction: JsonSchemaConverterDirection,
+  ): Exclude<JsonSchema, boolean> | undefined {
     const general = JSON_SCHEMA_REGISTRY.get(schema)
-    const directional = direction === 'input'
-      ? JSON_SCHEMA_INPUT_REGISTRY.get(schema)
-      : JSON_SCHEMA_OUTPUT_REGISTRY.get(schema)
+    const directional =
+      direction === 'input'
+        ? JSON_SCHEMA_INPUT_REGISTRY.get(schema)
+        : JSON_SCHEMA_OUTPUT_REGISTRY.get(schema)
 
     if (general === undefined && directional === undefined) {
       return undefined
@@ -118,14 +158,26 @@ function convertNativeType(
 
   switch (def.type) {
     case 'bigint':
-      return { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': JsonSchemaXNativeType.BigInt }
+      return {
+        'type': 'string',
+        'pattern': '^-?[0-9]+$',
+        'x-native-type': JsonSchemaXNativeType.BigInt,
+      }
     case 'date':
-      return { 'type': 'string', 'format': JsonSchemaFormat.DateTime, 'x-native-type': JsonSchemaXNativeType.Date }
+      return {
+        'type': 'string',
+        'format': JsonSchemaFormat.DateTime,
+        'x-native-type': JsonSchemaXNativeType.Date,
+      }
     case 'set':
     case 'map': {
       const schemaPath: $ZodType[] = []
       for (const [seenSchema, seen] of ctx.seen) {
-        if (seen.path && seen.path.length <= path.length && seen.path.every((segment, i) => segment === path[i])) {
+        if (
+          seen.path &&
+          seen.path.length <= path.length &&
+          seen.path.every((segment, i) => segment === path[i])
+        ) {
           schemaPath.push(seenSchema)
         }
       }
@@ -134,12 +186,20 @@ function convertNativeType(
         processZodSchema(schema, ctx, { path: [...path, 'items', ...segments], schemaPath })
 
       return def.type === 'set'
-        ? { 'type': 'array', 'uniqueItems': true, 'items': processItems(def.valueType), 'x-native-type': JsonSchemaXNativeType.Set }
+        ? {
+            'type': 'array',
+            'uniqueItems': true,
+            'items': processItems(def.valueType),
+            'x-native-type': JsonSchemaXNativeType.Set,
+          }
         : {
             'type': 'array',
             'items': {
               type: 'array',
-              prefixItems: [processItems(def.keyType, 'prefixItems', 0), processItems(def.valueType, 'prefixItems', 1)],
+              prefixItems: [
+                processItems(def.keyType, 'prefixItems', 0),
+                processItems(def.valueType, 'prefixItems', 1),
+              ],
               maxItems: 2,
               minItems: 2,
             },

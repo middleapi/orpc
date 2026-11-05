@@ -1,6 +1,7 @@
 import type { ORPCError } from '@orpc/client'
-import type { ORPCErrorFromErrorMap } from './error.ts'
 import z from 'zod'
+
+import type { ORPCErrorFromErrorMap } from './error.ts'
 
 describe('ORPCErrorFromErrorMap', () => {
   it('converts an error map to an ORPCError union and defaults to unknown when schema is undefined', () => {
@@ -10,9 +11,7 @@ describe('ORPCErrorFromErrorMap', () => {
       UNDEFINED_SCHEMA: {},
     }
 
-    expectTypeOf<
-      ORPCErrorFromErrorMap<typeof errorMap>
-    >().toEqualTypeOf<
+    expectTypeOf<ORPCErrorFromErrorMap<typeof errorMap>>().toEqualTypeOf<
       | ORPCError<'TEST1', string>
       | ORPCError<'TEST2', string>
       | ORPCError<'UNDEFINED_SCHEMA', unknown>

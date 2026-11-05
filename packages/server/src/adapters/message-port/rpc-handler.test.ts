@@ -1,4 +1,5 @@
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
+
 import { os } from '../../builder.ts'
 import { RPCHandler } from './rpc-handler.ts'
 
@@ -8,14 +9,17 @@ describe('rpcHandler', () => {
   })
 
   const createHandler = (options: ConstructorParameters<typeof RPCHandler>[1] = {}) => {
-    return new RPCHandler({
-      ping: os.handler(async ({ signal }) => {
-        await new Promise(resolve => setTimeout(resolve, 10))
-        signal?.throwIfAborted()
+    return new RPCHandler(
+      {
+        ping: os.handler(async ({ signal }) => {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          signal?.throwIfAborted()
 
-        return 'pong'
-      }),
-    }, options)
+          return 'pong'
+        }),
+      },
+      options,
+    )
   }
 
   const createPort = () => {
@@ -32,24 +36,25 @@ describe('rpcHandler', () => {
   const createRequestMessage = async ({
     prefix,
     url = '/ping',
-  }: { prefix?: string, url?: `/${string}` } = {}) => {
-    return encodePeerMessage({
-      id: '19',
-      kind: 'request',
-      json: {
-        url,
-        body: { json: 'input' },
-        headers: {},
-        method: 'POST',
+  }: { prefix?: string; url?: `/${string}` } = {}) => {
+    return encodePeerMessage(
+      {
+        id: '19',
+        kind: 'request',
+        json: {
+          url,
+          body: { json: 'input' },
+          headers: {},
+          method: 'POST',
+        },
       },
-    }, prefix ? { prefix } : undefined)
+      prefix ? { prefix } : undefined,
+    )
   }
 
   it('accepts context and prefix option in message method', async () => {
     const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     const { serverPort } = createPort()
@@ -78,10 +83,13 @@ describe('rpcHandler', () => {
 
   it.each([
     ['string', () => createRequestMessage()],
-    ['bytes', async () => {
-      const message = await createRequestMessage()
-      return new TextEncoder().encode(message as string)
-    }],
+    [
+      'bytes',
+      async () => {
+        const message = await createRequestMessage()
+        return new TextEncoder().encode(message as string)
+      },
+    ],
   ])('handles %s request', async (_type, createMessage) => {
     const handler = createHandler()
     const { serverPort } = createPort()
@@ -275,7 +283,9 @@ describe('rpcHandler', () => {
     expect(result.matched).toBe(true)
     expect(transfer).toHaveBeenCalledTimes(1)
     expect(postMessage).toHaveBeenCalledTimes(1)
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'response' }), [transferable])
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'response' }), [
+      transferable,
+    ])
   })
 
   it('wires message and close events via upgrade', async () => {

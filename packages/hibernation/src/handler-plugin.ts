@@ -1,5 +1,9 @@
 import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '@orpc/server/standard'
 import { toArray } from '@orpc/shared'
 import { HibernationAsyncIteratorClass } from '@standard-server/peer'
 
@@ -51,11 +55,15 @@ export class HibernationHandlerPlugin<T extends Context> implements StandardHand
       }
     }
 
-    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async (options) => {
+    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async (
+      options,
+    ) => {
       const pluginContext = options.context[this.CONTEXT_SYMBOL] as PluginContext | undefined
 
       if (!pluginContext) {
-        throw new TypeError('[HibernationHandlerPlugin] Hibernation context has been corrupted or modified by another plugin or interceptor')
+        throw new TypeError(
+          '[HibernationHandlerPlugin] Hibernation context has been corrupted or modified by another plugin or interceptor',
+        )
       }
 
       const output = await options.next()
@@ -70,14 +78,8 @@ export class HibernationHandlerPlugin<T extends Context> implements StandardHand
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
-      clientInterceptors: [
-        ...toArray(options.clientInterceptors),
-        clientInterceptor,
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
+      clientInterceptors: [...toArray(options.clientInterceptors), clientInterceptor],
     }
   }
 }

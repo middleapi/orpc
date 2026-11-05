@@ -1,11 +1,12 @@
-import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { oc } from '@orpc/contract'
+import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { setupServer } from 'msw/node'
 import z from 'zod'
+
 import { createHTTPUtils } from './http-router-utils.ts'
 
 const contract = {
@@ -16,7 +17,7 @@ const contract = {
 }
 
 it('mirrors the router-contract shape', () => {
-  const utils = createHTTPUtils(contract, { handler: router => new RPCHandler(router) })
+  const utils = createHTTPUtils(contract, { handler: (router) => new RPCHandler(router) })
 
   expect(utils.ping.handler).toBeTypeOf('function')
   expect(utils.ping.error).toBeTypeOf('function')
@@ -26,7 +27,7 @@ it('mirrors the router-contract shape', () => {
 
 it('keeps non-router values as-is', () => {
   const utils: any = createHTTPUtils({ ping: contract.ping, invalid: null } as any, {
-    handler: router => new RPCHandler(router),
+    handler: (router) => new RPCHandler(router),
   })
 
   expect(utils.invalid).toBeNull()
@@ -51,15 +52,17 @@ describe('with an implemented router', () => {
     const utils = createHTTPUtils(router, {
       origin: 'http://localhost:3000',
       prefix: '/rpc',
-      handler: router => new RPCHandler(router),
+      handler: (router) => new RPCHandler(router),
     })
 
     server.use(utils.ping.handler(({ input }) => ({ value: input.value * 2 })))
 
-    const client: RouterClient<typeof router> = createORPCClient(new RPCLink({
-      origin: 'http://localhost:3000',
-      url: '/rpc',
-    }))
+    const client: RouterClient<typeof router> = createORPCClient(
+      new RPCLink({
+        origin: 'http://localhost:3000',
+        url: '/rpc',
+      }),
+    )
 
     await expect(client.ping({ value: 21 })).resolves.toEqual({ value: 42 })
   })

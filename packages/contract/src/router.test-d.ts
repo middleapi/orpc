@@ -1,31 +1,34 @@
 import type { ORPCError } from '@orpc/client'
 import type { ThrowableError } from '@orpc/shared'
-import type { InferRouterContractError, InferRouterContractErrorMap, InferRouterContractErrors, InferRouterContractInputs, InferRouterContractOutputs } from './router.ts'
 import { expectTypeOf, it } from 'vitest'
 import { z } from 'zod'
+
 import { oc } from './builder.ts'
+import type {
+  InferRouterContractError,
+  InferRouterContractErrorMap,
+  InferRouterContractErrors,
+  InferRouterContractInputs,
+  InferRouterContractOutputs,
+} from './router.ts'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const schema1 = z.object({ schema1: z.string().transform(n => Number(n)) })
-const schema2 = z.object({ schema2: z.string().transform(n => Number(n)) })
+const schema1 = z.object({ schema1: z.string().transform((n) => Number(n)) })
+const schema2 = z.object({ schema2: z.string().transform((n) => Number(n)) })
 
-const ping = oc
-  .input(schema1)
-  .output(schema2)
+const ping = oc.input(schema1).output(schema2)
 
-const pong = oc
-  .errors({
-    BAD_GATEWAY: {
-      data: schema1,
-    },
-  })
+const pong = oc.errors({
+  BAD_GATEWAY: {
+    data: schema1,
+  },
+})
 
-const notFound = oc
-  .errors({
-    NOT_FOUND: {
-      data: schema2,
-    },
-  })
+const notFound = oc.errors({
+  NOT_FOUND: {
+    data: schema2,
+  },
+})
 
 const router = {
   ping,
@@ -76,8 +79,12 @@ it('InferRouterContractErrorMap', () => {
 it('InferRouterContractErrors', () => {
   type Errors = InferRouterContractErrors<typeof errorRouter>
 
-  expectTypeOf<Errors['pong']>().toEqualTypeOf<ORPCError<'BAD_GATEWAY', { schema1: number }> | ThrowableError>()
-  expectTypeOf<Errors['nested']['notFound']>().toEqualTypeOf<ORPCError<'NOT_FOUND', { schema2: number }> | ThrowableError>()
+  expectTypeOf<Errors['pong']>().toEqualTypeOf<
+    ORPCError<'BAD_GATEWAY', { schema1: number }> | ThrowableError
+  >()
+  expectTypeOf<Errors['nested']['notFound']>().toEqualTypeOf<
+    ORPCError<'NOT_FOUND', { schema2: number }> | ThrowableError
+  >()
 })
 
 it('InferRouterContractError', () => {

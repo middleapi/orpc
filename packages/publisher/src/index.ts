@@ -1,5 +1,3 @@
 export * from './publisher.ts'
 
-export type {
-  AsyncIteratorClass,
-} from '@orpc/shared'
+export type { AsyncIteratorClass } from '@orpc/shared'

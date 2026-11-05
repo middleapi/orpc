@@ -1,7 +1,8 @@
+import { toArray } from '@orpc/shared'
+
 import type { ErrorMap } from './error.ts'
 import type { AnyMetaPlugin, Meta, MetaPlugin } from './meta.ts'
 import type { AnySchema } from './schema.ts'
-import { toArray } from '@orpc/shared'
 
 export function resolveMetaPlugins<
   TInputSchema extends AnySchema,
@@ -96,7 +97,8 @@ export function defineMeta<TName extends string, TData>(
     },
   })
 
-  const getMeta = (procedureOrLazy: { '~orpc': { meta: Meta } }) => procedureOrLazy['~orpc'].meta[name] as TData | undefined
+  const getMeta = (procedureOrLazy: { '~orpc': { meta: Meta } }) =>
+    procedureOrLazy['~orpc'].meta[name] as TData | undefined
 
   return [metaPlugin, getMeta]
 }

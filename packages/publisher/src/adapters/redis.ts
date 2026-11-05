@@ -1,5 +1,6 @@
 import type { ThrowableError } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
+
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis.ts'
 import { BaseRedisPublisher } from './base-redis.ts'
 
@@ -18,7 +19,10 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
  * The `onError` callbacks of the subscriptions on each subscriber, so publishers sharing
  * a subscriber, such as those created by `prefix`, add a single `error` listener to it.
  */
-const subscriberOnErrors = /* @__PURE__ */ new WeakMap<object, Array<(error: ThrowableError) => void>>()
+const subscriberOnErrors = /* @__PURE__ */ new WeakMap<
+  object,
+  Array<(error: ThrowableError) => void>
+>()
 
 /**
  * Publisher adapter for Redis. Distributes events across processes via
@@ -58,7 +62,7 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
 
       this.subscriber.on('error', (error) => {
         // Snapshot, since a callback may unsubscribe itself mid-dispatch.
-        onErrors.slice().forEach(onError => onError(error))
+        onErrors.slice().forEach((onError) => onError(error))
       })
     }
 
@@ -71,7 +75,11 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
    * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
    */
   prefix(prefix: string): RedisPublisher<T> {
-    return new RedisPublisher(this.redis, { ...this.options, subscriber: this.subscriber, prefix: `${this.eventPrefix}${prefix}` })
+    return new RedisPublisher(this.redis, {
+      ...this.options,
+      subscriber: this.subscriber,
+      prefix: `${this.eventPrefix}${prefix}`,
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -118,7 +126,8 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
 
     const results = await this.redis.xRead({ key, id: lastId })
 
-    const entries: Array<{ id: string, message: Record<string, string> }> = results?.[0]?.messages ?? []
+    const entries: Array<{ id: string; message: Record<string, string> }> =
+      results?.[0]?.messages ?? []
 
     return entries.map(({ id, message }) => ({ id, data: message.data! }))
   }

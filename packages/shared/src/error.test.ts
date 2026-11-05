@@ -1,4 +1,5 @@
 import { AbortError } from '@standard-server/shared'
+
 import { isAbortError } from './error.ts'
 
 describe('isAbortError', () => {

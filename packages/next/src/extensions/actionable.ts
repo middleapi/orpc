@@ -1,7 +1,8 @@
 import type { AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions } from '@orpc/server'
-import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ProcedureServerFunction } from '../server-function.ts'
 import { DecoratedProcedure } from '@orpc/server'
+import type { MaybeOptionalOptions } from '@orpc/shared'
+
+import type { ProcedureServerFunction } from '../server-function.ts'
 import { createServerFunction } from '../server-function.ts'
 
 declare module '@orpc/server' {
@@ -14,16 +15,10 @@ declare module '@orpc/server' {
   > {
     actionable(
       ...rest: MaybeOptionalOptions<
-        ProcedureClientOptions<
-          TInitialContext,
-          TOutputSchema,
-          TErrorMap,
-          object
-        >
+        ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, object>
       >
-    ):
-      & ProcedureServerFunction<TInputSchema, TOutputSchema, TErrorMap>
-      & Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    ): ProcedureServerFunction<TInputSchema, TOutputSchema, TErrorMap> &
+      Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
   }
 }
 

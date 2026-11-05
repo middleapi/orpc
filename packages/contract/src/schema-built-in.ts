@@ -1,10 +1,13 @@
-import type { AsyncIteratorClass } from '@orpc/shared'
-import type { AnySchema, Schema } from './schema.ts'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import type { AsyncIteratorClass } from '@orpc/shared'
 import { isAsyncIteratorObject, ORPC_NAME, override } from '@orpc/shared'
-import { ValidationError } from './error.ts'
 
-const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS')
+import { ValidationError } from './error.ts'
+import type { AnySchema, Schema } from './schema.ts'
+
+const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = /* @__PURE__ */ Symbol.for(
+  'ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS',
+)
 
 export interface AsyncIteratorObjectSchemaDetails {
   yieldSchema: AnySchema
@@ -20,10 +23,16 @@ export interface AsyncIteratorObjectSchemaDetails {
 export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TReturnOut = unknown>(
   yieldSchema: Schema<TYieldIn, TYieldOut>,
   returnSchema?: Schema<TReturnIn, TReturnOut>,
-): Schema<AsyncIteratorObject<TYieldIn, TReturnIn, void>, AsyncIteratorClass<TYieldOut, TReturnOut, void>> {
+): Schema<
+  AsyncIteratorObject<TYieldIn, TReturnIn, void>,
+  AsyncIteratorClass<TYieldOut, TReturnOut, void>
+> {
   return {
     '~standard': {
-      [ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL as any]: { yieldSchema, returnSchema } satisfies AsyncIteratorObjectSchemaDetails,
+      [ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL as any]: {
+        yieldSchema,
+        returnSchema,
+      } satisfies AsyncIteratorObjectSchemaDetails,
       vendor: ORPC_NAME,
       version: 1,
       validate(iterator) {
@@ -62,7 +71,9 @@ export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TR
   }
 }
 
-export function getAsyncIteratorObjectSchemaDetails(schema: AnySchema | undefined): undefined | AsyncIteratorObjectSchemaDetails {
+export function getAsyncIteratorObjectSchemaDetails(
+  schema: AnySchema | undefined,
+): undefined | AsyncIteratorObjectSchemaDetails {
   if (schema === undefined) {
     return undefined
   }
@@ -79,7 +90,9 @@ export interface AsyncIteratorObjectSchemasDetails {
  * Collects the yield and return schemas of multiple schemas, such as the `.output` schemas of a procedure,
  * or returns `undefined` when there are none or any of them does not describe an AsyncIteratorObject.
  */
-export function getAsyncIteratorObjectSchemasDetails(schemas: readonly AnySchema[] | undefined): undefined | AsyncIteratorObjectSchemasDetails {
+export function getAsyncIteratorObjectSchemasDetails(
+  schemas: readonly AnySchema[] | undefined,
+): undefined | AsyncIteratorObjectSchemasDetails {
   if (!schemas || schemas.length === 0) {
     return undefined
   }

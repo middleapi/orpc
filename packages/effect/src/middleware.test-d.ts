@@ -1,8 +1,9 @@
 import type { Middleware, ORPCErrorConstructorMap } from '@orpc/server'
-import type { WithEffectContext } from './context.ts'
 import { os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
+
+import type { WithEffectContext } from './context.ts'
 import { middlewareGen } from './middleware.ts'
 
 class Service1 extends Context.Service<
@@ -31,11 +32,13 @@ describe('middlewareGen', () => {
     const procedure = os
       .$context<{ auth: boolean }>()
       .errors(errorMap)
-      .use(middlewareGen(function* ({ context, next }) {
-        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & object>()
+      .use(
+        middlewareGen(function* ({ context, next }) {
+          expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & object>()
 
-        return yield* next({ context: { user: 'user' as const } })
-      }))
+          return yield* next({ context: { user: 'user' as const } })
+        }),
+      )
       .handler(({ context }) => {
         expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { user: 'user' }>()
         return 'output'
@@ -45,55 +48,63 @@ describe('middlewareGen', () => {
   })
 
   it('exposes downstream failures in the error channel of next', () => {
-    void os.use(middlewareGen(function* ({ next }) {
-      expectTypeOf(next()).toEqualTypeOf<Effect.Effect<{ context: object, output: unknown }, unknown>>()
-      expectTypeOf(next({ context: { user: 'user' as const } })).toEqualTypeOf<Effect.Effect<{ context: { user: 'user' }, output: unknown }, unknown>>()
+    void os.use(
+      middlewareGen(function* ({ next }) {
+        expectTypeOf(next()).toEqualTypeOf<
+          Effect.Effect<{ context: object; output: unknown }, unknown>
+        >()
+        expectTypeOf(next({ context: { user: 'user' as const } })).toEqualTypeOf<
+          Effect.Effect<{ context: { user: 'user' }; output: unknown }, unknown>
+        >()
 
-      const recovered = next().pipe(
-        Effect.catch((error) => {
-          expectTypeOf(error).toEqualTypeOf<unknown>()
-          return Effect.fail(error)
-        }),
-      )
+        const recovered = next().pipe(
+          Effect.catch((error) => {
+            expectTypeOf(error).toEqualTypeOf<unknown>()
+            return Effect.fail(error)
+          }),
+        )
 
-      return yield* recovered
-    }))
+        return yield* recovered
+      }),
+    )
   })
 
   it('can terminate the chain early with done', () => {
-    void os.use(middlewareGen(function* ({ next }, input, done) {
-      if (Math.random() < 0.5) {
-        return done({ output: 'early' })
-      }
+    void os.use(
+      middlewareGen(function* ({ next }, input, done) {
+        if (Math.random() < 0.5) {
+          return done({ output: 'early' })
+        }
 
-      return yield* next()
-    }))
+        return yield* next()
+      }),
+    )
   })
 
   it('can strict dependant-effect-service with WithEffectContext', () => {
-    void os
-      .$context<WithEffectContext<Service1>>()
-      .use(middlewareGen(function* ({ next }) {
+    void os.$context<WithEffectContext<Service1>>().use(
+      middlewareGen(function* ({ next }) {
         yield* Service1
         return yield* next()
-      }))
+      }),
+    )
 
-    void os
-      .$context<WithEffectContext<Service1>>()
+    void os.$context<WithEffectContext<Service1>>().use(
       // @ts-expect-error - Service2 is not provided
-      .use(middlewareGen(function* ({ next }) {
+      middlewareGen(function* ({ next }) {
         yield* Service2
         return yield* next()
-      }))
+      }),
+    )
   })
 
   it('works with os.middleware for standalone middleware', () => {
-    const middleware = os
-      .$context<{ auth: boolean }>()
-      .middleware(middlewareGen(function* ({ context, next }) {
+    const middleware = os.$context<{ auth: boolean }>().middleware(
+      middlewareGen(function* ({ context, next }) {
         expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & object>()
         return yield* next({ context: { extra: true } })
-      }))
+      }),
+    )
 
     const procedure = os
       .$context<{ auth: boolean }>()
@@ -110,14 +121,14 @@ describe('middlewareGen', () => {
       auth: boolean
     }
 
-    const requireAuth = os
-      .$context<ServerContext>()
-      .middleware(middlewareGen(function* ({ context, next }) {
+    const requireAuth = os.$context<ServerContext>().middleware(
+      middlewareGen(function* ({ context, next }) {
         expectTypeOf(context.auth).toEqualTypeOf<boolean>()
         yield* Service1
 
         return yield* next({ context: { user: 'user' as const } })
-      }))
+      }),
+    )
 
     const procedure = os
       .$context<ServerContext>()
@@ -138,14 +149,15 @@ describe('middlewareGen', () => {
       auth: boolean
     }
 
-    const requireAuth = middlewareGen<ServerContext, { user: 'user' }>(
-      function* ({ context, next }) {
-        expectTypeOf(context.auth).toEqualTypeOf<boolean>()
-        yield* Service1
+    const requireAuth = middlewareGen<ServerContext, { user: 'user' }>(function* ({
+      context,
+      next,
+    }) {
+      expectTypeOf(context.auth).toEqualTypeOf<boolean>()
+      yield* Service1
 
-        return yield* next({ context: { user: 'user' as const } })
-      },
-    )
+      return yield* next({ context: { user: 'user' as const } })
+    })
 
     const procedure = os
       .$context<ServerContext>()
@@ -160,9 +172,7 @@ describe('middlewareGen', () => {
 
     void procedure
 
-    const decorated = os
-      .$context<ServerContext>()
-      .middleware(requireAuth)
+    const decorated = os.$context<ServerContext>().middleware(requireAuth)
 
     const decoratedProcedure = os
       .$context<ServerContext>()
@@ -177,23 +187,36 @@ describe('middlewareGen', () => {
   it('can infer typed errors through os.middleware', () => {
     // Unlike `.use`, `os.middleware` types `errors` from the builder's error map
     // because its middleware parameter references the error map non-generically.
-    void os
-      .errors(errorMap)
-      .middleware(middlewareGen(function* ({ next, errors }) {
+    void os.errors(errorMap).middleware(
+      middlewareGen(function* ({ next, errors }) {
         expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
         return yield* next()
-      }))
+      }),
+    )
   })
 
   it('accepts explicit type arguments in Middleware order with TYield last', () => {
-    const middleware = middlewareGen<WithEffectContext<Service1>, { user: 'user' }, { id: string }, number, typeof errorMap, Effect.Effect<any, any, Service1>>(
-      function* ({ errors, next }, input) {
-        expectTypeOf(input).toEqualTypeOf<{ id: string }>()
-        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-        yield* Service1
-        return yield* next({ context: { user: 'user' as const } })
-      },
-    )
-    expectTypeOf(middleware).toEqualTypeOf<Middleware<WithEffectContext<Service1>, { user: 'user' }, { id: string }, number, typeof errorMap>>()
+    const middleware = middlewareGen<
+      WithEffectContext<Service1>,
+      { user: 'user' },
+      { id: string },
+      number,
+      typeof errorMap,
+      Effect.Effect<any, any, Service1>
+    >(function* ({ errors, next }, input) {
+      expectTypeOf(input).toEqualTypeOf<{ id: string }>()
+      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+      yield* Service1
+      return yield* next({ context: { user: 'user' as const } })
+    })
+    expectTypeOf(middleware).toEqualTypeOf<
+      Middleware<
+        WithEffectContext<Service1>,
+        { user: 'user' },
+        { id: string },
+        number,
+        typeof errorMap
+      >
+    >()
   })
 })

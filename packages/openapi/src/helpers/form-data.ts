@@ -1,5 +1,6 @@
 import { isSchemaIssue } from '@orpc/contract'
 import { isTypescriptObject } from '@orpc/shared'
+
 import { BracketNotationSerializer } from '../bracket-notation.ts'
 
 /**
@@ -63,7 +64,11 @@ export function parseFormData(form: FormData): any {
  * @see {@link https://orpc.dev/docs/helpers/form-data#getissuemessage | Form Data Helpers - getIssueMessage}
  */
 export function getIssueMessage(error: unknown, path: string): string | undefined {
-  if (!isTypescriptObject(error) || !isTypescriptObject(error.data) || !Array.isArray(error.data.issues)) {
+  if (
+    !isTypescriptObject(error) ||
+    !isTypescriptObject(error.data) ||
+    !Array.isArray(error.data.issues)
+  ) {
     return undefined
   }
 
@@ -83,7 +88,9 @@ export function getIssueMessage(error: unknown, path: string): string | undefine
     }
 
     const issuePath = serializer.stringifyPath(
-      issue.path.map(segment => typeof segment === 'object' ? segment.key.toString() : segment.toString()),
+      issue.path.map((segment) =>
+        typeof segment === 'object' ? segment.key.toString() : segment.toString(),
+      ),
     )
 
     if (issuePath === path) {

@@ -1,7 +1,15 @@
-import type { AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions, Schema } from '@orpc/server'
+import type {
+  AnySchema,
+  Context,
+  ErrorMap,
+  Procedure,
+  ProcedureClientOptions,
+  Schema,
+} from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ServerFormFunction } from './server-form-function.ts'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+
+import type { ServerFormFunction } from './server-form-function.ts'
 import { createServerFormFunction } from './server-form-function.ts'
 
 export interface ServerFormFunctionable<TInitialContext extends Context> {
@@ -11,10 +19,9 @@ export interface ServerFormFunctionable<TInitialContext extends Context> {
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   >(
-    procedure: Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
-  ):
-    & ServerFormFunction
-    & Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    procedure: Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>,
+  ): ServerFormFunction &
+    Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
 }
 
 /**
@@ -26,12 +33,7 @@ export interface ServerFormFunctionable<TInitialContext extends Context> {
  */
 export function createServerFormFunctionable<TInitialContext extends Context = object>(
   ...rest: MaybeOptionalOptions<
-    ProcedureClientOptions<
-      TInitialContext,
-      Schema<unknown>,
-      ErrorMap,
-      object
-    >
+    ProcedureClientOptions<TInitialContext, Schema<unknown>, ErrorMap, object>
   >
 ): ServerFormFunctionable<TInitialContext> {
   const options = resolveMaybeOptionalOptions(rest)
@@ -42,20 +44,10 @@ export function createServerFormFunctionable<TInitialContext extends Context = o
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   >(
-    procedure: Procedure<
-      TInitialContext,
-      TInjectedContext,
-      TInputSchema,
-      TOutputSchema,
-      TErrorMap
-    >,
+    procedure: Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>,
   ) => {
-    const functionable = createServerFormFunction(
-      procedure,
-      options,
-    ) as
-    & ServerFormFunction
-    & Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+    const functionable = createServerFormFunction(procedure, options) as ServerFormFunction &
+      Procedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
 
     functionable['~orpc'] = procedure['~orpc']
 

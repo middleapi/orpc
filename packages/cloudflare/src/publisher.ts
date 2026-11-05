@@ -1,7 +1,7 @@
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
-import type { Public } from '@orpc/shared'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
 import { Publisher } from '@orpc/publisher'
+import type { Public } from '@orpc/shared'
 import { isTypescriptObject, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
 import { unwrapEvent, withEventMeta } from '@standard-server/core'
 
@@ -25,7 +25,9 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default ((namespace, event) => namespace.getByName(event))
    */
-  getStubByName?: ((namespace: DurableObjectNamespace, event: string) => DurableObjectStub) | undefined
+  getStubByName?:
+    | ((namespace: DurableObjectNamespace, event: string) => DurableObjectStub)
+    | undefined
 }
 
 /**
@@ -55,7 +57,10 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
    * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
    */
   prefix(prefix: string): DurablePublisher<T> {
-    return new DurablePublisher(this.namespace, { ...this.options, prefix: `${this.eventPrefix}${prefix}` })
+    return new DurablePublisher(this.namespace, {
+      ...this.options,
+      prefix: `${this.eventPrefix}${prefix}`,
+    })
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
@@ -77,13 +82,20 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
 
     if (!response.ok) {
       const reason = await response.text()
-      throw new Error(`Failed to publish event: ${response.status} ${reason || response.statusText}`, {
-        cause: response,
-      })
+      throw new Error(
+        `Failed to publish event: ${response.status} ${reason || response.statusText}`,
+        {
+          cause: response,
+        },
+      )
     }
   }
 
-  protected async subscribeListener<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
+  protected async subscribeListener<K extends keyof T & string>(
+    event: K,
+    listener: (payload: T[K]) => void,
+    options?: PublisherSubscribeListenerOptions,
+  ): Promise<() => Promise<void>> {
     const stub = this.getStubByName(this.namespace, this.eventPrefix + event)
 
     const headers = new Headers({ upgrade: 'websocket' })
@@ -105,7 +117,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     // The Durable Object sends missed events first and their count in this header,
     // so wait for them all to reach the listener before this resolves
     const replayedEvents = Number(response.headers.get('orpc-replayed-events'))
-    let pendingReplayedEvents = Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
+    let pendingReplayedEvents =
+      Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
     const replayed = promiseWithResolvers<void>()
 
     if (pendingReplayedEvents === 0) {
@@ -115,8 +128,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     const reportError = (error: Error) => {
       if (pendingReplayedEvents > 0) {
         replayed.reject(error) // no-op once the subscription already rejected
-      }
-      else {
+      } else {
         options?.onError?.(error)
       }
     }
@@ -130,8 +142,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
         }
 
         listener(payload as T[K])
-      }
-      catch (error) {
+      } catch (error) {
         options?.onError?.(
           new Error('Failed to deserialize message from publisher durable object', {
             cause: error,

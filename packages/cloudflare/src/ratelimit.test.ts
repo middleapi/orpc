@@ -1,6 +1,7 @@
-import type { CloudflareRateLimiterOptions } from './ratelimit.ts'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
+
+import type { CloudflareRateLimiterOptions } from './ratelimit.ts'
 import { CloudflareRateLimiter } from './ratelimit.ts'
 
 describe('cloudflareRateLimiter', () => {
@@ -20,9 +21,11 @@ describe('cloudflareRateLimiter', () => {
       try {
         await spend(`user:${crypto.randomUUID()}`)
         return
-      }
-      catch (error) {
-        if (remaining === 1 || Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)) {
+      } catch (error) {
+        if (
+          remaining === 1 ||
+          Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)
+        ) {
           throw error
         }
       }

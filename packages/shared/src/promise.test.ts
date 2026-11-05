@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { captureAsyncContext, promiseWithResolvers } from './promise.ts'
 
 describe('promiseWithResolvers', () => {
@@ -76,8 +77,10 @@ describe('captureAsyncContext', () => {
   it('rejects when the callback rejects', async () => {
     const run = captureAsyncContext()
 
-    await expect(run(async () => {
-      throw new Error('test')
-    })).rejects.toThrow('test')
+    await expect(
+      run(async () => {
+        throw new Error('test')
+      }),
+    ).rejects.toThrow('test')
   })
 })

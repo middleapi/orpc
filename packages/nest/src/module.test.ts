@@ -7,6 +7,7 @@ import { openapi } from '@orpc/openapi'
 import { implement } from '@orpc/server'
 import supertest from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { Implement } from './implement.ts'
 import { ORPCModule } from './module.ts'
 
@@ -15,9 +16,11 @@ beforeEach(() => {
 })
 
 describe('module configuration', () => {
-  const contract = oc.meta(openapi({
-    path: '/module-config',
-  }))
+  const contract = oc.meta(
+    openapi({
+      path: '/module-config',
+    }),
+  )
 
   const handler = vi.fn(({ context }) => context.source)
 
@@ -57,7 +60,7 @@ describe('module configuration', () => {
 
   it('should apply config from ORPCModule.forRootAsync with injections', async () => {
     const routingInterceptor = vi.fn(({ next }) => next())
-    const useFactory = vi.fn(async request => ({
+    const useFactory = vi.fn(async (request) => ({
       context: {
         source: 'forRootAsync',
       },
@@ -80,7 +83,9 @@ describe('module configuration', () => {
     const res1 = await supertest(app.getHttpServer()).post('/module-config?test=1')
 
     expect(useFactory).toHaveBeenCalledTimes(1)
-    expect(useFactory).toHaveBeenCalledWith(expect.objectContaining({ url: '/module-config?test=1', method: 'POST' }))
+    expect(useFactory).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/module-config?test=1', method: 'POST' }),
+    )
     expect(res1.statusCode).toEqual(200)
     expect(res1.body).toEqual('forRootAsync')
     expect(routingInterceptor).toHaveBeenCalledTimes(1)
@@ -92,13 +97,17 @@ describe('module configuration', () => {
     expect(res2.body).toEqual('forRootAsync')
     // because the request is different, the useFactory should be called again
     expect(useFactory).toHaveBeenCalledTimes(2)
-    expect(useFactory).toHaveBeenCalledWith(expect.objectContaining({ url: '/module-config?test=2', method: 'POST' }))
+    expect(useFactory).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/module-config?test=2', method: 'POST' }),
+    )
     expect(routingInterceptor).toHaveBeenCalledTimes(2)
     expect(handler).toHaveBeenCalledTimes(2)
   })
 
   it('should support context as an async function receiving ExecutionContext, isolated per request', async () => {
-    const context = vi.fn((ctx: ExecutionContext) => ({ source: ctx.switchToHttp().getRequest().url }))
+    const context = vi.fn((ctx: ExecutionContext) => ({
+      source: ctx.switchToHttp().getRequest().url,
+    }))
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ImplController],

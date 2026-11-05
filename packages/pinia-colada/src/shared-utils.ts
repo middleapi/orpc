@@ -1,6 +1,6 @@
 import type { OperationKey, OperationKeyBaseOptions, OperationKeyOptions } from './key.ts'
-import type { OperationType } from './types.ts'
 import { generateOperationKey } from './key.ts'
+import type { OperationType } from './types.ts'
 
 export class SharedUtils<TInput> {
   constructor(
@@ -13,7 +13,13 @@ export class SharedUtils<TInput> {
    *
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#querymutation-key | Pinia Colada Integration - Query/Mutation Key}
    */
-  key<TType extends OperationType>(options: Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> = {}): OperationKey<TType, TInput> {
-    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix, serializer: this.options.serializer })
+  key<TType extends OperationType>(
+    options: Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> = {},
+  ): OperationKey<TType, TInput> {
+    return generateOperationKey(this.path, {
+      ...options,
+      prefix: this.options.prefix,
+      serializer: this.options.serializer,
+    })
   }
 }

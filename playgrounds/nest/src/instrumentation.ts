@@ -14,15 +14,10 @@ const provider = new NodeTracerProvider({
   resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: 'nest-playground',
   }),
-  spanProcessors: [
-    new BatchSpanProcessor(traceExporter),
-  ],
+  spanProcessors: [new BatchSpanProcessor(traceExporter)],
 })
 provider.register()
 
 registerInstrumentations({
-  instrumentations: [
-    new HttpInstrumentation(),
-    new ORPCInstrumentation(),
-  ],
+  instrumentations: [new HttpInstrumentation(), new ORPCInstrumentation()],
 })

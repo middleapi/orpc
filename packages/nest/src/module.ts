@@ -1,11 +1,12 @@
 import type { DynamicModule, ExecutionContext } from '@nestjs/common'
+import { Module } from '@nestjs/common'
 import type { OpenAPIHandlerCodecCoreOptions } from '@orpc/openapi/standard'
 import type { DefaultInitialContext } from '@orpc/server'
 import type { StandardHandlerOptions } from '@orpc/server/standard'
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import type { ToEventStreamOptions } from '@standard-server/node'
-import { Module } from '@nestjs/common'
+
 import { ORPC_MODULE_CONFIG_SYMBOL } from './constants.ts'
 import { ImplementInterceptor } from './implement.ts'
 
@@ -22,29 +23,29 @@ export interface NestStandardLazyRequest extends StandardLazyRequest {
   params?: Record<string, string | string[]> | undefined
 }
 
-export type ORPCModuleConfig
-  = & OpenAPIHandlerCodecCoreOptions<DefaultInitialContext>
-    & StandardHandlerOptions<DefaultInitialContext>
-    & (object extends DefaultInitialContext
-      ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> | undefined }
-      : { context: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> })
-    & {
-      /**
-       * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.
-       * You might need to define this if you are not using the express, fastify or node adapters.
-       */
-      toNestStandardLazyRequest?: ((req: any, res: any) => NestStandardLazyRequest) | undefined
+export type ORPCModuleConfig = OpenAPIHandlerCodecCoreOptions<DefaultInitialContext> &
+  StandardHandlerOptions<DefaultInitialContext> &
+  (object extends DefaultInitialContext
+    ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> | undefined }
+    : { context: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> }) & {
+    /**
+     * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.
+     * You might need to define this if you are not using the express, fastify or node adapters.
+     */
+    toNestStandardLazyRequest?: ((req: any, res: any) => NestStandardLazyRequest) | undefined
 
-      /**
-       * Options for how to convert the Standard Response to a Nest Response (returning value), like event stream options, etc.
-       */
-      toNestResponse?: {
-        /**
-         * Options for the event stream, like keep-alive settings, initial comment, etc.
-         */
-        eventStream?: ToEventStreamOptions | undefined
-      } | undefined
-    }
+    /**
+     * Options for how to convert the Standard Response to a Nest Response (returning value), like event stream options, etc.
+     */
+    toNestResponse?:
+      | {
+          /**
+           * Options for the event stream, like keep-alive settings, initial comment, etc.
+           */
+          eventStream?: ToEventStreamOptions | undefined
+        }
+      | undefined
+  }
 
 /**
  * NestJS module that configures the `@orpc/nest` integration via `forRoot`

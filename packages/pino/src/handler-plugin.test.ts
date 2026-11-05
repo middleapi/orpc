@@ -1,8 +1,9 @@
-import type { StandardLazyRequest } from '@standard-server/core'
 import { ORPCError, os } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { AbortError } from '@orpc/shared'
+import type { StandardLazyRequest } from '@standard-server/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 import { PinoHandlerPlugin } from './handler-plugin.ts'
 
@@ -18,7 +19,10 @@ const globalSpies = {
 class FakeLogger {
   private _bindings: any
 
-  constructor(initial: any = {}, private readonly childDepth: number = 0) {
+  constructor(
+    initial: any = {},
+    private readonly childDepth: number = 0,
+  ) {
     this._bindings = initial
   }
 
@@ -103,9 +107,11 @@ describe('pinoHandlerPlugin', () => {
 
   it('logs request lifecycle for matched and unmatched requests', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
-    const codec = createCodec(os.handler(() => {
-      throw new Error('boom')
-    }))
+    const codec = createCodec(
+      os.handler(() => {
+        throw new Error('boom')
+      }),
+    )
 
     const handler = new StandardHandler(codec as any, {
       plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, logLifecycle: true })],
@@ -119,7 +125,7 @@ describe('pinoHandlerPlugin', () => {
       res: {
         status: 500,
       },
-      responseTime: expect.toSatisfy(v => Number.isInteger(v) && v > 0),
+      responseTime: expect.toSatisfy((v) => Number.isInteger(v) && v > 0),
     })
 
     vi.clearAllMocks()
@@ -133,23 +139,31 @@ describe('pinoHandlerPlugin', () => {
   it('logs abort events with reason', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     const controller = new AbortController()
-    const codec = createCodec(os.handler(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20))
-      return 'pong'
-    }))
+    const codec = createCodec(
+      os.handler(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return 'pong'
+      }),
+    )
 
     const handler = new StandardHandler(codec as any, {
       plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, logAbort: true })],
     })
 
-    const promise = handler.handle(createRequest('GET', '/ping', controller.signal), { prefix: undefined, context: {} })
+    const promise = handler.handle(createRequest('GET', '/ping', controller.signal), {
+      prefix: undefined,
+      context: {},
+    })
 
     setTimeout(() => controller.abort('manual'), 0)
     await promise
 
     expect(globalSpies.info).toHaveBeenCalledWith('request is aborted (manual)')
 
-    await handler.handle(createRequest('GET', '/ping', controller.signal), { prefix: undefined, context: {} })
+    await handler.handle(createRequest('GET', '/ping', controller.signal), {
+      prefix: undefined,
+      context: {},
+    })
 
     expect(globalSpies.info).toHaveBeenCalledWith('request was aborted before handling (manual)')
   })
@@ -157,13 +171,21 @@ describe('pinoHandlerPlugin', () => {
   it('logs business errors (ORPCError) as warn except INTERNAL_SERVER_ERROR, unexpected errors as error, and abort errors as info', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     const businessError = new ORPCError('UNAUTHORIZED')
-    const handler1 = new StandardHandler(createCodec(os.handler(() => {
-      throw businessError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler1 = new StandardHandler(
+      createCodec(
+        os.handler(() => {
+          throw businessError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result1 = await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result1 = await handler1.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     expect(result1.matched).toBe(true)
     expect(globalSpies.warn).toHaveBeenCalledWith(businessError)
@@ -172,13 +194,21 @@ describe('pinoHandlerPlugin', () => {
     vi.clearAllMocks()
 
     const unexpectedError = new Error('boom')
-    const handler2 = new StandardHandler(createCodec(os.handler(() => {
-      throw unexpectedError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler2 = new StandardHandler(
+      createCodec(
+        os.handler(() => {
+          throw unexpectedError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result2 = await handler2.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result2 = await handler2.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     expect(result2.matched).toBe(true)
     expect(result2.response?.status).toBe(500)
@@ -188,13 +218,21 @@ describe('pinoHandlerPlugin', () => {
     vi.clearAllMocks()
 
     const abortError = new AbortError('reason')
-    const handler3 = new StandardHandler(createCodec(os.handler(() => {
-      throw abortError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler3 = new StandardHandler(
+      createCodec(
+        os.handler(() => {
+          throw abortError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result3 = await handler3.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result3 = await handler3.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     expect(result3.matched).toBe(true)
     expect(globalSpies.info).toHaveBeenCalledWith(abortError)
@@ -204,13 +242,21 @@ describe('pinoHandlerPlugin', () => {
     vi.clearAllMocks()
 
     const internalError = new ORPCError('INTERNAL_SERVER_ERROR')
-    const handler4 = new StandardHandler(createCodec(os.handler(() => {
-      throw internalError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler4 = new StandardHandler(
+      createCodec(
+        os.handler(() => {
+          throw internalError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result4 = await handler4.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result4 = await handler4.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     expect(result4.matched).toBe(true)
     expect(globalSpies.error).toHaveBeenCalledWith(internalError)
@@ -222,14 +268,19 @@ describe('pinoHandlerPlugin', () => {
     const businessError = new ORPCError('UNAUTHORIZED')
     const procedureErrorLevel = vi.fn(
       (error: unknown, level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace') =>
-        error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? 'debug' as const : level,
+        error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? ('debug' as const) : level,
     )
 
-    const handler1 = new StandardHandler(createCodec(os.handler(() => {
-      throw businessError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, procedureErrorLevel })],
-    })
+    const handler1 = new StandardHandler(
+      createCodec(
+        os.handler(() => {
+          throw businessError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, procedureErrorLevel })],
+      },
+    )
 
     await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
 
@@ -240,11 +291,16 @@ describe('pinoHandlerPlugin', () => {
     vi.clearAllMocks()
 
     const otherError = new ORPCError('CONFLICT')
-    const handler2 = new StandardHandler(createCodec(os.handler(() => {
-      throw otherError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, procedureErrorLevel })],
-    })
+    const handler2 = new StandardHandler(
+      createCodec(
+        os.handler(() => {
+          throw otherError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, procedureErrorLevel })],
+      },
+    )
 
     await handler2.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
 
@@ -265,7 +321,9 @@ describe('pinoHandlerPlugin', () => {
       ],
     })
 
-    await expect(handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })).rejects.toThrow(error)
+    await expect(
+      handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} }),
+    ).rejects.toThrow(error)
     expect(globalSpies.error).toHaveBeenCalledWith(error)
   })
 
@@ -273,14 +331,22 @@ describe('pinoHandlerPlugin', () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     let capturedBindings: any
 
-    const handler = new StandardHandler(createCodec(os.handler(({ context }) => {
-      capturedBindings = getLogger(context)?.bindings()
-      return 'pong'
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler = new StandardHandler(
+      createCodec(
+        os.handler(({ context }) => {
+          capturedBindings = getLogger(context)?.bindings()
+          return 'pong'
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result = await handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result = await handler.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     expect(result.matched).toBe(true)
     expect(capturedBindings.rpc.method).toBe('ping')
@@ -289,21 +355,28 @@ describe('pinoHandlerPlugin', () => {
   it('logs AsyncIteratorObject errors as error and aborted stream errors as info', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     const streamError = new Error('stream-error')
-    const handler1 = new StandardHandler(createCodec(os.handler(async function* () {
-      yield 1
-      throw streamError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler1 = new StandardHandler(
+      createCodec(
+        os.handler(async function* () {
+          yield 1
+          throw streamError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result1 = await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result1 = await handler1.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     try {
       for await (const _ of result1.response?.body as AsyncIterable<unknown>) {
         // consume only
       }
-    }
-    catch (error) {
+    } catch (error) {
       expect(error).toBe(streamError)
     }
 
@@ -314,20 +387,27 @@ describe('pinoHandlerPlugin', () => {
     vi.clearAllMocks()
 
     const abortedStreamError = new AbortError('reason')
-    const handler2 = new StandardHandler(createCodec(os.handler(async function* () {
-      throw abortedStreamError
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler2 = new StandardHandler(
+      createCodec(
+        os.handler(async function* () {
+          throw abortedStreamError
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result2 = await handler2.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result2 = await handler2.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     try {
       for await (const _ of result2.response?.body as AsyncIterable<unknown>) {
         // consume only
       }
-    }
-    catch (error) {
+    } catch (error) {
       expect(error).toBe(abortedStreamError)
     }
 
@@ -339,18 +419,26 @@ describe('pinoHandlerPlugin', () => {
   it('logs octet stream errors as error and aborted stream errors as info', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     const streamError = new Error('stream-error')
-    const handler1 = new StandardHandler(createCodec(os.handler(async () => {
-      return new ReadableStream({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode('chunk1'))
-          controller.error(streamError)
-        },
-      })
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler1 = new StandardHandler(
+      createCodec(
+        os.handler(async () => {
+          return new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('chunk1'))
+              controller.error(streamError)
+            },
+          })
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result1 = await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result1 = await handler1.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
 
     try {
       const reader = (result1.response?.body as ReadableStream<unknown>).getReader()
@@ -360,8 +448,7 @@ describe('pinoHandlerPlugin', () => {
           break
         }
       }
-    }
-    catch (error) {
+    } catch (error) {
       expect(error).toBe(streamError)
     }
 
@@ -372,17 +459,25 @@ describe('pinoHandlerPlugin', () => {
     vi.clearAllMocks()
 
     const abortedStreamError = new AbortError('reason')
-    const handler2 = new StandardHandler(createCodec(os.handler(async () => {
-      return new ReadableStream({
-        start(controller) {
-          controller.error(abortedStreamError)
-        },
-      })
-    })) as any, {
-      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-    })
+    const handler2 = new StandardHandler(
+      createCodec(
+        os.handler(async () => {
+          return new ReadableStream({
+            start(controller) {
+              controller.error(abortedStreamError)
+            },
+          })
+        }),
+      ) as any,
+      {
+        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+      },
+    )
 
-    const result2 = await handler2.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+    const result2 = await handler2.handle(createRequest('GET', '/ping'), {
+      prefix: undefined,
+      context: {},
+    })
     try {
       const reader = (result2.response?.body as ReadableStream<unknown>).getReader()
       while (true) {
@@ -391,8 +486,7 @@ describe('pinoHandlerPlugin', () => {
           break
         }
       }
-    }
-    catch (error) {
+    } catch (error) {
       expect(error).toBe(abortedStreamError)
     }
 
@@ -405,30 +499,39 @@ describe('pinoHandlerPlugin', () => {
     it('creates a child logger with id and req when none is provided in context', async () => {
       const baseLogger = new FakeLogger({ rpc: { existing: true } })
       const handler = new StandardHandler(createCodec(os.handler(() => 'pong')) as any, {
-        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, generateRequestId: () => 'test-id' })],
+        plugins: [
+          new PinoHandlerPlugin({ logger: baseLogger as any, generateRequestId: () => 'test-id' }),
+        ],
       })
 
       const request = createRequest('POST', '/ping')
       await handler.handle(request, { prefix: undefined, context: {} })
 
       expect(globalSpies.child).toHaveBeenCalledWith({})
-      expect(globalSpies.setBindings).toHaveBeenCalledWith(expect.objectContaining({
-        req: expect.objectContaining({
-          id: 'test-id',
-          url: '/ping',
-          method: 'POST',
-          headers: expect.objectContaining({
-            'content-type': 'application/json',
+      expect(globalSpies.setBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          req: expect.objectContaining({
+            id: 'test-id',
+            url: '/ping',
+            method: 'POST',
+            headers: expect.objectContaining({
+              'content-type': 'application/json',
+            }),
           }),
         }),
-      }))
+      )
       expect(globalSpies.error).not.toHaveBeenCalled()
     })
 
     it('preserves an existing req binding from the context logger', async () => {
       const loggerWithReq = new FakeLogger({ rpc: {}, req: { url: '/original', method: 'POST' } })
       const handler = new StandardHandler(createCodec(os.handler(() => 'pong')) as any, {
-        plugins: [new PinoHandlerPlugin({ logger: loggerWithReq as any, generateRequestId: () => 'test-id' })],
+        plugins: [
+          new PinoHandlerPlugin({
+            logger: loggerWithReq as any,
+            generateRequestId: () => 'test-id',
+          }),
+        ],
       })
 
       await handler.handle(createRequest('GET', '/ping'), {
@@ -437,7 +540,7 @@ describe('pinoHandlerPlugin', () => {
       })
 
       const setBindingsCalls = globalSpies.setBindings.mock.calls
-      expect(setBindingsCalls.some(call => call[0]?.req !== undefined)).toBe(false)
+      expect(setBindingsCalls.some((call) => call[0]?.req !== undefined)).toBe(false)
     })
 
     it('uses the default pino logger when none is provided', () => {

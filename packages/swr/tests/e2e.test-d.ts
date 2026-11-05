@@ -3,6 +3,7 @@ import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
+
 import { client, orpc } from './__shared__/orpc.ts'
 
 it('.call', () => {
@@ -10,18 +11,12 @@ it('.call', () => {
 })
 
 it('useSWR', () => {
-  const swr = useSWR(
-    orpc.nested.static.key({ input: { input: 123 } }),
-    orpc.static.fetcher(),
-  )
+  const swr = useSWR(orpc.nested.static.key({ input: { input: 123 } }), orpc.static.fetcher())
 
   expectTypeOf(swr.data).toEqualTypeOf<{ output: string } | undefined>()
 
   // FIXME: this should be an error because invalid key
-  useSWR(
-    'invalid',
-    orpc.static.fetcher(),
-  )
+  useSWR('invalid', orpc.static.fetcher())
 })
 
 it('useSWRMutation', () => {
@@ -36,7 +31,7 @@ it('useSWRMutation', () => {
 
 it('useSWRInfinite', () => {
   const swr = useSWRInfinite(
-    index => orpc.nested.static.key({ input: { input: index + 1 } }),
+    (index) => orpc.nested.static.key({ input: { input: index + 1 } }),
     orpc.static.fetcher(),
   )
 
@@ -51,7 +46,11 @@ it('useSWRSubscription with subscriber', () => {
 
   expectTypeOf(subscription.data).toEqualTypeOf<Array<{ output: string }> | undefined>()
 
-  if (subscription.error && isDefinedError(subscription.error) && subscription.error.code === 'STREAM_ERROR') {
+  if (
+    subscription.error &&
+    isDefinedError(subscription.error) &&
+    subscription.error.code === 'STREAM_ERROR'
+  ) {
     expectTypeOf(subscription.error.data).toEqualTypeOf<{ stream: string }>()
   }
 
@@ -70,7 +69,11 @@ it('useSWRSubscription with liveSubscriber', () => {
 
   expectTypeOf(subscription.data).toEqualTypeOf<{ output: string } | undefined>()
 
-  if (subscription.error && isDefinedError(subscription.error) && subscription.error.code === 'STREAM_ERROR') {
+  if (
+    subscription.error &&
+    isDefinedError(subscription.error) &&
+    subscription.error.code === 'STREAM_ERROR'
+  ) {
     expectTypeOf(subscription.error.data).toEqualTypeOf<{ stream: string }>()
   }
 

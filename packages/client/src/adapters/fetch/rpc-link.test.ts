@@ -1,9 +1,10 @@
 import { toFetchBody } from '@standard-server/fetch'
+
 import { createORPCClient } from '../../client.ts'
 import { RPCLink } from './rpc-link.ts'
 
 vi.mock('@orpc/shared', async (loadOrigin) => {
-  const origin = await loadOrigin() as any
+  const origin = (await loadOrigin()) as any
 
   return {
     ...origin,
@@ -12,7 +13,7 @@ vi.mock('@orpc/shared', async (loadOrigin) => {
 })
 
 vi.mock('@standard-server/fetch', async (loadOrigin) => {
-  const origin = await loadOrigin() as any
+  const origin = (await loadOrigin()) as any
 
   return {
     ...origin,
@@ -35,10 +36,12 @@ describe('rpcLink', () => {
       })
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com',
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com',
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -66,11 +69,13 @@ describe('rpcLink', () => {
       })
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      method: 'QUERY',
-      origin: 'http://api.example.com',
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        method: 'QUERY',
+        origin: 'http://api.example.com',
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -97,11 +102,13 @@ describe('rpcLink', () => {
 
     const headers = vi.fn(() => ({ 'x-custom-header': 'value' }))
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com/api?token=abc',
-      headers,
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com/api?token=abc',
+        headers,
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -137,9 +144,11 @@ describe('rpcLink', () => {
       globalThis.fetch = originalFetch
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      origin: 'http://api.example.com/',
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        origin: 'http://api.example.com/',
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -153,10 +162,14 @@ describe('rpcLink', () => {
     )
   })
 
-  it('uses the current global fetch even when it is patched after link construction', async ({ onTestFinished }) => {
-    const orpc = createORPCClient(new RPCLink({
-      origin: 'http://api.example.com/',
-    })) as any
+  it('uses the current global fetch even when it is patched after link construction', async ({
+    onTestFinished,
+  }) => {
+    const orpc = createORPCClient(
+      new RPCLink({
+        origin: 'http://api.example.com/',
+      }),
+    ) as any
 
     const fetchSpy = vi.fn(async () => {
       return new Response(JSON.stringify({ json: 'pong' }), {
@@ -196,10 +209,12 @@ describe('rpcLink', () => {
       })
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com',
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com',
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -218,11 +233,13 @@ describe('rpcLink', () => {
 
     const toFetchRequestOptions = { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } }
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com',
-      toFetchRequest: toFetchRequestOptions,
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com',
+        toFetchRequest: toFetchRequestOptions,
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -249,9 +266,11 @@ describe('rpcLink', () => {
       })
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
@@ -279,11 +298,13 @@ describe('rpcLink', () => {
       })
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com',
-      toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com',
+        toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
+      }),
+    ) as any
 
     await expect(orpc.ping(new ReadableStream())).resolves.toEqual('pong')
 
@@ -302,7 +323,9 @@ describe('rpcLink', () => {
     )
   })
 
-  it('does not set duplex mode for ReadableStream body when not supported', async ({ onTestFinished }) => {
+  it('does not set duplex mode for ReadableStream body when not supported', async ({
+    onTestFinished,
+  }) => {
     const OriginalRequest = globalThis.Request
     ;(globalThis as any).Request = class ThrowsDuplex extends OriginalRequest {
       constructor(input: any, init?: any) {
@@ -314,7 +337,7 @@ describe('rpcLink', () => {
     }
 
     onTestFinished(() => {
-      (globalThis as any).Request = OriginalRequest
+      ;(globalThis as any).Request = OriginalRequest
     })
 
     const fetch = vi.fn(async () => {
@@ -326,11 +349,13 @@ describe('rpcLink', () => {
       })
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com',
-      toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com',
+        toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
+      }),
+    ) as any
 
     await expect(orpc.ping(new ReadableStream())).resolves.toEqual('pong')
 
@@ -341,7 +366,10 @@ describe('rpcLink', () => {
 
   it.each([
     ['opaqueredirect', 'Unexpected redirect response: redirects are not followed.'],
-    ['opaque', 'Unexpected opaque response: the response is unreadable, likely due to a no-cors request.'],
+    [
+      'opaque',
+      'Unexpected opaque response: the response is unreadable, likely due to a no-cors request.',
+    ],
   ])('throws on %s responses', async (type, message) => {
     const fetch = vi.fn(async () => {
       // Browsers return opaque responses with status 0 and no headers or body
@@ -350,10 +378,12 @@ describe('rpcLink', () => {
       return response
     })
 
-    const orpc = createORPCClient(new RPCLink({
-      fetch,
-      origin: 'http://api.example.com',
-    })) as any
+    const orpc = createORPCClient(
+      new RPCLink({
+        fetch,
+        origin: 'http://api.example.com',
+      }),
+    ) as any
 
     await expect(orpc.ping('input')).rejects.toThrow(new TypeError(message))
     expect(fetch).toHaveBeenCalledOnce()

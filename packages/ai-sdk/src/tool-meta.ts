@@ -1,6 +1,14 @@
-import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, MetaPlugin } from '@orpc/contract'
+import type {
+  AnyProcedureContract,
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  MetaPlugin,
+} from '@orpc/contract'
 import type { Lazy } from '@orpc/server'
 import type { JSONValue, Tool } from 'ai'
+
 import type { ToolOutput } from './tool.ts'
 
 /**
@@ -24,10 +32,12 @@ export type FunctionTool<
 export type AiSdkToolMeta<
   TInputSchema extends AnySchema = AnySchema,
   TOutputSchema extends AnySchema = AnySchema,
-> = Partial<Omit<
-  FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
-  'inputSchema' | 'outputSchema' | 'execute'
->>
+> = Partial<
+  Omit<
+    FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
+    'inputSchema' | 'outputSchema' | 'execute'
+  >
+>
 
 export interface AiSdkToolMetaPlugin<
   TInputSchema extends AnySchema,
@@ -62,7 +72,7 @@ export interface AiSdkToolFunction {
  *
  * @see {@link https://orpc.dev/docs/integrations/ai-sdk#tool-implementer | AI SDK Integration - Tool Implementer}
  */
-export const aiSdkTool: AiSdkToolFunction = incoming => ({
+export const aiSdkTool: AiSdkToolFunction = (incoming) => ({
   name: '~ai-sdk/tool',
   init(meta) {
     const existing = meta['~ai-sdk/tool'] as undefined | AiSdkToolMeta
@@ -80,6 +90,8 @@ export const aiSdkTool: AiSdkToolFunction = incoming => ({
  *
  * @see {@link https://orpc.dev/docs/integrations/ai-sdk#tool-implementer | AI SDK Integration - Tool Implementer}
  */
-export function getAiSdkToolMeta(procedureOrLazy: AnyProcedureContract | Lazy<any>): AiSdkToolMeta | undefined {
+export function getAiSdkToolMeta(
+  procedureOrLazy: AnyProcedureContract | Lazy<any>,
+): AiSdkToolMeta | undefined {
   return procedureOrLazy['~orpc'].meta['~ai-sdk/tool'] as AiSdkToolMeta | undefined
 }

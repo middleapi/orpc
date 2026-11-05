@@ -1,6 +1,7 @@
-import type { JsonSchemaConverter } from './convert.ts'
 import { type } from '@orpc/contract'
 import z from 'zod'
+
+import type { JsonSchemaConverter } from './convert.ts'
 import { DelegatingJsonSchemaConverter } from './convert.ts'
 
 describe('delegatingJsonSchemaConverter', () => {
@@ -34,7 +35,9 @@ describe('delegatingJsonSchemaConverter', () => {
 
     expect(converter.convert(undefined, 'input')).toEqual([{}, true])
     expect(converter.convert(type<number, string>(map), 'input')).toEqual([{}, true])
-    expect(converter.convert({ '~standard': { vendor: 'custom', version: 1, validate } }, 'output')).toEqual([{}, true])
+    expect(
+      converter.convert({ '~standard': { vendor: 'custom', version: 1, validate } }, 'output'),
+    ).toEqual([{}, true])
     expect(converter.convert(z.string(), 'input')).toEqual([{}, true])
 
     expect(map).not.toHaveBeenCalled()

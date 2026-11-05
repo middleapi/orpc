@@ -1,18 +1,30 @@
-import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/contract'
-import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { AnyProcedure, AnyRouter } from '@orpc/server'
-import type { Public, Value } from '@orpc/shared'
-import type { OpenAPIMeta } from './meta.ts'
-import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation.ts'
-import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types.ts'
 import { downgradeSpecV31ToV30, downgradeSpecV32ToV31 } from '@openapi-spec/downgrader'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
-import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter, hoistRecursiveRefToDef, StandardJsonSchemaConverter } from '@orpc/json-schema'
+import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/contract'
+import type {
+  JsonSchema,
+  JsonSchemaConverter,
+  JsonSchemaConverterDirection,
+} from '@orpc/json-schema'
+import {
+  combineJsonSchemasWithComposition,
+  DelegatingJsonSchemaConverter,
+  hoistRecursiveRefToDef,
+  StandardJsonSchemaConverter,
+} from '@orpc/json-schema'
+import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
+import type { Public, Value } from '@orpc/shared'
 import { clone, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
+
 import { DEFAULT_OPENAPI_METHOD } from './constants.ts'
+import type { OpenAPIMeta } from './meta.ts'
 import { getOpenAPIMeta } from './meta.ts'
 import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
+import type {
+  OpenAPIErrorBodyDefinition,
+  OpenAPIOperationContext,
+} from './openapi-generator-operation.ts'
 import {
   buildErrorResponse,
   buildRequest,
@@ -21,6 +33,7 @@ import {
   toOpenAPIPath,
 } from './openapi-generator-operation.ts'
 import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
+import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types.ts'
 import { getDynamicPathParams } from './utils.ts'
 
 export { OpenAPIGeneratorError } from './openapi-generator-operation.ts'
@@ -69,7 +82,9 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
+  filter?:
+    | Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+    | undefined
 
   /**
    * Define a custom JSON schema for the error response body when using
@@ -80,10 +95,16 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    * - Return `defaultSchema()` to keep the default schema, or `null | undefined` to document an empty body, matching an `errorResponseBodyEncoder` that returns `undefined`.
    * - The schema is an OpenAPI 3.2 Schema Object, it is downgraded with the rest of the document when an older `version` is requested.
    */
-  errorResponseBodySchema?: Value<
-    JsonSchema | null | undefined,
-    [definedErrors: OpenAPIErrorBodyDefinition[], status: number, defaultSchema: () => JsonSchema]
-  > | undefined
+  errorResponseBodySchema?:
+    | Value<
+        JsonSchema | null | undefined,
+        [
+          definedErrors: OpenAPIErrorBodyDefinition[],
+          status: number,
+          defaultSchema: () => JsonSchema,
+        ]
+      >
+    | undefined
 
   /**
    * Media type of error responses in the generated document, e.g. `application/problem+json`.
@@ -155,7 +176,9 @@ export class OpenAPIGenerator {
         const def = contract['~orpc']
         const meta = getOpenAPIMeta(contract)
 
-        const method = (meta?.method ?? DEFAULT_OPENAPI_METHOD).toLowerCase() as Lowercase<NonNullable<OpenAPIMeta['method']>>
+        const method = (meta?.method ?? DEFAULT_OPENAPI_METHOD).toLowerCase() as Lowercase<
+          NonNullable<OpenAPIMeta['method']>
+        >
 
         if (method === 'query' && !version.startsWith('3.2.')) {
           throw new OpenAPIGeneratorError(
@@ -172,14 +195,13 @@ export class OpenAPIGenerator {
 
         if (meta?.spec !== undefined && typeof meta.spec !== 'function') {
           operation = meta.spec
-        }
-        else {
+        } else {
           operation = {
             operationId: meta?.operationId ?? path.join('.'),
             summary: meta?.summary,
             description: meta?.description,
             deprecated: meta?.deprecated,
-            tags: meta?.tags?.map(tag => tag),
+            tags: meta?.tags?.map((tag) => tag),
           }
 
           buildRequest(ctx, operation, def, meta, dynamicPathParams)
@@ -191,14 +213,17 @@ export class OpenAPIGenerator {
           operation = meta.spec(operation)
         }
 
-        const routeKey = `${method} ${toOpenAPIPath(httpPath, dynamicPathParams?.map(p => ({ ...p, parameterName: '' })))}`
+        const routeKey = `${method} ${toOpenAPIPath(
+          httpPath,
+          dynamicPathParams?.map((p) => ({ ...p, parameterName: '' })),
+        )}`
         const routeOwner = routeOwners.get(routeKey)
 
         if (routeOwner !== undefined) {
           throw new OpenAPIGeneratorError(
-            `${method.toUpperCase()} ${openApiPath} is already documented by the procedure at ${routeOwner}.\n`
-            + `  OpenAPI allows one operation per method and path (path param names are ignored).\n`
-            + `  Fix: change the method or path of one of them.`,
+            `${method.toUpperCase()} ${openApiPath} is already documented by the procedure at ${routeOwner}.\n` +
+              `  OpenAPI allows one operation per method and path (path param names are ignored).\n` +
+              `  Fix: change the method or path of one of them.`,
           )
         }
 
@@ -209,8 +234,8 @@ export class OpenAPIGenerator {
 
           if (operationIdOwner !== undefined) {
             throw new OpenAPIGeneratorError(
-              `operationId "${operationId}" is already used by the procedure at ${operationIdOwner}.\n`
-              + `  OpenAPI requires operationIds to be unique. Fix: give one of them a different operationId.`,
+              `operationId "${operationId}" is already used by the procedure at ${operationIdOwner}.\n` +
+                `  OpenAPI requires operationIds to be unique. Fix: give one of them a different operationId.`,
             )
           }
 
@@ -222,8 +247,7 @@ export class OpenAPIGenerator {
         doc.paths ??= {}
         doc.paths[openApiPath] ??= {}
         doc.paths[openApiPath][method] = operation
-      }
-      catch (e) {
+      } catch (e) {
         if (!(e instanceof OpenAPIGeneratorError)) {
           throw e
         }
@@ -241,28 +265,40 @@ export class OpenAPIGenerator {
     return this.serializer.serializeJson(versioned).json as OpenAPIDocument<TVersion>
   }
 
-  private convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
+  private convertSchema(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [JsonSchema, boolean] {
     const [jsonSchema, optional] = this.converter.convert(schema as any, direction)
     // composing or hoisting would retarget root-relative refs (`#`, `#/properties/...`),
     // so move a schema that points into itself under a def first
     return [hoistRecursiveRefToDef(strip$schemaField(jsonSchema)), optional]
   }
 
-  private convertSchemas(schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
+  private convertSchemas(
+    schemas: AnySchema[] | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [JsonSchema, boolean] {
     if (!schemas || schemas.length <= 1) {
       return this.convertSchema(schemas?.[0], direction)
     }
 
-    const results = schemas.map(s => this.convertSchema(s, direction))
+    const results = schemas.map((s) => this.convertSchema(s, direction))
 
     return [
-      combineJsonSchemasWithComposition('allOf', results.map(([jsonSchema]) => jsonSchema)),
+      combineJsonSchemasWithComposition(
+        'allOf',
+        results.map(([jsonSchema]) => jsonSchema),
+      ),
       results.every(([, optional]) => optional),
     ]
   }
 }
 
-function toVersionedOpenAPIDocument(doc: OpenAPIV3_2.OpenAPIObject, version: OpenAPIVersion): OpenAPIDocument<OpenAPIVersion> {
+function toVersionedOpenAPIDocument(
+  doc: OpenAPIV3_2.OpenAPIObject,
+  version: OpenAPIVersion,
+): OpenAPIDocument<OpenAPIVersion> {
   const downgraded = version.startsWith('3.2.')
     ? doc
     : version.startsWith('3.1.')

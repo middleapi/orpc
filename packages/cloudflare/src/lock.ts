@@ -1,6 +1,6 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
-import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
+import type { Promisable } from '@orpc/shared'
 import { promiseWithResolvers, runWithSignal, throwIfAborted } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
@@ -31,7 +31,9 @@ export interface experimental_DurableLockerOptions {
    *
    * @default ((namespace, key) => namespace.getByName(key))
    */
-  getStubByName?: ((namespace: DurableObjectNamespace, key: string) => DurableObjectStub) | undefined
+  getStubByName?:
+    | ((namespace: DurableObjectNamespace, key: string) => DurableObjectStub)
+    | undefined
 }
 
 /**
@@ -45,7 +47,10 @@ export class experimental_DurableLocker implements Locker {
   private readonly keyPrefix: string
   private readonly ttl: number
   private readonly timeout: number
-  private readonly getStubByName: Exclude<experimental_DurableLockerOptions['getStubByName'], undefined>
+  private readonly getStubByName: Exclude<
+    experimental_DurableLockerOptions['getStubByName'],
+    undefined
+  >
 
   constructor(
     private readonly namespace: DurableObjectNamespace<any>,
@@ -64,15 +69,25 @@ export class experimental_DurableLocker implements Locker {
    */
   prefix(prefix: string): experimental_DurableLocker {
     // oxlint-disable-next-line new-cap
-    return new experimental_DurableLocker(this.namespace, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
+    return new experimental_DurableLocker(this.namespace, {
+      ...this.options,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
-  async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
+  async lock<T>(
+    key: string,
+    fn: (options: LockCallbackOptions) => Promisable<T>,
+    options: LockOptions = {},
+  ): Promise<T> {
     throwIfAborted(options.signal)
 
-    const response = await this.getStubByName(this.namespace, `${this.keyPrefix}${key}`).fetch('http://localhost/acquire', {
-      headers: { upgrade: 'websocket' },
-    })
+    const response = await this.getStubByName(this.namespace, `${this.keyPrefix}${key}`).fetch(
+      'http://localhost/acquire',
+      {
+        headers: { upgrade: 'websocket' },
+      },
+    )
 
     const websocket = response.webSocket
 
@@ -103,8 +118,14 @@ export class experimental_DurableLocker implements Locker {
       const timer = setTimeout(() => granted.reject(new LockTimeoutError(key)), timeout)
 
       websocket.addEventListener('message', () => granted.resolve())
-      websocket.addEventListener('close', () => granted.reject(new Error('The lock durable object closed the socket before handing the lock over')))
-      websocket.addEventListener('error', event => granted.reject(new Error('Lock websocket error', { cause: event })))
+      websocket.addEventListener('close', () =>
+        granted.reject(
+          new Error('The lock durable object closed the socket before handing the lock over'),
+        ),
+      )
+      websocket.addEventListener('error', (event) =>
+        granted.reject(new Error('Lock websocket error', { cause: event })),
+      )
 
       await runWithSignal(options.signal, () => granted.promise)
         .catch((error) => {
@@ -118,8 +139,7 @@ export class experimental_DurableLocker implements Locker {
 
     try {
       return await fn({ waited })
-    }
-    finally {
+    } finally {
       clearTimeout(expiry)
       close()
     }

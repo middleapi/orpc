@@ -10,7 +10,4 @@ export * from './server-form-functionable.ts'
 export * from './server-function.ts'
 export * from './server-functionable.ts'
 
-export {
-  getIssueMessage,
-  parseFormData,
-} from '@orpc/openapi/helpers'
+export { getIssueMessage, parseFormData } from '@orpc/openapi/helpers'

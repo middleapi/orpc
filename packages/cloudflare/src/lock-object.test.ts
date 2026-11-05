@@ -1,8 +1,9 @@
-import type { experimental_DurableLockObject as DurableLockObject } from './lock-object.ts'
 import { sleep } from '@orpc/shared'
 import { evictDurableObject, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
+
+import type { experimental_DurableLockObject as DurableLockObject } from './lock-object.ts'
 
 describe('durableLockObject', () => {
   function createStub() {
@@ -40,14 +41,17 @@ describe('durableLockObject', () => {
   }
 
   async function waitForSockets(stub: DurableObjectStub, count: number) {
-    await vi.waitFor(async () => {
-      const open = await runInDurableObject(
-        stub,
-        (_, ctx) => ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN).length,
-      )
+    await vi.waitFor(
+      async () => {
+        const open = await runInDurableObject(
+          stub,
+          (_, ctx) => ctx.getWebSockets().filter((ws) => ws.readyState === WebSocket.OPEN).length,
+        )
 
-      expect(open).toBe(count)
-    }, { interval: 10 })
+        expect(open).toBe(count)
+      },
+      { interval: 10 },
+    )
   }
 
   it('grants the first socket right away and hands over to parked sockets in order', async () => {
@@ -101,14 +105,17 @@ describe('durableLockObject', () => {
 
     // The runtime still lists a socket while it is closing, which only happens
     // inside the close event itself, so drive that state directly.
-    await runInDurableObject(stub as unknown as DurableObjectStub<DurableLockObject>, (instance, ctx) => {
-      const [, staleWs, holderWs] = ctx.getWebSockets() // newest first
+    await runInDurableObject(
+      stub as unknown as DurableObjectStub<DurableLockObject>,
+      (instance, ctx) => {
+        const [, staleWs, holderWs] = ctx.getWebSockets() // newest first
 
-      staleWs!.close()
-      holderWs!.close()
+        staleWs!.close()
+        holderWs!.close()
 
-      instance.webSocketClose(holderWs!)
-    })
+        instance.webSocketClose(holderWs!)
+      },
+    )
 
     await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalled())
     expect(stale.granted).not.toHaveBeenCalled()

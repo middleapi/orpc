@@ -1,8 +1,13 @@
 import { RPCJsonSerializer } from '@orpc/client'
 import { InfiniteQueryObserver, QueryClient, QueryObserver, skipToken } from '@tanstack/query-core'
+
 import * as KeyModule from './key.ts'
 import * as LiveQuery from './live-query.ts'
-import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils.ts'
+import {
+  isProcedureUtilsOptions,
+  mergeProcedureUtilsOptions,
+  ProcedureUtils,
+} from './procedure-utils.ts'
 import * as streamQueryModule from './stream-query.ts'
 import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
@@ -29,9 +34,14 @@ describe('procedureUtils', () => {
   })
 
   it('.queryKey', () => {
-    expect(utils.queryKey({ input: { search: '__search__' } })).toBe(generateOperationKeySpy.mock.results[0]!.value)
+    expect(utils.queryKey({ input: { search: '__search__' } })).toBe(
+      generateOperationKeySpy.mock.results[0]!.value,
+    )
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { search: '__search__' } })
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+      type: 'query',
+      input: { search: '__search__' },
+    })
 
     expect(utils.queryKey({ queryKey: ['1'] })).toEqual(['1'])
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
@@ -43,42 +53,82 @@ describe('procedureUtils', () => {
 
     it('includes key options in generated keys', () => {
       keyedUtils.queryKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', serializer, type: 'query', input: 1 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], {
+        prefix: '__prefix__',
+        serializer,
+        type: 'query',
+        input: 1,
+      })
 
       keyedUtils.streamedKey({ input: 1, queryFnOptions: { maxChunks: 1 } } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', serializer, type: 'streamed', input: 1, fnOptions: { maxChunks: 1 } })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], {
+        prefix: '__prefix__',
+        serializer,
+        type: 'streamed',
+        input: 1,
+        fnOptions: { maxChunks: 1 },
+      })
 
       keyedUtils.liveKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', serializer, type: 'live', input: 1 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], {
+        prefix: '__prefix__',
+        serializer,
+        type: 'live',
+        input: 1,
+      })
 
-      keyedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], { prefix: '__prefix__', serializer, type: 'infinite', input: { cursor: 0 } })
+      keyedUtils.infiniteKey({
+        input: (cursor: number) => ({ cursor }),
+        initialPageParam: 0,
+      } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], {
+        prefix: '__prefix__',
+        serializer,
+        type: 'infinite',
+        input: { cursor: 0 },
+      })
 
       keyedUtils.mutationKey()
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], { prefix: '__prefix__', serializer, type: 'mutation' })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], {
+        prefix: '__prefix__',
+        serializer,
+        type: 'mutation',
+      })
     })
   })
 
   describe('.queryOptions', () => {
     it('without skipToken', async () => {
-      const options = utils.queryOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
+      const options = utils.queryOptions({
+        input: { search: '__search__' },
+        context: { batch: '__batch__' },
+      })
 
       expect((options as any).enabled).toBeUndefined()
 
       expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { search: '__search__' } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: { search: '__search__' },
+      })
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
 
       client.mockResolvedValueOnce('__output__')
       await expect(options.queryFn!({ signal } as any)).resolves.toEqual('__output__')
       expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith({ search: '__search__' }, { signal, context: {
-        batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.queryKey,
-          type: 'query',
+      expect(client).toHaveBeenCalledWith(
+        { search: '__search__' },
+        {
+          signal,
+          context: {
+            batch: '__batch__',
+            [OPERATION_CONTEXT_SYMBOL]: {
+              key: options.queryKey,
+              type: 'query',
+            },
+          },
         },
-      } })
+      )
     })
 
     it('with skipToken', () => {
@@ -87,10 +137,15 @@ describe('procedureUtils', () => {
       expect((options as any).enabled).toBe(false)
 
       expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: skipToken })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: skipToken,
+      })
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
 
-      expect(() => options.queryFn!({ signal } as any)).toThrow('queryFn should not be called when skipToken used for skipping')
+      expect(() => options.queryFn!({ signal } as any)).toThrow(
+        'queryFn should not be called when skipToken used for skipping',
+      )
       expect(client).toHaveBeenCalledTimes(0)
     })
 
@@ -111,9 +166,14 @@ describe('procedureUtils', () => {
   })
 
   it('.streamedKey', () => {
-    expect(utils.streamedKey({ input: { search: '__search__' } })).toBe(generateOperationKeySpy.mock.results[0]!.value)
+    expect(utils.streamedKey({ input: { search: '__search__' } })).toBe(
+      generateOperationKeySpy.mock.results[0]!.value,
+    )
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: { search: '__search__' } })
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+      type: 'streamed',
+      input: { search: '__search__' },
+    })
 
     expect(utils.streamedKey({ queryKey: ['1'] })).toEqual(['1'])
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
@@ -147,7 +207,9 @@ describe('procedureUtils', () => {
         yield '__2__'
         return '__3__'
       })
-      await expect(options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)).resolves.toEqual(['__1__', '__2__'])
+      await expect(
+        options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any),
+      ).resolves.toEqual(['__1__', '__2__'])
       expect(streamedQuerySpy).toHaveBeenCalledTimes(1)
       expect(streamedQuerySpy).toHaveBeenCalledWith(expect.any(Function), {
         refetchMode: 'replace',
@@ -155,16 +217,19 @@ describe('procedureUtils', () => {
       expect(queryClient.getQueryData(options.queryKey)).toEqual(['__1__', '__2__'])
 
       expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith({ search: '__search__' }, {
-        signal,
-        context: {
-          batch: '__batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
-            key: options.queryKey,
-            type: 'streamed',
+      expect(client).toHaveBeenCalledWith(
+        { search: '__search__' },
+        {
+          signal,
+          context: {
+            batch: '__batch__',
+            [OPERATION_CONTEXT_SYMBOL]: {
+              key: options.queryKey,
+              type: 'streamed',
+            },
           },
         },
-      })
+      )
     })
 
     it('with skipToken', () => {
@@ -173,26 +238,42 @@ describe('procedureUtils', () => {
       expect((options as any).enabled).toBe(false)
 
       expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: skipToken })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: skipToken,
+      })
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
 
-      expect(() => options.queryFn!({ signal, client: queryClient } as any)).toThrow('queryFn should not be called when skipToken used for skipping')
+      expect(() => options.queryFn!({ signal, client: queryClient } as any)).toThrow(
+        'queryFn should not be called when skipToken used for skipping',
+      )
       expect(client).toHaveBeenCalledTimes(0)
     })
 
     it('with unsupported output', async () => {
-      const options = utils.streamedOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
+      const options = utils.streamedOptions({
+        input: { search: '__search__' },
+        context: { batch: '__batch__' },
+      })
 
       client.mockResolvedValueOnce('INVALID')
-      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow('streamedQuery requires an AsyncIteratorObject output')
+      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow(
+        'streamedQuery requires an AsyncIteratorObject output',
+      )
       expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith({ search: '__search__' }, { signal, context: {
-        batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.queryKey,
-          type: 'streamed',
+      expect(client).toHaveBeenCalledWith(
+        { search: '__search__' },
+        {
+          signal,
+          context: {
+            batch: '__batch__',
+            [OPERATION_CONTEXT_SYMBOL]: {
+              key: options.queryKey,
+              type: 'streamed',
+            },
+          },
         },
-      } })
+      )
     })
 
     it('uses custom queryFn instead of client', async () => {
@@ -213,9 +294,14 @@ describe('procedureUtils', () => {
   })
 
   it('.liveKey', () => {
-    expect(utils.liveKey({ input: { search: '__search__' } })).toBe(generateOperationKeySpy.mock.results[0]!.value)
+    expect(utils.liveKey({ input: { search: '__search__' } })).toBe(
+      generateOperationKeySpy.mock.results[0]!.value,
+    )
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: { search: '__search__' } })
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+      type: 'live',
+      input: { search: '__search__' },
+    })
 
     expect(utils.liveKey({ queryKey: ['1'] })).toEqual(['1'])
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
@@ -243,22 +329,27 @@ describe('procedureUtils', () => {
         yield '__2__'
         return '__3__'
       })
-      await expect(options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)).resolves.toEqual('__2__')
+      await expect(
+        options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any),
+      ).resolves.toEqual('__2__')
       expect(liveQuerySpy).toHaveBeenCalledTimes(1)
       expect(liveQuerySpy).toHaveBeenCalledWith(expect.any(Function))
       expect(queryClient.getQueryData(options.queryKey)).toEqual('__2__')
 
       expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith({ search: '__search__' }, {
-        signal,
-        context: {
-          batch: '__batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
-            key: options.queryKey,
-            type: 'live',
+      expect(client).toHaveBeenCalledWith(
+        { search: '__search__' },
+        {
+          signal,
+          context: {
+            batch: '__batch__',
+            [OPERATION_CONTEXT_SYMBOL]: {
+              key: options.queryKey,
+              type: 'live',
+            },
           },
         },
-      })
+      )
     })
 
     it('with skipToken', () => {
@@ -268,28 +359,41 @@ describe('procedureUtils', () => {
 
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
       expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: skipToken })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: skipToken,
+      })
 
-      expect(() => options.queryFn!({ signal, client: queryClient } as any)).toThrow('queryFn should not be called when skipToken used for skipping')
+      expect(() => options.queryFn!({ signal, client: queryClient } as any)).toThrow(
+        'queryFn should not be called when skipToken used for skipping',
+      )
       expect(client).toHaveBeenCalledTimes(0)
     })
 
     it('with unsupported output', async () => {
-      const options = utils.liveOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
+      const options = utils.liveOptions({
+        input: { search: '__search__' },
+        context: { batch: '__batch__' },
+      })
 
       client.mockResolvedValueOnce('INVALID')
-      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow('liveQuery requires an AsyncIteratorObject output')
+      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow(
+        'liveQuery requires an AsyncIteratorObject output',
+      )
       expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith({ search: '__search__' }, {
-        signal,
-        context: {
-          batch: '__batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
-            key: options.queryKey,
-            type: 'live',
+      expect(client).toHaveBeenCalledWith(
+        { search: '__search__' },
+        {
+          signal,
+          context: {
+            batch: '__batch__',
+            [OPERATION_CONTEXT_SYMBOL]: {
+              key: options.queryKey,
+              type: 'live',
+            },
           },
         },
-      })
+      )
     })
 
     it('uses custom queryFn instead of client', async () => {
@@ -310,11 +414,21 @@ describe('procedureUtils', () => {
   })
 
   it('.infiniteKey', () => {
-    expect(utils.infiniteKey({ input: pageParam => ({ search: '__search__', pageParam }), initialPageParam: '__initialPageParam__' })).toBe(generateOperationKeySpy.mock.results[0]!.value)
+    expect(
+      utils.infiniteKey({
+        input: (pageParam) => ({ search: '__search__', pageParam }),
+        initialPageParam: '__initialPageParam__',
+      }),
+    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { search: '__search__', pageParam: '__initialPageParam__' } })
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+      type: 'infinite',
+      input: { search: '__search__', pageParam: '__initialPageParam__' },
+    })
 
-    expect(utils.infiniteKey({ input: () => ({}), initialPageParam: 0, queryKey: ['1'] })).toEqual(['1'])
+    expect(utils.infiniteKey({ input: () => ({}), initialPageParam: 0, queryKey: ['1'] })).toEqual([
+      '1',
+    ])
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
   })
 
@@ -323,7 +437,7 @@ describe('procedureUtils', () => {
       const getNextPageParam = vi.fn()
 
       const options = utils.infiniteOptions({
-        input: pageParam => ({ search: '__search__', pageParam }),
+        input: (pageParam) => ({ search: '__search__', pageParam }),
         context: { batch: '__batch__' },
         getNextPageParam,
         initialPageParam: '__initialPageParam__',
@@ -334,13 +448,18 @@ describe('procedureUtils', () => {
 
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
       expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { search: '__search__', pageParam: '__initialPageParam__' } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'infinite',
+        input: { search: '__search__', pageParam: '__initialPageParam__' },
+      })
 
       expect(options.initialPageParam).toEqual('__initialPageParam__')
       expect(options.getNextPageParam).toBe(getNextPageParam)
 
       client.mockResolvedValueOnce('__output__')
-      await expect(options.queryFn!({ signal, pageParam: '__pageParam__' } as any)).resolves.toEqual('__output__')
+      await expect(
+        options.queryFn!({ signal, pageParam: '__pageParam__' } as any),
+      ).resolves.toEqual('__output__')
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(
         { search: '__search__', pageParam: '__pageParam__' },
@@ -371,12 +490,17 @@ describe('procedureUtils', () => {
 
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
       expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: skipToken })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'infinite',
+        input: skipToken,
+      })
 
       expect(options.initialPageParam).toEqual('__initialPageParam__')
       expect(options.getNextPageParam).toBe(getNextPageParam)
 
-      expect(() => options.queryFn!({ signal, pageParam: '__pageParam__' } as any)).toThrow('queryFn should not be called when skipToken used for skipping')
+      expect(() => options.queryFn!({ signal, pageParam: '__pageParam__' } as any)).toThrow(
+        'queryFn should not be called when skipToken used for skipping',
+      )
       expect(client).toHaveBeenCalledTimes(0)
     })
 
@@ -384,7 +508,7 @@ describe('procedureUtils', () => {
       const queryFn = vi.fn().mockResolvedValue('__custom_output__')
       const fnContext = { signal, pageParam: '__pageParam__' } as any
       const options = utils.infiniteOptions({
-        input: pageParam => ({ search: '__search__', pageParam }),
+        input: (pageParam) => ({ search: '__search__', pageParam }),
         context: { batch: '__batch__' },
         getNextPageParam: vi.fn(),
         initialPageParam: '__initialPageParam__',
@@ -419,13 +543,15 @@ describe('procedureUtils', () => {
     client.mockResolvedValueOnce('__output__')
     await expect(options.mutationFn!('__input__', {} as any)).resolves.toEqual('__output__')
     expect(client).toHaveBeenCalledTimes(1)
-    expect(client).toHaveBeenCalledWith('__input__', { context: {
-      batch: '__batch__',
-      [OPERATION_CONTEXT_SYMBOL]: {
-        key: options.mutationKey,
-        type: 'mutation',
+    expect(client).toHaveBeenCalledWith('__input__', {
+      context: {
+        batch: '__batch__',
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.mutationKey,
+          type: 'mutation',
+        },
       },
-    } })
+    })
   })
 
   it('.mutationOptions uses custom mutationFn instead of client', async () => {
@@ -445,7 +571,12 @@ describe('procedureUtils', () => {
 
 describe('skipToken queries do not share a query with unskipped ones', () => {
   const client = vi.fn(async () => '__output__')
-  const utils = new ProcedureUtils<Record<never, never>, { search?: string } | undefined, string, Error>(['planet', 'list'], client)
+  const utils = new ProcedureUtils<
+    Record<never, never>,
+    { search?: string } | undefined,
+    string,
+    Error
+  >(['planet', 'list'], client)
 
   it('.queryOptions', async () => {
     const unskipped = new QueryObserver(queryClient, utils.queryOptions())
@@ -465,19 +596,25 @@ describe('skipToken queries do not share a query with unskipped ones', () => {
   })
 
   it('.infiniteOptions', async () => {
-    const unskipped = new InfiniteQueryObserver(queryClient, utils.infiniteOptions({
-      input: () => undefined,
-      initialPageParam: 0,
-      getNextPageParam: () => undefined,
-    }))
+    const unskipped = new InfiniteQueryObserver(
+      queryClient,
+      utils.infiniteOptions({
+        input: () => undefined,
+        initialPageParam: 0,
+        getNextPageParam: () => undefined,
+      }),
+    )
     onTestFinished(unskipped.subscribe(() => {}))
     await vi.waitFor(() => expect(unskipped.getCurrentResult().status).toBe('success'))
 
-    const skipped = new InfiniteQueryObserver(queryClient, utils.infiniteOptions({
-      input: skipToken,
-      initialPageParam: 0,
-      getNextPageParam: () => undefined,
-    }))
+    const skipped = new InfiniteQueryObserver(
+      queryClient,
+      utils.infiniteOptions({
+        input: skipToken,
+        initialPageParam: 0,
+        getNextPageParam: () => undefined,
+      }),
+    )
     onTestFinished(skipped.subscribe(() => {}))
 
     expect(queryClient.getQueryCache().getAll()).toHaveLength(2)
@@ -492,8 +629,13 @@ describe('skipToken queries do not share a query with unskipped ones', () => {
 
 describe('structural sharing', () => {
   const client = vi.fn()
-  const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(['planet', 'list'], client)
-  const planets = () => [{ name: 'Earth', createdAt: new Date('2025-01-01'), tags: new Set(['blue']) }]
+  const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(
+    ['planet', 'list'],
+    client,
+  )
+  const planets = () => [
+    { name: 'Earth', createdAt: new Date('2025-01-01'), tags: new Set(['blue']) },
+  ]
 
   it('.queryOptions keeps the previous data when nothing changed', async () => {
     client.mockImplementation(async () => planets())
@@ -509,7 +651,10 @@ describe('structural sharing', () => {
 
   it('.queryOptions can opt out with structuralSharing: false', async () => {
     client.mockImplementation(async () => planets())
-    const observer = new QueryObserver(queryClient, utils.queryOptions({ structuralSharing: false }))
+    const observer = new QueryObserver(
+      queryClient,
+      utils.queryOptions({ structuralSharing: false }),
+    )
     onTestFinished(observer.subscribe(() => {}))
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
 
@@ -527,7 +672,7 @@ describe('structural sharing', () => {
       yield [{ ...planets()[0], name: 'Mars' }]
     })
     const observer = new QueryObserver(queryClient, utils.liveOptions())
-    onTestFinished(observer.subscribe(result => result.data && results.add(result.data)))
+    onTestFinished(observer.subscribe((result) => result.data && results.add(result.data)))
     await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('idle'))
 
     const [first, second] = results
@@ -539,11 +684,14 @@ describe('structural sharing', () => {
 
   it('.infiniteOptions keeps unchanged pages', async () => {
     client.mockImplementation(async () => planets())
-    const observer = new InfiniteQueryObserver(queryClient, utils.infiniteOptions({
-      input: () => undefined,
-      initialPageParam: 0,
-      getNextPageParam: lastPage => lastPage.length,
-    }))
+    const observer = new InfiniteQueryObserver(
+      queryClient,
+      utils.infiniteOptions({
+        input: () => undefined,
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => lastPage.length,
+      }),
+    )
     onTestFinished(observer.subscribe(() => {}))
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
 
@@ -565,15 +713,19 @@ describe('structural sharing', () => {
     const serializer = new RPCJsonSerializer({
       handlers: {
         person: {
-          condition: value => value instanceof Person,
+          condition: (value) => value instanceof Person,
           serialize: (value: Person) => value.name,
-          deserialize: name => new Person(name as string),
+          deserialize: (name) => new Person(name as string),
         },
       },
     })
 
     client.mockImplementation(async () => [new Person('Earth')])
-    const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(['planet', 'list'], client, { serializer })
+    const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(
+      ['planet', 'list'],
+      client,
+      { serializer },
+    )
     const observer = new QueryObserver(queryClient, utils.queryOptions())
     onTestFinished(observer.subscribe(() => {}))
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
@@ -605,7 +757,10 @@ describe('createProcedureUtils with options', () => {
 
       utils.queryKey()
 
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: { defaultInput: true },
+      })
     })
 
     it('user options override defaults', () => {
@@ -615,7 +770,10 @@ describe('createProcedureUtils with options', () => {
 
       utils.queryKey({ input: { userInput: true } })
 
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { userInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: { userInput: true },
+      })
     })
 
     it('custom queryKey overrides default', () => {
@@ -647,7 +805,10 @@ describe('createProcedureUtils with options', () => {
       const options = utils.queryOptions() as any
 
       expect(options.staleTime).toBe(1000)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: { defaultInput: true },
+      })
     })
 
     it('user options override defaults', () => {
@@ -658,7 +819,10 @@ describe('createProcedureUtils with options', () => {
       const options = utils.queryOptions({ input: { userInput: true }, staleTime: 2000 }) as any
 
       expect(options.staleTime).toBe(2000)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { userInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: { userInput: true },
+      })
     })
 
     it('applies a modifier function', () => {
@@ -671,7 +835,10 @@ describe('createProcedureUtils with options', () => {
 
       expect(options.staleTime).toBe(1000)
       expect(queryOptions).toHaveBeenCalledWith({ input: 'per-call' })
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'query',
+        input: { defaultInput: true },
+      })
     })
 
     it('can use queryKey options to configure the query key', () => {
@@ -691,7 +858,10 @@ describe('createProcedureUtils with options', () => {
 
       utils.streamedKey()
 
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: { defaultInput: true },
+      })
     })
 
     it('user options override defaults', () => {
@@ -701,7 +871,10 @@ describe('createProcedureUtils with options', () => {
 
       utils.streamedKey({ input: { userInput: true } })
 
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: { userInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: { userInput: true },
+      })
     })
 
     it('applies a modifier function', () => {
@@ -724,7 +897,10 @@ describe('createProcedureUtils with options', () => {
       const options = utils.streamedOptions() as any
 
       expect(options.staleTime).toBe(1000)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: { defaultInput: true },
+      })
     })
 
     it('user options override defaults', () => {
@@ -735,7 +911,10 @@ describe('createProcedureUtils with options', () => {
       const options = utils.streamedOptions({ input: { userInput: true }, staleTime: 2000 }) as any
 
       expect(options.staleTime).toBe(2000)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: { userInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: { userInput: true },
+      })
     })
 
     it('applies a modifier function', () => {
@@ -748,7 +927,10 @@ describe('createProcedureUtils with options', () => {
 
       expect(options.staleTime).toBe(1000)
       expect(streamedOptions).toHaveBeenCalledWith({ input: 'per-call' })
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'streamed', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: { defaultInput: true },
+      })
     })
 
     it('can use streamedKey options to configure the query key', () => {
@@ -768,7 +950,10 @@ describe('createProcedureUtils with options', () => {
 
       utils.liveKey()
 
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: { defaultInput: true },
+      })
     })
 
     it('user options override defaults', () => {
@@ -778,7 +963,10 @@ describe('createProcedureUtils with options', () => {
 
       utils.liveKey({ input: { userInput: true } })
 
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: { userInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: { userInput: true },
+      })
     })
 
     it('applies a modifier function', () => {
@@ -801,7 +989,10 @@ describe('createProcedureUtils with options', () => {
       const options = utils.liveOptions() as any
 
       expect(options.staleTime).toBe(1000)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: { defaultInput: true },
+      })
     })
 
     it('user options override defaults', () => {
@@ -812,7 +1003,10 @@ describe('createProcedureUtils with options', () => {
       const options = utils.liveOptions({ input: { userInput: true }, staleTime: 2000 }) as any
 
       expect(options.staleTime).toBe(2000)
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: { userInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: { userInput: true },
+      })
     })
 
     it('applies a modifier function', () => {
@@ -825,7 +1019,10 @@ describe('createProcedureUtils with options', () => {
 
       expect(options.staleTime).toBe(1000)
       expect(liveOptions).toHaveBeenCalledWith({ input: 'per-call' })
-      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'live', input: { defaultInput: true } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: { defaultInput: true },
+      })
     })
 
     it('can use liveKey options to configure the query key', () => {
@@ -854,16 +1051,23 @@ describe('createProcedureUtils with options', () => {
         infiniteKey: { queryKey: ['default-infinite-key'] },
       })
 
-      expect(utils.infiniteKey({ input: () => ({}), initialPageParam: 0 })).toEqual(['default-infinite-key'])
+      expect(utils.infiniteKey({ input: () => ({}), initialPageParam: 0 })).toEqual([
+        'default-infinite-key',
+      ])
     })
 
     it('applies an modifier function', () => {
-      const infiniteKey = vi.fn((options: any) => ({ ...options, queryKey: ['function-infinite-key'] }))
+      const infiniteKey = vi.fn((options: any) => ({
+        ...options,
+        queryKey: ['function-infinite-key'],
+      }))
       const utils = new ProcedureUtils(['ping'], client, {
         infiniteKey,
       })
 
-      expect(utils.infiniteKey({ input: () => ({}), initialPageParam: 0 })).toEqual(['function-infinite-key'])
+      expect(utils.infiniteKey({ input: () => ({}), initialPageParam: 0 })).toEqual([
+        'function-infinite-key',
+      ])
       expect(infiniteKey).toHaveBeenCalledWith({ input: expect.any(Function), initialPageParam: 0 })
     })
   })
@@ -949,7 +1153,9 @@ describe('createProcedureUtils with options', () => {
         mutationKey: { mutationKey: ['default-mutation-key'] },
       })
 
-      expect(utils.mutationKey({ mutationKey: ['user-mutation-key'] })).toEqual(['user-mutation-key'])
+      expect(utils.mutationKey({ mutationKey: ['user-mutation-key'] })).toEqual([
+        'user-mutation-key',
+      ])
     })
 
     it('applies a modifier function', () => {
@@ -1037,7 +1243,10 @@ describe('createProcedureUtils with interceptors', () => {
       queryInterceptors: [queryInterceptor],
     })
 
-    const options = utils.queryOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
+    const options = utils.queryOptions({
+      input: { search: '__search__' },
+      context: { batch: '__batch__' },
+    })
 
     client.mockResolvedValueOnce('__output__')
     await expect(options.queryFn!({ signal } as any)).resolves.toBe('__output__')
@@ -1055,16 +1264,19 @@ describe('createProcedureUtils with interceptors', () => {
       },
       fnContext: { signal },
     })
-    expect(client).toHaveBeenCalledWith({ search: '__intercepted__' }, {
-      signal,
-      context: {
-        batch: '__intercepted_batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.queryKey,
-          type: 'query',
+    expect(client).toHaveBeenCalledWith(
+      { search: '__intercepted__' },
+      {
+        signal,
+        context: {
+          batch: '__intercepted_batch__',
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.queryKey,
+            type: 'query',
+          },
         },
       },
-    })
+    )
   })
 
   it('applies streamedInterceptors', async () => {
@@ -1085,12 +1297,17 @@ describe('createProcedureUtils with interceptors', () => {
       streamedInterceptors: [streamedInterceptor],
     })
 
-    const options = utils.streamedOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
+    const options = utils.streamedOptions({
+      input: { search: '__search__' },
+      context: { batch: '__batch__' },
+    })
 
     client.mockImplementationOnce(async function* () {
       yield '__1__'
     })
-    await expect(options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)).resolves.toEqual(['__1__'])
+    await expect(
+      options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any),
+    ).resolves.toEqual(['__1__'])
 
     expect(streamedInterceptor).toHaveBeenCalledTimes(1)
     expect(streamedInterceptor.mock.calls[0]![0]).toMatchObject({
@@ -1105,16 +1322,19 @@ describe('createProcedureUtils with interceptors', () => {
       },
       fnContext: { signal, client: queryClient, queryKey: options.queryKey },
     })
-    expect(client).toHaveBeenCalledWith({ search: '__intercepted__' }, {
-      signal,
-      context: {
-        batch: '__intercepted_batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.queryKey,
-          type: 'streamed',
+    expect(client).toHaveBeenCalledWith(
+      { search: '__intercepted__' },
+      {
+        signal,
+        context: {
+          batch: '__intercepted_batch__',
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.queryKey,
+            type: 'streamed',
+          },
         },
       },
-    })
+    )
   })
 
   it('applies liveInterceptors', async () => {
@@ -1135,12 +1355,17 @@ describe('createProcedureUtils with interceptors', () => {
       liveInterceptors: [liveInterceptor],
     })
 
-    const options = utils.liveOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
+    const options = utils.liveOptions({
+      input: { search: '__search__' },
+      context: { batch: '__batch__' },
+    })
 
     client.mockImplementationOnce(async function* () {
       yield '__1__'
     })
-    await expect(options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)).resolves.toEqual('__1__')
+    await expect(
+      options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any),
+    ).resolves.toEqual('__1__')
 
     expect(liveInterceptor).toHaveBeenCalledTimes(1)
     expect(liveInterceptor.mock.calls[0]![0]).toMatchObject({
@@ -1155,16 +1380,19 @@ describe('createProcedureUtils with interceptors', () => {
       },
       fnContext: { signal, client: queryClient, queryKey: options.queryKey },
     })
-    expect(client).toHaveBeenCalledWith({ search: '__intercepted__' }, {
-      signal,
-      context: {
-        batch: '__intercepted_batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.queryKey,
-          type: 'live',
+    expect(client).toHaveBeenCalledWith(
+      { search: '__intercepted__' },
+      {
+        signal,
+        context: {
+          batch: '__intercepted_batch__',
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.queryKey,
+            type: 'live',
+          },
         },
       },
-    })
+    )
   })
 
   it('applies infiniteInterceptors', async () => {
@@ -1186,14 +1414,16 @@ describe('createProcedureUtils with interceptors', () => {
     })
 
     const options = utils.infiniteOptions({
-      input: pageParam => ({ search: '__search__', pageParam }),
+      input: (pageParam) => ({ search: '__search__', pageParam }),
       context: { batch: '__batch__' },
       getNextPageParam: vi.fn(),
       initialPageParam: '__initialPageParam__',
     })
 
     client.mockResolvedValueOnce('__output__')
-    await expect(options.queryFn!({ signal, pageParam: '__pageParam__' } as any)).resolves.toBe('__output__')
+    await expect(options.queryFn!({ signal, pageParam: '__pageParam__' } as any)).resolves.toBe(
+      '__output__',
+    )
 
     expect(infiniteInterceptor).toHaveBeenCalledTimes(1)
     expect(infiniteInterceptor.mock.calls[0]![0]).toMatchObject({
@@ -1208,16 +1438,19 @@ describe('createProcedureUtils with interceptors', () => {
       },
       fnContext: { signal, pageParam: '__pageParam__' },
     })
-    expect(client).toHaveBeenCalledWith({ search: '__intercepted__', pageParam: '__intercepted_page__' }, {
-      signal,
-      context: {
-        batch: '__intercepted_batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.queryKey,
-          type: 'infinite',
+    expect(client).toHaveBeenCalledWith(
+      { search: '__intercepted__', pageParam: '__intercepted_page__' },
+      {
+        signal,
+        context: {
+          batch: '__intercepted_batch__',
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.queryKey,
+            type: 'infinite',
+          },
         },
       },
-    })
+    )
   })
 
   it('applies mutationInterceptors', async () => {
@@ -1273,8 +1506,12 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions({})).toBe(true)
     expect(isProcedureUtilsOptions({ prefix: 'planet' })).toBe(true)
     expect(isProcedureUtilsOptions({ serializer: new RPCJsonSerializer() })).toBe(true)
-    expect(isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] })).toBe(true)
-    expect(isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) })).toBe(true)
+    expect(
+      isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] }),
+    ).toBe(true)
+    expect(
+      isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) }),
+    ).toBe(true)
     expect(isProcedureUtilsOptions({ liveOptions: undefined, streamedKey: undefined })).toBe(true)
     expect(isProcedureUtilsOptions({ unknown: 'allowed' })).toBe(true)
   })
@@ -1339,7 +1576,11 @@ describe('mergeProcedureUtilsOptions', () => {
       { queryOptions: (options: any) => ({ ...options, retry: 2 }) },
     )
 
-    expect((merged.queryOptions as any)({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
+    expect((merged.queryOptions as any)({ enabled: true })).toEqual({
+      enabled: true,
+      staleTime: 1000,
+      retry: 2,
+    })
   })
 
   it('composes mixed object and function modifiers', () => {
@@ -1348,14 +1589,22 @@ describe('mergeProcedureUtilsOptions', () => {
       { queryOptions: (options: any) => ({ ...options, retry: 2 }) },
     )
 
-    expect((objectFirst.queryOptions as any)({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
+    expect((objectFirst.queryOptions as any)({ enabled: true })).toEqual({
+      enabled: true,
+      staleTime: 1000,
+      retry: 2,
+    })
 
     const functionFirst = mergeProcedureUtilsOptions<any, any, any, any>(
       { queryOptions: (options: any) => ({ ...options, staleTime: 1000 }) },
       { queryOptions: { retry: 2 } },
     )
 
-    expect((functionFirst.queryOptions as any)({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
+    expect((functionFirst.queryOptions as any)({ enabled: true })).toEqual({
+      enabled: true,
+      staleTime: 1000,
+      retry: 2,
+    })
   })
 
   it('lets an object override beat defaults of a function base, below per-call options', () => {

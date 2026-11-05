@@ -25,12 +25,12 @@ export function TopBar() {
     <div className="topbar">
       <div className="brand">
         <span className="dot" />
-        <a href="https://orpc.dev" target="_blank">orpc.dev</a>
+        <a href="https://orpc.dev" target="_blank">
+          orpc.dev
+        </a>
         mission console
       </div>
-      <div className="mission-time">
-        {`T+${pad(h)}:${pad(m)}:${pad(s)}`}
-      </div>
+      <div className="mission-time">{`T+${pad(h)}:${pad(m)}:${pad(s)}`}</div>
     </div>
   )
 }

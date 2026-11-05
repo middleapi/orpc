@@ -1,7 +1,14 @@
-import type { AnySchema, Context, ErrorMap, Lazyable, Procedure, ProcedureClientOptions } from '@orpc/server'
-import type { MaybeOptionalOptions } from '@orpc/shared'
 import { parseFormData } from '@orpc/openapi/helpers'
+import type {
+  AnySchema,
+  Context,
+  ErrorMap,
+  Lazyable,
+  Procedure,
+  ProcedureClientOptions,
+} from '@orpc/server'
 import { createProcedureClient } from '@orpc/server'
+import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 
 export interface ServerFormFunction {
@@ -14,20 +21,9 @@ export function createServerFormFunction<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 >(
-  procedure: Lazyable<Procedure<
-    TInitialContext,
-    any,
-    TInputSchema,
-    TOutputSchema,
-    TErrorMap
-  >>,
+  procedure: Lazyable<Procedure<TInitialContext, any, TInputSchema, TOutputSchema, TErrorMap>>,
   ...rest: MaybeOptionalOptions<
-    ProcedureClientOptions<
-      TInitialContext,
-      TOutputSchema,
-      TErrorMap,
-      object
-    >
+    ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, object>
   >
 ): ServerFormFunction {
   const options = resolveMaybeOptionalOptions(rest)

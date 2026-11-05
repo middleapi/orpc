@@ -1,18 +1,37 @@
 import type { ORPCError } from './error.ts'
-import type { Client, ClientContext, InferClientBodyInputs, InferClientBodyOutputs, InferClientContext, InferClientError, InferClientErrors, InferClientInputs, InferClientOutputs } from './types.ts'
+import type {
+  Client,
+  ClientContext,
+  InferClientBodyInputs,
+  InferClientBodyOutputs,
+  InferClientContext,
+  InferClientError,
+  InferClientErrors,
+  InferClientInputs,
+  InferClientOutputs,
+} from './types.ts'
 
 describe('client', () => {
-  const client: Client<{ cache?: boolean }, string, number, Error | ORPCError<'OVERRIDE', unknown>> = async (...args) => {
+  const client: Client<
+    { cache?: boolean },
+    string,
+    number,
+    Error | ORPCError<'OVERRIDE', unknown>
+  > = async (...args) => {
     const [input, options] = args
 
     expectTypeOf(input).toEqualTypeOf<string>()
-    expectTypeOf(options).toExtend<{ context?: { cache?: boolean }, signal?: AbortSignal } | undefined>()
+    expectTypeOf(options).toExtend<
+      { context?: { cache?: boolean }; signal?: AbortSignal } | undefined
+    >()
 
     return 123
   }
 
   it('just a function', () => {
-    expectTypeOf(client).toExtend<(input: string, options: { context?: ClientContext, signal?: AbortSignal }) => Promise<number>>()
+    expectTypeOf(client).toExtend<
+      (input: string, options: { context?: ClientContext; signal?: AbortSignal }) => Promise<number>
+    >()
   })
 
   it('infer correct input', () => {
@@ -56,7 +75,12 @@ describe('client', () => {
     })
 
     it('can call without args when both input and context are optional', () => {
-      const client = {} as Client<{ userId?: string }, undefined | { val: string }, { val: number }, Error>
+      const client = {} as Client<
+        { userId?: string },
+        undefined | { val: string },
+        { val: number },
+        Error
+      >
 
       client()
       client({ val: 'string' })
@@ -75,7 +99,9 @@ describe('client', () => {
   it('can reverse infer', () => {
     expectTypeOf<
       typeof client extends Client<infer C, infer I, infer O, infer E> ? [C, I, O, E] : never
-    >().toEqualTypeOf<[{ cache?: boolean }, string, number, Error | ORPCError<'OVERRIDE', unknown>]>()
+    >().toEqualTypeOf<
+      [{ cache?: boolean }, string, number, Error | ORPCError<'OVERRIDE', unknown>]
+    >()
   })
 })
 
@@ -149,6 +175,8 @@ describe('infer utilities', () => {
   })
 
   it('InferClientError', () => {
-    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<Error | ORPCError<'PING', unknown> | ORPCError<'NESTED_PING', unknown>>()
+    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<
+      Error | ORPCError<'PING', unknown> | ORPCError<'NESTED_PING', unknown>
+    >()
   })
 })

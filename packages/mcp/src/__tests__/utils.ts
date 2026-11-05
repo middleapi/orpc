@@ -1,6 +1,7 @@
-import type { McpRegistrar, McpRegistrarRegisterOptions } from '../registrar.ts'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { createMcpHandler, InMemoryTransport, McpServer } from '@modelcontextprotocol/server'
+
+import type { McpRegistrar, McpRegistrarRegisterOptions } from '../registrar.ts'
 
 export type ProtocolEra = 'legacy' | 'modern'
 
@@ -18,7 +19,10 @@ export function createTestServer(): McpServer {
 export async function createTestClient(
   era: ProtocolEra,
   registrar: McpRegistrar<any>,
-  { context, requestInit }: { context?: McpRegistrarRegisterOptions<any>['context'], requestInit?: RequestInit } = {},
+  {
+    context,
+    requestInit,
+  }: { context?: McpRegistrarRegisterOptions<any>['context']; requestInit?: RequestInit } = {},
 ): Promise<Client> {
   const createServer = async () => {
     const server = createTestServer()
@@ -37,15 +41,16 @@ export async function createTestClient(
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     await (await createServer()).connect(serverTransport)
     await client.connect(clientTransport)
-  }
-  else {
+  } else {
     const handler = createMcpHandler(createServer, { legacy: 'reject' })
     onTestFinished(() => handler.close())
 
-    await client.connect(new StreamableHTTPClientTransport(new URL('http://localhost/mcp'), {
-      fetch: (url, init) => handler.fetch(new Request(url, init)),
-      requestInit,
-    }))
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL('http://localhost/mcp'), {
+        fetch: (url, init) => handler.fetch(new Request(url, init)),
+        requestInit,
+      }),
+    )
   }
 
   return client

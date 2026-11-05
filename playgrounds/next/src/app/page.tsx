@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
+
 import { ChatRoom } from '@/components/chat-room'
 import { CreatePlanetForm } from '@/components/create-planet-form'
 import { PlanetTable } from '@/components/planet-table'
-import { TopBar } from '@/components/top-bar'
+import { PlanetTableSkeleton } from '@/components/planet-table-skeleton'
 import { ReferenceLinks } from '@/components/reference-links'
 import { ServerFunction } from '@/components/server-function'
-import { PlanetTableSkeleton } from '@/components/planet-table-skeleton'
+import { TopBar } from '@/components/top-bar'
 
 export default function Home() {
   return (

@@ -1,34 +1,49 @@
 {
   "name": "@orpc/openapi",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Generate OpenAPI specs from oRPC routers and serve OpenAPI-compliant APIs with end-to-end type safety",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "json-schema",
+    "openapi",
+    "orpc",
+    "rest",
+    "rpc",
+    "scalar",
+    "swagger",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/openapi"
   },
-  "keywords": [
-    "orpc",
-    "rpc",
-    "api",
-    "typescript",
-    "typesafe",
-    "openapi",
-    "swagger",
-    "scalar",
-    "json-schema",
-    "rest"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": [
     "./dist/extensions/route.js"
   ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./helpers": "./src/helpers/index.ts",
+    "./plugins": "./src/plugins/index.ts",
+    "./standard": "./src/adapters/standard/index.ts",
+    "./fetch": "./src/adapters/fetch/index.ts",
+    "./node": "./src/adapters/node/index.ts",
+    "./aws-lambda": "./src/adapters/aws-lambda/index.ts",
+    "./fastify": "./src/adapters/fastify/index.ts",
+    "./extensions/route": "./src/extensions/route.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -79,39 +94,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./helpers": "./src/helpers/index.ts",
-    "./plugins": "./src/plugins/index.ts",
-    "./standard": "./src/adapters/standard/index.ts",
-    "./fetch": "./src/adapters/fetch/index.ts",
-    "./node": "./src/adapters/node/index.ts",
-    "./aws-lambda": "./src/adapters/aws-lambda/index.ts",
-    "./fastify": "./src/adapters/fastify/index.ts",
-    "./extensions/route": "./src/extensions/route.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc && node ../../scripts/verify-dist.ts"
-  },
-  "peerDependencies": {
-    "@scalar/api-reference": ">=1.57.2",
-    "@types/swagger-ui": ">=5.32.0",
-    "swagger-ui": ">=5.32.6"
-  },
-  "peerDependenciesMeta": {
-    "@scalar/api-reference": {
-      "optional": true
-    },
-    "@types/swagger-ui": {
-      "optional": true
-    },
-    "swagger-ui": {
-      "optional": true
-    }
   },
   "dependencies": {
     "@openapi-spec/downgrader": "~0.6.0",
@@ -132,5 +116,21 @@
     "fastify": "^5.12.8",
     "swagger-ui": "^5.34.1",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@scalar/api-reference": ">=1.57.2",
+    "@types/swagger-ui": ">=5.32.0",
+    "swagger-ui": ">=5.32.6"
+  },
+  "peerDependenciesMeta": {
+    "@scalar/api-reference": {
+      "optional": true
+    },
+    "@types/swagger-ui": {
+      "optional": true
+    },
+    "swagger-ui": {
+      "optional": true
+    }
   }
 }

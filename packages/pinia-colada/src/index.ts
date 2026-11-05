@@ -29,9 +29,7 @@ export {
    */
   createRouterUtils as createORPCVueColadaUtils,
 } from './router-utils.ts'
-export {
-  createRouterUtils as createPiniaColadaUtils,
-} from './router-utils.ts'
+export { createRouterUtils as createPiniaColadaUtils } from './router-utils.ts'
 export { SharedUtils } from './shared-utils.ts'
 export type { SerializableStreamedQueryOptions } from './stream-query.ts'
 export * from './types.ts'
@@ -40,10 +38,6 @@ export {
   type OperationContext as PiniaColadaOperationContext,
 } from './types.ts'
 
-export type {
-  AnyNestedClient,
-} from '@orpc/client'
+export type { AnyNestedClient } from '@orpc/client'
 
-export type {
-  Public,
-} from '@orpc/shared'
+export type { Public } from '@orpc/shared'

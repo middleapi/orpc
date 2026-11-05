@@ -65,7 +65,7 @@ describe('setCookie', () => {
   it('should support custom encode function', () => {
     const headers = new Headers()
     setCookie(headers, 'test', 'value with spaces', {
-      encode: str => str.replace(/ /g, '_'),
+      encode: (str) => str.replace(/ /g, '_'),
     })
 
     expect(headers.get('Set-Cookie')).toContain('test=value_with_spaces')
@@ -110,9 +110,11 @@ describe('getCookie', () => {
     expect(getCookie(headers, 'test')).toBe('"quoted value"')
 
     // With custom decode option that removes quotes
-    expect(getCookie(headers, 'test', {
-      decode: (val: string) => val.replace(/^"|"$/g, ''),
-    })).toBe('quoted value')
+    expect(
+      getCookie(headers, 'test', {
+        decode: (val: string) => val.replace(/^"|"$/g, ''),
+      }),
+    ).toBe('quoted value')
   })
 
   it('should handle invalid cookie formats gracefully', () => {

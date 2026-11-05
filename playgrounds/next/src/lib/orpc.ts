@@ -1,10 +1,11 @@
-import type { router } from '@/routers'
-import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { createRouterUtils, StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
 import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import { BatchLinkPlugin, RetryLinkPlugin } from '@orpc/client/plugins'
+import type { RouterClient } from '@orpc/server'
+import { createRouterUtils, StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
+
+import type { router } from '@/routers'
 
 export interface ClientContext extends RetryLinkPluginContext {}
 
@@ -26,10 +27,12 @@ const link = new RPCLink({
   url: '/rpc',
   plugins: [
     new BatchLinkPlugin({
-      groups: [{
-        condition: () => true,
-        context: {},
-      }],
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
     }),
     new RetryLinkPlugin(),
   ],
@@ -46,7 +49,8 @@ const link = new RPCLink({
 /**
  * Fall back to a browser client when no SSR client is registered.
  */
-export const client: RouterClient<typeof router, ClientContext> = globalThis.$client ?? createORPCClient(link)
+export const client: RouterClient<typeof router, ClientContext> =
+  globalThis.$client ?? createORPCClient(link)
 
 export const orpc = createRouterUtils(client, {
   plugins: [new StreamQuerySSRUtilsPlugin()],

@@ -1,6 +1,6 @@
 import type { InitialInputSchema, InitialOutputSchema } from './builder.ts'
-import type { ErrorMap } from './error.ts'
 import type { MergedErrorMap } from './error-utils.ts'
+import type { ErrorMap } from './error.ts'
 import type { MetaPlugin } from './meta.ts'
 import type { ProcedureContract } from './procedure.ts'
 import type { AnySchema, MergedSchema } from './schema.ts'
@@ -14,7 +14,7 @@ import type { AnySchema, MergedSchema } from './schema.ts'
 export interface ProcedureContractBuilderWithInput<
   TInputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContract<TInputSchema, InitialOutputSchema, TErrorMap> {
+> extends ProcedureContract<TInputSchema, InitialOutputSchema, TErrorMap> {
   /**
    * Applies metadata plugins to contracts built from this builder.
    *
@@ -61,7 +61,7 @@ export interface ProcedureContractBuilderWithInput<
 export interface ProcedureContractBuilderWithOutput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContract<InitialInputSchema, TOutputSchema, TErrorMap> {
+> extends ProcedureContract<InitialInputSchema, TOutputSchema, TErrorMap> {
   /**
    * Applies metadata plugins to contracts built from this builder.
    *
@@ -110,7 +110,7 @@ export interface ProcedureContractBuilderWithInputOutput<
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContract<TInputSchema, TOutputSchema, TErrorMap> {
+> extends ProcedureContract<TInputSchema, TOutputSchema, TErrorMap> {
   /**
    * Applies metadata plugins to contracts built from this builder.
    *
@@ -127,7 +127,11 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   errors<T extends ErrorMap>(
     errors: T,
-  ): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, T>>
+  ): ProcedureContractBuilderWithInputOutput<
+    TInputSchema,
+    TOutputSchema,
+    MergedErrorMap<TErrorMap, T>
+  >
 
   /**
    * Adds an additional input schema, merged with the previously defined one.
@@ -136,7 +140,11 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   input<T extends AnySchema>(
     schema: T,
-  ): ProcedureContractBuilderWithInputOutput<MergedSchema<T, TInputSchema>, TOutputSchema, TErrorMap>
+  ): ProcedureContractBuilderWithInputOutput<
+    MergedSchema<T, TInputSchema>,
+    TOutputSchema,
+    TErrorMap
+  >
 
   /**
    * Adds an additional output schema, merged with the previously defined one.
@@ -145,5 +153,9 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   output<T extends AnySchema>(
     schema: T,
-  ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<T, TOutputSchema>, TErrorMap>
+  ): ProcedureContractBuilderWithInputOutput<
+    TInputSchema,
+    MergedSchema<T, TOutputSchema>,
+    TErrorMap
+  >
 }

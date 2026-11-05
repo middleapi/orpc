@@ -1,32 +1,39 @@
 {
   "name": "@orpc/cloudflare",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Cloudflare integration for oRPC: Durable Object pub/sub and locking, Workers rate limiting, and Workers Traces adapters",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "cloudflare",
+    "cloudflare-workers",
+    "durable-objects",
+    "lock",
+    "observability",
+    "orpc",
+    "pubsub",
+    "ratelimit",
+    "tracing",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/cloudflare"
   },
-  "keywords": [
-    "orpc",
-    "cloudflare",
-    "cloudflare-workers",
-    "durable-objects",
-    "ratelimit",
-    "lock",
-    "pubsub",
-    "tracing",
-    "observability",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -37,13 +44,6 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepare": "wrangler types",
     "prepack": "tsc -p tsconfig.build.json && node ../../scripts/verify-dist.ts",

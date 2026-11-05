@@ -1,6 +1,15 @@
 import type { Schema } from '@orpc/contract'
-import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, DecoratedProcedure, ORPCErrorConstructorMap } from '@orpc/server'
+import type {
+  Builder,
+  BuilderWithInput,
+  BuilderWithInputOutput,
+  BuilderWithMiddlewares,
+  BuilderWithOutput,
+  DecoratedProcedure,
+  ORPCErrorConstructorMap,
+} from '@orpc/server'
 import { z } from 'zod'
+
 import './effect.ts'
 import '@orpc/server/extensions/callable' // not sure why, but we need import this to make type work
 
@@ -11,20 +20,22 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 describe('adds .effect into Builder', async () => {
   const builder = {} as Builder<{ auth: boolean }, typeof errorMap>
 
   it('simple', () => {
-    expectTypeOf(builder.effect(function* ({ errors, context }, input) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-      expectTypeOf(input).toEqualTypeOf<unknown>()
-      expectTypeOf(context).toEqualTypeOf<{ auth: boolean }>()
+    expectTypeOf(
+      builder.effect(function* ({ errors, context }, input) {
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+        expectTypeOf(input).toEqualTypeOf<unknown>()
+        expectTypeOf(context).toEqualTypeOf<{ auth: boolean }>()
 
-      return 'out'
-    })).toEqualTypeOf<
+        return 'out'
+      }),
+    ).toEqualTypeOf<
       DecoratedProcedure<
         { auth: boolean },
         object,
@@ -37,16 +48,22 @@ describe('adds .effect into Builder', async () => {
 })
 
 describe('adds .effect into BuilderWithMiddlewares', async () => {
-  const builder = {} as BuilderWithMiddlewares<{ auth: boolean }, { extra: boolean }, typeof errorMap>
+  const builder = {} as BuilderWithMiddlewares<
+    { auth: boolean },
+    { extra: boolean },
+    typeof errorMap
+  >
 
   it('simple', () => {
-    expectTypeOf(builder.effect(function* ({ errors, context }, input) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-      expectTypeOf(input).toEqualTypeOf<unknown>()
-      expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
+    expectTypeOf(
+      builder.effect(function* ({ errors, context }, input) {
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+        expectTypeOf(input).toEqualTypeOf<unknown>()
+        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
 
-      return 'out'
-    })).toEqualTypeOf<
+        return 'out'
+      }),
+    ).toEqualTypeOf<
       DecoratedProcedure<
         { auth: boolean },
         { extra: boolean },
@@ -59,16 +76,23 @@ describe('adds .effect into BuilderWithMiddlewares', async () => {
 })
 
 describe('adds .effect into BuilderWithInput', async () => {
-  const builder = {} as BuilderWithInput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof errorMap>
+  const builder = {} as BuilderWithInput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof errorMap
+  >
 
   it('simple', () => {
-    expectTypeOf(builder.effect(function* ({ errors, context }, input) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-      expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
-      expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
+    expectTypeOf(
+      builder.effect(function* ({ errors, context }, input) {
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+        expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
+        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
 
-      return 'out'
-    })).toEqualTypeOf<
+        return 'out'
+      }),
+    ).toEqualTypeOf<
       DecoratedProcedure<
         { auth: boolean },
         { extra: boolean },
@@ -81,16 +105,23 @@ describe('adds .effect into BuilderWithInput', async () => {
 })
 
 describe('adds .effect into BuilderWithOutput', async () => {
-  const builder = {} as BuilderWithOutput<{ auth: boolean }, { extra: boolean }, typeof schema2, typeof errorMap>
+  const builder = {} as BuilderWithOutput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema2,
+    typeof errorMap
+  >
 
   it('simple', () => {
-    expectTypeOf(builder.effect(function* ({ errors, context }, input) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-      expectTypeOf(input).toEqualTypeOf<unknown>()
-      expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
+    expectTypeOf(
+      builder.effect(function* ({ errors, context }, input) {
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+        expectTypeOf(input).toEqualTypeOf<unknown>()
+        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
 
-      return { schema2: 123 }
-    })).toEqualTypeOf<
+        return { schema2: 123 }
+      }),
+    ).toEqualTypeOf<
       DecoratedProcedure<
         { auth: boolean },
         { extra: boolean },
@@ -108,16 +139,24 @@ describe('adds .effect into BuilderWithOutput', async () => {
 })
 
 describe('adds .effect into BuilderWithInputOutput', async () => {
-  const builder = {} as BuilderWithInputOutput<{ auth: boolean }, { extra: boolean }, typeof schema1, typeof schema2, typeof errorMap>
+  const builder = {} as BuilderWithInputOutput<
+    { auth: boolean },
+    { extra: boolean },
+    typeof schema1,
+    typeof schema2,
+    typeof errorMap
+  >
 
   it('simple', () => {
-    expectTypeOf(builder.effect(function* ({ errors, context }, input) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-      expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
-      expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
+    expectTypeOf(
+      builder.effect(function* ({ errors, context }, input) {
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+        expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
+        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean }>()
 
-      return { schema2: 123 }
-    })).toEqualTypeOf<
+        return { schema2: 123 }
+      }),
+    ).toEqualTypeOf<
       DecoratedProcedure<
         { auth: boolean },
         { extra: boolean },

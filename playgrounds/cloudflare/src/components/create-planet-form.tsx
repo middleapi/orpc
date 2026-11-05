@@ -1,7 +1,8 @@
-import { orpc } from '../lib/orpc'
 import { getIssueMessage } from '@orpc/openapi/helpers'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+
+import { orpc } from '../lib/orpc'
 
 export function CreatePlanetForm() {
   const queryClient = useQueryClient()
@@ -50,13 +51,17 @@ export function CreatePlanetForm() {
         }}
       >
         <div className="field">
-          <label className="field-label" htmlFor="planet-name">Name</label>
+          <label className="field-label" htmlFor="planet-name">
+            Name
+          </label>
           <input id="planet-name" type="text" name="name" required />
           <p className="field-error">{getIssueMessage(error, 'name')}</p>
         </div>
 
         <div className="field">
-          <label className="field-label" htmlFor="planet-description">Description</label>
+          <label className="field-label" htmlFor="planet-description">
+            Description
+          </label>
           <textarea id="planet-description" name="description" />
         </div>
 
@@ -69,9 +74,11 @@ export function CreatePlanetForm() {
               type="file"
               name="image"
               accept="image/*"
-              onChange={e => setFileName(e.target.files?.[0]?.name ?? null)}
+              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
             />
-            <label htmlFor="planet-image" className="btn btn-ghost">Attach file</label>
+            <label htmlFor="planet-image" className="btn btn-ghost">
+              Attach file
+            </label>
             <span className="file-name">{fileName ?? 'No file selected'}</span>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import type { Public } from '@orpc/shared'
-import type { SharedUtils } from './shared-utils.ts'
 import { ref } from 'vue'
+
+import type { SharedUtils } from './shared-utils.ts'
 
 describe('SharedUtils', () => {
   const utils = {} as Public<SharedUtils<{ a: { b: { c: number } } }>>

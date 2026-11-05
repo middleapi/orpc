@@ -1,9 +1,10 @@
-import type { PartialDeep, Public } from '@orpc/shared'
-import type { SerializableStreamedQueryOptions } from './stream-query.ts'
-import type { OperationType } from './types.ts'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { PartialDeep, Public } from '@orpc/shared'
 import { stringifyJSON } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
+
+import type { SerializableStreamedQueryOptions } from './stream-query.ts'
+import type { OperationType } from './types.ts'
 
 export interface OperationKeyPrefixOptions {
   /**
@@ -30,7 +31,10 @@ export type OperationKeyOptions<TType extends OperationType, TInput> = Operation
   fnOptions?: (TType extends 'streamed' ? SerializableStreamedQueryOptions : never) | undefined
 }
 
-type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> & {
+type OperationKeyContent<TType extends OperationType, TInput> = Omit<
+  OperationKeyOptions<TType, TInput>,
+  keyof OperationKeyBaseOptions
+> & {
   /**
    * Set in place of `input` when the operation is disabled with `skipToken`,
    * because query key hashers drop symbols.
@@ -45,9 +49,9 @@ type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKe
   inputMeta?: Record<string, string[]> | undefined
 }
 
-export type OperationKey<TType extends OperationType, TInput>
-  = | [path: string[], options: OperationKeyContent<TType, TInput>]
-    | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
+export type OperationKey<TType extends OperationType, TInput> =
+  | [path: string[], options: OperationKeyContent<TType, TInput>]
+  | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
 
 const defaultSerializer = /* @__PURE__ */ new RPCJsonSerializer()
 
@@ -64,14 +68,16 @@ export function generateOperationKey<TType extends OperationType, TInput>(
   options: OperationKeyOptions<TType, TInput> = {},
 ): OperationKey<TType, TInput> {
   return [
-    ...options.prefix !== undefined ? [options.prefix] : [],
+    ...(options.prefix !== undefined ? [options.prefix] : []),
     path,
     {
-      ...options.input === skipToken
+      ...(options.input === skipToken
         ? { skipToken: true }
-        : options.input !== undefined ? serializeInput(options.serializer ?? defaultSerializer, options.input) : {},
-      ...options.type !== undefined ? { type: options.type } : {},
-      ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
+        : options.input !== undefined
+          ? serializeInput(options.serializer ?? defaultSerializer, options.input)
+          : {}),
+      ...(options.type !== undefined ? { type: options.type } : {}),
+      ...(options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {}),
     },
   ] as OperationKey<TType, TInput>
 }
@@ -86,7 +92,7 @@ function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown) {
   const inputMeta: Record<string, string[]> = {}
 
   for (const [type, ...segments] of meta) {
-    (inputMeta[stringifyJSON(segments)] ??= []).push(type)
+    ;(inputMeta[stringifyJSON(segments)] ??= []).push(type)
   }
 
   return { input: json, inputMeta }

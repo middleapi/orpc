@@ -3,11 +3,18 @@
  * and exclusively use absolute JSON pointers for `$ref` values.
  */
 
+import { get, isDeepEqual, omit, toArray } from '@orpc/shared'
+
+import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants.ts'
+import {
+  decodeJsonPointerSegment,
+  encodeJsonPointerSegment,
+  hoistRecursiveRefToDef,
+  mapJsonSchemaRefs,
+  resolveJsonSchemaRootLocalRef,
+} from './ref-utils.ts'
 import type { JsonSchema } from './types.ts'
 import type { JsonArraySchema, JsonObjectSchema } from './utils.ts'
-import { get, isDeepEqual, omit, toArray } from '@orpc/shared'
-import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants.ts'
-import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef } from './ref-utils.ts'
 import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils.ts'
 
 /**
@@ -43,7 +50,10 @@ function promoteJsonSchemaDefs(
         : ['#/$defs', encodeJsonPointerSegment(newName), ...segments].join('/')
     }
 
-    if (ref.startsWith('#/') && get(rootBody, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined) {
+    if (
+      ref.startsWith('#/') &&
+      get(rootBody, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined
+    ) {
       return `${basePath}/${ref.slice(2)}`
     }
 
@@ -68,7 +78,11 @@ function promoteJsonSchemaDefs(
         const body = mapJsonSchemaRefs(def, mapRef)
         promoted.set(name, body)
 
-        if (renameMap.has(name) || !mergedDefs.has(name) || isDeepEqual(mergedDefs.get(name), body)) {
+        if (
+          renameMap.has(name) ||
+          !mergedDefs.has(name) ||
+          isDeepEqual(mergedDefs.get(name), body)
+        ) {
           continue
         }
 
@@ -108,9 +122,11 @@ export function combineJsonSchemasWithComposition(
   for (let i = 0; i < schemas.length; i++) {
     const schema = schemas[i]!
 
-    compositionBranches.push(typeof schema === 'boolean'
-      ? schema
-      : promoteJsonSchemaDefs(schema, mergedDefs, `#/${keyword}/${i}`))
+    compositionBranches.push(
+      typeof schema === 'boolean'
+        ? schema
+        : promoteJsonSchemaDefs(schema, mergedDefs, `#/${keyword}/${i}`),
+    )
   }
 
   const result: Exclude<JsonSchema, boolean> = { [keyword]: compositionBranches }
@@ -127,7 +143,10 @@ export type JsonObjectSchemaEntry = [name: string, schema: JsonSchema, optional:
  * Combines object property entries back into a single object schema.
  * When given, `additionalProperties` constrains every property the entries do not name.
  */
-export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[], additionalProperties?: JsonSchema): JsonObjectSchema {
+export function combineJsonObjectSchemaEntries(
+  entries: JsonObjectSchemaEntry[],
+  additionalProperties?: JsonSchema,
+): JsonObjectSchema {
   const properties = new Map<string, JsonSchema>()
   const required: string[] = []
   const mergedDefs = new Map<string, JsonSchema>()
@@ -137,9 +156,16 @@ export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[],
       required.push(name)
     }
 
-    properties.set(name, typeof propertySchema === 'boolean'
-      ? propertySchema
-      : promoteJsonSchemaDefs(propertySchema, mergedDefs, `#/properties/${encodeJsonPointerSegment(name)}`))
+    properties.set(
+      name,
+      typeof propertySchema === 'boolean'
+        ? propertySchema
+        : promoteJsonSchemaDefs(
+            propertySchema,
+            mergedDefs,
+            `#/properties/${encodeJsonPointerSegment(name)}`,
+          ),
+    )
   }
 
   const schema: JsonObjectSchema = {
@@ -152,9 +178,10 @@ export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[],
   }
 
   if (additionalProperties !== undefined) {
-    schema.additionalProperties = typeof additionalProperties === 'boolean'
-      ? additionalProperties
-      : promoteJsonSchemaDefs(additionalProperties, mergedDefs, '#/additionalProperties')
+    schema.additionalProperties =
+      typeof additionalProperties === 'boolean'
+        ? additionalProperties
+        : promoteJsonSchemaDefs(additionalProperties, mergedDefs, '#/additionalProperties')
   }
 
   if (mergedDefs.size > 0) {
@@ -167,13 +194,19 @@ export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[],
 /**
  * Parses an object schema, or a composition of object schemas, into property entries.
  */
-export function extractJsonObjectSchemaEntries(schema: JsonSchema): JsonObjectSchemaEntry[] | undefined {
+export function extractJsonObjectSchemaEntries(
+  schema: JsonSchema,
+): JsonObjectSchemaEntry[] | undefined {
   schema = hoistRecursiveRefToDef(schema)
   if (typeof schema !== 'object') {
     return undefined
   }
 
-  const result = extractJsonObjectSchemaEntriesInternal(omit(schema, ['$defs']), schema.$defs, new Set())
+  const result = extractJsonObjectSchemaEntriesInternal(
+    omit(schema, ['$defs']),
+    schema.$defs,
+    new Set(),
+  )
 
   if (!result.objectLike) {
     return undefined
@@ -187,7 +220,9 @@ export function extractJsonObjectSchemaEntries(schema: JsonSchema): JsonObjectSc
  * with the root `$defs` attached so it can be passed to {@link combineJsonObjectSchemaEntries}.
  * Composition branches are not inspected, since their keyword only constrains that branch.
  */
-export function extractJsonObjectSchemaAdditionalProperties(schema: JsonSchema): JsonSchema | undefined {
+export function extractJsonObjectSchemaAdditionalProperties(
+  schema: JsonSchema,
+): JsonSchema | undefined {
   schema = hoistRecursiveRefToDef(schema)
   if (typeof schema !== 'object') {
     return undefined
@@ -202,7 +237,15 @@ export function extractJsonObjectSchemaAdditionalProperties(schema: JsonSchema):
   return withRootDefs(resolved.additionalProperties, schema.$defs)
 }
 
-const JSON_SCHEMA_OBJECT_KEYWORDS = ['properties', 'patternProperties', 'additionalProperties', 'required', 'propertyNames', 'minProperties', 'maxProperties']
+const JSON_SCHEMA_OBJECT_KEYWORDS = [
+  'properties',
+  'patternProperties',
+  'additionalProperties',
+  'required',
+  'propertyNames',
+  'minProperties',
+  'maxProperties',
+]
 
 /**
  * Returns true when an object can stand for every value the schema describes: the schema constrains objects,
@@ -210,7 +253,11 @@ const JSON_SCHEMA_OBJECT_KEYWORDS = ['properties', 'patternProperties', 'additio
  * Unlike {@link extractJsonObjectSchemaEntries}, an unconstrained schema counts as object-like.
  */
 export function isJsonObjectLikeSchema(schema: JsonSchema): boolean {
-  return isJsonObjectLikeSchemaInternal(schema, typeof schema === 'object' ? schema.$defs : undefined, new Set())
+  return isJsonObjectLikeSchemaInternal(
+    schema,
+    typeof schema === 'object' ? schema.$defs : undefined,
+    new Set(),
+  )
 }
 
 function isJsonObjectLikeSchemaInternal(
@@ -237,7 +284,7 @@ function isJsonObjectLikeSchemaInternal(
     return resolved.type === 'object'
   }
 
-  if (JSON_SCHEMA_OBJECT_KEYWORDS.some(keyword => keyword in resolved)) {
+  if (JSON_SCHEMA_OBJECT_KEYWORDS.some((keyword) => keyword in resolved)) {
     return true
   }
 
@@ -245,7 +292,7 @@ function isJsonObjectLikeSchemaInternal(
     const members = resolved[keyword]
 
     if (Array.isArray(members) && members.length > 0) {
-      return members.every(member => isJsonObjectLikeSchemaInternal(member, $defs, followedRefs))
+      return members.every((member) => isJsonObjectLikeSchemaInternal(member, $defs, followedRefs))
     }
   }
 
@@ -274,11 +321,16 @@ function extractJsonObjectSchemaEntriesInternal(
     const resolved = resolveJsonSchemaRootLocalRef(schema, $defs)
 
     if (resolved !== schema) {
-      return extractJsonObjectSchemaEntriesInternal(resolved, $defs, new Set(resolvingRefs).add(schema.$ref))
+      return extractJsonObjectSchemaEntriesInternal(
+        resolved,
+        $defs,
+        new Set(resolvingRefs).add(schema.$ref),
+      )
     }
   }
 
-  const sources: Array<{ entries: JsonObjectSchemaEntry[], source: JsonObjectSchemaEntrySource }> = []
+  const sources: Array<{ entries: JsonObjectSchemaEntry[]; source: JsonObjectSchemaEntrySource }> =
+    []
 
   if (schema.properties) {
     sources.push({
@@ -293,10 +345,11 @@ function extractJsonObjectSchemaEntriesInternal(
     })
   }
 
-  let objectLike = schema.type === 'object'
-    || schema.properties !== undefined
-    || schema.required !== undefined
-    || schema.additionalProperties !== undefined
+  let objectLike =
+    schema.type === 'object' ||
+    schema.properties !== undefined ||
+    schema.required !== undefined ||
+    schema.additionalProperties !== undefined
 
   for (const keyword of ['anyOf', 'oneOf', 'allOf'] as const) {
     const branches = schema[keyword]
@@ -305,9 +358,11 @@ function extractJsonObjectSchemaEntriesInternal(
       continue
     }
 
-    const branchResults = branches.map(branch => extractJsonObjectSchemaEntriesInternal(branch, $defs, resolvingRefs))
+    const branchResults = branches.map((branch) =>
+      extractJsonObjectSchemaEntriesInternal(branch, $defs, resolvingRefs),
+    )
 
-    if (branchResults.some(result => !result.objectLike)) {
+    if (branchResults.some((result) => !result.objectLike)) {
       return { entries: [], objectLike: false }
     }
 
@@ -319,8 +374,7 @@ function extractJsonObjectSchemaEntriesInternal(
 
         if (entries) {
           entries.push(entry)
-        }
-        else {
+        } else {
           entriesByName.set(entry[0], [entry])
         }
       }
@@ -329,13 +383,14 @@ function extractJsonObjectSchemaEntriesInternal(
     objectLike = true
     sources.push({
       entries: Array.from(entriesByName.entries()).map(([name, entries]) => {
-        const schemas = deduplicateJsonSchemas(entries.map(entry => entry[1]))
-        const required = keyword === 'allOf'
-          ? entries.some(entry => !entry[2])
-          : branchResults.every((result) => {
-              const entry = result.entries.find(item => item[0] === name)
-              return entry !== undefined && !entry[2]
-            })
+        const schemas = deduplicateJsonSchemas(entries.map((entry) => entry[1]))
+        const required =
+          keyword === 'allOf'
+            ? entries.some((entry) => !entry[2])
+            : branchResults.every((result) => {
+                const entry = result.entries.find((item) => item[0] === name)
+                return entry !== undefined && !entry[2]
+              })
 
         return [
           name,
@@ -351,7 +406,10 @@ function extractJsonObjectSchemaEntriesInternal(
     })
   }
 
-  const sourceEntries = new Map<string, Partial<Record<JsonObjectSchemaEntrySource, JsonObjectSchemaEntry>>>()
+  const sourceEntries = new Map<
+    string,
+    Partial<Record<JsonObjectSchemaEntrySource, JsonObjectSchemaEntry>>
+  >()
 
   for (const { entries, source } of sources) {
     for (const entry of entries) {
@@ -359,8 +417,7 @@ function extractJsonObjectSchemaEntriesInternal(
 
       if (existing) {
         existing[source] = entry
-      }
-      else {
+      } else {
         sourceEntries.set(entry[0], { [source]: entry })
       }
     }
@@ -368,18 +425,19 @@ function extractJsonObjectSchemaEntriesInternal(
 
   return {
     entries: Array.from(sourceEntries.entries()).map(([name, entries]) => {
-      const schemas = deduplicateJsonSchemas([
-        entries.direct?.[1],
-        entries.allOf?.[1],
-        entries.anyOf?.[1],
-        entries.oneOf?.[1],
-      ].filter(schema => schema !== undefined))
+      const schemas = deduplicateJsonSchemas(
+        [entries.direct?.[1], entries.allOf?.[1], entries.anyOf?.[1], entries.oneOf?.[1]].filter(
+          (schema) => schema !== undefined,
+        ),
+      )
 
       return [
         name,
         schemas.length === 1 ? schemas[0]! : { allOf: schemas },
-        !schema.required?.includes(name)
-        && [entries.allOf, entries.anyOf, entries.oneOf].every(entry => entry === undefined || entry[2]),
+        !schema.required?.includes(name) &&
+          [entries.allOf, entries.anyOf, entries.oneOf].every(
+            (entry) => entry === undefined || entry[2],
+          ),
       ] satisfies JsonObjectSchemaEntry
     }),
     objectLike,
@@ -409,7 +467,10 @@ function flattenJsonUnionSchemaInternal(
     const resolved = resolveJsonSchemaRootLocalRef(schema)
 
     if (resolved !== schema) {
-      const result = flattenJsonUnionSchemaInternal(resolved, new Set(resolvingRefs).add(schema.$ref))
+      const result = flattenJsonUnionSchemaInternal(
+        resolved,
+        new Set(resolvingRefs).add(schema.$ref),
+      )
       if (result.length > 1) {
         return result
       }
@@ -445,7 +506,9 @@ function flattenJsonUnionSchemaInternal(
 /**
  * Matches a union made of a single item schema and its array form.
  */
-export function matchArrayableJsonSchema(schema: JsonSchema): undefined | [itemSchema: JsonSchema, arraySchema: JsonArraySchema] {
+export function matchArrayableJsonSchema(
+  schema: JsonSchema,
+): undefined | [itemSchema: JsonSchema, arraySchema: JsonArraySchema] {
   const schemas = flattenJsonUnionSchema(schema)
 
   if (schemas.length !== 2) {
@@ -458,16 +521,18 @@ export function matchArrayableJsonSchema(schema: JsonSchema): undefined | [itemS
   }
 
   const items1 = arraySchema.items ?? true
-  const items2 = schemas.find(s => s !== arraySchema) as JsonSchema
+  const items2 = schemas.find((s) => s !== arraySchema) as JsonSchema
 
   const logicItem1: JsonSchema = Object.fromEntries(
-    Object.entries(ensureJsonSchemaObject(items1))
-      .filter(([key]) => JSON_SCHEMA_LOGIC_KEYWORDS.has(key)),
+    Object.entries(ensureJsonSchemaObject(items1)).filter(([key]) =>
+      JSON_SCHEMA_LOGIC_KEYWORDS.has(key),
+    ),
   )
 
   const logicItem2: JsonSchema = Object.fromEntries(
-    Object.entries(ensureJsonSchemaObject(items2))
-      .filter(([key]) => JSON_SCHEMA_LOGIC_KEYWORDS.has(key)),
+    Object.entries(ensureJsonSchemaObject(items2)).filter(([key]) =>
+      JSON_SCHEMA_LOGIC_KEYWORDS.has(key),
+    ),
   )
 
   if (!isDeepEqual(logicItem1, logicItem2)) {
@@ -481,7 +546,7 @@ export function deduplicateJsonSchemas(schemas: JsonSchema[]): JsonSchema[] {
   const result: JsonSchema[] = []
 
   for (const schema of schemas) {
-    if (result.some(i => isDeepEqual(i, schema))) {
+    if (result.some((i) => isDeepEqual(i, schema))) {
       continue
     }
 
@@ -491,7 +556,10 @@ export function deduplicateJsonSchemas(schemas: JsonSchema[]): JsonSchema[] {
   return result
 }
 
-function withRootDefs(schema: JsonSchema, $defs: Record<string, JsonSchema> | undefined): JsonSchema {
+function withRootDefs(
+  schema: JsonSchema,
+  $defs: Record<string, JsonSchema> | undefined,
+): JsonSchema {
   if (typeof schema === 'boolean' || !$defs) {
     return schema
   }

@@ -1,28 +1,36 @@
 {
   "name": "@orpc/evlog",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Evlog integration for oRPC: wide-event logging for typesafe APIs",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "evlog",
+    "logging",
+    "observability",
+    "orpc",
+    "typescript",
+    "wide-events"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/evlog"
   },
-  "keywords": [
-    "orpc",
-    "evlog",
-    "logging",
-    "wide-events",
-    "observability",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./node": "./src/adapters/node.ts"
+  },
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
@@ -38,19 +46,8 @@
       }
     }
   },
-  "exports": {
-    "./package.json": "./package.json",
-    ".": "./src/index.ts",
-    "./node": "./src/adapters/node.ts"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "prepack": "tsc && node ../../scripts/verify-dist.ts"
-  },
-  "peerDependencies": {
-    "evlog": ">=2.18.1"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -60,5 +57,8 @@
   },
   "devDependencies": {
     "evlog": "^2.34.0"
+  },
+  "peerDependencies": {
+    "evlog": ">=2.18.1"
   }
 }

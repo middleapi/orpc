@@ -1,10 +1,11 @@
 import type { AnyMetaPlugin, ErrorMap } from '@orpc/contract'
-import type { AnyMiddleware } from './middleware.ts'
 import { setHiddenMetaPlugins } from '@orpc/contract'
 import * as ContractModule from '@orpc/contract'
 import z from 'zod'
-import { Procedure } from './procedure.ts'
+
+import type { AnyMiddleware } from './middleware.ts'
 import { DecoratedProcedure } from './procedure-decorated.ts'
+import { Procedure } from './procedure.ts'
 
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')
@@ -16,19 +17,19 @@ beforeEach(() => {
 describe('decoratedProcedure', () => {
   const procedure = new DecoratedProcedure({
     errorMap: {
-      BASE: { },
+      BASE: {},
     },
     inputSchemas: [z.object({})],
     outputSchemas: [z.object({})],
     meta: { base: true },
-    metaPlugins: [{ name: 'test1', init: m => m }],
+    metaPlugins: [{ name: 'test1', init: (m) => m }],
     orderedMiddlewares: [],
     handler: async () => {},
   })
 
   const metaPlugin: AnyMetaPlugin = {
     name: 'test2',
-    init: m => ({ ...m, metaPlugin: true }),
+    init: (m) => ({ ...m, metaPlugin: true }),
   }
 
   it('is a procedure', () => {
@@ -65,10 +66,7 @@ describe('decoratedProcedure', () => {
       expect(applied).not.toBe(procedure)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledOnce()
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
-        procedure['~orpc'].errorMap,
-        errors,
-      )
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(procedure['~orpc'].errorMap, errors)
 
       expect(applied['~orpc']).toEqual({
         ...procedure['~orpc'],
@@ -88,10 +86,7 @@ describe('decoratedProcedure', () => {
       expect(applied).not.toBe(procedure)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledOnce()
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
-        procedure['~orpc'].errorMap,
-        errors,
-      )
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(procedure['~orpc'].errorMap, errors)
 
       expect(resolveMetaPluginsSpy).toHaveBeenCalledOnce()
       expect(resolveMetaPluginsSpy).toHaveBeenCalledWith(

@@ -1,4 +1,12 @@
-import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor.ts'
+import {
+  intercept,
+  onAsyncIteratorObjectError,
+  onError,
+  onFinish,
+  onReadableStreamError,
+  onStart,
+  onSuccess,
+} from './interceptor.ts'
 import { promiseWithResolvers } from './promise.ts'
 
 describe('intercept', () => {
@@ -16,10 +24,7 @@ describe('intercept', () => {
       interceptor2.mockReturnValueOnce('__interceptor2__')
 
       const result = await intercept(
-        [
-          interceptor1,
-          interceptor2,
-        ],
+        [interceptor1, interceptor2],
         {
           foo: 'bar',
         },
@@ -52,10 +57,7 @@ describe('intercept', () => {
       interceptor2.mockReturnValueOnce(Promise.resolve('__interceptor2__'))
 
       const result = await intercept(
-        [
-          interceptor1,
-          interceptor2,
-        ],
+        [interceptor1, interceptor2],
         {
           foo: 'bar',
         },
@@ -90,10 +92,7 @@ describe('intercept', () => {
       interceptor1.mockImplementationOnce(({ next }) => next({ bar: 'foo' }))
 
       const result = await intercept(
-        [
-          interceptor1,
-          interceptor2,
-        ],
+        [interceptor1, interceptor2],
         {
           foo: 'bar',
         },
@@ -124,10 +123,7 @@ describe('intercept', () => {
       interceptor2.mockImplementationOnce(({ next }) => next({ bar: 'foo', next: 'hello2' }))
 
       const result = await intercept(
-        [
-          interceptor1,
-          interceptor2,
-        ],
+        [interceptor1, interceptor2],
         {
           foo: 'bar',
           next: 'hello',
@@ -192,7 +188,10 @@ describe('intercept', () => {
     })
 
     it('should allow overriding options independently for each next call', async () => {
-      const main: any = vi.fn(async (options: { foo: string, requestId: number }) => `${options.foo}:${options.requestId}`)
+      const main: any = vi.fn(
+        async (options: { foo: string; requestId: number }) =>
+          `${options.foo}:${options.requestId}`,
+      )
 
       const result = await intercept(
         [
@@ -298,12 +297,7 @@ describe('lifecycle interceptors', () => {
 
   it('should run start, success, and finish hooks for successful calls', async () => {
     const result = await intercept(
-      [
-        onStart(onStartFn),
-        onSuccess(onSuccessFn),
-        onError(onErrorFn),
-        onFinish(onFinishFn),
-      ],
+      [onStart(onStartFn), onSuccess(onSuccessFn), onError(onErrorFn), onFinish(onFinishFn)],
       {
         foo: 'bar',
       },
@@ -319,22 +313,16 @@ describe('lifecycle interceptors', () => {
     })
 
     expect(onSuccessFn).toHaveBeenCalledTimes(1)
-    expect(onSuccessFn).toHaveBeenCalledWith(
-      '__main__',
-      {
-        foo: 'bar',
-        next: expect.any(Function),
-      },
-    )
+    expect(onSuccessFn).toHaveBeenCalledWith('__main__', {
+      foo: 'bar',
+      next: expect.any(Function),
+    })
 
     expect(onFinishFn).toHaveBeenCalledTimes(1)
-    expect(onFinishFn).toHaveBeenCalledWith(
-      [null, '__main__', true],
-      {
-        foo: 'bar',
-        next: expect.any(Function),
-      },
-    )
+    expect(onFinishFn).toHaveBeenCalledWith([null, '__main__', true], {
+      foo: 'bar',
+      next: expect.any(Function),
+    })
 
     expect(onErrorFn).toHaveBeenCalledTimes(0)
   })
@@ -342,18 +330,15 @@ describe('lifecycle interceptors', () => {
   it('should run start, error, and finish hooks for failed calls', async () => {
     const error = new Error('__error__')
 
-    await expect(intercept(
-      [
-        onStart(onStartFn),
-        onSuccess(onSuccessFn),
-        onError(onErrorFn),
-        onFinish(onFinishFn),
-      ],
-      {
-        foo: 'bar',
-      },
-      () => Promise.reject(error),
-    )).rejects.toThrow('__error__')
+    await expect(
+      intercept(
+        [onStart(onStartFn), onSuccess(onSuccessFn), onError(onErrorFn), onFinish(onFinishFn)],
+        {
+          foo: 'bar',
+        },
+        () => Promise.reject(error),
+      ),
+    ).rejects.toThrow('__error__')
 
     expect(onStartFn).toHaveBeenCalledTimes(1)
     expect(onStartFn).toHaveBeenCalledWith({
@@ -362,22 +347,16 @@ describe('lifecycle interceptors', () => {
     })
 
     expect(onErrorFn).toHaveBeenCalledTimes(1)
-    expect(onErrorFn).toHaveBeenCalledWith(
-      error,
-      {
-        foo: 'bar',
-        next: expect.any(Function),
-      },
-    )
+    expect(onErrorFn).toHaveBeenCalledWith(error, {
+      foo: 'bar',
+      next: expect.any(Function),
+    })
 
     expect(onFinishFn).toHaveBeenCalledTimes(1)
-    expect(onFinishFn).toHaveBeenCalledWith(
-      [error, undefined, false],
-      {
-        foo: 'bar',
-        next: expect.any(Function),
-      },
-    )
+    expect(onFinishFn).toHaveBeenCalledWith([error, undefined, false], {
+      foo: 'bar',
+      next: expect.any(Function),
+    })
 
     expect(onSuccessFn).toHaveBeenCalledTimes(0)
   })
@@ -430,11 +409,11 @@ describe('stream interceptors', () => {
 
       const callback = vi.fn()
 
-      const wrapped = await intercept(
+      const wrapped = (await intercept(
         [onAsyncIteratorObjectError(callback)],
         { foo: 'bar' },
         () => iterator,
-      ) as AsyncIterableIterator<string>
+      )) as AsyncIterableIterator<string>
 
       await expect(wrapped.next()).resolves.toEqual({ value: 'event', done: false })
       await expect(wrapped.next()).rejects.toThrow(error)
@@ -454,11 +433,11 @@ describe('stream interceptors', () => {
 
       const callback = vi.fn()
 
-      const wrapped = await intercept(
+      const wrapped = (await intercept(
         [onAsyncIteratorObjectError(callback)],
         { foo: 'bar' },
         () => iterator,
-      ) as AsyncIterableIterator<string>
+      )) as AsyncIterableIterator<string>
 
       await expect(wrapped.next()).resolves.toEqual({ value: 'event', done: false })
       await expect(wrapped.next()).resolves.toEqual({ value: 'done', done: true })
@@ -491,11 +470,11 @@ describe('stream interceptors', () => {
 
       const callback = vi.fn()
 
-      const wrapped = await intercept(
+      const wrapped = (await intercept(
         [onReadableStreamError(callback)],
         { foo: 'bar' },
         () => stream,
-      ) as ReadableStream<string>
+      )) as ReadableStream<string>
 
       const reader = wrapped.getReader()
       await expect(reader.read()).rejects.toThrow(error)
@@ -517,11 +496,11 @@ describe('stream interceptors', () => {
 
       const callback = vi.fn()
 
-      const wrapped = await intercept(
+      const wrapped = (await intercept(
         [onReadableStreamError(callback)],
         { foo: 'bar' },
         () => stream,
-      ) as ReadableStream<string>
+      )) as ReadableStream<string>
 
       const reader = wrapped.getReader()
       await expect(reader.read()).resolves.toEqual({ value: 'event', done: false })

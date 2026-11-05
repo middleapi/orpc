@@ -1,12 +1,23 @@
 import type { MergedErrorMap, Schema } from '@orpc/contract'
+
 import type { MergedInitialContext } from './context.ts'
 import type { Lazy } from './lazy.ts'
 import type { Procedure } from './procedure.ts'
-import type { AugmentedRouter, AugmentedRouterWithMiddlewares, UnlaziedRouter } from './router-utils.ts'
+import type {
+  AugmentedRouter,
+  AugmentedRouterWithMiddlewares,
+  UnlaziedRouter,
+} from './router-utils.ts'
 
 describe('AugmentedRouter', () => {
   const router = {
-    ping: {} as Procedure<{ i: 1 }, { c: 2 }, Schema<number>, Schema<string>, { E1: { message: string } }>,
+    ping: {} as Procedure<
+      { i: 1 },
+      { c: 2 },
+      Schema<number>,
+      Schema<string>,
+      { E1: { message: string } }
+    >,
     nested: {
       pong: {} as Procedure<{ i: 1 }, object, Schema<number>, Schema<string>, object>,
     },
@@ -81,7 +92,13 @@ describe('AugmentedRouter', () => {
 
 describe('AugmentedRouterWithMiddlewares', () => {
   const router = {
-    ping: {} as Procedure<{ i: 1 }, { c: 2 }, Schema<number>, Schema<string>, { E1: { message: string } }>,
+    ping: {} as Procedure<
+      { i: 1 },
+      { c: 2 },
+      Schema<number>,
+      Schema<string>,
+      { E1: { message: string } }
+    >,
     nested: {
       pong: {} as Procedure<{ i: 1 }, object, Schema<number>, Schema<string>, object>,
     },
@@ -92,7 +109,14 @@ describe('AugmentedRouterWithMiddlewares', () => {
     type TInitialContext = { baseI: string }
     type TInjectedContext = { baseC: number }
 
-    expectTypeOf<AugmentedRouterWithMiddlewares<typeof router.ping, TInitialContext, TInjectedContext, ErrorMap>>().toEqualTypeOf<
+    expectTypeOf<
+      AugmentedRouterWithMiddlewares<
+        typeof router.ping,
+        TInitialContext,
+        TInjectedContext,
+        ErrorMap
+      >
+    >().toEqualTypeOf<
       Procedure<
         MergedInitialContext<TInitialContext, TInjectedContext, { i: 1 }>,
         { c: 2 },
@@ -108,7 +132,9 @@ describe('AugmentedRouterWithMiddlewares', () => {
     type TInitialContext = { baseI: string }
     type TInjectedContext = { baseC: number }
 
-    expectTypeOf<AugmentedRouterWithMiddlewares<typeof router, TInitialContext, TInjectedContext, ErrorMap>>().toEqualTypeOf<{
+    expectTypeOf<
+      AugmentedRouterWithMiddlewares<typeof router, TInitialContext, TInjectedContext, ErrorMap>
+    >().toEqualTypeOf<{
       ping: Procedure<
         MergedInitialContext<TInitialContext, TInjectedContext, { i: 1 }>,
         { c: 2 },
@@ -137,7 +163,9 @@ describe('AugmentedRouterWithMiddlewares', () => {
       lazy: {} as Lazy<typeof router>,
     }
 
-    expectTypeOf<AugmentedRouterWithMiddlewares<typeof lazyRouter, TInitialContext, TInjectedContext, ErrorMap>>().toEqualTypeOf<{
+    expectTypeOf<
+      AugmentedRouterWithMiddlewares<typeof lazyRouter, TInitialContext, TInjectedContext, ErrorMap>
+    >().toEqualTypeOf<{
       lazy: Lazy<{
         ping: Procedure<
           MergedInitialContext<TInitialContext, TInjectedContext, { i: 1 }>,
@@ -161,7 +189,13 @@ describe('AugmentedRouterWithMiddlewares', () => {
 })
 
 it('UnlaziedRouter', () => {
-  const ping = {} as Procedure<{ i: 1 }, { c: 2 }, Schema<number>, Schema<string>, { E1: { message: string } }>
+  const ping = {} as Procedure<
+    { i: 1 },
+    { c: 2 },
+    Schema<number>,
+    Schema<string>,
+    { E1: { message: string } }
+  >
   const pong = {} as Procedure<{ i: 1 }, object, Schema<number>, Schema<string>, object>
 
   const router = {

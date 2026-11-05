@@ -1,10 +1,11 @@
-import type { router } from '../../worker/routers'
-import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { createRouterUtils } from '@orpc/tanstack-query'
 import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import { BatchLinkPlugin, RetryLinkPlugin } from '@orpc/client/plugins'
+import type { RouterClient } from '@orpc/server'
+import { createRouterUtils } from '@orpc/tanstack-query'
+
+import type { router } from '../../worker/routers'
 
 export interface ClientContext extends RetryLinkPluginContext {}
 
@@ -13,10 +14,12 @@ const link = new RPCLink({
   url: '/rpc',
   plugins: [
     new BatchLinkPlugin({
-      groups: [{
-        condition: () => true,
-        context: {},
-      }],
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
     }),
     new RetryLinkPlugin(),
   ],

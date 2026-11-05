@@ -1,53 +1,59 @@
 import type { ClientContext, ORPCError } from '@orpc/client'
-import type { PromiseWithError } from '@orpc/shared'
-import type { SkipToken } from '@tanstack/query-core'
-import type { OperationContext } from './types.ts'
 import { RPCJsonSerializer } from '@orpc/client'
 import { oc, type } from '@orpc/contract'
+import type { PromiseWithError } from '@orpc/shared'
+import type { SkipToken } from '@tanstack/query-core'
+
 import { tanstackQuery } from './meta.ts'
+import type { OperationContext } from './types.ts'
 
 describe('tanstackQuery', () => {
   it('infers input, output and error types from the contract', () => {
-    oc
-      .errors({ BAD_GATEWAY: { data: type<string, RegExp>(vi.fn()) } })
+    oc.errors({ BAD_GATEWAY: { data: type<string, RegExp>(vi.fn()) } })
       .input(type<string, boolean>(vi.fn()))
       .output(type<number, Date>(vi.fn()))
-      .meta(tanstackQuery({
-        queryOptions: { staleTime: 1000 },
-        queryInterceptors: [
-          async ({ context, input, next }) => {
-            expectTypeOf(input).toEqualTypeOf<string | SkipToken>()
-            expectTypeOf(context).toEqualTypeOf<ClientContext & OperationContext>()
+      .meta(
+        tanstackQuery({
+          queryOptions: { staleTime: 1000 },
+          queryInterceptors: [
+            async ({ context, input, next }) => {
+              expectTypeOf(input).toEqualTypeOf<string | SkipToken>()
+              expectTypeOf(context).toEqualTypeOf<ClientContext & OperationContext>()
 
-            const result = next()
+              const result = next()
 
-            expectTypeOf(result).toEqualTypeOf<
-              PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>
-            >()
+              expectTypeOf(result).toEqualTypeOf<
+                PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>
+              >()
 
-            return result
+              return result
+            },
+          ],
+          mutationOptions: {
+            onSuccess: (data, input) => {
+              expectTypeOf(data).toEqualTypeOf<Date>()
+              expectTypeOf(input).toEqualTypeOf<string>()
+            },
           },
-        ],
-        mutationOptions: {
-          onSuccess: (data, input) => {
-            expectTypeOf(data).toEqualTypeOf<Date>()
-            expectTypeOf(input).toEqualTypeOf<string>()
-          },
-        },
-      }))
+        }),
+      )
   })
 
   it('rejects invalid base options', () => {
-    oc.output(type<number, Date>(vi.fn())).meta(tanstackQuery({
-      queryOptions: {
-        // @ts-expect-error - staleTime must be a number
-        staleTime: 'invalid',
-      },
-    }))
+    oc.output(type<number, Date>(vi.fn())).meta(
+      tanstackQuery({
+        queryOptions: {
+          // @ts-expect-error - staleTime must be a number
+          staleTime: 'invalid',
+        },
+      }),
+    )
 
-    oc.output(type<number, Date>(vi.fn())).meta(tanstackQuery({
-      // @ts-expect-error - serializer belongs to the client, not the contract
-      serializer: new RPCJsonSerializer(),
-    }))
+    oc.output(type<number, Date>(vi.fn())).meta(
+      tanstackQuery({
+        // @ts-expect-error - serializer belongs to the client, not the contract
+        serializer: new RPCJsonSerializer(),
+      }),
+    )
   })
 })

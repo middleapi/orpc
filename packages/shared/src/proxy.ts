@@ -1,5 +1,6 @@
-import type { Value } from './value.ts'
 import { getOrBind } from '@standard-server/shared'
+
+import type { Value } from './value.ts'
 import { value } from './value.ts'
 
 /**

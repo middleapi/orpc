@@ -1,4 +1,5 @@
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
+
 import { os } from '../../builder.ts'
 import { experimental_RPCHandler as RPCHandler } from './rpc-handler.ts'
 
@@ -8,14 +9,17 @@ describe('rpcHandler', () => {
   })
 
   const createHandler = (options: ConstructorParameters<typeof RPCHandler>[1] = {}) => {
-    return new RPCHandler({
-      ping: os.handler(async ({ signal }) => {
-        await new Promise(resolve => setTimeout(resolve, 10))
-        signal?.throwIfAborted()
+    return new RPCHandler(
+      {
+        ping: os.handler(async ({ signal }) => {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          signal?.throwIfAborted()
 
-        return 'pong'
-      }),
-    }, options)
+          return 'pong'
+        }),
+      },
+      options,
+    )
   }
 
   const createPeer = () => ({
@@ -31,16 +35,21 @@ describe('rpcHandler', () => {
     url?: `/${string}`
     rawData?: string | Uint8Array<ArrayBuffer>
   } = {}) => {
-    const encoded = rawData ?? await encodePeerMessage({
-      id: '19',
-      kind: 'request',
-      json: {
-        url,
-        body: { json: 'input' },
-        headers: {},
-        method: 'POST',
-      },
-    }, prefix ? { prefix } : undefined)
+    const encoded =
+      rawData ??
+      (await encodePeerMessage(
+        {
+          id: '19',
+          kind: 'request',
+          json: {
+            url,
+            body: { json: 'input' },
+            headers: {},
+            method: 'POST',
+          },
+        },
+        prefix ? { prefix } : undefined,
+      ))
 
     return {
       rawData: encoded,
@@ -56,9 +65,7 @@ describe('rpcHandler', () => {
 
   it('accepts context and prefix option in message method', async () => {
     const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     const peer = createPeer()
@@ -82,13 +89,19 @@ describe('rpcHandler', () => {
 
   it.each([
     ['string', () => createMessage()],
-    ['bytes', async () => {
-      const message = await createMessage()
-      return {
-        ...message,
-        rawData: typeof message.rawData === 'string' ? new TextEncoder().encode(message.rawData) : message.rawData,
-      }
-    }],
+    [
+      'bytes',
+      async () => {
+        const message = await createMessage()
+        return {
+          ...message,
+          rawData:
+            typeof message.rawData === 'string'
+              ? new TextEncoder().encode(message.rawData)
+              : message.rawData,
+        }
+      },
+    ],
   ])('handles %s request', async (_type, createMessage) => {
     const handler = createHandler()
     const peer = createPeer()
@@ -140,7 +153,9 @@ describe('rpcHandler', () => {
     expect(result.matched).toBe(true)
     expect(peer.send).toHaveBeenCalledTimes(1)
 
-    const decoded = decodePeerMessage((peer as any).send.mock.calls[0][0], { prefix: 'orpc:' }) as any
+    const decoded = decodePeerMessage((peer as any).send.mock.calls[0][0], {
+      prefix: 'orpc:',
+    }) as any
 
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
@@ -196,7 +211,7 @@ describe('rpcHandler', () => {
     const peer = createPeer()
     await handler.close(peer as any)
 
-    const result = await handler.message(peer as any, await createMessage() as any)
+    const result = await handler.message(peer as any, (await createMessage()) as any)
 
     expect(result.matched).toBe(true)
     expect(procedure).not.toHaveBeenCalled()

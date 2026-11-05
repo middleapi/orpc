@@ -13,9 +13,14 @@ it('SafeClient', async () => {
   const safeClient = {} as SafeClient<typeof client>
 
   const pingResult = await safeClient.ping('test')
-  expectTypeOf(pingResult.error).toEqualTypeOf<Error | ORPCError<'BAD_GATEWAY', { val: string }> | null>()
+  expectTypeOf(pingResult.error).toEqualTypeOf<
+    Error | ORPCError<'BAD_GATEWAY', { val: string }> | null
+  >()
   expectTypeOf(pingResult.data).toEqualTypeOf<number | undefined>()
-  expectTypeOf(pingResult.definedError).toEqualTypeOf<ORPCError<'BAD_GATEWAY', { val: string }> | null>()
+  expectTypeOf(pingResult.definedError).toEqualTypeOf<ORPCError<
+    'BAD_GATEWAY',
+    { val: string }
+  > | null>()
   expectTypeOf(pingResult.isSuccess).toEqualTypeOf<boolean>()
 
   const pongResult = await safeClient.nested.pong({ id: 123 })

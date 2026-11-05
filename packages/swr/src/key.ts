@@ -12,9 +12,9 @@ export type OperationKeyOptions<TInput> = OperationKeyPrefixOptions & {
   input?: PartialDeep<TInput> | undefined
 }
 
-export type OperationKey<TInput>
-  = | [path: string[], options: Omit<OperationKeyOptions<TInput>, 'prefix'>]
-    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TInput>, 'prefix'>]
+export type OperationKey<TInput> =
+  | [path: string[], options: Omit<OperationKeyOptions<TInput>, 'prefix'>]
+  | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TInput>, 'prefix'>]
 
 /**
  * Generate a **full matching** key for SWR operations.
@@ -26,10 +26,10 @@ export function generateOperationKey<TInput>(
   options: OperationKeyOptions<TInput> = {},
 ): OperationKey<TInput> {
   return [
-    ...options.prefix !== undefined ? [options.prefix] : [],
+    ...(options.prefix !== undefined ? [options.prefix] : []),
     path,
     {
-      ...options.input !== undefined ? { input: options.input } : {},
+      ...(options.input !== undefined ? { input: options.input } : {}),
     },
   ] as OperationKey<TInput>
 }

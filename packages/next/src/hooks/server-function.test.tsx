@@ -1,12 +1,13 @@
 import { ORPCError, os } from '@orpc/server'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { z } from 'zod'
+
 import { createServerFunction } from '../server-function.ts'
 import { useServerFunction } from './server-function.ts'
 
-export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+export const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 
-export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 export const baseErrorMap = {
   BASE: {
@@ -25,11 +26,7 @@ describe('useServerFunction', () => {
   })
 
   const fn = createServerFunction(
-    os
-      .input(inputSchema.optional())
-      .errors(baseErrorMap)
-      .output(outputSchema)
-      .handler(handler),
+    os.input(inputSchema.optional()).errors(baseErrorMap).output(outputSchema).handler(handler),
   )
 
   it('on success', async () => {
@@ -130,9 +127,11 @@ describe('useServerFunction', () => {
   })
 
   it('on action calling error', async () => {
-    const { result } = renderHook(() => useServerFunction(() => {
-      throw new Error('failed to call')
-    }))
+    const { result } = renderHook(() =>
+      useServerFunction(() => {
+        throw new Error('failed to call')
+      }),
+    )
 
     expect(result.current.status).toBe('idle')
     expect(result.current.isIdle).toBe(true)
@@ -184,21 +183,22 @@ describe('useServerFunction', () => {
     const interceptor = vi.fn(({ next }) => next())
     const executeInterceptor = vi.fn(({ next }) => next())
 
-    const { result } = renderHook(() => useServerFunction(fn, {
-      interceptors: [
-        interceptor,
-      ],
-    }))
+    const { result } = renderHook(() =>
+      useServerFunction(fn, {
+        interceptors: [interceptor],
+      }),
+    )
 
     expect(interceptor).toHaveBeenCalledTimes(0)
     expect(executeInterceptor).toHaveBeenCalledTimes(0)
 
     act(() => {
-      result.current.execute({ input: 123 }, {
-        interceptors: [
-          executeInterceptor,
-        ],
-      })
+      result.current.execute(
+        { input: 123 },
+        {
+          interceptors: [executeInterceptor],
+        },
+      )
     })
 
     expect(interceptor).toHaveBeenCalledTimes(1)
@@ -269,7 +269,7 @@ describe('useServerFunction', () => {
     expect(result.current.status).toBe('idle')
 
     handler.mockImplementationOnce(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20))
+      await new Promise((resolve) => setTimeout(resolve, 20))
       return { output: 123 }
     })
 
@@ -286,7 +286,7 @@ describe('useServerFunction', () => {
     expect(result.current.error).toBeNull()
 
     handler.mockImplementationOnce(async () => {
-      await new Promise(resolve => setTimeout(resolve, 40))
+      await new Promise((resolve) => setTimeout(resolve, 40))
       return { output: 456 }
     })
 
@@ -329,7 +329,7 @@ describe('useServerFunction', () => {
     expect(result.current.status).toBe('idle')
 
     handler.mockImplementationOnce(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20))
+      await new Promise((resolve) => setTimeout(resolve, 20))
       return { output: 123 }
     })
 

@@ -13,52 +13,147 @@ describe('memoryRateLimiter', () => {
   it('allows requests up to the limit, then starts denying', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 3, window: 1000 })
 
-    expect(await limiter.limit('key')).toEqual({ success: true, limit: 3, remaining: 2, reset: 1000 })
-    expect(await limiter.limit('key')).toEqual({ success: true, limit: 3, remaining: 1, reset: 1000 })
-    expect(await limiter.limit('key')).toEqual({ success: true, limit: 3, remaining: 0, reset: 1000 })
-    expect(await limiter.limit('key')).toEqual({ success: false, limit: 3, remaining: 0, reset: 1000 })
+    expect(await limiter.limit('key')).toEqual({
+      success: true,
+      limit: 3,
+      remaining: 2,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key')).toEqual({
+      success: true,
+      limit: 3,
+      remaining: 1,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key')).toEqual({
+      success: true,
+      limit: 3,
+      remaining: 0,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key')).toEqual({
+      success: false,
+      limit: 3,
+      remaining: 0,
+      reset: 1000,
+    })
   })
 
   it('consumes weight and denies when accumulated weight exceeds the limit', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 5, window: 1000 })
 
-    expect(await limiter.limit('key', { weight: 3 })).toEqual({ success: true, limit: 5, remaining: 2, reset: 1000 })
-    expect(await limiter.limit('key', { weight: 3 })).toEqual({ success: false, limit: 5, remaining: 2, reset: 1000 })
-    expect(await limiter.limit('key', { weight: 2 })).toEqual({ success: true, limit: 5, remaining: 0, reset: 1000 })
-    expect(await limiter.limit('key', { weight: 1 })).toEqual({ success: false, limit: 5, remaining: 0, reset: 1000 })
+    expect(await limiter.limit('key', { weight: 3 })).toEqual({
+      success: true,
+      limit: 5,
+      remaining: 2,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key', { weight: 3 })).toEqual({
+      success: false,
+      limit: 5,
+      remaining: 2,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key', { weight: 2 })).toEqual({
+      success: true,
+      limit: 5,
+      remaining: 0,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key', { weight: 1 })).toEqual({
+      success: false,
+      limit: 5,
+      remaining: 0,
+      reset: 1000,
+    })
   })
 
   it('tracks limits independently per key', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 1, window: 1000 })
 
-    expect(await limiter.limit('alice')).toEqual({ success: true, limit: 1, remaining: 0, reset: 1000 })
-    expect(await limiter.limit('alice')).toEqual({ success: false, limit: 1, remaining: 0, reset: 1000 })
-    expect(await limiter.limit('bob')).toEqual ({ success: true, limit: 1, remaining: 0, reset: 1000 })
+    expect(await limiter.limit('alice')).toEqual({
+      success: true,
+      limit: 1,
+      remaining: 0,
+      reset: 1000,
+    })
+    expect(await limiter.limit('alice')).toEqual({
+      success: false,
+      limit: 1,
+      remaining: 0,
+      reset: 1000,
+    })
+    expect(await limiter.limit('bob')).toEqual({
+      success: true,
+      limit: 1,
+      remaining: 0,
+      reset: 1000,
+    })
   })
 
   it('denies within window and resets counter on new epoch', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 2, window: 1000 })
 
-    expect(await limiter.limit('key')).toEqual({ success: true, limit: 2, remaining: 1, reset: 1000 })
-    expect(await limiter.limit('key')).toEqual({ success: true, limit: 2, remaining: 0, reset: 1000 })
+    expect(await limiter.limit('key')).toEqual({
+      success: true,
+      limit: 2,
+      remaining: 1,
+      reset: 1000,
+    })
+    expect(await limiter.limit('key')).toEqual({
+      success: true,
+      limit: 2,
+      remaining: 0,
+      reset: 1000,
+    })
 
     await vi.advanceTimersByTimeAsync(999) // still inside window
-    expect(await limiter.limit('key')).toEqual({ success: false, limit: 2, remaining: 0, reset: 1000 })
+    expect(await limiter.limit('key')).toEqual({
+      success: false,
+      limit: 2,
+      remaining: 0,
+      reset: 1000,
+    })
 
     await vi.advanceTimersByTimeAsync(1) // t=1000 — new epoch
-    expect(await limiter.limit('key', { weight: 2 })).toEqual({ success: true, limit: 2, remaining: 0, reset: 2000 })
-    expect(await limiter.limit('key')).toEqual ({ success: false, limit: 2, remaining: 0, reset: 2000 })
+    expect(await limiter.limit('key', { weight: 2 })).toEqual({
+      success: true,
+      limit: 2,
+      remaining: 0,
+      reset: 2000,
+    })
+    expect(await limiter.limit('key')).toEqual({
+      success: false,
+      limit: 2,
+      remaining: 0,
+      reset: 2000,
+    })
   })
 
   it('reset is pegged to epoch start and does not shift mid-window', async () => {
     vi.setSystemTime(200)
     const limiter = new MemoryRateLimiter({ maxRequests: 3, window: 1000 })
 
-    expect(await limiter.limit('key', { weight: 2 })).toEqual({ success: true, limit: 3, remaining: 1, reset: 1200 })
+    expect(await limiter.limit('key', { weight: 2 })).toEqual({
+      success: true,
+      limit: 3,
+      remaining: 1,
+      reset: 1200,
+    })
     vi.setSystemTime(500)
-    expect(await limiter.limit('key', { weight: 1 })).toEqual({ success: true, limit: 3, remaining: 0, reset: 1200 })
+    expect(await limiter.limit('key', { weight: 1 })).toEqual({
+      success: true,
+      limit: 3,
+      remaining: 0,
+      reset: 1200,
+    })
     vi.setSystemTime(600)
-    expect(await limiter.limit('key', { weight: 2 })).toEqual({ success: false, limit: 3, remaining: 0, reset: 1200 })
+    expect(await limiter.limit('key', { weight: 2 })).toEqual({
+      success: false,
+      limit: 3,
+      remaining: 0,
+      reset: 1200,
+    })
   })
 
   it('throws for invalid weights', async () => {
@@ -77,11 +172,9 @@ describe('memoryRateLimiter', () => {
       window: 1000,
     })
 
-    const results = await Promise.all(
-      Array.from({ length: 100 }, () => limiter.limit('user')),
-    )
+    const results = await Promise.all(Array.from({ length: 100 }, () => limiter.limit('user')))
 
-    const successCount = results.filter(r => r.success).length
+    const successCount = results.filter((r) => r.success).length
 
     expect(successCount).toBe(10)
     expect(results.length - successCount).toBe(90)
@@ -95,7 +188,12 @@ describe('memoryRateLimiter', () => {
         timeout: 1000,
       })
 
-      expect(await limiter.limit('key')).toEqual({ success: true, limit: 1, remaining: 0, reset: 500 })
+      expect(await limiter.limit('key')).toEqual({
+        success: true,
+        limit: 1,
+        remaining: 0,
+        reset: 500,
+      })
 
       const pending = limiter.limit('key')
       await vi.advanceTimersByTimeAsync(500) // new epoch at t=500
@@ -110,7 +208,12 @@ describe('memoryRateLimiter', () => {
         timeout: 1000,
       })
 
-      expect(await limiter.limit('key', { weight: 3 })).toEqual({ success: true, limit: 3, remaining: 0, reset: 500 })
+      expect(await limiter.limit('key', { weight: 3 })).toEqual({
+        success: true,
+        limit: 3,
+        remaining: 0,
+        reset: 500,
+      })
 
       const pending = limiter.limit('key', { weight: 2 })
       await vi.advanceTimersByTimeAsync(500) // new epoch at t=500
@@ -125,7 +228,12 @@ describe('memoryRateLimiter', () => {
         timeout: 100,
       })
 
-      expect(await limiter.limit('key')).toEqual({ success: true, limit: 1, remaining: 0, reset: 2000 })
+      expect(await limiter.limit('key')).toEqual({
+        success: true,
+        limit: 1,
+        remaining: 0,
+        reset: 2000,
+      })
 
       const pending = limiter.limit('key')
       await vi.advanceTimersByTimeAsync(200)
@@ -140,8 +248,18 @@ describe('memoryRateLimiter', () => {
         timeout: 0,
       })
 
-      expect(await limiter.limit('key')).toEqual({ success: true, limit: 1, remaining: 0, reset: 1000 })
-      expect(await limiter.limit('key')).toEqual({ success: false, limit: 1, remaining: 0, reset: 1000 })
+      expect(await limiter.limit('key')).toEqual({
+        success: true,
+        limit: 1,
+        remaining: 0,
+        reset: 1000,
+      })
+      expect(await limiter.limit('key')).toEqual({
+        success: false,
+        limit: 1,
+        remaining: 0,
+        reset: 1000,
+      })
     })
   })
 

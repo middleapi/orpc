@@ -1,8 +1,8 @@
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from '@orpc/publisher/base-redis'
-import type { Promisable, ThrowableError } from '@orpc/shared'
-import type { RedisClient } from 'bun'
 import { BaseRedisPublisher } from '@orpc/publisher/base-redis'
+import type { Promisable, ThrowableError } from '@orpc/shared'
 import { once } from '@orpc/shared'
+import type { RedisClient } from 'bun'
 
 export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
   /**
@@ -49,7 +49,10 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
    * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
    */
   prefix(prefix: string): BunRedisPublisher<T> {
-    const publisher = new BunRedisPublisher<T>(this.redis, { ...this.options, prefix: `${this.eventPrefix}${prefix}` })
+    const publisher = new BunRedisPublisher<T>(this.redis, {
+      ...this.options,
+      prefix: `${this.eventPrefix}${prefix}`,
+    })
 
     // Share the lazily created subscriber, which reports its errors to `onErrors` of this publisher.
     publisher.getSubscriber = this.getSubscriber
@@ -91,8 +94,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
 
       try {
         await subscriber.unsubscribe(channel, listener)
-      }
-      catch (error) {
+      } catch (error) {
         if (subscriber.connected) {
           throw error
         }
@@ -114,7 +116,8 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
   private watchSubscriber(subscriber: RedisClient): void {
     const { onconnect, onclose } = subscriber
     // Snapshot, since a callback may unsubscribe itself mid-dispatch.
-    const report = (error: ThrowableError) => this.onErrors.slice().forEach(onError => onError(error))
+    const report = (error: ThrowableError) =>
+      this.onErrors.slice().forEach((onError) => onError(error))
 
     subscriber.onconnect = function () {
       onconnect?.call(this)

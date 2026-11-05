@@ -1,8 +1,8 @@
 import type { Context } from '../../context.ts'
 import type { Router } from '../../router.ts'
 import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard/index.ts'
-import type { WebSocketHandlerOptions } from './handler.ts'
 import { RPCHandlerCodec, StandardHandler } from '../standard/index.ts'
+import type { WebSocketHandlerOptions } from './handler.ts'
 import { WebSocketHandler } from './handler.ts'
 
 export interface RPCHandlerOptions<T extends Context>
@@ -15,10 +15,7 @@ export interface RPCHandlerOptions<T extends Context>
  * @see {@link https://orpc.dev/docs/adapters/websocket | WebSocket Adapters}
  */
 export class RPCHandler<T extends Context> extends WebSocketHandler<T> {
-  constructor(
-    router: Router<T>,
-    options: NoInfer<RPCHandlerOptions<T>> = {},
-  ) {
+  constructor(router: Router<T>, options: NoInfer<RPCHandlerOptions<T>> = {}) {
     const codec = new RPCHandlerCodec(router, options)
     const handler = new StandardHandler(codec, options)
     super(handler, options)

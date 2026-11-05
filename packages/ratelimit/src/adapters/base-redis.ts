@@ -75,11 +75,11 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   }
 
   private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
-    const [used, ttl] = await this.evalScript(
+    const [used, ttl] = (await this.evalScript(
       FIXED_WINDOW_SCRIPT,
       [key],
       [String(weight), String(this.window)],
-    ) as [used: number, ttl: number]
+    )) as [used: number, ttl: number]
 
     return {
       success: used <= this.maxRequests,

@@ -30,8 +30,11 @@ export function serverSourcemapsPlugin(): Plugin {
         // Runners reach this method through the environment's invoke handler. It
         // forwards its options to Vite's `fetchModule`, which reads
         // `inlineSourceMap` although the method's own type leaves it out.
-        const fetchModule: (id: string, importer: string | undefined, options: FetchModuleOptions) => ReturnType<typeof environment.fetchModule>
-          = environment.fetchModule.bind(environment)
+        const fetchModule: (
+          id: string,
+          importer: string | undefined,
+          options: FetchModuleOptions,
+        ) => ReturnType<typeof environment.fetchModule> = environment.fetchModule.bind(environment)
         environment.fetchModule = (id, importer, options) =>
           fetchModule(id, importer, { ...options, inlineSourceMap: false })
       }

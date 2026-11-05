@@ -9,14 +9,8 @@ export * from './router-utils.ts'
 export * from './types.ts'
 export { getDynamicPathParams } from './utils.ts'
 
-export {
-  COMMON_ERROR_STATUS_MAP,
-} from '@orpc/client'
+export { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 
-export type {
-  JsonSchema,
-} from '@orpc/json-schema'
+export type { JsonSchema } from '@orpc/json-schema'
 
-export type {
-  StandardBodyHint,
-} from '@standard-server/core'
+export type { StandardBodyHint } from '@standard-server/core'

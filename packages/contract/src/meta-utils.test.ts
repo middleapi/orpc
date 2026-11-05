@@ -1,24 +1,24 @@
-import type { AnyMetaPlugin } from './meta.ts'
 import { oc } from './builder.ts'
 import { defineMeta, resolveMetaPlugins } from './meta-utils.ts'
+import type { AnyMetaPlugin } from './meta.ts'
 
 it('resolveMetaPlugins', () => {
   const baseMeta = { mode: 'base' }
 
   const plugin1 = {
     name: 'plugin1',
-    init: vi.fn(m => ({ ...m, p1: true })),
-    apply: vi.fn(m => ({ ...m, a1: true })),
+    init: vi.fn((m) => ({ ...m, p1: true })),
+    apply: vi.fn((m) => ({ ...m, a1: true })),
   } satisfies AnyMetaPlugin
   const plugin2 = {
     name: 'plugin2',
-    init: vi.fn(m => ({ ...m, p2: true })),
-    apply: vi.fn(m => ({ ...m, a2: true })),
+    init: vi.fn((m) => ({ ...m, p2: true })),
+    apply: vi.fn((m) => ({ ...m, a2: true })),
   } satisfies AnyMetaPlugin
   const plugin3 = {
     name: 'plugin3',
-    init: vi.fn(m => ({ ...m, p3: true })),
-    apply: vi.fn(m => ({ ...m, a3: true })),
+    init: vi.fn((m) => ({ ...m, p3: true })),
+    apply: vi.fn((m) => ({ ...m, a3: true })),
   } satisfies AnyMetaPlugin
   const plugin4 = {
     name: 'plugin4',
@@ -51,7 +51,13 @@ it('resolveMetaPlugins', () => {
   expect(plugin2.apply).toHaveBeenCalledWith({ mode: 'base', a1: true, p2: true, p3: true })
 
   expect(plugin3.apply).toHaveBeenCalledTimes(1)
-  expect(plugin3.apply).toHaveBeenCalledWith({ mode: 'base', a1: true, a2: true, p2: true, p3: true })
+  expect(plugin3.apply).toHaveBeenCalledWith({
+    mode: 'base',
+    a1: true,
+    a2: true,
+    p2: true,
+    p3: true,
+  })
 
   expect(plugin2.init).toHaveBeenCalledBefore(plugin3.init)
   expect(plugin1.apply).toHaveBeenCalledBefore(plugin2.apply)
@@ -64,14 +70,16 @@ it('defineMeta', () => {
     scope?: 'user' | 'admin'
   }
 
-  const [authMeta, getAuthMeta] = defineMeta(
-    'auth',
-    (incoming: AuthMeta, current) => ({ ...current, ...incoming }),
-  )
+  const [authMeta, getAuthMeta] = defineMeta('auth', (incoming: AuthMeta, current) => ({
+    ...current,
+    ...incoming,
+  }))
 
   const requiredAuthProcedure = oc.meta(authMeta({ required: true }))
   const adminAuthProcedure = oc.meta(authMeta({ scope: 'admin' }))
-  const requiredAndAdminProcedure = oc.meta(authMeta({ required: true, scope: 'user' })).meta(authMeta({ scope: 'admin' }))
+  const requiredAndAdminProcedure = oc
+    .meta(authMeta({ required: true, scope: 'user' }))
+    .meta(authMeta({ scope: 'admin' }))
 
   expect(getAuthMeta(oc)).toBeUndefined()
   expect(getAuthMeta(requiredAuthProcedure)).toEqual({ required: true })

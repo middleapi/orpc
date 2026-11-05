@@ -2,14 +2,18 @@ import type { RPCJsonSerializerHandler } from '@orpc/client'
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { encodePeerMessage } from '@standard-server/peer'
+
 import { encodeHibernationRPCEvent } from './encode-event.ts'
 
 class Planet {
-  constructor(public readonly name: string, public readonly diameter: number) {}
+  constructor(
+    public readonly name: string,
+    public readonly diameter: number,
+  ) {}
 }
 
 const planetHandler: RPCJsonSerializerHandler = {
-  condition: value => value instanceof Planet,
+  condition: (value) => value instanceof Planet,
   serialize: (value: Planet) => [value.name, value.diameter],
   deserialize: ([name, diameter]: [string, number]) => new Planet(name, diameter),
 }
@@ -91,14 +95,19 @@ describe('encodeHibernationRPCEvent', () => {
 
   it('with prefix', async () => {
     const id = '39483'
-    const encoded = await encodeHibernationRPCEvent(id, 'hello world', { encodePeerMessage: { prefix: 'orpc:' } })
+    const encoded = await encodeHibernationRPCEvent(id, 'hello world', {
+      encodePeerMessage: { prefix: 'orpc:' },
+    })
 
     expect(encoded).toEqual(
-      await encodePeerMessage({
-        kind: 'event-stream',
-        id,
-        json: { event: undefined, data: serializeData('hello world') },
-      }, { prefix: 'orpc:' }),
+      await encodePeerMessage(
+        {
+          kind: 'event-stream',
+          id,
+          json: { event: undefined, data: serializeData('hello world') },
+        },
+        { prefix: 'orpc:' },
+      ),
     )
     expect(encoded).toSatisfy((encoded: string) => encoded.startsWith('orpc:'))
   })

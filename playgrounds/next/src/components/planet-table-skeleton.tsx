@@ -34,11 +34,21 @@ export function PlanetTableSkeleton() {
           <tbody>
             {Array.from({ length: 2 }).map((_, i) => (
               <tr key={i} style={{ '--delay': `${i * 80}ms` } as React.CSSProperties}>
-                <td data-label="ID"><span className="skeleton-bar skeleton-bar--lg" /></td>
-                <td data-label="Name"><span className="skeleton-bar skeleton-bar--md" /></td>
-                <td data-label="Description"><span className="skeleton-bar skeleton-bar--lg" /></td>
-                <td data-label="Image"><span className="skeleton-thumb" /></td>
-                <td data-label="Actions"><span className="skeleton-thumb skeleton-thumb--sm" /></td>
+                <td data-label="ID">
+                  <span className="skeleton-bar skeleton-bar--lg" />
+                </td>
+                <td data-label="Name">
+                  <span className="skeleton-bar skeleton-bar--md" />
+                </td>
+                <td data-label="Description">
+                  <span className="skeleton-bar skeleton-bar--lg" />
+                </td>
+                <td data-label="Image">
+                  <span className="skeleton-thumb" />
+                </td>
+                <td data-label="Actions">
+                  <span className="skeleton-thumb skeleton-thumb--sm" />
+                </td>
               </tr>
             ))}
           </tbody>

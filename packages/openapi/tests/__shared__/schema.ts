@@ -9,7 +9,7 @@ import z from 'zod'
  * (see {@link testSchema}) work the same way.
  */
 export const zodJsonSchemaConverter: JsonSchemaConverter = {
-  condition: schema => schema?.['~standard'].vendor === 'zod',
+  condition: (schema) => schema?.['~standard'].vendor === 'zod',
   convert(schema, direction) {
     const jsonSchema = z.toJSONSchema(schema as any, { io: direction })
     const output = schema?.['~standard'].validate(undefined)
@@ -48,7 +48,7 @@ export function testSchema(jsonSchema: JsonSchema, options: TestSchemaOptions = 
 }
 
 export const testSchemaConverter: JsonSchemaConverter = {
-  condition: schema => (schema as any)?.['~standard'].vendor === 'orpc-test',
+  condition: (schema) => (schema as any)?.['~standard'].vendor === 'orpc-test',
   convert(schema, direction) {
     const detail = (schema as any)['~test']
     return [detail[direction], detail.optional]

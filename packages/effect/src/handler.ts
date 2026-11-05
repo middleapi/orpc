@@ -1,6 +1,12 @@
-import type { Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
-import type { InferEffectServices, WithEffectContext } from './context.ts'
+import type {
+  Context,
+  ORPCErrorConstructorMap,
+  ProcedureHandler,
+  ProcedureHandlerOptions,
+} from '@orpc/server'
 import { Effect, Context as EffectContext } from 'effect'
+
+import type { InferEffectServices, WithEffectContext } from './context.ts'
 import { runPromise } from './runtime.ts'
 
 export interface HandlerGen<
@@ -13,11 +19,7 @@ export interface HandlerGen<
   (
     opts: ProcedureHandlerOptions<TCurrentContext, TInput, TErrorConstructorMap>,
     input: TInput,
-  ): Generator<
-    TYield,
-    TReturn,
-    never
-  >
+  ): Generator<TYield, TReturn, never>
 }
 
 export type AnyHandlerGen = HandlerGen<any, any, any, any, any>
@@ -33,8 +35,14 @@ export function handlerGen<
   TCurrentContext extends Context,
   TInput = unknown,
   TReturn = unknown,
-  TErrorConstructorMap extends ORPCErrorConstructorMap<any> = ORPCErrorConstructorMap<Record<never, never>>,
-  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>> = Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
+  TErrorConstructorMap extends ORPCErrorConstructorMap<any> = ORPCErrorConstructorMap<
+    Record<never, never>
+  >,
+  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>> = Effect.Effect<
+    any,
+    any,
+    InferEffectServices<TCurrentContext>
+  >,
 >(
   handler: HandlerGen<TCurrentContext, TInput, TReturn, TErrorConstructorMap, TYield>,
 ): ProcedureHandler<TCurrentContext, TInput, TReturn, TErrorConstructorMap> {
@@ -43,9 +51,9 @@ export function handlerGen<
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
     const ef = Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, unknown>
 
-    return runPromise(
-      typeof wrap === 'function' ? wrap(ef, { ...opts, kind: 'handler' }) : ef,
-      { context: EffectContext.isContext(effectContext) ? effectContext : undefined, signal: opts.signal },
-    )
+    return runPromise(typeof wrap === 'function' ? wrap(ef, { ...opts, kind: 'handler' }) : ef, {
+      context: EffectContext.isContext(effectContext) ? effectContext : undefined,
+      signal: opts.signal,
+    })
   }
 }

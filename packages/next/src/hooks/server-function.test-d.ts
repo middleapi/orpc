@@ -1,12 +1,13 @@
 import type { ORPCError } from '@orpc/server'
 import { os, safe } from '@orpc/server'
 import * as z from 'zod'
+
 import { createServerFunction } from '../server-function.ts'
 import { useServerFunction } from './server-function.ts'
 
-export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+export const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 
-export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 export const baseErrorMap = {
   BASE: {
@@ -39,7 +40,10 @@ describe('useServerFunction', () => {
   })
 
   it('require non-undefindable input ', () => {
-    const action = os.input(z.string()).handler(() => 123).actionable()
+    const action = os
+      .input(z.string())
+      .handler(() => 123)
+      .actionable()
 
     const state = useServerFunction(action)
 
@@ -63,7 +67,9 @@ describe('useServerFunction', () => {
           const [error, data, definedError] = await safe(next())
 
           if (definedError) {
-            expectTypeOf(error).toEqualTypeOf<ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>>()
+            expectTypeOf(error).toEqualTypeOf<
+              ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>
+            >()
           }
 
           if (!error) {
@@ -77,34 +83,41 @@ describe('useServerFunction', () => {
       ],
     })
 
-    state.execute({ input: 123 }, {
-      interceptors: [
-        async ({ input, next }) => {
-          expectTypeOf(input).toEqualTypeOf<{ input: number } | undefined>()
+    state.execute(
+      { input: 123 },
+      {
+        interceptors: [
+          async ({ input, next }) => {
+            expectTypeOf(input).toEqualTypeOf<{ input: number } | undefined>()
 
-          const [error, data, definedError] = await safe(next())
+            const [error, data, definedError] = await safe(next())
 
-          if (definedError) {
-            expectTypeOf(error).toEqualTypeOf<ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>>()
-          }
+            if (definedError) {
+              expectTypeOf(error).toEqualTypeOf<
+                ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>
+              >()
+            }
 
-          if (!error) {
-            expectTypeOf(data).toEqualTypeOf<{ output: string }>()
+            if (!error) {
+              expectTypeOf(data).toEqualTypeOf<{ output: string }>()
 
-            return data
-          }
+              return data
+            }
 
-          return next()
-        },
-      ],
-    })
+            return next()
+          },
+        ],
+      },
+    )
   })
 
   it('output & error', async () => {
     const [error, data, definedError] = await state.execute({ input: 123 })
 
     if (definedError) {
-      expectTypeOf(error).toEqualTypeOf<ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>>()
+      expectTypeOf(error).toEqualTypeOf<
+        ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>
+      >()
     }
 
     if (!error) {

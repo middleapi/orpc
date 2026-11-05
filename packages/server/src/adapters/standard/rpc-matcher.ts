@@ -1,13 +1,14 @@
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { Value } from '@orpc/shared'
-import type { StandardMethod } from '@standard-server/core'
-import type { AnyProcedure } from '../../procedure.ts'
-import type { AnyRouter } from '../../router.ts'
-import type { WalkProcedureContractsLazyResult } from '../../router-utils.ts'
 import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
+import type { StandardMethod } from '@standard-server/core'
+
 import { unlazy } from '../../lazy.ts'
+import type { AnyProcedure } from '../../procedure.ts'
 import { Procedure } from '../../procedure.ts'
+import type { WalkProcedureContractsLazyResult } from '../../router-utils.ts'
 import { resolveContractProcedure, walkProcedureContractsSync } from '../../router-utils.ts'
+import type { AnyRouter } from '../../router.ts'
 
 /**
  * Methods that can invoke procedures by default. Browsers cannot trigger them
@@ -18,7 +19,12 @@ import { resolveContractProcedure, walkProcedureContractsSync } from '../../rout
  *
  * @see {@link https://orpc.dev/docs/rpc/handler#supported-http-methods | RPC Handler - Supported HTTP Methods}
  */
-export const RPC_DEFAULT_ALLOW_METHODS: readonly StandardMethod[] = ['POST', 'PUT', 'PATCH', 'DELETE']
+export const RPC_DEFAULT_ALLOW_METHODS: readonly StandardMethod[] = [
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+]
 
 export interface RPCMatcherOptions {
   /**
@@ -26,7 +32,9 @@ export interface RPCMatcherOptions {
    *
    * @default true
    */
-  filter?: Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
+  filter?:
+    | Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]>
+    | undefined
 
   /**
    * Restricts which HTTP methods can invoke procedures, either with a list of allowed
@@ -37,7 +45,10 @@ export interface RPCMatcherOptions {
    * @default RPC_DEFAULT_ALLOW_METHODS (['POST', 'PUT', 'PATCH', 'DELETE'])
    * @see {@link https://orpc.dev/docs/rpc/handler#supported-http-methods | RPC Handler - Supported HTTP Methods}
    */
-  allowMethods?: readonly StandardMethod[] | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean) | undefined
+  allowMethods?:
+    | readonly StandardMethod[]
+    | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
+    | undefined
 }
 
 // `%` or a char `encodeURIComponent` encodes, meaning normalization may change the pathname
@@ -57,7 +68,9 @@ interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
 export class RPCMatcher {
   private readonly filter: Exclude<RPCMatcherOptions['filter'], undefined>
   private readonly allowMethodsSet: undefined | ReadonlySet<StandardMethod>
-  private readonly allowMethodsFn: undefined | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
+  private readonly allowMethodsFn:
+    | undefined
+    | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
   private readonly rootRouter: AnyRouter
 
   private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
@@ -71,8 +84,7 @@ export class RPCMatcher {
     const allowMethods = options.allowMethods ?? RPC_DEFAULT_ALLOW_METHODS
     if (typeof allowMethods !== 'function') {
       this.allowMethodsSet = new Set(allowMethods)
-    }
-    else {
+    } else {
       this.allowMethodsFn = allowMethods
     }
 
@@ -81,18 +93,22 @@ export class RPCMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
-    const lazyResults = walkProcedureContractsSync(router, (procedure, procedurePath) => {
-      if (!value(this.filter, procedure, procedurePath)) {
-        return
-      }
+    const lazyResults = walkProcedureContractsSync(
+      router,
+      (procedure, procedurePath) => {
+        if (!value(this.filter, procedure, procedurePath)) {
+          return
+        }
 
-      this.tree.set(pathToHttpPath(procedurePath), {
-        path: procedurePath,
-        contract: procedure,
-        // contract-first entries have no implementation yet, resolveProcedure fills it in on demand
-        procedure: procedure instanceof Procedure ? procedure : undefined,
-      })
-    }, path)
+        this.tree.set(pathToHttpPath(procedurePath), {
+          path: procedurePath,
+          contract: procedure,
+          // contract-first entries have no implementation yet, resolveProcedure fills it in on demand
+          procedure: procedure instanceof Procedure ? procedure : undefined,
+        })
+      },
+      path,
+    )
 
     for (const result of lazyResults) {
       this.pendingLazyRouters.set(pathToHttpPath(result.path), result)
@@ -100,7 +116,11 @@ export class RPCMatcher {
     }
   }
 
-  async match(method: StandardMethod, pathname: `/${string}`, prefix: `/${string}` | undefined): Promise<{ path: string[], procedure: AnyProcedure } | undefined> {
+  async match(
+    method: StandardMethod,
+    pathname: `/${string}`,
+    prefix: `/${string}` | undefined,
+  ): Promise<{ path: string[]; procedure: AnyProcedure } | undefined> {
     if (this.allowMethodsSet && !this.allowMethodsSet.has(method)) {
       return undefined
     }
@@ -114,14 +134,11 @@ export class RPCMatcher {
 
       if (charAfterPrefix === '/') {
         pathname = pathname.slice(prefix.length) as `/${string}`
-      }
-      else if (charAfterPrefix === undefined) {
+      } else if (charAfterPrefix === undefined) {
         pathname = '/'
-      }
-      else if (prefix[prefix.length - 1] === '/') {
+      } else if (prefix[prefix.length - 1] === '/') {
         pathname = pathname.slice(prefix.length - 1) as `/${string}`
-      }
-      else {
+      } else {
         return undefined
       }
     }
@@ -158,7 +175,7 @@ export class RPCMatcher {
       return undefined
     }
 
-    const procedure = entry.procedure ?? await this.resolveProcedure(entry)
+    const procedure = entry.procedure ?? (await this.resolveProcedure(entry))
 
     if (this.allowMethodsFn && !this.allowMethodsFn(method, procedure, entry.path)) {
       return undefined
@@ -185,7 +202,9 @@ export class RPCMatcher {
       const pending = this.pendingLazyRouters.get(httpPathPrefix)
 
       if (pending !== undefined) {
-        return this.loadPendingLazyRouter(httpPathPrefix, pending).then(() => this.resolvePendingLazyRouters(pathname))
+        return this.loadPendingLazyRouter(httpPathPrefix, pending).then(() =>
+          this.resolvePendingLazyRouters(pathname),
+        )
       }
 
       slashIndex = nextSlashIndex
@@ -203,7 +222,10 @@ export class RPCMatcher {
     return pending.loading
   }
 
-  private async indexPendingLazyRouter(httpPathPrefix: string, pending: PendingLazyRouter): Promise<void> {
+  private async indexPendingLazyRouter(
+    httpPathPrefix: string,
+    pending: PendingLazyRouter,
+  ): Promise<void> {
     const { default: router } = await unlazy(pending.router)
 
     this.index(router, pending.path)
