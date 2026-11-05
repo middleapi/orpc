@@ -7,7 +7,7 @@
     "check": "oxlint",
     "fix": "oxlint --fix",
     "format": "oxfmt",
-    "repo:fix": "sherif --fix -i typescript@^6.0.3",
+    "repo:fix": "sherif --fix -i typescript",
     "test": "pnpm run -r test && vitest run",
     "test:coverage": "pnpm run -r test:coverage && vitest run --coverage",
     "bench": "vitest bench --run",
