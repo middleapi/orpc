@@ -30,6 +30,31 @@ export default defineConfig({
     'prefer-const': 'error',
     'typescript/no-import-type-side-effects': 'error',
     'unicorn/prefer-node-protocol': 'error',
+    'no-restricted-globals': [
+      'error',
+      {
+        name: 'global',
+        message: 'Use `globalThis` instead.',
+      },
+      {
+        name: 'self',
+        message: 'Use `globalThis` instead.',
+      },
+      {
+        name: 'AbortSignal',
+        message: 'AbortSignal is not a global in every runtime, read it only behind a typeof guard',
+      },
+      {
+        name: 'encodeURIComponent',
+        message:
+          'encodeURIComponent throws on lone surrogates, use safeEncodeURIComponent from @orpc/shared instead',
+      },
+      {
+        name: 'decodeURIComponent',
+        message:
+          'decodeURIComponent throws on malformed input, use safeDecodeURIComponent from @orpc/shared instead',
+      },
+    ],
     'no-restricted-properties': [
       'error',
       {
@@ -72,38 +97,13 @@ export default defineConfig({
   },
   overrides: [
     {
-      files: ['packages/*/src/**'],
-      rules: {
-        'no-restricted-globals': [
-          'error',
-          {
-            name: 'global',
-            message: 'Use `globalThis` instead.',
-          },
-          {
-            name: 'self',
-            message: 'Use `globalThis` instead.',
-          },
-          {
-            name: 'AbortSignal',
-            message:
-              'AbortSignal is not a global in every runtime, read it only behind a typeof guard',
-          },
-          {
-            name: 'encodeURIComponent',
-            message:
-              'encodeURIComponent throws on lone surrogates, use safeEncodeURIComponent from @orpc/shared instead',
-          },
-          {
-            name: 'decodeURIComponent',
-            message:
-              'decodeURIComponent throws on malformed input, use safeDecodeURIComponent from @orpc/shared instead',
-          },
-        ],
-      },
-    },
-    {
-      files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test-d.ts', 'playgrounds/**'],
+      files: [
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/*.test-d.ts',
+        'playgrounds/**',
+        'apps/content/**',
+      ],
       rules: {
         'no-unused-vars': 'off',
         'no-restricted-properties': 'off',
