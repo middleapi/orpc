@@ -75,6 +75,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
     })
     const window: { onload?: () => void } = { SwaggerUIBundle, ...globals } as any
 
+    // oxlint-disable-next-line typescript/no-implied-eval
     new Function('window', 'SwaggerUIBundle', script)(window, SwaggerUIBundle)
     window.onload!()
 

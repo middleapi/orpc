@@ -46,7 +46,7 @@ export function* getConstructors(value: unknown): Generator<Function> {
   }
 
   let proto = Object.getPrototypeOf(value)
-  while (proto != null) {
+  while (proto !== null) {
     if (proto.constructor) {
       yield proto.constructor
     }

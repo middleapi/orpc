@@ -358,7 +358,7 @@ export class JsonSchemaCoercer {
         }
         case 'object': {
           if (Array.isArray(coerced)) {
-            // eslint-disable-next-line typescript/no-misused-spread
+            // oxlint-disable-next-line typescript/no-misused-spread
             coerced = { ...coerced }
           }
 

@@ -13,7 +13,7 @@ export function CreatePlanetForm() {
   const { mutate, isPending, error } = useMutation(
     orpc.planet.create.mutationOptions({
       onSuccess() {
-        queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           queryKey: orpc.planet.key(),
         })
       },

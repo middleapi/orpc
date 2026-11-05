@@ -6,7 +6,7 @@ import { openapi } from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import z from 'zod'
+import * as z from 'zod'
 
 import { createHTTPUtils } from './index.ts'
 

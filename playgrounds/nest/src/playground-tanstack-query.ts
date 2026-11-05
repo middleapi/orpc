@@ -22,7 +22,7 @@ const mutation = useMutation(
       }
     },
     onSuccess() {
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({
         queryKey: orpc.planet.key(),
       })
     },

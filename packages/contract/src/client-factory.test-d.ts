@@ -98,13 +98,13 @@ describe('createContractClientFactory', () => {
     const factory = createContractClientFactory(link)
 
     // @ts-expect-error - invalid input
-    factory(contract.nested.pong)(123)
+    void factory(contract.nested.pong)(123)
   })
 
   it('rejects invalid context', () => {
     const factory = createContractClientFactory(link)
 
     // @ts-expect-error - invalid context
-    factory(contract.nested.pong)('string', { context: { cache: 'invalid' } })
+    void factory(contract.nested.pong)('string', { context: { cache: 'invalid' } })
   })
 })

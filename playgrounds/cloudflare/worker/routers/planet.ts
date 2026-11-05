@@ -1,6 +1,6 @@
 import { openapi } from '@orpc/openapi'
 import { call } from '@orpc/server'
-import z from 'zod'
+import * as z from 'zod'
 
 import { protectedOS, publicOS } from '../orpc'
 import { CreatingPlanetSchema, PlanetSchema } from '../schemas/planet'

@@ -5,12 +5,11 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [],
     "declaration": true,
-    "isolatedDeclarations": true,
     "noEmit": false,
     "rootDir": "${configDir}/src",
     "outDir": "${configDir}/dist"
   },
-  "include": ["${configDir}/package.json", "${configDir}/src"],
+  "include": ["${configDir}/src"],
   "exclude": [
     "${configDir}/src/**/*.test.ts",
     "${configDir}/src/**/*.test.tsx",

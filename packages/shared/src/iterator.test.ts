@@ -245,7 +245,7 @@ describe('traceAsyncIterator', () => {
       try {
         yield 1
       } finally {
-        // eslint-disable-next-line no-unsafe-finally
+        // oxlint-disable-next-line no-unsafe-finally
         throw new Error('Forced error')
       }
     })()
@@ -583,7 +583,7 @@ describe('consumeAsyncIterator', () => {
         return 3
       } finally {
         cleanup = true
-        // eslint-disable-next-line no-unsafe-finally
+        // oxlint-disable-next-line no-unsafe-finally
         throw error
       }
     })()

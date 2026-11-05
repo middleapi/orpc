@@ -122,7 +122,7 @@ describe('durable publisher object', () => {
     // the closing socket is still listed alongside the healthy one when publishing
     await runInDurableObject(stub, async (_, state) => {
       const readyStates = state.getWebSockets().map((websocket) => websocket.readyState)
-      expect(readyStates.sort()).toEqual([WebSocket.OPEN, WebSocket.CLOSING])
+      expect(readyStates.toSorted((a, b) => a - b)).toEqual([WebSocket.OPEN, WebSocket.CLOSING])
     })
 
     expect((await publish(stub, { data: { text: 'live event' } })).status).toBe(204)

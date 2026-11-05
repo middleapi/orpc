@@ -1,8 +1,8 @@
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type * as OpenAPIV3_0 from '@openapi-spec/types/v3.0'
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type * as OpenAPIV3_1 from '@openapi-spec/types/v3.1'
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type * as OpenAPIV3_2 from '@openapi-spec/types/v3.2'
 import type { AnyNestedClient, Client, ORPCError } from '@orpc/client'
 import type { AsyncIteratorClass } from '@orpc/shared'

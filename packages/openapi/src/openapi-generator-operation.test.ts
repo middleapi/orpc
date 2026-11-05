@@ -1426,7 +1426,7 @@ describe('openAPIGenerator operation builders', () => {
         expect.objectContaining({ oneOf: expect.any(Array) }),
       )
       // the default schema of 400 was not used, so its error component is not registered
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual([
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual([
         'NotFound',
         'UndefinedError',
       ])

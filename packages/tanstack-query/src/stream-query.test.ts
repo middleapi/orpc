@@ -578,7 +578,7 @@ describe('serializableStreamedQuery', () => {
       expect(queryClient.getQueryData(key)).toEqual(['chunk1'])
 
       // reset data before stream ends
-      queryClient.resetQueries({ queryKey: key, exact: true })
+      void queryClient.resetQueries({ queryKey: key, exact: true })
 
       await promise1
     })

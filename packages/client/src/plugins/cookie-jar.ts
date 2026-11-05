@@ -249,7 +249,7 @@ function splitCookiePair(pair: string): [name: string, value: string] {
  */
 function parseSetCookie(setCookie: string) {
   // Control characters other than tab make the whole cookie invalid
-  // eslint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0A-\x1F\x7F]/.test(setCookie)) {
     return undefined
   }

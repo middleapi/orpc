@@ -7,7 +7,7 @@ import {
   useQueries,
   useQuery,
 } from '@tanstack/solid-query'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils } from './procedure-utils.ts'
 

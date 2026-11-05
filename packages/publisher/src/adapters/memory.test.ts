@@ -267,7 +267,7 @@ describe('memoryPublisher', () => {
     it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
       const publisher = new MemoryPublisher<TestEvents>()
 
-      // eslint-disable-next-line prefer-const -- assigned after the callback that reads it is created
+      // oxlint-disable-next-line prefer-const -- assigned after the callback that reads it is created
       let unsubscribeFirst: () => Promise<void>
       const first = vi.fn(() => {
         void unsubscribeFirst()

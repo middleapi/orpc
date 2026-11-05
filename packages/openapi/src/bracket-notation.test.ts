@@ -481,6 +481,7 @@ describe('bracket notation serializer', () => {
 
     it('stores integer keys that leave gaps in objects sparsely, without a trace', () => {
       setFlagsFromString('--allow-natives-syntax')
+      // oxlint-disable-next-line typescript/no-implied-eval
       const hasSparseIntegerKeys = new Function('o', 'return %HasDictionaryElements(o)') as (
         o: object,
       ) => boolean

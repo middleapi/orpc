@@ -1,5 +1,5 @@
 import type { Schema } from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
 
 import { os } from './builder.ts'
 import type { ProcedureClient } from './procedure-client.ts'

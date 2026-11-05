@@ -68,14 +68,14 @@ it('case: useSWRInfinite', async () => {
 
   await act(async () => {
     await vi.waitFor(() => expect(result.current.swr.data).toEqual([{ output: '1' }]))
-    result.current.swr.setSize(2)
+    void result.current.swr.setSize(2)
   })
 
   await act(async () => {
     await vi.waitFor(() =>
       expect(result.current.swr.data).toEqual([{ output: '1' }, { output: '2' }]),
     )
-    result.current.swr.setSize(3)
+    void result.current.swr.setSize(3)
   })
 
   await act(async () => {

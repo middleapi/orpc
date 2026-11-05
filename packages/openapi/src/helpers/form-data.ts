@@ -105,4 +105,6 @@ export function getIssueMessage(error: unknown, path: string): string | undefine
       return issue.message
     }
   }
+
+  return undefined
 }

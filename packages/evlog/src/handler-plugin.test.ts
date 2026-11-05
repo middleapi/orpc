@@ -285,7 +285,7 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger } = mockIntegration()
 
     async function* source() {
-      // eslint-disable-next-line no-throw-literal
+      // oxlint-disable-next-line no-throw-literal
       throw 'iterator-failure'
     }
 

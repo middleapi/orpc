@@ -32,8 +32,10 @@ describe('sharedUtils', () => {
     })
 
     it('can be used for mutating', () => {
-      mutate(optionalUtils.matcher())
-      mutate(requiredUtils.matcher({ strategy: 'exact', input: { nested: { value1: 'test' } } }))
+      void mutate(optionalUtils.matcher())
+      void mutate(
+        requiredUtils.matcher({ strategy: 'exact', input: { nested: { value1: 'test' } } }),
+      )
     })
   })
 })

@@ -1,5 +1,5 @@
 import * as ClientModule from '@orpc/client'
-import z from 'zod'
+import * as z from 'zod'
 
 import { mergeErrorMap, reconcileORPCError } from './error-utils.ts'
 import type { ErrorMap } from './error.ts'

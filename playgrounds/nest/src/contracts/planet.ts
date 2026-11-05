@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
-import z from 'zod'
+import * as z from 'zod'
 
 import { bearAuthMeta } from '../meta'
 import { CreatingPlanetSchema, PlanetSchema } from '../schemas/planet'

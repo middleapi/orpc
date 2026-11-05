@@ -6,7 +6,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { PiniaColada } from '@pinia/colada'
 import { mount as baseMount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import z from 'zod'
+import * as z from 'zod'
 
 import { createPiniaColadaUtils } from '../../src/index.ts'
 

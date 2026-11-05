@@ -7,7 +7,7 @@ import { client, orpc } from './__shared__/orpc.ts'
 it('.key', () => {
   const queryCache = useQueryCache()
 
-  queryCache.invalidateQueries({
+  void queryCache.invalidateQueries({
     key: orpc.nested.key(),
   })
 
@@ -132,7 +132,7 @@ describe('.mutationOptions', () => {
 
     mutation.mutate({ input: 123 })
 
-    mutation.mutateAsync({
+    void mutation.mutateAsync({
       // @ts-expect-error --- input is invalid
       input: 'INVALID',
     })

@@ -18,7 +18,7 @@ describe.concurrent('lock redis adapters compatibility', async () => {
     const redis = createClient({ url: REDIS_URL })
 
     afterAll(() => {
-      redis.close()
+      void redis.close()
     })
 
     lockers.push({

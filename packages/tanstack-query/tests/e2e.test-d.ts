@@ -14,7 +14,7 @@ import {
 import { client, orpc, queryClient } from './__shared__/orpc.tsx'
 
 it('.key', () => {
-  queryClient.invalidateQueries({
+  void queryClient.invalidateQueries({
     queryKey: orpc.key({ type: 'query' }),
   })
 
@@ -593,7 +593,7 @@ describe('.mutationOptions', () => {
 
     mutation.mutate({ input: 123 })
 
-    mutation.mutateAsync({
+    void mutation.mutateAsync({
       // @ts-expect-error --- input is invalid
       input: 'invalid',
     })

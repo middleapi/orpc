@@ -194,7 +194,7 @@ describe('signalSyncHandlerPlugin', () => {
           yield 'second'
         }),
         {
-          plugins: reverse ? plugins.reverse() : plugins,
+          plugins: reverse ? plugins.toReversed() : plugins,
         },
       )
 

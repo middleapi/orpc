@@ -151,7 +151,7 @@ describe('encodeBase64', () => {
     if (descriptor) {
       delete (Uint8Array.prototype as any).toBase64
       onTestFinished(() => {
-        // eslint-disable-next-line no-extend-native -- restores the native method removed above
+        // oxlint-disable-next-line no-extend-native -- restores the native method removed above
         Object.defineProperty(Uint8Array.prototype, 'toBase64', descriptor)
       })
     }

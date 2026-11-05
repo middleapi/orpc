@@ -1,7 +1,7 @@
 import type { AnyMetaPlugin, ErrorMap } from '@orpc/contract'
 import { setHiddenMetaPlugins } from '@orpc/contract'
 import * as ContractModule from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { AnyMiddleware } from './middleware.ts'
 import { DecoratedProcedure } from './procedure-decorated.ts'

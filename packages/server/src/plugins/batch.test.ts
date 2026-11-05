@@ -502,7 +502,7 @@ describe('batchHandlerPlugin', () => {
           messages
             .filter((m) => m.kind === 'response')
             .map((m) => m.id)
-            .sort(),
+            .toSorted((a, b) => a.localeCompare(b)),
         ).toEqual(['0', '1'])
         expect(new TextDecoder().decode(messages.find((m) => m.id === '1').binary)).toBe('__FILE__')
       })

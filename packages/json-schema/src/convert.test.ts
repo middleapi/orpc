@@ -1,5 +1,5 @@
 import { type } from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { JsonSchemaConverter } from './convert.ts'
 import { DelegatingJsonSchemaConverter } from './convert.ts'

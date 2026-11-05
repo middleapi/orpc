@@ -167,7 +167,7 @@ describe('requestLimitHandlerPlugin', () => {
     )
 
     const server = supertest((req: any, res: any) => {
-      nodeHandler.handle(req, res)
+      void nodeHandler.handle(req, res)
     })
 
     const response = await server

@@ -1,5 +1,5 @@
 import { ORPCError } from '@orpc/client'
-import z from 'zod'
+import * as z from 'zod'
 
 import { createORPCErrorConstructorMap, error } from './error-factory.ts'
 import { ValidationError } from './error.ts'

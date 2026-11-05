@@ -1,4 +1,4 @@
-import z from 'zod'
+import * as z from 'zod'
 
 import { os } from './builder.ts'
 import { call } from './procedure-utils.ts'
@@ -8,9 +8,9 @@ describe('call', () => {
     const procedure = os.$context<{ auth: boolean }>().handler(() => 'output')
 
     // @ts-expect-error require input & options
-    call(procedure)
+    void call(procedure)
     // @ts-expect-error require options
-    call(procedure, undefined)
+    void call(procedure, undefined)
 
     const output = await call(procedure, undefined, { context: { auth: true } })
     expectTypeOf(output).toEqualTypeOf<string>()
@@ -20,7 +20,7 @@ describe('call', () => {
     const procedure = os.input(z.string()).handler(() => 'output')
 
     // @ts-expect-error require input & options
-    call(procedure)
+    void call(procedure)
 
     const output = await call(procedure, 'input')
     expectTypeOf(output).toEqualTypeOf<string>()
@@ -37,15 +37,15 @@ describe('call', () => {
     const procedure = os.input(z.number()).handler(() => 'output')
 
     // @ts-expect-error require input is invalid
-    call(procedure, 'invalid')
-    call(procedure, 123)
+    void call(procedure, 'invalid')
+    void call(procedure, 123)
   })
 
   it('infer correct context types', () => {
     const procedure = os.$context<{ auth: boolean }>().handler(() => 'output')
 
     // @ts-expect-error require input is invalid
-    call(procedure, undefined, { context: { auth: 'invalid' } })
-    call(procedure, undefined, { context: { auth: true } })
+    void call(procedure, undefined, { context: { auth: 'invalid' } })
+    void call(procedure, undefined, { context: { auth: true } })
   })
 })

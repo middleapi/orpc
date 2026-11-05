@@ -11,7 +11,7 @@
     "test:coverage": "pnpm run -r test:coverage && vitest run --coverage",
     "bench": "vitest bench --run",
     "docs:validate": "node scripts/verify-docs-jsdoc.ts && pnpm run -r docs:validate",
-    "sponsors:sync": "node scripts/sync-sponsors.ts && oxfmt \"**/README.md\""
+    "sponsors:sync": "node scripts/sync-sponsors.ts && oxfmt '**/README.md' apps/content/sponsors"
   },
   "devDependencies": {
     "@codspeed/vitest-plugin": "^6.1.0",

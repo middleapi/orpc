@@ -180,7 +180,7 @@ describe('catchORPCErrorCode', () => {
       }),
     )
 
-    expectTypeOf(recovered).toEqualTypeOf<Effect.Effect<'output' | 'recovered', never, never>>()
+    expectTypeOf(recovered).toEqualTypeOf<Effect.Effect<'output' | 'recovered'>>()
   })
 
   it('suggests and restricts the code to those present in the error channel', () => {
@@ -517,7 +517,7 @@ describe('catchORPCErrorCodes', () => {
       }),
     )
 
-    expectTypeOf(recoveredAll).toEqualTypeOf<Effect.Effect<'output' | 'nf' | 'cf', never>>()
+    expectTypeOf(recoveredAll).toEqualTypeOf<Effect.Effect<'output' | 'nf' | 'cf'>>()
   })
 
   it('keeps codes whose handler can be undefined in the error channel', () => {

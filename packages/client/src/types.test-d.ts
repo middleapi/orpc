@@ -38,7 +38,7 @@ describe('client', () => {
     expectTypeOf(client).parameter(0).toEqualTypeOf<string>()
 
     // @ts-expect-error - input is required
-    client()
+    void client()
   })
 
   it('optional undefinedable input', () => {
@@ -46,32 +46,32 @@ describe('client', () => {
 
     expectTypeOf(client).parameter(0).toEqualTypeOf<{ val: string } | undefined>()
 
-    client(undefined)
-    client()
+    void client(undefined)
+    void client()
   })
 
   it('accept signal', () => {
-    client('123', { signal: new AbortSignal() })
+    void client('123', { signal: new AbortSignal() })
     // @ts-expect-error - invalid signal
-    client('123', { signal: 1234 })
+    void client('123', { signal: 1234 })
   })
 
   describe('context', () => {
     it('can accept context', () => {
       const client = {} as Client<{ userId: string }, { val: string }, { val: number }, Error>
 
-      client({ val: '123' }, { context: { userId: '123' } })
+      void client({ val: '123' }, { context: { userId: '123' } })
       // @ts-expect-error - invalid context
-      client({ val: '123' }, { context: { userId: 123 } })
+      void client({ val: '123' }, { context: { userId: 123 } })
       // @ts-expect-error - context is required
-      client({ val: '123' })
+      void client({ val: '123' })
     })
 
     it('optional options when context is optional', () => {
       const client = {} as Client<{ userId?: string }, { val: string }, { val: number }, Error>
 
-      client({ val: '123' })
-      client({ val: '123' }, { context: { userId: '123' } })
+      void client({ val: '123' })
+      void client({ val: '123' }, { context: { userId: '123' } })
     })
 
     it('can call without args when both input and context are optional', () => {
@@ -82,13 +82,13 @@ describe('client', () => {
         Error
       >
 
-      client()
-      client({ val: 'string' })
-      client({ val: 'string' }, { context: { userId: '123' } })
+      void client()
+      void client({ val: 'string' })
+      void client({ val: 'string' }, { context: { userId: '123' } })
       // @ts-expect-error - input is invalid
-      client({ val: 123 }, { context: { userId: '123' } })
+      void client({ val: 123 }, { context: { userId: '123' } })
       // @ts-expect-error - context is invalid
-      client({ val: '123' }, { context: { userId: 123 } })
+      void client({ val: '123' }, { context: { userId: 123 } })
     })
   })
 

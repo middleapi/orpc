@@ -1,5 +1,5 @@
 import { openapi } from '@orpc/openapi'
-import z from 'zod'
+import * as z from 'zod'
 
 import { protectedOS, publicOS } from '@/orpc'
 

@@ -30,15 +30,15 @@ export const contract = {
 
 const os = implement(contract).$context<{ headers?: IncomingHttpHeaders }>()
 
-export const listPlanet = os.planet.list.handler(({ input }) => {
+export const listPlanet = os.planet.list.handler(() => {
   return []
 })
 
-export const findPlanet = os.planet.find.handler(({ input }) => {
+export const findPlanet = os.planet.find.handler(() => {
   return { id: 123, name: 'name' }
 })
 
-export const createPlanet = os.planet.create.handler(({ input }) => {
+export const createPlanet = os.planet.create.handler(() => {
   return { id: 123, name: 'name' }
 })
 

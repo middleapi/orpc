@@ -273,7 +273,7 @@ describe('openAPIComponentRegistry', () => {
       })
 
       expect(result).toEqual({ $ref: '#/components/schemas/Planet2' })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Planet', 'Planet2'])
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual(['Planet', 'Planet2'])
     })
 
     it.each([
@@ -325,7 +325,7 @@ describe('openAPIComponentRegistry', () => {
       expect(registry.hoistDefs(structuredClone(wrapper))).toEqual({
         $ref: '#/components/schemas/Wrapper',
       })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Data', 'Wrapper'])
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual(['Data', 'Wrapper'])
     })
 
     it.each([
@@ -355,7 +355,9 @@ describe('openAPIComponentRegistry', () => {
       })
 
       expect(result).toEqual({ $ref: `#/components/schemas/${expected}` })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(Object.keys(schemas).sort())
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual(
+        Object.keys(schemas).toSorted(),
+      )
     })
 
     it('compares a ref to a sibling by its own body when the sibling reuses another def name', () => {
@@ -426,7 +428,11 @@ describe('openAPIComponentRegistry', () => {
       })
 
       expect(result).toEqual({ $ref: '#/components/schemas/User' })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Post', 'Post2', 'User'])
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual([
+        'Post',
+        'Post2',
+        'User',
+      ])
       expect(doc.components?.schemas?.Post).toEqual({ type: 'string' })
     })
 
@@ -450,7 +456,11 @@ describe('openAPIComponentRegistry', () => {
       })
 
       expect(result).toEqual({ $ref: '#/components/schemas/User' })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Post', 'Post2', 'User'])
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual([
+        'Post',
+        'Post2',
+        'User',
+      ])
     })
 
     it('reuses sibling defs when a later sibling needs the family rename', () => {
@@ -473,7 +483,11 @@ describe('openAPIComponentRegistry', () => {
       })
 
       expect(result).toEqual({ $ref: '#/components/schemas/User2' })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Post', 'User', 'User2'])
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual([
+        'Post',
+        'User',
+        'User2',
+      ])
     })
 
     it('handles shared subschema instances during traversal and comparison', () => {
@@ -512,7 +526,7 @@ describe('openAPIComponentRegistry', () => {
       })
 
       expect(result).toEqual({ $ref: '#/components/schemas/Pair' })
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Leaf', 'Pair'])
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual(['Leaf', 'Pair'])
     })
 
     it('does not reuse components whose date defaults differ', () => {
@@ -610,7 +624,7 @@ describe('openAPIComponentRegistry', () => {
           'output',
         ),
       ).toEqual({ $ref: '#/components/schemas/PlanetInput' })
-      expect(Object.keys(taken.doc.components?.schemas ?? {}).sort()).toEqual([
+      expect(Object.keys(taken.doc.components?.schemas ?? {}).toSorted()).toEqual([
         'Planet',
         'PlanetInput',
       ])
@@ -651,7 +665,7 @@ describe('openAPIComponentRegistry', () => {
         ),
       ).toEqual({ $ref: '#/components/schemas/Planet2' })
 
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual([
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual([
         'Planet',
         'Planet2',
         'PlanetOutput',
@@ -683,7 +697,7 @@ describe('openAPIComponentRegistry', () => {
         ),
       ).toEqual({ $ref: '#/components/schemas/Planet2' })
 
-      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual([
+      expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual([
         'Planet',
         'Planet2',
         'PlanetInput',

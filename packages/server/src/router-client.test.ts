@@ -1,4 +1,4 @@
-import z from 'zod'
+import * as z from 'zod'
 
 import { os } from './builder.ts'
 import * as ProcedureClientModule from './procedure-client.ts'

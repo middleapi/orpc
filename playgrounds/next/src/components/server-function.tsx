@@ -37,7 +37,7 @@ export function ServerFunction() {
 
       <form
         action={(form) => {
-          action.execute(parseFormData(form))
+          void action.execute(parseFormData(form))
         }}
       >
         <div className="field">

@@ -2,7 +2,7 @@ import type { Client, ORPCError } from '@orpc/client'
 import type { RouterContractClient } from '@orpc/contract'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import type { AsyncIteratorClass } from '@orpc/shared'
-import z from 'zod'
+import * as z from 'zod'
 
 import type {
   JsonifiedClient,

@@ -53,7 +53,7 @@ export const createCompressionCrosswsClientServerTest: CreateClientServerTest = 
 
   server.on('upgrade', (req, socket, head) => {
     if (req.headers.upgrade === 'websocket') {
-      ws.handleUpgrade(req, socket, head)
+      void ws.handleUpgrade(req, socket, head)
     }
   })
 

@@ -506,6 +506,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     async () => {
       const userSubscriber = await redis.duplicate()
       const userOnclose = vi.fn()
+      // oxlint-disable-next-line unicorn/prefer-add-event-listener
       userSubscriber.onclose = userOnclose
       onTestFinished(() => {
         userSubscriber.close()

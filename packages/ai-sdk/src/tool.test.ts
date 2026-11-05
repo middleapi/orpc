@@ -3,7 +3,7 @@ import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { generateText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
-import z from 'zod'
+import * as z from 'zod'
 
 import { aiSdkTool } from './tool-meta.ts'
 import { createToolFactory, implementToolFactory } from './tool.ts'

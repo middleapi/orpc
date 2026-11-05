@@ -20,7 +20,7 @@ function mockText(): AnyTextAdapter {
     kind: 'text' as const,
     name: 'mock',
     model: 'mock-echo-1',
-    async *chatStream(options: TextOptions<Record<string, any>>): AsyncIterable<StreamChunk> {
+    async *chatStream(options: TextOptions): AsyncIterable<StreamChunk> {
       const runId = options.runId ?? 'run_mock'
       const threadId = options.threadId ?? 'thread_mock'
       const messageId = 'msg_mock'

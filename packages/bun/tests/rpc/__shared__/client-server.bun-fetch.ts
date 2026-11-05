@@ -28,7 +28,7 @@ export const createBunFetchClientServerTest: CreateClientServerTest = (
   })
 
   afterAll(() => {
-    server.stop()
+    void server.stop()
   })
 
   const link = new RPCLink({

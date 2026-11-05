@@ -2,7 +2,7 @@ import { oc } from '@orpc/contract'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { RPCHandler } from '@orpc/server/fetch'
 import type { HttpHandler } from 'msw'
-import z from 'zod'
+import * as z from 'zod'
 
 import { createHTTPUtils } from './http-router-utils.ts'
 

@@ -128,7 +128,7 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
 
     // Since the default oRPC format is always draft/2020-12,
     // `$schema` can be safely omitted here.
-    const { $schema, ...rest } = jsonSchema
+    const { $schema: _schema, ...rest } = jsonSchema
     return rest
   }
 }

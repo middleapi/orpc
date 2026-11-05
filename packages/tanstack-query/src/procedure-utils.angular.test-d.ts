@@ -7,7 +7,7 @@ import {
   QueryClient,
 } from '@tanstack/angular-query-experimental'
 import { injectQueries } from '@tanstack/angular-query-experimental/inject-queries-experimental'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils } from './procedure-utils.ts'
 

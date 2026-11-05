@@ -145,7 +145,7 @@ export function toSpanAttributeValue(data: unknown): string {
   }
 
   try {
-    // eslint-disable-next-line no-restricted-properties
+    // oxlint-disable-next-line no-restricted-properties
     return JSON.stringify(data, (_, value) => {
       if (typeof value === 'bigint') {
         return value.toString()

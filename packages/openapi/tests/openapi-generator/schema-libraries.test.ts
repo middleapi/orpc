@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 import * as arktype from 'arktype'
-import z from 'zod'
+import * as z from 'zod'
 
 import { openapi, OpenAPIGenerator } from '../../src/index.ts'
 import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../__shared__/schema.ts'

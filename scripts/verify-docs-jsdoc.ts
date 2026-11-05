@@ -613,11 +613,13 @@ async function main(): Promise<void> {
 
   if (values.list) {
     for (const mention of selected) {
+      // oxlint-disable-next-line no-console
       console.log(
         `${mention.specifier}#${mention.name}\t${[...mention.pages].toSorted().join(', ')}`,
       )
     }
 
+    // oxlint-disable-next-line no-console
     console.log(`\n${selected.length} docs-mentioned symbols`)
     return
   }
@@ -733,18 +735,22 @@ async function main(): Promise<void> {
   }
 
   for (const [group, issues] of [...byGroup.entries()].toSorted(([a], [b]) => a.localeCompare(b))) {
+    // oxlint-disable-next-line no-console
     console.log(`\n${group}`)
 
     for (const issue of issues) {
       const severityLabel = issue.severity === 'error' ? 'error' : 'warn '
+      // oxlint-disable-next-line no-console
       console.log(
         `  ${severityLabel} [${issue.code}] ${issue.label}  ${issue.location ?? '(unresolved)'}`,
       )
+      // oxlint-disable-next-line no-console
       console.log(`        ${issue.message}${issue.note ? ` (${issue.note})` : ''}`)
     }
   }
 
   const allowlistNote = allowlisted > 0 ? `, ${allowlisted} allowlisted` : ''
+  // oxlint-disable-next-line no-console
   console.log(
     `\n${errors.length} errors, ${warnings.length} warnings across ${selected.length} docs-mentioned symbols and ${scannedLinks} orpc.dev links${allowlistNote}`,
   )

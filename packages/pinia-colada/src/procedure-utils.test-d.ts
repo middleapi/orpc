@@ -4,7 +4,7 @@ import type { PromiseWithError, Public } from '@orpc/shared'
 import type { UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
 import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
 import type {

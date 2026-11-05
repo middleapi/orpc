@@ -1,6 +1,6 @@
 import type { AnySchema } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
-import z from 'zod'
+import * as z from 'zod'
 
 /**
  * Converts zod schemas during tests.

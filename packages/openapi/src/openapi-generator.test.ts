@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 import * as arktype from 'arktype'
-import z from 'zod'
+import * as z from 'zod'
 
 import {
   testSchema,

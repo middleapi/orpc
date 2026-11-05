@@ -40,13 +40,13 @@ it('case: with useQuery', async () => {
     ),
   )
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.ping.key() })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.ping.key() })
   expect(mounted.vm.query.isLoading.value).toEqual(false)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.nested.pong.key() })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.nested.pong.key() })
   expect(mounted.vm.query.isLoading.value).toEqual(false)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.nested.key() })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.nested.key() })
   expect(mounted.vm.query.isLoading.value).toEqual(true)
 
   await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '123' }))
@@ -100,13 +100,13 @@ it('case: with streamed/useQuery', async () => {
     yield { output: '1' }
   } as any)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.ping.key() })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.ping.key() })
   expect(mounted.vm.query.isLoading.value).toEqual(false)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'live' }) })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'live' }) })
   expect(mounted.vm.query.isLoading.value).toEqual(false)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'streamed' }) })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'streamed' }) })
   expect(mounted.vm.query.isLoading.value).toEqual(true)
 
   // the first chunk is visible while the stream is still open
@@ -175,10 +175,10 @@ it('case: with live/useQuery', async () => {
     yield { output: '1' }
   } as any)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'streamed' }) })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'streamed' }) })
   expect(mounted.vm.query.isLoading.value).toEqual(false)
 
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'live' }) })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'live' }) })
   expect(mounted.vm.query.isLoading.value).toEqual(true)
 
   // each chunk replaces the previous value while the stream is still open
@@ -307,13 +307,13 @@ it('case: with prefix', async () => {
   ).toEqual({ output: '123' })
 
   // invalidating un-prefixed keys does not touch prefixed entries
-  mounted.vm.queryCache.invalidateQueries({ key: orpc.key() })
+  void mounted.vm.queryCache.invalidateQueries({ key: orpc.key() })
   expect(mounted.vm.prefixedQuery.isLoading.value).toEqual(false)
   expect(mounted.vm.query.isLoading.value).toEqual(true)
 
   // invalidating prefixed keys does not touch un-prefixed entries
   await vi.waitFor(() => expect(mounted.vm.query.isLoading.value).toEqual(false))
-  mounted.vm.queryCache.invalidateQueries({ key: prefixed.key() })
+  void mounted.vm.queryCache.invalidateQueries({ key: prefixed.key() })
   expect(mounted.vm.prefixedQuery.isLoading.value).toEqual(true)
   expect(mounted.vm.query.isLoading.value).toEqual(false)
 })

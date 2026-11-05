@@ -47,7 +47,7 @@ it('case: with useQuery', async () => {
 
   await act(async () => {
     vi.mocked(router.static['~orpc'].handler).mockRejectedValueOnce(new ORPCError('TEST'))
-    result.current.refetch()
+    void result.current.refetch()
 
     await vi.waitFor(() => {
       expect((result as any).current.error).toBeInstanceOf(ORPCError)
@@ -139,7 +139,7 @@ it('case: with streamed/useQuery', async () => {
 
   await act(async () => {
     // make sure refetch mode works
-    result.current.refetch()
+    void result.current.refetch()
 
     await vi.waitFor(() =>
       expect(result.current.data).toEqual([{ output: '1' }, { output: '0' }, { output: '1' }]),
@@ -148,7 +148,7 @@ it('case: with streamed/useQuery', async () => {
 
   await act(async () => {
     vi.mocked(router.stream['~orpc'].handler).mockRejectedValueOnce(new ORPCError('TEST'))
-    result.current.refetch()
+    void result.current.refetch()
 
     await vi.waitFor(() => {
       expect((result as any).current.error).toBeInstanceOf(ORPCError)
@@ -222,7 +222,7 @@ it('case: with useInfiniteQuery', async () => {
   })
 
   await act(async () => {
-    result.current.fetchNextPage()
+    void result.current.fetchNextPage()
 
     await vi.waitFor(() =>
       expect(result.current.data).toEqual({
@@ -241,7 +241,7 @@ it('case: with useInfiniteQuery', async () => {
 
   await act(async () => {
     vi.mocked(router.static['~orpc'].handler).mockRejectedValueOnce(new ORPCError('TEST'))
-    result.current.fetchNextPage()
+    void result.current.fetchNextPage()
 
     await vi.waitFor(() => {
       expect((result as any).current.error).toBeInstanceOf(ORPCError)

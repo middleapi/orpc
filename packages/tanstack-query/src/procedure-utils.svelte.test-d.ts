@@ -7,7 +7,7 @@ import {
   createQuery,
   QueryClient,
 } from '@tanstack/svelte-query'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils } from './procedure-utils.ts'
 

@@ -1,6 +1,6 @@
 import * as arktype from 'arktype'
 import * as v from 'valibot'
-import z from 'zod'
+import * as z from 'zod'
 
 import { isSchemaIssue, type } from './schema-utils.ts'
 

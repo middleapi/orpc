@@ -14,6 +14,7 @@ oRPC: typesafe APIs with RPC and OpenAPI support, in a pnpm monorepo.
 
 ```bash
 pnpm install
+npx skills experimental_install  # restore agent skills from skills-lock.json
 pnpm test                    # per-package tests + vitest
 pnpm vitest run <path>       # one test file
 pnpm check                   # lint and type check, including *.test-d.ts
@@ -28,4 +29,4 @@ Before finishing, run `pnpm format`, `pnpm check` and `pnpm test`. CI doesn't ch
 
 ## Pull requests
 
-Titles follow Conventional Commits, scoped by the affected package (`feat(server): ...`), or `rpc`/`openapi` for changes tied to a protocol. Use `content` only with `chore`, for the docs site itself; docs about a package use its scope (`docs(openapi): ...`). Leave out the scope when the change is too broad.
+Titles follow Conventional Commits, scoped by the affected packages, separated by a comma and a space: `fix(server): ...`, `fix(server, client): ...`. Use `rpc`/`openapi` for changes tied to a protocol, and `content` only with `chore`, for the docs site itself; docs about a package use its scope (`docs(openapi): ...`). Leave out the scope when the change is too broad.

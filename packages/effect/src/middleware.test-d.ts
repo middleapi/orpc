@@ -89,15 +89,13 @@ describe('middlewareGen', () => {
       }),
     )
 
-    void os
-      .$context<WithEffectContext<Service1>>()
-      .use(
-        // @ts-expect-error - Service2 is not provided
-        middlewareGen(function* ({ next }) {
-          yield* Service2
-          return yield* next()
-        }),
-      )
+    void os.$context<WithEffectContext<Service1>>().use(
+      // @ts-expect-error - Service2 is not provided
+      middlewareGen(function* ({ next }) {
+        yield* Service2
+        return yield* next()
+      }),
+    )
   })
 
   it('works with os.middleware for standalone middleware', () => {

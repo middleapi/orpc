@@ -2,7 +2,7 @@ import { once } from 'node:events'
 import type { AddressInfo } from 'node:net'
 
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
-import WebSocket, { WebSocketServer } from 'ws'
+import { WebSocket, WebSocketServer } from 'ws'
 
 import { os } from '../../builder.ts'
 import { RPCHandler } from './rpc-handler.ts'

@@ -9,22 +9,3 @@ updates:
       # pnpm requires minimumReleaseAge of 1, so the value below should be 1 or more
       default-days: 1
     versioning-strategy: increase
-    groups:
-      oxc:
-        patterns:
-          - oxlint
-          - oxlint-tsgolint
-          - oxfmt
-      standard-server:
-        patterns:
-          - '@standard-server/*'
-      dev-dependencies-minor-patch:
-        dependency-type: development
-        exclude-patterns:
-          - oxlint
-          - oxlint-tsgolint
-          - oxfmt
-          - compression # inline
-        update-types:
-          - minor
-          - patch

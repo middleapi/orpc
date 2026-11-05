@@ -403,13 +403,16 @@ describe('routing', () => {
 
     @Implement(contract.styledParams)
     styledParams() {
-      return implement(contract.styledParams).handler(({ input }) => `params: ${input.params}`)
+      return implement(contract.styledParams).handler(
+        ({ input }) => `params: ${String(input.params)}`,
+      )
     }
 
     @Implement(contract.mixed201Path)
     mixed201Path() {
       return implement(contract.mixed201Path).handler(
-        ({ input }) => `prefixes: ${input.prefixes} param: ${input.param}, rest: ${input.rest}`,
+        ({ input }) =>
+          `prefixes: ${String(input.prefixes)} param: ${input.param}, rest: ${input.rest}`,
       )
     }
   }
@@ -429,10 +432,11 @@ describe('routing', () => {
           ({ input }) => `prefix: ${input.prefix}`,
         ),
         styledParams: implement(contract.styledParams).handler(
-          ({ input }) => `params: ${input.params}`,
+          ({ input }) => `params: ${String(input.params)}`,
         ),
         mixed201Path: implement(contract.mixed201Path).handler(
-          ({ input }) => `prefixes: ${input.prefixes} param: ${input.param}, rest: ${input.rest}`,
+          ({ input }) =>
+            `prefixes: ${String(input.prefixes)} param: ${input.param}, rest: ${input.rest}`,
         ),
       }
     }
@@ -1249,7 +1253,7 @@ describe('error handling', () => {
     const app = moduleRef.createNestApplication(adapter as any)
     app.useGlobalInterceptors(
       new (class implements NestInterceptor {
-        intercept(ctx: ExecutionContext, next: CallHandler<any>) {
+        intercept(ctx: ExecutionContext, next: CallHandler) {
           return next.handle().pipe(catchError((error) => catchErrorSpy(error)))
         }
       })(),

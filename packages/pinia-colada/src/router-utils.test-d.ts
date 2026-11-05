@@ -4,7 +4,7 @@ import { OpenAPISerializer } from '@orpc/openapi'
 import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
 import type { Public } from '@orpc/shared'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils } from './procedure-utils.ts'
 import type { RouterUtils } from './router-utils.ts'

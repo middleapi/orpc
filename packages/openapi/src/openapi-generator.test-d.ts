@@ -46,10 +46,10 @@ describe('openAPIGenerator.generate', () => {
 
   it('rejects unsupported versions and the openapi field in base', () => {
     // @ts-expect-error unsupported version
-    generator.generate({}, { version: '4.0.0' })
+    void generator.generate({}, { version: '4.0.0' })
     // @ts-expect-error the patch segment is required
-    generator.generate({}, { version: '3.2' })
+    void generator.generate({}, { version: '3.2' })
     // @ts-expect-error the openapi field is derived from version
-    generator.generate({}, { base: { openapi: '3.2.0' } })
+    void generator.generate({}, { base: { openapi: '3.2.0' } })
   })
 })

@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { HTTPProcedureUtils } from './http-procedure-utils.ts'
 import type { HTTPRouterUtils } from './http-router-utils.ts'

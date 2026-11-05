@@ -85,7 +85,7 @@ const server = serve({
 
   websocket: {
     message(ws, message) {
-      rpcHandler.message(ws, message, {
+      void rpcHandler.message(ws, message, {
         /**
          * Provide initial context if needed. The context can be an async function
          * that receives the per-call request as its first argument, and is **not**
@@ -97,7 +97,7 @@ const server = serve({
       })
     },
     close(ws) {
-      rpcHandler.close(ws)
+      void rpcHandler.close(ws)
     },
   },
 

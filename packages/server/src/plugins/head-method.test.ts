@@ -420,7 +420,7 @@ describe('headMethodHandlerPlugin', () => {
       })
 
       const server = supertest((req: any, res: any) => {
-        handler.handle(req, res)
+        void handler.handle(req, res)
       })
 
       const getResponse = await server.get('/ping')

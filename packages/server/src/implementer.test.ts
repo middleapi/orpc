@@ -1,6 +1,6 @@
 import type { RouterContract } from '@orpc/contract'
 import { oc } from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
 
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
 import * as ImplementerRouter from './implementer-router.ts'

@@ -1,4 +1,4 @@
-import z from 'zod'
+import * as z from 'zod'
 
 import { ContractBuilder, oc } from './builder.ts'
 import * as ErrorUtilsModule from './error-utils.ts'

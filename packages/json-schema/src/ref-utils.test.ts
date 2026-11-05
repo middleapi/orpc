@@ -39,7 +39,7 @@ describe('visitJsonSchemaRefs', () => {
     const visited: string[] = []
     visitJsonSchemaRefs(schema, (ref) => visited.push(ref))
 
-    expect(visited.sort()).toEqual(mapped.sort())
+    expect(visited.toSorted()).toEqual(mapped.toSorted())
     expect(visited).not.toContain('#/$defs/Ignored')
     expect(visited.length).toBe(14)
   })

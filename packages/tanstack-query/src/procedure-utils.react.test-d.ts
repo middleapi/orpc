@@ -10,7 +10,7 @@ import {
   useSuspenseQueries,
   useSuspenseQuery,
 } from '@tanstack/react-query'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils } from './procedure-utils.ts'
 

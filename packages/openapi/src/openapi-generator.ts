@@ -312,6 +312,6 @@ function strip$schemaField(schema: JsonSchema): JsonSchema {
   if (typeof schema !== 'object') {
     return schema
   }
-  const { $schema, ...rest } = schema
+  const { $schema: _schema, ...rest } = schema
   return rest
 }

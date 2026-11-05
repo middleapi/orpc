@@ -30,11 +30,11 @@ describe('useServerFunction', () => {
   const state = useServerFunction(fn)
 
   it('infer correct input', () => {
-    state.execute({ input: 123 })
-    state.execute(undefined)
-    state.execute()
+    void state.execute({ input: 123 })
+    void state.execute(undefined)
+    void state.execute()
     // @ts-expect-error --- input is invalid
-    state.execute({ input: 'invalid' })
+    void state.execute({ input: 'invalid' })
 
     expectTypeOf(state.input).toEqualTypeOf<undefined | { input: number }>()
   })
@@ -47,11 +47,11 @@ describe('useServerFunction', () => {
 
     const state = useServerFunction(action)
 
-    state.execute('123')
+    void state.execute('123')
     // @ts-expect-error --- missing input
-    state.execute()
+    void state.execute()
     // @ts-expect-error --- invalid input
-    state.execute(123)
+    void state.execute(123)
 
     if (!state.isIdle || state.status !== 'idle') {
       expectTypeOf(state.input).toEqualTypeOf<string>()
@@ -83,7 +83,7 @@ describe('useServerFunction', () => {
       ],
     })
 
-    state.execute(
+    void state.execute(
       { input: 123 },
       {
         interceptors: [

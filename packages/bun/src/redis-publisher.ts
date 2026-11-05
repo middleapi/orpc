@@ -119,11 +119,13 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     const report = (error: ThrowableError) =>
       this.onErrors.slice().forEach((onError) => onError(error))
 
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
     subscriber.onconnect = function () {
       onconnect?.call(this)
       report(new Error('Redis subscriber reconnected without its subscriptions.'))
     }
 
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
     subscriber.onclose = function (error) {
       onclose?.call(this, error)
       report(error)

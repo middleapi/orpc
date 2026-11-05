@@ -8,9 +8,9 @@ import type { Arrayable } from 'type-fest'
 export async function loadBytes(
   source: Pick<Blob, 'arrayBuffer' | 'bytes'>,
 ): ReturnType<Blob['bytes']> {
-  // eslint-disable-next-line no-restricted-properties
+  // oxlint-disable-next-line no-restricted-properties
   if (typeof source.bytes === 'function') {
-    // eslint-disable-next-line no-restricted-properties
+    // oxlint-disable-next-line no-restricted-properties
     return source.bytes()
   }
 

@@ -42,7 +42,7 @@ describe('useServerFunction', () => {
     expect(result.current.error).toBe(null)
 
     act(() => {
-      result.current.execute({ input: 123 })
+      void result.current.execute({ input: 123 })
     })
 
     expect(result.current.status).toBe('pending')
@@ -91,7 +91,7 @@ describe('useServerFunction', () => {
 
     act(() => {
       // @ts-expect-error --- invalid input
-      result.current.execute({ input: 'invalid' })
+      void result.current.execute({ input: 'invalid' })
     })
 
     expect(result.current.status).toBe('pending')
@@ -143,7 +143,7 @@ describe('useServerFunction', () => {
     expect(result.current.error).toBe(null)
 
     act(() => {
-      result.current.execute({ input: 123 })
+      void result.current.execute({ input: 123 })
     })
 
     expect(result.current.status).toBe('pending')
@@ -193,7 +193,7 @@ describe('useServerFunction', () => {
     expect(executeInterceptor).toHaveBeenCalledTimes(0)
 
     act(() => {
-      result.current.execute(
+      void result.current.execute(
         { input: 123 },
         {
           interceptors: [executeInterceptor],

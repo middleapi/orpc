@@ -2,7 +2,7 @@ import { ORPCError } from '@orpc/client'
 import type { ErrorMap } from '@orpc/contract'
 import * as ContractModule from '@orpc/contract'
 import * as SharedV2Module from '@orpc/shared'
-import z from 'zod'
+import * as z from 'zod'
 
 import { os } from './builder.ts'
 import { createProcedureClient } from './procedure-client.ts'

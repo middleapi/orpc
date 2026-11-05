@@ -25,7 +25,7 @@ describe('publisher redis adapters compatibility', () => {
     const redis = createClient({ url: REDIS_URL })
 
     afterAll(() => {
-      redis.close()
+      void redis.close()
     })
 
     publishers.push({

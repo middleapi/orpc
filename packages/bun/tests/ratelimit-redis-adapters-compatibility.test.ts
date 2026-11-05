@@ -17,7 +17,7 @@ describe.concurrent('ratelimit redis adapters compatibility', async () => {
     const redis = createClient({ url: REDIS_URL })
 
     afterAll(() => {
-      redis.close()
+      void redis.close()
     })
 
     limiters.push({

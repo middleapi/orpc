@@ -29,7 +29,7 @@ describe('useOptimisticServerFunction', () => {
       const state = useOptimisticServerFunction(fn, {
         optimisticPassthrough: outputs,
         optimisticReducer(state, input) {
-          return [...state, { output: Number(input?.input ?? 0) }]
+          return [...state, { output: input?.input ?? 0 }]
         },
       })
 
@@ -37,7 +37,7 @@ describe('useOptimisticServerFunction', () => {
     })
 
     act(() => {
-      result.current.state.execute({ input: 123 })
+      void result.current.state.execute({ input: 123 })
     })
 
     expect(result.current.state.optimisticState).toEqual([{ output: 0 }, { output: 123 }])

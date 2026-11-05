@@ -60,9 +60,9 @@ export function anyAbortSignal(
     return realSignals[0]
   }
 
-  // eslint-disable-next-line no-restricted-globals, no-restricted-properties
+  // oxlint-disable-next-line no-restricted-globals, no-restricted-properties
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
-    // eslint-disable-next-line no-restricted-properties, no-restricted-globals
+    // oxlint-disable-next-line no-restricted-properties, no-restricted-globals
     return AbortSignal.any(realSignals)
   }
 

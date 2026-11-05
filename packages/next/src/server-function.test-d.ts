@@ -33,9 +33,9 @@ describe('createServerFunction', () => {
     const fn = createServerFunction(procedure, { context: () => ({ auth: true }) })
 
     // @ts-expect-error missing input
-    fn()
+    void fn()
     // @ts-expect-error invalid input
-    fn('invalid')
+    void fn('invalid')
     const [error, data] = await fn({ schema1: 123 })
 
     if (error) {

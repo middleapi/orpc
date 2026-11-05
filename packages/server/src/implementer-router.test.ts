@@ -1,6 +1,6 @@
 import { oc, ProcedureContract } from '@orpc/contract'
 import { getOwn } from '@orpc/shared'
-import z from 'zod'
+import * as z from 'zod'
 
 import { os } from './builder.ts'
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'

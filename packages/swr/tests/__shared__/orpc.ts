@@ -3,7 +3,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import type { RouterClient } from '@orpc/server'
 import { asyncIteratorObject, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
-import z from 'zod'
+import * as z from 'zod'
 
 import { createSWRUtils } from '../../src/index.ts'
 

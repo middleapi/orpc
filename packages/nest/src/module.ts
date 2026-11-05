@@ -55,7 +55,7 @@ export type ORPCModuleConfig = OpenAPIHandlerCodecCoreOptions<DefaultInitialCont
  * @see {@link https://orpc.dev/docs/integrations/nest#configuration | Implement oRPC contract with NestJS - Configuration}
  */
 @Module({})
-// eslint-disable-next-line typescript/no-extraneous-class
+// oxlint-disable-next-line typescript/no-extraneous-class
 export class ORPCModule {
   static forRoot(config: ORPCModuleConfig): DynamicModule {
     return {

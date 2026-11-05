@@ -94,7 +94,7 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
   ): [jsonSchema: JsonSchema, optional: boolean] {
     // Since the default oRPC format is always draft/2020-12,
     // `$schema` can be safely omitted here.
-    const { $schema, ...jsonSchema } = toJsonSchema(
+    const { $schema: _schema, ...jsonSchema } = toJsonSchema(
       valibotSchema,
       this.createConversionConfig(direction),
     )
@@ -168,6 +168,8 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
         } as ValibotJsonSchema
       }
     }
+
+    return undefined
   }
 
   private convertWithin(
@@ -190,6 +192,8 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
         } else if (context.valibotSchema !== wrapper) {
           return this.overrideSchema(context, direction)
         }
+
+        return undefined
       },
     })
 

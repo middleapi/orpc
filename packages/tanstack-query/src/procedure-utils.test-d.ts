@@ -15,7 +15,7 @@ import type {
   SkipToken,
 } from '@tanstack/query-core'
 import { QueryClient, skipToken } from '@tanstack/query-core'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
 import type {

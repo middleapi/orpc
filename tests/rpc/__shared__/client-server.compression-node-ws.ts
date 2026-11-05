@@ -8,7 +8,7 @@ import {
   ResponseCompressionHandlerPlugin,
 } from '@orpc/server/plugins'
 import { RPCHandler } from '@orpc/server/websocket'
-import WebSocket, { WebSocketServer } from 'ws'
+import { WebSocket, WebSocketServer } from 'ws'
 
 import type { CreateClientServerTest } from './client-server.ts'
 import { defaultSerializer } from './client-server.ts'

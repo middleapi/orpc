@@ -16,7 +16,7 @@ export function PlanetTable() {
   const deleteMutation = useMutation(
     orpc.planet.delete.mutationOptions({
       onSuccess() {
-        queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           queryKey: orpc.planet.key(),
         })
       },

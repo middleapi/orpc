@@ -3,8 +3,5 @@
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
-  },
-
-  "typescript.preferences.autoImportFileExcludePatterns": [],
-  "typescript.preferences.autoImportSpecifierExcludeRegexes": []
+  }
 }

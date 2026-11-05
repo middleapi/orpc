@@ -77,7 +77,7 @@ describe('runPromise & extractErrorFromCause', () => {
       const effect = Effect.acquireUseRelease(
         Effect.succeed('resource'),
         () => Effect.fail(useError),
-        () => Effect.fail(new Error('finalizer also failed')) as Effect.Effect<never, never>,
+        () => Effect.fail(new Error('finalizer also failed')) as Effect.Effect<never>,
       )
 
       await expect(runPromise(effect)).rejects.toThrow(useError)

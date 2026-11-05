@@ -1,5 +1,5 @@
 import type { ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { Middleware } from './middleware.ts'
 

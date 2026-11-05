@@ -1,6 +1,6 @@
 import type { AnySchema } from '@orpc/contract'
 import { isTypescriptObject } from '@orpc/shared'
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type { StandardJSONSchemaV1 } from '@standard-schema/spec'
 
 import type { JsonSchemaConverter, JsonSchemaConverterDirection } from './convert.ts'

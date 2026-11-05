@@ -561,7 +561,7 @@ describe('batchLinkPlugin', () => {
             'x-mapped': 'true',
             'x-batch-status': `${batchResponse.status}`,
           },
-          resolveBody: async () => `mapped-${await subResponse.resolveBody()}`,
+          resolveBody: async () => `mapped-${String(await subResponse.resolveBody())}`,
         }),
       )
 

@@ -2,7 +2,7 @@ import type { ORPCError } from '@orpc/client'
 import type { MergedErrorMap, Schema } from '@orpc/contract'
 import { oc } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { Lazy, Lazyable } from './lazy.ts'
 import type { Procedure } from './procedure.ts'

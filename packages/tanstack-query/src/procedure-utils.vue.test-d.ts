@@ -8,7 +8,7 @@ import {
   useQuery,
 } from '@tanstack/vue-query'
 import { computed } from 'vue'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils } from './procedure-utils.ts'
 

@@ -112,14 +112,12 @@ describe('handlerGen', () => {
       }),
     )
 
-    void os
-      .$context<WithEffectContext<Service1>>()
-      .handler(
-        // @ts-expect-error - Random2 is not provided
-        handlerGen(function* () {
-          yield* Service2
-        }),
-      )
+    void os.$context<WithEffectContext<Service1>>().handler(
+      // @ts-expect-error - Random2 is not provided
+      handlerGen(function* () {
+        yield* Service2
+      }),
+    )
   })
 
   it('accepts explicit type arguments in ProcedureHandler order with TYield last', () => {

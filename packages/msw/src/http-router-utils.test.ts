@@ -5,7 +5,7 @@ import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { setupServer } from 'msw/node'
-import z from 'zod'
+import * as z from 'zod'
 
 import { createHTTPUtils } from './http-router-utils.ts'
 

@@ -32,7 +32,7 @@ export const createCompressionBunWebSocketClientServerTest: CreateClientServerTe
   const server = Bun.serve({
     fetch(req, server) {
       if (server.upgrade(req)) {
-        return
+        return undefined
       }
       return new Response('Upgrade failed', { status: 500 })
     },
@@ -51,7 +51,7 @@ export const createCompressionBunWebSocketClientServerTest: CreateClientServerTe
   })
 
   afterAll(() => {
-    server.stop(true)
+    void server.stop(true)
   })
 
   const link = new RPCLink({

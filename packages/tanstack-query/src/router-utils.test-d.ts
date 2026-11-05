@@ -3,7 +3,7 @@ import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import { OpenAPISerializer } from '@orpc/openapi'
 import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
-import z from 'zod'
+import * as z from 'zod'
 
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
 import type { RouterUtils, RouterUtilsScoped } from './router-utils.ts'

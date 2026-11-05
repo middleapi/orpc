@@ -20,7 +20,7 @@ export const createBunWebSocketClientServerTest: CreateClientServerTest = (
   const server = Bun.serve({
     fetch(req, server) {
       if (server.upgrade(req)) {
-        return
+        return undefined
       }
       return new Response('Upgrade failed', { status: 500 })
     },
@@ -39,7 +39,7 @@ export const createBunWebSocketClientServerTest: CreateClientServerTest = (
   })
 
   afterAll(() => {
-    server.stop(true)
+    void server.stop(true)
   })
 
   const link = new RPCLink({

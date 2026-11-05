@@ -89,9 +89,9 @@ describe('publisher', () => {
       const iterator = publisher.subscribe('message')
 
       setTimeout(() => {
-        publisher.publish('message', { text: 'first' })
-        publisher.publish('message', { text: 'second' })
-        publisher.publish('message', { text: 'third' })
+        void publisher.publish('message', { text: 'first' })
+        void publisher.publish('message', { text: 'second' })
+        void publisher.publish('message', { text: 'third' })
         setTimeout(() => iterator.return(), 50)
       }, 10)
 

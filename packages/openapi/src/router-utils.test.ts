@@ -1,5 +1,5 @@
 import { oc } from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
 
 import { getOpenAPIMeta, openapi } from './meta.ts'
 import { populateRouterContractOpenAPIPaths } from './router-utils.ts'
