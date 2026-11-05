@@ -5,6 +5,7 @@ export default defineConfig({
     typeAware: true,
     typeCheck: true,
   },
+  ignorePatterns: ['.agents/skills/**', '.claude/skills/**'],
   categories: {
     correctness: 'error',
     suspicious: 'error',

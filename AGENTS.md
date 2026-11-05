@@ -14,7 +14,6 @@ oRPC: typesafe APIs with RPC and OpenAPI support, in a pnpm monorepo.
 
 ```bash
 pnpm install
-npx skills experimental_install  # restore agent skills from skills-lock.json
 pnpm test                    # per-package tests + vitest
 pnpm vitest run <path>       # one test file
 pnpm check                   # lint and type check, including *.test-d.ts

@@ -5,4 +5,5 @@ export default defineConfig({
   singleQuote: true,
   quoteProps: 'consistent',
   sortImports: true,
+  ignorePatterns: ['.agents/skills/**', '.claude/skills/**'],
 })
