@@ -3,7 +3,8 @@
   "compilerOptions": {
     "lib": ["ES2022"],
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "types": ["node"]
   },
   "include": ["src", "tests"],
   "exclude": []
