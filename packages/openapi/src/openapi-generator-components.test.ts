@@ -235,7 +235,8 @@ describe('openAPIComponentRegistry', () => {
         })
       })
 
-      it.each([
+      // malformed discriminators from arbitrary JSON schemas fall back to structural comparison
+      it.each<[name: string, discriminator: any, otherDiscriminator: any]>([
         ['a non-object discriminator', 'kind', 'type'],
         [
           'non-string mapping values',
