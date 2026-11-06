@@ -249,3 +249,19 @@ describe('generateOperationKey serializer', () => {
     expect(serializeJson).toHaveBeenCalledWith({ a: 1 })
   })
 })
+
+it('generateOperationKey leaves out default streamed options', () => {
+  const key = (fnOptions: object) =>
+    generateOperationKey(['planet', 'stream'], { type: 'streamed', fnOptions })
+
+  expect(key({ refetchMode: 'append', maxChunks: 3 })).toEqual([
+    ['planet', 'stream'],
+    { type: 'streamed', fnOptions: { refetchMode: 'append', maxChunks: 3 } },
+  ])
+  expect(key({ refetchMode: 'reset', maxChunks: 3 })).toEqual([
+    ['planet', 'stream'],
+    { type: 'streamed', fnOptions: { maxChunks: 3 } },
+  ])
+  expect(key({ refetchMode: 'reset', maxChunks: Number.POSITIVE_INFINITY })).toEqual(key({}))
+  expect(key({})).toEqual([['planet', 'stream'], { type: 'streamed' }])
+})

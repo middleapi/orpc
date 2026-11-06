@@ -99,7 +99,7 @@ For a loading state, call `queryClient.resetQueries({ queryKey })` before refetc
 :::
 
 :::warning
-`queryFnOptions` is part of the query key:
+`queryFnOptions` is part of the query key, except for default values:
 
 - Queries with different options get separate cache entries and separate streams. To share one, use the same options, and show fewer chunks with `select`, e.g. `select: data => data.slice(-3)`.
 - To read or write the cache by key, pass the same options: `streamedKey({ input, queryFnOptions })`.
