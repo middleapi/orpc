@@ -1,4 +1,4 @@
-import { getOwn, isTypescriptObject, setOwn } from '@orpc/shared'
+import { getOwn, isNonPrimitive, setOwn } from '@orpc/shared'
 
 import type { MergedErrorMap } from './error-utils.ts'
 import { mergeErrorMap } from './error-utils.ts'
@@ -48,7 +48,7 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
     return enhanced as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 
@@ -70,7 +70,7 @@ export function getRouterContract(
   for (let i = 0; i < path.length; i++) {
     const segment = path[i]!
 
-    if (!isTypescriptObject(current)) {
+    if (!isNonPrimitive(current)) {
       return undefined
     }
 
@@ -81,7 +81,7 @@ export function getRouterContract(
     current = getOwn(current, segment)
   }
 
-  if (!isTypescriptObject(current)) {
+  if (!isNonPrimitive(current)) {
     return undefined
   }
 
@@ -124,7 +124,7 @@ export function minifyRouterContract(router: RouterContract): RouterContract {
     return procedure
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router
   }
 

@@ -39,7 +39,7 @@
     "prepack": "tsc"
   },
   "dependencies": {
-    "@standard-server/shared": "~0.14.0",
+    "@standard-server/shared": "~0.15.0",
     "type-fest": "^5.10.0"
   },
   "devDependencies": {

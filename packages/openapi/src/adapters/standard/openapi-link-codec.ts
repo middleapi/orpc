@@ -11,7 +11,7 @@ import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import {
-  isTypescriptObject,
+  isNonPrimitive,
   mergeHttpPath,
   pathToHttpPath,
   safeEncodeURIComponent,
@@ -146,7 +146,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       let data = input
 
       if (dynamicParams?.length) {
-        if (!isTypescriptObject(input)) {
+        if (!isNonPrimitive(input)) {
           throw new TypeError(
             `Input must be an object with "compact" input structure when the path has dynamic params (${dynamicParams.map((p) => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
           )
@@ -275,7 +275,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         // oxlint-disable-next-line typescript/no-base-to-string
         .map((val) => safeEncodeURIComponent(String(val)))
         .join(',')
-    } else if (style === 'comma-delimited-object' && isTypescriptObject(val)) {
+    } else if (style === 'comma-delimited-object' && isNonPrimitive(val)) {
       encoded = Object.entries(val)
         .map(([key, val]) => [key, this.serializeURLValue(val)])
         .filter(([, val]) => val !== undefined && val !== null)
@@ -330,7 +330,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     data: unknown,
     queryStyles: OpenAPIMeta['queryStyles'],
   ): string | undefined {
-    if (!queryStyles || !isTypescriptObject(data)) {
+    if (!queryStyles || !isNonPrimitive(data)) {
       return toURLSearchParams(
         this.serializer.serialize(data, { asFormData: true }) as FormData,
       ).toString()
@@ -378,7 +378,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      } else if (style === 'comma-delimited-object' && isTypescriptObject(value)) {
+      } else if (style === 'comma-delimited-object' && isNonPrimitive(value)) {
         const encodedValue = encodeDelimitedObject(
           Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           ',',
@@ -396,7 +396,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      } else if (style === 'pipe-delimited-object' && isTypescriptObject(value)) {
+      } else if (style === 'pipe-delimited-object' && isNonPrimitive(value)) {
         const encodedValue = encodeDelimitedObject(
           Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           '%7C' /* '/' */,
@@ -414,7 +414,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      } else if (style === 'space-delimited-object' && isTypescriptObject(value)) {
+      } else if (style === 'space-delimited-object' && isNonPrimitive(value)) {
         const encodedValue = encodeDelimitedObject(
           Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           '%20' /* ' ' */,
@@ -566,19 +566,19 @@ function isValidDetailedInput(input: unknown): input is
       headers?: object
       body?: unknown
     } {
-  if (!isTypescriptObject(input)) {
+  if (!isNonPrimitive(input)) {
     return input === undefined
   }
 
-  if (input.params !== undefined && !isTypescriptObject(input.params)) {
+  if (input.params !== undefined && !isNonPrimitive(input.params)) {
     return false
   }
 
-  if (input.query !== undefined && !isTypescriptObject(input.query)) {
+  if (input.query !== undefined && !isNonPrimitive(input.query)) {
     return false
   }
 
-  if (input.headers !== undefined && !isTypescriptObject(input.headers)) {
+  if (input.headers !== undefined && !isNonPrimitive(input.headers)) {
     return false
   }
 

@@ -19,7 +19,11 @@ import {
   wrapReadableStream,
 } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import {
+  EventStreamErrorEvent,
+  flattenStandardHeader,
+  parseStandardUrl,
+} from '@standard-server/core'
 
 import type { Context } from '../../context.ts'
 import type { ProcedureClientInterceptor } from '../../procedure-client.ts'
@@ -289,10 +293,10 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                         onError(error) {
                           /**
                            * Errors here are internal (interceptor/framework) failures,
-                           * except `ErrorEvent`: a business error the protocol delivers
+                           * except `EventStreamErrorEvent`: a business error the protocol delivers
                            * inside the event stream, already logged by the client interceptor.
                            */
-                          if (!(error instanceof ErrorEvent)) {
+                          if (!(error instanceof EventStreamErrorEvent)) {
                             span.recordException('error', toTracingException(error))
                           }
                         },

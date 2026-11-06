@@ -1,6 +1,6 @@
 import type { ClientContext, ClientLink, ORPCClientOptions } from '@orpc/client'
 import { createORPCClient } from '@orpc/client'
-import { get, isTypescriptObject, set } from '@orpc/shared'
+import { get, isNonPrimitive, set } from '@orpc/shared'
 
 import { resolveBasePathMeta } from './meta-built-in.ts'
 import { ProcedureContract } from './procedure.ts'
@@ -53,7 +53,7 @@ export function createContractClientFactory<TClientContext extends ClientContext
           return
         }
 
-        if (isTypescriptObject(contract)) {
+        if (isNonPrimitive(contract)) {
           for (const [key, value] of Object.entries(contract)) {
             register(value, [...path, key])
           }

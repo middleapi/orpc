@@ -11,7 +11,7 @@ import type { Promisable, Public } from '@orpc/shared'
 import {
   getOwn,
   isPlainObject,
-  isTypescriptObject,
+  isNonPrimitive,
   NullProtoObj,
   parseEmptyableJSON,
   stringifyJSON,
@@ -301,7 +301,7 @@ export class OpenAPIHandlerCodec<T extends Context>
 function isValidDetailedOutput(
   output: unknown,
 ): output is { status?: number; body?: unknown; headers?: object } {
-  if (!isTypescriptObject(output)) {
+  if (!isNonPrimitive(output)) {
     return false
   }
 
@@ -316,7 +316,7 @@ function isValidDetailedOutput(
     return false
   }
 
-  if (output.headers !== undefined && !isTypescriptObject(output.headers)) {
+  if (output.headers !== undefined && !isNonPrimitive(output.headers)) {
     return false
   }
 

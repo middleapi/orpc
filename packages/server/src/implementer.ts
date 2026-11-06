@@ -1,6 +1,6 @@
 import type { RouterContract } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 import type { DefaultInitialContext } from './builder.ts'
 import type { Context } from './context.ts'
@@ -43,7 +43,7 @@ export function implement<
       const value = Reflect.get(routerImplementer, p)
 
       if (method) {
-        if (!isTypescriptObject(value)) {
+        if (!isNonPrimitive(value)) {
           return method
         }
 

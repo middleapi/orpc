@@ -111,12 +111,19 @@ A `streaming` batch response always streams, so your client and any proxy in bet
 
 ### Keep-Alive Timer
 
-A streaming batch response may stay idle for long periods. The server plugin sends keep-alive frames to keep the connection alive. Pass `keepAlive: false` to disable them, or an object to customize them.
+A streaming batch response may stay idle for long periods. The server plugin can send keep-alive frames to keep the connection alive.
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
     new BatchHandlerPlugin({
+      /**
+       * Keep-alive frames sent periodically while the stream is idle.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
         /**
          * Interval (in milliseconds) between keep-alive frames after the last message.

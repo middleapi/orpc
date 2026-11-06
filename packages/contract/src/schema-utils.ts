@@ -1,5 +1,5 @@
 import type { IsEqual, Promisable } from '@orpc/shared'
-import { isPropertyKey, isTypescriptObject, ORPC_NAME } from '@orpc/shared'
+import { isPropertyKey, isNonPrimitive, ORPC_NAME } from '@orpc/shared'
 
 import type { Schema, SchemaIssue } from './schema.ts'
 
@@ -41,7 +41,7 @@ export function type<TInput, TOutput = TInput>(
  * Check if the given issue is following the standard-schema issue format.
  */
 export function isSchemaIssue(issue: unknown): issue is SchemaIssue {
-  if (!isTypescriptObject(issue) || typeof issue.message !== 'string') {
+  if (!isNonPrimitive(issue) || typeof issue.message !== 'string') {
     return false
   }
 
@@ -53,7 +53,7 @@ export function isSchemaIssue(issue: unknown): issue is SchemaIssue {
     if (
       !issue.path.every(
         (segment) =>
-          isPropertyKey(segment) || (isTypescriptObject(segment) && isPropertyKey(segment.key)),
+          isPropertyKey(segment) || (isNonPrimitive(segment) && isPropertyKey(segment.key)),
       )
     ) {
       return false

@@ -11,7 +11,7 @@ import {
   isStandardSchemaOptional,
   isUnconstrainedSchema,
 } from '@orpc/json-schema'
-import { isTypescriptObject, ORPC_NAME } from '@orpc/shared'
+import { isNonPrimitive, ORPC_NAME } from '@orpc/shared'
 
 type JsonSchemaObject = Exclude<JsonSchema, boolean>
 
@@ -145,15 +145,11 @@ export function resolveToolInputJsonSchema(
  * Empty arguments become `undefined` for inputs that accept no object.
  */
 export function resolveToolInput(args: unknown, inputJsonSchema: ToolInputJsonSchema): unknown {
-  if (
-    inputJsonSchema.emptyAsUndefined &&
-    isTypescriptObject(args) &&
-    Object.keys(args).length === 0
-  ) {
+  if (inputJsonSchema.emptyAsUndefined && isNonPrimitive(args) && Object.keys(args).length === 0) {
     return undefined
   }
 
-  return inputJsonSchema.wrapped && isTypescriptObject(args) ? args[WRAPPED_INPUT_KEY] : args
+  return inputJsonSchema.wrapped && isNonPrimitive(args) ? args[WRAPPED_INPUT_KEY] : args
 }
 
 /**

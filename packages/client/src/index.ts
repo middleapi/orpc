@@ -77,7 +77,11 @@ export type {
 } from '@standard-server/core'
 
 export {
-  ErrorEvent,
+  /**
+   * @deprecated Use `EventStreamErrorEvent` instead.
+   */
+  EventStreamErrorEvent as ErrorEvent,
+  EventStreamErrorEvent,
   /**
    * Retrieves event metadata (such as the event id and retry interval)
    * attached to a single iterator event value.

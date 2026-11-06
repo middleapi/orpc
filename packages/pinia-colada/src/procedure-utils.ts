@@ -3,7 +3,7 @@ import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/
 import {
   intercept,
   isAsyncIteratorObject,
-  isTypescriptObject,
+  isNonPrimitive,
   resolveMaybeOptionalOptions,
 } from '@orpc/shared'
 import type {
@@ -294,7 +294,7 @@ const PROCEDURE_UTILS_MODIFIER_KEYS: string[] = [
 export function isProcedureUtilsOptions(
   value: unknown,
 ): value is ProcedureUtilsOptions<any, any, any, any> {
-  if (!isTypescriptObject(value)) {
+  if (!isNonPrimitive(value)) {
     return false
   }
 
@@ -308,7 +308,7 @@ export function isProcedureUtilsOptions(
         return false
       }
     } else if (key === 'serializer') {
-      if (!isTypescriptObject(value[key]) || typeof value[key].serializeJson !== 'function') {
+      if (!isNonPrimitive(value[key]) || typeof value[key].serializeJson !== 'function') {
         return false
       }
     } else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
@@ -316,7 +316,7 @@ export function isProcedureUtilsOptions(
         return false
       }
     } else if (PROCEDURE_UTILS_MODIFIER_KEYS.includes(key)) {
-      if (!isTypescriptObject(value[key])) {
+      if (!isNonPrimitive(value[key])) {
         return false
       }
     }

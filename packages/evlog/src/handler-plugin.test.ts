@@ -1,6 +1,6 @@
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
-import { ErrorEvent } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
 import type { LogLevel } from 'evlog'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -309,7 +309,7 @@ describe('evlogHandlerPlugin', () => {
     expect(logger.error).toHaveBeenCalledBefore(finish)
   })
 
-  it('does not log ErrorEvent from response body iterators', async () => {
+  it('does not log EventStreamErrorEvent from response body iterators', async () => {
     const plugin = new EvlogHandlerPlugin()
     const { routing } = getPluginHooks(plugin)
     const { finish, logger } = mockIntegration()
@@ -332,7 +332,7 @@ describe('evlogHandlerPlugin', () => {
 
     await expect(
       collectIterator(result.response.body as AsyncIterable<unknown>),
-    ).rejects.toBeInstanceOf(ErrorEvent)
+    ).rejects.toBeInstanceOf(EventStreamErrorEvent)
     expect(logger.error).not.toHaveBeenCalled()
     expect(finish).toHaveBeenCalledWith({ status: 200 })
   })

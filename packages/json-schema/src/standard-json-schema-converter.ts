@@ -1,5 +1,5 @@
 import type { AnySchema } from '@orpc/contract'
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 // oxlint-disable-next-line no-restricted-imports
 import type { StandardJSONSchemaV1 } from '@standard-schema/spec'
 
@@ -35,7 +35,7 @@ export class StandardJsonSchemaConverter implements JsonSchemaConverter {
     return Boolean(
       schema &&
       'jsonSchema' in schema['~standard'] &&
-      isTypescriptObject(schema['~standard'].jsonSchema) &&
+      isNonPrimitive(schema['~standard'].jsonSchema) &&
       'input' in schema['~standard'].jsonSchema &&
       typeof schema['~standard'].jsonSchema.input === 'function' &&
       'output' in schema['~standard'].jsonSchema &&

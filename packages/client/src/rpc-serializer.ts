@@ -1,6 +1,6 @@
 import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
-import { ErrorEvent } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
 
 import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object.ts'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils.ts'
@@ -55,7 +55,9 @@ export class RPCSerializer extends RPCJsonSerializer {
           return { done: result.done, value: this.serializePayload(result.value, false) }
         },
         mapError: (e) =>
-          new ErrorEvent(this.serializePayload(toORPCError(e).toJSON(), false), { cause: e }),
+          new EventStreamErrorEvent(this.serializePayload(toORPCError(e).toJSON(), false), {
+            cause: e,
+          }),
       })
     }
 
@@ -99,7 +101,7 @@ export class RPCSerializer extends RPCJsonSerializer {
           return { done: result.done, value: this.deserializePayload(result.value) }
         },
         mapError: (e) => {
-          if (!(e instanceof ErrorEvent)) {
+          if (!(e instanceof EventStreamErrorEvent)) {
             return e
           }
 
@@ -109,7 +111,7 @@ export class RPCSerializer extends RPCJsonSerializer {
             return createORPCErrorFromJson(deserialized, { cause: e })
           }
 
-          return new ErrorEvent(deserialized, { cause: e })
+          return new EventStreamErrorEvent(deserialized, { cause: e })
         },
       })
     }

@@ -22,11 +22,22 @@ export * from './types.ts'
 export * from './value.ts'
 
 export {
+  /**
+   * @deprecated Use `isPlainObject` instead.
+   */
+  isPlainObject as isObject,
+} from './object.ts'
+
+export {
   AbortError,
   AsyncIteratorClass,
   getOrBind,
   isAsyncIteratorObject,
-  isTypescriptObject,
+  isNonPrimitive,
+  /**
+   * @deprecated Use `isNonPrimitive` instead.
+   */
+  isNonPrimitive as isTypescriptObject,
   parseEmptyableJSON,
   safeDecodeURIComponent,
   safeEncodeURIComponent,

@@ -220,24 +220,26 @@ export interface BatchHandlerPluginOptions<T extends Context> {
     | undefined
 
   /**
-   * Keep-alive for batch responses that stream. `false` disables it,
-   * {@link BatchHandlerPluginKeepAliveOptions} customizes it.
+   * Keep-alive frames for batch responses that stream.
    *
-   * When enabled, a zero-length length-prefixed frame is sent periodically while the
-   * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
+   * A zero-length length-prefixed frame is sent periodically while the stream is idle
+   * (no message sent for `interval` ms). Clients ignore these frames.
+   *
+   * `false` disables it, an object customizes it.
    *
    * @default true
    */
-  keepAlive?: boolean | BatchHandlerPluginKeepAliveOptions | undefined
-}
-
-export interface BatchHandlerPluginKeepAliveOptions {
-  /**
-   * Interval (in milliseconds) between keep-alive frames after the last message.
-   *
-   * @default 15000
-   */
-  interval?: number | undefined
+  keepAlive?:
+    | boolean
+    | {
+        /**
+         * Interval (in milliseconds) between keep-alive frames after the last message.
+         *
+         * @default 15000
+         */
+        interval?: number | undefined
+      }
+    | undefined
 }
 
 /**

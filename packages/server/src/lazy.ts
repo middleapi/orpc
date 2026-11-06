@@ -1,5 +1,5 @@
 import type { AnyMetaPlugin, Meta } from '@orpc/contract'
-import { getConstructor, isTypescriptObject } from '@orpc/shared'
+import { getConstructor, isNonPrimitive } from '@orpc/shared'
 
 export interface LazyDefinition<T> {
   meta: Meta
@@ -29,9 +29,9 @@ export class Lazy<T> {
     }
 
     return (
-      isTypescriptObject(instance) &&
-      isTypescriptObject(instance['~orpc']) &&
-      isTypescriptObject(instance['~orpc'].meta) &&
+      isNonPrimitive(instance) &&
+      isNonPrimitive(instance['~orpc']) &&
+      isNonPrimitive(instance['~orpc'].meta) &&
       (instance['~orpc'].metaPlugins === undefined ||
         Array.isArray(instance['~orpc'].metaPlugins)) &&
       typeof instance['~orpc'].loader === 'function'
