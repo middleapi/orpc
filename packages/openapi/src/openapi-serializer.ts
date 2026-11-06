@@ -6,7 +6,7 @@ import {
 } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
-import { ErrorEvent } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
 
 import type { BracketNotationSerializerOptions } from './bracket-notation.ts'
 import { BracketNotationSerializer } from './bracket-notation.ts'
@@ -76,9 +76,12 @@ export class OpenAPISerializer extends OpenAPIJsonSerializer {
             return { done: result.done, value: this.serializePayload(result.value, false, false) }
           },
           mapError: (e) =>
-            new ErrorEvent(this.serializePayload(toORPCError(e).toJSON(), false, false), {
-              cause: e,
-            }),
+            new EventStreamErrorEvent(
+              this.serializePayload(toORPCError(e).toJSON(), false, false),
+              {
+                cause: e,
+              },
+            ),
         })
       }
     }
@@ -134,7 +137,7 @@ export class OpenAPISerializer extends OpenAPIJsonSerializer {
           return { done: result.done, value: this.deserializeJson({ json: result.value }) }
         },
         mapError: (e) => {
-          if (e instanceof ErrorEvent) {
+          if (e instanceof EventStreamErrorEvent) {
             const deserialized = this.deserializeJson({ json: e.data })
 
             if (isORPCErrorJson(deserialized)) {

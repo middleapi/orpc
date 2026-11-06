@@ -56,7 +56,7 @@
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.14.0"
+    "@standard-server/core": "~0.15.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.5.0",

@@ -227,7 +227,7 @@ describe('rpcLink', () => {
       })
     })
 
-    const toFetchRequestOptions = { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } }
+    const toFetchRequestOptions = { eventStream: { keepAlive: { comment: 'ok' } } }
 
     const orpc = createORPCClient(
       new RPCLink({
@@ -296,7 +296,7 @@ describe('rpcLink', () => {
       new RPCLink({
         fetch,
         origin: 'http://api.example.com',
-        toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
+        toFetchRequest: { eventStream: { keepAlive: { comment: 'ok' } } },
       }),
     ) as any
 
@@ -346,7 +346,7 @@ describe('rpcLink', () => {
       new RPCLink({
         fetch,
         origin: 'http://api.example.com',
-        toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
+        toFetchRequest: { eventStream: { keepAlive: { comment: 'ok' } } },
       }),
     ) as any
 

@@ -1,7 +1,7 @@
 import type { AnyNestedClient, Client } from '@orpc/client'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import { bindMethods, isTypescriptObject, toArray } from '@orpc/shared'
+import { bindMethods, isNonPrimitive, toArray } from '@orpc/shared'
 
 import type { OperationKeyPrefixOptions } from './key.ts'
 import { ProcedureUtils } from './procedure-utils.ts'
@@ -57,7 +57,7 @@ export function createRouterUtils<T extends AnyNestedClient>(
 
       const nextClient = Reflect.get(client, prop)
 
-      if (typeof prop !== 'string' || !isTypescriptObject(nextClient)) {
+      if (typeof prop !== 'string' || !isNonPrimitive(nextClient)) {
         return value
       }
 

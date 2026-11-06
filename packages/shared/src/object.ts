@@ -1,4 +1,4 @@
-import { getOrBind, isTypescriptObject } from '@standard-server/shared'
+import { getOrBind, isNonPrimitive } from '@standard-server/shared'
 
 import type { AnyFunction } from './function.ts'
 
@@ -33,7 +33,7 @@ export function findDeepMatches(
  */
 export function getConstructor(value: unknown): Function | null | undefined {
   // Object.getPrototypeOf require object in node.js
-  if (!isTypescriptObject(value)) {
+  if (!isNonPrimitive(value)) {
     return null
   }
 
@@ -41,7 +41,7 @@ export function getConstructor(value: unknown): Function | null | undefined {
 }
 
 export function* getConstructors(value: unknown): Generator<Function> {
-  if (!isTypescriptObject(value)) {
+  if (!isNonPrimitive(value)) {
     return
   }
 
@@ -80,7 +80,7 @@ export function get(object: unknown, path: readonly PropertyKey[]): unknown {
   let current: unknown = object
 
   for (const key of path) {
-    if (!isTypescriptObject(current)) {
+    if (!isNonPrimitive(current)) {
       return undefined
     }
 
@@ -104,7 +104,7 @@ export function set(
     const key = path[i]!
     const next = getOwn(current, key)
 
-    if (!isTypescriptObject(next)) {
+    if (!isNonPrimitive(next)) {
       const child = {}
       setOwn(current, key, child)
       current = child

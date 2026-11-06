@@ -1,4 +1,4 @@
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 import type { ErrorMap } from './error.ts'
 import type { AnySchema } from './schema.ts'
@@ -64,7 +64,7 @@ export type AnyMetaPlugin = MetaPlugin<any, any, any>
 const HIDDEN_META_PLUGINS_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_META_PLUGINS')
 
 export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | undefined {
-  if (!isTypescriptObject(container)) {
+  if (!isNonPrimitive(container)) {
     return undefined
   }
 

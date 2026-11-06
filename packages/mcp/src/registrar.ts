@@ -37,7 +37,7 @@ import type {
 import {
   DEFAULT_ERROR_STATUS,
   DEFAULT_SUCCESS_STATUS,
-  ErrorEvent,
+  EventStreamErrorEvent,
   resolveContractProcedure,
   walkProcedureContractsAsync,
 } from '@orpc/server'
@@ -315,7 +315,9 @@ export class McpRegistrar<T extends AnyRouter> {
         } catch (e) {
           // a tool execution error the model can read, rather than a protocol error
           return await toErrorCallToolResult(
-            e instanceof ErrorEvent ? e.data : this.codec.encodeError(toORPCError(e)).body,
+            e instanceof EventStreamErrorEvent
+              ? e.data
+              : this.codec.encodeError(toORPCError(e)).body,
           )
         }
       },
@@ -404,7 +406,8 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
         headers: {},
         body: wrapAsyncIteratorPreservingEventMeta(output, {
           mapResult: (result) => ({ done: result.done, value: this.serialize(result.value) }),
-          mapError: (e) => new ErrorEvent(this.serialize(toORPCError(e).toJSON()), { cause: e }),
+          mapError: (e) =>
+            new EventStreamErrorEvent(this.serialize(toORPCError(e).toJSON()), { cause: e }),
         }),
       }
     }

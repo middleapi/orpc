@@ -1,7 +1,7 @@
 import type { AnyNestedClient, Client, InferClientContext, InferClientError } from '@orpc/client'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import { bindMethods, isTypescriptObject, pick, toArray } from '@orpc/shared'
+import { bindMethods, isNonPrimitive, pick, toArray } from '@orpc/shared'
 
 import type { OperationKeyBaseOptions } from './key.ts'
 import type { RouterUtilsPlugin } from './plugin.ts'
@@ -179,7 +179,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
 
       const nextClient = Reflect.get(client, prop)
 
-      if (typeof prop !== 'string' || !isTypescriptObject(nextClient)) {
+      if (typeof prop !== 'string' || !isNonPrimitive(nextClient)) {
         return value
       }
 

@@ -1,7 +1,7 @@
 import type { RouterContract } from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
 import type { Context } from '@orpc/server'
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 import type { HTTPProcedureUtilsOptions } from './http-procedure-utils.ts'
 import { HTTPProcedureUtils } from './http-procedure-utils.ts'
@@ -38,7 +38,7 @@ function createHTTPUtilsInternal(
     return new HTTPProcedureUtils(contract, path, options)
   }
 
-  if (!isTypescriptObject(contract)) {
+  if (!isNonPrimitive(contract)) {
     return contract
   }
 

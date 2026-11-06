@@ -16,7 +16,11 @@ import {
   wrapReadableStream,
 } from '@orpc/shared'
 import type { StandardRequest } from '@standard-server/core'
-import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import {
+  EventStreamErrorEvent,
+  flattenStandardHeader,
+  parseStandardUrl,
+} from '@standard-server/core'
 import type { LogLevel, RequestLogger } from 'evlog'
 import type {
   BaseEvlogOptions,
@@ -147,10 +151,10 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
                     onError: (error) => {
                       /**
                        * Errors here are internal (interceptor/framework) failures,
-                       * except `ErrorEvent`: a business error the protocol delivers
+                       * except `EventStreamErrorEvent`: a business error the protocol delivers
                        * inside the event stream, already logged by the client interceptor.
                        */
-                      if (!(error instanceof ErrorEvent)) {
+                      if (!(error instanceof EventStreamErrorEvent)) {
                         logger.error(toErrorOrString(error))
                       }
                     },

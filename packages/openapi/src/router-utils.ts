@@ -1,6 +1,6 @@
 import type { RouterContract } from '@orpc/contract'
 import { ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
-import { isTypescriptObject, pathToHttpPath, toArray } from '@orpc/shared'
+import { isNonPrimitive, pathToHttpPath, toArray } from '@orpc/shared'
 
 import { getOpenAPIMeta, openapi } from './meta.ts'
 
@@ -52,7 +52,7 @@ export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
     }) as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 

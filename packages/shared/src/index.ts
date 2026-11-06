@@ -26,7 +26,11 @@ export {
   AsyncIteratorClass,
   getOrBind,
   isAsyncIteratorObject,
-  isTypescriptObject,
+  isNonPrimitive,
+  /**
+   * @deprecated Use `isNonPrimitive` instead.
+   */
+  isNonPrimitive as isTypescriptObject,
   parseEmptyableJSON,
   safeDecodeURIComponent,
   safeEncodeURIComponent,
