@@ -211,6 +211,19 @@ describe('standardRPCLinkCodec', () => {
       expect(isORPCErrorStatusSpy).toBeCalledWith(499)
     })
 
+    it.each([300, 301, 302, 304, 307, 308, 399])('error: redirect response %i', async (status) => {
+      const body = vi.fn(() => Promise.resolve(undefined))
+
+      await expect(codec.decode({
+        status,
+        headers: { location: 'http://localhost:3000/login' },
+        body,
+      })).rejects.toThrow(`Unexpected redirect response (status ${status}): RPCLink does not follow redirects.`)
+
+      expect(body).toBeCalledTimes(0)
+      expect(deserializeSpy).toBeCalledTimes(0)
+    })
+
     it('error: Cannot parse response body', async () => {
       await expect(codec.decode({
         status: 200,
