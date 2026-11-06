@@ -31,12 +31,30 @@ describe('oRPCInstrumentation', () => {
     expect(tracer!.extract).toBeTypeOf('function')
   })
 
-  it('should support propagationEnabled=false', () => {
-    void new ORPCInstrumentation({ propagationEnabled: false })
+  it('should support propagation=false', () => {
+    void new ORPCInstrumentation({ propagation: false })
 
     const tracer = getTracer()
     expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
     expect(tracer!.inject).toBeUndefined()
+    expect(tracer!.extract).toBeUndefined()
+  })
+
+  it('should support propagation.inject=false', () => {
+    void new ORPCInstrumentation({ propagation: { inject: false } })
+
+    const tracer = getTracer()
+    expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
+    expect(tracer!.inject).toBeUndefined()
+    expect(tracer!.extract).toBeTypeOf('function')
+  })
+
+  it('should support propagation.extract=false', () => {
+    void new ORPCInstrumentation({ propagation: { extract: false } })
+
+    const tracer = getTracer()
+    expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
+    expect(tracer!.inject).toBeTypeOf('function')
     expect(tracer!.extract).toBeUndefined()
   })
 

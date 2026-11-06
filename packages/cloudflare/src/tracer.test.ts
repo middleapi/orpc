@@ -124,9 +124,25 @@ describe('cloudflareTracer', () => {
   it('has no inject method when propagation is disabled', () => {
     const tracer: Tracer = new CloudflareTracer({
       tracing: createFakeTracing() as any,
-      propagationEnabled: false,
+      propagation: false,
     })
     expect(tracer.inject).toBeUndefined()
+  })
+
+  it('has no inject method when inject is disabled', () => {
+    const tracer: Tracer = new CloudflareTracer({
+      tracing: createFakeTracing() as any,
+      propagation: { inject: false },
+    })
+    expect(tracer.inject).toBeUndefined()
+  })
+
+  it('has an inject method when propagation is an empty object', () => {
+    const tracer: Tracer = new CloudflareTracer({
+      tracing: createFakeTracing() as any,
+      propagation: {},
+    })
+    expect(tracer.inject).toBeTypeOf('function')
   })
 
   it('has no extract method', () => {

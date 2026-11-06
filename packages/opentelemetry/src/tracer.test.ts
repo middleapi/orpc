@@ -7,6 +7,7 @@ import {
 import type { TracingHeaders } from '@orpc/shared'
 
 import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer.ts'
+import type { OpenTelemetryTracerOptions } from './tracer.ts'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({
@@ -30,7 +31,7 @@ afterAll(async () => {
   propagation.disable()
 })
 
-function createTracer(options: { propagationEnabled?: boolean } = {}) {
+function createTracer(options: Omit<OpenTelemetryTracerOptions, 'tracer'> = {}) {
   return new OpenTelemetryTracer({ tracer: () => trace.getTracer('test'), ...options })
 }
 
@@ -382,8 +383,26 @@ describe('openTelemetryTracer', () => {
   })
 
   it('has no propagation methods when propagation is disabled', () => {
-    const tracer = createTracer({ propagationEnabled: false })
+    const tracer = createTracer({ propagation: false })
     expect(tracer.inject).toBeUndefined()
+    expect(tracer.extract).toBeUndefined()
+  })
+
+  it('has propagation methods when propagation is an empty object', () => {
+    const tracer = createTracer({ propagation: {} })
+    expect(tracer.inject).toBeTypeOf('function')
+    expect(tracer.extract).toBeTypeOf('function')
+  })
+
+  it('has no inject method when inject is disabled', () => {
+    const tracer = createTracer({ propagation: { inject: false } })
+    expect(tracer.inject).toBeUndefined()
+    expect(tracer.extract).toBeTypeOf('function')
+  })
+
+  it('has no extract method when extract is disabled', () => {
+    const tracer = createTracer({ propagation: { extract: false } })
+    expect(tracer.inject).toBeTypeOf('function')
     expect(tracer.extract).toBeUndefined()
   })
 })

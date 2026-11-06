@@ -56,6 +56,24 @@ export class OpenTelemetrySpan implements TracingSpan {
   }
 }
 
+export interface OpenTelemetryPropagationOptions {
+  /**
+   * Whether oRPC links write the trace context and baggage of the active span into outgoing request headers.
+   *
+   * @default true
+   */
+  inject?: boolean | undefined
+
+  /**
+   * Whether oRPC handlers read the trace context and baggage from incoming request headers and continue that trace.
+   *
+   * Disable this when callers are untrusted, e.g. public web clients.
+   *
+   * @default true
+   */
+  extract?: boolean | undefined
+}
+
 export interface OpenTelemetryTracerOptions {
   /**
    * Called for every span, so a tracer provider set after construction is picked up.
@@ -63,9 +81,14 @@ export interface OpenTelemetryTracerOptions {
   tracer: () => OpenTelemetryApiTracer
 
   /**
+   * Automatic OpenTelemetry context propagation. `false` disables it,
+   * {@link OpenTelemetryPropagationOptions} controls each direction separately.
+   *
+   * Disable this if propagation is handled elsewhere or managed manually.
+   *
    * @default true
    */
-  propagationEnabled?: boolean | undefined
+  propagation?: boolean | OpenTelemetryPropagationOptions | undefined
 }
 
 export class OpenTelemetryTracer implements Tracer {
@@ -77,11 +100,18 @@ export class OpenTelemetryTracer implements Tracer {
   constructor(options: OpenTelemetryTracerOptions) {
     this.tracer = options.tracer
 
-    if (options.propagationEnabled ?? true) {
+    const enabled =
+      typeof options.propagation === 'object'
+        ? options.propagation
+        : { inject: options.propagation, extract: options.propagation }
+
+    if (enabled.inject ?? true) {
       this.inject = (span, headers) => {
         propagation.inject(contextOf(span), headers)
       }
+    }
 
+    if (enabled.extract ?? true) {
       this.extract = (headers) => {
         const active = context.active()
         const extracted = withActiveBaggage(propagation.extract(active, headers), active)

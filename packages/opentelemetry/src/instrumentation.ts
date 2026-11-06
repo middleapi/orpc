@@ -3,17 +3,19 @@ import { InstrumentationBase } from '@opentelemetry/instrumentation'
 import { getTracer, setTracer } from '@orpc/shared'
 
 import pkg from '../package.json' with { type: 'json' }
+import type { OpenTelemetryPropagationOptions } from './tracer.ts'
 import { OpenTelemetryTracer } from './tracer.ts'
 
 export interface ORPCInstrumentationConfig extends InstrumentationConfig {
   /**
-   * Whether to enable automatic OpenTelemetry context/span propagation.
+   * Automatic OpenTelemetry context/span propagation. `false` disables it,
+   * {@link OpenTelemetryPropagationOptions} controls each direction separately.
    *
    * Disable this if propagation is handled elsewhere or managed manually.
    *
    * @default true
    */
-  propagationEnabled?: boolean | undefined
+  propagation?: boolean | OpenTelemetryPropagationOptions | undefined
 }
 
 /**
@@ -33,7 +35,7 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
     setTracer(
       new OpenTelemetryTracer({
         tracer: () => this.tracer,
-        propagationEnabled: this.getConfig().propagationEnabled,
+        propagation: this.getConfig().propagation,
       }),
     )
   }

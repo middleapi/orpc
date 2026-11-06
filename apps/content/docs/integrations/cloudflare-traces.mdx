@@ -47,11 +47,11 @@ During local development, [Local Explorer](https://developers.cloudflare.com/wor
 
 Workers already join service binding and Durable Object calls into one trace. oRPC links also send a W3C `traceparent` header built from the active span, so servers outside Cloudflare, such as one using the [OpenTelemetry integration](/docs/integrations/opentelemetry), continue the same trace.
 
-Workers decide whether to keep a trace only after the invocation, so the header always marks the trace as sampled, and the downstream server records it even if Workers later drop their part. Set `propagationEnabled` to `false` to stop sending the header and let downstream servers sample on their own:
+Workers decide whether to keep a trace only after the invocation, so the header always marks the trace as sampled, and the downstream server records it even if Workers later drop their part. Set `propagation` to `false` to stop sending the header and let downstream servers sample on their own:
 
 ```ts
 new CloudflareTracer({
-  propagationEnabled: false,
+  propagation: false, // or { inject: false }
 }).enable()
 ```
 

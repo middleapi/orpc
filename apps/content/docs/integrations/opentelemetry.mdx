@@ -68,11 +68,11 @@ On Cloudflare Workers, the [Cloudflare Workers Traces integration](/docs/integra
 
 ## Context Propagation
 
-By default, `ORPCInstrumentation` enables [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) between the client and server. Both the trace context and [baggage](https://opentelemetry.io/docs/concepts/signals/baggage/) are read from incoming requests and written to outgoing oRPC requests, so `propagation.getActiveBaggage()` works inside procedures, including streaming ones. You can disable it by setting `propagationEnabled` to `false` if you do not need it or if another instrumentation already handles it.
+By default, `ORPCInstrumentation` enables [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) between the client and server. Both the trace context and [baggage](https://opentelemetry.io/docs/concepts/signals/baggage/) are read from incoming requests and written to outgoing oRPC requests, so `propagation.getActiveBaggage()` works inside procedures, including streaming ones. You can disable it by setting `propagation` to `false` if you do not need it or if another instrumentation already handles it.
 
 ```ts
 const instrumentation = new ORPCInstrumentation({
-  propagationEnabled: false,
+  propagation: false, // or { inject: true, extract: false }
 })
 ```
 
