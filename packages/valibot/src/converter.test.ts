@@ -389,6 +389,86 @@ describe('valibotToJsonSchemaConverter', () => {
       ])
     })
 
+    it.each([
+      ['file', v.file(), { type: 'string', contentMediaType: '*/*' }],
+      ['blob', v.blob(), { type: 'string', contentMediaType: '*/*' }],
+      [
+        'file with a single mime type',
+        v.pipe(v.file(), v.mimeType(['image/png'])),
+        { type: 'string', contentMediaType: 'image/png' },
+      ],
+      [
+        'blob with multiple mime types',
+        v.pipe(v.blob(), v.mimeType(['image/png', 'image/jpeg']), v.description('image')),
+        {
+          anyOf: [
+            { type: 'string', contentMediaType: 'image/png' },
+            { type: 'string', contentMediaType: 'image/jpeg' },
+          ],
+          description: 'image',
+        },
+      ],
+      [
+        'file nested in an object',
+        v.object({ avatar: v.pipe(v.file(), v.mimeType(['image/png'])), name: v.string() }),
+        {
+          type: 'object',
+          properties: {
+            avatar: { type: 'string', contentMediaType: 'image/png' },
+            name: { type: 'string' },
+          },
+          required: ['avatar', 'name'],
+        },
+      ],
+      [
+        'file nested in a set',
+        v.set(v.pipe(v.file(), v.mimeType(['image/png']))),
+        {
+          'type': 'array',
+          'uniqueItems': true,
+          'items': { type: 'string', contentMediaType: 'image/png' },
+          'x-native-type': 'set',
+        },
+      ],
+    ] as const)('converts %s into a file schema', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(
+        new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'output'),
+      ).toEqual([jsonSchema, false])
+    })
+
+    it('leaves the mimeType action on non-file schemas to the errorMode option', () => {
+      const schema = v.pipe(v.any(), v.mimeType(['image/png']))
+
+      expect(converter.convert(schema, 'input')).toEqual([{}, false])
+      expect(() =>
+        new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'input'),
+      ).toThrow('The "mime_type" action cannot be converted to JSON Schema.')
+    })
+
+    it('passes the mimeType action to the overrideAction option without the conversion error', () => {
+      const overrideAction = vi.fn(({ valibotAction, jsonSchema }) =>
+        valibotAction.type === 'mime_type' ? { ...jsonSchema, title: 'image' } : undefined,
+      )
+      const converter = new ValibotToJsonSchemaConverter({ errorMode: 'throw', overrideAction })
+
+      expect(
+        converter.convert(
+          v.pipe(v.file(), v.mimeType(['image/png']), v.description('avatar')),
+          'input',
+        ),
+      ).toEqual([
+        { type: 'string', contentMediaType: 'image/png', title: 'image', description: 'avatar' },
+        false,
+      ])
+      expect(
+        overrideAction.mock.calls.map(([context]) => [context.valibotAction.type, context.errors]),
+      ).toEqual([
+        ['mime_type', undefined],
+        ['description', undefined],
+      ])
+    })
+
     it('leaves other unsupported schemas to the errorMode option', () => {
       expect(converter.convert(v.symbol(), 'input')).toEqual([{}, false])
       expect(() =>

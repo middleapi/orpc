@@ -30,7 +30,7 @@ export interface ArkTypeToJsonSchemaConverterOptions extends Omit<
 
 /**
  * Converts ArkType schemas into JSON Schema using ArkType's built-in `toJsonSchema`,
- * with additional support for types such as `bigint` and `Date`.
+ * with additional support for types such as `bigint`, `Date`, `File`, and `Blob`.
  *
  * @see {@link https://orpc.dev/docs/integrations/arktype | ArkType Integration}
  */
@@ -68,6 +68,9 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
             ;(ctx.base as any).type = 'string'
             ;(ctx.base as any).format = JsonSchemaFormat.DateTime
             ;(ctx.base as any)['x-native-type'] = JsonSchemaXNativeType.Date
+          } else if (ctx.code === 'proto' && isBlobConstructor(ctx.proto)) {
+            ;(ctx.base as any).type = 'string'
+            ;(ctx.base as any).contentMediaType = '*/*'
           }
 
           if (typeof options.fallback === 'function') {
@@ -131,4 +134,8 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
     const { $schema: _schema, ...rest } = jsonSchema
     return rest
   }
+}
+
+function isBlobConstructor(proto: abstract new (...args: any[]) => unknown): boolean {
+  return typeof Blob !== 'undefined' && (proto === Blob || proto.prototype instanceof Blob)
 }

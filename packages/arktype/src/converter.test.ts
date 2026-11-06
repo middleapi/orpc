@@ -135,8 +135,29 @@ describe('arkTypeToJsonSchemaConverter', () => {
           'format': 'date-time',
         },
       ],
+      [type('File'), { type: 'string', contentMediaType: '*/*' }],
+      [type('Blob'), { type: 'string', contentMediaType: '*/*' }],
+      [type.instanceOf(class extends Blob {}), { type: 'string', contentMediaType: '*/*' }],
     ] as const)('extends conversion for %s', (schema, jsonSchema) => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+    })
+
+    it('converts files nested in objects', () => {
+      expect(converter.convert(type({ avatar: 'File', name: 'string' }), 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            avatar: { type: 'string', contentMediaType: '*/*' },
+            name: { type: 'string' },
+          },
+          required: ['avatar', 'name'],
+        },
+        false,
+      ])
+    })
+
+    it('leaves other instanceof types to the fallback option', () => {
+      expect(converter.convert(type.instanceOf(Map), 'input')).toEqual([{}, false])
     })
   })
 

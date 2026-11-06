@@ -12,11 +12,12 @@ import {
 import type {
   ConversionConfig,
   ConversionContext,
+  OverrideActionContext,
   OverrideSchemaContext,
   JsonSchema as ValibotJsonSchema,
 } from '@valibot/to-json-schema'
 import { toJsonSchema } from '@valibot/to-json-schema'
-import type { BaseSchema, MapSchema, SetSchema } from 'valibot'
+import type { BaseSchema, MapSchema, MimeTypeAction, SetSchema } from 'valibot'
 import { any, tuple } from 'valibot'
 
 export interface ValibotToJsonSchemaConverterOptions extends Omit<
@@ -39,7 +40,7 @@ const NESTED_CONVERSION_SENTINEL = /* @__PURE__ */ any()
 
 /**
  * Converts Valibot schemas into JSON Schema using Valibot's built-in `toJsonSchema`,
- * with additional support for types such as `v.bigint()`, `v.date()`, `v.set()`, and `v.map()`.
+ * with additional support for types such as `v.bigint()`, `v.date()`, `v.set()`, `v.map()`, `v.file()`, and `v.blob()`.
  *
  * @see {@link https://orpc.dev/docs/integrations/valibot | Valibot Integration}
  */
@@ -109,7 +110,17 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
       target: 'draft-2020-12',
       typeMode: direction,
       overrideSchema: (context) => this.overrideSchema(context, direction),
+      overrideAction: (context) => this.overrideAction(context),
     }
+  }
+
+  private overrideAction(context: OverrideActionContext): ValibotJsonSchema | null | undefined {
+    const jsonSchema = convertAction(context)
+
+    return jsonSchema
+      ? (this.conversionConfig.overrideAction?.({ ...context, jsonSchema, errors: undefined }) ??
+          jsonSchema)
+      : this.conversionConfig.overrideAction?.(context)
   }
 
   private overrideSchema(
@@ -167,6 +178,10 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
           'x-native-type': JsonSchemaXNativeType.Map,
         } as ValibotJsonSchema
       }
+      case 'blob':
+      case 'file':
+        // `v.mimeType()` narrows `contentMediaType` in `convertAction`.
+        return { type: 'string', contentMediaType: '*/*' }
     }
 
     return undefined
@@ -200,6 +215,36 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
     mergeConversionContext(parent, child)
 
     return prefixItems!.slice(1) as ValibotJsonSchema[]
+  }
+}
+
+function convertAction({
+  valibotAction,
+  jsonSchema,
+}: OverrideActionContext): ValibotJsonSchema | undefined {
+  if (
+    valibotAction.type !== 'mime_type' ||
+    jsonSchema.type !== 'string' ||
+    typeof jsonSchema.contentMediaType !== 'string'
+  ) {
+    return undefined
+  }
+
+  const { requirement } = valibotAction as MimeTypeAction<Blob, `${string}/${string}`[], undefined>
+
+  if (requirement.length === 0) {
+    return undefined
+  }
+
+  if (requirement.length === 1) {
+    return { ...jsonSchema, contentMediaType: requirement[0] }
+  }
+
+  // One branch per media type, so the OpenAPI generator documents each one.
+  const { type: _type, contentMediaType: _contentMediaType, ...rest } = jsonSchema
+  return {
+    ...rest,
+    anyOf: requirement.map((contentMediaType) => ({ type: 'string', contentMediaType })),
   }
 }
 
