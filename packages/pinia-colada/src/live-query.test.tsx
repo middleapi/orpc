@@ -175,4 +175,22 @@ describe('liveQuery', () => {
     await expect(fetching).rejects.toSatisfy((error) => error === controller.signal.reason)
     expect(entry.when).toBe(0)
   })
+
+  it('marks the entry stale when the signal is aborted before the query function runs', async () => {
+    const signal = AbortSignal.abort()
+    const entry = {
+      key: ['stream'],
+      when: 1,
+      state: { value: { status: 'success', data: 0, error: null } },
+    }
+
+    await expect(
+      liveQuery(async () =>
+        (async function* () {
+          yield 1
+        })(),
+      )({ entry, signal } as any),
+    ).rejects.toBe(signal.reason)
+    expect(entry).toMatchObject({ when: 0, state: { value: { data: 0 } } })
+  })
 })

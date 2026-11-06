@@ -230,6 +230,21 @@ describe('serializableStreamedQuery', () => {
       expect(queryClient.getQueryState(key)).toMatchObject({ data: ['new'], isInvalidated: false })
     })
 
+    it('marks the query stale when the signal is aborted before the query function runs', async () => {
+      const key = ['aborted-before-call']
+      queryClient.setQueryData(key, ['old'])
+      const signal = AbortSignal.abort()
+
+      await expect(
+        serializableStreamedQuery(stream(['new']))({
+          queryKey: key,
+          signal,
+          client: queryClient,
+        } as any),
+      ).rejects.toBe(signal.reason)
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['old'], isInvalidated: true })
+    })
+
     it('handles abort signal during streaming', async () => {
       let cleanupCalled = false
       const yieldFn = vi.fn((v) => v)

@@ -101,6 +101,19 @@ describe('liveQuery', async () => {
     expect(queryClient.getQueryState(key)).toMatchObject({ data: 0, isInvalidated: true })
   })
 
+  it('marks the query stale when the signal is aborted before the query function runs', async () => {
+    const key = ['live-aborted-before-call']
+    queryClient.setQueryData(key, 0)
+    const signal = AbortSignal.abort()
+
+    await expect(
+      liveQuery(async function* () {
+        yield 1
+      })({ queryKey: key, signal, client: queryClient } as any),
+    ).rejects.toBe(signal.reason)
+    expect(queryClient.getQueryState(key)).toMatchObject({ data: 0, isInvalidated: true })
+  })
+
   it('throw if no data yielded', async () => {
     const queryFn = liveQuery(async function* () {})
 
