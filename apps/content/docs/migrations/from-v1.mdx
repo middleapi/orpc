@@ -827,16 +827,16 @@ const link = new RPCLink({
 
 </CodeGroup>
 
-### Fetch links follow redirects
+### Fetch links no longer set `redirect`
 
-`RPCLink` and `OpenAPILink` no longer set `redirect: 'manual'`, so `fetch` follows redirects. To get `3xx` responses as the output, as in v1, set it in a custom `fetch`. See [OpenAPI Link](/docs/openapi/link#redirect-responses).
+`RPCLink` and `OpenAPILink` no longer set `redirect: 'manual'`, so redirect handling is left to your `fetch` implementation. Most follow redirects by default, but not all do. To get `3xx` responses as the output, as in v1, set `redirect: 'manual'` in a custom `fetch`, or set `redirect: 'follow'` to ensure redirects are followed. See [OpenAPI Link](/docs/openapi/link#redirect-responses).
 
 ```ts
 const link = new OpenAPILink(contract, {
   fetch: (url, init) =>
     globalThis.fetch(url, {
       ...init,
-      redirect: 'manual',
+      redirect: 'manual', // or 'follow'
     }),
 })
 ```
