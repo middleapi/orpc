@@ -7,7 +7,7 @@ import {
 import type { TracingHeaders } from '@orpc/shared'
 
 import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer.ts'
-import type { OpenTelemetryPropagationOptions } from './tracer.ts'
+import type { OpenTelemetryTracerOptions } from './tracer.ts'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({
@@ -31,7 +31,7 @@ afterAll(async () => {
   propagation.disable()
 })
 
-function createTracer(options: { propagationEnabled?: OpenTelemetryPropagationOptions } = {}) {
+function createTracer(options: Omit<OpenTelemetryTracerOptions, 'tracer'> = {}) {
   return new OpenTelemetryTracer({ tracer: () => trace.getTracer('test'), ...options })
 }
 
@@ -382,15 +382,27 @@ describe('openTelemetryTracer', () => {
     })
   })
 
-  it('has not inject method when outgoing propagation is disabled', () => {
-    const tracer = createTracer({ propagationEnabled: { inject: false } })
+  it('has no propagation methods when propagation is disabled', () => {
+    const tracer = createTracer({ propagation: false })
     expect(tracer.inject).toBeUndefined()
-    expect(tracer.extract).toBeDefined()
+    expect(tracer.extract).toBeUndefined()
   })
 
-  it('has not extract method when incoming propagation is disabled', () => {
-    const tracer = createTracer({ propagationEnabled: { extract: false } })
+  it('has propagation methods when propagation is an empty object', () => {
+    const tracer = createTracer({ propagation: {} })
+    expect(tracer.inject).toBeTypeOf('function')
+    expect(tracer.extract).toBeTypeOf('function')
+  })
+
+  it('has no inject method when inject is disabled', () => {
+    const tracer = createTracer({ propagation: { inject: false } })
+    expect(tracer.inject).toBeUndefined()
+    expect(tracer.extract).toBeTypeOf('function')
+  })
+
+  it('has no extract method when extract is disabled', () => {
+    const tracer = createTracer({ propagation: { extract: false } })
+    expect(tracer.inject).toBeTypeOf('function')
     expect(tracer.extract).toBeUndefined()
-    expect(tracer.inject).toBeDefined()
   })
 })

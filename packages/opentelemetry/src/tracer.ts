@@ -58,18 +58,20 @@ export class OpenTelemetrySpan implements TracingSpan {
 
 export interface OpenTelemetryPropagationOptions {
   /**
-   * Whether to enable outgoing context propagation
+   * Whether oRPC links write the trace context and baggage of the active span into outgoing request headers.
    *
    * @default true
    */
-  inject?: boolean
+  inject?: boolean | undefined
 
   /**
-   * Whether to enable incoming context propagation
+   * Whether oRPC handlers read the trace context and baggage from incoming request headers and continue that trace.
+   *
+   * Disable this when callers are untrusted, e.g. public web clients.
    *
    * @default true
    */
-  extract?: boolean
+  extract?: boolean | undefined
 }
 
 export interface OpenTelemetryTracerOptions {
@@ -78,7 +80,15 @@ export interface OpenTelemetryTracerOptions {
    */
   tracer: () => OpenTelemetryApiTracer
 
-  propagationEnabled?: OpenTelemetryPropagationOptions
+  /**
+   * Automatic OpenTelemetry context propagation. `false` disables it,
+   * {@link OpenTelemetryPropagationOptions} controls each direction separately.
+   *
+   * Disable this if propagation is handled elsewhere or managed manually.
+   *
+   * @default true
+   */
+  propagation?: boolean | OpenTelemetryPropagationOptions | undefined
 }
 
 export class OpenTelemetryTracer implements Tracer {
@@ -90,13 +100,18 @@ export class OpenTelemetryTracer implements Tracer {
   constructor(options: OpenTelemetryTracerOptions) {
     this.tracer = options.tracer
 
-    if (options.propagationEnabled?.inject ?? true) {
+    const enabled =
+      typeof options.propagation === 'object'
+        ? options.propagation
+        : { inject: options.propagation, extract: options.propagation }
+
+    if (enabled.inject ?? true) {
       this.inject = (span, headers) => {
         propagation.inject(contextOf(span), headers)
       }
     }
 
-    if (options.propagationEnabled?.extract ?? true) {
+    if (enabled.extract ?? true) {
       this.extract = (headers) => {
         const active = context.active()
         const extracted = withActiveBaggage(propagation.extract(active, headers), active)

@@ -31,8 +31,8 @@ describe('oRPCInstrumentation', () => {
     expect(tracer!.extract).toBeTypeOf('function')
   })
 
-  it('should support propagationEnabled=false', () => {
-    void new ORPCInstrumentation({ propagationEnabled: false })
+  it('should support propagation=false', () => {
+    void new ORPCInstrumentation({ propagation: false })
 
     const tracer = getTracer()
     expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
@@ -40,22 +40,22 @@ describe('oRPCInstrumentation', () => {
     expect(tracer!.extract).toBeUndefined()
   })
 
-  it('should support propagationEnabled.inject=false', () => {
-    void new ORPCInstrumentation({ propagationEnabled: { inject: false } })
+  it('should support propagation.inject=false', () => {
+    void new ORPCInstrumentation({ propagation: { inject: false } })
 
     const tracer = getTracer()
     expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
     expect(tracer!.inject).toBeUndefined()
-    expect(tracer!.extract).toBeDefined()
+    expect(tracer!.extract).toBeTypeOf('function')
   })
 
-  it('should support propagationEnabled.extract=false', () => {
-    void new ORPCInstrumentation({ propagationEnabled: { extract: false } })
+  it('should support propagation.extract=false', () => {
+    void new ORPCInstrumentation({ propagation: { extract: false } })
 
     const tracer = getTracer()
     expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
+    expect(tracer!.inject).toBeTypeOf('function')
     expect(tracer!.extract).toBeUndefined()
-    expect(tracer!.inject).toBeDefined()
   })
 
   it('should not enable if enabled=false', () => {

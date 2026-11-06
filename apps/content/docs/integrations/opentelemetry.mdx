@@ -68,17 +68,25 @@ On Cloudflare Workers, the [Cloudflare Workers Traces integration](/docs/integra
 
 ## Context Propagation
 
-By default, `ORPCInstrumentation` enables [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) between the client and server. Both the trace context and [baggage](https://opentelemetry.io/docs/concepts/signals/baggage/) are read from incoming requests and written to outgoing oRPC requests, so `propagation.getActiveBaggage()` works inside procedures, including streaming ones. You can disable it by setting `propagationEnabled` to `false` if you do not need it or if another instrumentation already handles it.
+By default, `ORPCInstrumentation` enables [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) between the client and server. Both the trace context and [baggage](https://opentelemetry.io/docs/concepts/signals/baggage/) are read from incoming requests and written to outgoing oRPC requests, so `propagation.getActiveBaggage()` works inside procedures, including streaming ones. You can disable it by setting `propagation` to `false` if you do not need it or if another instrumentation already handles it.
 
 ```ts
 const instrumentation = new ORPCInstrumentation({
-  propagationEnabled: false,
+  propagation: false,
 })
 ```
 
 :::warning
 Popular instrumentations that already handle context propagation include [@hono/otel](https://www.npmjs.com/package/@hono/otel), [@opentelemetry/instrumentation-http](https://www.npmjs.com/package/@opentelemetry/instrumentation-http), and [@opentelemetry/instrumentation-fetch](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch).
 :::
+
+To control each direction separately, pass an object instead. `inject` writes the context into outgoing oRPC requests and `extract` reads it from incoming requests. Both default to `true`. For example, disable `extract` on a server that receives requests from untrusted clients, such as browsers, so they cannot join or set baggage on your traces:
+
+```ts
+const instrumentation = new ORPCInstrumentation({
+  propagation: { extract: false },
+})
+```
 
 ## Middleware Span
 
