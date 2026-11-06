@@ -16,6 +16,8 @@ describe('visitJsonSchemaRefs', () => {
       properties: {
         child: { $ref: '#/$defs/A' },
         unmapped: { discriminator: { propertyName: 'kind' } },
+        // malformed discriminators are skipped
+        malformed: { discriminator: 'kind' as any },
       },
       patternProperties: { '^x-': { $ref: '#/$defs/B' } },
       propertyNames: { $ref: '#/$defs/C' },
@@ -34,6 +36,7 @@ describe('visitJsonSchemaRefs', () => {
       discriminator: {
         propertyName: 'kind',
         mapping: { o: '#/$defs/O', bare: 'Bare', remote: 'other.json#/Remote' },
+        defaultMapping: '#/$defs/P',
       },
       examples: [{ $ref: '#/$defs/Ignored' }],
     }
@@ -51,7 +54,7 @@ describe('visitJsonSchemaRefs', () => {
     expect(visited).not.toContain('#/$defs/Ignored')
     expect(visited).not.toContain('Bare')
     expect(visited).not.toContain('other.json#/Remote')
-    expect(visited.length).toBe(15)
+    expect(visited.length).toBe(16)
   })
 
   it('visits shared and cyclic object instances once', () => {
@@ -252,11 +255,15 @@ describe('mapJsonSchemaRefs', () => {
             discriminator: {
               'propertyName': 'kind',
               'mapping': { cat: '#/$defs/Cat', dog: 'Dog', remote: 'other.json#/Bird' },
+              'defaultMapping': '#/$defs/Dog',
               'x-extra': true,
             },
           },
           plain: { discriminator: discriminatorWithoutRefs },
           unmapped: { discriminator: discriminatorWithoutMapping },
+          defaultOnly: { discriminator: { propertyName: 'kind', defaultMapping: '#/$defs/Cat' } },
+          // malformed discriminators are kept as is
+          malformed: { discriminator: 'kind' as any },
         },
         // discriminator-shaped metadata is not a schema keyword here
         examples: [{ discriminator: { mapping: { cat: '#/$defs/Cat' } } }],
@@ -278,11 +285,16 @@ describe('mapJsonSchemaRefs', () => {
               dog: 'Dog',
               remote: 'other.json#/Bird',
             },
+            'defaultMapping': '#/components/schemas/Dog',
             'x-extra': true,
           },
         },
         plain: { discriminator: discriminatorWithoutRefs },
         unmapped: { discriminator: discriminatorWithoutMapping },
+        defaultOnly: {
+          discriminator: { propertyName: 'kind', defaultMapping: '#/components/schemas/Cat' },
+        },
+        malformed: { discriminator: 'kind' },
       },
       examples: [{ discriminator: { mapping: { cat: '#/$defs/Cat' } } }],
     })
@@ -293,6 +305,8 @@ describe('mapJsonSchemaRefs', () => {
       ['#/$defs/Cat', ['properties', 'pet', 'oneOf', 0, '$ref']],
       ['#/$defs/Dog', ['properties', 'pet', 'oneOf', 1, '$ref']],
       ['#/$defs/Cat', ['properties', 'pet', 'discriminator', 'mapping', 'cat']],
+      ['#/$defs/Dog', ['properties', 'pet', 'discriminator', 'defaultMapping']],
+      ['#/$defs/Cat', ['properties', 'defaultOnly', 'discriminator', 'defaultMapping']],
     ])
   })
 

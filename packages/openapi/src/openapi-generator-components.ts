@@ -298,7 +298,7 @@ function areRefValuesEquivalentForReuse(
 }
 
 /**
- * `discriminator.mapping` values can be refs, which are rewritten during hoisting like `$ref`,
+ * `discriminator.mapping`/`defaultMapping` values can be refs, which are rewritten during hoisting like `$ref`,
  * so they must be compared by their targets rather than by their (prefix-dependent) strings.
  * Values that are not refs (bare schema names) still compare by string equality.
  */
@@ -319,6 +319,10 @@ function areDiscriminatorsEquivalentForReuse(
         (_, candidateRef, existingRef) =>
           areRefValuesEquivalentForReuse(candidateRef, existingRef, ctx),
       )
+    }
+
+    if (key === 'defaultMapping') {
+      return areRefValuesEquivalentForReuse(candidateValue, existingValue, ctx)
     }
 
     return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)

@@ -131,7 +131,12 @@ describe('openAPIComponentRegistry', () => {
     })
 
     describe('discriminator mapping', () => {
-      const petSchema = (mapping: Record<string, string> = {}) =>
+      interface DiscriminatorOverrides {
+        mapping?: Record<string, string>
+        defaultMapping?: string
+      }
+
+      const petSchema = (overrides: DiscriminatorOverrides = {}) =>
         ({
           type: 'object',
           properties: {
@@ -139,7 +144,13 @@ describe('openAPIComponentRegistry', () => {
               oneOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }, { $ref: '#/$defs/Bird' }],
               discriminator: {
                 propertyName: 'kind',
-                mapping: { cat: '#/$defs/Cat', dog: '#/$defs/Dog', bird: 'Bird', ...mapping },
+                mapping: {
+                  cat: '#/$defs/Cat',
+                  dog: '#/$defs/Dog',
+                  bird: 'Bird',
+                  ...overrides.mapping,
+                },
+                defaultMapping: overrides.defaultMapping ?? '#/$defs/Cat',
               },
             },
           },
@@ -151,8 +162,8 @@ describe('openAPIComponentRegistry', () => {
         }) satisfies JsonSchema
 
       // the union lives in a `Pet` def, so its mapping is rewritten inside a hoisted component
-      const wrappedPetSchema = (mapping?: Record<string, string>) => {
-        const { $defs, ...pet } = petSchema(mapping)
+      const wrappedPetSchema = (overrides?: DiscriminatorOverrides) => {
+        const { $defs, ...pet } = petSchema(overrides)
         return { $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: pet } }
       }
 
@@ -179,6 +190,7 @@ describe('openAPIComponentRegistry', () => {
                   // bare schema names are not refs
                   bird: 'Bird',
                 },
+                defaultMapping: `#/components/schemas/${prefix}Cat`,
               },
             },
           },
@@ -203,6 +215,7 @@ describe('openAPIComponentRegistry', () => {
                   dog: '#/components/schemas/Dog',
                   bird: 'Bird',
                 },
+                defaultMapping: '#/components/schemas/Cat',
               },
             },
           },
@@ -216,24 +229,32 @@ describe('openAPIComponentRegistry', () => {
         expect(doc.components?.schemas).toEqual(components)
       })
 
-      it('does not reuse components whose discriminator mapping targets differ', () => {
-        const { doc, registry } = createRegistry()
+      it.each<[name: string, overrides: DiscriminatorOverrides, expected: object]>([
+        [
+          'mapping',
+          { mapping: { cat: '#/$defs/Dog', dog: '#/$defs/Cat' } },
+          { mapping: { cat: '#/components/schemas/Dog', dog: '#/components/schemas/Cat' } },
+        ],
+        [
+          'defaultMapping',
+          { defaultMapping: '#/$defs/Dog' },
+          { defaultMapping: '#/components/schemas/Dog' },
+        ],
+      ])(
+        'does not reuse components whose discriminator %s targets differ',
+        (_, overrides, expected) => {
+          const { doc, registry } = createRegistry()
 
-        registry.hoistDefs(wrappedPetSchema())
+          registry.hoistDefs(wrappedPetSchema())
 
-        expect(
-          registry.hoistDefs(wrappedPetSchema({ cat: '#/$defs/Dog', dog: '#/$defs/Cat' })),
-        ).toEqual({ $ref: '#/components/schemas/Pet2' })
-        expect(doc.components?.schemas?.Pet2).toMatchObject({
-          properties: {
-            pet: {
-              discriminator: {
-                mapping: { cat: '#/components/schemas/Dog', dog: '#/components/schemas/Cat' },
-              },
-            },
-          },
-        })
-      })
+          expect(registry.hoistDefs(wrappedPetSchema(overrides))).toEqual({
+            $ref: '#/components/schemas/Pet2',
+          })
+          expect(doc.components?.schemas?.Pet2).toMatchObject({
+            properties: { pet: { discriminator: expected } },
+          })
+        },
+      )
 
       // malformed discriminators from arbitrary JSON schemas fall back to structural comparison
       it.each<[name: string, discriminator: any, otherDiscriminator: any]>([
