@@ -230,6 +230,159 @@ describe('zodToJsonSchemaConverter', () => {
     })
   })
 
+  describe('undefined', () => {
+    it.each([
+      ['z.undefined()', z.undefined(), { not: {} }],
+      ['z.void()', z.void(), { not: {} }],
+      ['z.literal(undefined)', z.literal(undefined), { not: {} }],
+      ['string | undefined', z.union([z.string(), z.undefined()]), { type: 'string' }],
+      [
+        'number | null | undefined',
+        z.union([z.number(), z.null(), z.undefined()]),
+        { anyOf: [{ type: 'number' }, { type: 'null' }] },
+      ],
+      ['z.xor with undefined', z.xor([z.string(), z.undefined()]), { type: 'string' }],
+      ["z.literal(['a', undefined])", z.literal(['a', undefined]), { type: 'string', const: 'a' }],
+    ] as const)('drops the undefined branch of %s', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, true])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, true])
+    })
+
+    it('drops undefined from array items', () => {
+      expect(converter.convert(z.array(z.union([z.string(), z.undefined()])), 'input')).toEqual([
+        { type: 'array', items: { type: 'string' } },
+        false,
+      ])
+    })
+
+    it('treats properties accepting undefined as optional', () => {
+      const schema = z.object({
+        a: z.union([z.string(), z.undefined()]),
+        b: z.undefined(),
+        c: z.void(),
+        d: z.literal(['a', undefined]),
+        e: z.union([z.number(), z.null(), z.undefined()]).optional(),
+        f: z.string(),
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'string' },
+            b: { not: {} },
+            c: { not: {} },
+            d: { type: 'string', const: 'a' },
+            e: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+            f: { type: 'string' },
+          },
+          required: ['f'],
+        },
+        false,
+      ])
+    })
+
+    it('treats properties referencing a reused undefined schema as optional', () => {
+      const converter = new ZodToJsonSchemaConverter({ reused: 'ref' })
+      const undefinedSchema = z.undefined()
+      const schema = z.object({
+        a: z.union([z.string(), undefinedSchema]),
+        b: undefinedSchema,
+        c: z.string(),
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'string' },
+            b: { $ref: '#/$defs/__schema0' },
+            c: { type: 'string' },
+          },
+          required: ['c'],
+          $defs: { __schema0: { not: {} } },
+        },
+        false,
+      ])
+    })
+
+    it('handles undefined even when unrepresentable is "throw"', () => {
+      const converter = new ZodToJsonSchemaConverter({ unrepresentable: 'throw' })
+
+      expect(
+        converter.convert(z.object({ a: z.union([z.string(), z.undefined()]) }), 'input'),
+      ).toEqual([{ type: 'object', properties: { a: { type: 'string' } } }, false])
+    })
+
+    it('lets a custom override replace the undefined schema', () => {
+      const converter = new ZodToJsonSchemaConverter({
+        override: (ctx) => {
+          if (ctx.zodSchema._zod.def.type === 'undefined') {
+            for (const key of Object.keys(ctx.jsonSchema)) {
+              delete ctx.jsonSchema[key]
+            }
+            ctx.jsonSchema.type = 'null'
+          }
+        },
+      })
+
+      expect(
+        converter.convert(z.object({ a: z.union([z.string(), z.undefined()]) }), 'input'),
+      ).toEqual([
+        {
+          type: 'object',
+          properties: { a: { type: ['string', 'null'] } },
+          required: ['a'],
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('non-finite numbers', () => {
+    it.each([
+      ['z.literal(Infinity)', z.literal(Infinity), { type: 'number', not: {} }],
+      ['z.literal(-Infinity)', z.literal(-Infinity), { type: 'number', not: {} }],
+      ['z.literal(NaN)', z.literal(Number.NaN), { type: 'number', not: {} }],
+      ['z.nan()', z.nan(), { not: {} }],
+      [
+        'z.literal([1, Infinity, NaN])',
+        z.literal([1, Infinity, Number.NaN]),
+        { type: 'number', enum: [1] },
+      ],
+      ['string | NaN', z.union([z.string(), z.nan()]), { type: 'string' }],
+      ['string | Infinity', z.union([z.string(), z.literal(Infinity)]), { type: 'string' }],
+    ] as const)('converts %s without non-JSON values', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, false])
+    })
+
+    it('replaces non-finite members of a literal also holding undefined', () => {
+      expect(
+        converter.convert(z.object({ a: z.literal([1, Infinity, undefined]) }), 'input'),
+      ).toEqual([{ type: 'object', properties: { a: { type: 'number', enum: [1] } } }, false])
+    })
+
+    it('keeps a property holding a non-finite literal required', () => {
+      expect(converter.convert(z.object({ a: z.literal(Infinity) }), 'input')).toEqual([
+        { type: 'object', properties: { a: { type: 'number', not: {} } }, required: ['a'] },
+        false,
+      ])
+    })
+
+    it('replaces non-finite values a custom override writes', () => {
+      const converter = new ZodToJsonSchemaConverter({
+        override: (ctx) => {
+          if (ctx.zodSchema._zod.def.type === 'number') {
+            ctx.jsonSchema.enum = [1, Infinity]
+          }
+        },
+      })
+
+      expect(converter.convert(z.number(), 'input')).toEqual([{ type: 'number', enum: [1] }, false])
+    })
+  })
+
   describe('native type extensions', () => {
     it.each([
       [

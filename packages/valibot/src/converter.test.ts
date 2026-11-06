@@ -153,6 +153,160 @@ describe('valibotToJsonSchemaConverter', () => {
     })
   })
 
+  describe('undefined', () => {
+    it.each([
+      ['v.undefined()', v.undefined(), { not: {} }],
+      ['v.void()', v.void(), { not: {} }],
+      ['string | undefined', v.union([v.string(), v.undefined()]), { type: 'string' }],
+      [
+        'number | null | undefined',
+        v.union([v.number(), v.null(), v.undefined()]),
+        { anyOf: [{ type: 'number' }, { type: 'null' }] },
+      ],
+      ['v.undefinedable()', v.undefinedable(v.string()), { type: 'string' }],
+    ] as const)('drops the undefined branch of %s', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, true])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, true])
+    })
+
+    it('drops undefined from array items', () => {
+      expect(converter.convert(v.array(v.union([v.string(), v.undefined()])), 'input')).toEqual([
+        { type: 'array', items: { type: 'string' } },
+        false,
+      ])
+    })
+
+    it('treats properties accepting undefined as optional', () => {
+      const schema = v.object({
+        a: v.union([v.string(), v.undefined()]),
+        b: v.undefined(),
+        c: v.void(),
+        d: v.undefinedable(v.string()),
+        e: v.optional(v.union([v.number(), v.null(), v.undefined()])),
+        f: v.string(),
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'string' },
+            b: { not: {} },
+            c: { not: {} },
+            d: { type: 'string' },
+            e: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+            f: { type: 'string' },
+          },
+          required: ['f'],
+        },
+        false,
+      ])
+    })
+
+    it('keeps a defaulted v.undefinedable() property required on the output side', () => {
+      const schema = v.object({ a: v.undefinedable(v.string(), 'fallback') })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        { type: 'object', properties: { a: { type: 'string', default: 'fallback' } } },
+        false,
+      ])
+      expect(converter.convert(schema, 'output')).toEqual([
+        {
+          type: 'object',
+          properties: { a: { type: 'string', default: 'fallback' } },
+          required: ['a'],
+        },
+        false,
+      ])
+    })
+
+    it('treats properties referencing an undefined definition as optional', () => {
+      const undefinedSchema = v.undefined()
+      const converter = new ValibotToJsonSchemaConverter({
+        definitions: { Undefined: undefinedSchema },
+      })
+      const schema = v.object({
+        a: v.union([v.string(), undefinedSchema]),
+        b: undefinedSchema,
+        c: v.string(),
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'string' },
+            b: { $ref: '#/$defs/Undefined' },
+            c: { type: 'string' },
+          },
+          required: ['c'],
+          $defs: { Undefined: { not: {} } },
+        },
+        false,
+      ])
+    })
+
+    it('drops undefined nested in set and map conversions', () => {
+      expect(converter.convert(v.set(v.union([v.string(), v.undefined()])), 'input')).toEqual([
+        {
+          'type': 'array',
+          'uniqueItems': true,
+          'items': { type: 'string' },
+          'x-native-type': 'set',
+        },
+        false,
+      ])
+    })
+
+    it('lets a custom overrideSchema replace the undefined schema', () => {
+      const converter = new ValibotToJsonSchemaConverter({
+        overrideSchema: (context) =>
+          context.valibotSchema.type === 'undefined' ? { type: 'null' } : undefined,
+      })
+
+      expect(
+        converter.convert(v.object({ a: v.union([v.string(), v.undefined()]) }), 'input'),
+      ).toEqual([
+        {
+          type: 'object',
+          properties: { a: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+          required: ['a'],
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('non-finite numbers', () => {
+    it.each([
+      ['v.literal(Infinity)', v.literal(Infinity), { not: {} }],
+      ['v.literal(-Infinity)', v.literal(-Infinity), { not: {} }],
+      ['v.literal(NaN)', v.literal(Number.NaN), { not: {} }],
+      ['v.nan()', v.nan(), { not: {} }],
+      ['v.picklist([1, Infinity, NaN])', v.picklist([1, Infinity, Number.NaN]), { enum: [1] }],
+      ['v.picklist([Infinity, -Infinity])', v.picklist([Infinity, -Infinity]), { not: {} }],
+      ['v.enum() with a non-finite value', v.enum({ a: 1, b: Infinity }), { enum: [1] }],
+      ['string | NaN', v.union([v.string(), v.nan()]), { type: 'string' }],
+      ['string | Infinity', v.union([v.string(), v.literal(Infinity)]), { type: 'string' }],
+      [
+        'object property',
+        v.object({ a: v.literal(Infinity) }),
+        { type: 'object', properties: { a: { not: {} } }, required: ['a'] },
+      ],
+    ] as const)('converts %s without non-JSON values', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, false])
+    })
+
+    it('leaves finite literals and picklists to @valibot/to-json-schema', () => {
+      expect(converter.convert(v.literal(1), 'input')).toEqual([{ const: 1 }, false])
+      expect(converter.convert(v.picklist([1, 2]), 'input')).toEqual([
+        { enum: [1, 2], type: 'number' },
+        false,
+      ])
+    })
+  })
+
   describe('native type extensions', () => {
     it.each([
       [

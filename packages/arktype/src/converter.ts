@@ -6,11 +6,12 @@ import type {
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import {
+  createUndefinedJsonSchema,
   deduplicateJsonSchemas,
   isStandardSchemaOptional,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
-  resolveJsonSchemaRootLocalRef,
+  normalizeJsonSchema,
 } from '@orpc/json-schema'
 import type { Type } from 'arktype'
 
@@ -66,8 +67,7 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
           if (ctx.unit === undefined) {
             // JSON can't hold `undefined`: it matches nothing here,
             // and `normalizeJsonSchema` drops it from unions and makes the property optional
-            ;(ctx.base as any).not = {}
-            ;(ctx.base as any)[UNDEFINED_MARKER] = true
+            Object.assign(ctx.base, createUndefinedJsonSchema())
           } else if (isNonFiniteNumber(ctx.unit)) {
             // JSON can't hold NaN or ±Infinity, so no JSON value can match them
             ;(ctx.base as any).not = {}
@@ -148,109 +148,9 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
     // Since the default oRPC format is always draft/2020-12,
     // `$schema` can be safely omitted here.
     const { $schema: _schema, ...rest } = jsonSchema
-    return this.normalizeJsonSchema(rest)
-  }
-
-  /**
-   * Fixes up what ArkType's `toJsonSchema` can't express in JSON:
-   * - drops `undefined` branches from unions and makes properties that accept `undefined` optional
-   * - routes `const`/`enum` NaN or ±Infinity (which ArkType emits as-is) through the `unit` fallback
-   */
-  private normalizeJsonSchema(root: ArkJsonSchema): ArkJsonSchema {
-    const defs = (root as Exclude<JsonSchema, boolean>).$defs
-
-    const isUndefinable = (schema: unknown, seen = new Set<unknown>()): boolean => {
-      if (!isRecord(schema) || seen.has(schema)) {
-        return false
-      }
-      seen.add(schema)
-
-      if (UNDEFINED_MARKER in schema) {
-        return true
-      }
-
-      if (
-        Array.isArray(schema.anyOf) &&
-        schema.anyOf.some((branch) => isUndefinable(branch, seen))
-      ) {
-        return true
-      }
-
-      const resolved = resolveJsonSchemaRootLocalRef(schema as JsonSchema, defs)
-      return resolved !== schema && isUndefinable(resolved, seen)
-    }
-
-    // only the keywords ArkType's `toJsonSchema` emits need walking
-    const normalize = (schema: unknown): unknown => {
-      if (!isRecord(schema)) {
-        return schema
-      }
-
-      if (isNonFiniteNumber(schema.const)) {
-        const { const: unit, ...rest } = schema
-        return { ...rest, ...this.resolveNonFiniteUnit(unit) }
-      }
-
-      const result: Record<string, unknown> = { ...schema }
-      delete (result as Record<PropertyKey, unknown>)[UNDEFINED_MARKER]
-
-      for (const key of ['items', 'additionalProperties'] as const) {
-        if (key in result) {
-          result[key] = normalize(result[key])
-        }
-      }
-
-      for (const key of ['properties', 'patternProperties', '$defs'] as const) {
-        if (isRecord(result[key])) {
-          result[key] = Object.fromEntries(
-            Object.entries(result[key]).map(([k, v]) => [k, normalize(v)]),
-          )
-        }
-      }
-
-      if (Array.isArray(result.prefixItems)) {
-        result.prefixItems = result.prefixItems.map(normalize)
-      }
-
-      if (isRecord(schema.properties) && Array.isArray(schema.required)) {
-        const properties = schema.properties
-        const required = schema.required.filter((key) => !isUndefinable(properties[key]))
-        if (required.length) {
-          result.required = required
-        } else {
-          delete result.required
-        }
-      }
-
-      if (Array.isArray(result.enum) && result.enum.some(isNonFiniteNumber)) {
-        const finite = result.enum.filter((value) => !isNonFiniteNumber(value))
-        result.anyOf = [
-          ...(finite.length ? [{ enum: finite }] : []),
-          ...result.enum.filter(isNonFiniteNumber).map((unit) => this.resolveNonFiniteUnit(unit)),
-        ]
-        delete result.enum
-      }
-
-      if (Array.isArray(result.anyOf)) {
-        const kept = result.anyOf
-          .filter((branch) => !(isRecord(branch) && UNDEFINED_MARKER in branch))
-          .map(normalize)
-          .filter((branch) => !isNeverSchema(branch))
-
-        if (!kept.length) {
-          delete result.anyOf
-          result.not = {}
-        } else if (kept.length === 1 && Object.keys(result).length === 1) {
-          return kept[0]
-        } else {
-          result.anyOf = kept
-        }
-      }
-
-      return result
-    }
-
-    return normalize(root) as ArkJsonSchema
+    return normalizeJsonSchema(rest as JsonSchema, {
+      resolveNonFiniteValue: (unit) => this.resolveNonFiniteUnit(unit) as JsonSchema,
+    }) as ArkJsonSchema
   }
 
   /**
@@ -264,28 +164,12 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
   }
 }
 
-/**
- * Marks the built-in `undefined` unit schema, so the property holding it can be made optional.
- * A symbol survives spreads in custom fallbacks and is never serialized; `normalize` strips it.
- */
-const UNDEFINED_MARKER: unique symbol = Symbol('ORPC_ARKTYPE_UNDEFINED')
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function isNonFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && !Number.isFinite(value)
-}
-
-function isNeverSchema(schema: unknown): boolean {
-  return (
-    schema === false ||
-    (isRecord(schema) &&
-      Object.keys(schema).length === 1 &&
-      isRecord(schema.not) &&
-      Object.keys(schema.not).length === 0)
-  )
 }
 
 function combineAnyOf(schemas: readonly unknown[]): unknown {

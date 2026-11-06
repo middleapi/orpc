@@ -10,6 +10,7 @@ import {
   combineJsonSchemasWithComposition,
   DelegatingJsonSchemaConverter,
   hoistRecursiveRefToDef,
+  normalizeJsonSchema,
   StandardJsonSchemaConverter,
 } from '@orpc/json-schema'
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
@@ -272,9 +273,11 @@ export class OpenAPIGenerator {
     direction: JsonSchemaConverterDirection,
   ): [JsonSchema, boolean] {
     const [jsonSchema, optional] = this.converter.convert(schema as any, direction)
+    // guards against converters emitting NaN/±Infinity `const`/`enum` values, which would be serialized as `null`
+    const normalized = normalizeJsonSchema(strip$schemaField(jsonSchema))
     // composing or hoisting would retarget root-relative refs (`#`, `#/properties/...`),
     // so move a schema that points into itself under a def first
-    return [hoistRecursiveRefToDef(strip$schemaField(jsonSchema)), optional]
+    return [hoistRecursiveRefToDef(normalized), optional]
   }
 
   private convertSchemas(

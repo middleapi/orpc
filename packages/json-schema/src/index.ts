@@ -1,6 +1,7 @@
 export * from './coercer.ts'
 export * from './composition-utils.ts'
 export * from './convert.ts'
+export * from './normalize-utils.ts'
 export * from './ref-utils.ts'
 export * from './smart-coercion-handler-plugin.ts'
 export * from './smart-coercion-link-plugin.ts'

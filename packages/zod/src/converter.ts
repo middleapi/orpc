@@ -5,9 +5,12 @@ import type {
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import {
+  createUndefinedJsonSchema,
   isStandardSchemaOptional,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
+  normalizeJsonSchema,
+  replaceNonFiniteJsonSchemaValues,
 } from '@orpc/json-schema'
 import type {
   $ZodType,
@@ -120,7 +123,27 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
           Object.assign(ctx.jsonSchema, customJsonSchema)
         }
 
+        // Zod drops the `undefined` member of a literal, so add it back for `normalizeJsonSchema`
+        const def = ctx.zodSchema._zod.def
+        if (
+          def.type === 'literal' &&
+          def.values.includes(undefined) &&
+          def.values.some((value) => value !== undefined)
+        ) {
+          const literal = replaceNonFiniteJsonSchemaValues({ ...ctx.jsonSchema } as JsonSchema)
+          replaceJsonSchemaInPlace(ctx.jsonSchema, {
+            anyOf: [literal, createUndefinedJsonSchema()],
+          } as ZodJsonSchema.BaseSchema)
+        }
+
         this.toJSONSchemaParams.override?.(ctx)
+
+        // Zod JSON-clones its result, turning NaN/±Infinity into `null`, so replace them before that,
+        // including any a custom override wrote
+        const replaced = replaceNonFiniteJsonSchemaValues(ctx.jsonSchema as JsonSchema)
+        if (replaced !== ctx.jsonSchema) {
+          replaceJsonSchemaInPlace(ctx.jsonSchema, replaced as ZodJsonSchema.BaseSchema)
+        }
       },
     })
 
@@ -128,7 +151,7 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     // `$schema` can be safely omitted here.
     const { $schema: _schema, ...rest } = jsonSchema
 
-    return rest
+    return normalizeJsonSchema(rest as JsonSchema) as ZodJsonSchema.JSONSchema
   }
 
   private getCustomJsonSchema(
@@ -153,10 +176,32 @@ function convertNativeType(
   ctx: ToJSONSchemaContext,
   zodSchema: $ZodTypes,
   path: (string | number)[],
-): ZodJsonSchema.BaseSchema | undefined {
+): ZodJsonSchema.BaseSchema | 'any' | undefined {
   const def = zodSchema._zod.def
 
   switch (def.type) {
+    case 'undefined':
+    case 'void':
+      // JSON can't hold `undefined`: `normalizeJsonSchema` drops it from unions and makes the property optional
+      return createUndefinedJsonSchema() as ZodJsonSchema.BaseSchema
+    case 'nan':
+      // JSON can't hold NaN, so no JSON value can match it
+      return { not: {} }
+    case 'literal':
+      if (def.values.every((value) => value === undefined)) {
+        return createUndefinedJsonSchema() as ZodJsonSchema.BaseSchema
+      }
+
+      // skip the `undefined` member, the `override` adds it back as an `undefined` branch;
+      // bigint members share this callback, so leave literals holding them to the user's setting
+      if (
+        def.values.includes(undefined) &&
+        !def.values.some((value) => typeof value === 'bigint')
+      ) {
+        return 'any'
+      }
+
+      return undefined
     case 'bigint':
       return {
         'type': 'string',
@@ -209,4 +254,15 @@ function convertNativeType(
   }
 
   return undefined
+}
+
+function replaceJsonSchemaInPlace(
+  target: ZodJsonSchema.BaseSchema,
+  replacement: ZodJsonSchema.BaseSchema,
+): void {
+  for (const key of Object.keys(target)) {
+    delete target[key]
+  }
+
+  Object.assign(target, replacement)
 }

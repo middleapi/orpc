@@ -5,9 +5,12 @@ import type {
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import {
+  createUndefinedJsonSchema,
   isStandardSchemaOptional,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
+  normalizeJsonSchema,
+  replaceNonFiniteJsonSchemaValues,
 } from '@orpc/json-schema'
 import type {
   ConversionConfig,
@@ -16,7 +19,15 @@ import type {
   JsonSchema as ValibotJsonSchema,
 } from '@valibot/to-json-schema'
 import { toJsonSchema } from '@valibot/to-json-schema'
-import type { BaseSchema, MapSchema, SetSchema } from 'valibot'
+import type {
+  BaseSchema,
+  EnumSchema,
+  LiteralSchema,
+  MapSchema,
+  PicklistSchema,
+  SetSchema,
+  UndefinedableSchema,
+} from 'valibot'
 import { any, tuple } from 'valibot'
 
 export interface ValibotToJsonSchemaConverterOptions extends Omit<
@@ -99,7 +110,10 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
       this.createConversionConfig(direction),
     )
 
-    return [jsonSchema as JsonSchema, isStandardSchemaOptional(valibotSchema, direction)]
+    return [
+      normalizeJsonSchema(jsonSchema as JsonSchema),
+      isStandardSchemaOptional(valibotSchema, direction),
+    ]
   }
 
   private createConversionConfig(direction: JsonSchemaConverterDirection): ConversionConfig {
@@ -116,7 +130,8 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
     context: OverrideSchemaContext,
     direction: JsonSchemaConverterDirection,
   ): ValibotJsonSchema | null | undefined {
-    const jsonSchema = this.convertNativeType(context, direction)
+    const jsonSchema =
+      this.convertNativeType(context, direction) ?? this.convertNonJsonValue(context, direction)
 
     return jsonSchema
       ? (this.conversionConfig.overrideSchema?.({ ...context, jsonSchema, errors: undefined }) ??
@@ -170,6 +185,57 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
     }
 
     return undefined
+  }
+
+  /**
+   * Describes values JSON can't hold, which `@valibot/to-json-schema` turns into `{}` (accepting anything),
+   * for `normalizeJsonSchema` to finish: `undefined` is marked, so it is dropped from unions
+   * and the property holding it becomes optional, and NaN/±Infinity match nothing.
+   */
+  private convertNonJsonValue(
+    context: OverrideSchemaContext,
+    direction: JsonSchemaConverterDirection,
+  ): ValibotJsonSchema | undefined {
+    switch (context.valibotSchema.type) {
+      case 'undefined':
+      case 'void':
+        return createUndefinedJsonSchema() as ValibotJsonSchema
+      case 'undefinedable': {
+        const { default: defaultValue } = context.valibotSchema as UndefinedableSchema<
+          BaseSchema<any, any, any>,
+          unknown
+        >
+
+        // the default replaces `undefined` on the output side
+        if (direction === 'output' && defaultValue !== undefined) {
+          return undefined
+        }
+
+        return {
+          anyOf: [context.jsonSchema, createUndefinedJsonSchema()],
+        } as ValibotJsonSchema
+      }
+      case 'nan':
+        return { not: {} }
+      case 'literal': {
+        const { literal } = context.valibotSchema as LiteralSchema<any, any>
+        return this.convertNonFiniteValues({ const: literal })
+      }
+      case 'picklist':
+      case 'enum': {
+        const { options } = context.valibotSchema as PicklistSchema<any, any> | EnumSchema<any, any>
+        return this.convertNonFiniteValues({ enum: options as unknown[] })
+      }
+    }
+
+    return undefined
+  }
+
+  private convertNonFiniteValues(
+    jsonSchema: Exclude<JsonSchema, boolean>,
+  ): ValibotJsonSchema | undefined {
+    const replaced = replaceNonFiniteJsonSchemaValues(jsonSchema)
+    return replaced === jsonSchema ? undefined : (replaced as ValibotJsonSchema)
   }
 
   private convertWithin(

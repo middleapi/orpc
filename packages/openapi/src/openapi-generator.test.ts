@@ -825,10 +825,37 @@ describe('openAPIGenerator version', () => {
           .output(testSchema({ type: 'object', properties: { value } })),
       })
 
-      const infinity = await generator.generate(routerWith({ const: Infinity }), { version })
-      const serialized = await generator.generate(routerWith({ const: null }), { version })
+      const date = await generator.generate(
+        routerWith({ const: new Date('2020-01-01T00:00:00.000Z') as any }),
+        { version },
+      )
+      const serialized = await generator.generate(
+        routerWith({ const: '2020-01-01T00:00:00.000Z' }),
+        { version },
+      )
 
-      expect(infinity).toEqual(serialized)
+      expect(date).toEqual(serialized)
     },
   )
+})
+
+describe('openAPIGenerator non-finite values', () => {
+  const generator = new OpenAPIGenerator({ converters: [testSchemaConverter] })
+
+  it.each([
+    ['const Infinity', { const: Infinity }, { not: {} }],
+    ['const NaN', { type: 'number', const: Number.NaN }, { type: 'number', not: {} }],
+    ['enum with -Infinity', { enum: [1, -Infinity] }, { enum: [1] }],
+    ['anyOf branch', { anyOf: [{ type: 'string' }, { const: Infinity }] }, { type: 'string' }],
+  ] as const)('turns a %s into a schema matching nothing', async (_, value, expected) => {
+    const doc = await generator.generate({
+      ping: oc
+        .meta(openapi({ method: 'GET', path: '/ping' }))
+        .output(testSchema({ type: 'object', properties: { value } } as JsonSchema)),
+    })
+
+    expect(
+      (doc.paths!['/ping']!.get!.responses!['200'] as any).content['application/json'].schema,
+    ).toEqual({ type: 'object', properties: { value: expected } })
+  })
 })
