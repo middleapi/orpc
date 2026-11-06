@@ -220,29 +220,24 @@ export interface BatchHandlerPluginOptions<T extends Context> {
     | undefined
 
   /**
-   * Keep-alive settings for batch responses that stream.
+   * Keep-alive for batch responses that stream. `false` disables it,
+   * {@link BatchHandlerPluginKeepAliveOptions} customizes it.
    *
    * When enabled, a zero-length length-prefixed frame is sent periodically while the
    * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
    *
-   * @default { enabled: true, interval: 15000 }
+   * @default true
    */
-  keepAlive?:
-    | {
-        /**
-         * If true, a keep-alive frame is sent periodically while the stream is idle.
-         *
-         * @default true
-         */
-        enabled: boolean
-        /**
-         * Interval (in milliseconds) between keep-alive frames after the last message.
-         *
-         * @default 15000
-         */
-        interval?: number | undefined
-      }
-    | undefined
+  keepAlive?: boolean | BatchHandlerPluginKeepAliveOptions | undefined
+}
+
+export interface BatchHandlerPluginKeepAliveOptions {
+  /**
+   * Interval (in milliseconds) between keep-alive frames after the last message.
+   *
+   * @default 15000
+   */
+  interval?: number | undefined
 }
 
 /**
@@ -316,8 +311,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
     this.successStatus = options.successStatus ?? 207
     this.headers = options.headers ?? {}
-    this.keepAliveEnabled = options.keepAlive?.enabled ?? true
-    this.keepAliveInterval = options.keepAlive?.interval ?? 15_000
+    this.keepAliveEnabled = options.keepAlive !== false
+    this.keepAliveInterval =
+      (typeof options.keepAlive === 'object' ? options.keepAlive.interval : undefined) ?? 15_000
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {

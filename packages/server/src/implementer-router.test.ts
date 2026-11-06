@@ -38,7 +38,7 @@ beforeEach(() => {
 })
 
 describe('createRouterImplementer', () => {
-  const config = { disableInputValidation: false }
+  const config = { validation: { input: true } }
 
   describe('without middlewares', () => {
     const implementer = createRouterImplementer(contract, config)
@@ -263,7 +263,7 @@ describe('createRouterImplementer', () => {
       const contractFirst = { ping: oc.errors({ BAD_GATEWAY: {} }) }
       const real = {
         ping: os
-          .$config({ disableInputValidation: true })
+          .$config({ validation: { input: false } })
           .input(z.string())
           .handler(() => 'REAL'),
         nested: { pong: os.handler(() => 'REAL') },
@@ -280,8 +280,7 @@ describe('createRouterImplementer', () => {
       ] as const) {
         expect(procedure).toBeInstanceOf(ProcedureContract)
         expect(procedure).not.toBeInstanceOf(Procedure)
-        const { handler, orderedMiddlewares, disableInputValidation, ...contractDef } =
-          original['~orpc']
+        const { handler, orderedMiddlewares, validation, ...contractDef } = original['~orpc']
         expect(procedure['~orpc']).toEqual(contractDef)
       }
 
@@ -290,18 +289,16 @@ describe('createRouterImplementer', () => {
 
     describe('implementing a server procedure', () => {
       const procedure = os
-        .$config({ disableInputValidation: true, disableOutputValidation: true })
+        .$config({ validation: false })
         .input(z.string())
         .handler(() => 'original')
 
       it('lets the implementer config win over the procedure config', () => {
-        const implementer = createRouterImplementer(procedure, { disableOutputValidation: false })
-        expect(implementer['~orpc'].disableInputValidation).toBeUndefined()
-        expect(implementer['~orpc'].disableOutputValidation).toBe(false)
+        const implementer = createRouterImplementer(procedure, { validation: { output: true } })
+        expect(implementer['~orpc'].validation).toEqual({ output: true })
 
-        const nested = createRouterImplementer({ procedure }, { disableInputValidation: false })
-        expect(nested.procedure['~orpc'].disableInputValidation).toBe(false)
-        expect(nested.procedure['~orpc'].disableOutputValidation).toBeUndefined()
+        const nested = createRouterImplementer({ procedure }, { validation: true })
+        expect(nested.procedure['~orpc'].validation).toBe(true)
       })
 
       it('does not copy the handler and middlewares, so an unimplemented procedure is not a procedure', () => {

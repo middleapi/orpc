@@ -130,7 +130,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
 
     const handler = new RPCHandler(router, {
       plugins: [
-        new BatchHandlerPlugin({ keepAlive: { enabled: true, interval: 20 } }),
+        new BatchHandlerPlugin({ keepAlive: { interval: 20 } }),
         new BatchResponseCompressionHandlerPlugin(),
       ],
     })

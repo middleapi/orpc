@@ -64,17 +64,15 @@ const publisher = new MemoryPublisher<Record<string, { message: string }>>()
 import { MemoryPublisher } from '@orpc/publisher/memory'
 
 const publisher = new MemoryPublisher<Events>({
+  /**
+   * Event resume support. `true` enables it, an object enables and customizes it.
+   *
+   * When enabled, published events are temporarily stored so new
+   * subscribers can resume from a previous position using `lastEventId`.
+   *
+   * @default false
+   */
   resume: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: false,
-
     /**
      * How long to retain events for resume, in milliseconds.
      *
@@ -125,17 +123,15 @@ const publisher = new RedisPublisher<Events>(client, {
    */
   serializer: undefined,
 
+  /**
+   * Event resume support. `true` enables it, an object enables and customizes it.
+   *
+   * When enabled, published events are temporarily stored so new
+   * subscribers can resume from a previous position using `lastEventId`.
+   *
+   * @default false
+   */
   resume: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: false,
-
     /**
      * How long to retain events for resume, in milliseconds.
      *
@@ -174,17 +170,15 @@ const publisher = new UpstashPublisher<Events>(redis, {
    */
   serializer: undefined,
 
+  /**
+   * Event resume support. `true` enables it, an object enables and customizes it.
+   *
+   * When enabled, published events are temporarily stored so new
+   * subscribers can resume from a previous position using `lastEventId`.
+   *
+   * @default false
+   */
   resume: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: false,
-
     /**
      * How long to retain events for resume, in milliseconds.
      *
@@ -234,17 +228,15 @@ const publisher = new BunRedisPublisher<Events>(redis, {
    */
   serializer: undefined,
 
+  /**
+   * Event resume support. `true` enables it, an object enables and customizes it.
+   *
+   * When enabled, published events are temporarily stored so new
+   * subscribers can resume from a previous position using `lastEventId`.
+   *
+   * @default false
+   */
   resume: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: false,
-
     /**
      * How long to retain events for resume, in milliseconds.
      *
@@ -267,19 +259,17 @@ import { DurablePublisher, DurablePublisherObject } from '@orpc/cloudflare'
 export class PublisherDO extends DurablePublisherObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, {
+      /**
+       * Event resume support. `true` enables it, an object enables and customizes it.
+       *
+       * When enabled, published events are temporarily stored so new
+       * subscribers can resume from a previous position using `lastEventId`.
+       * Each stored event must fit within the Durable Object SQLite row size limit,
+       * so publishing a larger one fails.
+       *
+       * @default false
+       */
       resume: {
-        /**
-         * Whether event resume support is enabled.
-         *
-         * When enabled, published events are temporarily stored so new
-         * subscribers can resume from a previous position using `lastEventId`.
-         * Each stored event must fit within the Durable Object SQLite row size limit,
-         * so publishing a larger one fails.
-         *
-         * @default false
-         */
-        enabled: false,
-
         /**
          * How long to retain events for resume, in milliseconds.
          *
@@ -348,12 +338,15 @@ export default {
 
 ## Resume Missing Events
 
-Some adapters can resume events missed while a subscriber is offline. This feature is usually disabled by default, but you can enable it when creating the publisher. When enabled, the publisher automatically manages event ids and attempts to deliver events since the last event id provided by the subscriber.
+Some adapters can resume events missed while a subscriber is offline. This feature is usually disabled by default, but you can enable it when creating the publisher with `resume: true`, or with an object to customize it. When enabled, the publisher automatically manages event ids and attempts to deliver events since the last event id provided by the subscriber.
 
 ```ts
 const publisher = new MemoryPublisher({
+  resume: true, // Enable resuming missed events
+})
+
+const customized = new MemoryPublisher({
   resume: {
-    enabled: true, // Enable resuming missed events
     ttl: 5 * 60 * 1000, // How long to retain events, in milliseconds
   },
 })

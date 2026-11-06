@@ -1360,7 +1360,7 @@ describe('batchHandlerPlugin', () => {
 
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: true, interval: 100 },
+          keepAlive: { interval: 100 },
         }),
         {
           events: os.handler(async function* () {
@@ -1399,7 +1399,7 @@ describe('batchHandlerPlugin', () => {
     it('does not schedule a keep-alive timer when disabled', async () => {
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: false },
+          keepAlive: false,
         }),
         eventsRouter,
       )
@@ -1421,7 +1421,7 @@ describe('batchHandlerPlugin', () => {
     it('stops keep-alive after the stream is cancelled', async () => {
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: true, interval: 50 },
+          keepAlive: { interval: 50 },
         }),
         idleRouter,
       )
@@ -1475,7 +1475,7 @@ describe('batchHandlerPlugin', () => {
 
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: true, interval: 50 },
+          keepAlive: { interval: 50 },
         }),
         idleRouter,
       )
@@ -1506,7 +1506,7 @@ describe('batchHandlerPlugin', () => {
 
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: false },
+          keepAlive: false,
         }),
         eventsRouter,
       )

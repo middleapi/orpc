@@ -35,6 +35,7 @@ import type { Context } from './context.ts'
 import type { Lazyable } from './lazy.ts'
 import { unlazy } from './lazy.ts'
 import type { MiddlewareDone } from './middleware.ts'
+import { resolveProcedureValidation } from './procedure-validation.ts'
 import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure.ts'
 
 export type ProcedureClient<
@@ -235,6 +236,7 @@ async function executeProcedureInternal(
   const inputSchemas = toArray(procedure['~orpc'].inputSchemas)
   const outputSchemas = toArray(procedure['~orpc'].outputSchemas)
   const orderedMiddlewares = procedure['~orpc'].orderedMiddlewares
+  const validation = resolveProcedureValidation(procedure['~orpc'].validation)
 
   const next = async (
     midIndex: number,
@@ -257,7 +259,7 @@ async function executeProcedureInternal(
      * its result is merged in, so no schema loses a field an earlier one stripped. Values that are not
      * plain objects stay piped, which keeps schemas like `asyncIteratorObject` wrapping each other.
      */
-    if (!procedure['~orpc'].disableInputValidation) {
+    if (validation.input) {
       for (let i = startInputIndex; i < endInputIndex; i++) {
         const validated = await validateInput(
           i,
@@ -325,7 +327,7 @@ async function executeProcedureInternal(
         ? outputSchemas.length
         : (orderedMiddlewares[midIndex]!.outputSchemasLengthAtUse ?? 0)
 
-    if (!procedure['~orpc'].disableOutputValidation) {
+    if (validation.output) {
       for (let i = endOutputIndex - 1; i >= startOutputIndex; i--) {
         currentOutput = await validateOutput(i, outputSchemas[i]!, currentOutput)
       }

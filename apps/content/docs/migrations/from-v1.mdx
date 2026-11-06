@@ -238,14 +238,13 @@ Stacked object input schemas compose into a single flat value, so one schema nev
 
 ### `.$config` options changed
 
-The index-based validation options were replaced by two simple flags. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/recipes/validation-customization).
+The index-based validation options were replaced by a single `validation` option, which takes `false` or `{ input, output }`. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/recipes/validation-customization).
 
 <CodeGroup>
 
 ```ts v2
 const base = os.$config({
-  disableInputValidation: true,
-  disableOutputValidation: true,
+  validation: false, // or { input: false } / { output: false }
 })
 ```
 
@@ -876,7 +875,7 @@ import { RPCLink } from '@orpc/client/websocket'
 
 const link = new RPCLink({
   connect: () => new WebSocket('ws://localhost:3000'),
-  reconnect: { enabled: true },
+  reconnect: true,
 })
 ```
 
@@ -974,7 +973,7 @@ The implementer works the same as in v1: `implement(contract)` still supports `.
 ```ts
 import { implement } from '@orpc/server'
 
-const os = implement(contract, { disableOutputValidation: true })
+const os = implement(contract, { validation: { output: false } })
 ```
 
 Contract routing uses `openapi()` metadata now, as described in [Routing Moved to OpenAPI Metadata](#routing-moved-to-openapi-metadata).
@@ -1244,7 +1243,7 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const publisher = new RedisPublisher(client, {
   subscriber,
-  resume: { enabled: true, ttl: 300_000 },
+  resume: { ttl: 300_000 },
 })
 ```
 

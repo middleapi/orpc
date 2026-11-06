@@ -7,7 +7,6 @@ export class PublisherResume3sDO extends DurablePublisherObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, {
       resume: {
-        enabled: true,
         ttl: 3_000,
         cleanupInterval: 30_000,
         schemaPrefix: 'prefix:',

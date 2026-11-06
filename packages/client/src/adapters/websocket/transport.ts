@@ -47,14 +47,10 @@ export interface WebSocketLinkTransportAttemptInfo {
   attempt: number
 }
 
+/**
+ * Reconnection behavior when the connection is lost. Passing it enables reconnection.
+ */
 export interface WebSocketLinkTransportReconnectOptions {
-  /**
-   * Whether to automatically reconnect when the connection is lost.
-   *
-   * @default false
-   */
-  enabled: boolean
-
   /**
    * Delay before a (re)connect attempt, in milliseconds.
    *
@@ -86,27 +82,23 @@ export interface WebSocketLinkTransportReconnectOptions {
    * rather than waiting for the next call to trigger reconnection.
    * Reduces latency for the next request.
    *
-   * @default { enabled: false }
+   * `true` enables it, {@link WebSocketLinkTransportReconnectOnCloseOptions} enables and customizes it.
+   *
+   * @default false
    */
-  onClose?:
-    | {
-        /**
-         * Whether to proactively reconnect right after the socket closes,
-         * rather than waiting for the next call to trigger reconnection.
-         * Reduces latency for the next request.
-         *
-         * @default false
-         */
-        enabled: boolean
+  onClose?: boolean | WebSocketLinkTransportReconnectOnCloseOptions | undefined
+}
 
-        /**
-         * Delay before reconnecting after the socket closes, in milliseconds.
-         *
-         * @default 0
-         */
-        delay?: number | undefined
-      }
-    | undefined
+/**
+ * Proactive reconnection right after the socket closes. Passing it enables it.
+ */
+export interface WebSocketLinkTransportReconnectOnCloseOptions {
+  /**
+   * Delay before reconnecting after the socket closes, in milliseconds.
+   *
+   * @default 0
+   */
+  delay?: number | undefined
 }
 
 export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
@@ -125,11 +117,12 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
   connectOnInit?: boolean | undefined
 
   /**
-   * Reconnection behavior when the connection is lost.
+   * Reconnection when the connection is lost. `true` enables it,
+   * {@link WebSocketLinkTransportReconnectOptions} enables and customizes it.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  reconnect?: WebSocketLinkTransportReconnectOptions | undefined
+  reconnect?: boolean | WebSocketLinkTransportReconnectOptions | undefined
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
@@ -155,13 +148,16 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
   constructor(options: WebSocketLinkTransportOptions<T>) {
     this.connect = options.connect
-    this.reconnectEnabled = options.reconnect?.enabled ?? false
-    this.reconnectDelay = options.reconnect?.delay ?? ((info) => (info.attempt === 1 ? 0 : 2_000))
-    this.reconnectMaxAttempt = options.reconnect?.maxAttempt ?? Infinity
-    this.reconnectMaxTotalAttempt = options.reconnect?.maxTotalAttempt ?? Infinity
+    const reconnect = typeof options.reconnect === 'object' ? options.reconnect : {}
+    const onClose = typeof reconnect.onClose === 'object' ? reconnect.onClose : {}
+
+    this.reconnectEnabled = options.reconnect !== undefined && options.reconnect !== false
+    this.reconnectDelay = reconnect.delay ?? ((info) => (info.attempt === 1 ? 0 : 2_000))
+    this.reconnectMaxAttempt = reconnect.maxAttempt ?? Infinity
+    this.reconnectMaxTotalAttempt = reconnect.maxTotalAttempt ?? Infinity
     this.reconnectOnCloseEnabled =
-      this.reconnectEnabled && (options.reconnect?.onClose?.enabled ?? false)
-    this.reconnectOnCloseDelay = options.reconnect?.onClose?.delay ?? 0
+      this.reconnectEnabled && reconnect.onClose !== undefined && reconnect.onClose !== false
+    this.reconnectOnCloseDelay = onClose.delay ?? 0
 
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage

@@ -9,9 +9,7 @@ const link = new RPCLink({
     new WebSocket(
       `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/chat-room`,
     ),
-  reconnect: {
-    enabled: true,
-  },
+  reconnect: true,
 })
 
 export const chatRoomClient: RouterClient<typeof chatRoomRouter> = createORPCClient(link)

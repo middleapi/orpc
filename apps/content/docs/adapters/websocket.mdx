@@ -267,18 +267,17 @@ The examples above only show how to configure the link. For examples of creating
 
 ### Auto Reconnect
 
-The client adapter has built-in support for reconnecting when the connection is lost. You can configure reconnect behavior with the `reconnect` option when creating the link.
+The client adapter has built-in support for reconnecting when the connection is lost. Enable it with `reconnect: true` when creating the link, or pass an object to customize it.
 
 ```ts
 const link = new RPCLink({
+  /**
+   * Whether to automatically reconnect when the connection is lost.
+   * `true` enables it, an object enables and customizes it.
+   *
+   * @default false
+   */
   reconnect: {
-    /**
-     * Whether to automatically reconnect when the connection is lost.
-     *
-     * @default false
-     */
-    enabled: true,
-
     /**
      * Delay before a (re)connect attempt, in milliseconds.
      *
@@ -305,16 +304,15 @@ const link = new RPCLink({
      */
     maxTotalAttempt: Infinity,
 
+    /**
+     * Whether to proactively reconnect right after the socket closes,
+     * rather than waiting for the next call to trigger reconnection.
+     * Reduces latency for the next request.
+     * `true` enables it, an object enables and customizes it.
+     *
+     * @default false
+     */
     onClose: {
-      /**
-       * Whether to proactively reconnect right after the socket closes,
-       * rather than waiting for the next call to trigger reconnection.
-       * Reduces latency for the next request.
-       *
-       * @default false
-       */
-      enabled: false,
-
       /**
        * Delay before reconnecting after the socket closes, in milliseconds.
        *

@@ -89,8 +89,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
     inputSchemas: inputSchema ? [inputSchema] : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,
     // tRPC procedure calling already validates the input/output
-    disableInputValidation: true,
-    disableOutputValidation: true,
+    validation: false,
     handler: async ({ context, signal, path, input, lastEventId }) => {
       try {
         const trpcInput =

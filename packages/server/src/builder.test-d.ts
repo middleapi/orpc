@@ -43,9 +43,7 @@ describe('Builder', () => {
   })
 
   it('$config', () => {
-    expectTypeOf(
-      builder.$config({ disableInputValidation: true, disableOutputValidation: true }),
-    ).toEqualTypeOf<typeof builder>()
+    expectTypeOf(builder.$config({ validation: false })).toEqualTypeOf<typeof builder>()
 
     // @ts-expect-error - invalid setting
     builder.$config('invalid')

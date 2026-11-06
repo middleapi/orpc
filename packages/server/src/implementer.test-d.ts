@@ -24,7 +24,7 @@ describe('Implementer', () => {
   })
 
   it('.$config', () => {
-    const withConfig = implementer.$config({ disableInputValidation: true })
+    const withConfig = implementer.$config({ validation: { input: false } })
     expectTypeOf(withConfig).toEqualTypeOf<typeof implementer>()
   })
 

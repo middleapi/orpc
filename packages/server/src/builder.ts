@@ -26,6 +26,7 @@ import type { DecoratedMiddleware } from './middleware-decorated.ts'
 import { decorateMiddleware } from './middleware-decorated.ts'
 import type { Middleware } from './middleware.ts'
 import { DecoratedProcedure } from './procedure-decorated.ts'
+import { mergeProcedureValidation } from './procedure-validation.ts'
 import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure.ts'
 import type { AugmentedRouter } from './router-utils.ts'
 import { augmentRouter } from './router-utils.ts'
@@ -112,6 +113,7 @@ export class Builder<TInitialContext extends Context, TErrorMap extends ErrorMap
     return new Builder({
       ...this['~orpc'],
       ...config,
+      validation: mergeProcedureValidation(this['~orpc'].validation, config.validation),
     })
   }
 

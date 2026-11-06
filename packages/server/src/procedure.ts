@@ -55,30 +55,38 @@ export interface OrderedMiddleware {
   middleware: AnyMiddleware
 }
 
-export interface ProcedureConfig {
+export interface ProcedureValidationOptions {
   /**
-   * When enabled, input schemas are not validated at runtime.
-   * Schemas are still used for type inference and OpenAPI generation.
+   * Whether input schemas are validated at runtime.
    *
-   * @remarks
-   * **Warning**: Do not disable validation for schemas that transform values.
-   *
-   * @default false
+   * @default true
    */
-  disableInputValidation?: boolean | undefined
+  input?: boolean | undefined
 
   /**
-   * When enabled, output schemas are not validated at runtime.
-   * Schemas are still used for type inference and OpenAPI generation.
+   * Whether output schemas are validated at runtime.
    *
-   * Useful when output schemas exist only for specification generation.
+   * Disable this when output schemas exist only for specification generation.
+   *
+   * @default true
+   */
+  output?: boolean | undefined
+}
+
+export interface ProcedureConfig {
+  /**
+   * Runtime validation of input and output schemas. `false` disables both,
+   * {@link ProcedureValidationOptions} controls each separately.
+   *
+   * Schemas are still used for type inference and OpenAPI generation when validation is disabled.
+   * Each `$config` call only overrides the directions it sets.
    *
    * @remarks
    * **Warning**: Do not disable validation for schemas that transform values.
    *
-   * @default false
+   * @default true
    */
-  disableOutputValidation?: boolean | undefined
+  validation?: boolean | ProcedureValidationOptions | undefined
 }
 
 export interface ProcedureDefinition<

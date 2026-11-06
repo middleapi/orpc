@@ -11,14 +11,15 @@ import { Publisher } from '../publisher.ts'
 
 export interface MemoryPublisherOptions extends PublisherOptions {
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link PublisherResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: PublisherResumeOptions | undefined
+  resume?: boolean | PublisherResumeOptions | undefined
 }
 
 interface StoredEvent<T> {
@@ -41,8 +42,8 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
   constructor({ resume, ...options }: MemoryPublisherOptions = {}) {
     super(options)
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeTtl = resume?.ttl ?? 300_000
+    this.resumeEnabled = resume !== undefined && resume !== false
+    this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {

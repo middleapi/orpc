@@ -27,7 +27,7 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
     })
     const publisher = new RedisPublisher(redis, {
       prefix,
-      resume: { enabled: true, ttl: 10_000 },
+      resume: { ttl: 10_000 },
     })
     publishers.push({ name: 'redis', publisher })
   }
@@ -41,7 +41,7 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
     const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
     const publisher = new UpstashPublisher(upstashRedis, {
       prefix,
-      resume: { enabled: true, ttl: 10_000 },
+      resume: { ttl: 10_000 },
     })
     publishers.push({ name: 'upstash', publisher })
   }
