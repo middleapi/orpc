@@ -431,10 +431,10 @@ describe('valibotToJsonSchemaConverter', () => {
         },
       ],
     ] as const)('converts %s into a file schema', (_, schema, jsonSchema) => {
+      const converter = new ValibotToJsonSchemaConverter({ errorMode: 'throw' })
+
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
-      expect(
-        new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'output'),
-      ).toEqual([jsonSchema, false])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, false])
     })
 
     it('leaves the mimeType action on non-file schemas to the errorMode option', () => {

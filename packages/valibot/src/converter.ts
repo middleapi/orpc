@@ -5,6 +5,7 @@ import type {
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import {
+  isJsonFileSchema,
   isStandardSchemaOptional,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
@@ -115,24 +116,18 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   private overrideAction(context: OverrideActionContext): ValibotJsonSchema | null | undefined {
-    const jsonSchema = convertAction(context)
-
-    return jsonSchema
-      ? (this.conversionConfig.overrideAction?.({ ...context, jsonSchema, errors: undefined }) ??
-          jsonSchema)
-      : this.conversionConfig.overrideAction?.(context)
+    return applyOverride(context, convertAction(context), this.conversionConfig.overrideAction)
   }
 
   private overrideSchema(
     context: OverrideSchemaContext,
     direction: JsonSchemaConverterDirection,
   ): ValibotJsonSchema | null | undefined {
-    const jsonSchema = this.convertNativeType(context, direction)
-
-    return jsonSchema
-      ? (this.conversionConfig.overrideSchema?.({ ...context, jsonSchema, errors: undefined }) ??
-          jsonSchema)
-      : this.conversionConfig.overrideSchema?.(context)
+    return applyOverride(
+      context,
+      this.convertNativeType(context, direction),
+      this.conversionConfig.overrideSchema,
+    )
   }
 
   private convertNativeType(
@@ -222,11 +217,7 @@ function convertAction({
   valibotAction,
   jsonSchema,
 }: OverrideActionContext): ValibotJsonSchema | undefined {
-  if (
-    valibotAction.type !== 'mime_type' ||
-    jsonSchema.type !== 'string' ||
-    typeof jsonSchema.contentMediaType !== 'string'
-  ) {
+  if (valibotAction.type !== 'mime_type' || !isJsonFileSchema(jsonSchema as JsonSchema)) {
     return undefined
   }
 
@@ -241,11 +232,22 @@ function convertAction({
   }
 
   // One branch per media type, so the OpenAPI generator documents each one.
-  const { type: _type, contentMediaType: _contentMediaType, ...rest } = jsonSchema
-  return {
-    ...rest,
-    anyOf: requirement.map((contentMediaType) => ({ type: 'string', contentMediaType })),
-  }
+  return { anyOf: requirement.map((contentMediaType) => ({ ...jsonSchema, contentMediaType })) }
+}
+
+/**
+ * Runs the user's override on top of oRPC's conversion, or on its own when oRPC has none.
+ */
+function applyOverride<
+  T extends { readonly jsonSchema: ValibotJsonSchema; readonly errors: unknown },
+>(
+  context: T,
+  jsonSchema: ValibotJsonSchema | undefined,
+  override: ((context: T) => ValibotJsonSchema | null | undefined) | undefined,
+): ValibotJsonSchema | null | undefined {
+  return jsonSchema
+    ? (override?.({ ...context, jsonSchema, errors: undefined }) ?? jsonSchema)
+    : override?.(context)
 }
 
 function mergeConversionContext(target: ConversionContext, source: ConversionContext): void {

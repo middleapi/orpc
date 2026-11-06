@@ -14,30 +14,31 @@ describe('openAPIGenerator with file schemas', () => {
     [
       'valibot',
       v.object({ avatar: v.pipe(v.file(), v.mimeType(['image/png'])), name: v.string() }),
+      'image/png',
     ],
-    ['arktype', type({ avatar: 'File', name: 'string' })],
-  ])('documents %s inputs with files as a multipart/form-data body', async (vendor, schema) => {
-    const doc = await generator.generate({ upload: oc.input(schema) })
+    ['arktype', type({ avatar: 'File', name: 'string' }), '*/*'],
+  ])(
+    'documents %s inputs with files as a multipart/form-data body',
+    async (_, schema, contentMediaType) => {
+      const doc = await generator.generate({ upload: oc.input(schema) })
 
-    expect(doc.paths?.['/upload']?.post?.requestBody).toEqual({
-      required: true,
-      content: {
-        'multipart/form-data': {
-          schema: {
-            type: 'object',
-            properties: {
-              avatar: {
-                type: 'string',
-                contentMediaType: vendor === 'valibot' ? 'image/png' : '*/*',
+      expect(doc.paths?.['/upload']?.post?.requestBody).toEqual({
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: {
+                avatar: { type: 'string', contentMediaType },
+                name: { type: 'string' },
               },
-              name: { type: 'string' },
+              required: ['avatar', 'name'],
             },
-            required: ['avatar', 'name'],
           },
         },
-      },
-    })
-  })
+      })
+    },
+  )
 
   it.each([
     ['valibot blob', v.blob()],

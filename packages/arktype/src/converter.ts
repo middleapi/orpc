@@ -68,7 +68,10 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
             ;(ctx.base as any).type = 'string'
             ;(ctx.base as any).format = JsonSchemaFormat.DateTime
             ;(ctx.base as any)['x-native-type'] = JsonSchemaXNativeType.Date
-          } else if (ctx.code === 'proto' && isBlobConstructor(ctx.proto)) {
+          } else if (
+            ctx.code === 'proto' &&
+            (ctx.proto === Blob || ctx.proto.prototype instanceof Blob)
+          ) {
             ;(ctx.base as any).type = 'string'
             ;(ctx.base as any).contentMediaType = '*/*'
           }
@@ -134,8 +137,4 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
     const { $schema: _schema, ...rest } = jsonSchema
     return rest
   }
-}
-
-function isBlobConstructor(proto: abstract new (...args: any[]) => unknown): boolean {
-  return typeof Blob !== 'undefined' && (proto === Blob || proto.prototype instanceof Blob)
 }

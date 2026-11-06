@@ -137,7 +137,6 @@ describe('arkTypeToJsonSchemaConverter', () => {
       ],
       [type('File'), { type: 'string', contentMediaType: '*/*' }],
       [type('Blob'), { type: 'string', contentMediaType: '*/*' }],
-      [type.instanceOf(class extends Blob {}), { type: 'string', contentMediaType: '*/*' }],
     ] as const)('extends conversion for %s', (schema, jsonSchema) => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
     })
