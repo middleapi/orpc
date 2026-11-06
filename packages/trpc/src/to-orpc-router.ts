@@ -1,6 +1,6 @@
 import * as ORPC from '@orpc/server'
 import type { AsyncIteratorClass } from '@orpc/shared'
-import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
+import { isNonPrimitive, set, wrapAsyncIterator } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
@@ -169,11 +169,7 @@ function toORPCError<T>(error: T): T | ORPC.ORPCError<string, undefined> {
  * so schemas remain usable for type inference and OpenAPI generation.
  */
 function toStandardSchema(schema: undefined | Parser): undefined | ORPC.AnySchema {
-  if (
-    !isTypescriptObject(schema) ||
-    !('~standard' in schema) ||
-    !isTypescriptObject(schema['~standard'])
-  ) {
+  if (!isNonPrimitive(schema) || !('~standard' in schema) || !isNonPrimitive(schema['~standard'])) {
     return undefined
   }
 

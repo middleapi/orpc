@@ -660,7 +660,7 @@ const handler = new RPCHandler(router, {
   toFetchResponse: {
     // fetch adapter; node uses sendStandardResponse
     eventStream: {
-      keepAlive: { enabled: true, interval: 15000, comment: '' },
+      keepAlive: { interval: 15000, comment: '' }, // or `false` to disable
     },
   },
 })

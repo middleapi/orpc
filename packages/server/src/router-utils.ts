@@ -7,7 +7,7 @@ import type {
 } from '@orpc/contract'
 import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import type { Promisable } from '@orpc/shared'
-import { getOwn, isTypescriptObject, omit, setOwn } from '@orpc/shared'
+import { getOwn, isNonPrimitive, omit, setOwn } from '@orpc/shared'
 
 import type { Context, MergedInitialContext } from './context.ts'
 import type { Lazyable } from './lazy.ts'
@@ -132,7 +132,7 @@ export function augmentRouter<
     return enhanced as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 
@@ -189,7 +189,7 @@ export function augmentImplementedRouter<
     return enhanced as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 
@@ -238,7 +238,7 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
   for (let i = 0; i < path.length; i++) {
     const segment = path[i]!
 
-    if (!isTypescriptObject(current)) {
+    if (!isNonPrimitive(current)) {
       return undefined as any
     }
 
@@ -267,7 +267,7 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
     })
   }
 
-  if (!isTypescriptObject(current)) {
+  if (!isNonPrimitive(current)) {
     return undefined as any
   }
 
@@ -307,7 +307,7 @@ function walkProcedureContractsSyncInternal(
     return
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return
   }
 
@@ -339,7 +339,7 @@ export async function walkProcedureContractsAsync(
     return
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return
   }
 
@@ -370,7 +370,7 @@ export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<Unla
     return router as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 

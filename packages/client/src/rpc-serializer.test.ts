@@ -1,5 +1,5 @@
 import { isAsyncIteratorObject, parseEmptyableJSON } from '@orpc/shared'
-import { ErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
+import { EventStreamErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
 
 import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types.ts'
 import { ORPCError } from './error.ts'
@@ -210,7 +210,7 @@ describe('rpcSerializer', () => {
       await expect(deserialized.next()).rejects.toSatisfy((e: any) => {
         expect(e).toEqual(error)
         expect(e).toBeInstanceOf(ORPCError)
-        expect(e.cause).toBeInstanceOf(ErrorEvent)
+        expect(e.cause).toBeInstanceOf(EventStreamErrorEvent)
 
         return true
       })
@@ -250,12 +250,12 @@ describe('rpcSerializer', () => {
     it('deserialize an invalid ORPCError json', async () => {
       const iterator = serializer.deserialize(
         (async function* () {
-          throw new ErrorEvent({ json: { value: 1234 } })
+          throw new EventStreamErrorEvent({ json: { value: 1234 } })
         })(),
       ) as any
 
       await expect(iterator.next()).rejects.toSatisfy((e: any) => {
-        expect(e).toBeInstanceOf(ErrorEvent)
+        expect(e).toBeInstanceOf(EventStreamErrorEvent)
         expect(e.data).toEqual({ value: 1234 })
 
         return true

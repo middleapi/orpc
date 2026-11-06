@@ -1,4 +1,4 @@
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 import type { ErrorMap } from './error.ts'
 import type { Meta, MetaPlugin } from './meta.ts'
@@ -70,7 +70,7 @@ export function resolveBasePathMeta(
     return base
   }
 
-  if (isTypescriptObject(contract)) {
+  if (isNonPrimitive(contract)) {
     for (const [key, child] of Object.entries(contract)) {
       const base = resolveBasePathMeta(child, [...currentPath, key])
 

@@ -2,7 +2,7 @@ import {
   DEFAULT_MAX_BIGINT_DIGITS,
   getOwn,
   isPlainObject,
-  isTypescriptObject,
+  isNonPrimitive,
   parseBigIntString,
   toArray,
   tryOrUndefined,
@@ -507,7 +507,7 @@ export class JsonSchemaCoercer {
     let memo: Map<unknown, CoercionResult> | undefined
 
     // while another `$ref` is applied to the value, the cycle check changes the result
-    if (context.memoize && !appliedRefs?.size && isTypescriptObject(value)) {
+    if (context.memoize && !appliedRefs?.size && isNonPrimitive(value)) {
       context.memo ??= new Map()
       memo = context.memo.get(resolved)
 
@@ -565,7 +565,7 @@ function countValues(input: unknown, limit: number): number {
 
         const item = items[i]
 
-        if (isTypescriptObject(item)) {
+        if (isNonPrimitive(item)) {
           stack.push(item)
         }
       }

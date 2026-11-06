@@ -1360,7 +1360,7 @@ describe('batchHandlerPlugin', () => {
 
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: true, interval: 100 },
+          keepAlive: { interval: 100 },
         }),
         {
           events: os.handler(async function* () {
@@ -1396,10 +1396,51 @@ describe('batchHandlerPlugin', () => {
       expect(vi.getTimerCount()).toBe(0)
     })
 
+    it('sends keep-alive frames at the default interval when set to true', async () => {
+      const gate = promiseWithResolvers<void>()
+
+      const handler = createHandler(new BatchHandlerPlugin({ keepAlive: true }), {
+        events: os.handler(async function* () {
+          await gate.promise
+        }),
+      })
+
+      const { response } = await handler.handle(
+        createBatchRequest({
+          messages: [makePeerRequestMessage('0', '/events')],
+        }),
+      )
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+
+      await readMessage(reader) // the response message
+
+      let settled = false
+      const keepAlive = reader.read().finally(() => {
+        settled = true
+      })
+
+      await vi.advanceTimersByTimeAsync(14_999)
+      expect(settled).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(keepAlive).resolves.toEqual({
+        done: false,
+        value: new Uint8Array([0, 0, 0, 0]),
+      })
+
+      gate.resolve()
+      while (!(await reader.read()).done) {
+        // keep reading until closed
+      }
+
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
     it('does not schedule a keep-alive timer when disabled', async () => {
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: false },
+          keepAlive: false,
         }),
         eventsRouter,
       )
@@ -1421,7 +1462,7 @@ describe('batchHandlerPlugin', () => {
     it('stops keep-alive after the stream is cancelled', async () => {
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: true, interval: 50 },
+          keepAlive: { interval: 50 },
         }),
         idleRouter,
       )
@@ -1475,7 +1516,7 @@ describe('batchHandlerPlugin', () => {
 
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: true, interval: 50 },
+          keepAlive: { interval: 50 },
         }),
         idleRouter,
       )
@@ -1506,7 +1547,7 @@ describe('batchHandlerPlugin', () => {
 
       const handler = createHandler(
         new BatchHandlerPlugin({
-          keepAlive: { enabled: false },
+          keepAlive: false,
         }),
         eventsRouter,
       )

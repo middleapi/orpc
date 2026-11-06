@@ -156,7 +156,11 @@ export type {
 } from '@standard-server/core'
 
 export {
-  ErrorEvent,
+  /**
+   * @deprecated Use `EventStreamErrorEvent` instead.
+   */
+  EventStreamErrorEvent as ErrorEvent,
+  EventStreamErrorEvent,
   /**
    * Retrieves metadata attached to a single iterator event value.
    *

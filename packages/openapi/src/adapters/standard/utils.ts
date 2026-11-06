@@ -1,5 +1,5 @@
 import type { Public } from '@orpc/shared'
-import { isTypescriptObject, NullProtoObj } from '@orpc/shared'
+import { isNonPrimitive, NullProtoObj } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
 
 import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer.ts'
@@ -54,7 +54,7 @@ function serializeHeaderValue(
       .join(',')
   }
 
-  if (isTypescriptObject(serialized)) {
+  if (isNonPrimitive(serialized)) {
     return Object.entries(serialized)
       .filter(([, val]) => val !== undefined && val !== null)
       .map(([key, val]) => `${key},${String(val)}`)

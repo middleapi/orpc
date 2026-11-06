@@ -117,13 +117,14 @@ A streaming batch response may stay idle for long periods. The server plugin can
 const handler = new RPCHandler(router, {
   plugins: [
     new BatchHandlerPlugin({
+      /**
+       * Keep-alive frames sent periodically while the stream is idle.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a keep-alive frame is sent periodically while the stream is idle.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between keep-alive frames after the last message.
          *

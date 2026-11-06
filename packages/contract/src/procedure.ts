@@ -1,4 +1,4 @@
-import { getConstructor, isTypescriptObject } from '@orpc/shared'
+import { getConstructor, isNonPrimitive } from '@orpc/shared'
 
 import type { ErrorMap } from './error.ts'
 import type { AnyMetaPlugin, Meta } from './meta.ts'
@@ -48,10 +48,10 @@ export class ProcedureContract<
     }
 
     return (
-      isTypescriptObject(instance) &&
-      isTypescriptObject(instance['~orpc']) &&
-      isTypescriptObject(instance['~orpc'].errorMap) &&
-      isTypescriptObject(instance['~orpc'].meta) &&
+      isNonPrimitive(instance) &&
+      isNonPrimitive(instance['~orpc']) &&
+      isNonPrimitive(instance['~orpc'].errorMap) &&
+      isNonPrimitive(instance['~orpc'].meta) &&
       (instance['~orpc'].inputSchemas === undefined ||
         Array.isArray(instance['~orpc'].inputSchemas)) &&
       (instance['~orpc'].outputSchemas === undefined ||

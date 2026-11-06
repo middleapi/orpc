@@ -1,5 +1,5 @@
 import type { AsyncIteratorClass, WrapAsyncIteratorOptions } from '@orpc/shared'
-import { isTypescriptObject, wrapAsyncIterator } from '@orpc/shared'
+import { isNonPrimitive, wrapAsyncIterator } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 
 export function wrapAsyncIteratorPreservingEventMeta<
@@ -24,7 +24,7 @@ export function wrapAsyncIteratorPreservingEventMeta<
 
         if (mapped.value !== result.value) {
           const meta = getEventMeta(result.value)
-          if (meta && isTypescriptObject(mapped.value)) {
+          if (meta && isNonPrimitive(mapped.value)) {
             return { done: mapped.done, value: withEventMeta(mapped.value, meta) } as any
           }
         }
@@ -38,7 +38,7 @@ export function wrapAsyncIteratorPreservingEventMeta<
 
         if (mapped !== error) {
           const meta = getEventMeta(error)
-          if (meta && isTypescriptObject(mapped)) {
+          if (meta && isNonPrimitive(mapped)) {
             return withEventMeta(mapped, meta)
           }
         }

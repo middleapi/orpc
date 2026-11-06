@@ -2,7 +2,7 @@ import { RPCJsonSerializer } from '@orpc/client'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
 import { Publisher } from '@orpc/publisher'
 import type { Public } from '@orpc/shared'
-import { isTypescriptObject, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
+import { isNonPrimitive, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
 import { unwrapEvent, withEventMeta } from '@standard-server/core'
 
 export interface DurablePublisherOptions extends PublisherOptions {
@@ -137,7 +137,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
       try {
         const serialized = JSON.parse(event.data)
         let payload = this.serializer.deserializeJson(serialized.data)
-        if (isTypescriptObject(payload) && serialized.meta) {
+        if (isNonPrimitive(payload) && serialized.meta) {
           payload = withEventMeta(payload, serialized.meta)
         }
 

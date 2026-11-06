@@ -1,4 +1,4 @@
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts.ts'
 import type { AnyNestedClient, Client, ClientRest } from './types.ts'
@@ -38,7 +38,7 @@ export function createSafeClient<T extends AnyNestedClient>(client: T): SafeClie
       if (safeClient === undefined) {
         const value = (client as Record<string, unknown>)[prop]
 
-        if (!isTypescriptObject(value)) {
+        if (!isNonPrimitive(value)) {
           return value
         }
 

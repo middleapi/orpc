@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client'
 import * as sharedExperimental from '@orpc/shared'
-import { ErrorEvent } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
 
 import { createProcedureClient } from '../../procedure-client.ts'
 import { StandardHandler } from './handler.ts'
@@ -686,8 +686,8 @@ describe('standardHandler', () => {
       })
     })
 
-    it('does not record ErrorEvent failures of an async iterator body on the request span', async () => {
-      const errorEvent = new ErrorEvent({ code: 'BAD_REQUEST' })
+    it('does not record EventStreamErrorEvent failures of an async iterator body on the request span', async () => {
+      const errorEvent = new EventStreamErrorEvent({ code: 'BAD_REQUEST' })
       const wrapped = await handleBody(
         (async function* () {
           yield 'a'

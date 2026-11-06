@@ -1,6 +1,6 @@
 import type { AnyNestedClient, Client, ClientContext, ClientRest } from '@orpc/client'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS, resolveClientRest } from '@orpc/client'
-import { anyAbortSignal, isTypescriptObject } from '@orpc/shared'
+import { anyAbortSignal, isNonPrimitive } from '@orpc/shared'
 import { Effect } from 'effect'
 
 function callAsEffect<TClientContext extends ClientContext, TInput, TOutput, TError>(
@@ -51,7 +51,7 @@ export function createEffectClient<T extends AnyNestedClient>(client: T): Effect
         if (effectClient === undefined) {
           const value = (client as Record<string, unknown>)[prop]
 
-          if (!isTypescriptObject(value)) {
+          if (!isNonPrimitive(value)) {
             return value
           }
 
