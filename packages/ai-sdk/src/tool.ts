@@ -337,13 +337,9 @@ export function createToolFactory<TInitialContext extends Context = object>(
      * Output validation stays enabled because the AI SDK does not validate
      * the value returned from `execute` against the tool's `outputSchema`.
      */
-    const { validation } = procedure['~orpc']
     const disabledValidation = new Procedure({
       ...procedure['~orpc'],
-      validation: {
-        input: false,
-        output: typeof validation === 'object' ? validation.output : validation,
-      },
+      disableInputValidation: true,
     })
 
     /**

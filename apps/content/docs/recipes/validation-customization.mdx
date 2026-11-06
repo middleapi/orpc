@@ -5,39 +5,33 @@ description: 'Learn how to customize validation in oRPC, including disabling run
 
 ## Disable Validation
 
-You can disable runtime validation with the `.$config`. `false` disables it for both input and output, an object controls each separately.
+You can disable runtime validation with the `.$config`.
 
 ```ts
 const base = os.$config({
   /**
-   * Runtime validation of input and output schemas.
-   * Schemas are still used for type inference and OpenAPI generation when validation is disabled.
+   * When enabled, input schemas are not validated at runtime.
+   * Schemas are still used for type inference and OpenAPI generation.
    *
    * @warning Do not disable validation for schemas that transform values.
    *
-   * @default true
+   * @default false
    */
-  validation: {
-    /**
-     * Whether input schemas are validated at runtime.
-     *
-     * @default true
-     */
-    input: false,
+  disableInputValidation: true,
 
-    /**
-     * Whether output schemas are validated at runtime.
-     *
-     * Useful to disable when output schemas exist only for specification generation.
-     *
-     * @default true
-     */
-    output: false,
-  },
+  /**
+   * When enabled, output schemas are not validated at runtime.
+   * Schemas are still used for type inference and OpenAPI generation.
+   *
+   * Useful when output schemas exist only for specification generation.
+   *
+   * @warning Do not disable validation for schemas that transform values.
+   *
+   * @default false
+   */
+  disableOutputValidation: true,
 })
 ```
-
-Each `.$config` call only overrides the directions it sets, so `.$config({ validation: { input: false } }).$config({ validation: { output: false } })` disables both.
 
 :::warning
 Do not disable validation for schemas that transform values.

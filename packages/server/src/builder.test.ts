@@ -44,7 +44,8 @@ describe('builder', () => {
         outputSchemasLengthAtUse: 0,
       },
     ],
-    validation: { input: true },
+    disableInputValidation: false,
+    disableOutputValidation: false,
   }
 
   const metaPlugin: AnyMetaPlugin = {
@@ -67,7 +68,7 @@ describe('builder', () => {
 
   it('$config', () => {
     const applied = builder.$config({
-      validation: { output: false },
+      disableOutputValidation: undefined,
     })
 
     expect(applied).toBeInstanceOf(Builder)
@@ -75,13 +76,7 @@ describe('builder', () => {
 
     expect(applied['~orpc']).toEqual({
       ...builder['~orpc'],
-      validation: { input: true, output: false },
-    })
-
-    expect(builder.$config({})['~orpc'].validation).toEqual({ input: true })
-    expect(builder.$config({ validation: false })['~orpc'].validation).toEqual({
-      input: false,
-      output: false,
+      disableOutputValidation: undefined,
     })
   })
 

@@ -12,7 +12,7 @@ describe('procedureImplementer', () => {
     outputSchemas: [z.number()],
     meta: { meta: true },
     metaPlugins: [{ name: 'plugin', init: vi.fn() }],
-    validation: { input: false },
+    disableInputValidation: true,
   }
 
   const implementer = new ProcedureImplementer(definition)

@@ -464,11 +464,11 @@ describe('rpcMatcher', () => {
     it('uses the implemented handler and config when implementing a server router', async () => {
       const original = {
         ping: os
-          .$config({ validation: { input: false } })
+          .$config({ disableInputValidation: true })
           .input(z.string())
           .handler(() => 'original'),
       }
-      const implementer = implement(original, { validation: true })
+      const implementer = implement(original, { disableInputValidation: false })
       const matcher = new RPCMatcher(
         implementer.router({ ping: implementer.ping.handler(() => 'implemented') }),
       )

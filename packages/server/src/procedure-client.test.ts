@@ -872,13 +872,13 @@ describe('createProcedureClient', () => {
     const inputSchemaValidateSpy = vi.spyOn(inputSchema['~standard'], 'validate')
     const outputSchemaValidateSpy = vi.spyOn(outputSchema['~standard'], 'validate')
 
-    it('skips input validation when input validation is disabled', async () => {
+    it('skips input validation when disableInputValidation is enabled', async () => {
       const handler = vi.fn(async (opts: any) => {
         expect(opts.input).toEqual({ value: 'INVALID' })
         return { value: 'ok' }
       })
       const procedure = os
-        .$config({ validation: { input: false } })
+        .$config({ disableInputValidation: true })
         .input(inputSchema)
         .output(outputSchema)
         .handler(handler)
@@ -891,10 +891,10 @@ describe('createProcedureClient', () => {
       expect(handler).toHaveBeenCalledTimes(1)
     })
 
-    it('skips output validation when output validation is disabled', async () => {
+    it('skips output validation when disableOutputValidation is enabled', async () => {
       const handler = vi.fn(async () => ({ value: 'INVALID' }))
       const procedure = os
-        .$config({ validation: { output: false } })
+        .$config({ disableOutputValidation: true })
         .input(inputSchema)
         .output(outputSchema)
         .handler(handler)
@@ -913,7 +913,7 @@ describe('createProcedureClient', () => {
         return { value: 'INVALID' }
       })
       const procedure = os
-        .$config({ validation: false })
+        .$config({ disableOutputValidation: true, disableInputValidation: true })
         .input(inputSchema)
         .output(outputSchema)
         .handler(handler)
@@ -934,7 +934,7 @@ describe('createProcedureClient', () => {
         return 'raw-out'
       })
       const procedure = os
-        .$config({ validation: false })
+        .$config({ disableOutputValidation: true, disableInputValidation: true })
         .input(transformInputSchema)
         .output(transformOutputSchema)
         .handler(handler)

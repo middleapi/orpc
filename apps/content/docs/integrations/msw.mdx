@@ -151,7 +151,8 @@ You can also disable input or output validation of the mocked data:
 ```ts
 const mock = createHTTPUtils(contract, {
   handler: (router) => new RPCHandler(router),
-  validation: false, // or { input: false } / { output: false }
+  disableInputValidation: true,
+  disableOutputValidation: true,
 })
 ```
 

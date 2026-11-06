@@ -3,7 +3,6 @@ import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 
 import { Lazy, unlazy } from './lazy.ts'
-import { mergeProcedureValidation } from './procedure-validation.ts'
 import { Procedure } from './procedure.ts'
 import { withHiddenRouterContract } from './router-hidden.ts'
 import {
@@ -47,7 +46,7 @@ const procedure1 = new Procedure({
   handler: vi.fn(),
   orderedMiddlewares: [],
   metaPlugins: [{ name: 'test', apply: vi.fn() }],
-  validation: { input: true },
+  disableInputValidation: false,
 })
 
 const procedure2 = new Procedure({
@@ -64,7 +63,7 @@ const procedure2 = new Procedure({
   orderedMiddlewares: [
     { middleware: vi.fn() as any, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 },
   ],
-  validation: undefined,
+  disableOutputValidation: undefined,
 })
 
 /**
@@ -108,7 +107,7 @@ describe('augmentRouter', () => {
       },
       metaPlugins: [{ name: 'plugin1', init: vi.fn() }],
       middlewares: [vi.fn()],
-      validation: { output: false },
+      disableOutputValidation: true,
     }
   }
 
@@ -135,8 +134,8 @@ describe('augmentRouter', () => {
       original['~orpc'].metaPlugins,
     )
     expect(actual['~orpc']).toEqual({
+      disableOutputValidation: true,
       ...original['~orpc'],
-      validation: mergeProcedureValidation(options.validation, original['~orpc'].validation),
       orderedMiddlewares: [
         ...middlewareEntries(options.middlewares),
         ...original['~orpc'].orderedMiddlewares,
@@ -235,7 +234,7 @@ describe('augmentImplementedRouter', () => {
   function createImplementedOptions() {
     return {
       middlewares: [vi.fn()],
-      validation: { output: false },
+      disableOutputValidation: true,
     }
   }
 
@@ -247,8 +246,8 @@ describe('augmentImplementedRouter', () => {
     expect(actual).toBeInstanceOf(Procedure)
     expect(actual).not.toBe(original)
     expect(actual['~orpc']).toEqual({
+      disableOutputValidation: true,
       ...original['~orpc'],
-      validation: mergeProcedureValidation(options.validation, original['~orpc'].validation),
       orderedMiddlewares: [
         ...middlewareEntries(options.middlewares),
         ...original['~orpc'].orderedMiddlewares,

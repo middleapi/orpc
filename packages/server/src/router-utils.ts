@@ -14,7 +14,6 @@ import type { Lazyable } from './lazy.ts'
 import { Lazy, unlazy } from './lazy.ts'
 import type { AnyMiddleware } from './middleware.ts'
 import { createContractProcedure } from './procedure-utils.ts'
-import { mergeProcedureValidation } from './procedure-validation.ts'
 import type { AnyProcedure, ProcedureConfig } from './procedure.ts'
 import { Procedure } from './procedure.ts'
 import { getHiddenRouterContract } from './router-hidden.ts'
@@ -117,7 +116,6 @@ export function augmentRouter<
     const enhanced = new Procedure({
       ...omit(options, ['middlewares', 'errorMap', 'meta', 'metaPlugins']),
       ...router['~orpc'],
-      validation: mergeProcedureValidation(options.validation, router['~orpc'].validation),
       meta,
       metaPlugins,
       errorMap: mergeErrorMap(options.errorMap, router['~orpc'].errorMap),
@@ -178,7 +176,6 @@ export function augmentImplementedRouter<
     const enhanced = new Procedure({
       ...omit(options, ['middlewares']),
       ...router['~orpc'],
-      validation: mergeProcedureValidation(options.validation, router['~orpc'].validation),
       orderedMiddlewares: [
         ...options.middlewares.map((middleware) => ({
           middleware,

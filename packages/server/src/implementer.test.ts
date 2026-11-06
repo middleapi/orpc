@@ -24,13 +24,13 @@ beforeEach(() => {
 })
 
 describe('implement', () => {
-  const implementer = implement(contract, { validation: { input: true } })
+  const implementer = implement(contract, { disableInputValidation: false })
 
   it('crate with router implementer', () => {
-    void implement(contract, { validation: { input: true } })
+    void implement(contract, { disableInputValidation: false })
     expect(createRouterImplementerSpy).toHaveBeenCalledTimes(1)
     expect(createRouterImplementerSpy).toHaveBeenCalledWith(contract, {
-      validation: { input: true },
+      disableInputValidation: false,
     })
   })
 
@@ -51,8 +51,9 @@ describe('implement', () => {
 
   describe('.$config', () => {
     it('on conflict procedure name', () => {
-      const applied = implementer.$config({ validation: { output: false } })
-      expect(applied.ping['~orpc'].validation).toEqual({ input: true, output: false })
+      const applied = implementer.$config({ disableOutputValidation: true })
+      expect(applied.ping['~orpc'].disableInputValidation).toBe(false)
+      expect(applied.ping['~orpc'].disableOutputValidation).toBe(true)
     })
 
     it('without conflict', () => {
@@ -60,9 +61,10 @@ describe('implement', () => {
         ping: contract.ping,
       }
 
-      const implementer = implement(contract2, { validation: { input: true } })
-      const applied = implementer.$config({ validation: { output: false } })
-      expect(applied.ping['~orpc'].validation).toEqual({ input: true, output: false })
+      const implementer = implement(contract2, { disableInputValidation: false })
+      const applied = implementer.$config({ disableOutputValidation: true })
+      expect(applied.ping['~orpc'].disableInputValidation).toBe(false)
+      expect(applied.ping['~orpc'].disableOutputValidation).toBe(true)
     })
   })
 

@@ -130,7 +130,8 @@ export class HTTPProcedureUtils<
     >,
   ): HttpHandler {
     const procedure = implement(this.contract, {
-      validation: this.options.validation,
+      disableInputValidation: this.options.disableInputValidation,
+      disableOutputValidation: this.options.disableOutputValidation,
     }).handler(handler as ProcedureHandler<any, any, any, any>)
 
     return this.toMSWHandler(procedure, ({ matched, response }) => (matched ? response : undefined))
@@ -184,7 +185,8 @@ export class HTTPProcedureUtils<
      * targets this procedure, its response is discarded.
      */
     const procedure = implement(this.contract, {
-      validation: false,
+      disableInputValidation: true,
+      disableOutputValidation: true,
     }).handler(() => undefined)
 
     return this.toMSWHandler(

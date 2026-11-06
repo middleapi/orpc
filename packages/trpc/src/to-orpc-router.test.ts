@@ -109,10 +109,11 @@ describe('toORPCRouter', () => {
 
     expect((orpcRouter as any).ping['~orpc'].inputSchemas[0]['~standard'].vendor).toBe('zod')
     expect((orpcRouter as any).ping['~orpc'].inputSchemas[0]._def).toBe(inputSchema._def)
-    expect((orpcRouter as any).ping['~orpc'].validation).toBe(false)
+    expect((orpcRouter as any).ping['~orpc'].disableInputValidation).toBe(true)
 
     expect((orpcRouter as any).ping['~orpc'].outputSchemas[0]['~standard'].vendor).toBe('zod')
     expect((orpcRouter as any).ping['~orpc'].outputSchemas[0]._def).toBe(outputSchema._def)
+    expect((orpcRouter as any).ping['~orpc'].disableOutputValidation).toBe(true)
 
     const withoutHandlerProcedure = new Procedure({
       ...(orpcRouter as any).ping['~orpc'],

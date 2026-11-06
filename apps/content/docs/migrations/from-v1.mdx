@@ -238,13 +238,14 @@ Stacked object input schemas compose into a single flat value, so one schema nev
 
 ### `.$config` options changed
 
-The index-based validation options were replaced by a single `validation` option, which takes `false` or `{ input, output }`. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/recipes/validation-customization).
+The index-based validation options were replaced by two simple flags. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/recipes/validation-customization).
 
 <CodeGroup>
 
 ```ts v2
 const base = os.$config({
-  validation: false, // or { input: false } / { output: false }
+  disableInputValidation: true,
+  disableOutputValidation: true,
 })
 ```
 
@@ -973,7 +974,7 @@ The implementer works the same as in v1: `implement(contract)` still supports `.
 ```ts
 import { implement } from '@orpc/server'
 
-const os = implement(contract, { validation: { output: false } })
+const os = implement(contract, { disableOutputValidation: true })
 ```
 
 Contract routing uses `openapi()` metadata now, as described in [Routing Moved to OpenAPI Metadata](#routing-moved-to-openapi-metadata).

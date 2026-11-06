@@ -6,7 +6,6 @@ import type { DefaultInitialContext } from './builder.ts'
 import type { Context } from './context.ts'
 import type { RouterImplementer } from './implementer-router.ts'
 import { createRouterImplementer } from './implementer-router.ts'
-import { mergeProcedureValidation } from './procedure-validation.ts'
 import type { ProcedureConfig } from './procedure.ts'
 
 export type Implementer<TContract extends RouterContract, TInitialContext extends Context> = {
@@ -38,12 +37,7 @@ export function implement<
       if (p === '$context') {
         method = () => implementer
       } else if (p === '$config') {
-        method = (incoming: ProcedureConfig) =>
-          implement(contract, {
-            ...config,
-            ...incoming,
-            validation: mergeProcedureValidation(config.validation, incoming.validation),
-          })
+        method = (incoming: ProcedureConfig) => implement(contract, { ...config, ...incoming })
       }
 
       const value = Reflect.get(routerImplementer, p)

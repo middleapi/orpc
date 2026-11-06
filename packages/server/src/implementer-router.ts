@@ -240,7 +240,8 @@ function toPlainRouterContract<T extends RouterContract>(contract: T): T {
       omit(contract['~orpc'] as AnyProcedure['~orpc'], [
         'handler',
         'orderedMiddlewares',
-        'validation',
+        'disableInputValidation',
+        'disableOutputValidation',
       ]),
     ) as T
   }
