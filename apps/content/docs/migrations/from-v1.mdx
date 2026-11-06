@@ -827,6 +827,20 @@ const link = new RPCLink({
 
 </CodeGroup>
 
+### Fetch links follow redirects
+
+`RPCLink` and `OpenAPILink` no longer set `redirect: 'manual'`, so `fetch` follows redirects. To get `3xx` responses as the output, as in v1, set it in a custom `fetch`. See [OpenAPI Link](/docs/openapi/link#redirect-responses).
+
+```ts
+const link = new OpenAPILink(contract, {
+  fetch: (url, init) =>
+    globalThis.fetch(url, {
+      ...init,
+      redirect: 'manual',
+    }),
+})
+```
+
 ### Link interceptors renamed
 
 `clientInterceptors` is now `transportInterceptors`. `adapterInterceptors` was removed, mirroring the handler-side change. Event stream options moved under `toFetchRequest.eventStream`. See [RPC Link](/docs/rpc/link).

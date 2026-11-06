@@ -14,6 +14,16 @@ describe('openapiLink', () => {
     get: os.meta(openapi({ method: 'GET', path: '/ping/{pong}' })).handler(({ input }) => input),
     post: os.handler(({ input }) => input),
     query: os.meta(openapi({ method: 'QUERY', path: '/query' })).handler(({ input }) => input),
+    redirect: os
+      .meta(
+        openapi({
+          method: 'GET',
+          path: '/redirect',
+          successStatus: 307,
+          outputStructure: 'detailed',
+        }),
+      )
+      .handler(() => ({ headers: { location: 'https://orpc.dev' } })),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -67,7 +77,6 @@ describe('openapiLink', () => {
       expect.stringContaining('http://localhost:3000/api/ping/pong'),
       expect.objectContaining({
         method: 'GET',
-        redirect: 'manual',
       }),
       expect.objectContaining({ context: {} }),
       ['get'],
@@ -210,5 +219,55 @@ describe('openapiLink', () => {
     ) as any
 
     await expect(client.post('ignored')).resolves.toBe('intercepted')
+  })
+
+  it('follows redirects by default', async () => {
+    const fetch = vi.fn(
+      async (_url: string, _init: RequestInit) =>
+        new Response('"ok"', { headers: { 'content-type': 'application/json' } }),
+    )
+
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        fetch,
+        origin: 'http://localhost:3000',
+        url: '/api',
+      }),
+    ) as any
+
+    await expect(client.get({ pong: 'pong' })).resolves.toBe('ok')
+
+    const [url, init] = fetch.mock.calls[0]!
+    expect(init).not.toHaveProperty('redirect')
+    expect(new Request(url, init).redirect).toBe('follow')
+  })
+
+  it('reflects redirect responses when fetch is overridden with `redirect: manual`', async () => {
+    const client = createORPCClient(
+      new OpenAPILink(router, {
+        origin: 'http://localhost:3000',
+        url: '/api',
+        fetch: async (url, init) => {
+          const request = new Request(url, { ...init, redirect: 'manual' })
+          expect(request.redirect).toBe('manual')
+
+          const { matched, response } = await handler.handle(request, {
+            prefix: '/api',
+          })
+
+          if (!matched || !response) {
+            throw new Error('No procedure match')
+          }
+
+          return response
+        },
+      }),
+    ) as any
+
+    await expect(client.redirect()).resolves.toEqual({
+      status: 307,
+      headers: expect.objectContaining({ location: 'https://orpc.dev' }),
+      body: undefined,
+    })
   })
 })

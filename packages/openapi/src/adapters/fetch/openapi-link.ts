@@ -14,7 +14,12 @@ export interface OpenAPILinkOptions<T extends ClientContext>
 /**
  * Client link that calls an OpenAPI (RESTful) oRPC server over HTTP using the Fetch API.
  *
+ * @remarks
+ * **Warning**: `fetch` follows redirects by default, so `3xx` responses are never returned.
+ * Use a custom `fetch` with `redirect: 'manual'` to get them (server runtimes only).
+ *
  * @see {@link https://orpc.dev/docs/openapi/link | OpenAPI Link}
+ * @see {@link https://orpc.dev/docs/openapi/link#redirect-responses | OpenAPI Link - Redirect Responses}
  */
 export class OpenAPILink<T extends ClientContext> extends StandardLink<T> {
   constructor(router: RouterContract, options: OpenAPILinkOptions<T> = {}) {
