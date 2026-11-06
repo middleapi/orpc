@@ -45,28 +45,18 @@ export function resolveJsonSchemaLocalPointer(
   return get(root, ref.slice(2).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
 }
 
+function getDiscriminatorMapping(discriminator: unknown): Record<PropertyKey, unknown> | undefined {
+  return isPlainObject(discriminator) && isPlainObject(discriminator.mapping)
+    ? discriminator.mapping
+    : undefined
+}
+
 /**
- * Returns the local JSON pointer values of an OpenAPI `discriminator.mapping`.
- * Values that are not local pointers (bare schema names, external refs) are skipped.
+ * OpenAPI `discriminator.mapping` values are refs when they are local JSON pointers;
+ * other values (bare schema names, external refs) are left alone.
  */
-function getDiscriminatorMappingRefs(discriminator: unknown): Array<[key: string, ref: string]> {
-  const mapping = isPlainObject(discriminator) ? discriminator.mapping : undefined
-
-  if (!isPlainObject(mapping)) {
-    return []
-  }
-
-  const refs: Array<[key: string, ref: string]> = []
-
-  for (const key of Object.keys(mapping)) {
-    const value = mapping[key]
-
-    if (typeof value === 'string' && value.startsWith('#')) {
-      refs.push([key, value])
-    }
-  }
-
-  return refs
+function isDiscriminatorMappingRef(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith('#')
 }
 
 /**
@@ -100,8 +90,10 @@ export function visitJsonSchemaRefs(
     } else if (!schemaLevel) {
       visitJsonSchemaRefs(val as JsonSchema, visit, true, seen)
     } else if (key === 'discriminator') {
-      for (const [, ref] of getDiscriminatorMappingRefs(val)) {
-        visit(ref)
+      for (const ref of Object.values(getDiscriminatorMapping(val) ?? {})) {
+        if (isDiscriminatorMappingRef(ref)) {
+          visit(ref)
+        }
       }
     } else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
       visitJsonSchemaRefs(val as JsonSchema, visit, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), seen)
@@ -133,7 +125,7 @@ export function mapJsonSchemaRefs(
     } else if (!schemaLevel) {
       setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key]))
     } else if (key === 'discriminator') {
-      setOwn(result, key, mapDiscriminatorMappingRefs(val, map, [...path, key]))
+      setOwn(result, key, mapDiscriminatorMappingRefs(val, map, path))
     } else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
       setOwn(
         result,
@@ -156,20 +148,24 @@ function mapDiscriminatorMappingRefs(
   map: (ref: string, path: Array<string | number>) => string,
   path: Array<string | number>,
 ): unknown {
-  const refs = getDiscriminatorMappingRefs(discriminator)
+  const mapping = getDiscriminatorMapping(discriminator)
 
-  if (refs.length === 0) {
+  if (!mapping) {
     return discriminator
   }
 
-  const { mapping, ...rest } = discriminator as { mapping: Record<string, unknown> }
-  const mappedMapping = { ...mapping }
+  let mappedMapping: Record<PropertyKey, unknown> | undefined
 
-  for (const [key, ref] of refs) {
-    setOwn(mappedMapping, key, map(ref, [...path, 'mapping', key]))
+  for (const key of Object.keys(mapping)) {
+    const ref = mapping[key]
+
+    if (isDiscriminatorMappingRef(ref)) {
+      mappedMapping ??= { ...mapping }
+      setOwn(mappedMapping, key, map(ref, [...path, 'discriminator', 'mapping', key]))
+    }
   }
 
-  return { ...rest, mapping: mappedMapping }
+  return mappedMapping ? { ...(discriminator as object), mapping: mappedMapping } : discriminator
 }
 
 /**

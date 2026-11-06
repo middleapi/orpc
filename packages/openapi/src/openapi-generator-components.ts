@@ -255,67 +255,74 @@ function areSchemasEquivalentForReuse(
     )
   }
 
-  const candidateObject = candidate as Record<string, unknown>
-  const existingObject = existing as Record<string, unknown>
-  const candidateKeys = definedKeysOf(candidateObject)
-  const existingKeys = definedKeysOf(existingObject)
+  return areObjectsEquivalentForReuse(
+    candidate as Record<string, unknown>,
+    existing as Record<string, unknown>,
+    (key, candidateValue, existingValue) => {
+      if (key === '$ref') {
+        return areRefValuesEquivalentForReuse(candidateValue, existingValue, ctx)
+      }
 
-  if (!isDeepEqual(candidateKeys, existingKeys)) {
-    return false
+      if (key === 'discriminator') {
+        return areDiscriminatorsEquivalentForReuse(candidateValue, existingValue, ctx)
+      }
+
+      return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
+    },
+  )
+}
+
+function areObjectsEquivalentForReuse(
+  candidate: Record<string, unknown>,
+  existing: Record<string, unknown>,
+  areValuesEquivalent: (key: string, candidateValue: unknown, existingValue: unknown) => boolean,
+): boolean {
+  const candidateKeys = definedKeysOf(candidate)
+
+  return (
+    isDeepEqual(candidateKeys, definedKeysOf(existing)) &&
+    candidateKeys.every((key) => areValuesEquivalent(key, candidate[key], existing[key]))
+  )
+}
+
+function areRefValuesEquivalentForReuse(
+  candidate: unknown,
+  existing: unknown,
+  ctx: ReuseComparisonContext,
+): boolean {
+  if (typeof candidate === 'string' && typeof existing === 'string') {
+    return areSchemaRefsEquivalentForReuse(candidate, existing, ctx)
   }
 
-  return candidateKeys.every((key) => {
-    const candidateValue = candidateObject[key]
-    const existingValue = existingObject[key]
-
-    if (key === '$ref' && typeof candidateValue === 'string' && typeof existingValue === 'string') {
-      return areSchemaRefsEquivalentForReuse(candidateValue, existingValue, ctx)
-    }
-
-    if (key === 'discriminator') {
-      return areDiscriminatorsEquivalentForReuse(candidateValue, existingValue, ctx)
-    }
-
-    return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
-  })
+  return areSchemasEquivalentForReuse(candidate, existing, ctx)
 }
 
 /**
  * `discriminator.mapping` values can be refs, which are rewritten during hoisting like `$ref`,
  * so they must be compared by their targets rather than by their (prefix-dependent) strings.
+ * Values that are not refs (bare schema names) still compare by string equality.
  */
 function areDiscriminatorsEquivalentForReuse(
   candidate: unknown,
   existing: unknown,
   ctx: ReuseComparisonContext,
 ): boolean {
-  if (
-    !isPlainObject(candidate) ||
-    !isPlainObject(existing) ||
-    !isPlainObject(candidate.mapping) ||
-    !isPlainObject(existing.mapping)
-  ) {
+  if (!isPlainObject(candidate) || !isPlainObject(existing)) {
     return areSchemasEquivalentForReuse(candidate, existing, ctx)
   }
 
-  const { mapping: candidateMapping, ...candidateRest } = candidate
-  const { mapping: existingMapping, ...existingRest } = existing
-  const mappingKeys = definedKeysOf(candidateMapping)
+  return areObjectsEquivalentForReuse(candidate, existing, (key, candidateValue, existingValue) => {
+    if (key === 'mapping' && isPlainObject(candidateValue) && isPlainObject(existingValue)) {
+      return areObjectsEquivalentForReuse(
+        candidateValue,
+        existingValue,
+        (_, candidateRef, existingRef) =>
+          areRefValuesEquivalentForReuse(candidateRef, existingRef, ctx),
+      )
+    }
 
-  return (
-    areSchemasEquivalentForReuse(candidateRest, existingRest, ctx) &&
-    isDeepEqual(mappingKeys, definedKeysOf(existingMapping)) &&
-    mappingKeys.every((mappingKey) => {
-      const candidateRef = candidateMapping[mappingKey]
-      const existingRef = existingMapping[mappingKey]
-
-      if (typeof candidateRef === 'string' && typeof existingRef === 'string') {
-        return areSchemaRefsEquivalentForReuse(candidateRef, existingRef, ctx)
-      }
-
-      return isDeepEqual(candidateRef, existingRef)
-    })
-  )
+    return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
+  })
 }
 
 function parseRefName(ref: string, prefix: string): string | undefined {
