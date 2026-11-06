@@ -29,26 +29,6 @@ describe('liveQuery', () => {
     expect(mounted.vm.queryCache.getQueryData(['live'])).toEqual(2)
   })
 
-  it('keeps data written to the entry after the last event', async () => {
-    const controller = createChunkController<number>()
-    const mounted = mountQuery({
-      key: ['live'],
-      query: liveQuery(() => controller.stream()),
-    })
-
-    controller.push(1)
-    await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual(1), { interval: 1 })
-
-    mounted.vm.queryCache.setQueryData(['live'], 2)
-
-    controller.close()
-    await vi.waitFor(() => expect(mounted.vm.query.asyncStatus.value).toEqual('idle'), {
-      interval: 1,
-    })
-    expect(mounted.vm.query.data.value).toEqual(2)
-    expect(mounted.vm.query.status.value).toEqual('success')
-  })
-
   it('errors when the stream yields no chunks', async () => {
     const controller = createChunkController<number>()
     const mounted = mountQuery({
@@ -175,5 +155,24 @@ describe('liveQuery', () => {
     await expect(fetching).rejects.toBe(controller.signal.reason)
     expect(started).not.toHaveBeenCalled()
     expect(entry).toMatchObject({ when: 0, state: { value: { data: 0 } } })
+  })
+
+  it('rejects and keeps the entry stale when the stream ends on abort', async () => {
+    const controller = new AbortController()
+    const entry = {
+      key: ['live'],
+      when: 1,
+      state: { value: { status: 'success', data: 0, error: null } },
+    }
+
+    const fetching = liveQuery(async () =>
+      (async function* () {
+        yield 1
+        controller.abort()
+      })(),
+    )({ entry, signal: controller.signal } as any)
+
+    await expect(fetching).rejects.toSatisfy((error) => error === controller.signal.reason)
+    expect(entry.when).toBe(0)
   })
 })

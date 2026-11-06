@@ -11,6 +11,14 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
   return async (context) => {
     const { client, queryKey, signal } = context
 
+    // a stream cut short (cancelled, or its last observer left) reopens when observed again;
+    // marked at abort, so the writes of a fetch that replaces this one clear it
+    const markStale = () => client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
+    if (signal.aborted) {
+      markStale()
+    }
+    signal.addEventListener('abort', markStale, { once: true })
+
     try {
       const stream = await queryFn(context)
 
@@ -38,16 +46,9 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
         )
       }
 
-      // the returned data is written again, so return the cache to keep later writes
-      const cached = client.getQueryData<TQueryFnData>(queryKey)
-      return cached === undefined ? last.chunk : cached
-    } catch (error) {
-      // a stream cut short (cancelled, or its last observer left) reopens when observed again
-      if (signal.aborted) {
-        client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
-      }
-
-      throw error
+      return last.chunk
+    } finally {
+      signal.removeEventListener('abort', markStale)
     }
   }
 }

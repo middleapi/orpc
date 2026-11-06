@@ -57,25 +57,22 @@ export class StreamQuerySSRUtilsPlugin<
 > implements RouterUtilsPlugin<T> {
   readonly name = '~stream-query-ssr'
 
-  private readonly defaults:
-    | { settleOnFirstData: true; refetchOnMount: false }
-    | { refetchOnMount: 'always' }
-
-  constructor(options: StreamQuerySSRUtilsPluginOptions = {}) {
-    this.defaults =
-      (options.isServer ?? environmentManager.isServer())
-        ? // the render must finish even with observers (vue, svelte), which must not reopen the settled stream
-          { settleOnFirstData: true, refetchOnMount: false }
-        : // hydrated data (even dehydrated while pending) reopens its stream on mount, despite a `staleTime`
-          { refetchOnMount: 'always' }
-  }
+  constructor(private readonly options: StreamQuerySSRUtilsPluginOptions = {}) {}
 
   initProcedureOptions(
     _path: string[],
     options: ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>>,
   ): ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>> {
+    // read when utils are built, so `environmentManager.setIsServer` applies even after the plugin is created
+    const defaults =
+      (this.options.isServer ?? environmentManager.isServer())
+        ? // the render must finish even with observers (vue, svelte), which must not reopen the settled stream
+          { settleOnFirstData: true, refetchOnMount: false }
+        : // hydrated data reopens its stream on mount, despite a `staleTime`
+          { refetchOnMount: 'always' as const }
+
     return mergeProcedureUtilsOptions<any, any, any, any>(
-      { streamedOptions: this.defaults, liveOptions: this.defaults },
+      { streamedOptions: defaults, liveOptions: defaults },
       options,
     )
   }

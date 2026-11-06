@@ -1,4 +1,5 @@
 import type { Promisable } from '@orpc/shared'
+import { throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
 export interface SerializableStreamedQueryOptions {
@@ -53,6 +54,14 @@ export function serializableStreamedQuery<
   return async (context) => {
     const { client, queryKey, signal } = context
 
+    // a stream cut short (cancelled, or its last observer left) reopens when observed again;
+    // marked at abort, so the writes of a fetch that replaces this one clear it
+    const markStale = () => client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
+    if (signal.aborted) {
+      markStale()
+    }
+    signal.addEventListener('abort', markStale, { once: true })
+
     try {
       const stream = await queryFn(context)
 
@@ -72,9 +81,7 @@ export function serializableStreamedQuery<
       }
 
       for await (const chunk of stream) {
-        if (signal.aborted) {
-          throw signal.reason
-        }
+        throwIfAborted(signal)
 
         // read the cache, so writes made during the stream are kept
         data = client.setQueryData<TQueryFnData[]>(queryKey, (current = []) =>
@@ -83,14 +90,10 @@ export function serializableStreamedQuery<
       }
 
       // the returned data is written again, so return the cache to keep later writes
-      return limitArraySize(client.getQueryData<TQueryFnData[]>(queryKey) ?? data, maxChunks)
-    } catch (error) {
-      // a stream cut short (cancelled, or its last observer left) reopens when observed again
-      if (signal.aborted) {
-        client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
-      }
-
-      throw error
+      const cached = client.getQueryData<TQueryFnData[]>(queryKey)
+      return limitArraySize(cached === undefined ? data : cached, maxChunks)
+    } finally {
+      signal.removeEventListener('abort', markStale)
     }
   }
 }

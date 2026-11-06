@@ -133,10 +133,6 @@ describe('streamQuerySSRUtilsPlugin', () => {
     vi.clearAllMocks()
   })
 
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   describe('on the server', () => {
     it('settles streamed queries once they connect', async () => {
       const queryClient = createQueryClient()
@@ -387,6 +383,22 @@ describe('streamQuerySSRUtilsPlugin', () => {
       expect(observer.getCurrentResult()).toMatchObject({ data: [], fetchStatus: 'idle' })
       expect(client.stream).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it('reads the server detection when utils are built', () => {
+    const isServer = environmentManager.isServer()
+    try {
+      environmentManager.setIsServer(() => true)
+      const plugin = new StreamQuerySSRUtilsPlugin()
+      environmentManager.setIsServer(() => false)
+
+      expect(plugin.initProcedureOptions([], {})).toEqual({
+        streamedOptions: { refetchOnMount: 'always' },
+        liveOptions: { refetchOnMount: 'always' },
+      })
+    } finally {
+      environmentManager.setIsServer(() => isServer)
+    }
   })
 
   it("defaults to TanStack Query's server detection", () => {

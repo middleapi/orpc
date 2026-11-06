@@ -1,4 +1,5 @@
 import type { Promisable } from '@orpc/shared'
+import { throwIfAborted } from '@orpc/shared'
 
 import type { UseQueryFnContext } from './types.ts'
 
@@ -54,12 +55,19 @@ export function serializableStreamedQuery<T>(
 ): (context: UseQueryFnContext) => Promise<T[]> {
   return async (context) => {
     const { entry, signal } = context
-    const write = (data: T[]): void => {
+    const write = (data: T[]): T[] => {
       entry.state.value = { status: 'success', data, error: null } as any
+      return data
     }
 
     // a fetch cut short (cancelled, superseded, or its last component left) reopens when used again
-    signal.addEventListener('abort', () => (entry.when = 0), { once: true })
+    const markStale = () => {
+      entry.when = 0
+    }
+    if (signal.aborted) {
+      markStale()
+    }
+    signal.addEventListener('abort', markStale, { once: true })
 
     const stream = await queryFn(context)
 
@@ -70,28 +78,27 @@ export function serializableStreamedQuery<T>(
     }
 
     const current = entry.state.value.data as T[] | undefined
-    write(refetchMode === 'append' && current ? limitArraySize(current, maxChunks) : [])
+    let data = write(refetchMode === 'append' && current ? limitArraySize(current, maxChunks) : [])
 
     if (settleOnFirstData) {
       await stream[Symbol.asyncIterator]().return?.()
-    } else {
-      for await (const chunk of stream) {
-        if (signal.aborted) {
-          throw signal.reason
-        }
-
-        // read the entry, so writes made during the stream are kept
-        write(
-          limitArraySize(
-            [...((entry.state.value.data as T[] | undefined) ?? []), chunk],
-            maxChunks,
-          ),
-        )
-      }
+      return data
     }
 
+    for await (const chunk of stream) {
+      throwIfAborted(signal)
+
+      // read the entry, so writes made during the stream are kept
+      const current = (entry.state.value.data as T[] | undefined) ?? []
+      data = write(limitArraySize([...current, chunk], maxChunks))
+    }
+
+    // a stream that ends on abort must not be stored as fresh data
+    throwIfAborted(signal)
+
     // Colada writes the returned data again, so return the entry data to keep later writes
-    return limitArraySize(entry.state.value.data as T[], maxChunks)
+    const cached = entry.state.value.data as T[] | undefined
+    return cached === undefined ? data : limitArraySize(cached, maxChunks)
   }
 }
 

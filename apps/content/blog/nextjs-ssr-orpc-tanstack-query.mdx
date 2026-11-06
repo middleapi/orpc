@@ -430,7 +430,7 @@ export const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
-On the server, the plugin stops a live query at its first event (a streamed query once it connects) and closes the stream. The HTML ships with a real temperature. The plugin also sets `refetchOnMount: 'always'`, so the browser reopens the stream on mount while the server value stays on screen. See [Streamed and Live Queries](/docs/integrations/tanstack-query#streamed-and-live-queries) for details.
+On the server, the plugin stops a live query at its first event (a streamed query once it connects) and closes the stream. The HTML ships with a real temperature. In the browser, the plugin sets `refetchOnMount: 'always'`, so the stream reopens on mount while the server value stays on screen. See [Streamed and Live Queries](/docs/integrations/tanstack-query#streamed-and-live-queries) for details.
 
 Reload the page one last time and check your work:
 

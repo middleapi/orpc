@@ -201,6 +201,35 @@ describe('serializableStreamedQuery', () => {
       expect(queryClient.getQueryState(key)).toMatchObject({ data: ['old'], isInvalidated: true })
     })
 
+    it('does not mark a replacing fetch stale when the cancelled stream notices the abort late', async () => {
+      const key = ['superseded-test']
+      const connect = vi.fn(async () =>
+        connect.mock.calls.length > 1
+          ? (async function* () {
+              yield 'new'
+            })()
+          : // ignores the abort until its next chunk
+            (async function* () {
+              yield 'old1'
+              await sleep(50)
+              yield 'old2'
+            })(),
+      )
+      const observer = new QueryObserver(queryClient, {
+        queryKey: key,
+        queryFn: serializableStreamedQuery(connect),
+        staleTime: Number.POSITIVE_INFINITY,
+      })
+      onTestFinished(observer.subscribe(() => {}))
+      await vi.waitFor(() => expect(queryClient.getQueryData(key)).toEqual(['old1']))
+
+      await observer.refetch()
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['new'], isInvalidated: false })
+
+      await sleep(80)
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['new'], isInvalidated: false })
+    })
+
     it('handles abort signal during streaming', async () => {
       let cleanupCalled = false
       const yieldFn = vi.fn((v) => v)

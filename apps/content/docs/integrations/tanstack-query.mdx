@@ -81,7 +81,7 @@ const query = useQuery(
   orpc.streamed.streamedOptions({
     input: { id: 123 },
     queryFnOptions: {
-      refetchMode: 'append',
+      refetchMode: 'reset',
       maxChunks: 3, // Keep only the last 3 events
     },
     retry: true, // Retry forever to keep the stream alive
@@ -122,7 +122,7 @@ const query = useQuery(
 
 By default, a streamed or live query follows its stream until it ends, so awaiting an endless stream (`fetchQuery`, `ensureQueryData`, route loaders) never resolves. Suspense hooks are fine: they resume at the first data while the stream keeps going.
 
-Pass `settleOnFirstData: true` to settle the fetch at the first data instead: when a streamed query connects, or on a live query's first event. The stream closes and the data stays. To reopen it on mount despite a `staleTime`, use `refetchOnMount: 'always'`, as the plugin does in the browser. [`StreamQuerySSRUtilsPlugin`](#streamed-and-live-queries) sets it on the server.
+Pass `settleOnFirstData: true` to settle the fetch at the first data instead: when a streamed query connects, or on a live query's first event. The stream closes and the data stays. To reopen it on mount in the browser despite a `staleTime`, set `refetchOnMount: 'always'` there, as the plugin does. [`StreamQuerySSRUtilsPlugin`](#streamed-and-live-queries) sets it on the server.
 
 ```ts
 await queryClient.prefetchQuery(

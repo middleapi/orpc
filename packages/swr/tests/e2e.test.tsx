@@ -1,3 +1,4 @@
+import { sleep } from '@orpc/shared'
 import { act, renderHook } from '@testing-library/react'
 import useSWR, { mutate } from 'swr'
 import useSWRInfinite from 'swr/infinite'
@@ -122,6 +123,7 @@ it('case: useSWRSubscription & .subscriber keeps data until the new stream conne
   first.unmount()
 
   streamHandler.mockImplementationOnce(async function* () {
+    await sleep(50)
     yield { output: '__new__' }
   })
 
@@ -133,7 +135,11 @@ it('case: useSWRSubscription & .subscriber keeps data until the new stream conne
   expect(second.result.current.data).toEqual([{ output: '0' }, { output: '1' }, { output: '2' }])
 
   await act(async () => {
-    // reset: the new stream starts from []
+    // reset: the data becomes [] when the new stream connects
+    await vi.waitFor(() => expect(second.result.current.data).toEqual([]), { interval: 1 })
+  })
+
+  await act(async () => {
     await vi.waitFor(() => expect(second.result.current.data).toEqual([{ output: '__new__' }]))
   })
 })

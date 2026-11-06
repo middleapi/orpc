@@ -46,36 +46,6 @@ describe('liveQuery', async () => {
     await resultPromise
   })
 
-  it('keeps data written after the last event', async () => {
-    const queryFn = liveQuery(async function* () {
-      yield 1
-      queryClient.setQueryData(['live-query'], 2)
-    })
-
-    await expect(
-      queryFn({
-        queryKey: ['live-query'],
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any),
-    ).resolves.toEqual(2)
-  })
-
-  it('keeps null written after the last event', async () => {
-    const queryFn = liveQuery(async function* () {
-      yield 1
-      queryClient.setQueryData(['live-query'], null)
-    })
-
-    await expect(
-      queryFn({
-        queryKey: ['live-query'],
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any),
-    ).resolves.toBeNull()
-  })
-
   it('on abort signal', async () => {
     let cleanupCalled = false
 
@@ -109,6 +79,26 @@ describe('liveQuery', async () => {
 
     await resultPromise
     expect(cleanupCalled).toBe(true)
+  })
+
+  it('closes the stream without starting it and marks the query stale when aborted before it connects', async () => {
+    const key = ['live-abort-before-connect']
+    queryClient.setQueryData(key, 0)
+    const controller = new AbortController()
+    const started = vi.fn()
+    const queryFn = liveQuery(async () => {
+      controller.abort()
+      return (async function* () {
+        started()
+        yield 1
+      })()
+    })
+
+    await expect(
+      queryFn({ queryKey: key, signal: controller.signal, client: queryClient } as any),
+    ).rejects.toBe(controller.signal.reason)
+    expect(started).not.toHaveBeenCalled()
+    expect(queryClient.getQueryState(key)).toMatchObject({ data: 0, isInvalidated: true })
   })
 
   it('throw if no data yielded', async () => {
