@@ -41,14 +41,15 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
   serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link PublisherResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: PublisherResumeOptions | undefined
+  resume?: boolean | PublisherResumeOptions | undefined
 }
 
 /**
@@ -100,8 +101,8 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
     this.eventPrefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeTtl = resume?.ttl ?? 300_000
+    this.resumeEnabled = resume !== undefined && resume !== false
+    this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
   }
 
   /**

@@ -129,7 +129,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
 
   it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
     const publisher = createTestingPublisher({
-      resume: { enabled: true, ttl: 10_000 },
+      resume: { ttl: 10_000 },
     })
     const event = 'orders'
     const liveListener = vi.fn()
@@ -182,7 +182,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
 
   it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
     const publisher = createTestingPublisher({
-      resume: { enabled: true, ttl: 10_000 },
+      resume: { ttl: 10_000 },
     })
     const event = 'empty-backlog'
     const listener = vi.fn()
@@ -228,7 +228,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
 
     const publisher = createTestingPublisher(
       {
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
       },
       { useRedis: delayedRedis },
     )
@@ -268,7 +268,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     const publishers = clients.map((client) =>
       createTestingPublisher(
         {
-          resume: { enabled: true, ttl: 10_000 },
+          resume: { ttl: 10_000 },
           prefix,
         },
         { useRedis: client },
@@ -310,7 +310,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     const prefix = `prefix:${crypto.randomUUID()}:`
     const publisher = createTestingPublisher(
       {
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
         subscriber,
         prefix,
       },
@@ -357,7 +357,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     const event = 'orders'
     const key = `${prefix}${event}`
     const publisher = createTestingPublisher({
-      resume: { enabled: true, ttl: 1_000 },
+      resume: { ttl: 1_000 },
       prefix,
     })
 
@@ -406,7 +406,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     const prefix = `custom:${crypto.randomUUID()}:`
     const event = 'profile-updated'
     const publisher = createTestingPublisher({
-      resume: { enabled: true, ttl: 10_000 },
+      resume: { ttl: 10_000 },
       serializer,
       prefix,
     })
@@ -446,7 +446,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
 
   it('reports resume errors while subscribing', async () => {
     const publisher = createTestingPublisher({
-      resume: { enabled: true, ttl: 10_000 },
+      resume: { ttl: 10_000 },
     })
     const event = 'resume-errors'
     const listener = vi.fn()
@@ -609,12 +609,9 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     const redis3 = createClient({ url: REDIS_URL })
 
     const prefix = `lazy:${crypto.randomUUID()}:`
-    const publisher = createTestingPublisher(
-      { prefix, resume: { enabled: true } },
-      { useRedis: redis1 },
-    )
+    const publisher = createTestingPublisher({ prefix, resume: true }, { useRedis: redis1 })
     const subscriber = createTestingPublisher(
-      { prefix, resume: { enabled: true }, subscriber: redis3 },
+      { prefix, resume: true, subscriber: redis3 },
       { useRedis: redis2 },
     )
 

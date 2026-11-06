@@ -282,12 +282,17 @@ describe('rpcLink', () => {
     await expect(promise).resolves.toEqual('pong')
   })
 
-  it('propagates connection failures when reconnect is disabled', async () => {
-    const error = new Error('connect failed')
-    const orpc = createORPCClient(new RPCLink({ connect: () => Promise.reject(error) })) as any
+  it.each([undefined, false])(
+    'propagates connection failures when reconnect is %s',
+    async (reconnect) => {
+      const error = new Error('connect failed')
+      const orpc = createORPCClient(
+        new RPCLink({ connect: () => Promise.reject(error), reconnect }),
+      ) as any
 
-    await expect(orpc.ping('input')).rejects.toBe(error)
-  })
+      await expect(orpc.ping('input')).rejects.toBe(error)
+    },
+  )
 
   it('rejects calls after the socket closes when reconnect is disabled', async () => {
     const ws = createWs()
@@ -356,7 +361,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { enabled: true, delay: () => 0 },
+        reconnect: { delay: () => 0 },
       }),
     ) as any
 
@@ -380,7 +385,6 @@ describe('rpcLink', () => {
       new RPCLink({
         connect,
         reconnect: {
-          enabled: true,
           delay,
           maxAttempt: 1,
         },
@@ -399,7 +403,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { enabled: true, delay: () => 0, maxAttempt: 3 },
+        reconnect: { delay: () => 0, maxAttempt: 3 },
       }),
     ) as any
 
@@ -437,7 +441,7 @@ describe('rpcLink', () => {
       const orpc = createORPCClient(
         new RPCLink({
           connect,
-          reconnect: { enabled: true, delay: () => 0, maxAttempt: 2 },
+          reconnect: { delay: () => 0, maxAttempt: 2 },
         }),
       ) as any
 
@@ -469,7 +473,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { enabled: true, delay: () => 0, maxTotalAttempt: 3 },
+        reconnect: { delay: () => 0, maxTotalAttempt: 3 },
       }),
     ) as any
 
@@ -509,7 +513,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { enabled: true },
+        reconnect: true,
       }),
     ) as any
 
@@ -543,7 +547,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { enabled: true },
+        reconnect: true,
       }),
     ) as any
 
@@ -583,11 +587,7 @@ describe('rpcLink', () => {
       new RPCLink({
         connect,
         reconnect: {
-          enabled: true,
-          onClose: {
-            enabled: true,
-            delay: 0,
-          },
+          onClose: true,
         },
       }),
     ) as any
@@ -635,12 +635,8 @@ describe('rpcLink', () => {
       new RPCLink({
         connect,
         reconnect: {
-          enabled: true,
           maxAttempt: 1,
-          onClose: {
-            enabled: true,
-            delay: 0,
-          },
+          onClose: { delay: 0 },
         },
       }),
     ) as any
@@ -677,7 +673,7 @@ describe('rpcLink', () => {
       new RPCLink({
         connect,
         connectOnInit: true,
-        reconnect: { enabled: true, delay: () => 0, maxAttempt: 2, onClose: { enabled: true } },
+        reconnect: { delay: () => 0, maxAttempt: 2, onClose: true },
       }),
     )
 
@@ -732,7 +728,7 @@ describe('rpcLink', () => {
       const orpc = createORPCClient(
         new RPCLink({
           connect,
-          reconnect: { enabled: true, delay: () => 0 },
+          reconnect: { delay: () => 0 },
         }),
       ) as any
 

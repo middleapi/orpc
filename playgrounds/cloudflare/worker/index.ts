@@ -100,9 +100,7 @@ export { ChatRoomDO } from './dos/chat-room'
 export class PublisherDO extends DurablePublisherObject {
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, {
-      resume: {
-        enabled: true,
-      },
+      resume: true,
     })
   }
 }

@@ -3,19 +3,10 @@ import { isPlainObject, stringifyJSON } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
 import { DurableObject } from 'cloudflare:workers'
 
+/**
+ * Configuration for event resume support. Passing it enables resume.
+ */
 export interface DurablePublisherObjectResumeOptions extends PublisherResumeOptions {
-  /**
-   * Whether event resume support is enabled.
-   *
-   * When enabled, published events are temporarily stored so new
-   * subscribers can resume from a previous position using `lastEventId`.
-   * Each stored event must fit within the Durable Object SQLite row size limit,
-   * so publishing a larger one fails.
-   *
-   * @default false
-   */
-  enabled: boolean
-
   /**
    * Interval between cleanup checks for the Durable Object, in milliseconds.
    *
@@ -38,14 +29,17 @@ export interface DurablePublisherObjectResumeOptions extends PublisherResumeOpti
 
 export interface DurablePublisherObjectOptions {
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link DurablePublisherObjectResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
+   * Each stored event must fit within the Durable Object SQLite row size limit,
+   * so publishing a larger one fails.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: DurablePublisherObjectResumeOptions | undefined
+  resume?: boolean | DurablePublisherObjectResumeOptions | undefined
 }
 
 /**
@@ -144,9 +138,11 @@ class ResumeStorage {
 
   constructor(
     private readonly ctx: DurableObjectState,
-    options: DurablePublisherObjectResumeOptions = { enabled: false },
+    resume: DurablePublisherObjectOptions['resume'],
   ) {
-    this.enabled = options.enabled
+    const options = typeof resume === 'object' ? resume : {}
+
+    this.enabled = resume !== undefined && resume !== false
     this.ttl = options.ttl ?? 300_000
     this.cleanupInterval = options.cleanupInterval ?? 6 * 60 * 60 * 1000
     const schemaPrefix = options.schemaPrefix ?? 'orpc:'

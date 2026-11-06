@@ -20,18 +20,9 @@ export interface PublisherOptions {
 
 /**
  * Configuration for event resume support, shared by the adapters that support it.
+ * Passing it enables resume.
  */
 export interface PublisherResumeOptions {
-  /**
-   * Whether event resume support is enabled.
-   *
-   * When enabled, published events are temporarily stored so new
-   * subscribers can resume from a previous position using `lastEventId`.
-   *
-   * @default false
-   */
-  enabled: boolean
-
   /**
    * How long to retain events for resume, in milliseconds.
    *

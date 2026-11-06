@@ -876,7 +876,7 @@ import { RPCLink } from '@orpc/client/websocket'
 
 const link = new RPCLink({
   connect: () => new WebSocket('ws://localhost:3000'),
-  reconnect: { enabled: true },
+  reconnect: true,
 })
 ```
 
@@ -1244,7 +1244,7 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const publisher = new RedisPublisher(client, {
   subscriber,
-  resume: { enabled: true, ttl: 300_000 },
+  resume: { ttl: 300_000 },
 })
 ```
 
