@@ -1189,9 +1189,6 @@ importers:
 
   packages/zod:
     dependencies:
-      '@openapi-spec/types':
-        specifier: ~0.7.0
-        version: 0.7.0
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:../json-schema

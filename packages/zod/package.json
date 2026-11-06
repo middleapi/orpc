@@ -45,7 +45,6 @@
     "prepack": "tsc"
   },
   "dependencies": {
-    "@openapi-spec/types": "~0.7.0",
     "@orpc/json-schema": "workspace:*"
   },
   "devDependencies": {
