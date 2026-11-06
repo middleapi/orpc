@@ -130,6 +130,144 @@ describe('openAPIComponentRegistry', () => {
       expect(componentName).toHaveBeenNthCalledWith(2, 'Moon', {})
     })
 
+    describe('discriminator mapping', () => {
+      const petSchema = () =>
+        ({
+          type: 'object',
+          properties: {
+            pet: {
+              oneOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }, { $ref: '#/$defs/Bird' }],
+              discriminator: {
+                propertyName: 'kind',
+                mapping: { cat: '#/$defs/Cat', dog: '#/$defs/Dog', bird: 'Bird' },
+              },
+            },
+          },
+          $defs: {
+            Cat: { type: 'object', properties: { kind: { const: 'cat' } } },
+            Dog: { type: 'object', properties: { kind: { const: 'dog' } } },
+            Bird: { type: 'object', properties: { kind: { const: 'bird' } } },
+          },
+        }) satisfies JsonSchema
+
+      it('rewrites discriminator mapping refs to the hoisted components', () => {
+        const { doc, registry } = createRegistry()
+
+        expect(registry.hoistDefs(petSchema())).toEqual({
+          type: 'object',
+          properties: {
+            pet: {
+              oneOf: [
+                { $ref: '#/components/schemas/Cat' },
+                { $ref: '#/components/schemas/Dog' },
+                { $ref: '#/components/schemas/Bird' },
+              ],
+              discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                  cat: '#/components/schemas/Cat',
+                  dog: '#/components/schemas/Dog',
+                  // bare schema names are not refs
+                  bird: 'Bird',
+                },
+              },
+            },
+          },
+        })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Cat', 'Dog', 'Bird'])
+      })
+
+      it('rewrites discriminator mapping refs inside hoisted components', () => {
+        const { doc, registry } = createRegistry()
+
+        const { $defs, ...pet } = petSchema()
+        expect(registry.hoistDefs({ $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: pet } })).toEqual({
+          $ref: '#/components/schemas/Pet',
+        })
+        expect(doc.components?.schemas?.Pet).toMatchObject({
+          properties: {
+            pet: {
+              discriminator: {
+                mapping: {
+                  cat: '#/components/schemas/Cat',
+                  dog: '#/components/schemas/Dog',
+                  bird: 'Bird',
+                },
+              },
+            },
+          },
+        })
+      })
+
+      it('rewrites discriminator mapping refs to componentName names', () => {
+        const { doc, registry } = createRegistry({ componentName: (defName) => `X${defName}` })
+
+        expect(registry.hoistDefs(petSchema())).toEqual({
+          type: 'object',
+          properties: {
+            pet: {
+              oneOf: [
+                { $ref: '#/components/schemas/XCat' },
+                { $ref: '#/components/schemas/XDog' },
+                { $ref: '#/components/schemas/XBird' },
+              ],
+              discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                  cat: '#/components/schemas/XCat',
+                  dog: '#/components/schemas/XDog',
+                  bird: 'Bird',
+                },
+              },
+            },
+          },
+        })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['XCat', 'XDog', 'XBird'])
+      })
+
+      it('reuses components whose discriminator mapping refs were already rewritten', () => {
+        const { doc, registry } = createRegistry()
+
+        const { $defs, ...pet } = petSchema()
+        const schema = { $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: pet } }
+
+        registry.hoistDefs(schema)
+        const components = structuredClone(doc.components?.schemas)
+
+        expect(registry.hoistDefs(structuredClone(schema))).toEqual({
+          $ref: '#/components/schemas/Pet',
+        })
+        expect(doc.components?.schemas).toEqual(components)
+      })
+
+      it('does not reuse components whose discriminator mapping targets differ', () => {
+        const { $defs, ...pet } = petSchema()
+        const { doc, registry } = createRegistry()
+
+        registry.hoistDefs({ $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: pet } })
+
+        const swapped = structuredClone(pet)
+        swapped.properties.pet.discriminator.mapping = {
+          cat: '#/$defs/Dog',
+          dog: '#/$defs/Cat',
+          bird: 'Bird',
+        }
+
+        expect(
+          registry.hoistDefs({ $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: swapped } }),
+        ).toEqual({ $ref: '#/components/schemas/Pet2' })
+        expect(doc.components?.schemas?.Pet2).toMatchObject({
+          properties: {
+            pet: {
+              discriminator: {
+                mapping: { cat: '#/components/schemas/Dog', dog: '#/components/schemas/Cat' },
+              },
+            },
+          },
+        })
+      })
+    })
+
     it('keeps the def name when componentName returns undefined', () => {
       const { doc, registry } = createRegistry({
         componentName: (defName) => (defName === 'Planet' ? 'World' : undefined),

@@ -272,8 +272,50 @@ function areSchemasEquivalentForReuse(
       return areSchemaRefsEquivalentForReuse(candidateValue, existingValue, ctx)
     }
 
+    if (key === 'discriminator') {
+      return areDiscriminatorsEquivalentForReuse(candidateValue, existingValue, ctx)
+    }
+
     return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
   })
+}
+
+/**
+ * `discriminator.mapping` values can be refs, which are rewritten during hoisting like `$ref`,
+ * so they must be compared by their targets rather than by their (prefix-dependent) strings.
+ */
+function areDiscriminatorsEquivalentForReuse(
+  candidate: unknown,
+  existing: unknown,
+  ctx: ReuseComparisonContext,
+): boolean {
+  if (
+    !isPlainObject(candidate) ||
+    !isPlainObject(existing) ||
+    !isPlainObject(candidate.mapping) ||
+    !isPlainObject(existing.mapping)
+  ) {
+    return areSchemasEquivalentForReuse(candidate, existing, ctx)
+  }
+
+  const { mapping: candidateMapping, ...candidateRest } = candidate
+  const { mapping: existingMapping, ...existingRest } = existing
+  const mappingKeys = definedKeysOf(candidateMapping)
+
+  return (
+    areSchemasEquivalentForReuse(candidateRest, existingRest, ctx) &&
+    isDeepEqual(mappingKeys, definedKeysOf(existingMapping)) &&
+    mappingKeys.every((mappingKey) => {
+      const candidateRef = candidateMapping[mappingKey]
+      const existingRef = existingMapping[mappingKey]
+
+      if (typeof candidateRef === 'string' && typeof existingRef === 'string') {
+        return areSchemaRefsEquivalentForReuse(candidateRef, existingRef, ctx)
+      }
+
+      return isDeepEqual(candidateRef, existingRef)
+    })
+  )
 }
 
 function parseRefName(ref: string, prefix: string): string | undefined {

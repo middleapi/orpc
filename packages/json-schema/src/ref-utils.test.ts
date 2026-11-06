@@ -66,6 +66,26 @@ describe('visitJsonSchemaRefs', () => {
     expect(visited).toEqual(['#/$defs/Shared'])
   })
 
+  it('visits local pointers in discriminator mapping values', () => {
+    const visited: string[] = []
+    visitJsonSchemaRefs(
+      {
+        properties: {
+          pet: {
+            oneOf: [{ $ref: '#/$defs/Cat' }],
+            discriminator: {
+              propertyName: 'kind',
+              mapping: { cat: '#/$defs/Cat', dog: 'Dog', remote: 'other.json#/Bird' },
+            },
+          },
+        },
+      },
+      (ref) => visited.push(ref),
+    )
+
+    expect(visited).toEqual(['#/$defs/Cat', '#/$defs/Cat'])
+  })
+
   it('ignores non-object schemas', () => {
     const visited: string[] = []
     visitJsonSchemaRefs(true, (ref) => visited.push(ref))
@@ -228,6 +248,59 @@ describe('mapJsonSchemaRefs', () => {
     })
 
     expect(visited).toEqual([['#/$defs/Tracked', ['properties', 'nested', 'allOf', 0, '$ref']]])
+  })
+
+  it('rewrites local pointers in discriminator mapping values and leaves other values alone', () => {
+    const visited: Array<[ref: string, path: Array<string | number>]> = []
+    const discriminatorWithoutRefs = { propertyName: 'kind', mapping: { dog: 'Dog' } }
+
+    const rewritten = mapJsonSchemaRefs(
+      {
+        properties: {
+          pet: {
+            oneOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }],
+            discriminator: {
+              'propertyName': 'kind',
+              'mapping': { cat: '#/$defs/Cat', dog: 'Dog', remote: 'other.json#/Bird' },
+              'x-extra': true,
+            },
+          },
+          plain: { discriminator: discriminatorWithoutRefs },
+        },
+        // discriminator-shaped metadata is not a schema keyword here
+        examples: [{ discriminator: { mapping: { cat: '#/$defs/Cat' } } }],
+      },
+      (ref, path) => {
+        visited.push([ref, path])
+        return ref.replace('#/$defs/', '#/components/schemas/')
+      },
+    )
+
+    expect(rewritten).toEqual({
+      properties: {
+        pet: {
+          oneOf: [{ $ref: '#/components/schemas/Cat' }, { $ref: '#/components/schemas/Dog' }],
+          discriminator: {
+            'propertyName': 'kind',
+            'mapping': {
+              cat: '#/components/schemas/Cat',
+              dog: 'Dog',
+              remote: 'other.json#/Bird',
+            },
+            'x-extra': true,
+          },
+        },
+        plain: { discriminator: discriminatorWithoutRefs },
+      },
+      examples: [{ discriminator: { mapping: { cat: '#/$defs/Cat' } } }],
+    })
+    expect((rewritten as any).properties.plain.discriminator).toBe(discriminatorWithoutRefs)
+
+    expect(visited).toEqual([
+      ['#/$defs/Cat', ['properties', 'pet', 'oneOf', 0, '$ref']],
+      ['#/$defs/Dog', ['properties', 'pet', 'oneOf', 1, '$ref']],
+      ['#/$defs/Cat', ['properties', 'pet', 'discriminator', 'mapping', 'cat']],
+    ])
   })
 
   it('keeps properties and defs named __proto__ as own keys', () => {
