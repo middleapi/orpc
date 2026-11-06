@@ -39,6 +39,8 @@ describe('visitJsonSchemaRefs', () => {
         defaultMapping: '#/$defs/P',
       },
       examples: [{ $ref: '#/$defs/Ignored' }],
+      const: { $ref: '#/$defs/Ignored', discriminator: { mapping: { cat: '#/$defs/Ignored' } } },
+      enum: [{ $ref: '#/$defs/Ignored' }],
     }
 
     const mapped: string[] = []
@@ -213,6 +215,9 @@ describe('mapJsonSchemaRefs', () => {
         default: {
           $ref: '#/$defs/AlsoIgnored',
         },
+        // literal instance data, never subschemas
+        const: { $ref: '#/$defs/Literal', discriminator: { mapping: { cat: '#/$defs/Literal' } } },
+        enum: [{ $ref: '#/$defs/Literal' }],
         properties: {
           nested: {
             allOf: [{ $ref: '#/$defs/Tracked' }],
@@ -232,6 +237,8 @@ describe('mapJsonSchemaRefs', () => {
       default: {
         $ref: '#/$defs/AlsoIgnored',
       },
+      const: { $ref: '#/$defs/Literal', discriminator: { mapping: { cat: '#/$defs/Literal' } } },
+      enum: [{ $ref: '#/$defs/Literal' }],
       properties: {
         nested: {
           allOf: [{ $ref: '#/$defs/rewritten-Tracked' }],

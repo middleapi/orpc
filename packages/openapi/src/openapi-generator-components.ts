@@ -3,6 +3,7 @@ import {
   decodeJsonPointerSegment,
   encodeJsonPointerSegment,
   ensureJsonSchemaObject,
+  getJsonSchemaKeywordKind,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
 import { getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
@@ -215,10 +216,17 @@ function isSchemaContainer(value: unknown): value is unknown[] | Record<Property
   return Array.isArray(value) || isPlainObject(value)
 }
 
+/**
+ * Where a value sits, mirroring how hoisting rewrites refs: only refs in subschemas are
+ * rewritten, so literal data (`const`, `default`, `examples`, ...) is compared as is.
+ */
+type ReusePosition = 'schema' | 'schema-record' | 'data'
+
 function areSchemasEquivalentForReuse(
   candidate: unknown,
   existing: unknown,
   ctx: ReuseComparisonContext,
+  position: ReusePosition = 'schema',
 ): boolean {
   if (candidate === existing) {
     return true
@@ -251,7 +259,7 @@ function areSchemasEquivalentForReuse(
     }
 
     return candidate.every((item, index) =>
-      areSchemasEquivalentForReuse(item, existing[index], ctx),
+      areSchemasEquivalentForReuse(item, existing[index], ctx, position),
     )
   }
 
@@ -259,15 +267,22 @@ function areSchemasEquivalentForReuse(
     candidate as Record<string, unknown>,
     existing as Record<string, unknown>,
     (key, candidateValue, existingValue) => {
-      if (key === '$ref') {
-        return areRefValuesEquivalentForReuse(candidateValue, existingValue, ctx)
+      if (position === 'data') {
+        return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx, 'data')
       }
 
-      if (key === 'discriminator') {
-        return areDiscriminatorsEquivalentForReuse(candidateValue, existingValue, ctx)
+      switch (getJsonSchemaKeywordKind(key, candidateValue, position === 'schema')) {
+        case 'ref':
+          return areRefValuesEquivalentForReuse(candidateValue, existingValue, ctx)
+        case 'discriminator':
+          return areDiscriminatorsEquivalentForReuse(candidateValue, existingValue, ctx)
+        case 'schema':
+          return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
+        case 'schema-record':
+          return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx, 'schema-record')
+        default:
+          return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx, 'data')
       }
-
-      return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
     },
   )
 }
@@ -294,7 +309,7 @@ function areRefValuesEquivalentForReuse(
     return areSchemaRefsEquivalentForReuse(candidate, existing, ctx)
   }
 
-  return areSchemasEquivalentForReuse(candidate, existing, ctx)
+  return areSchemasEquivalentForReuse(candidate, existing, ctx, 'data')
 }
 
 /**
@@ -308,7 +323,7 @@ function areDiscriminatorsEquivalentForReuse(
   ctx: ReuseComparisonContext,
 ): boolean {
   if (!isPlainObject(candidate) || !isPlainObject(existing)) {
-    return areSchemasEquivalentForReuse(candidate, existing, ctx)
+    return areSchemasEquivalentForReuse(candidate, existing, ctx, 'data')
   }
 
   return areObjectsEquivalentForReuse(candidate, existing, (key, candidateValue, existingValue) => {
@@ -325,7 +340,7 @@ function areDiscriminatorsEquivalentForReuse(
       return areRefValuesEquivalentForReuse(candidateValue, existingValue, ctx)
     }
 
-    return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx)
+    return areSchemasEquivalentForReuse(candidateValue, existingValue, ctx, 'data')
   })
 }
 

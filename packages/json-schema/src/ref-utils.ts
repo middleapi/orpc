@@ -5,7 +5,11 @@
 
 import { get, isPlainObject, setOwn } from '@orpc/shared'
 
-import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_RECORD_KEYWORDS } from './constants.ts'
+import {
+  JSON_SCHEMA_LITERAL_KEYWORDS,
+  JSON_SCHEMA_LOGIC_KEYWORDS,
+  JSON_SCHEMA_RECORD_KEYWORDS,
+} from './constants.ts'
 import type { JsonSchema } from './types.ts'
 
 /**
@@ -43,6 +47,43 @@ export function resolveJsonSchemaLocalPointer(
   }
 
   return get(root, ref.slice(2).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+}
+
+export type JsonSchemaKeywordKind = 'ref' | 'discriminator' | 'schema' | 'schema-record' | 'data'
+
+/**
+ * Classifies `value` under `key` in a schema object, as traversed by {@link visitJsonSchemaRefs}
+ * and {@link mapJsonSchemaRefs}: a `$ref` string, an OpenAPI `discriminator`, a subschema (or list
+ * of subschemas), a record of subschemas, or data that holds no refs (including `const`/`enum`).
+ *
+ * @param schemaLevel `false` when the object is itself a record of subschemas, e.g. `properties`.
+ */
+export function getJsonSchemaKeywordKind(
+  key: string,
+  value: unknown,
+  schemaLevel = true,
+): JsonSchemaKeywordKind {
+  if (key === '$ref' && typeof value === 'string') {
+    return 'ref'
+  }
+
+  if (!schemaLevel) {
+    return 'schema'
+  }
+
+  if (key === 'discriminator') {
+    return 'discriminator'
+  }
+
+  if (JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
+    return 'schema-record'
+  }
+
+  if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) && !JSON_SCHEMA_LITERAL_KEYWORDS.has(key)) {
+    return 'schema'
+  }
+
+  return 'data'
 }
 
 /**
@@ -96,14 +137,20 @@ export function visitJsonSchemaRefs(
 
   for (const key of Object.keys(value)) {
     const val = value[key]
-    if (key === '$ref' && typeof val === 'string') {
-      visit(val)
-    } else if (!schemaLevel) {
-      visitJsonSchemaRefs(val as JsonSchema, visit, true, seen)
-    } else if (key === 'discriminator') {
-      visitDiscriminatorRefs(val, visit)
-    } else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
-      visitJsonSchemaRefs(val as JsonSchema, visit, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), seen)
+
+    switch (getJsonSchemaKeywordKind(key, val, schemaLevel)) {
+      case 'ref':
+        visit(val as string)
+        break
+      case 'discriminator':
+        visitDiscriminatorRefs(val, visit)
+        break
+      case 'schema':
+        visitJsonSchemaRefs(val as JsonSchema, visit, true, seen)
+        break
+      case 'schema-record':
+        visitJsonSchemaRefs(val as JsonSchema, visit, false, seen)
+        break
     }
   }
 }
@@ -127,23 +174,22 @@ export function mapJsonSchemaRefs(
   const result: Record<string, unknown> = {}
   for (const key of Object.keys(value)) {
     const val = value[key]
-    if (key === '$ref' && typeof val === 'string') {
-      setOwn(result, key, map(val, [...path, key]))
-    } else if (!schemaLevel) {
-      setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key]))
-    } else if (key === 'discriminator') {
-      setOwn(result, key, mapDiscriminatorRefs(val, map, path))
-    } else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
-      setOwn(
-        result,
-        key,
-        mapJsonSchemaRefs(val as JsonSchema, map, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), [
-          ...path,
-          key,
-        ]),
-      )
-    } else {
-      setOwn(result, key, val)
+
+    switch (getJsonSchemaKeywordKind(key, val, schemaLevel)) {
+      case 'ref':
+        setOwn(result, key, map(val as string, [...path, key]))
+        break
+      case 'discriminator':
+        setOwn(result, key, mapDiscriminatorRefs(val, map, path))
+        break
+      case 'schema':
+        setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key]))
+        break
+      case 'schema-record':
+        setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, false, [...path, key]))
+        break
+      default:
+        setOwn(result, key, val)
     }
   }
 

@@ -256,6 +256,53 @@ describe('openAPIComponentRegistry', () => {
         },
       )
 
+      it('treats a property named discriminator as a subschema', () => {
+        const { doc, registry } = createRegistry()
+        const schema = (): JsonSchema => ({
+          $ref: '#/$defs/Pet',
+          $defs: {
+            Pet: { type: 'object', properties: { discriminator: { $ref: '#/$defs/Kind' } } },
+            Kind: { type: 'string' },
+          },
+        })
+
+        registry.hoistDefs(schema())
+
+        expect(registry.hoistDefs(schema())).toEqual({ $ref: '#/components/schemas/Pet' })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Pet', 'Kind'])
+      })
+
+      // ref-shaped literal data is never rewritten, so it must not compare by ref target either
+      it.each([
+        ['const', (value: unknown) => value],
+        ['enum', (value: unknown) => [value]],
+        ['default', (value: unknown) => value],
+        ['examples', (value: unknown) => [value]],
+      ] as const)('compares ref-shaped %s data as is', (keyword, wrap) => {
+        const literal = (prefix: string) =>
+          wrap({ $ref: `${prefix}Cat`, discriminator: { mapping: { cat: `${prefix}Cat` } } })
+        const { doc, registry } = createRegistry({
+          schemas: {
+            Cat: { type: 'string' },
+            Pet: { type: 'object', [keyword]: literal('#/components/schemas/') },
+          },
+        })
+
+        expect(
+          registry.hoistDefs({
+            $ref: '#/$defs/Pet',
+            $defs: {
+              Cat: { type: 'string' },
+              Pet: { type: 'object', [keyword]: literal('#/$defs/') },
+            },
+          }),
+        ).toEqual({ $ref: '#/components/schemas/Pet2' })
+        expect(doc.components?.schemas?.Pet2).toEqual({
+          type: 'object',
+          [keyword]: literal('#/$defs/'),
+        })
+      })
+
       // malformed discriminators from arbitrary JSON schemas fall back to structural comparison
       it.each<[name: string, discriminator: any, otherDiscriminator: any]>([
         ['a non-object discriminator', 'kind', 'type'],
