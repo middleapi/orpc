@@ -12,8 +12,7 @@ import type {
   UseQueryOptions,
 } from '@pinia/colada'
 
-import type { SettleOnFirstDataOptions } from './stream-cache.ts'
-import type { SerializableStreamedQueryOptions } from './stream-query.ts'
+import type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query.ts'
 
 export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
 export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never

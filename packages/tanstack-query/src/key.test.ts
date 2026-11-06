@@ -18,18 +18,12 @@ it('generateOperationKey', () => {
     generateOperationKey(['planet', 'stream'], {
       type: 'streamed',
       input: { cursor: 0 },
-      fnOptions: { refetchMode: 'append', maxChunks: 3 },
+      fnOptions: { refetchMode: 'append' },
     }),
   ).toEqual([
     ['planet', 'stream'],
-    { type: 'streamed', input: { cursor: 0 }, fnOptions: { refetchMode: 'append', maxChunks: 3 } },
+    { type: 'streamed', input: { cursor: 0 }, fnOptions: { refetchMode: 'append' } },
   ])
-  expect(
-    generateOperationKey(['planet', 'stream'], {
-      type: 'streamed',
-      fnOptions: { refetchMode: 'reset', maxChunks: Number.POSITIVE_INFINITY },
-    }),
-  ).toEqual([['planet', 'stream'], { type: 'streamed' }])
 
   expect(generateOperationKey(['path'], { prefix: '__prefix__' })).toEqual([
     '__prefix__',

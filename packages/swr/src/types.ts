@@ -1,5 +1,5 @@
 import type { ClientContext } from '@orpc/client'
-import type { PartialDeep, StreamedArrayOptions } from '@orpc/shared'
+import type { PartialDeep } from '@orpc/shared'
 import type { SWRSubscriptionOptions } from 'swr/subscription'
 
 import type { OperationKey } from './key.ts'
@@ -51,7 +51,24 @@ export type FetcherOptions<TClientContext extends ClientContext> = object extend
   : { context: TClientContext }
 
 export type SubscriberOptions<TClientContext extends ClientContext> =
-  FetcherOptions<TClientContext> & StreamedArrayOptions
+  FetcherOptions<TClientContext> & {
+    /**
+     * Determines how data is handled when the subscription is subscribed again.
+     * Existing data stays until the new stream connects.
+     *
+     * - `'reset'`: The data becomes `[]` when the stream connects.
+     * - `'append'`: New chunks are added to the existing data.
+     *
+     * @default 'reset'
+     */
+    refetchMode?: 'append' | 'reset' | undefined
+
+    /**
+     * Maximum number of chunks to store.
+     * When exceeded, the oldest chunks will be removed.
+     */
+    maxChunks?: number | undefined
+  }
 
 export type MutatorOptions<TClientContext extends ClientContext> = FetcherOptions<TClientContext>
 

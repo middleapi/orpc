@@ -454,30 +454,4 @@ describe('serializableStreamedQuery', () => {
     expect(mounted.vm.query.data.value).toEqual([])
     expect(mounted.vm.query.status.value).toEqual('success')
   })
-
-  it('does not write unchanged data at connect (append)', async () => {
-    const queryCache = createQueryCache()
-    queryCache.setQueryData(['stream'], ['old'])
-    const entry = queryCache.ensure({
-      key: ['stream'],
-      query: serializableStreamedQuery(
-        async () =>
-          (async function* () {
-            yield 'a'
-          })(),
-        { refetchMode: 'append', settleOnFirstData: true },
-      ),
-    })
-    const writes = vi.fn()
-    const stop = watch(entry.state, writes, { flush: 'sync' })
-
-    await expect(queryCache.fetch(entry)).resolves.toEqual({
-      status: 'success',
-      data: ['old'],
-      error: null,
-    })
-    // only Colada's own write once the fetch resolves
-    expect(writes).toHaveBeenCalledTimes(1)
-    stop()
-  })
 })

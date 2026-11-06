@@ -143,7 +143,7 @@ describe('streamQuerySSRUtilsPlugin', () => {
       const options = createUtils(true).stream.streamedOptions()
 
       await expect(queryClient.fetchQuery(options)).resolves.toEqual([])
-      expect(queryClient.getQueryState(options.queryKey)).toMatchObject({ isInvalidated: true })
+      expect(started).not.toHaveBeenCalled()
     })
 
     it('settles live queries on their first event', async () => {
@@ -151,7 +151,7 @@ describe('streamQuerySSRUtilsPlugin', () => {
       const options = createUtils(true).stream.liveOptions()
 
       await expect(queryClient.fetchQuery(options)).resolves.toBe(1)
-      expect(queryClient.getQueryState(options.queryKey)).toMatchObject({ isInvalidated: true })
+      expect(cleanup).toHaveBeenCalledTimes(1)
     })
 
     it('settles even when an observer is subscribed, as vue and svelte do on the server', async () => {
@@ -165,10 +165,6 @@ describe('streamQuerySSRUtilsPlugin', () => {
           data: [],
         }),
       )
-      expect(queryClient.getQueryState(observer.options.queryKey)).toMatchObject({
-        isInvalidated: true,
-      })
-
       await sleep(30)
       expect(client.stream).toHaveBeenCalledTimes(1)
       expect(started).not.toHaveBeenCalled()
@@ -274,11 +270,13 @@ describe('streamQuerySSRUtilsPlugin', () => {
         unsubscribe()
 
         expect(callSignal().aborted).toBe(true)
-        expect(queryClient.getQueryState(options.queryKey)).toMatchObject({
-          data,
-          fetchStatus: 'idle',
-          isInvalidated: true,
-        })
+        await vi.waitFor(() =>
+          expect(queryClient.getQueryState(options.queryKey)).toMatchObject({
+            data,
+            fetchStatus: 'idle',
+            isInvalidated: true,
+          }),
+        )
 
         const { observer, results } = observe(queryClient, options)
 
@@ -325,7 +323,6 @@ describe('streamQuerySSRUtilsPlugin', () => {
         expect(browser.getQueryState(options.queryKey)).toMatchObject({
           status: 'success',
           data: firstData,
-          isInvalidated: true,
         })
 
         const { observer, results } = observe(browser, options)

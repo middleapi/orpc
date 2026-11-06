@@ -99,15 +99,15 @@ For a loading state, call `queryClient.resetQueries({ queryKey })` before refetc
 :::
 
 :::warning
-`refetchMode` and `maxChunks` are part of the query key (when not the default):
+`queryFnOptions` is part of the query key:
 
 - Queries with different options get separate cache entries and separate streams. To share one, use the same options, and show fewer chunks with `select`, e.g. `select: data => data.slice(-3)`.
-- To read or write the cache by key, pass the same options: `streamedKey({ input, queryFnOptions: { refetchMode, maxChunks } })`.
+- To read or write the cache by key, pass the same options: `streamedKey({ input, queryFnOptions })`.
   :::
 
 ## Live Query Options
 
-Use `.liveOptions` to build query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data is always the latest event. An `undefined` event rejects the fetch, since TanStack Query cannot store `undefined`.
+Use `.liveOptions` to build query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data is always the latest event.
 
 ```ts
 const query = useQuery(
@@ -122,7 +122,7 @@ const query = useQuery(
 
 By default, a streamed or live query follows its stream until it ends, so awaiting an endless stream (`fetchQuery`, `ensureQueryData`, route loaders) never resolves. Suspense hooks are fine: they resume at the first data while the stream keeps going.
 
-Pass `settleOnFirstData: true` to settle the fetch at the first data instead: when a streamed query connects, or on a live query's first event. The stream closes and the data stays, marked stale, so the next fetch (for example on mount) reopens it. [`StreamQuerySSRUtilsPlugin`](#streamed-and-live-queries) sets it on the server.
+Pass `settleOnFirstData: true` to settle the fetch at the first data instead: when a streamed query connects, or on a live query's first event. The stream closes and the data stays. To reopen it on mount despite a `staleTime`, use `refetchOnMount: 'always'`, as the plugin does in the browser. [`StreamQuerySSRUtilsPlugin`](#streamed-and-live-queries) sets it on the server.
 
 ```ts
 await queryClient.prefetchQuery(

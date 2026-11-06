@@ -154,4 +154,26 @@ describe('liveQuery', () => {
     expect(cleanup).toHaveBeenCalledTimes(1)
     expect(entry.asyncStatus.value).toEqual('idle')
   })
+
+  it('closes the stream without starting it and marks the entry stale when aborted before it connects', async () => {
+    const controller = new AbortController()
+    const started = vi.fn()
+    const entry = {
+      key: ['live'],
+      when: 1,
+      state: { value: { status: 'success', data: 0, error: null } },
+    }
+
+    const fetching = liveQuery(async () => {
+      controller.abort()
+      return (async function* () {
+        started()
+        yield 1
+      })()
+    })({ entry, signal: controller.signal } as any)
+
+    await expect(fetching).rejects.toBe(controller.signal.reason)
+    expect(started).not.toHaveBeenCalled()
+    expect(entry).toMatchObject({ when: 0, state: { value: { data: 0 } } })
+  })
 })

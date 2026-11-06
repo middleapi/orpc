@@ -90,10 +90,10 @@ const { data, error } = useSWRSubscription(
 
 When the subscription restarts, existing data stays until the new stream connects. Then `refetchMode` decides:
 
-| `refetchMode`         | At connect                           |
-| --------------------- | ------------------------------------ |
-| `'reset'` _(default)_ | Data becomes `[]`                    |
-| `'append'`            | Data is kept, trimmed to `maxChunks` |
+| `refetchMode`         | At connect        |
+| --------------------- | ----------------- |
+| `'reset'` _(default)_ | Data becomes `[]` |
+| `'append'`            | Data is kept      |
 
 Each chunk is then appended. `maxChunks` keeps only the latest chunks.
 

@@ -201,28 +201,6 @@ describe('serializableStreamedQuery', () => {
       expect(queryClient.getQueryState(key)).toMatchObject({ data: ['old'], isInvalidated: true })
     })
 
-    it('adds one abort listener per signal across retries', async () => {
-      const controller = new AbortController()
-      const addEventListener = vi.spyOn(controller.signal, 'addEventListener')
-      const queryFn = serializableStreamedQuery(async function* () {
-        throw new Error('disconnected')
-      })
-      const context = {
-        queryKey: ['retry-listeners'],
-        signal: controller.signal,
-        client: queryClient,
-      } as any
-
-      await expect(queryFn(context)).rejects.toThrow('disconnected')
-      await expect(queryFn(context)).rejects.toThrow('disconnected')
-      // listeners removed once their call ends pass their own `signal`
-      expect(
-        addEventListener.mock.calls.filter(
-          ([type, , options]) => type === 'abort' && !(options as AddEventListenerOptions)?.signal,
-        ),
-      ).toHaveLength(1)
-    })
-
     it('handles abort signal during streaming', async () => {
       let cleanupCalled = false
       const yieldFn = vi.fn((v) => v)
@@ -360,82 +338,23 @@ describe('serializableStreamedQuery', () => {
   })
 
   describe('settleOnFirstData option', () => {
-    it('invalidates only the settled query', async () => {
-      const closed = promiseWithResolvers<void>()
-      const settling = serializableStreamedQuery(
-        async () => ({
-          [Symbol.asyncIterator]: () => ({
-            next: async () => ({ done: false as const, value: 'x' }),
-            return: async () => {
-              await closed.promise
-              return { done: true as const, value: undefined }
-            },
-          }),
-        }),
-        { settleOnFirstData: true },
-      )
-
-      const promise = queryClient.fetchQuery({ queryKey: ['settled'], queryFn: settling })
-      await vi.waitFor(() => expect(queryClient.getQueryData(['settled'])).toEqual([]), {
-        interval: 1,
-      })
-
-      await queryClient.fetchQuery({ queryKey: ['other'], queryFn: () => 'other' })
-      closed.resolve()
-      await promise
-
-      expect(queryClient.getQueryState(['settled'])).toMatchObject({ isInvalidated: true })
-      expect(queryClient.getQueryState(['other'])).toMatchObject({ isInvalidated: false })
-    })
-
-    it('does not invalidate a later fetch once a settled fetch is cancelled', async () => {
-      const key = ['settle-then-cancel']
-      const closed = promiseWithResolvers<void>()
-      const settling = serializableStreamedQuery(
-        async () => ({
-          [Symbol.asyncIterator]: () => ({
-            next: async () => ({ done: false as const, value: 'x' }),
-            return: async () => {
-              await closed.promise
-              return { done: true as const, value: undefined }
-            },
-          }),
-        }),
-        { settleOnFirstData: true },
-      )
-
-      void queryClient.fetchQuery({ queryKey: key, queryFn: settling }).catch(() => {})
-      await vi.waitFor(() => expect(queryClient.getQueryData(key)).toEqual([]), { interval: 1 })
-
-      queryClient
-        .getQueryCache()
-        .find({ queryKey: key, exact: true })!
-        .setOptions({ queryKey: key, queryFn: serializableStreamedQuery(stream(['a'], 1)) })
-      await queryClient.refetchQueries({ queryKey: key }, { cancelRefetch: true })
-      closed.resolve()
-
-      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['a'], isInvalidated: false })
-    })
-
     it.each([
       ['reset', []],
       ['append', ['x2', 'x3']],
     ] as const)(
-      'settles at connect, marked stale, when true (%s)',
+      'settles at connect without starting the stream when true (%s)',
       async (refetchMode, expected) => {
         const onSuccess = vi.fn()
         const client = new QueryClient({ queryCache: new QueryCache({ onSuccess }) })
         const key = ['settle-test']
         client.setQueryData(key, ['x1', 'x2', 'x3'])
         const started = vi.fn()
-        let signal: AbortSignal | undefined
 
         await expect(
           client.fetchQuery({
             queryKey: key,
             queryFn: serializableStreamedQuery(
-              async (context) => {
-                signal = context.signal
+              async () => {
                 return (async function* () {
                   started()
                   yield 'c1'
@@ -449,73 +368,11 @@ describe('serializableStreamedQuery', () => {
         expect(client.getQueryState(key)).toMatchObject({
           status: 'success',
           fetchStatus: 'idle',
-          isInvalidated: true,
           data: expected,
         })
         expect(started).not.toHaveBeenCalled()
-        // the call that opened the stream is told to stop
-        expect(signal!.aborted).toBe(true)
         expect(onSuccess).toHaveBeenCalledTimes(1)
       },
     )
-
-    it.each([
-      [false, [1, 2]],
-      [true, []],
-    ] as const)(
-      "writes to the fetch's own query with a custom queryKeyHashFn (%s)",
-      async (settleOnFirstData, expected) => {
-        await expect(
-          queryClient.fetchQuery({
-            queryKey: ['hash-fn-test'],
-            queryKeyHashFn: () => 'custom',
-            queryFn: serializableStreamedQuery(stream([1, 2]), { settleOnFirstData }),
-          }),
-        ).resolves.toEqual(expected)
-
-        expect(
-          queryClient
-            .getQueryCache()
-            .getAll()
-            .map((query) => query.queryHash),
-        ).toEqual(['custom'])
-      },
-    )
-
-    it('does not invalidate a later fetch once a settled fetch fails', async () => {
-      const key = ['settled-error-test']
-      const streamed = serializableStreamedQuery(stream([1]), { settleOnFirstData: true })
-
-      await expect(
-        queryClient.fetchQuery({
-          queryKey: key,
-          queryFn: async (context) => {
-            await streamed(context)
-            throw new Error('after settle')
-          },
-        }),
-      ).rejects.toThrow('after settle')
-
-      await queryClient.fetchQuery({ queryKey: key, queryFn: () => [2] })
-      expect(queryClient.getQueryState(key)).toMatchObject({ data: [2], isInvalidated: false })
-    })
-
-    it('does not write unchanged data at connect (append)', async () => {
-      const key = ['unchanged-test']
-      queryClient.setQueryData(key, ['a'])
-      const setData = vi.spyOn(queryClient.getQueryCache().find({ queryKey: key })!, 'setData')
-
-      await expect(
-        queryClient.fetchQuery({
-          queryKey: key,
-          queryFn: serializableStreamedQuery(stream([1]), {
-            refetchMode: 'append',
-            settleOnFirstData: true,
-          }),
-        }),
-      ).resolves.toEqual(['a'])
-
-      expect(setData.mock.calls.filter(([, options]) => options?.manual)).toEqual([])
-    })
   })
 })

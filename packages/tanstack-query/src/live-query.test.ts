@@ -125,47 +125,6 @@ describe('liveQuery', async () => {
     )
   })
 
-  it('rejects on an undefined event, which TanStack Query cannot store', async () => {
-    const queryFn = liveQuery(async function* () {
-      yield undefined
-    })
-
-    await expect(
-      queryFn({
-        queryKey: ['live-query'],
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any),
-    ).rejects.toEqual(
-      new TypeError(
-        'Live query for ["live-query"] yielded `undefined`, which TanStack Query cannot store.',
-      ),
-    )
-  })
-
-  it("writes to the fetch's own query with a custom queryKeyHashFn", async () => {
-    await expect(
-      queryClient.fetchQuery({
-        queryKey: ['live-query'],
-        queryKeyHashFn: () => 'custom',
-        queryFn: liveQuery(
-          async function* () {
-            yield 1
-            yield 2
-          },
-          { settleOnFirstData: true },
-        ),
-      }),
-    ).resolves.toBe(1)
-
-    expect(
-      queryClient
-        .getQueryCache()
-        .getAll()
-        .map((query) => query.queryHash),
-    ).toEqual(['custom'])
-  })
-
   it('keeps existing data until the first event', async () => {
     const key = ['live-query']
     queryClient.setQueryData(key, 0)
@@ -191,7 +150,7 @@ describe('liveQuery', async () => {
     expect(statuses).not.toContain('pending')
   })
 
-  it('settles on the first event marked stale when settleOnFirstData is true', async () => {
+  it('settles on the first event and closes the stream when settleOnFirstData is true', async () => {
     const key = ['live-query']
     const cleanup = vi.fn()
 
@@ -217,7 +176,6 @@ describe('liveQuery', async () => {
       status: 'success',
       fetchStatus: 'idle',
       data: 1,
-      isInvalidated: true,
     })
   })
 })

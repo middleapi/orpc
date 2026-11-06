@@ -1,6 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import type { ReactNode } from 'react'
-import useSWR, { mutate, SWRConfig } from 'swr'
+import useSWR, { mutate } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
@@ -105,59 +104,39 @@ it('case: useSWRSubscription & .subscriber', async () => {
   })
 })
 
-it.each([
-  ['reset', [{ output: '__new__' }]],
-  ['append', [{ output: '0' }, { output: '1' }, { output: '2' }, { output: '__new__' }]],
-] as const)(
-  'case: useSWRSubscription & .subscriber refetchMode=%s',
-  async (refetchMode, expected) => {
-    // subscription data is not cleared by the global mutate, so each case gets its own cache
-    const cache = new Map()
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <SWRConfig value={{ provider: () => cache }}>{children}</SWRConfig>
+it('case: useSWRSubscription & .subscriber keeps data until the new stream connects', async () => {
+  const first = renderHook(() =>
+    useSWRSubscription(orpc.stream.key({ input: { input: 3 } }), orpc.stream.subscriber()),
+  )
+
+  await act(async () => {
+    await vi.waitFor(() =>
+      expect(first.result.current.data).toEqual([
+        { output: '0' },
+        { output: '1' },
+        { output: '2' },
+      ]),
     )
+  })
 
-    const first = renderHook(
-      () =>
-        useSWRSubscription(
-          orpc.stream.key({ input: { input: 3 } }),
-          orpc.stream.subscriber({ refetchMode }),
-        ),
-      { wrapper },
-    )
+  first.unmount()
 
-    await act(async () => {
-      await vi.waitFor(() =>
-        expect(first.result.current.data).toEqual([
-          { output: '0' },
-          { output: '1' },
-          { output: '2' },
-        ]),
-      )
-    })
+  streamHandler.mockImplementationOnce(async function* () {
+    yield { output: '__new__' }
+  })
 
-    first.unmount()
+  const second = renderHook(() =>
+    useSWRSubscription(orpc.stream.key({ input: { input: 3 } }), orpc.stream.subscriber()),
+  )
 
-    streamHandler.mockImplementationOnce(async function* () {
-      yield { output: '__new__' }
-    })
+  // previous data stays until the new stream connects
+  expect(second.result.current.data).toEqual([{ output: '0' }, { output: '1' }, { output: '2' }])
 
-    const second = renderHook(
-      () =>
-        useSWRSubscription(
-          orpc.stream.key({ input: { input: 3 } }),
-          orpc.stream.subscriber({ refetchMode }),
-        ),
-      { wrapper },
-    )
-
-    expect(second.result.current.data).toEqual([{ output: '0' }, { output: '1' }, { output: '2' }])
-
-    await act(async () => {
-      await vi.waitFor(() => expect(second.result.current.data).toEqual(expected))
-    })
-  },
-)
+  await act(async () => {
+    // reset: the new stream starts from []
+    await vi.waitFor(() => expect(second.result.current.data).toEqual([{ output: '__new__' }]))
+  })
+})
 
 it('case: useSWRSubscription & .liveSubscriber', async () => {
   const { result } = renderHook(() => {

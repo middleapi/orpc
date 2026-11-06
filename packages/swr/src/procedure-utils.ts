@@ -1,12 +1,6 @@
 import type { Client, ClientContext } from '@orpc/client'
-import type { MaybeOptionalOptions, PipeStreamToCacheOptions } from '@orpc/shared'
-import {
-  isAsyncIteratorObject,
-  pipeStreamToCache,
-  resolveMaybeOptionalOptions,
-  streamedArrayWrites,
-} from '@orpc/shared'
-import type { SWRSubscriptionOptions } from 'swr/subscription'
+import type { MaybeOptionalOptions } from '@orpc/shared'
+import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 
 import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key.ts'
 import { generateOperationKey } from './key.ts'
@@ -95,39 +89,8 @@ export class ProcedureUtils<
   subscriber(
     ...rest: MaybeOptionalOptions<SubscriberOptions<TClientContext>>
   ): Subscriber<TInput, InferSubscriberOutput<TOutput>, TError> {
-    const { maxChunks, refetchMode, ...options } = resolveMaybeOptionalOptions(rest)
+    const { maxChunks, refetchMode = 'reset', ...options } = resolveMaybeOptionalOptions(rest)
 
-    return this.streamSubscriber('subscriber', options.context, (next) => ({
-      update: (updater) =>
-        next(undefined, (current) => updater(Array.isArray(current) ? current : undefined) as any),
-      ...streamedArrayWrites({ refetchMode, maxChunks }),
-    }))
-  }
-
-  /**
-   * Generate a live subscriber that subscribes to the latest events from an [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object) for use with useSWRSubscription, etc.
-   *
-   * @see {@link https://orpc.dev/docs/integrations/swr#subscriptions | SWR Integration - Subscriptions}
-   */
-  liveSubscriber(
-    ...rest: MaybeOptionalOptions<FetcherOptions<TClientContext>>
-  ): Subscriber<TInput, InferLiveSubscriberOutput<TOutput>, TError> {
-    const options = resolveMaybeOptionalOptions(rest)
-
-    return this.streamSubscriber('liveSubscriber', options.context, (next) => ({
-      // a live write ignores the current data, so pass the event itself rather than a mutator
-      update: (updater) => next(undefined, updater(undefined)),
-      onChunk: (_, chunk) => chunk,
-    }))
-  }
-
-  private streamSubscriber<TData>(
-    type: 'subscriber' | 'liveSubscriber',
-    context: TClientContext | undefined,
-    pipeOptions: (
-      next: SWRSubscriptionOptions<TData, TError>['next'],
-    ) => Omit<PipeStreamToCacheOptions<unknown, any>, 'signal'>,
-  ): Subscriber<TInput, TData, TError> {
     return (key, { next }) => {
       const controller = new AbortController()
 
@@ -141,17 +104,101 @@ export class ProcedureUtils<
 
           const iterator = await this.call(input, {
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: { key, type },
-              ...context,
+              [OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' },
+              ...options.context,
             } satisfies OperationContext as any,
             signal: controller.signal,
           })
 
           if (!isAsyncIteratorObject(iterator)) {
-            throw new TypeError(`.${type} requires an AsyncIteratorObject output`)
+            throw new TypeError('.subscriber requires an AsyncIteratorObject output')
           }
 
-          await pipeStreamToCache(iterator, { signal: controller.signal, ...pipeOptions(next) })
+          if (controller.signal.aborted) {
+            await iterator.return?.()
+            return
+          }
+
+          if (refetchMode === 'reset') {
+            next(undefined, [] as unknown as InferSubscriberOutput<TOutput>)
+          }
+
+          for await (const event of iterator) {
+            if (controller.signal.aborted) {
+              break
+            }
+
+            next(undefined, (old) => {
+              const newData = Array.isArray(old) ? [...old, event] : [event]
+
+              if (typeof maxChunks === 'number' && newData.length > maxChunks) {
+                return newData.slice(newData.length - maxChunks) as InferSubscriberOutput<TOutput>
+              }
+
+              return newData as InferSubscriberOutput<TOutput>
+            })
+          }
+        } catch (error) {
+          /**
+           * Only report the error if the controller is not aborted.
+           */
+          if (!controller.signal.aborted) {
+            next(error as TError)
+          }
+        }
+      })()
+
+      return () => {
+        controller.abort()
+      }
+    }
+  }
+
+  /**
+   * Generate a live subscriber that subscribes to the latest events from an [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object) for use with useSWRSubscription, etc.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/swr#subscriptions | SWR Integration - Subscriptions}
+   */
+  liveSubscriber(
+    ...rest: MaybeOptionalOptions<FetcherOptions<TClientContext>>
+  ): Subscriber<TInput, InferLiveSubscriberOutput<TOutput>, TError> {
+    const options = resolveMaybeOptionalOptions(rest)
+
+    return (key, { next }) => {
+      const controller = new AbortController()
+
+      void (async () => {
+        try {
+          /**
+           * Input can be omitted from the key when it is undefined,
+           * so we can safely cast it to TInput with an undefined fallback.
+           */
+          const { input } = key[key.length - 1] as { input: TInput }
+
+          const iterator = await this.call(input, {
+            context: {
+              [OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' },
+              ...options.context,
+            } satisfies OperationContext as any,
+            signal: controller.signal,
+          })
+
+          if (!isAsyncIteratorObject(iterator)) {
+            throw new TypeError('.liveSubscriber requires an AsyncIteratorObject output')
+          }
+
+          if (controller.signal.aborted) {
+            await iterator.return?.()
+            return
+          }
+
+          for await (const event of iterator) {
+            if (controller.signal.aborted) {
+              break
+            }
+
+            next(undefined, event as InferLiveSubscriberOutput<TOutput>)
+          }
         } catch (error) {
           /**
            * Only report the error if the controller is not aborted.

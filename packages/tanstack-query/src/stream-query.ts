@@ -1,11 +1,38 @@
-import type { Promisable, StreamedArrayOptions } from '@orpc/shared'
-import { limitArraySize, pipeStreamToCache, streamedArrayWrites } from '@orpc/shared'
+import type { Promisable } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
-import type { SettleOnFirstDataOptions } from './stream-cache.ts'
-import { followStream } from './stream-cache.ts'
+export interface SerializableStreamedQueryOptions {
+  /**
+   * What a fetch does with existing data once its stream connects.
+   * Until then the data stays, so a query with data never returns to `pending`.
+   *
+   * - `'reset'`: the data becomes `[]`, then each chunk is appended.
+   * - `'append'`: the data is kept (trimmed to `maxChunks`), and each chunk is appended.
+   *
+   * @default 'reset'
+   */
+  refetchMode?: 'append' | 'reset' | undefined
 
-export type SerializableStreamedQueryOptions = StreamedArrayOptions
+  /**
+   * Limits the number of data chunks stored in the query result.
+   * Older chunks are removed when the limit is reached.
+   *
+   * @default Number.POSITIVE_INFINITY (unlimited)
+   */
+  maxChunks?: number | undefined
+}
+
+export interface SettleOnFirstDataOptions {
+  /**
+   * Settles the fetch at its first data (streamed: when the stream connects; live: on the first event)
+   * instead of following the stream to its end. The stream is closed and the data kept.
+   * Use it only where nothing watches the stream, such as server rendering:
+   * a refetch while a query is mounted would also settle, closing its stream.
+   *
+   * @default false
+   */
+  settleOnFirstData?: boolean | undefined
+}
 
 /**
  * A variant of `streamedQuery` where:
@@ -18,21 +45,60 @@ export function serializableStreamedQuery<
 >(
   queryFn: (context: QueryFunctionContext<TQueryKey>) => Promisable<AsyncIterable<TQueryFnData>>,
   {
-    settleOnFirstData,
-    ...options
+    refetchMode = 'reset',
+    maxChunks = Number.POSITIVE_INFINITY,
+    settleOnFirstData = false,
   }: SerializableStreamedQueryOptions & SettleOnFirstDataOptions = {},
 ): QueryFunction<TQueryFnData[], TQueryKey> {
   return async (context) => {
-    const result = await followStream<QueryFunctionContext<TQueryKey>, TQueryFnData[]>(
-      context,
-      settleOnFirstData,
-      async (callContext, writes) =>
-        pipeStreamToCache(await queryFn(callContext), {
-          ...writes,
-          ...streamedArrayWrites(options),
-        }),
-    )
+    const { client, queryKey, signal } = context
 
-    return limitArraySize(result!.data, options.maxChunks ?? Number.POSITIVE_INFINITY)
+    try {
+      const stream = await queryFn(context)
+
+      // close without reading, so a generator the query no longer wants never starts
+      if (signal.aborted) {
+        await stream[Symbol.asyncIterator]().return?.()
+        throw signal.reason
+      }
+
+      let data = client.setQueryData<TQueryFnData[]>(queryKey, (current) =>
+        refetchMode === 'append' && current ? limitArraySize(current, maxChunks) : [],
+      )!
+
+      if (settleOnFirstData) {
+        await stream[Symbol.asyncIterator]().return?.()
+        return data
+      }
+
+      for await (const chunk of stream) {
+        if (signal.aborted) {
+          throw signal.reason
+        }
+
+        // read the cache, so writes made during the stream are kept
+        data = client.setQueryData<TQueryFnData[]>(queryKey, (current = []) =>
+          limitArraySize([...current, chunk], maxChunks),
+        )!
+      }
+
+      // the returned data is written again, so return the cache to keep later writes
+      return limitArraySize(client.getQueryData<TQueryFnData[]>(queryKey) ?? data, maxChunks)
+    } catch (error) {
+      // a stream cut short (cancelled, or its last observer left) reopens when observed again
+      if (signal.aborted) {
+        client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
+      }
+
+      throw error
+    }
   }
+}
+
+function limitArraySize<T>(items: T[], maxSize: number): T[] {
+  if (items.length <= maxSize) {
+    return items
+  }
+
+  return items.slice(items.length - maxSize)
 }

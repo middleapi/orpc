@@ -80,10 +80,10 @@ On refetch, existing data stays until the new stream connects. Then `refetchMode
 | `'append'`            | Data is kept, trimmed to `maxChunks` |
 
 :::warning
-`refetchMode` and `maxChunks` are part of the query key (when not the default):
+`fnOptions` is part of the query key:
 
 - Queries with different options get separate cache entries and separate streams. To share one, use the same options, and show fewer chunks when reading, e.g. `computed(() => data.value?.slice(-3))`.
-- To read or write the cache by key, pass the same options: `streamedKey({ input, fnOptions: { refetchMode, maxChunks } })`.
+- To read or write the cache by key, pass the same options: `streamedKey({ input, fnOptions })`.
   :::
 
 ## Live Query Options Utility
