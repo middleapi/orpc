@@ -22,6 +22,13 @@ export * from './types.ts'
 export * from './value.ts'
 
 export {
+  /**
+   * @deprecated Use `isPlainObject` instead.
+   */
+  isPlainObject as isObject,
+} from './object.ts'
+
+export {
   AbortError,
   AsyncIteratorClass,
   getOrBind,
