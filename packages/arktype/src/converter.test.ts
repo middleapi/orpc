@@ -34,29 +34,8 @@ describe('arkTypeToJsonSchemaConverter', () => {
 
   describe('optionality', () => {
     it.each([
-      [
-        'optional input schema',
-        type('string | undefined'),
-        'input',
-        {
-          anyOf: [{ type: 'string' }, {}],
-        },
-        true,
-      ],
-      [
-        'optional output schema',
-        type('string | undefined'),
-        'output',
-        {
-          anyOf: [
-            {
-              type: 'string',
-            },
-            {},
-          ],
-        },
-        true,
-      ],
+      ['optional input schema', type('string | undefined'), 'input', { type: 'string' }, true],
+      ['optional output schema', type('string | undefined'), 'output', { type: 'string' }, true],
       [
         'required input schema',
         type('string'),
@@ -114,6 +93,189 @@ describe('arkTypeToJsonSchemaConverter', () => {
     ] as const)('converts %s from the matching side', (_, schema, input, output) => {
       expect(converter.convert(schema, 'input')).toEqual([input, false])
       expect(converter.convert(schema, 'output')).toEqual([output, false])
+    })
+  })
+
+  describe('undefined', () => {
+    it.each([
+      ['string | undefined', type('string | undefined'), { type: 'string' }],
+      [
+        'number | null | undefined',
+        type('number | null | undefined'),
+        { anyOf: [{ type: 'number' }, { type: 'null' }] },
+      ],
+      [
+        "'a' | 'b' | undefined",
+        type("'a' | 'b' | undefined"),
+        { anyOf: [{ const: 'a' }, { const: 'b' }] },
+      ],
+      ['undefined', type('undefined'), { not: {} }],
+    ] as const)('drops the undefined branch of %s', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, true])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, true])
+    })
+
+    it('treats properties accepting undefined as optional', () => {
+      const schema = type({
+        'a': 'string | undefined',
+        'b?': 'number | null | undefined',
+        'c': 'undefined',
+        'd': 'string',
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: { type: 'string' },
+            b: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+            c: { not: {} },
+            d: { type: 'string' },
+          },
+          required: ['d'],
+        },
+        false,
+      ])
+
+      expect(converter.convert(type({ a: 'string | undefined' }), 'input')).toEqual([
+        { type: 'object', properties: { a: { type: 'string' } } },
+        false,
+      ])
+    })
+
+    it('treats properties referencing an undefined-accepting definition as optional', () => {
+      const schema = type({ 'a': 'string | undefined', 'self?': 'this' })
+
+      const [jsonSchema] = converter.convert(schema, 'input') as [any, boolean]
+      const root = jsonSchema.$defs[jsonSchema.$ref.slice('#/$defs/'.length)]
+      const a = jsonSchema.$defs[root.properties.a.$ref.slice('#/$defs/'.length)]
+
+      expect(root.required).toBeUndefined()
+      expect(a).toEqual({ type: 'string' })
+    })
+
+    it('drops undefined from array items', () => {
+      expect(converter.convert(type('(string | undefined)[]'), 'input')).toEqual([
+        { type: 'array', items: { type: 'string' } },
+        false,
+      ])
+    })
+
+    it('keeps the result of a custom fallback for undefined', () => {
+      const converter = new ArkTypeToJsonSchemaConverter({
+        fallback: (ctx) => (ctx.code === 'unit' ? { type: 'null' } : ctx.base),
+      })
+
+      expect(converter.convert(type({ a: 'string | undefined' }), 'input')).toEqual([
+        {
+          type: 'object',
+          properties: { a: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+          required: ['a'],
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('non-finite numbers', () => {
+    it.each([
+      ['number.Infinity', type('number.Infinity'), { not: {} }],
+      ['number.NegativeInfinity', type('number.NegativeInfinity'), { not: {} }],
+      ['number.NaN', type('number.NaN'), { not: {} }],
+      ['number.Infinity | string', type('number.Infinity | string'), { type: 'string' }],
+      ['1 | number.Infinity', type('1 | number.Infinity'), { enum: [1] }],
+      ['1 | number.NaN', type('1 | number.NaN'), { const: 1 }],
+      [
+        'number.Infinity | number.NegativeInfinity',
+        type('number.Infinity | number.NegativeInfinity'),
+        { not: {} },
+      ],
+      [
+        'object property',
+        type({ a: 'number.Infinity' }),
+        { type: 'object', properties: { a: { not: {} } }, required: ['a'] },
+      ],
+    ] as const)('converts %s without non-JSON values', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, false])
+    })
+
+    it('passes non-finite units through custom fallbacks', () => {
+      const units: unknown[] = []
+      const converter = new ArkTypeToJsonSchemaConverter({
+        fallback: {
+          unit: (ctx) => {
+            units.push(ctx.unit)
+            return { type: 'number', description: String(ctx.unit as unknown as number) }
+          },
+        },
+      })
+
+      expect(converter.convert(type('number.Infinity'), 'input')).toEqual([
+        { type: 'number', description: 'Infinity' },
+        false,
+      ])
+      expect(converter.convert(type('1 | number.NegativeInfinity'), 'input')).toEqual([
+        { anyOf: [{ enum: [1] }, { type: 'number', description: '-Infinity' }] },
+        false,
+      ])
+      expect(converter.convert(type('number.NaN'), 'input')).toEqual([
+        { type: 'number', description: 'NaN' },
+        false,
+      ])
+      expect(units).toEqual([Infinity, -Infinity, Number.NaN])
+    })
+
+    it('passes the built-in never schema to a custom default fallback', () => {
+      const converter = new ArkTypeToJsonSchemaConverter({
+        fallback: (ctx) => ({ ...ctx.base, title: '__EXTENDED__' }),
+      })
+
+      expect(converter.convert(type('number.Infinity'), 'input')).toEqual([
+        { not: {}, title: '__EXTENDED__' },
+        false,
+      ])
+      expect(converter.convert(type('number.NaN'), 'input')).toEqual([
+        { not: {}, title: '__EXTENDED__' },
+        false,
+      ])
+    })
+  })
+
+  describe('tuple postfix elements', () => {
+    it.each([
+      [
+        "['string', '...', 'number[]', 'boolean']",
+        type(['string', '...', 'number[]', 'boolean']),
+        {
+          type: 'array',
+          minItems: 2,
+          prefixItems: [{ type: 'string' }],
+          items: { anyOf: [{ type: 'number' }, { type: 'boolean' }] },
+        },
+      ],
+      [
+        "['...', 'number[]', 'boolean', 'null']",
+        type(['...', 'number[]', 'boolean', 'null']),
+        {
+          type: 'array',
+          minItems: 2,
+          items: { anyOf: [{ type: 'number' }, { type: 'boolean' }, { type: 'null' }] },
+        },
+      ],
+      [
+        "['...', 'number[]', 'number']",
+        type(['...', 'number[]', 'number']),
+        { type: 'array', minItems: 1, items: { type: 'number' } },
+      ],
+      [
+        "['...', '(number | string)[]', 'string']",
+        type(['...', '(number | string)[]', 'string']),
+        { type: 'array', minItems: 1, items: { anyOf: [{ type: 'number' }, { type: 'string' }] } },
+      ],
+    ] as const)('loosens items to accept postfix elements of %s', (_, schema, jsonSchema) => {
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, false])
     })
   })
 

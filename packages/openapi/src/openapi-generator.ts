@@ -261,8 +261,10 @@ export class OpenAPIGenerator {
       )
     }
 
-    const versioned = toVersionedOpenAPIDocument(doc, version)
-    return this.serializer.serializeJson(versioned).json as OpenAPIDocument<TVersion>
+    // serialize before downgrading, so non-JSON values a converter may emit (Infinity, NaN, Date, ...)
+    // are downgraded as the JSON they become, giving the same result across versions
+    const serialized = this.serializer.serializeJson(doc).json as OpenAPIV3_2.OpenAPIObject
+    return toVersionedOpenAPIDocument(serialized, version) as OpenAPIDocument<TVersion>
   }
 
   private convertSchema(
