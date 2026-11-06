@@ -177,6 +177,36 @@ describe('openAPIGenerator e2e: crud api', () => {
     ])
   })
 
+  it('keeps the default form style for query params whose schema has a primitive type list', async () => {
+    const doc = await generator.generate({
+      search: oc.meta(openapi({ method: 'GET', path: '/search' })).input(
+        z.object({
+          a: z.string().nullable(),
+          b: z.union([z.string(), z.number()]),
+        }),
+      ),
+    })
+
+    expect(doc.paths?.['/search']?.get?.parameters).toEqual([
+      {
+        name: 'a',
+        in: 'query',
+        required: true,
+        allowEmptyValue: true,
+        allowReserved: true,
+        schema: { type: ['string', 'null'] },
+      },
+      {
+        name: 'b',
+        in: 'query',
+        required: true,
+        allowEmptyValue: true,
+        allowReserved: true,
+        schema: { type: ['string', 'number'] },
+      },
+    ])
+  })
+
   it('maps path params and reuses the shared Planet component in responses', async () => {
     const doc = await generator.generate(router)
 

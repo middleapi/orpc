@@ -13,6 +13,11 @@ it('isJsonPrimitiveSchema', () => {
   expect(isJsonPrimitiveSchema({ type: 'string' })).toBe(true)
   expect(isJsonPrimitiveSchema({ const: 'fixed' })).toBe(true)
   expect(isJsonPrimitiveSchema({ enum: ['a', 'b'] })).toBe(true)
+  expect(isJsonPrimitiveSchema({ type: ['string', 'null'] })).toBe(true)
+  expect(isJsonPrimitiveSchema({ type: ['string', 'number', 'integer', 'boolean'] })).toBe(true)
+  expect(isJsonPrimitiveSchema({ type: ['string', 'object'] })).toBe(false)
+  expect(isJsonPrimitiveSchema({ type: ['array', 'null'] })).toBe(false)
+  expect(isJsonPrimitiveSchema({ type: [] })).toBe(false)
 
   expect(isJsonPrimitiveSchema(true)).toBe(false)
   expect(isJsonPrimitiveSchema({ type: 'object', properties: { a: { type: 'string' } } })).toBe(

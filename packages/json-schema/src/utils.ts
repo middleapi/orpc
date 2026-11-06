@@ -11,12 +11,25 @@ import {
 import { resolveJsonSchemaLocalPointer } from './ref-utils.ts'
 import type { JsonSchema } from './types.ts'
 
+/**
+ * Returns true when the schema only describes primitive values, by a primitive `type`
+ * (or a non-empty list of them, such as `['string', 'null']`), a `const`, or an `enum`.
+ * Composition keywords are not inspected, so flatten unions with {@link flattenJsonUnionSchema} first.
+ */
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
   if (typeof schema === 'boolean') {
     return false
   }
 
   if (typeof schema.type === 'string' && JSON_SCHEMA_PRIMITIVE_TYPES.has(schema.type)) {
+    return true
+  }
+
+  if (
+    Array.isArray(schema.type) &&
+    schema.type.length > 0 &&
+    schema.type.every((type) => JSON_SCHEMA_PRIMITIVE_TYPES.has(type))
+  ) {
     return true
   }
 
