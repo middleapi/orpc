@@ -56,16 +56,29 @@ export class OpenTelemetrySpan implements TracingSpan {
   }
 }
 
+export interface OpenTelemetryPropagationOptions {
+  /**
+   * Whether to enable outgoing context propagation
+   *
+   * @default true
+   */
+  inject?: boolean
+
+  /**
+   * Whether to enable incoming context propagation
+   *
+   * @default true
+   */
+  extract?: boolean
+}
+
 export interface OpenTelemetryTracerOptions {
   /**
    * Called for every span, so a tracer provider set after construction is picked up.
    */
   tracer: () => OpenTelemetryApiTracer
 
-  /**
-   * @default true
-   */
-  propagationEnabled?: boolean | undefined
+  propagationEnabled?: OpenTelemetryPropagationOptions
 }
 
 export class OpenTelemetryTracer implements Tracer {
@@ -77,11 +90,13 @@ export class OpenTelemetryTracer implements Tracer {
   constructor(options: OpenTelemetryTracerOptions) {
     this.tracer = options.tracer
 
-    if (options.propagationEnabled ?? true) {
+    if (options.propagationEnabled?.inject ?? true) {
       this.inject = (span, headers) => {
         propagation.inject(contextOf(span), headers)
       }
+    }
 
+    if (options.propagationEnabled?.extract ?? true) {
       this.extract = (headers) => {
         const active = context.active()
         const extracted = withActiveBaggage(propagation.extract(active, headers), active)

@@ -7,6 +7,7 @@ import {
 import type { TracingHeaders } from '@orpc/shared'
 
 import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer.ts'
+import type { OpenTelemetryPropagationOptions } from './tracer.ts'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({
@@ -30,7 +31,7 @@ afterAll(async () => {
   propagation.disable()
 })
 
-function createTracer(options: { propagationEnabled?: boolean } = {}) {
+function createTracer(options: { propagationEnabled?: OpenTelemetryPropagationOptions } = {}) {
   return new OpenTelemetryTracer({ tracer: () => trace.getTracer('test'), ...options })
 }
 
@@ -381,9 +382,15 @@ describe('openTelemetryTracer', () => {
     })
   })
 
-  it('has no propagation methods when propagation is disabled', () => {
-    const tracer = createTracer({ propagationEnabled: false })
+  it('has not inject method when outgoing propagation is disabled', () => {
+    const tracer = createTracer({ propagationEnabled: { inject: false } })
     expect(tracer.inject).toBeUndefined()
+    expect(tracer.extract).toBeDefined()
+  })
+
+  it('has not extract method when incoming propagation is disabled', () => {
+    const tracer = createTracer({ propagationEnabled: { extract: false } })
     expect(tracer.extract).toBeUndefined()
+    expect(tracer.inject).toBeDefined()
   })
 })

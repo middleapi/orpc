@@ -40,6 +40,24 @@ describe('oRPCInstrumentation', () => {
     expect(tracer!.extract).toBeUndefined()
   })
 
+  it('should support propagationEnabled.inject=false', () => {
+    void new ORPCInstrumentation({ propagationEnabled: { inject: false } })
+
+    const tracer = getTracer()
+    expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
+    expect(tracer!.inject).toBeUndefined()
+    expect(tracer!.extract).toBeDefined()
+  })
+
+  it('should support propagationEnabled.extract=false', () => {
+    void new ORPCInstrumentation({ propagationEnabled: { extract: false } })
+
+    const tracer = getTracer()
+    expect(tracer).toBeInstanceOf(OpenTelemetryTracer)
+    expect(tracer!.extract).toBeUndefined()
+    expect(tracer!.inject).toBeDefined()
+  })
+
   it('should not enable if enabled=false', () => {
     const instrumentation = new ORPCInstrumentation({ enabled: false })
 

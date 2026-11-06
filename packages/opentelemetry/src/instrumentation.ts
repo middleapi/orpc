@@ -4,6 +4,7 @@ import { getTracer, setTracer } from '@orpc/shared'
 
 import pkg from '../package.json' with { type: 'json' }
 import { OpenTelemetryTracer } from './tracer.ts'
+import type { OpenTelemetryPropagationOptions } from './tracer.ts'
 
 export interface ORPCInstrumentationConfig extends InstrumentationConfig {
   /**
@@ -13,7 +14,7 @@ export interface ORPCInstrumentationConfig extends InstrumentationConfig {
    *
    * @default true
    */
-  propagationEnabled?: boolean | undefined
+  propagationEnabled?: boolean | OpenTelemetryPropagationOptions | undefined
 }
 
 /**
@@ -30,10 +31,14 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
   protected override init(): void {}
 
   override enable(): void {
+    const { propagationEnabled } = this.getConfig()
     setTracer(
       new OpenTelemetryTracer({
         tracer: () => this.tracer,
-        propagationEnabled: this.getConfig().propagationEnabled,
+        propagationEnabled:
+          typeof propagationEnabled === 'boolean'
+            ? { inject: propagationEnabled, extract: propagationEnabled }
+            : propagationEnabled,
       }),
     )
   }
