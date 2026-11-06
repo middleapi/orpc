@@ -59,7 +59,7 @@
     "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "@pinia/colada": ">=1.2.0",
+    "@pinia/colada": ">=1.4.9",
     "vue": ">=3.5.17"
   }
 }

@@ -1,6 +1,8 @@
 import type { Promisable } from '@orpc/shared'
-import { stringifyJSON } from '@orpc/shared'
+import { pipeStreamToCache, stringifyJSON } from '@orpc/shared'
 
+import type { SettleOnFirstDataOptions } from './stream-cache.ts'
+import { followEntryStream } from './stream-cache.ts'
 import type { UseQueryFnContext } from './types.ts'
 
 /**
@@ -9,34 +11,22 @@ import type { UseQueryFnContext } from './types.ts'
  */
 export function liveQuery<T>(
   queryFn: (context: UseQueryFnContext) => Promisable<AsyncIterable<T>>,
+  { settleOnFirstData }: SettleOnFirstDataOptions = {},
 ): (context: UseQueryFnContext) => Promise<T> {
   return async (context) => {
-    const { entry, signal } = context
+    const result = await followEntryStream<T>(
+      context,
+      settleOnFirstData,
+      async (callContext, writes) =>
+        pipeStreamToCache(await queryFn(callContext), { ...writes, onChunk: (_, chunk) => chunk }),
+    )
 
-    const stream = await queryFn(context)
-
-    if (signal.aborted) {
-      await stream[Symbol.asyncIterator]().return?.()
-      throw signal.reason
-    }
-
-    let last: { chunk: T } | undefined
-
-    for await (const chunk of stream) {
-      if (signal.aborted) {
-        throw signal.reason
-      }
-
-      last = { chunk }
-      entry.state.value = { status: 'success', data: chunk, error: null } as any
-    }
-
-    if (!last) {
+    if (!result) {
       throw new TypeError(
-        `Live query for ${stringifyJSON(entry.key)} did not yield any data. Ensure the query function returns an AsyncIterable with at least one chunk.`,
+        `Live query for ${stringifyJSON(context.entry.key)} did not yield any data. Ensure the query function returns an AsyncIterable with at least one chunk.`,
       )
     }
 
-    return last.chunk
+    return result.data
   }
 }

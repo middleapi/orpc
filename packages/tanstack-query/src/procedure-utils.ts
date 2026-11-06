@@ -28,6 +28,7 @@ import type {
   InfiniteKeyOptions,
   InfiniteOptionsIn,
   InfiniteOptionsOut,
+  LiveOptionsIn,
   MutationKeyOptions,
   MutationOptionsIn,
   MutationOptionsOut,
@@ -208,7 +209,7 @@ export interface ProcedureUtilsOptions<
    */
   liveOptions?:
     | ProcedureUtilsModifier<
-        QueryOptionsIn<
+        LiveOptionsIn<
           TClientContext,
           TInput,
           InferLiveQueryOutput<TOutput>,
@@ -510,6 +511,7 @@ export class ProcedureUtils<
    * Configure queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * This is built on [TanStack Query streamedQuery](https://tanstack.com/query/latest/docs/reference/streamedQuery)
    * and works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
+   * The query never returns to pending once it has data.
    */
   streamedOptions<USelectData = InferStreamedQueryOutput<TOutput>, UInitialData = undefined>(
     ...rest: MaybeOptionalOptions<
@@ -534,9 +536,10 @@ export class ProcedureUtils<
     }
 
     const queryKey = this.streamedKey(optionsIn)
+    const { settleOnFirstData, ...queryOptions } = optionsIn
 
     return {
-      ...(optionsIn as any),
+      ...(queryOptions as any),
       queryKey,
       queryFn: (fnContext) => {
         return intercept(
@@ -562,15 +565,18 @@ export class ProcedureUtils<
               return optionsIn.queryFn(fnContext) as any
             }
 
-            return serializableStreamedQuery(async (queryContext) => {
-              const output = await this.call(input, { signal: queryContext.signal, context })
+            return serializableStreamedQuery(
+              async (queryContext) => {
+                const output = await this.call(input, { signal: queryContext.signal, context })
 
-              if (!isAsyncIteratorObject(output)) {
-                throw new Error('streamedQuery requires an AsyncIteratorObject output')
-              }
+                if (!isAsyncIteratorObject(output)) {
+                  throw new Error('streamedQuery requires an AsyncIteratorObject output')
+                }
 
-              return output
-            }, optionsIn.queryFnOptions)(fnContext)
+                return output
+              },
+              { ...optionsIn.queryFnOptions, settleOnFirstData },
+            )(fnContext)
           },
         )
       },
@@ -607,7 +613,7 @@ export class ProcedureUtils<
    */
   liveOptions<USelectData = InferLiveQueryOutput<TOutput>, UInitialData = undefined>(
     ...rest: MaybeOptionalOptions<
-      QueryOptionsIn<
+      LiveOptionsIn<
         TClientContext,
         TInput,
         InferLiveQueryOutput<TOutput>,
@@ -626,10 +632,11 @@ export class ProcedureUtils<
     }
 
     const queryKey = this.liveKey(optionsIn)
+    const { settleOnFirstData, ...queryOptions } = optionsIn
 
     return {
       structuralSharing: createStructuralSharing(this.options.serializer),
-      ...(optionsIn as any),
+      ...(queryOptions as any),
       queryKey,
       queryFn: (fnContext) => {
         return intercept(
@@ -655,18 +662,21 @@ export class ProcedureUtils<
               return optionsIn.queryFn(fnContext)
             }
 
-            return liveQuery(async (queryContext) => {
-              const output = await this.call(input, {
-                signal: queryContext.signal,
-                context,
-              })
+            return liveQuery(
+              async (queryContext) => {
+                const output = await this.call(input, {
+                  signal: queryContext.signal,
+                  context,
+                })
 
-              if (!isAsyncIteratorObject(output)) {
-                throw new Error('liveQuery requires an AsyncIteratorObject output')
-              }
+                if (!isAsyncIteratorObject(output)) {
+                  throw new Error('liveQuery requires an AsyncIteratorObject output')
+                }
 
-              return output
-            })(fnContext)
+                return output
+              },
+              { settleOnFirstData },
+            )(fnContext)
           },
         )
       },

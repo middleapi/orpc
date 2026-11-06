@@ -1,6 +1,6 @@
 import { RPCJsonSerializer } from '@orpc/client'
 import type { PartialDeep, Public } from '@orpc/shared'
-import { stringifyJSON } from '@orpc/shared'
+import { streamedArrayKeyOptions, stringifyJSON } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
 
 import type { SerializableStreamedQueryOptions } from './stream-query.ts'
@@ -67,6 +67,8 @@ export function generateOperationKey<TType extends OperationType, TInput>(
   path: string[],
   options: OperationKeyOptions<TType, TInput> = {},
 ): OperationKey<TType, TInput> {
+  const fnOptions = streamedArrayKeyOptions(options.fnOptions)
+
   return [
     ...(options.prefix !== undefined ? [options.prefix] : []),
     path,
@@ -77,7 +79,7 @@ export function generateOperationKey<TType extends OperationType, TInput>(
           ? serializeInput(options.serializer ?? defaultSerializer, options.input)
           : {}),
       ...(options.type !== undefined ? { type: options.type } : {}),
-      ...(options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {}),
+      ...(fnOptions !== undefined ? { fnOptions } : {}),
     },
   ] as OperationKey<TType, TInput>
 }

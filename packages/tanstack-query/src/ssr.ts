@@ -6,9 +6,10 @@ import type {
 } from '@orpc/client'
 import { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
+import { environmentManager } from '@tanstack/query-core'
 
 import type { RouterUtilsPlugin } from './plugin.ts'
-import type { ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils.ts'
+import type { ProcedureUtilsOptions } from './procedure-utils.ts'
 import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
 
 /**
@@ -39,40 +40,15 @@ export function createHydrationOptions(
 
 export interface StreamQuerySSRUtilsPluginOptions {
   /**
-   * Whether utils run on the server, where streamed and live queries are cancelled once they have data.
-   * Defaults to `true` when there is no global `window`.
+   * Whether utils run on the server, where streamed and live queries settle at their first data.
+   * Defaults to TanStack Query's `environmentManager.isServer()`.
    */
   isServer?: boolean | undefined
 }
 
 /**
- * Cancels the query once it has data, keeping that data. The cancel aborts the call's `signal`.
- */
-const cancelOnFirstData: ProcedureUtilsQueryInterceptor<any, any, any, any> = async ({
-  next,
-  fnContext,
-}) => {
-  const cache = fnContext.client.getQueryCache()
-  const query = cache.find({ queryKey: fnContext.queryKey, exact: true })
-
-  const unsubscribe = cache.subscribe((event) => {
-    if (event.query === query && event.type === 'updated' && event.action.type === 'success') {
-      unsubscribe()
-      void event.query.cancel({ revert: true })
-    }
-  })
-
-  try {
-    return await next()
-  } finally {
-    unsubscribe()
-  }
-}
-
-/**
- * Router utils plugin for SSR of streamed and live queries. On the server, streamed queries are
- * cancelled once they connect and live queries on their first event, keeping the data received so far;
- * in the browser, they refetch on mount so streams reopen after hydration.
+ * Router utils plugin for SSR of streamed and live queries: sets `.streamedOptions` and `.liveOptions` defaults
+ * so they settle at their first data on the server, and reopen their stream on mount in the browser.
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#streamed-and-live-queries | TanStack Query Integration - Streamed and Live Queries}
  */
@@ -81,10 +57,17 @@ export class StreamQuerySSRUtilsPlugin<
 > implements RouterUtilsPlugin<T> {
   readonly name = '~stream-query-ssr'
 
-  private readonly isServer: boolean
+  private readonly defaults:
+    | { settleOnFirstData: true; refetchOnMount: false }
+    | { refetchOnMount: 'always' }
 
   constructor(options: StreamQuerySSRUtilsPluginOptions = {}) {
-    this.isServer = options.isServer ?? !('window' in globalThis)
+    this.defaults =
+      (options.isServer ?? environmentManager.isServer())
+        ? // the render must finish even with observers (vue, svelte), which must not reopen the settled stream
+          { settleOnFirstData: true, refetchOnMount: false }
+        : // hydrated data (even dehydrated while pending) reopens its stream on mount, despite a `staleTime`
+          { refetchOnMount: 'always' }
   }
 
   initProcedureOptions(
@@ -92,13 +75,7 @@ export class StreamQuerySSRUtilsPlugin<
     options: ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>>,
   ): ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>> {
     return mergeProcedureUtilsOptions<any, any, any, any>(
-      {
-        ...(this.isServer
-          ? { streamedInterceptors: [cancelOnFirstData], liveInterceptors: [cancelOnFirstData] }
-          : {}),
-        streamedOptions: { initialData: [], refetchOnMount: 'always' },
-        liveOptions: { refetchOnMount: 'always' },
-      },
+      { streamedOptions: this.defaults, liveOptions: this.defaults },
       options,
     )
   }

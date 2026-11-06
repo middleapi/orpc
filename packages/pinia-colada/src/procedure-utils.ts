@@ -23,6 +23,7 @@ import type {
   InfiniteKeyOptions,
   InfiniteOptionsIn,
   InfiniteOptionsOut,
+  LiveOptionsIn,
   MutationKeyOptions,
   MutationOptionsIn,
   MutationOptionsOut,
@@ -206,7 +207,7 @@ export interface ProcedureUtilsOptions<
    */
   liveOptions?:
     | ProcedureUtilsModifier<
-        QueryOptionsIn<
+        LiveOptionsIn<
           TClientContext,
           TInput,
           InferLiveQueryOutput<TOutput>,
@@ -523,6 +524,7 @@ export class ProcedureUtils<
   /**
    * Configure queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * The resulting data is an array of chunks, and each new chunk is appended as it arrives.
+   * It never returns to pending once it has data.
    * Works with `useQuery` and any other API that accepts query options.
    */
   streamedOptions<UInitialData extends InferStreamedQueryOutput<TOutput> | undefined = undefined>(
@@ -550,6 +552,7 @@ export class ProcedureUtils<
       key: _keyIn,
       query: queryIn,
       fnOptions,
+      settleOnFirstData,
       ...restOptions
     } = optionsIn as Record<string, any>
 
@@ -581,15 +584,18 @@ export class ProcedureUtils<
               >
             }
 
-            return serializableStreamedQuery(async (queryContext) => {
-              const output = await this.call(input, { signal: queryContext.signal, context })
+            return serializableStreamedQuery(
+              async (queryContext) => {
+                const output = await this.call(input, { signal: queryContext.signal, context })
 
-              if (!isAsyncIteratorObject(output)) {
-                throw new Error('streamedQuery requires an AsyncIteratorObject output')
-              }
+                if (!isAsyncIteratorObject(output)) {
+                  throw new Error('streamedQuery requires an AsyncIteratorObject output')
+                }
 
-              return output
-            }, fnOptions)(fnContext) as PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>
+                return output
+              },
+              { ...fnOptions, settleOnFirstData },
+            )(fnContext) as PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>
           },
         )
       },
@@ -625,7 +631,7 @@ export class ProcedureUtils<
    */
   liveOptions<UInitialData extends InferLiveQueryOutput<TOutput> | undefined = undefined>(
     ...rest: MaybeOptionalOptions<
-      QueryOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, UInitialData>
+      LiveOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, UInitialData>
     >
   ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, UInitialData>> {
     let optionsIn = resolveMaybeOptionalOptions(rest)
@@ -641,6 +647,7 @@ export class ProcedureUtils<
       context,
       key: _keyIn,
       query: queryIn,
+      settleOnFirstData,
       ...restOptions
     } = optionsIn as Record<string, any>
 
@@ -669,15 +676,18 @@ export class ProcedureUtils<
               return queryIn(fnContext) as PromiseWithError<InferLiveQueryOutput<TOutput>, TError>
             }
 
-            return liveQuery(async (queryContext) => {
-              const output = await this.call(input, { signal: queryContext.signal, context })
+            return liveQuery(
+              async (queryContext) => {
+                const output = await this.call(input, { signal: queryContext.signal, context })
 
-              if (!isAsyncIteratorObject(output)) {
-                throw new Error('liveQuery requires an AsyncIteratorObject output')
-              }
+                if (!isAsyncIteratorObject(output)) {
+                  throw new Error('liveQuery requires an AsyncIteratorObject output')
+                }
 
-              return output
-            })(fnContext)
+                return output
+              },
+              { settleOnFirstData },
+            )(fnContext)
           },
         )
       },

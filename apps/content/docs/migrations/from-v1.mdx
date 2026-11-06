@@ -1167,9 +1167,24 @@ orpc.live.experimental_liveOptions({ input: {} })
 
 `experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCJsonSerializer` (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)).
 
+Streamed and live queries changed (see [Streamed Query Options](/docs/integrations/tanstack-query#streamed-query-options)):
+
+- `refetchMode: 'reset'` keeps the old data until the new stream connects, then sets it to `[]`. (v1 cleared it immediately, returning the query to `pending`.)
+- `.liveOptions` rejects an `undefined` event, which TanStack Query cannot store.
+- `refetchMode: 'replace'` was removed. To keep the old data until the stream ends, collect the stream in a custom `queryFn`:
+
+```ts
+orpc.streamed.streamedOptions({
+  input: {},
+  queryFn: async ({ signal }) => Array.fromAsync(await client.streamed({}, { signal })),
+})
+```
+
 ### SWR and Pinia Colada
 
 `@orpc/experimental-react-swr` is now `@orpc/swr` (see [SWR Integration](/docs/integrations/swr)), and `@orpc/vue-colada` is now `@orpc/pinia-colada` with `createORPCVueColadaUtils` renamed to `createPiniaColadaUtils` (see [Pinia Colada Integration](/docs/integrations/pinia-colada)). Both switched from `path` to `prefix`, same as TanStack Query.
+
+In SWR, `.subscriber` now writes the data when the stream connects: `[]` with `refetchMode: 'reset'` (instead of `undefined`), and the existing data trimmed to `maxChunks` with `'append'`.
 
 ### NestJS
 

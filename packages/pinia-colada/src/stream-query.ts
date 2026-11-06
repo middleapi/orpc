@@ -1,27 +1,11 @@
-import type { Promisable } from '@orpc/shared'
+import type { Promisable, StreamedArrayOptions } from '@orpc/shared'
+import { limitArraySize, pipeStreamToCache, streamedArrayWrites } from '@orpc/shared'
 
+import type { SettleOnFirstDataOptions } from './stream-cache.ts'
+import { followEntryStream } from './stream-cache.ts'
 import type { UseQueryFnContext } from './types.ts'
 
-export interface SerializableStreamedQueryOptions {
-  /**
-   * Determines how data is handled when the query is fetched again
-   *
-   * - `'reset'`: Clears existing data and returns the query to a pending state.
-   * - `'append'`: Adds new streamed chunks to the existing data.
-   * - `'replace'`: Buffers streamed data and replaces the cache after the stream completes.
-   *
-   * @default 'reset'
-   */
-  refetchMode?: 'append' | 'reset' | 'replace' | undefined
-
-  /**
-   * Limits the number of data chunks stored in the query result.
-   * Older chunks are removed when the limit is reached.
-   *
-   * @default Number.POSITIVE_INFINITY (unlimited)
-   */
-  maxChunks?: number | undefined
-}
+export type SerializableStreamedQueryOptions = StreamedArrayOptions
 
 /**
  * A Pinia Colada query function that accumulates streamed chunks into an array,
@@ -34,56 +18,21 @@ export interface SerializableStreamedQueryOptions {
 export function serializableStreamedQuery<T>(
   queryFn: (context: UseQueryFnContext) => Promisable<AsyncIterable<T>>,
   {
-    refetchMode = 'reset',
-    maxChunks = Number.POSITIVE_INFINITY,
-  }: SerializableStreamedQueryOptions = {},
+    settleOnFirstData,
+    ...options
+  }: SerializableStreamedQueryOptions & SettleOnFirstDataOptions = {},
 ): (context: UseQueryFnContext) => Promise<T[]> {
   return async (context) => {
-    const { entry, signal } = context
+    const result = await followEntryStream<T[]>(
+      context,
+      settleOnFirstData,
+      async (callContext, writes) =>
+        pipeStreamToCache(await queryFn(callContext), {
+          ...writes,
+          ...streamedArrayWrites(options),
+        }),
+    )
 
-    const previousData = entry.state.value.data as T[] | undefined
-    const hasPreviousData = previousData !== undefined
-
-    if (hasPreviousData && refetchMode === 'reset') {
-      entry.state.value = { status: 'pending', data: undefined, error: null }
-    }
-
-    const stream = await queryFn(context)
-
-    if (signal.aborted) {
-      await stream[Symbol.asyncIterator]().return?.()
-      throw signal.reason
-    }
-
-    const shouldUpdateCacheDuringStream = !hasPreviousData || refetchMode !== 'replace'
-
-    let result: T[] =
-      hasPreviousData && refetchMode === 'append' ? limitArraySize(previousData, maxChunks) : []
-
-    if (shouldUpdateCacheDuringStream) {
-      entry.state.value = { status: 'success', data: result, error: null } as any
-    }
-
-    for await (const chunk of stream) {
-      if (signal.aborted) {
-        throw signal.reason
-      }
-
-      result = limitArraySize([...result, chunk], maxChunks)
-
-      if (shouldUpdateCacheDuringStream) {
-        entry.state.value = { status: 'success', data: result, error: null } as any
-      }
-    }
-
-    return result
+    return limitArraySize(result!.data, options.maxChunks ?? Number.POSITIVE_INFINITY)
   }
-}
-
-function limitArraySize<T>(items: T[], maxSize: number): T[] {
-  if (items.length <= maxSize) {
-    return items
-  }
-
-  return items.slice(items.length - maxSize)
 }

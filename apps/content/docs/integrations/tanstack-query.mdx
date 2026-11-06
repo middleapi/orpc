@@ -74,51 +74,68 @@ const query = useQuery(
 
 ## Streamed Query Options
 
-Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of events, and each new event is appended as it arrives.
-
-It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
+Use `.streamedOptions` to build query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data is an array of events, and each new event is appended to it. It works with `useQuery`, `useSuspenseQuery`, `prefetchQuery`, and any other API that accepts query options.
 
 ```ts
 const query = useQuery(
   orpc.streamed.streamedOptions({
-    input: { id: 123 }, // Specify input if needed
-    context: { cache: true }, // Provide client context if needed
+    input: { id: 123 },
     queryFnOptions: {
-      // Configure streamed query behavior
-      refetchMode: 'reset',
-      maxChunks: 3,
+      refetchMode: 'append',
+      maxChunks: 3, // Keep only the last 3 events
     },
-    retry: true, // Infinite retry for more reliable streaming
-    // additional options...
+    retry: true, // Retry forever to keep the stream alive
   }),
 )
 ```
 
 :::info
-`refetchMode` determines how data is handled when the query is fetched again:
+On refetch, existing data stays until the new stream connects. Then `refetchMode` decides:
 
-- `'reset'` _(default)_: Clears existing data and returns the query to a pending state.
-- `'append'`: Adds new streamed chunks to the existing data.
-- `'replace'`: Buffers streamed data and replaces the cache after the stream completes.
+- `'reset'` _(default)_: data becomes `[]`.
+- `'append'`: data is kept, trimmed to `maxChunks`.
 
+For a loading state, call `queryClient.resetQueries({ queryKey })` before refetching.
 :::
+
+:::warning
+`refetchMode` and `maxChunks` are part of the query key (when not the default):
+
+- Queries with different options get separate cache entries and separate streams. To share one, use the same options, and show fewer chunks with `select`, e.g. `select: data => data.slice(-3)`.
+- To read or write the cache by key, pass the same options: `streamedKey({ input, queryFnOptions: { refetchMode, maxChunks } })`.
+  :::
 
 ## Live Query Options
 
-Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest event, replacing the previous value whenever a new one arrives.
-
-It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
+Use `.liveOptions` to build query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data is always the latest event. An `undefined` event rejects the fetch, since TanStack Query cannot store `undefined`.
 
 ```ts
 const query = useQuery(
   orpc.live.liveOptions({
-    input: { id: 123 }, // Specify input if needed
-    context: { cache: true }, // Provide client context if needed
-    retry: true, // Infinite retry for more reliable streaming
-    // additional options...
+    input: { id: 123 },
+    retry: true, // Retry forever to keep the stream alive
   }),
 )
 ```
+
+### Settle on First Data
+
+By default, a streamed or live query follows its stream until it ends, so awaiting an endless stream (`fetchQuery`, `ensureQueryData`, route loaders) never resolves. Suspense hooks are fine: they resume at the first data while the stream keeps going.
+
+Pass `settleOnFirstData: true` to settle the fetch at the first data instead: when a streamed query connects, or on a live query's first event. The stream closes and the data stays, marked stale, so the next fetch (for example on mount) reopens it. [`StreamQuerySSRUtilsPlugin`](#streamed-and-live-queries) sets it on the server.
+
+```ts
+await queryClient.prefetchQuery(
+  orpc.live.liveOptions({
+    input: { id: 123 },
+    settleOnFirstData: true,
+  }),
+)
+```
+
+- Pass it only to a fetch nothing watches. A refetch while a query is mounted would also settle, closing its stream.
+- Not part of the query key, and ignored with a custom `queryFn`.
+- A stream cut short (cancelled, or its last observer unmounts) is marked stale, so it reopens when observed again.
 
 ## Infinite Query Options
 
@@ -570,7 +587,7 @@ const queryClient = new QueryClient({
 
 ### Streamed and Live Queries
 
-`StreamQuerySSRUtilsPlugin` lets [streamed](#streamed-query-options) and [live](#live-query-options) queries render on the server without blocking forever: streamed queries are cancelled once they connect and live queries on their first event, keeping the data received so far. In the browser, they refetch on mount to reopen the stream after hydration.
+Add `StreamQuerySSRUtilsPlugin` so [streamed](#streamed-query-options) and [live](#live-query-options) queries render on the server without blocking forever.
 
 ```ts
 import { StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
@@ -580,4 +597,20 @@ export const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
-An environment without `window` counts as the server; pass `isServer` to override.
+It sets these defaults on `.streamedOptions` and `.liveOptions`:
+
+| Option                                       | Server  | Browser    |
+| -------------------------------------------- | ------- | ---------- |
+| [`settleOnFirstData`](#settle-on-first-data) | `true`  | -          |
+| `refetchOnMount`                             | `false` | `'always'` |
+
+- The server settles at the first data, so the render finishes and the query is dehydrated with it. Components sharing a settled query don't reopen it.
+- In the browser, mounting reopens the stream after hydration (even with a `staleTime`) while the hydrated data stays on screen. A finished finite stream also reruns on each mount; pass `refetchOnMount: true` to respect `staleTime` instead.
+
+Per-call and [default options](#default-options) override the plugin. The server is detected with TanStack Query's `environmentManager.isServer()`; pass `isServer` to override.
+
+:::warning
+
+- Avoid `staleTime: 'static'`, which stops the stream from reopening on mount.
+- When [streaming](https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr#streaming-with-server-components) pending queries, read them with `useSuspenseQuery`. A `useQuery` that mounts before the hydrated data arrives keeps that data until it goes stale.
+  :::

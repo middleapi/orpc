@@ -415,10 +415,10 @@ Wire it into the page, inside its own suspense boundary:
 </Suspense>
 ```
 
-Think about what SSR means for a query that never completes. Two problems:
+A query that never completes causes two SSR problems:
 
-1. **On the server**, waiting for the stream to end would block rendering forever.
-2. **In the browser**, the hydrated reading is a static snapshot, and `staleTime` marks it fresh, so TanStack Query sees no reason to refetch. Nothing reopens the stream, and the widget silently freezes at the SSR value.
+1. **On the server**, waiting for the stream to end blocks rendering forever.
+2. **In the browser**, `staleTime` marks the hydrated reading fresh, so nothing reopens the stream. The widget freezes at the SSR value.
 
 `StreamQuerySSRUtilsPlugin` fixes both. Register it once as a [plugin](/docs/integrations/tanstack-query#plugins) in `lib/orpc.ts`:
 
@@ -430,7 +430,7 @@ export const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
-On the server, the plugin settles live queries on their first event and closes the stream, so the HTML ships with a real temperature in it. In the browser, it sets `refetchOnMount: 'always'` on streamed and live queries, so the client reopens the stream after hydration. It also gives streamed queries `initialData: []`, so they render an empty list instead of suspending or reporting `pending` before their stream connects. Per-call options still override anything the plugin sets. The [Streamed and Live Queries](/docs/integrations/tanstack-query#streamed-and-live-queries) docs cover the details.
+On the server, the plugin stops a live query at its first event (a streamed query once it connects) and closes the stream. The HTML ships with a real temperature. The plugin also sets `refetchOnMount: 'always'`, so the browser reopens the stream on mount while the server value stays on screen. See [Streamed and Live Queries](/docs/integrations/tanstack-query#streamed-and-live-queries) for details.
 
 Reload the page one last time and check your work:
 

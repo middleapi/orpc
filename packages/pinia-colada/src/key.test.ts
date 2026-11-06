@@ -43,6 +43,24 @@ it('generateOperationKey', () => {
   ).toEqual(['__prefix__', ['path'], { type: 'query', input: { a: 1 } }])
 })
 
+it('generateOperationKey keeps only non-default streamed fnOptions', () => {
+  expect(
+    generateOperationKey(['planet', 'stream'], {
+      type: 'streamed',
+      fnOptions: { refetchMode: 'append', maxChunks: 3 },
+    }),
+  ).toEqual([
+    ['planet', 'stream'],
+    { type: 'streamed', fnOptions: { refetchMode: 'append', maxChunks: 3 } },
+  ])
+  expect(
+    generateOperationKey(['planet', 'stream'], {
+      type: 'streamed',
+      fnOptions: { refetchMode: 'reset', maxChunks: Number.POSITIVE_INFINITY },
+    }),
+  ).toEqual([['planet', 'stream'], { type: 'streamed' }])
+})
+
 describe('generateOperationKey input meta', () => {
   it('keys meta by JSON-encoded path', () => {
     expect(

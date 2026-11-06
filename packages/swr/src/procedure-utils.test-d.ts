@@ -146,6 +146,13 @@ describe('procedureUtils', () => {
       requiredUtils.subscriber({ context: { batch: 'invalid' } })
     })
 
+    it('should infer types for `refetchMode` correctly', () => {
+      optionalUtils.subscriber({ refetchMode: 'reset' })
+      optionalUtils.subscriber({ refetchMode: 'append' })
+      // @ts-expect-error - 'replace' is removed
+      optionalUtils.subscriber({ refetchMode: 'replace' })
+    })
+
     it('should infer types for `output` and `error` correctly', () => {
       const subscription = useSWRSubscription(
         streamUtils.key(),

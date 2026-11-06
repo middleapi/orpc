@@ -68,6 +68,6 @@
     "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "@tanstack/query-core": ">=5.89.0"
+    "@tanstack/query-core": ">=5.105.0"
   }
 }
