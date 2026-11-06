@@ -72,21 +72,20 @@ By default, `ORPCInstrumentation` enables [context propagation](https://opentele
 
 ```ts
 const instrumentation = new ORPCInstrumentation({
-  propagation: false,
+  /**
+   * `false` disables propagation in both directions. Pass an object to control each one:
+   * - `inject`: write the context into outgoing oRPC requests
+   * - `extract`: read the context from incoming requests, disable it for untrusted clients such as browsers
+   *
+   * @default true
+   */
+  propagation: false, // or { inject: true, extract: false }
 })
 ```
 
 :::warning
 Popular instrumentations that already handle context propagation include [@hono/otel](https://www.npmjs.com/package/@hono/otel), [@opentelemetry/instrumentation-http](https://www.npmjs.com/package/@opentelemetry/instrumentation-http), and [@opentelemetry/instrumentation-fetch](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch).
 :::
-
-To control each direction separately, pass an object instead. `inject` writes the context into outgoing oRPC requests and `extract` reads it from incoming requests. Both default to `true`. For example, disable `extract` on a server that receives requests from untrusted clients, such as browsers, so they cannot join or set baggage on your traces:
-
-```ts
-const instrumentation = new ORPCInstrumentation({
-  propagation: { extract: false },
-})
-```
 
 ## Middleware Span
 
