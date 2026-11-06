@@ -649,8 +649,8 @@ importers:
   packages/json-schema:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.7.0
-        version: 0.7.0
+        specifier: ~0.7.1
+        version: 0.7.1
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -866,14 +866,14 @@ importers:
   packages/openapi:
     dependencies:
       '@openapi-spec/downgrader':
-        specifier: ~0.7.0
-        version: 0.7.0
+        specifier: ~0.7.1
+        version: 0.7.1
       '@openapi-spec/router':
-        specifier: ~0.7.0
-        version: 0.7.0
+        specifier: ~0.7.1
+        version: 0.7.1
       '@openapi-spec/types':
-        specifier: ~0.7.0
-        version: 0.7.0
+        specifier: ~0.7.1
+        version: 0.7.1
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -3219,14 +3219,14 @@ packages:
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     resolution: {integrity: sha512-Gj6C0JwCr8arj0sYuslWXUBSP/KnUlEGnPW4qxlXvAl543oaNQgMgIgkQUA6vs5BCCvwTEiL8m/wdWzfl4UvSw==}
 
-  '@openapi-spec/downgrader@0.7.0':
-    resolution: {integrity: sha512-F9sGp9phxVOoVqqRtNAN1cU4yiaMxvhUSM6wfhL2yaVVYD20wYYe6Q64P3avxNdaurFLDeuS0BM6enILqXVv+Q==}
+  '@openapi-spec/downgrader@0.7.1':
+    resolution: {integrity: sha512-8tHf1l734EUhmFjfsl6b/4wdG+VhJQIneLcDz3LGdJ2FRfSP27uPJGvi55VaGBtNPRM3AQAcDxymhtrgyvZbOA==}
 
-  '@openapi-spec/router@0.7.0':
-    resolution: {integrity: sha512-G3ZYcSJB1jJFkJ+A76KrGeK9lLYZwmmHSahbEZ8KBrGBdUqG+vqq+FSj6f4Qo25a+J71S9Sufc2ldNB75AjvRQ==}
+  '@openapi-spec/router@0.7.1':
+    resolution: {integrity: sha512-yG6JfQM2BqJrj2DCce3L64JvJKah9ssgKoweTxx3IdsP0F0Xm4lDgBzV2NP3pF1kamDbFxXkP7N2T7fJn5WLSA==}
 
-  '@openapi-spec/types@0.7.0':
-    resolution: {integrity: sha512-DH/vp8WOL6vhbJ5i5lh9xJqbCNrHpjLdR56+L5KQeDkx2O0MQqswGXPz5ceQ5XpxEkuhRNjaZZD4Tvggk4pRKg==}
+  '@openapi-spec/types@0.7.1':
+    resolution: {integrity: sha512-T85cdOyCZ1zKekZSAvwDYHfAi8heGOq5jK8GGqS0qmQVRjtyiRo1ojIkvwvLokdOANOyA1SVxp0Za13kfSDHXg==}
 
   '@opentelemetry/api-logs@0.223.0':
     resolution: {integrity: sha512-Oepm6etVPFCn0VWB1t833iOTgz1eYBDUPxcrOR/XvwzD1+Ag9VzSPSrrKAFNJ/haatj+8CXbG47pZXvdNQKDJw==}
@@ -13789,13 +13789,13 @@ snapshots:
       fast-deep-equal: 3.1.3
     optional: true
 
-  '@openapi-spec/downgrader@0.7.0':
+  '@openapi-spec/downgrader@0.7.1':
     dependencies:
-      '@openapi-spec/types': 0.7.0
+      '@openapi-spec/types': 0.7.1
 
-  '@openapi-spec/router@0.7.0': {}
+  '@openapi-spec/router@0.7.1': {}
 
-  '@openapi-spec/types@0.7.0': {}
+  '@openapi-spec/types@0.7.1': {}
 
   '@opentelemetry/api-logs@0.223.0':
     dependencies:

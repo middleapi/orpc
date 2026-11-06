@@ -98,9 +98,9 @@
     "prepack": "tsc"
   },
   "dependencies": {
-    "@openapi-spec/downgrader": "~0.7.0",
-    "@openapi-spec/router": "~0.7.0",
-    "@openapi-spec/types": "~0.7.0",
+    "@openapi-spec/downgrader": "~0.7.1",
+    "@openapi-spec/router": "~0.7.1",
+    "@openapi-spec/types": "~0.7.1",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/json-schema": "workspace:*",
