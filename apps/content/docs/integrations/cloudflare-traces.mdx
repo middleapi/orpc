@@ -51,7 +51,7 @@ Workers decide whether to keep a trace only after the invocation, so the header 
 
 ```ts
 new CloudflareTracer({
-  propagation: false,
+  propagation: false, // or { inject: false }
 }).enable()
 ```
 

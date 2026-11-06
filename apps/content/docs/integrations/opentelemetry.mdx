@@ -72,13 +72,6 @@ By default, `ORPCInstrumentation` enables [context propagation](https://opentele
 
 ```ts
 const instrumentation = new ORPCInstrumentation({
-  /**
-   * `false` disables propagation in both directions. Pass an object to control each one:
-   * - `inject`: write the context into outgoing oRPC requests
-   * - `extract`: read the context from incoming requests, disable it for untrusted clients such as browsers
-   *
-   * @default true
-   */
   propagation: false, // or { inject: true, extract: false }
 })
 ```
