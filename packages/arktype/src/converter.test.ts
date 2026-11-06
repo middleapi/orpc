@@ -98,7 +98,6 @@ describe('arkTypeToJsonSchemaConverter', () => {
 
   describe('undefined', () => {
     it.each([
-      ['string | undefined', type('string | undefined'), { type: 'string' }],
       [
         'number | null | undefined',
         type('number | null | undefined'),
@@ -157,6 +156,17 @@ describe('arkTypeToJsonSchemaConverter', () => {
     it('drops undefined from array items', () => {
       expect(converter.convert(type('(string | undefined)[]'), 'input')).toEqual([
         { type: 'array', items: { type: 'string' } },
+        false,
+      ])
+    })
+
+    it('still drops undefined when a custom fallback spreads the base schema', () => {
+      const converter = new ArkTypeToJsonSchemaConverter({
+        fallback: (ctx) => ({ ...ctx.base, title: '__EXTENDED__' }),
+      })
+
+      expect(converter.convert(type({ a: 'string | undefined' }), 'input')).toEqual([
+        { type: 'object', properties: { a: { type: 'string' } } },
         false,
       ])
     })

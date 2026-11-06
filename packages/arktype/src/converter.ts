@@ -6,9 +6,11 @@ import type {
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import {
+  deduplicateJsonSchemas,
   isStandardSchemaOptional,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
+  resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import type { Type } from 'arktype'
 
@@ -37,8 +39,6 @@ export interface ArkTypeToJsonSchemaConverterOptions extends Omit<
 export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
   private readonly toJsonSchemaOptions: ToJsonSchema.Options
   private readonly fallback: ToJsonSchema.FallbackObject
-  /** `undefined` unit schemas produced by the built-in fallback, recognized by identity */
-  private readonly undefinedSchemas = new WeakSet()
   private readonly cache:
     | undefined
     | {
@@ -67,7 +67,7 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
             // JSON can't hold `undefined`: it matches nothing here,
             // and `normalizeJsonSchema` drops it from unions and makes the property optional
             ;(ctx.base as any).not = {}
-            this.undefinedSchemas.add(ctx.base)
+            ;(ctx.base as any)[UNDEFINED_MARKER] = true
           } else if (isNonFiniteNumber(ctx.unit)) {
             // JSON can't hold NaN or ±Infinity, so no JSON value can match them
             ;(ctx.base as any).not = {}
@@ -157,58 +157,50 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
    * - routes `const`/`enum` NaN or ±Infinity (which ArkType emits as-is) through the `unit` fallback
    */
   private normalizeJsonSchema(root: ArkJsonSchema): ArkJsonSchema {
-    const defs = (root as Record<string, unknown>).$defs as Record<string, unknown> | undefined
-    const undefinableRefs = new Map<string, boolean>()
+    const defs = (root as Exclude<JsonSchema, boolean>).$defs
 
-    const isUndefinable = (schema: unknown): boolean => {
-      if (!isRecord(schema)) {
+    const isUndefinable = (schema: unknown, seen = new Set<unknown>()): boolean => {
+      if (!isRecord(schema) || seen.has(schema)) {
         return false
       }
+      seen.add(schema)
 
-      if (this.undefinedSchemas.has(schema)) {
+      if (UNDEFINED_MARKER in schema) {
         return true
       }
 
-      const branches = schema.anyOf ?? schema.oneOf
-      if (Array.isArray(branches) && branches.some(isUndefinable)) {
+      if (
+        Array.isArray(schema.anyOf) &&
+        schema.anyOf.some((branch) => isUndefinable(branch, seen))
+      ) {
         return true
       }
 
-      if (typeof schema.$ref === 'string' && schema.$ref.startsWith('#/$defs/')) {
-        const ref = schema.$ref
-        if (!undefinableRefs.has(ref)) {
-          undefinableRefs.set(ref, false) // guard against cycles
-          undefinableRefs.set(ref, isUndefinable(defs?.[ref.slice('#/$defs/'.length)]))
-        }
-        return undefinableRefs.get(ref)!
-      }
-
-      return false
+      const resolved = resolveJsonSchemaRootLocalRef(schema as JsonSchema, defs)
+      return resolved !== schema && isUndefinable(resolved, seen)
     }
 
+    // only the keywords ArkType's `toJsonSchema` emits need walking
     const normalize = (schema: unknown): unknown => {
       if (!isRecord(schema)) {
         return schema
       }
 
-      if (this.undefinedSchemas.has(schema)) {
-        return { not: {} }
-      }
-
       if (isNonFiniteNumber(schema.const)) {
         const { const: unit, ...rest } = schema
-        return { ...rest, ...(this.resolveNonFiniteUnit(unit) as object) }
+        return { ...rest, ...this.resolveNonFiniteUnit(unit) }
       }
 
       const result: Record<string, unknown> = { ...schema }
+      delete (result as Record<PropertyKey, unknown>)[UNDEFINED_MARKER]
 
-      for (const key of SINGLE_SCHEMA_KEYWORDS) {
+      for (const key of ['items', 'additionalProperties'] as const) {
         if (key in result) {
           result[key] = normalize(result[key])
         }
       }
 
-      for (const key of SCHEMA_RECORD_KEYWORDS) {
+      for (const key of ['properties', 'patternProperties', '$defs'] as const) {
         if (isRecord(result[key])) {
           result[key] = Object.fromEntries(
             Object.entries(result[key]).map(([k, v]) => [k, normalize(v)]),
@@ -216,10 +208,8 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
         }
       }
 
-      for (const key of SCHEMA_ARRAY_KEYWORDS) {
-        if (Array.isArray(result[key])) {
-          result[key] = result[key].map(normalize)
-        }
+      if (Array.isArray(result.prefixItems)) {
+        result.prefixItems = result.prefixItems.map(normalize)
       }
 
       if (isRecord(schema.properties) && Array.isArray(schema.required)) {
@@ -234,33 +224,26 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
 
       if (Array.isArray(result.enum) && result.enum.some(isNonFiniteNumber)) {
         const finite = result.enum.filter((value) => !isNonFiniteNumber(value))
-        const extra = result.enum
-          .filter(isNonFiniteNumber)
-          .map((unit) => this.resolveNonFiniteUnit(unit))
-          .filter((schema) => !isNeverSchema(schema))
-
+        result.anyOf = [
+          ...(finite.length ? [{ enum: finite }] : []),
+          ...result.enum.filter(isNonFiniteNumber).map((unit) => this.resolveNonFiniteUnit(unit)),
+        ]
         delete result.enum
-        const branches = [...(finite.length ? [{ enum: finite }] : []), ...extra]
-        result.anyOf = [...(Array.isArray(result.anyOf) ? result.anyOf : []), ...branches]
-        if (!branches.length) {
-          result.not = {}
-        }
       }
 
-      for (const key of ['anyOf', 'oneOf'] as const) {
-        const branches = result[key]
-        if (!Array.isArray(branches)) {
-          continue
-        }
+      if (Array.isArray(result.anyOf)) {
+        const kept = result.anyOf
+          .filter((branch) => !(isRecord(branch) && UNDEFINED_MARKER in branch))
+          .map(normalize)
+          .filter((branch) => !isNeverSchema(branch))
 
-        const kept = branches.filter((branch) => !isNeverSchema(branch))
         if (!kept.length) {
-          delete result[key]
+          delete result.anyOf
           result.not = {}
         } else if (kept.length === 1 && Object.keys(result).length === 1) {
           return kept[0]
         } else {
-          result[key] = kept
+          result.anyOf = kept
         }
       }
 
@@ -281,27 +264,11 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
   }
 }
 
-const SINGLE_SCHEMA_KEYWORDS = [
-  'items',
-  'contains',
-  'additionalProperties',
-  'propertyNames',
-  'unevaluatedItems',
-  'unevaluatedProperties',
-  'not',
-  'if',
-  'then',
-  'else',
-] as const
-
-const SCHEMA_RECORD_KEYWORDS = [
-  'properties',
-  'patternProperties',
-  'dependentSchemas',
-  '$defs',
-] as const
-
-const SCHEMA_ARRAY_KEYWORDS = ['prefixItems', 'allOf', 'anyOf', 'oneOf'] as const
+/**
+ * Marks the built-in `undefined` unit schema, so the property holding it can be made optional.
+ * A symbol survives spreads in custom fallbacks and is never serialized; `normalize` strips it.
+ */
+const UNDEFINED_MARKER: unique symbol = Symbol('ORPC_ARKTYPE_UNDEFINED')
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -322,28 +289,13 @@ function isNeverSchema(schema: unknown): boolean {
 }
 
 function combineAnyOf(schemas: readonly unknown[]): unknown {
-  const unique: unknown[] = []
-  const seen = new Set<string>()
-
-  for (const schema of schemas) {
-    const branches =
+  const branches = deduplicateJsonSchemas(
+    schemas.flatMap((schema) =>
       isRecord(schema) && Object.keys(schema).length === 1 && Array.isArray(schema.anyOf)
         ? schema.anyOf
-        : [schema]
+        : [schema],
+    ) as JsonSchema[],
+  )
 
-    for (const branch of branches) {
-      // tag non-finite numbers so they don't collide with `null`;
-      // branches are always schemas here, so the result is never undefined
-      // oxlint-disable-next-line no-restricted-properties
-      const key = JSON.stringify(branch, (_, value) =>
-        isNonFiniteNumber(value) ? `__non-finite:${value}` : value,
-      )
-      if (!seen.has(key)) {
-        seen.add(key)
-        unique.push(branch)
-      }
-    }
-  }
-
-  return unique.length === 1 ? unique[0] : { anyOf: unique }
+  return branches.length === 1 ? branches[0] : { anyOf: branches }
 }
