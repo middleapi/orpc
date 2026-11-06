@@ -18,7 +18,7 @@ import type {
   JsonSchema as ValibotJsonSchema,
 } from '@valibot/to-json-schema'
 import { toJsonSchema } from '@valibot/to-json-schema'
-import type { BaseSchema, MapSchema, MimeTypeAction, SetSchema } from 'valibot'
+import type { BaseSchema, MapSchema, SetSchema } from 'valibot'
 import { any, tuple } from 'valibot'
 
 export interface ValibotToJsonSchemaConverterOptions extends Omit<
@@ -221,18 +221,38 @@ function convertAction({
     return undefined
   }
 
-  const { requirement } = valibotAction as MimeTypeAction<Blob, `${string}/${string}`[], undefined>
+  const mimeTypes = toMimeTypes((valibotAction as { requirement?: unknown }).requirement)
 
-  if (requirement.length === 0) {
+  if (!mimeTypes) {
     return undefined
   }
 
-  if (requirement.length === 1) {
-    return { ...jsonSchema, contentMediaType: requirement[0] }
+  if (mimeTypes.length === 1) {
+    return { ...jsonSchema, contentMediaType: mimeTypes[0] }
   }
 
   // One branch per media type, so the OpenAPI generator documents each one.
-  return { anyOf: requirement.map((contentMediaType) => ({ ...jsonSchema, contentMediaType })) }
+  return { anyOf: mimeTypes.map((contentMediaType) => ({ ...jsonSchema, contentMediaType })) }
+}
+
+/**
+ * Reads the `v.mimeType()` requirement defensively, since it is not part of
+ * `@valibot/to-json-schema`'s contract: Valibot 1.x requires an array, and a single
+ * string is accepted in case a future version allows one. Anything else is left to
+ * the errorMode option instead of throwing a TypeError.
+ */
+function toMimeTypes(requirement: unknown): string[] | undefined {
+  const values = typeof requirement === 'string' ? [requirement] : requirement
+
+  if (
+    !Array.isArray(values) ||
+    values.length === 0 ||
+    !values.every((value) => typeof value === 'string')
+  ) {
+    return undefined
+  }
+
+  return [...new Set<string>(values)]
 }
 
 /**

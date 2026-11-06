@@ -446,6 +446,108 @@ describe('valibotToJsonSchemaConverter', () => {
       ).toThrow('The "mime_type" action cannot be converted to JSON Schema.')
     })
 
+    it('dedupes mime types and reads them through nested pipes', () => {
+      const schema = v.pipe(v.pipe(v.file(), v.mimeType(['image/png', 'image/png'])))
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        { type: 'string', contentMediaType: 'image/png' },
+        false,
+      ])
+    })
+
+    describe('with a mimeType requirement shape other than Valibot 1.x', () => {
+      const mimeType = (requirement: unknown) =>
+        ({ ...v.mimeType(['image/png']), requirement }) as unknown as v.MimeTypeAction<
+          File,
+          `${string}/${string}`[],
+          undefined
+        >
+
+      it('accepts a single mime type string', () => {
+        expect(converter.convert(v.pipe(v.file(), mimeType('image/png')), 'input')).toEqual([
+          { type: 'string', contentMediaType: 'image/png' },
+          false,
+        ])
+      })
+
+      it.each([[[]], [123], [undefined], [['image/png', 1]]])(
+        'leaves %j to the errorMode option',
+        (requirement) => {
+          const schema = v.pipe(v.file(), mimeType(requirement))
+
+          expect(converter.convert(schema, 'input')).toEqual([
+            { type: 'string', contentMediaType: '*/*' },
+            false,
+          ])
+          expect(() =>
+            new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'input'),
+          ).toThrow('The "mime_type" action cannot be converted to JSON Schema.')
+        },
+      )
+    })
+
+    describe('when @valibot/to-json-schema converts files natively', () => {
+      // Simulates a future version that converts `file`/`blob` and `mime_type` itself
+      // before calling the override hooks.
+      beforeEach(async () => {
+        const { toJsonSchema: original } =
+          await vi.importActual<typeof import('@valibot/to-json-schema')>('@valibot/to-json-schema')
+
+        // Mirrors the library: a hook that returns nothing keeps the native conversion.
+        const withNative =
+          <T extends object>(
+            hook: (context: T) => any,
+            native: (context: T) => Record<string, unknown> | undefined,
+          ) =>
+          (context: T) => {
+            const jsonSchema = native(context)
+            return jsonSchema
+              ? (hook({ ...context, jsonSchema, errors: undefined }) ?? jsonSchema)
+              : hook(context)
+          }
+
+        vi.mocked(toJsonSchema).mockImplementationOnce((schema, config) =>
+          original(schema, {
+            ...config,
+            overrideSchema: withNative(config!.overrideSchema!, ({ valibotSchema }) =>
+              valibotSchema.type === 'file' ? { type: 'string', format: 'binary' } : undefined,
+            ),
+            overrideAction: withNative(config!.overrideAction!, ({ valibotAction }) =>
+              valibotAction.type === 'mime_type'
+                ? {
+                    anyOf: (valibotAction as any).requirement.map((contentMediaType: string) => ({
+                      type: 'string',
+                      contentMediaType,
+                    })),
+                  }
+                : undefined,
+            ),
+          }),
+        )
+      })
+
+      it('keeps emitting the oRPC file schema', () => {
+        expect(converter.convert(v.file(), 'input')).toEqual([
+          { type: 'string', contentMediaType: '*/*' },
+          false,
+        ])
+      })
+
+      it('keeps the native mimeType conversion when it is no longer a single file schema', () => {
+        const schema = v.pipe(v.file(), v.mimeType(['image/png', 'image/jpeg']))
+
+        expect(converter.convert(schema, 'input')).toEqual([
+          {
+            anyOf: [
+              { type: 'string', contentMediaType: 'image/png' },
+              { type: 'string', contentMediaType: 'image/jpeg' },
+            ],
+          },
+          false,
+        ])
+      })
+    })
+
     it('passes the mimeType action to the overrideAction option without the conversion error', () => {
       const overrideAction = vi.fn(({ valibotAction, jsonSchema }) =>
         valibotAction.type === 'mime_type' ? { ...jsonSchema, title: 'image' } : undefined,
