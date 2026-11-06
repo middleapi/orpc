@@ -234,6 +234,33 @@ describe('openAPIComponentRegistry', () => {
           },
         })
       })
+
+      it.each([
+        ['a non-object discriminator', 'kind', 'type'],
+        [
+          'non-string mapping values',
+          { propertyName: 'kind', mapping: { cat: 1 } },
+          { propertyName: 'kind', mapping: { cat: 2 } },
+        ],
+      ])('compares %s structurally', (_, discriminator, otherDiscriminator) => {
+        const { doc, registry } = createRegistry({
+          schemas: { Pet: { type: 'object', discriminator: structuredClone(discriminator) } },
+        })
+
+        expect(
+          registry.hoistDefs({
+            $ref: '#/$defs/Pet',
+            $defs: { Pet: { type: 'object', discriminator } },
+          }),
+        ).toEqual({ $ref: '#/components/schemas/Pet' })
+        expect(
+          registry.hoistDefs({
+            $ref: '#/$defs/Pet',
+            $defs: { Pet: { type: 'object', discriminator: otherDiscriminator } },
+          }),
+        ).toEqual({ $ref: '#/components/schemas/Pet2' })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Pet', 'Pet2'])
+      })
     })
 
     it('keeps the def name when componentName returns undefined', () => {

@@ -13,7 +13,10 @@ describe('visitJsonSchemaRefs', () => {
   it('visits refs under the same keywords mapJsonSchemaRefs rewrites, and skips non-schema keywords', () => {
     const schema: JsonSchema = {
       type: 'object',
-      properties: { child: { $ref: '#/$defs/A' } },
+      properties: {
+        child: { $ref: '#/$defs/A' },
+        unmapped: { discriminator: { propertyName: 'kind' } },
+      },
       patternProperties: { '^x-': { $ref: '#/$defs/B' } },
       propertyNames: { $ref: '#/$defs/C' },
       dependentSchemas: { other: { $ref: '#/$defs/D' } },
@@ -239,6 +242,7 @@ describe('mapJsonSchemaRefs', () => {
   it('rewrites local pointers in discriminator mapping values and leaves other values alone', () => {
     const visited: Array<[ref: string, path: Array<string | number>]> = []
     const discriminatorWithoutRefs = { propertyName: 'kind', mapping: { dog: 'Dog' } }
+    const discriminatorWithoutMapping = { propertyName: 'kind' }
 
     const rewritten = mapJsonSchemaRefs(
       {
@@ -252,6 +256,7 @@ describe('mapJsonSchemaRefs', () => {
             },
           },
           plain: { discriminator: discriminatorWithoutRefs },
+          unmapped: { discriminator: discriminatorWithoutMapping },
         },
         // discriminator-shaped metadata is not a schema keyword here
         examples: [{ discriminator: { mapping: { cat: '#/$defs/Cat' } } }],
@@ -277,10 +282,12 @@ describe('mapJsonSchemaRefs', () => {
           },
         },
         plain: { discriminator: discriminatorWithoutRefs },
+        unmapped: { discriminator: discriminatorWithoutMapping },
       },
       examples: [{ discriminator: { mapping: { cat: '#/$defs/Cat' } } }],
     })
     expect((rewritten as any).properties.plain.discriminator).toBe(discriminatorWithoutRefs)
+    expect((rewritten as any).properties.unmapped.discriminator).toBe(discriminatorWithoutMapping)
 
     expect(visited).toEqual([
       ['#/$defs/Cat', ['properties', 'pet', 'oneOf', 0, '$ref']],
