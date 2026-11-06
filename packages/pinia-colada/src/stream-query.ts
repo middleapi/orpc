@@ -98,7 +98,12 @@ export function serializableStreamedQuery<T>(
 
     // Colada writes the returned data again, so return the entry data to keep later writes
     const cached = entry.state.value.data as T[] | undefined
-    return cached === undefined ? data : limitArraySize(cached, maxChunks)
+    if (cached === undefined) {
+      return data
+    }
+
+    // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
+    return Array.isArray(cached) ? limitArraySize(cached, maxChunks) : cached
   }
 }
 

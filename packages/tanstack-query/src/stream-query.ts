@@ -91,7 +91,12 @@ export function serializableStreamedQuery<
 
       // the returned data is written again, so return the cache to keep later writes
       const cached = client.getQueryData<TQueryFnData[]>(queryKey)
-      return limitArraySize(cached === undefined ? data : cached, maxChunks)
+      if (cached === undefined) {
+        return data
+      }
+
+      // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
+      return Array.isArray(cached) ? limitArraySize(cached, maxChunks) : cached
     } finally {
       signal.removeEventListener('abort', markStale)
     }

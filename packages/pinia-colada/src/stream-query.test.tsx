@@ -472,4 +472,19 @@ describe('serializableStreamedQuery', () => {
     ).rejects.toBe(signal.reason)
     expect(entry).toMatchObject({ when: 0, state: { value: { data: [0] } } })
   })
+
+  it('keeps a null written after the last chunk', async () => {
+    const queryCache = createQueryCache()
+    const entry = queryCache.ensure({
+      key: ['stream'],
+      query: serializableStreamedQuery(async () =>
+        (async function* () {
+          yield 1
+          entry.state.value = { status: 'success', data: null, error: null } as any
+        })(),
+      ),
+    })
+
+    await expect(queryCache.fetch(entry)).resolves.toMatchObject({ data: null })
+  })
 })

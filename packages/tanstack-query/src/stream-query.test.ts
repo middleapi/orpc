@@ -362,6 +362,21 @@ describe('serializableStreamedQuery', () => {
       await promise1
     })
 
+    it('keeps a null written after the last chunk', async () => {
+      const key = ['null-after-stream']
+
+      await expect(
+        queryClient.fetchQuery({
+          queryKey: key,
+          queryFn: serializableStreamedQuery(async function* () {
+            yield 1
+            queryClient.setQueryData(key, null)
+          }),
+        }),
+      ).resolves.toBeNull()
+      expect(queryClient.getQueryData(key)).toBeNull()
+    })
+
     it('handles error in stream', async () => {
       const queryFn = serializableStreamedQuery(async function* () {
         yield 'chunk1'
