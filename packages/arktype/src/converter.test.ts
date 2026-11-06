@@ -155,8 +155,11 @@ describe('arkTypeToJsonSchemaConverter', () => {
       ])
     })
 
-    it('leaves other instanceof types to the fallback option', () => {
-      expect(converter.convert(type.instanceOf(Map), 'input')).toEqual([{}, false])
+    it.each([
+      ['instanceof types', type.instanceOf(Map)],
+      ['domains', type('symbol')],
+    ])('leaves other %s to the fallback option', (_, schema) => {
+      expect(converter.convert(schema, 'input')).toEqual([{}, false])
     })
   })
 
