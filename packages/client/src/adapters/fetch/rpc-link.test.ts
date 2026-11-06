@@ -222,3 +222,22 @@ describe('standardRPCLink: event-iterator', async () => {
     expect(await output.next()).toEqual(expect.objectContaining({ value: undefined, done: true }))
   })
 })
+
+describe('rpcLink: redirect response', () => {
+  it.each([
+    ['empty body', null],
+    ['html body', '<html>Login</html>'],
+  ])('rejects a 302 with %s instead of resolving it as output', async (_, body) => {
+    const rpcLink = new RPCLink({
+      url: 'http://api.example.com',
+      fetch: async () => new Response(body, {
+        status: 302,
+        headers: { 'location': 'http://api.example.com/login', 'content-type': 'text/html' },
+      }),
+    })
+
+    await expect(rpcLink.call(['ping'], undefined, { context: {} })).rejects.toThrow(
+      'Unexpected redirect response (status 302): RPCLink does not follow redirects.',
+    )
+  })
+})

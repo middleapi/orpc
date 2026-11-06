@@ -104,6 +104,11 @@ export class StandardRPCLinkCodec<T extends ClientContext> implements StandardLi
   }
 
   async decode(response: StandardLazyResponse): Promise<unknown> {
+    // RPCHandler never redirects, so a 3xx comes from a proxy or gateway and its body is not the procedure output.
+    if (response.status >= 300 && response.status < 400) {
+      throw new Error(`Unexpected redirect response (status ${response.status}): RPCLink does not follow redirects.`)
+    }
+
     const isOk = !isORPCErrorStatus(response.status)
 
     const deserialized = await (async () => {
