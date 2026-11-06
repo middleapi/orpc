@@ -28,6 +28,10 @@ describe('visitJsonSchemaRefs', () => {
       additionalProperties: { $ref: '#/$defs/L' },
       anyOf: [{ $ref: '#/$defs/M' }],
       $defs: { Nested: { $ref: '#/$defs/N' } },
+      discriminator: {
+        propertyName: 'kind',
+        mapping: { o: '#/$defs/O', bare: 'Bare', remote: 'other.json#/Remote' },
+      },
       examples: [{ $ref: '#/$defs/Ignored' }],
     }
 
@@ -42,7 +46,9 @@ describe('visitJsonSchemaRefs', () => {
 
     expect(visited.toSorted()).toEqual(mapped.toSorted())
     expect(visited).not.toContain('#/$defs/Ignored')
-    expect(visited.length).toBe(14)
+    expect(visited).not.toContain('Bare')
+    expect(visited).not.toContain('other.json#/Remote')
+    expect(visited.length).toBe(15)
   })
 
   it('visits shared and cyclic object instances once', () => {
@@ -64,26 +70,6 @@ describe('visitJsonSchemaRefs', () => {
     )
 
     expect(visited).toEqual(['#/$defs/Shared'])
-  })
-
-  it('visits local pointers in discriminator mapping values', () => {
-    const visited: string[] = []
-    visitJsonSchemaRefs(
-      {
-        properties: {
-          pet: {
-            oneOf: [{ $ref: '#/$defs/Cat' }],
-            discriminator: {
-              propertyName: 'kind',
-              mapping: { cat: '#/$defs/Cat', dog: 'Dog', remote: 'other.json#/Bird' },
-            },
-          },
-        },
-      },
-      (ref) => visited.push(ref),
-    )
-
-    expect(visited).toEqual(['#/$defs/Cat', '#/$defs/Cat'])
   })
 
   it('ignores non-object schemas', () => {

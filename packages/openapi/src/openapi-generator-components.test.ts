@@ -156,23 +156,26 @@ describe('openAPIComponentRegistry', () => {
         return { $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: pet } }
       }
 
-      it('rewrites discriminator mapping refs to the hoisted components', () => {
-        const { doc, registry } = createRegistry()
+      it.each([
+        ['def names', undefined, ''],
+        ['componentName names', (defName: string) => `X${defName}`, 'X'],
+      ] as const)('rewrites discriminator mapping refs to %s', (_, componentName, prefix) => {
+        const { doc, registry } = createRegistry({ componentName })
 
         expect(registry.hoistDefs(petSchema())).toEqual({
           type: 'object',
           properties: {
             pet: {
               oneOf: [
-                { $ref: '#/components/schemas/Cat' },
-                { $ref: '#/components/schemas/Dog' },
-                { $ref: '#/components/schemas/Bird' },
+                { $ref: `#/components/schemas/${prefix}Cat` },
+                { $ref: `#/components/schemas/${prefix}Dog` },
+                { $ref: `#/components/schemas/${prefix}Bird` },
               ],
               discriminator: {
                 propertyName: 'kind',
                 mapping: {
-                  cat: '#/components/schemas/Cat',
-                  dog: '#/components/schemas/Dog',
+                  cat: `#/components/schemas/${prefix}Cat`,
+                  dog: `#/components/schemas/${prefix}Dog`,
                   // bare schema names are not refs
                   bird: 'Bird',
                 },
@@ -180,31 +183,9 @@ describe('openAPIComponentRegistry', () => {
             },
           },
         })
-        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Cat', 'Dog', 'Bird'])
-      })
-
-      it('rewrites discriminator mapping refs to componentName names', () => {
-        const { doc, registry } = createRegistry({ componentName: (defName) => `X${defName}` })
-
-        expect(registry.hoistDefs(petSchema())).toMatchObject({
-          properties: {
-            pet: {
-              oneOf: [
-                { $ref: '#/components/schemas/XCat' },
-                { $ref: '#/components/schemas/XDog' },
-                { $ref: '#/components/schemas/XBird' },
-              ],
-              discriminator: {
-                mapping: {
-                  cat: '#/components/schemas/XCat',
-                  dog: '#/components/schemas/XDog',
-                  bird: 'Bird',
-                },
-              },
-            },
-          },
-        })
-        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['XCat', 'XDog', 'XBird'])
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(
+          ['Cat', 'Dog', 'Bird'].map((name) => `${prefix}${name}`),
+        )
       })
 
       it('rewrites mapping refs inside hoisted components and reuses them', () => {
