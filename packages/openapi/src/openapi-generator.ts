@@ -71,9 +71,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    *
    * @remarks
    * - The returned name is a preference, conflicting names are still postfixed (`Planet`, `PlanetInput`, `Planet2`, ...).
-   * - Return `undefined` to keep the original def name.
+   * - Return `undefined` to keep the default name: the def name with characters OpenAPI does not allow
+   *   in component keys (anything but `a-z`, `A-Z`, `0-9`, `.`, `_`, `-`) replaced by `_`, e.g. `User Profile` becomes `User_Profile`.
+   * - The returned name is used as-is, without that replacement, keep it within `^[a-zA-Z0-9._-]+$` for a valid document.
    *
-   * @default defName => defName
+   * @default defName => defName.replace(/[^\w.-]/gu, '_')
    */
   componentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
 

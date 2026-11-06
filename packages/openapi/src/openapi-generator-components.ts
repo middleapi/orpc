@@ -5,7 +5,14 @@ import {
   ensureJsonSchemaObject,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
+import {
+  getOwn,
+  isDeepEqual,
+  isPlainObject,
+  safeDecodeURIComponent,
+  safeEncodeURIComponent,
+  setOwn,
+} from '@orpc/shared'
 
 import type { OpenAPIV3_2 } from './types.ts'
 
@@ -13,12 +20,45 @@ const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 
 /**
+ * Characters OpenAPI does not allow in component keys (`^[a-zA-Z0-9._-]+$`).
+ */
+const INVALID_COMPONENT_NAME_CHARS = /[^\w.-]/gu
+
+/**
+ * Characters a URI fragment cannot carry unencoded (RFC 3986 `fragment`).
+ * `%` is encoded as well, so names containing it decode back to themselves.
+ */
+const NON_URI_FRAGMENT_CHARS = /[^\w.~!$&'()*+,;=:@/?-]/gu
+
+/**
+ * Replaces characters OpenAPI does not allow in component keys with `_`,
+ * e.g. `User Profile` becomes `User_Profile` and `Page<User>` becomes `Page_User_`.
+ */
+function toValidComponentName(name: string): string {
+  return name.replace(INVALID_COMPONENT_NAME_CHARS, '_') || '_'
+}
+
+function toComponentRef(componentName: string): string {
+  return (
+    COMPONENTS_REF_PREFIX +
+    encodeJsonPointerSegment(componentName).replace(NON_URI_FRAGMENT_CHARS, safeEncodeURIComponent)
+  )
+}
+
+/**
  * Collects reusable schemas into `doc.components.schemas`.
  *
  * Equivalent schemas (including recursive ones) reuse a single component, and different
  * schemas competing for the same name get direction-suffixed or numbered postfixes.
+ * Def names are made valid component keys, see {@link toValidComponentName}.
  */
 export class OpenAPIComponentRegistry {
+  /**
+   * The unsanitized name each minted component was registered for, so distinct names
+   * that sanitize to the same key (`User Profile`, `User_Profile`) are never merged.
+   */
+  private readonly componentSources = new Map<string, string>()
+
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
     private readonly componentName:
@@ -80,11 +120,17 @@ export class OpenAPIComponentRegistry {
       []
 
     for (const [defName, cleanSchema] of defs) {
+      const customName = this.componentName?.(defName, cleanSchema)
+      const sourceName = customName ?? defName
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
         new Set(renameMap.values()),
         defName,
-        this.componentName?.(defName, cleanSchema) ?? defName,
+        customName ?? toValidComponentName(defName),
+        (name) => {
+          const existingSource = this.componentSources.get(name)
+          return existingSource === undefined || existingSource === sourceName
+        },
         defs,
         direction,
       )
@@ -92,6 +138,7 @@ export class OpenAPIComponentRegistry {
       renameMap.set(defName, componentName)
 
       if (!reuseExisting) {
+        this.componentSources.set(componentName, sourceName)
         pendingSchemas.push({ cleanSchema, componentName })
       }
     }
@@ -126,6 +173,7 @@ function resolveComponentName(
   claimedNames: Set<string>,
   defName: string,
   preferredName: string,
+  isReusable: (componentName: string) => boolean,
   defs: ReadonlyMap<string, JsonSchema>,
   direction: JsonSchemaConverterDirection | undefined,
 ): [componentName: string, reuseExisting: boolean] {
@@ -149,9 +197,10 @@ function resolveComponentName(
     }
 
     if (
+      isReusable(componentName) &&
       areSchemaRefsEquivalentForReuse(
         DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
-        COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(componentName),
+        toComponentRef(componentName),
         {
           defs,
           componentsSchemas,
@@ -281,7 +330,15 @@ function parseRefName(ref: string, prefix: string): string | undefined {
     return undefined
   }
 
-  return ref.slice(prefix.length).split('/').map(decodeJsonPointerSegment).join('/')
+  let pointer = ref.slice(prefix.length)
+
+  // converters write `#/$defs/...` refs unencoded (`#/$defs/User Profile`),
+  // component refs are proper URI fragments and may be percent-encoded
+  if (prefix === COMPONENTS_REF_PREFIX) {
+    pointer = safeDecodeURIComponent(pointer)
+  }
+
+  return pointer.split('/').map(decodeJsonPointerSegment).join('/')
 }
 
 function resolveNamedRef(
@@ -346,6 +403,6 @@ function rewriteComponentSchemaRefs(
       return ref
     }
 
-    return COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(renamedName)
+    return toComponentRef(renamedName)
   })
 }

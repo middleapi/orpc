@@ -797,6 +797,99 @@ describe('openAPIGenerator version', () => {
     },
   )
 
+  describe.each(['3.2.0', '3.1.1', '3.0.4'] as const)(
+    'component names in OpenAPI %s',
+    (version) => {
+      const zodGenerator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
+      const ids = ['root~/', 'User Profile', 'api:User', 'Page<User>']
+
+      const contract = {
+        list: oc
+          .meta(openapi({ method: 'GET', path: '/things' }))
+          .output(
+            z.object(
+              Object.fromEntries(
+                ids.map((id, i) => [`field${i}`, z.object({ value: z.literal(i) }).meta({ id })]),
+              ),
+            ),
+          ),
+      }
+
+      function collectRefs(value: unknown, refs: string[] = []): string[] {
+        if (Array.isArray(value)) {
+          value.forEach((item) => collectRefs(item, refs))
+        } else if (value && typeof value === 'object') {
+          for (const [key, item] of Object.entries(value)) {
+            if (key === '$ref' && typeof item === 'string') {
+              refs.push(item)
+            } else {
+              collectRefs(item, refs)
+            }
+          }
+        }
+
+        return refs
+      }
+
+      it('sanitizes schema ids into valid component keys by default', async () => {
+        const doc = await zodGenerator.generate(contract, { version })
+        const schemas = doc.components?.schemas ?? {}
+
+        expect(Object.keys(schemas)).toEqual(['root__', 'User_Profile', 'api_User', 'Page_User_'])
+        for (const key of Object.keys(schemas)) {
+          expect(key).toMatch(/^[\w.-]+$/)
+        }
+
+        expect(doc.paths?.['/things']?.get?.responses?.['200']).toMatchObject({
+          content: {
+            'application/json': {
+              schema: {
+                properties: {
+                  field0: { $ref: '#/components/schemas/root__' },
+                  field1: { $ref: '#/components/schemas/User_Profile' },
+                  field2: { $ref: '#/components/schemas/api_User' },
+                  field3: { $ref: '#/components/schemas/Page_User_' },
+                },
+              },
+            },
+          },
+        })
+      })
+
+      it('keeps componentName overrides and writes their refs as valid URI references', async () => {
+        const doc = await zodGenerator.generate(contract, {
+          version,
+          componentName: (defName) => defName,
+        })
+
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(ids)
+
+        const refs = collectRefs(doc.paths)
+        const expectedRefs = [
+          '#/components/schemas/root~0~1',
+          '#/components/schemas/User%20Profile',
+          '#/components/schemas/api:User',
+          '#/components/schemas/Page%3CUser%3E',
+        ]
+        // the 3.0 downgrade inlines percent-encoded refs, which 3.0 tooling handles poorly
+        expect(refs).toEqual(
+          version.startsWith('3.0.')
+            ? expectedRefs.filter((ref) => !ref.includes('%'))
+            : expectedRefs,
+        )
+
+        for (const ref of refs) {
+          // every ref resolves to a component after URI and JSON Pointer decoding
+          const name = decodeURIComponent(ref.slice('#/components/schemas/'.length))
+            .replaceAll('~1', '/')
+            .replaceAll('~0', '~')
+          expect(doc.components?.schemas).toHaveProperty([name])
+          expect(ref).not.toMatch(/[\s<>]/)
+        }
+      })
+    },
+  )
+
   it('serializes non-JSON values after downgrading', async () => {
     const doc = await generator.generate(
       {},
