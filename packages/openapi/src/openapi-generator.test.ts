@@ -885,33 +885,17 @@ describe('openAPIGenerator version', () => {
     },
   )
 
-  it.each(['3.1.0', '3.0.4'] as const)(
+  it.each(['3.2.0', '3.1.0', '3.0.4'] as const)(
     'omits undefined fields in OpenAPI %s when the serializer keeps them',
     async (version) => {
-      const generator = new OpenAPIGenerator({
+      const keepingGenerator = new OpenAPIGenerator({
         converters: [testSchemaConverter],
         serializer: new OpenAPIJsonSerializer({ omitUndefinedProperties: false }),
       })
 
-      const doc = await generator.generate(
-        {
-          ping: oc.meta(openapi({ method: 'GET', path: '/ping/{id}' })).input(
-            testSchema({
-              type: 'object',
-              properties: { id: { type: 'string' } },
-              required: ['id'],
-            }),
-          ),
-        },
-        { version },
+      expect(await keepingGenerator.generate(router, { version })).toEqual(
+        await generator.generate(router, { version }),
       )
-
-      const operation = doc.paths?.['/ping/{id}']?.get
-      expect(operation).not.toHaveProperty('summary')
-      expect(operation).not.toHaveProperty('tags')
-      expect(operation?.parameters).toEqual([
-        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
-      ])
     },
   )
 

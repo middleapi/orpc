@@ -15,7 +15,15 @@ import {
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
-import { clone, isPlainObject, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
+import {
+  clone,
+  isPlainObject,
+  mergeHttpPath,
+  pathToHttpPath,
+  setOwn,
+  toArray,
+  value,
+} from '@orpc/shared'
 
 import { DEFAULT_OPENAPI_METHOD } from './constants.ts'
 import type { OpenAPIMeta } from './meta.ts'
@@ -262,10 +270,10 @@ export class OpenAPIGenerator {
       )
     }
 
-    // the downgraders skip `undefined` properties; drop them first so a serializer that keeps them
-    // (as `null`) can't turn them into invalid fields such as `summary: null`
-    const source = version.startsWith('3.2.') ? doc : omitUndefinedProperties(doc)
-    const serialized = this.serializer.serializeJson(source).json as OpenAPIV3_2.OpenAPIObject
+    // drop `undefined` fields first so a serializer that keeps them (as `null`) can't write
+    // invalid fields such as `summary: null`
+    const serialized = this.serializer.serializeJson(omitUndefinedProperties(doc))
+      .json as OpenAPIV3_2.OpenAPIObject
     return toVersionedOpenAPIDocument(serialized, version) as OpenAPIDocument<TVersion>
   }
 
@@ -321,10 +329,10 @@ function omitUndefinedProperties<T>(value: T): T {
     return value
   }
 
-  const result: Record<string, unknown> = {}
-  for (const key of Object.keys(value)) {
-    if (value[key] !== undefined) {
-      result[key] = omitUndefinedProperties(value[key])
+  const result = {}
+  for (const [key, v] of Object.entries(value)) {
+    if (v !== undefined) {
+      setOwn(result, key, omitUndefinedProperties(v))
     }
   }
   return result as T
