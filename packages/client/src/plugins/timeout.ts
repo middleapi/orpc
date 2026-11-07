@@ -1,7 +1,13 @@
 import type { Value } from '@orpc/shared'
-import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
-import type { ClientContext } from '../types'
 import { AbortError, anyAbortSignal, toArray, value } from '@orpc/shared'
+
+import type {
+  StandardLinkInterceptor,
+  StandardLinkInterceptorOptions,
+  StandardLinkOptions,
+  StandardLinkPlugin,
+} from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 
 export interface TimeoutLinkPluginOptions<T extends ClientContext> {
   /**
@@ -47,8 +53,7 @@ export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkP
 
       try {
         return await interceptorOptions.next({ ...interceptorOptions, signal })
-      }
-      finally {
+      } finally {
         clearTimeout(timeoutId)
       }
     }

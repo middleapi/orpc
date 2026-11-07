@@ -14,7 +14,7 @@ This repository uses:
 - **Node.js** v22+ (use [`pnpm env`](https://pnpm.io/cli/env) for quick setup)
 - **pnpm** and **pnpm workspaces** for dependency management
 - **Vitest** for testing
-- **ESLint** with [@antfu/eslint-config](https://github.com/antfu/eslint-config) for linting and formatting
+- **oxlint** for linting and type checking (`pnpm check`), **oxfmt** for formatting (`pnpm format`)
 
 ## Workflow
 

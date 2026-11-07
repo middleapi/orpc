@@ -1,53 +1,49 @@
 {
   "name": "@orpc/ai-sdk",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "AI SDK integration for oRPC: turn contracts and procedures into typesafe AI SDK tools",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "agents",
+    "ai",
+    "ai-sdk",
+    "llm",
+    "orpc",
+    "tools",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/ai-sdk"
   },
-  "keywords": [
-    "orpc",
-    "ai",
-    "ai-sdk",
-    "tools",
-    "llm",
-    "agents",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "ai": ">=7.0.31"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -58,7 +54,10 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "ai": "^7.0.157",
+    "ai": "^7.0.162",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "ai": ">=7.0.31"
   }
 }

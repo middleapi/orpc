@@ -1,8 +1,8 @@
 ---
-title: "Smart Coercion Plugin"
-description: "Automatically coerce request and response values to match your schema types without writing manual coercion logic."
+title: 'Smart Coercion Plugin'
+description: 'Automatically coerce request and response values to match your schema types without writing manual coercion logic.'
 sidebar:
-  label: "Smart Coercion"
+  label: 'Smart Coercion'
 ---
 
 :::warning
@@ -29,8 +29,8 @@ const handler = new OpenAPIHandler(router, {
         new ZodToJsonSchemaConverter(),
         // Add other schema converters as needed
       ],
-    })
-  ]
+    }),
+  ],
 })
 ```
 
@@ -47,7 +47,7 @@ const link = new OpenAPILink(contract, {
         // Add other schema converters as needed
       ],
     }),
-  ]
+  ],
 })
 ```
 

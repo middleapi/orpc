@@ -1,10 +1,12 @@
-import type { AddressInfo } from 'node:net'
-import type { CreateClientServerTest } from './client-server'
 import * as http from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RPCHandler } from '@orpc/server/node'
-import { defaultSerializer } from './client-server'
+
+import type { CreateClientServerTest } from './client-server.ts'
+import { defaultSerializer } from './client-server.ts'
 
 export const createNodeHttpClientServerTest: CreateClientServerTest = (
   router,

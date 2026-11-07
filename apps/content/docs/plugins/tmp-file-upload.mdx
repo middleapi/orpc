@@ -1,8 +1,8 @@
 ---
-title: "Tmp File Upload Plugin"
-description: "Stream large file uploads into temporary files instead of memory, so requests far larger than available memory are parsed safely."
+title: 'Tmp File Upload Plugin'
+description: 'Stream large file uploads into temporary files instead of memory, so requests far larger than available memory are parsed safely.'
 sidebar:
-  label: "Tmp File Upload"
+  label: 'Tmp File Upload'
 ---
 
 ## Installation
@@ -47,18 +47,15 @@ Procedures receive ordinary `File` instances. An upload spooled to disk is a `Tm
 import { TmpFile } from '@orpc/node'
 import { rename, writeFile } from 'node:fs/promises'
 
-const uploadVideo = os
-  .input(z.object({ video: z.file() }))
-  .handler(async ({ input }) => {
-    const destination = `./videos/${crypto.randomUUID()}`
+const uploadVideo = os.input(z.object({ video: z.file() })).handler(async ({ input }) => {
+  const destination = `./videos/${crypto.randomUUID()}`
 
-    if (input.video instanceof TmpFile) {
-      await rename(input.video.path, destination)
-    }
-    else {
-      await writeFile(destination, input.video.stream())
-    }
-  })
+  if (input.video instanceof TmpFile) {
+    await rename(input.video.path, destination)
+  } else {
+    await writeFile(destination, input.video.stream())
+  }
+})
 ```
 
 :::warning
@@ -141,9 +138,10 @@ const handler = new RPCHandler(router, {
     new TmpFileUploadHandlerPlugin({
       maxBodySize: async ({ context }) => ({
         memory: 1024 * 1024, // 1MB
-        file: context.user === undefined
-          ? 5 * 1024 * 1024 // 5MB for guests
-          : 500 * 1024 * 1024, // 500MB for authenticated users
+        file:
+          context.user === undefined
+            ? 5 * 1024 * 1024 // 5MB for guests
+            : 500 * 1024 * 1024, // 500MB for authenticated users
         stream: 500 * 1024 * 1024, // 500MB
       }),
     }),

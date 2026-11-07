@@ -1,11 +1,10 @@
 import type { AnyProcedureContract, AnySchema } from '@orpc/contract'
-import type { JsonObjectSchemaEntry, JsonSchema, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { Value } from '@orpc/shared'
-import type { OpenAPIMeta } from './meta'
-import type { OpenAPIComponentRegistry } from './openapi-generator-components'
-import type { OpenAPIV3_2 } from './types'
-import type { getDynamicPathParams } from './utils'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
+import type {
+  JsonObjectSchemaEntry,
+  JsonSchema,
+  JsonSchemaConverterDirection,
+} from '@orpc/json-schema'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
@@ -20,18 +19,24 @@ import {
   resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
-import { stringifyJSON, value } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
+import { getOwn, stringifyJSON, value } from '@orpc/shared'
+
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
   DEFAULT_OPENAPI_SUCCESS_DESCRIPTION,
-} from './constants'
-import { isBodylessMethod } from './utils'
+} from './constants.ts'
+import type { OpenAPIMeta } from './meta.ts'
+import type { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
+import type { OpenAPIV3_2 } from './types.ts'
+import type { getDynamicPathParams } from './utils.ts'
+import { isBodylessMethod } from './utils.ts'
 
 export type DynamicPathParam = NonNullable<ReturnType<typeof getDynamicPathParams>>[number]
 
-export class OpenAPIGeneratorError extends TypeError { }
+export class OpenAPIGeneratorError extends TypeError {}
 
 export interface OpenAPIErrorBodyDefinition {
   code: string
@@ -45,16 +50,28 @@ export interface OpenAPIErrorBodyDefinition {
  */
 export interface OpenAPIOperationContext {
   registry: OpenAPIComponentRegistry
-  convertSchemas: (schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection) => [JsonSchema, boolean]
+  convertSchemas: (
+    schemas: AnySchema[] | undefined,
+    direction: JsonSchemaConverterDirection,
+  ) => [JsonSchema, boolean]
   errorStatusMap: Record<string, number>
-  errorResponseBodySchema: Value<
-    JsonSchema | null | undefined,
-    [definedErrors: OpenAPIErrorBodyDefinition[], status: number, defaultSchema: () => JsonSchema]
-  > | undefined
+  errorResponseBodySchema:
+    | Value<
+        JsonSchema | null | undefined,
+        [
+          definedErrors: OpenAPIErrorBodyDefinition[],
+          status: number,
+          defaultSchema: () => JsonSchema,
+        ]
+      >
+    | undefined
   errorResponseContentType: string
 }
 
-export function toOpenAPIPath(path: `/${string}`, dynamicPathParams: DynamicPathParam[] | undefined): `/${string}` {
+export function toOpenAPIPath(
+  path: `/${string}`,
+  dynamicPathParams: DynamicPathParam[] | undefined,
+): `/${string}` {
   if (!dynamicPathParams?.length) {
     return path
   }
@@ -93,11 +110,14 @@ export function buildRequest(
 ): void {
   const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
   const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
+  const dynamicParams = dynamicPathParams?.map((v) => v.parameterName)
 
   if (inputStructure === 'compact') {
     const iteratorDetails = getAsyncIteratorObjectSchemasDetails(def.inputSchemas)
 
     if (iteratorDetails) {
+      renderPathParameters(ctx, operation, dynamicParams, undefined, undefined)
+
       operation.requestBody = {
         required: true,
         content: toAsyncIteratorObjectContent(
@@ -112,16 +132,16 @@ export function buildRequest(
     }
   }
 
-  const dynamicParams = dynamicPathParams?.map(v => v.parameterName)
   const [schema, optional] = ctx.convertSchemas(def.inputSchemas, 'input')
 
   if (isUnconstrainedSchema(schema) && !dynamicParams?.length) {
     return
   }
 
-  const parts = inputStructure === 'compact'
-    ? extractCompactRequestParts(schema, optional, method, dynamicParams)
-    : extractDetailedRequestParts(schema)
+  const parts =
+    inputStructure === 'compact'
+      ? extractCompactRequestParts(schema, optional, method, dynamicParams)
+      : extractDetailedRequestParts(schema)
 
   renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
   renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
@@ -145,9 +165,9 @@ function extractCompactRequestParts(
 
   if (!entries && isBodylessMethod(method)) {
     throw new OpenAPIGeneratorError(
-      `method is ${method} but the input schema is not an object.\n`
-      + `  ${method} sends every input field as a query parameter, so the input must be an object schema.\n`
-      + `  Fix: make the input an object, or use a method with a request body (POST, PUT, PATCH, DELETE).`,
+      `method is ${method} but the input schema is not an object.\n` +
+        `  ${method} sends every input field as a query parameter, so the input must be an object schema.\n` +
+        `  Fix: make the input an object, or use a method with a request body (POST, PUT, PATCH, DELETE).`,
     )
   }
 
@@ -158,17 +178,22 @@ function extractCompactRequestParts(
   const bodySchema = !hasBody
     ? undefined
     : !dynamicParams?.length
-        ? schema
-        : restEntries
-          ? combineJsonObjectSchemaEntries(restEntries, extractJsonObjectSchemaAdditionalProperties(schema))
-          : undefined
+      ? schema
+      : restEntries
+        ? combineJsonObjectSchemaEntries(
+            restEntries,
+            extractJsonObjectSchemaAdditionalProperties(schema),
+          )
+        : undefined
 
   return {
     paramsEntries,
     queryEntries: isBodylessMethod(method) ? restEntries : undefined,
     headersEntries: undefined,
     bodySchema,
-    bodyOptional: !dynamicParams?.length ? optional : restEntries?.every(([,,optional]) => optional),
+    bodyOptional: !dynamicParams?.length
+      ? optional
+      : restEntries?.every(([, , optional]) => optional),
   }
 }
 
@@ -177,8 +202,8 @@ function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
 
   if (!entries) {
     throw new OpenAPIGeneratorError(
-      `inputStructure is "detailed" but the input schema is not an object.\n`
-      + `  Expected an object shaped like: { params?: object, query?: object, headers?: object, body?: unknown }`,
+      `inputStructure is "detailed" but the input schema is not an object.\n` +
+        `  Expected an object shaped like: { params?: object, query?: object, headers?: object, body?: unknown }`,
     )
   }
 
@@ -206,9 +231,9 @@ function renderPathParameters(
 
   if (!paramsEntries) {
     throw new OpenAPIGeneratorError(
-      `the route declares path params (${dynamicParams.map(p => `{${p}}`).join(', ')}) but there is no object schema to source them from.\n`
-      + `  compact mode:  the input schema must be an object containing each param.\n`
-      + `  detailed mode: the input's "params" section must be an object containing each param.`,
+      `the route declares path params (${dynamicParams.map((p) => `{${p}}`).join(', ')}) but there is no object schema to source them from.\n` +
+        `  compact mode:  the input schema must be an object containing each param.\n` +
+        `  detailed mode: the input's "params" section must be an object containing each param.`,
     )
   }
 
@@ -217,16 +242,16 @@ function renderPathParameters(
 
     if (!entry) {
       throw new OpenAPIGeneratorError(
-        `dynamic param "{${name}}" is missing from the input schema.\n`
-        + `  Route params: ${dynamicParams.map(p => `{${p}}`).join(', ')}\n`
-        + `  Schema keys:  ${paramsEntries.map(([n]) => n).join(', ') || '(none)'}`,
+        `dynamic param "{${name}}" is missing from the input schema.\n` +
+          `  Route params: ${dynamicParams.map((p) => `{${p}}`).join(', ')}\n` +
+          `  Schema keys:  ${paramsEntries.map(([n]) => n).join(', ') || '(none)'}`,
       )
     }
 
     if (entry[2]) {
       throw new OpenAPIGeneratorError(
-        `dynamic param "${name}" is optional in the input schema.\n`
-        + `  OpenAPI requires path params to be required. Make "${name}" required.`,
+        `dynamic param "${name}" is optional in the input schema.\n` +
+          `  OpenAPI requires path params to be required. Make "${name}" required.`,
       )
     }
 
@@ -241,8 +266,7 @@ function renderPathParameters(
     if (style === 'comma-delimited-array' || style === 'comma-delimited-object') {
       parameter.style = 'simple'
       parameter.explode = false
-    }
-    else {
+    } else {
       const _expect: 'primitive' | undefined = style
     }
 
@@ -273,23 +297,17 @@ function renderQueryParameters(
 
     if (style === 'comma-delimited-array' || style === 'comma-delimited-object') {
       parameter.explode = false
-    }
-    else if (style === 'pipe-delimited-array' || style === 'pipe-delimited-object') {
+    } else if (style === 'pipe-delimited-array' || style === 'pipe-delimited-object') {
       parameter.style = 'pipeDelimited'
-    }
-    else if (style === 'space-delimited-array' || style === 'space-delimited-object') {
+    } else if (style === 'space-delimited-array' || style === 'space-delimited-object') {
       parameter.style = 'spaceDelimited'
-    }
-    else if (style === 'json') {
+    } else if (style === 'json') {
       parameter.content = {
         'application/json': { schema: parameter.schema },
       }
       delete parameter.schema
       delete parameter.allowReserved
-    }
-    else if (style === undefined) {
-      const isPrimitive = (s: JsonSchema) => isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(s))
-
+    } else if (style === undefined) {
       if (!flattenJsonUnionSchema(schema).every(isPrimitive)) {
         const arrayable = matchArrayableJsonSchema(schema)
 
@@ -298,8 +316,7 @@ function renderQueryParameters(
           parameter.explode = true
         }
       }
-    }
-    else {
+    } else {
       const _expect: 'primitive' | 'array' = style
     }
 
@@ -370,11 +387,17 @@ export function buildSuccessResponse(
     }
 
     if (parts.bodies.length) {
-      responseObject.content = toBodyContent(ctx, 'output', combineJsonSchemasWithComposition('anyOf', parts.bodies))
+      responseObject.content = toBodyContent(
+        ctx,
+        'output',
+        combineJsonSchemasWithComposition('anyOf', parts.bodies),
+      )
     }
 
     if (parts.headers.length) {
-      const entries = extractJsonObjectSchemaEntries(combineJsonSchemasWithComposition('anyOf', parts.headers))
+      const entries = extractJsonObjectSchemaEntries(
+        combineJsonSchemasWithComposition('anyOf', parts.headers),
+      )
       entries?.forEach(([name, schema, optional]) => {
         responseObject.headers ??= {}
         responseObject.headers[name] = {
@@ -403,30 +426,40 @@ function toResponseStatusKey(status: number): `${1 | 2 | 3 | 4 | 5}${string}` {
 function extractDetailedResponseParts(
   schema: JsonSchema,
   defaultStatus: number,
-): Map<number, { descriptions: string[], bodies: JsonSchema[], headers: JsonSchema[] }> {
-  const partsByStatus = new Map<number, { descriptions: string[], bodies: JsonSchema[], headers: JsonSchema[] }>()
+): Map<number, { descriptions: string[]; bodies: JsonSchema[]; headers: JsonSchema[] }> {
+  const partsByStatus = new Map<
+    number,
+    { descriptions: string[]; bodies: JsonSchema[]; headers: JsonSchema[] }
+  >()
 
   for (const item of flattenJsonUnionSchema(schema)) {
     const entries = extractJsonObjectSchemaEntries(item)
 
     if (!entries) {
       throw new OpenAPIGeneratorError(
-        `outputStructure is "detailed" but the output schema (or one of its union members) is not an object.\n`
-        + `  Expected each member shaped like: { status?: number (< 400), headers?: object, body?: unknown }`,
+        `outputStructure is "detailed" but the output schema (or one of its union members) is not an object.\n` +
+          `  Expected each member shaped like: { status?: number (< 400), headers?: object, body?: unknown }`,
       )
     }
 
-    const statusSchema = entries.find(([name]) => name === 'status')?.[1]
-    const statuses = statusSchema === undefined
-      ? new Map([[defaultStatus, undefined]])
-      : extractDetailedStatuses(statusSchema)
+    const [, statusSchema, statusOptional = true] =
+      entries.find(([name]) => name === 'status') ?? []
+    const statuses =
+      statusSchema === undefined
+        ? new Map<number, string | undefined>()
+        : extractDetailedStatuses(statusSchema)
 
     if (!statuses) {
       throw new OpenAPIGeneratorError(
-        `invalid "status" field in the detailed output schema.\n`
-        + `  Expected: literal integers below 400 (const, enum, or a union of them)\n`
-        + `  Received: ${stringifyJSON(statusSchema)}`,
+        `invalid "status" field in the detailed output schema.\n` +
+          `  Expected: literal integers below 400 (const, enum, or a union of them)\n` +
+          `  Received: ${stringifyJSON(statusSchema)}`,
       )
+    }
+
+    // an omitted status falls back to the success status at runtime
+    if (statusOptional && !statuses.has(defaultStatus)) {
+      statuses.set(defaultStatus, undefined)
     }
 
     const headersSchema = entries.find(([name]) => name === 'headers')?.[1]
@@ -502,8 +535,11 @@ export function buildErrorResponse(
       continue
     }
 
-    const status = ctx.errorStatusMap[code] ?? DEFAULT_ERROR_STATUS
-    const [dataJsonSchema, dataOptional] = ctx.convertSchemas(config.data !== undefined ? [config.data] : undefined, 'output')
+    const status = getOwn(ctx.errorStatusMap, code) ?? DEFAULT_ERROR_STATUS
+    const [dataJsonSchema, dataOptional] = ctx.convertSchemas(
+      config.data !== undefined ? [config.data] : undefined,
+      'output',
+    )
 
     let definitions = definitionsByStatus.get(status)
     if (!definitions) {
@@ -531,29 +567,36 @@ export function buildErrorResponse(
   })
 
   for (const [status, definitions] of definitionsByStatus.entries()) {
-    const descriptions = definitions.map(({ defaultMessage }) => defaultMessage).filter(m => m !== undefined)
-    const definedErrors = definitions.map(def => ({ ...def, dataJsonSchema: ctx.registry.hoistDefs(def.dataJsonSchema, 'output') }))
+    const descriptions = definitions
+      .map(({ defaultMessage }) => defaultMessage)
+      .filter((m) => m !== undefined)
+    const definedErrors = definitions.map((def) => ({
+      ...def,
+      dataJsonSchema: ctx.registry.hoistDefs(def.dataJsonSchema, 'output'),
+    }))
 
     // lazy, so per-code error components are only registered when the default schema is actually used
-    const defaultSchema = (): JsonSchema => combineJsonSchemasWithComposition('oneOf', [
-      ...definedErrors.map(({ code, dataJsonSchema, dataOptional }) => {
-        return ctx.registry.register(toErrorComponentName(code), {
-          title: code,
-          ...combineJsonObjectSchemaEntries([
-            ['defined', { const: true }, false],
-            ['code', { const: code }, false],
-            // avoid using the defaultMessage here to improve component reusability
-            ['message', { type: 'string' }, false],
-            ['data', dataJsonSchema, dataOptional],
-          ]),
-        })
-      }),
-      undefinedErrorSchema,
-    ])
+    const defaultSchema = (): JsonSchema =>
+      combineJsonSchemasWithComposition('oneOf', [
+        ...definedErrors.map(({ code, dataJsonSchema, dataOptional }) => {
+          return ctx.registry.register(toErrorComponentName(code), {
+            title: code,
+            ...combineJsonObjectSchemaEntries([
+              ['defined', { const: true }, false],
+              ['code', { const: code }, false],
+              // avoid using the defaultMessage here to improve component reusability
+              ['message', { type: 'string' }, false],
+              ['data', dataJsonSchema, dataOptional],
+            ]),
+          })
+        }),
+        undefinedErrorSchema,
+      ])
 
-    const responseSchema = ctx.errorResponseBodySchema === undefined
-      ? defaultSchema()
-      : value(ctx.errorResponseBodySchema, definedErrors, status, defaultSchema)
+    const responseSchema =
+      ctx.errorResponseBodySchema === undefined
+        ? defaultSchema()
+        : value(ctx.errorResponseBodySchema, definedErrors, status, defaultSchema)
 
     const responseObject: OpenAPIV3_2.ResponseObject = {
       description: descriptions.length ? descriptions.join(', ') : status.toString(),
@@ -581,7 +624,9 @@ function toErrorComponentName(code: string): string {
     .filter(Boolean)
     .map((part) => {
       const rest = part.slice(1)
-      return part.charAt(0).toUpperCase() + (rest === rest.toUpperCase() ? rest.toLowerCase() : rest)
+      return (
+        part.charAt(0).toUpperCase() + (rest === rest.toUpperCase() ? rest.toLowerCase() : rest)
+      )
     })
     .join('')
 
@@ -626,7 +671,11 @@ function toAsyncIteratorObjectContent(
   }
 }
 
-function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConverterDirection, schema: JsonSchema): Record<string, OpenAPIV3_2.MediaTypeObject> {
+function toBodyContent(
+  ctx: OpenAPIOperationContext,
+  direction: JsonSchemaConverterDirection,
+  schema: JsonSchema,
+): Record<string, OpenAPIV3_2.MediaTypeObject> {
   const fileSchemasByMediaType = new Map<string, JsonSchema[]>()
 
   const rest = flattenJsonUnionSchema(schema).filter((s) => {
@@ -639,8 +688,7 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
     const schemas = fileSchemasByMediaType.get(contentMediaType)
     if (schemas) {
       schemas.push(s)
-    }
-    else {
+    } else {
       fileSchemasByMediaType.set(contentMediaType, [s])
     }
 
@@ -650,7 +698,9 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
   const content: Record<string, OpenAPIV3_2.MediaTypeObject> = {}
 
   if (rest.length > 0) {
-    const restSchema = fileSchemasByMediaType.size ? combineJsonSchemasWithComposition('anyOf', rest) : schema
+    const restSchema = fileSchemasByMediaType.size
+      ? combineJsonSchemasWithComposition('anyOf', rest)
+      : schema
     const hasNestedFiles = containsJsonFileSchema(restSchema)
 
     const contentType = hasNestedFiles ? 'multipart/form-data' : 'application/json'
@@ -658,15 +708,25 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
     fileSchemasByMediaType.delete(contentType)
 
     content[contentType] = {
-      schema: ctx.registry.toOpenAPISchema(combineJsonSchemasWithComposition('anyOf', [restSchema, ...fileSchemas ?? []]), direction),
+      schema: ctx.registry.toOpenAPISchema(
+        combineJsonSchemasWithComposition('anyOf', [restSchema, ...(fileSchemas ?? [])]),
+        direction,
+      ),
     }
   }
 
   for (const [contentType, schemas] of fileSchemasByMediaType.entries()) {
     content[contentType] = {
-      schema: ctx.registry.toOpenAPISchema(combineJsonSchemasWithComposition('anyOf', schemas), direction),
+      schema: ctx.registry.toOpenAPISchema(
+        combineJsonSchemasWithComposition('anyOf', schemas),
+        direction,
+      ),
     }
   }
 
   return content
+}
+
+function isPrimitive(schema: JsonSchema): boolean {
+  return isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(schema))
 }

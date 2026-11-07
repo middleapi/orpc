@@ -1,6 +1,7 @@
 import { promiseWithResolvers, sleep } from '@orpc/shared'
-import { LockTimeoutError } from '../error'
-import { MemoryLocker } from './memory'
+
+import { LockTimeoutError } from '../error.ts'
+import { MemoryLocker } from './memory.ts'
 
 describe('memoryLocker', () => {
   it('runs the callback right away when the lock is free and releases it afterwards', async () => {
@@ -58,9 +59,11 @@ describe('memoryLocker', () => {
   it('releases the lock when the callback throws', async () => {
     const locker = new MemoryLocker()
 
-    await expect(locker.lock('key', () => {
-      throw new Error('boom')
-    })).rejects.toThrow('boom')
+    await expect(
+      locker.lock('key', () => {
+        throw new Error('boom')
+      }),
+    ).rejects.toThrow('boom')
 
     await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
   })
@@ -71,14 +74,18 @@ describe('memoryLocker', () => {
     let maxActive = 0
     let count = 0
 
-    await Promise.all(Array.from({ length: 50 }, () => locker.lock('key', async () => {
-      active++
-      maxActive = Math.max(maxActive, active)
-      const current = count
-      await sleep(1)
-      count = current + 1
-      active--
-    })))
+    await Promise.all(
+      Array.from({ length: 50 }, () =>
+        locker.lock('key', async () => {
+          active++
+          maxActive = Math.max(maxActive, active)
+          const current = count
+          await sleep(1)
+          count = current + 1
+          active--
+        }),
+      ),
+    )
 
     expect(maxActive).toBe(1)
     expect(count).toBe(50)
@@ -283,11 +290,17 @@ describe('memoryLocker', () => {
       const locker = new MemoryLocker()
       const controller = new AbortController()
 
-      await expect(locker.lock('key', async () => {
-        controller.abort()
-        await sleep(1)
-        return 'ok'
-      }, { signal: controller.signal })).resolves.toBe('ok')
+      await expect(
+        locker.lock(
+          'key',
+          async () => {
+            controller.abort()
+            await sleep(1)
+            return 'ok'
+          },
+          { signal: controller.signal },
+        ),
+      ).resolves.toBe('ok')
     })
   })
 })

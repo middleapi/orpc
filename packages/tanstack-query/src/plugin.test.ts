@@ -1,5 +1,5 @@
-import type { RouterUtilsPlugin } from './plugin'
-import { CompositeRouterUtilsPlugin } from './plugin'
+import type { RouterUtilsPlugin } from './plugin.ts'
+import { CompositeRouterUtilsPlugin } from './plugin.ts'
 
 describe('compositeRouterUtilsPlugin', () => {
   beforeEach(() => {
@@ -78,8 +78,14 @@ describe('compositeRouterUtilsPlugin', () => {
     expect(plugin3.initProcedureOptions).toHaveBeenCalledOnce()
 
     expect(plugin3.initProcedureOptions).toHaveBeenCalledWith(['key'], { marks: [] })
-    expect(plugin2.initProcedureOptions).toHaveBeenCalledWith(['key'], { path: ['key'], marks: ['3'] })
-    expect(plugin1.initProcedureOptions).toHaveBeenCalledWith(['key'], { path: ['key'], marks: ['3', '2'] })
+    expect(plugin2.initProcedureOptions).toHaveBeenCalledWith(['key'], {
+      path: ['key'],
+      marks: ['3'],
+    })
+    expect(plugin1.initProcedureOptions).toHaveBeenCalledWith(['key'], {
+      path: ['key'],
+      marks: ['3', '2'],
+    })
 
     expect(result).toEqual({ path: ['key'], marks: ['3', '2', '1'] })
   })

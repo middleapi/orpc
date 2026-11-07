@@ -1,12 +1,15 @@
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ToFetchResponseOptions } from '@standard-server/fetch'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+import type { ToFetchResponseOptions } from '@standard-server/fetch'
 import { toFetchResponse, toStandardLazyRequest } from '@standard-server/fetch'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
 
-export type FetchHandlerHandleResult = { matched: true, response: Response } | { matched: false, response?: undefined }
+import type { Context } from '../../context.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index.ts'
+
+export type FetchHandlerHandleResult =
+  | { matched: true; response: Response }
+  | { matched: false; response?: undefined }
 
 export interface FetchHandlerOptions<_T extends Context> {
   /**

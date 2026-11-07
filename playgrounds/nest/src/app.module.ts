@@ -1,8 +1,9 @@
-import type { Publisher } from '@orpc/publisher'
 import { Module } from '@nestjs/common'
 import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
 import { ORPCModule } from '@orpc/nest'
+import type { Publisher } from '@orpc/publisher'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
 import { messagePublisher } from './context'
 import { FileController } from './controllers/file.controller'
 import { MessageController } from './controllers/message.controller'
@@ -32,4 +33,5 @@ declare module '@orpc/server' {
   controllers: [SpecController, PlanetController, FileController, MessageController],
   providers: [],
 })
+// oxlint-disable-next-line typescript/no-extraneous-class
 export class AppModule {}

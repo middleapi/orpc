@@ -1,8 +1,9 @@
-import type { StandardLazyRequest } from '@standard-server/core'
 import { ORPCError } from '@orpc/client'
 import { DEFAULT_ERROR_STATUS, os } from '@orpc/server'
-import { openapi } from '../../meta'
-import { OpenAPIHandlerCodec } from './openapi-handler-codec'
+import type { StandardLazyRequest } from '@standard-server/core'
+
+import { openapi } from '../../meta.ts'
+import { OpenAPIHandlerCodec } from './openapi-handler-codec.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -31,10 +32,13 @@ describe('openAPIHandlerCodec', () => {
           os.meta(openapi({ method: 'GET', path: '/items' })).handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/missing',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/missing',
+          }),
+          options as any,
+        )
 
         expect(result).toBeUndefined()
       })
@@ -45,13 +49,16 @@ describe('openAPIHandlerCodec', () => {
           .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/gateway/api/v1/items/42',
-        }), {
-          ...options,
-          prefix: '/gateway',
-        } as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/gateway/api/v1/items/42',
+          }),
+          {
+            ...options,
+            prefix: '/gateway',
+          } as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -63,17 +70,18 @@ describe('openAPIHandlerCodec', () => {
 
     describe('compact GET input', () => {
       it('merges path params and query without reading the body', async () => {
-        const procedure = os
-          .meta(openapi({ method: 'GET', path: '/{id}' }))
-          .handler(vi.fn())
+        const procedure = os.meta(openapi({ method: 'GET', path: '/{id}' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
         const resolveBody = vi.fn()
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/42?plain=value&filter[status]=active',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/42?plain=value&filter[status]=active',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
@@ -88,17 +96,18 @@ describe('openAPIHandlerCodec', () => {
       })
 
       it('treats HEAD like GET, merging path params and query without reading the body', async () => {
-        const procedure = os
-          .meta(openapi({ method: 'HEAD', path: '/{id}' }))
-          .handler(vi.fn())
+        const procedure = os.meta(openapi({ method: 'HEAD', path: '/{id}' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
         const resolveBody = vi.fn()
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'HEAD',
-          url: '/42?verbose=true',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'HEAD',
+            url: '/42?verbose=true',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -111,15 +120,16 @@ describe('openAPIHandlerCodec', () => {
       })
 
       it('gives path params precedence over conflicting query params', async () => {
-        const procedure = os
-          .meta(openapi({ method: 'GET', path: '/{id}' }))
-          .handler(vi.fn())
+        const procedure = os.meta(openapi({ method: 'GET', path: '/{id}' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/42?id=99&q=hello',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/42?id=99&q=hello',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -130,15 +140,16 @@ describe('openAPIHandlerCodec', () => {
       })
 
       it('returns query directly when there are no path params', async () => {
-        const procedure = os
-          .meta(openapi({ method: 'GET', path: '/status' }))
-          .handler(vi.fn())
+        const procedure = os.meta(openapi({ method: 'GET', path: '/status' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/status?plain=value&filter[status]=active',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/status?plain=value&filter[status]=active',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
@@ -150,15 +161,16 @@ describe('openAPIHandlerCodec', () => {
       })
 
       it('converts a bracket-notation root array query to an object and merges with path params', async () => {
-        const procedure = os
-          .meta(openapi({ method: 'GET', path: '/{id}' }))
-          .handler(vi.fn())
+        const procedure = os.meta(openapi({ method: 'GET', path: '/{id}' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/42?0=zero&1=one',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/42?0=zero&1=one',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -171,21 +183,28 @@ describe('openAPIHandlerCodec', () => {
 
       it('decodes path params using simple array and object styles', async () => {
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({
-            method: 'GET',
-            path: '/{id}/{tags}/{filters}',
-            paramsStyles: {
-              id: 'primitive',
-              tags: 'comma-delimited-array',
-              filters: 'comma-delimited-object',
-            },
-          })).handler(vi.fn()),
+          os
+            .meta(
+              openapi({
+                method: 'GET',
+                path: '/{id}/{tags}/{filters}',
+                paramsStyles: {
+                  id: 'primitive',
+                  tags: 'comma-delimited-array',
+                  filters: 'comma-delimited-object',
+                },
+              }),
+            )
+            .handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/42/red,blue/size,large,brand,nike?page=2',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/42/red,blue/size,large,brand,nike?page=2',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -198,34 +217,54 @@ describe('openAPIHandlerCodec', () => {
       })
 
       it('ignores paramsStyles keys that are not path params of the matched route', async () => {
-        const base = os.meta(openapi({ paramsStyles: { tags: 'comma-delimited-array', filters: 'comma-delimited-object' } }))
+        const base = os.meta(
+          openapi({
+            paramsStyles: { tags: 'comma-delimited-array', filters: 'comma-delimited-object' },
+          }),
+        )
         const codec = new OpenAPIHandlerCodec({
           list: base.meta(openapi({ method: 'GET', path: '/items/{category}' })).handler(vi.fn()),
-          create: base.meta(openapi({ method: 'POST', path: '/items/{category}' })).handler(vi.fn()),
-          detailed: base.meta(openapi({ method: 'PUT', path: '/items/{category}', inputStructure: 'detailed' })).handler(vi.fn()),
+          create: base
+            .meta(openapi({ method: 'POST', path: '/items/{category}' }))
+            .handler(vi.fn()),
+          detailed: base
+            .meta(openapi({ method: 'PUT', path: '/items/{category}', inputStructure: 'detailed' }))
+            .handler(vi.fn()),
         })
 
-        const list = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/items/books?tags=a&tags=b',
-        }), options as any)
+        const list = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/items/books?tags=a&tags=b',
+          }),
+          options as any,
+        )
 
         await expect(list!.decodeInput()).resolves.toEqual({ category: 'books', tags: ['a', 'b'] })
 
-        const create = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/items/books',
-          resolveBody: vi.fn().mockResolvedValueOnce({ tags: ['a', 'b'] }),
-        }), options as any)
+        const create = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/items/books',
+            resolveBody: vi.fn().mockResolvedValueOnce({ tags: ['a', 'b'] }),
+          }),
+          options as any,
+        )
 
-        await expect(create!.decodeInput()).resolves.toEqual({ category: 'books', tags: ['a', 'b'] })
+        await expect(create!.decodeInput()).resolves.toEqual({
+          category: 'books',
+          tags: ['a', 'b'],
+        })
 
-        const detailed = await codec.resolveProcedure(createRequest({
-          method: 'PUT',
-          url: '/items/books',
-        }), options as any)
+        const detailed = await codec.resolveProcedure(
+          createRequest({
+            method: 'PUT',
+            url: '/items/books',
+          }),
+          options as any,
+        )
 
-        const input = await detailed!.decodeInput() as any
+        const input = (await detailed!.decodeInput()) as any
         expect(Object.keys(input.params)).toEqual(['category'])
       })
     })
@@ -238,15 +277,20 @@ describe('openAPIHandlerCodec', () => {
         } as any
 
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' })).handler(vi.fn()),
+          os
+            .meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' }))
+            .handler(vi.fn()),
           { serializer },
         )
         const resolveBody = vi.fn().mockResolvedValueOnce(undefined)
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/24',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -262,16 +306,21 @@ describe('openAPIHandlerCodec', () => {
           .meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' }))
           .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
-        const resolveBody = vi.fn().mockResolvedValueOnce(new URLSearchParams([
-          ['title', 'hello'],
-          ['published', 'true'],
-        ]))
+        const resolveBody = vi.fn().mockResolvedValueOnce(
+          new URLSearchParams([
+            ['title', 'hello'],
+            ['published', 'true'],
+          ]),
+        )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/24',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
@@ -291,16 +340,21 @@ describe('openAPIHandlerCodec', () => {
           .meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' }))
           .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
-        const resolveBody = vi.fn().mockResolvedValueOnce(new URLSearchParams([
-          ['id', '99'],
-          ['title', 'hello'],
-        ]))
+        const resolveBody = vi.fn().mockResolvedValueOnce(
+          new URLSearchParams([
+            ['id', '99'],
+            ['title', 'hello'],
+          ]),
+        )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/24',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -317,16 +371,21 @@ describe('openAPIHandlerCodec', () => {
         } as any
 
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' })).handler(vi.fn()),
+          os
+            .meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' }))
+            .handler(vi.fn()),
           { serializer },
         )
         const resolveBody = vi.fn().mockResolvedValueOnce('__body__')
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/24',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -340,17 +399,18 @@ describe('openAPIHandlerCodec', () => {
           deserialize: vi.fn().mockReturnValueOnce({ name: 'din' }),
         } as any
 
-        const procedure = os
-          .meta(openapi({ method: 'POST', path: '/submit' }))
-          .handler(vi.fn())
+        const procedure = os.meta(openapi({ method: 'POST', path: '/submit' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
         const resolveBody = vi.fn().mockResolvedValueOnce('__body__')
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/submit',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/submit',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
@@ -371,11 +431,14 @@ describe('openAPIHandlerCodec', () => {
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
         const resolveBody = vi.fn().mockResolvedValueOnce('__body__')
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/24',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
@@ -396,11 +459,14 @@ describe('openAPIHandlerCodec', () => {
         )
         const resolveBody = vi.fn().mockResolvedValueOnce(blob)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/24',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -420,11 +486,14 @@ describe('openAPIHandlerCodec', () => {
         )
         const resolveBody = vi.fn().mockResolvedValueOnce(blob)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/submit',
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/submit',
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -435,25 +504,32 @@ describe('openAPIHandlerCodec', () => {
     describe('detailed input', () => {
       it('decodes input into { params, query, headers, body }', async () => {
         const procedure = os
-          .meta(openapi({
-            method: 'POST',
-            path: '/{id}',
-            inputStructure: 'detailed',
-            requestBodyHint: 'url-search-params',
-          }))
+          .meta(
+            openapi({
+              method: 'POST',
+              path: '/{id}',
+              inputStructure: 'detailed',
+              requestBodyHint: 'url-search-params',
+            }),
+          )
           .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
-        const resolveBody = vi.fn().mockResolvedValueOnce(new URLSearchParams([
-          ['name', 'alice'],
-          ['active', 'true'],
-        ]))
+        const resolveBody = vi.fn().mockResolvedValueOnce(
+          new URLSearchParams([
+            ['name', 'alice'],
+            ['active', 'true'],
+          ]),
+        )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/99?page=2',
-          headers: { 'x-trace-id': 'abc' },
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/99?page=2',
+            headers: { 'x-trace-id': 'abc' },
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
@@ -471,26 +547,31 @@ describe('openAPIHandlerCodec', () => {
 
       it('decodes styled path params inside the detailed params object', async () => {
         const procedure = os
-          .meta(openapi({
-            method: 'POST',
-            path: '/{id}/{tags}/{filters}',
-            inputStructure: 'detailed',
-            paramsStyles: {
-              id: 'primitive',
-              tags: 'comma-delimited-array',
-              filters: 'comma-delimited-object',
-            },
-          }))
+          .meta(
+            openapi({
+              method: 'POST',
+              path: '/{id}/{tags}/{filters}',
+              inputStructure: 'detailed',
+              paramsStyles: {
+                id: 'primitive',
+                tags: 'comma-delimited-array',
+                filters: 'comma-delimited-object',
+              },
+            }),
+          )
           .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
         const resolveBody = vi.fn().mockResolvedValueOnce(undefined)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/42/red,blue/size,large,brand,nike?page=2',
-          headers: { 'x-trace-id': 'abc' },
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/42/red,blue/size,large,brand,nike?page=2',
+            headers: { 'x-trace-id': 'abc' },
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -508,26 +589,31 @@ describe('openAPIHandlerCodec', () => {
 
       it('decodes styled query values inside the detailed query object', async () => {
         const procedure = os
-          .meta(openapi({
-            method: 'POST',
-            path: '/{id}',
-            inputStructure: 'detailed',
-            queryStyles: {
-              keyword: 'primitive',
-              tags: 'array',
-              meta: 'json',
-            },
-          }))
+          .meta(
+            openapi({
+              method: 'POST',
+              path: '/{id}',
+              inputStructure: 'detailed',
+              queryStyles: {
+                keyword: 'primitive',
+                tags: 'array',
+                meta: 'json',
+              },
+            }),
+          )
           .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
         const resolveBody = vi.fn().mockResolvedValueOnce(undefined)
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/42?keyword=first&keyword=last&tags=red&tags=blue&meta=%7B%22enabled%22%3Atrue%7D&plain=value',
-          headers: { 'x-trace-id': 'abc' },
-          resolveBody,
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'POST',
+            url: '/42?keyword=first&keyword=last&tags=red&tags=blue&meta=%7B%22enabled%22%3Atrue%7D&plain=value',
+            headers: { 'x-trace-id': 'abc' },
+            resolveBody,
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -548,21 +634,28 @@ describe('openAPIHandlerCodec', () => {
     describe('queryParsing', () => {
       it('applies last, array, and json strategies to repeated params', async () => {
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({
-            method: 'GET',
-            path: '/{id}',
-            queryStyles: {
-              keyword: 'primitive',
-              tags: 'array',
-              meta: 'json',
-            },
-          })).handler(vi.fn()),
+          os
+            .meta(
+              openapi({
+                method: 'GET',
+                path: '/{id}',
+                queryStyles: {
+                  keyword: 'primitive',
+                  tags: 'array',
+                  meta: 'json',
+                },
+              }),
+            )
+            .handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/42?keyword=first&keyword=last&tags=red&tags=blue&meta=%7B%22enabled%22%3Atrue%7D&plain=value',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/42?keyword=first&keyword=last&tags=red&tags=blue&meta=%7B%22enabled%22%3Atrue%7D&plain=value',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -580,10 +673,13 @@ describe('openAPIHandlerCodec', () => {
           os.meta(openapi({ method: 'GET', queryStyles: { tags: 'array' } })).handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/?0=zero&1=one',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/?0=zero&1=one',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -596,13 +692,16 @@ describe('openAPIHandlerCodec', () => {
 
       it('returns the deserialized result as-is when queryParsing is an empty object', async () => {
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({ method: 'GET', queryStyles: { } })).handler(vi.fn()),
+          os.meta(openapi({ method: 'GET', queryStyles: {} })).handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/?0=zero&1=one',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/?0=zero&1=one',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -613,10 +712,13 @@ describe('openAPIHandlerCodec', () => {
         const codec = new OpenAPIHandlerCodec(
           os.meta(openapi({ method: 'GET', queryStyles: { meta: 'json' } })).handler(vi.fn()),
         )
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/?meta=not-json',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/?meta=not-json',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -627,23 +729,30 @@ describe('openAPIHandlerCodec', () => {
 
       it('applies all delimited parsing strategies using the last matching value', async () => {
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              commaArray: 'comma-delimited-array',
-              commaObject: 'comma-delimited-object',
-              spaceArray: 'space-delimited-array',
-              spaceObject: 'space-delimited-object',
-              pipeArray: 'pipe-delimited-array',
-              pipeObject: 'pipe-delimited-object',
-            },
-          })).handler(vi.fn()),
+          os
+            .meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  commaArray: 'comma-delimited-array',
+                  commaObject: 'comma-delimited-object',
+                  spaceArray: 'space-delimited-array',
+                  spaceObject: 'space-delimited-object',
+                  pipeArray: 'pipe-delimited-array',
+                  pipeObject: 'pipe-delimited-object',
+                },
+              }),
+            )
+            .handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/?commaArray=skip&commaArray=red,blue%20sky,green%2Ftea&commaObject=skip&commaObject=first,1,second,two%20words&spaceArray=skip&spaceArray=alpha beta gamma%2Cdeta&spaceObject=skip&spaceObject=left 10 right twenty%2Cone&pipeArray=skip&pipeArray=north|south%20east|west%2Fcoast&pipeObject=skip&pipeObject=primary|1|secondary|two%20words',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/?commaArray=skip&commaArray=red,blue%20sky,green%2Ftea&commaObject=skip&commaObject=first,1,second,two%20words&spaceArray=skip&spaceArray=alpha beta gamma%2Cdeta&spaceObject=skip&spaceObject=left 10 right twenty%2Cone&pipeArray=skip&pipeArray=north|south%20east|west%2Fcoast&pipeObject=skip&pipeObject=primary|1|secondary|two%20words',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -659,23 +768,30 @@ describe('openAPIHandlerCodec', () => {
 
       it('parsing as undefined for delimited parsing strategies if query is absent', async () => {
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              commaArray: 'comma-delimited-array',
-              commaObject: 'comma-delimited-object',
-              spaceArray: 'space-delimited-array',
-              spaceObject: 'space-delimited-object',
-              pipeArray: 'pipe-delimited-array',
-              pipeObject: 'pipe-delimited-object',
-            },
-          })).handler(vi.fn()),
+          os
+            .meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  commaArray: 'comma-delimited-array',
+                  commaObject: 'comma-delimited-object',
+                  spaceArray: 'space-delimited-array',
+                  spaceObject: 'space-delimited-object',
+                  pipeArray: 'pipe-delimited-array',
+                  pipeObject: 'pipe-delimited-object',
+                },
+              }),
+            )
+            .handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -691,19 +807,26 @@ describe('openAPIHandlerCodec', () => {
 
       it('keeps default bracket-notation decoding when a parsing hint is undefined', async () => {
         const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({
-            method: 'GET',
-            queryStyles: {
-              keep: undefined,
-              tags: 'array',
-            },
-          })).handler(vi.fn()),
+          os
+            .meta(
+              openapi({
+                method: 'GET',
+                queryStyles: {
+                  keep: undefined,
+                  tags: 'array',
+                },
+              }),
+            )
+            .handler(vi.fn()),
         )
 
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'GET',
-          url: '/?keep[enabled]=true&tags=red&tags=blue',
-        }), options as any)
+        const result = await codec.resolveProcedure(
+          createRequest({
+            method: 'GET',
+            url: '/?keep[enabled]=true&tags=red&tags=blue',
+          }),
+          options as any,
+        )
 
         expect(result).toBeDefined()
 
@@ -774,9 +897,13 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput({
-          body: { ok: true },
-        }, procedure, ['detailed'] as any)
+        const response = codec.encodeOutput(
+          {
+            body: { ok: true },
+          },
+          procedure,
+          ['detailed'] as any,
+        )
 
         expect(response).toEqual({
           status: 200,
@@ -794,12 +921,18 @@ describe('openAPIHandlerCodec', () => {
           deserialize: vi.fn(),
         } as any
 
-        const procedure = os.meta(openapi({ outputStructure: 'detailed', successStatus: 201 })).handler(vi.fn())
+        const procedure = os
+          .meta(openapi({ outputStructure: 'detailed', successStatus: 201 }))
+          .handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput({
-          body: { ok: true },
-        }, procedure, ['detailed'] as any)
+        const response = codec.encodeOutput(
+          {
+            body: { ok: true },
+          },
+          procedure,
+          ['detailed'] as any,
+        )
 
         expect(response).toEqual({
           status: 201,
@@ -815,11 +948,15 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const response = codec.encodeOutput({
-          status: 202,
-          headers: { 'x-custom': 'value' },
-          body: { ok: true },
-        }, procedure, [])
+        const response = codec.encodeOutput(
+          {
+            status: 202,
+            headers: { 'x-custom': 'value' },
+            body: { ok: true },
+          },
+          procedure,
+          [],
+        )
 
         expect(response).toEqual({
           status: 202,
@@ -832,10 +969,14 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const response = codec.encodeOutput({
-          status: 302,
-          headers: { location: 'https://example.com' },
-        }, procedure, [])
+        const response = codec.encodeOutput(
+          {
+            status: 302,
+            headers: { location: 'https://example.com' },
+          },
+          procedure,
+          [],
+        )
 
         expect(response).toEqual({
           status: 302,
@@ -848,18 +989,22 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const response = codec.encodeOutput({
-          headers: {
-            'x-string': 'value',
-            'x-number': 42,
-            'x-boolean': true,
-            'x-date': new Date('2020-01-02T03:04:05.000Z'),
-            'x-array': ['a', 1, null, undefined],
-            'x-null': null,
-            'x-undefined': undefined,
+        const response = codec.encodeOutput(
+          {
+            headers: {
+              'x-string': 'value',
+              'x-number': 42,
+              'x-boolean': true,
+              'x-date': new Date('2020-01-02T03:04:05.000Z'),
+              'x-array': ['a', 1, null, undefined],
+              'x-null': null,
+              'x-undefined': undefined,
+            },
+            body: undefined,
           },
-          body: undefined,
-        }, procedure, []) as any
+          procedure,
+          [],
+        ) as any
 
         expect(response.headers).toEqual({
           'x-string': 'value',
@@ -876,14 +1021,20 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        const response = codec.encodeOutput({
-          headers: JSON.parse('{"__proto__": "injected", "constructor": "c", "x-safe": "ok"}'),
-        }, procedure, []) as any
+        const response = codec.encodeOutput(
+          {
+            headers: JSON.parse('{"__proto__": "injected", "constructor": "c", "x-safe": "ok"}'),
+          },
+          procedure,
+          [],
+        ) as any
 
         expect(response.headers['x-safe']).toBe('ok')
 
         // `__proto__` and `constructor` become plain own properties, not prototype-chain mutations
-        expect(Object.getOwnPropertyDescriptor(response.headers, '__proto__')?.value).toBe('injected')
+        expect(Object.getOwnPropertyDescriptor(response.headers, '__proto__')?.value).toBe(
+          'injected',
+        )
         expect(Object.getOwnPropertyDescriptor(response.headers, 'constructor')?.value).toBe('c')
       })
 
@@ -898,7 +1049,9 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        expect(() => codec.encodeOutput(output, procedure, [])).toThrow('Invalid "detailed" output structure')
+        expect(() => codec.encodeOutput(output, procedure, [])).toThrow(
+          'Invalid "detailed" output structure',
+        )
       })
     })
   })
@@ -970,7 +1123,9 @@ describe('openAPIHandlerCodec', () => {
 
     it('sets content-type header via errorResponseContentType option', () => {
       const procedure = os.handler(vi.fn())
-      const codec = new OpenAPIHandlerCodec(procedure, { errorResponseContentType: 'application/problem+json' })
+      const codec = new OpenAPIHandlerCodec(procedure, {
+        errorResponseContentType: 'application/problem+json',
+      })
       const error = new ORPCError('BAD_GATEWAY')
 
       expect(codec.encodeError(error)).toEqual({
@@ -984,7 +1139,9 @@ describe('openAPIHandlerCodec', () => {
       const serializer = { serialize: vi.fn(), deserialize: vi.fn() } as any
       const codec = new OpenAPIHandlerCodec({ procedure: os.handler(vi.fn()) }, { serializer })
 
-      expect((await codec.encodeError(new ORPCError('toString' as any))).status).toEqual(DEFAULT_ERROR_STATUS)
+      expect((await codec.encodeError(new ORPCError('toString' as any))).status).toEqual(
+        DEFAULT_ERROR_STATUS,
+      )
     })
 
     it('can custom error status via errorStatuses option', () => {
@@ -994,10 +1151,13 @@ describe('openAPIHandlerCodec', () => {
       } as any
 
       const procedure = os.handler(vi.fn())
-      const codec = new OpenAPIHandlerCodec({ procedure }, {
-        serializer,
-        errorStatusMap: { BAD_GATEWAY: 599 },
-      })
+      const codec = new OpenAPIHandlerCodec(
+        { procedure },
+        {
+          serializer,
+          errorStatusMap: { BAD_GATEWAY: 599 },
+        },
+      )
 
       const error = new ORPCError('BAD_GATEWAY')
       const response = codec.encodeError(error)
@@ -1011,16 +1171,18 @@ describe('openAPIHandlerCodec', () => {
 
     it('fallback unknown error code to DEFAULT_ERROR_STATUS', () => {
       const serializer = {
-        serialize: vi.fn()
-          .mockReturnValueOnce('__serialized_unknown__'),
+        serialize: vi.fn().mockReturnValueOnce('__serialized_unknown__'),
         deserialize: vi.fn(),
       } as any
 
       const procedure = os.handler(vi.fn())
-      const codec = new OpenAPIHandlerCodec({ procedure }, {
-        serializer,
-        errorStatusMap: {},
-      })
+      const codec = new OpenAPIHandlerCodec(
+        { procedure },
+        {
+          serializer,
+          errorStatusMap: {},
+        },
+      )
 
       const unknownError = new ORPCError('UNKNOWN_CODE' as any)
       const unknownResponse = codec.encodeError(unknownError)

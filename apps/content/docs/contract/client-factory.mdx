@@ -1,6 +1,6 @@
 ---
-title: "Contract Client Factory"
-description: "Create clients from individual procedure contracts instead of a single root contract, keeping large oRPC codebases fast and decoupled."
+title: 'Contract Client Factory'
+description: 'Create clients from individual procedure contracts instead of a single root contract, keeping large oRPC codebases fast and decoupled.'
 ---
 
 A single root [client](/docs/client/client-side) is a great way to get started. As your project grows, though, it can lead to type performance issues and tangled dependencies. Splitting the client into smaller service-level clients can help for a while, but very large codebases can still outgrow that approach.
@@ -30,7 +30,7 @@ const router = {
         procedure,
       },
     },
-  }
+  },
 }
 ```
 
@@ -41,7 +41,7 @@ This pattern does not require a single root client. Instead, you configure a cli
 ```ts
 import { createContractClientFactory } from '@orpc/contract'
 
-export const createClient = createContractClientFactory(link, { /** options */})
+export const createClient = createContractClientFactory(link, {/** options */})
 ```
 
 :::warning
@@ -76,9 +76,7 @@ import { RouterContract } from '@orpc/contract'
 const contractRef: RouterContract = {}
 
 const link = new OpenAPILink(contractRef, {
-  plugins: [
-    new PluginRequireContract(contractRef)
-  ]
+  plugins: [new PluginRequireContract(contractRef)],
 })
 
 export const createClient = createContractJsonifiedClientFactory(link, { contractRef })
@@ -97,7 +95,7 @@ Some features may not support `contractRef` well. In those cases, import the roo
 ```ts
 import { createContractUtilsFactory } from '@orpc/tanstack-query'
 
-export const createUtils = createContractUtilsFactory(createClient, { /** options */})
+export const createUtils = createContractUtilsFactory(createClient, {/** options */})
 ```
 
 :::warning
@@ -131,7 +129,7 @@ const query = useQuery(utils.path.to.procedure.queryOptions({/** options */}))
 ```ts
 import { createContractUtilsFactory } from '@orpc/pinia-colada'
 
-export const createUtils = createContractUtilsFactory(createClient, { /** options */})
+export const createUtils = createContractUtilsFactory(createClient, {/** options */})
 ```
 
 :::warning

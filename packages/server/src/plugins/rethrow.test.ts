@@ -1,8 +1,9 @@
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
-import { RPCHandler } from '../adapters/fetch'
-import { os } from '../builder'
-import { RethrowHandlerPlugin } from './rethrow'
+
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { os } from '../builder.ts'
+import { RethrowHandlerPlugin } from './rethrow.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -85,10 +86,7 @@ describe('rethrowHandlerPlugin', () => {
           init(options) {
             return {
               ...options,
-              interceptors: [
-                interceptor,
-                ...toArray(options.interceptors),
-              ],
+              interceptors: [interceptor, ...toArray(options.interceptors)],
             }
           },
         },
@@ -99,6 +97,8 @@ describe('rethrowHandlerPlugin', () => {
     expect(response?.status).toBe(500)
 
     expect(interceptor).toHaveBeenCalledTimes(1)
-    await expect(interceptor.mock.results[0]?.value).rejects.toThrow('context has been corrupted or modified')
+    await expect(interceptor.mock.results[0]?.value).rejects.toThrow(
+      'context has been corrupted or modified',
+    )
   })
 })

@@ -1,8 +1,8 @@
 {
   "name": "@orpc/bun-playground",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "build": "bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
@@ -26,7 +26,7 @@
     "@orpc/server": "beta",
     "@orpc/tanstack-query": "beta",
     "@orpc/zod": "beta",
-    "@tanstack/react-query": "^5.105.0",
+    "@tanstack/react-query": "^5.105.3",
     "@types/bun": "latest",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

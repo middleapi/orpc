@@ -1,12 +1,13 @@
 import type { RouterContract } from '@orpc/contract'
-import type { Context } from '@orpc/server'
-import type { HTTPProcedureUtilsOptions } from './http-procedure-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { isTypescriptObject } from '@orpc/shared'
-import { HTTPProcedureUtils } from './http-procedure-utils'
+import type { Context } from '@orpc/server'
+import { isNonPrimitive } from '@orpc/shared'
 
-export type HTTPRouterUtils<T extends RouterContract, TContext extends Context>
-  = T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>
+import type { HTTPProcedureUtilsOptions } from './http-procedure-utils.ts'
+import { HTTPProcedureUtils } from './http-procedure-utils.ts'
+
+export type HTTPRouterUtils<T extends RouterContract, TContext extends Context> =
+  T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>
     ? HTTPProcedureUtils<TContext, UInputSchema, UOutputSchema, UErrorMap>
     : {
         [K in keyof T]: T[K] extends RouterContract ? HTTPRouterUtils<T[K], TContext> : never
@@ -37,7 +38,7 @@ function createHTTPUtilsInternal(
     return new HTTPProcedureUtils(contract, path, options)
   }
 
-  if (!isTypescriptObject(contract)) {
+  if (!isNonPrimitive(contract)) {
     return contract
   }
 

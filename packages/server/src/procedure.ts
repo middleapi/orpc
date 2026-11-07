@@ -1,9 +1,15 @@
-import type { AnySchema, ErrorMap, ORPCErrorConstructorMap, ProcedureContractDefinition } from '@orpc/contract'
-import type { Promisable } from '@orpc/shared'
-import type { Context } from './context'
-import type { AnyMiddleware } from './middleware'
+import type {
+  AnySchema,
+  ErrorMap,
+  ORPCErrorConstructorMap,
+  ProcedureContractDefinition,
+} from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
+import type { Promisable } from '@orpc/shared'
 import { getConstructor } from '@orpc/shared'
+
+import type { Context } from './context.ts'
+import type { AnyMiddleware } from './middleware.ts'
 
 export interface ProcedureHandlerOptions<
   TCurrentContext extends Context,
@@ -81,7 +87,8 @@ export interface ProcedureDefinition<
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
-> extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
+>
+  extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
   __TInitialContext?: (type: TInitialContext) => unknown
   __TInjectedContext?: (type: TInjectedContext) => unknown
 
@@ -96,9 +103,23 @@ export class Procedure<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 > {
-  '~orpc': ProcedureDefinition<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+  '~orpc': ProcedureDefinition<
+    TInitialContext,
+    TInjectedContext,
+    TInputSchema,
+    TOutputSchema,
+    TErrorMap
+  >
 
-  constructor(def: ProcedureDefinition<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>) {
+  'constructor'(
+    def: ProcedureDefinition<
+      TInitialContext,
+      TInjectedContext,
+      TInputSchema,
+      TOutputSchema,
+      TErrorMap
+    >,
+  ) {
     this['~orpc'] = def
   }
 
@@ -117,9 +138,9 @@ export class Procedure<
     }
 
     return (
-      instance instanceof ProcedureContract
-      && Array.isArray((instance['~orpc'] as any).orderedMiddlewares)
-      && typeof (instance['~orpc'] as any).handler === 'function'
+      instance instanceof ProcedureContract &&
+      Array.isArray((instance['~orpc'] as any).orderedMiddlewares) &&
+      typeof (instance['~orpc'] as any).handler === 'function'
     )
   }
 }

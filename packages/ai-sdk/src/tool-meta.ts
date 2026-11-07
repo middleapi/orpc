@@ -1,14 +1,24 @@
-import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, MetaPlugin } from '@orpc/contract'
+import type {
+  AnyProcedureContract,
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  MetaPlugin,
+} from '@orpc/contract'
 import type { Lazy } from '@orpc/server'
 import type { JSONValue, Tool } from 'ai'
-import type { ToolOutput } from './tool'
+
+import type { ToolOutput } from './tool.ts'
 
 /**
  * The [function tool](https://ai-sdk.dev/docs/foundations/tools) member of the AI SDK `Tool` union,
  * which is the kind of tool this package produces.
  */
 export type FunctionTool<
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
   INPUT extends JSONValue | unknown | never = any,
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
   OUTPUT extends JSONValue | unknown | never = any,
 > = Extract<Tool<INPUT, OUTPUT>, { type?: 'function' | undefined }>
 
@@ -24,10 +34,12 @@ export type FunctionTool<
 export type AiSdkToolMeta<
   TInputSchema extends AnySchema = AnySchema,
   TOutputSchema extends AnySchema = AnySchema,
-> = Partial<Omit<
-  FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
-  'inputSchema' | 'outputSchema' | 'execute'
->>
+> = Partial<
+  Omit<
+    FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
+    'inputSchema' | 'outputSchema' | 'execute'
+  >
+>
 
 export interface AiSdkToolMetaPlugin<
   TInputSchema extends AnySchema,
@@ -62,7 +74,7 @@ export interface AiSdkToolFunction {
  *
  * @see {@link https://orpc.dev/docs/integrations/ai-sdk#tool-implementer | AI SDK Integration - Tool Implementer}
  */
-export const aiSdkTool: AiSdkToolFunction = incoming => ({
+export const aiSdkTool: AiSdkToolFunction = (incoming) => ({
   name: '~ai-sdk/tool',
   init(meta) {
     const existing = meta['~ai-sdk/tool'] as undefined | AiSdkToolMeta
@@ -80,6 +92,8 @@ export const aiSdkTool: AiSdkToolFunction = incoming => ({
  *
  * @see {@link https://orpc.dev/docs/integrations/ai-sdk#tool-implementer | AI SDK Integration - Tool Implementer}
  */
-export function getAiSdkToolMeta(procedureOrLazy: AnyProcedureContract | Lazy<any>): AiSdkToolMeta | undefined {
+export function getAiSdkToolMeta(
+  procedureOrLazy: AnyProcedureContract | Lazy<any>,
+): AiSdkToolMeta | undefined {
   return procedureOrLazy['~orpc'].meta['~ai-sdk/tool'] as AiSdkToolMeta | undefined
 }

@@ -5,7 +5,7 @@
     <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
   </a>
   <a href="https://www.npmjs.com/package/@orpc/bun">
-    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fbun?logo=npm" />
+    <img alt="monthly downloads" src="https://img.shields.io/npm/dm/%40orpc%2Fbun?logo=npm" />
   </a>
   <a href="https://github.com/middleapi/orpc/blob/main/LICENSE">
     <img alt="MIT License" src="https://img.shields.io/github/license/middleapi/orpc?logo=open-source-initiative" />
@@ -38,10 +38,11 @@ export const router = {
 Then call them from a client that knows every input and output, without generating anything:
 
 ```ts
-import type { RouterClient } from '@orpc/server'
-import type { router } from './router'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+import type { RouterClient } from '@orpc/server'
+
+import type { router } from './router'
 
 const link = new RPCLink({ origin: 'http://localhost:3000', url: '/rpc' })
 const client: RouterClient<typeof router> = createORPCClient(link)

@@ -1,8 +1,8 @@
 ---
-title: "Electron Adapter"
+title: 'Electron Adapter'
 description: "Use oRPC for typesafe communication between Electron's main, preload, and renderer processes by passing a MessagePort through the Message Port Adapter."
 sidebar:
-  label: "Electron"
+  label: 'Electron'
 ---
 
 Establish typesafe communication between processes in [Electron](https://www.electronjs.org/) using the [Message Port Adapter](/docs/adapters/message-port). Before you start, we recommend reading the [MessagePorts in Electron](https://www.electronjs.org/docs/latest/tutorial/message-ports) guide.
@@ -34,7 +34,7 @@ app.whenReady().then(() => {
        * that receives the per-call request as its first argument, and is **not**
        * related to the initial upgrade request.
        */
-      context: request => ({}),
+      context: (request) => ({}),
     })
 
     serverPort.start()

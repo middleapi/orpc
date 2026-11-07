@@ -1,50 +1,72 @@
 {
   "name": "@orpc/nest",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "NestJS integration for oRPC: implement typesafe contracts in NestJS controllers",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "contract-first",
+    "nest",
+    "nestjs",
+    "openapi",
+    "orpc",
+    "rpc",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/nest"
   },
-  "keywords": [
-    "orpc",
-    "nestjs",
-    "nest",
-    "contract-first",
-    "rpc",
-    "openapi",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/contract": "workspace:*",
+    "@orpc/openapi": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@oxc-project/runtime": "^0.155.0",
+    "@standard-server/core": "~0.15.0",
+    "@standard-server/node": "~0.15.0"
+  },
+  "devDependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@nestjs/common": "^12.3.2",
+    "@nestjs/core": "^12.3.2",
+    "@nestjs/platform-express": "^12.3.2",
+    "@nestjs/platform-fastify": "^12.3.2",
+    "@nestjs/platform-node": "^12.3.2",
+    "@nestjs/testing": "^12.3.2",
+    "@types/express": "^5.0.6",
+    "express": "^5.3.0",
+    "fastify": "^5.12.8",
+    "rxjs": "^7.8.2"
   },
   "peerDependencies": {
     "@nestjs/common": ">=11.1.27",
@@ -64,28 +86,5 @@
     "fastify": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@orpc/client": "workspace:*",
-    "@orpc/contract": "workspace:*",
-    "@orpc/openapi": "workspace:*",
-    "@orpc/server": "workspace:*",
-    "@orpc/shared": "workspace:*",
-    "@oxc-project/runtime": "^0.155.0",
-    "@standard-server/core": "~0.14.0",
-    "@standard-server/node": "~0.14.0"
-  },
-  "devDependencies": {
-    "@fastify/cookie": "^11.1.5",
-    "@nestjs/common": "^12.3.2",
-    "@nestjs/core": "^12.3.2",
-    "@nestjs/platform-express": "^12.3.2",
-    "@nestjs/platform-fastify": "^12.3.2",
-    "@nestjs/platform-node": "^12.3.2",
-    "@nestjs/testing": "^12.3.2",
-    "@types/express": "^5.0.6",
-    "express": "^5.3.0",
-    "fastify": "^5.12.7",
-    "rxjs": "^7.8.2"
   }
 }

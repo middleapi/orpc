@@ -1,16 +1,23 @@
-import type { AnyMetaPlugin } from './meta'
+import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
-import * as ErrorUtilsModule from './error-utils'
-import * as MetaUtilsModule from './meta-utils'
-import { ProcedureContract } from './procedure'
-import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils'
+
+import * as ErrorUtilsModule from './error-utils.ts'
+import * as MetaUtilsModule from './meta-utils.ts'
+import type { AnyMetaPlugin } from './meta.ts'
+import { ProcedureContract } from './procedure.ts'
+import {
+  augmentContractRouter,
+  getProcedureContractOrThrow,
+  getRouterContract,
+  minifyRouterContract,
+} from './router-utils.ts'
 
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
-const resolveAugmentedMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveAugmentedMetaPlugins')
+const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
 
 beforeEach(() => {
   mergeErrorMapSpy.mockClear()
-  resolveAugmentedMetaPluginsSpy.mockClear()
+  resolveMetaPluginsSpy.mockClear()
 })
 
 const schema1 = z.object({ schema1: z.string() })
@@ -65,16 +72,18 @@ const router = {
   }),
   invalid: 'invalid' as any,
   nested: callable({
-    ping: callable(new ProcedureContract({
-      errorMap: {
-        NESTED_PING_ERROR: {
-          data: schema2,
+    ping: callable(
+      new ProcedureContract({
+        errorMap: {
+          NESTED_PING_ERROR: {
+            data: schema2,
+          },
         },
-      },
-      meta: { nestedPing: true },
-      inputSchemas: [],
-      outputSchemas: [schema2],
-    })),
+        meta: { nestedPing: true },
+        inputSchemas: [],
+        outputSchemas: [schema2],
+      }),
+    ),
     invalid: 'invalid' as any,
   }),
 }
@@ -98,17 +107,20 @@ describe('augmentContractRouter', () => {
     original: any,
     options: ReturnType<typeof createAugmentOptions>,
   ) {
-    const resolved = resolveAugmentedMetaPluginsSpy.mock.results[callIndex - 1]?.value
+    const resolved = resolveMetaPluginsSpy.mock.results[callIndex - 1]?.value
 
     expect(actual).toBeInstanceOf(ProcedureContract)
     expect(actual).not.toBe(original)
-    expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(callIndex, options.errorMap, original['~orpc'].errorMap)
-    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenNthCalledWith(
+    expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(
+      callIndex,
+      options.errorMap,
+      original['~orpc'].errorMap,
+    )
+    expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
       callIndex,
       options.meta,
       options.metaPlugins,
       original['~orpc'].metaPlugins,
-      options,
     )
     expect(actual['~orpc']).toEqual({
       ...original['~orpc'],
@@ -128,7 +140,7 @@ describe('augmentContractRouter', () => {
     expect(augmented.nested.invalid).toBe('invalid')
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(3)
-    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledTimes(3)
+    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(3)
 
     expectAugmentedProcedure(1, augmented.ping, router.ping, options)
     expectAugmentedProcedure(2, augmented.pong, router.pong, options)
@@ -140,7 +152,7 @@ describe('augmentContractRouter', () => {
     const augmented = augmentContractRouter(router.pong, options)
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
-    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledTimes(1)
+    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
 
     expectAugmentedProcedure(1, augmented, router.pong, options)
   })
@@ -154,7 +166,7 @@ describe('augmentContractRouter', () => {
     expect(augmented.invalid).toBe('invalid')
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
-    expect(resolveAugmentedMetaPluginsSpy).toHaveBeenCalledTimes(1)
+    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
 
     expectAugmentedProcedure(1, augmented.ping, router.nested.ping, options)
   })
@@ -165,27 +177,22 @@ describe('augmentContractRouter', () => {
 
     expect(augmentContractRouter(invalid, options)).toBe(invalid)
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
-    expect(resolveAugmentedMetaPluginsSpy).not.toHaveBeenCalled()
+    expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
   })
 
-  describe('dedupeLeadingMetaPlugins', () => {
-    const contract = new ProcedureContract({
-      errorMap: {},
-      meta: { meta1: true },
-      metaPlugins: [meta1],
-    })
+  it('keeps an own `__proto__` key as a route instead of re-parenting the result', () => {
+    const options = createAugmentOptions()
+    const protoRouter = Object.fromEntries([
+      ['__proto__', router.ping],
+      ['other', router.pong],
+    ])
+    const augmented = augmentContractRouter(protoRouter, options) as any
 
-    it('dedupes leading meta plugins by default', () => {
-      const augmented = augmentContractRouter(contract, { errorMap: {}, meta: { meta1: true }, metaPlugins: [meta1] })
+    expect(Object.getPrototypeOf(augmented)).toBe(Object.prototype)
+    expect(Object.keys(augmented)).toEqual(['__proto__', 'other'])
 
-      expect(augmented['~orpc'].metaPlugins).toEqual([meta1])
-    })
-
-    it('does not dedupe when disabled', () => {
-      const augmented = augmentContractRouter(contract, { errorMap: {}, meta: { meta1: true }, metaPlugins: [meta1], dedupeLeadingMetaPlugins: false })
-
-      expect(augmented['~orpc'].metaPlugins).toEqual([meta1, meta1])
-    })
+    expectAugmentedProcedure(1, getOwn(augmented, '__proto__'), router.ping, options)
+    expectAugmentedProcedure(2, augmented.other, router.pong, options)
   })
 })
 
@@ -231,13 +238,21 @@ describe('getProcedureContractOrThrow', () => {
 
   it('throws for non-procedure or invalid paths', () => {
     function noProcedureError(path: readonly string[]) {
-      return new TypeError(`No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`)
+      return new TypeError(
+        `No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`,
+      )
     }
 
     expect(() => getProcedureContractOrThrow(router, [])).toThrow(noProcedureError([]))
-    expect(() => getProcedureContractOrThrow(router, ['nested'])).toThrow(noProcedureError(['nested']))
-    expect(() => getProcedureContractOrThrow(router, ['notExist'])).toThrow(noProcedureError(['notExist']))
-    expect(() => getProcedureContractOrThrow(router, ['invalid'])).toThrow(noProcedureError(['invalid']))
+    expect(() => getProcedureContractOrThrow(router, ['nested'])).toThrow(
+      noProcedureError(['nested']),
+    )
+    expect(() => getProcedureContractOrThrow(router, ['notExist'])).toThrow(
+      noProcedureError(['notExist']),
+    )
+    expect(() => getProcedureContractOrThrow(router, ['invalid'])).toThrow(
+      noProcedureError(['invalid']),
+    )
     expect(() => getProcedureContractOrThrow('invalid' as any, [])).toThrow(noProcedureError([]))
   })
 })
@@ -287,5 +302,19 @@ describe('minifyRouterContract', () => {
     const invalid = 'invalid' as any
 
     expect(minifyRouterContract(invalid)).toBe(invalid)
+  })
+
+  it('keeps an own `__proto__` key as a route instead of re-parenting the result', () => {
+    const protoRouter = Object.fromEntries([
+      ['__proto__', router.ping],
+      ['other', router.pong],
+    ])
+    const minified = minifyRouterContract(protoRouter) as any
+
+    expect(Object.getPrototypeOf(minified)).toBe(Object.prototype)
+    expect(Object.keys(minified)).toEqual(['__proto__', 'other'])
+
+    expectMinifiedProcedure(getOwn(minified, '__proto__'), router.ping)
+    expectMinifiedProcedure(minified.other, router.pong)
   })
 })

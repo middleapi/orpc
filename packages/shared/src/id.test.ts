@@ -1,4 +1,4 @@
-import { compareSequentialIds } from './id'
+import { compareSequentialIds } from './id.ts'
 
 describe('compareSequentialIds', () => {
   it('should return 0 when ids are equal', () => {
@@ -34,11 +34,9 @@ describe('compareSequentialIds', () => {
 
     if (bigInt1 > bigInt2) {
       expect(result).toBeGreaterThan(0)
-    }
-    else if (bigInt1 < bigInt2) {
+    } else if (bigInt1 < bigInt2) {
       expect(result).toBeLessThan(0)
-    }
-    else {
+    } else {
       expect(result).toBe(0)
     }
   })

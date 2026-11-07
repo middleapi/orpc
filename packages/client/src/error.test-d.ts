@@ -1,11 +1,15 @@
-import { ORPCError } from './error'
+import { ORPCError } from './error.ts'
 
 describe('ORPCError', () => {
   it('constructor', () => {
     const _error11: ORPCError<'CODE', undefined | 'optional'> = new ORPCError('CODE')
-    const _error12: ORPCError<'CODE', undefined | 'optional'> = new ORPCError('CODE', { data: 'optional' })
+    const _error12: ORPCError<'CODE', undefined | 'optional'> = new ORPCError('CODE', {
+      data: 'optional',
+    })
     // @ts-expect-error - data is invalid
-    const _error13: ORPCError<'CODE', undefined | 'optional'> = new ORPCError('CODE', { data: 'invalid' })
+    const _error13: ORPCError<'CODE', undefined | 'optional'> = new ORPCError('CODE', {
+      data: 'invalid',
+    })
 
     // @ts-expect-error - data is required
     const _error21: ORPCError<'CODE', 'required'> = new ORPCError('CODE')

@@ -1,10 +1,12 @@
 import type { AddressInfo } from 'node:net'
-import type { CreateClientServerTest } from './client-server'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/websocket'
 import { RPCHandler } from '@orpc/server/websocket'
-import WebSocket, { WebSocketServer } from 'ws'
-import { defaultSerializer } from './client-server'
+import { WebSocket, WebSocketServer } from 'ws'
+
+import type { CreateClientServerTest } from './client-server.ts'
+import { defaultSerializer } from './client-server.ts'
 
 export const createNodeWsClientServerTest: CreateClientServerTest = (
   router,

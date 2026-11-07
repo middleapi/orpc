@@ -22,9 +22,10 @@
  * preview pane and the hosted syncs all read the enriched `content` unchanged.
  */
 
-import type { Plugin } from 'vite'
 import { fileURLToPath } from 'node:url'
+
 import { stringifyJSON } from '@orpc/shared'
+import type { Plugin } from 'vite'
 
 /** Vite's id for the module this plugin rewrites (a resolved virtual module). */
 const SEARCH_INDEX = '\0blume:search-index'
@@ -37,7 +38,8 @@ const DEFAULT_EXPORT = 'export default '
  * the opening run — the ambiguity that would let a long line of backticks
  * backtrack quadratically.
  */
-const FENCE = /^[ \t]*(?<ticks>`{3,})(?<info>(?:[^\n`][^\n]*)?)\n(?<body>[\s\S]*?)^[ \t]*\k<ticks>[ \t]*$/gmu
+const FENCE =
+  /^[ \t]*(?<ticks>`{3,})(?<info>(?:[^\n`][^\n]*)?)\n(?<body>[\s\S]*?)^[ \t]*\k<ticks>[ \t]*$/gmu
 
 /**
  * Fence bodies Blume renders as something other than code, so their text is
@@ -81,9 +83,7 @@ function extractCode(markdown: string): string {
       continue
     }
 
-    const body = (match.groups?.body ?? '')
-      .replaceAll(TWOSLASH_LINE, '')
-      .replaceAll(NOTATION, '')
+    const body = (match.groups?.body ?? '').replaceAll(TWOSLASH_LINE, '').replaceAll(NOTATION, '')
 
     for (const line of body.split('\n')) {
       const trimmed = line.trim()
@@ -101,7 +101,10 @@ function extractCode(markdown: string): string {
  * and the preview pane can find the block a query matched. Imported by the
  * rewritten index module, so it runs wherever that module evaluates.
  */
-export function foldCodeIntoSearchIndex(documents: IndexedDocument[], raw: RawMarkdown): IndexedDocument[] {
+export function foldCodeIntoSearchIndex(
+  documents: IndexedDocument[],
+  raw: RawMarkdown,
+): IndexedDocument[] {
   // Rewritten in place: the snapshot module parses a fresh copy on evaluation,
   // and the endpoint is its only importer.
   for (const doc of documents) {
@@ -129,7 +132,9 @@ export function searchCodeIndexPlugin(): Plugin {
       // Fail the build loudly rather than ship an index without code: a newer
       // Blume that loads the snapshot differently needs this hook updated.
       if (!code.startsWith(DEFAULT_EXPORT)) {
-        this.error(`Unexpected shape for ${id.slice(1)}; update apps/content/search/code-index.ts for this Blume version.`)
+        this.error(
+          `Unexpected shape for ${id.slice(1)}; update apps/content/search/code-index.ts for this Blume version.`,
+        )
       }
 
       const snapshot = code.slice(DEFAULT_EXPORT.length).trim().replace(/;$/u, '')

@@ -9,7 +9,7 @@ import {
   parseAcceptEncodingQualities,
   pathToHttpPath,
   varyByAcceptEncoding,
-} from './http'
+} from './http.ts'
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {
@@ -189,25 +189,49 @@ describe('isCompressibleContentType', () => {
 
 describe('parseAcceptEncodingQualities', () => {
   it('defaults an unqualified coding to 1', () => {
-    expect(parseAcceptEncodingQualities('gzip, br')).toEqual(new Map([['gzip', 1], ['br', 1]]))
+    expect(parseAcceptEncodingQualities('gzip, br')).toEqual(
+      new Map([
+        ['gzip', 1],
+        ['br', 1],
+      ]),
+    )
   })
 
   it('parses q-values, where 0 means the coding is unacceptable', () => {
     expect(parseAcceptEncodingQualities('gzip;q=0, br;q=0.8, zstd;q=1.0')).toEqual(
-      new Map([['gzip', 0], ['br', 0.8], ['zstd', 1]]),
+      new Map([
+        ['gzip', 0],
+        ['br', 0.8],
+        ['zstd', 1],
+      ]),
     )
   })
 
   it('normalizes case and whitespace, and keeps the wildcard under its own key', () => {
-    expect(parseAcceptEncodingQualities(' GZIP ; Q=0 , * ')).toEqual(new Map([['gzip', 0], ['*', 1]]))
+    expect(parseAcceptEncodingQualities(' GZIP ; Q=0 , * ')).toEqual(
+      new Map([
+        ['gzip', 0],
+        ['*', 1],
+      ]),
+    )
   })
 
   it('ignores parameters that are not q-values', () => {
-    expect(parseAcceptEncodingQualities('gzip;a=1;q=0.5, br;a=1')).toEqual(new Map([['gzip', 0.5], ['br', 1]]))
+    expect(parseAcceptEncodingQualities('gzip;a=1;q=0.5, br;a=1')).toEqual(
+      new Map([
+        ['gzip', 0.5],
+        ['br', 1],
+      ]),
+    )
   })
 
   it('skips empty list elements', () => {
-    expect(parseAcceptEncodingQualities('gzip,, , br')).toEqual(new Map([['gzip', 1], ['br', 1]]))
+    expect(parseAcceptEncodingQualities('gzip,, , br')).toEqual(
+      new Map([
+        ['gzip', 1],
+        ['br', 1],
+      ]),
+    )
   })
 
   it('returns an empty map for a missing or empty header', () => {

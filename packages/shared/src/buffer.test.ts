@@ -1,21 +1,28 @@
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
-import { encodeBase64, loadBytes, toStringOrBytes } from './buffer'
+
+import { encodeBase64, loadBytes, toStringOrBytes } from './buffer.ts'
 
 it('loadBytes', async () => {
   const blob = new Blob(['test'], { type: 'text/plain' })
 
   expect(new TextDecoder().decode(await loadBytes(blob))).toBe('test')
-  expect(new TextDecoder().decode(await loadBytes(new Proxy(blob, {
-    get: (target, prop) => {
-      if (prop === 'bytes') {
-        return undefined
-      }
-      return Reflect.get(target, prop)
-    },
-  })))).toBe('test')
+  expect(
+    new TextDecoder().decode(
+      await loadBytes(
+        new Proxy(blob, {
+          get: (target, prop) => {
+            if (prop === 'bytes') {
+              return undefined
+            }
+            return Reflect.get(target, prop)
+          },
+        }),
+      ),
+    ),
+  ).toBe('test')
 
-  expect(new TextDecoder().decode(await loadBytes((new Response(blob) as any)))).toBe('test')
+  expect(new TextDecoder().decode(await loadBytes(new Response(blob) as any))).toBe('test')
 })
 
 describe('toStringOrBytes', () => {
@@ -144,7 +151,7 @@ describe('encodeBase64', () => {
     if (descriptor) {
       delete (Uint8Array.prototype as any).toBase64
       onTestFinished(() => {
-        // eslint-disable-next-line no-extend-native -- restores the native method removed above
+        // oxlint-disable-next-line no-extend-native -- restores the native method removed above
         Object.defineProperty(Uint8Array.prototype, 'toBase64', descriptor)
       })
     }

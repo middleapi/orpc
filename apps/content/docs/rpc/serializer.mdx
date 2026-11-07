@@ -1,6 +1,6 @@
 ---
-title: "RPC Serializer"
-description: "Learn how RPC Serializers encode data between client and server, supporting types beyond plain JSON such as Date, BigInt, Set, Map, and custom classes."
+title: 'RPC Serializer'
+description: 'Learn how RPC Serializers encode data between client and server, supporting types beyond plain JSON such as Date, BigInt, Set, Map, and custom classes.'
 ---
 
 ## Supported Data Types
@@ -59,18 +59,20 @@ const PersonSchema = z.object({ name: z.string(), age: z.number() })
 
 const serializer = new RPCSerializer({
   handlers: {
-    person: { // <- add support for Person
-      condition: v => v instanceof Person,
+    person: {
+      // <- add support for Person
+      condition: (v) => v instanceof Person,
       serialize: (v: Person) => ({ name: v.name, age: v.age }),
       deserialize: (v) => {
         const { name, age } = PersonSchema.parse(v)
         return new Person(name, age)
       },
     },
-    date: { // <- replace the default Date handler
-      condition: v => v instanceof Date,
+    date: {
+      // <- replace the default Date handler
+      condition: (v) => v instanceof Date,
       serialize: (v: Date) => v.getTime(),
-      deserialize: v => new Date(z.number().parse(v)),
+      deserialize: (v) => new Date(z.number().parse(v)),
     },
   },
 })
@@ -108,9 +110,16 @@ import { RPCSerializer } from '@orpc/client'
 const serializer = new RPCSerializer({
   handlers: {
     bigint: {
-      condition: v => typeof v === 'bigint',
+      condition: (v) => typeof v === 'bigint',
       serialize: (v: bigint) => v.toString(),
-      deserialize: v => BigInt(z.string().max(10_000).regex(/^-?\d+$/).parse(v)),
+      deserialize: (v) =>
+        BigInt(
+          z
+            .string()
+            .max(10_000)
+            .regex(/^-?\d+$/)
+            .parse(v),
+        ),
     },
   },
 })
@@ -163,9 +172,7 @@ In most cases, serialized data includes two optional fields: `json` and `meta`. 
     "age": 30,
     "createdAt": "2024-01-01T00:00:00.000Z"
   },
-  "meta": [
-    ["date", "createdAt"]
-  ]
+  "meta": [["date", "createdAt"]]
 }
 ```
 
@@ -182,16 +189,19 @@ For example, `[['thumbnail'], ['images', 0]]` means the first file part correspo
 ```ts
 const form = new FormData()
 
-form.set('data', JSON.stringify({
-  json: {
-    name: 'Earth',
-    thumbnail: {},
-    images: [{}],
-    createdAt: '2022-01-01T00:00:00.000Z'
-  },
-  meta: [['date', 'createdAt']],
-  maps: [['thumbnail'], ['images', 0]]
-}))
+form.set(
+  'data',
+  JSON.stringify({
+    json: {
+      name: 'Earth',
+      thumbnail: {},
+      images: [{}],
+      createdAt: '2022-01-01T00:00:00.000Z',
+    },
+    meta: [['date', 'createdAt']],
+    maps: [['thumbnail'], ['images', 0]],
+  }),
+)
 
 form.set('0', new Blob([''], { type: 'image/png' }))
 form.set('1', new Blob([''], { type: 'image/png' }))

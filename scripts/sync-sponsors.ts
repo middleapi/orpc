@@ -18,13 +18,14 @@ interface Sponsor {
   /** Tagline, present on sponsors that bought an ad slot. */
   description?: string
   /** Brand tint behind the ad card, both themes required together. */
-  background?: { light: string, dark: string }
+  background?: { light: string; dark: string }
   /** 1-based ad-grid position the sponsor bought. */
   slot?: number
   [key: string]: unknown
 }
 
-const SPONSORS_SOURCE_URL = 'https://raw.githubusercontent.com/middleapi/static/refs/heads/main/sponsors.json'
+const SPONSORS_SOURCE_URL =
+  'https://raw.githubusercontent.com/middleapi/static/refs/heads/main/sponsors.json'
 const SPONSORS_OUTPUT_FILE = 'apps/content/sponsors/sponsors.ts'
 const SLOTS_OUTPUT_FILE = 'apps/content/sponsors/slots.ts'
 const PAST_SPONSORS_URL = 'https://orpc.dev/sponsors#past-sponsors'
@@ -47,8 +48,7 @@ async function findReadmes(dir: string): Promise<string[]> {
       }
 
       subdirPromises.push(findReadmes(fullPath))
-    }
-    else if (entry.isFile() && entry.name === README_FILE_NAME) {
+    } else if (entry.isFile() && entry.name === README_FILE_NAME) {
       result.push(fullPath)
     }
   }
@@ -68,11 +68,14 @@ function escapeHtml(value: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
-    .replaceAll('\'', '&#39;')
+    .replaceAll("'", '&#39;')
 }
 
-function getTierImageSizeAndColumns(tierLevel: number, tierLevels: number[]): [columns: number, imageSize: number] {
-  const rank = tierLevels.findIndex(level => level === tierLevel)
+function getTierImageSizeAndColumns(
+  tierLevel: number,
+  tierLevels: number[],
+): [columns: number, imageSize: number] {
+  const rank = tierLevels.findIndex((level) => level === tierLevel)
 
   const columnByRank = [3, 4, 5, 6, 7, 8]
   const column = columnByRank[Math.min(rank, columnByRank.length - 1)] ?? 3
@@ -97,7 +100,9 @@ function buildSlotCards(slotSponsors: Sponsor[]): string[] {
     const description = escapeHtml(sponsor.description ?? '')
 
     lines.push('  <tr>')
-    lines.push(`   <td width="2000"><a href="${escapeHtml(sponsor.link)}" target="_blank" rel="${relAttribute(sponsor)}" title="${description}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${name}"/><b>${name}</b></a><br /><sub>${description}</sub></td>`)
+    lines.push(
+      `   <td width="2000"><a href="${escapeHtml(sponsor.link)}" target="_blank" rel="${relAttribute(sponsor)}" title="${description}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${name}"/><b>${name}</b></a><br /><sub>${description}</sub></td>`,
+    )
     lines.push('  </tr>')
   }
 
@@ -108,15 +113,15 @@ function buildSlotCards(slotSponsors: Sponsor[]): string[] {
 }
 
 function buildSponsorsSection(sponsors: Sponsor[]): string {
-  const activeSponsors = sponsors.filter(sponsor => sponsor.tierLevel > 0 && sponsor.amount > 0)
-  const pastSponsors = sponsors.filter(sponsor => sponsor.tierLevel <= 0 || sponsor.amount <= 0)
+  const activeSponsors = sponsors.filter((sponsor) => sponsor.tierLevel > 0 && sponsor.amount > 0)
+  const pastSponsors = sponsors.filter((sponsor) => sponsor.tierLevel <= 0 || sponsor.amount <= 0)
 
   // Slot sponsors are featured as cards up top; the tier tables below carry
   // everyone else so nobody appears twice.
   const slotSponsors = activeSponsors
-    .filter(sponsor => sponsor.slot !== undefined)
-    .sort((a, b) => a.slot! - b.slot!)
-  const tieredSponsors = activeSponsors.filter(sponsor => sponsor.slot === undefined)
+    .filter((sponsor) => sponsor.slot !== undefined)
+    .toSorted((a, b) => a.slot! - b.slot!)
+  const tieredSponsors = activeSponsors.filter((sponsor) => sponsor.slot === undefined)
 
   const groupedSponsors = new Map<number, Sponsor[]>()
 
@@ -144,8 +149,10 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
 
   // Sizes rank against every active tier, slot sponsors' tiers included, so
   // featuring the top tiers as cards does not inflate the tables below them.
-  const sizeTierLevels = [...new Set(activeSponsors.map(sponsor => sponsor.tierLevel))].sort((a, b) => b - a)
-  const tierLevels = [...groupedSponsors.keys()].sort((a, b) => b - a)
+  const sizeTierLevels = [...new Set(activeSponsors.map((sponsor) => sponsor.tierLevel))].toSorted(
+    (a, b) => b - a,
+  )
+  const tierLevels = [...groupedSponsors.keys()].toSorted((a, b) => b - a)
 
   for (const tierLevel of tierLevels) {
     const tierSponsors = groupedSponsors.get(tierLevel)
@@ -167,7 +174,9 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
       const displayName = sponsor.name ?? sponsor.login
       const escapedName = escapeHtml(displayName)
 
-      lines.push(`   <td align="center"><a href="${escapeHtml(href)}" target="_blank" rel="${relAttribute(sponsor)}" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="${imageSize}" alt="${escapedName}"/><br />${escapedName}</a></td>`)
+      lines.push(
+        `   <td align="center"><a href="${escapeHtml(href)}" target="_blank" rel="${relAttribute(sponsor)}" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="${imageSize}" alt="${escapedName}"/><br />${escapedName}</a></td>`,
+      )
 
       const isRowEnd = (index + 1) % columns === 0
       const isLast = index === tierSponsors.length - 1
@@ -186,7 +195,9 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
   if (pastSponsors.length > 0) {
     const noun = pastSponsors.length === 1 ? 'past sponsor' : 'past sponsors'
 
-    lines.push(`With thanks to [${pastSponsors.length} ${noun}](${PAST_SPONSORS_URL}) who helped get oRPC here.`)
+    lines.push(
+      `With thanks to [${pastSponsors.length} ${noun}](${PAST_SPONSORS_URL}) who helped get oRPC here.`,
+    )
     lines.push('')
   }
 
@@ -205,18 +216,16 @@ function replaceSponsorsSection(content: string, replacement: string): string {
   const endIndex = nextHeadingIndex === -1 ? content.length : nextHeadingIndex + 1
 
   // Trimmed to a single trailing newline, or a section replaced at the end of
-  // the file leaves a blank last line that eslint's markdown fixer removes —
+  // the file leaves a blank last line that the formatter removes —
   // and the next sync would put back, forever.
   return `${`${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`.trimEnd()}\n`
 }
 
 function generatedModule(entries: unknown): string {
   return [
-    '/* eslint-disable eslint-comments/no-unlimited-disable */',
-    '/* eslint-disable */',
     `// Generated by scripts/sync-sponsors.ts from ${SPONSORS_SOURCE_URL} — do not edit.`,
     '',
-    // eslint-disable-next-line ban/ban
+    // oxlint-disable-next-line no-restricted-properties
     `export default ${JSON.stringify(entries, null, 2)}`,
     '',
   ].join('\n')
@@ -231,13 +240,14 @@ function generatedModule(entries: unknown): string {
  */
 async function writeSponsorsData(sponsors: Sponsor[]): Promise<void> {
   const entries = [...sponsors]
-    .sort((a, b) =>
-      b.tierLevel - a.tierLevel
-      || b.amount - a.amount
-      || a.createdAt.localeCompare(b.createdAt)
-      || a.login.localeCompare(b.login),
+    .toSorted(
+      (a, b) =>
+        b.tierLevel - a.tierLevel ||
+        b.amount - a.amount ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.login.localeCompare(b.login),
     )
-    .map(sponsor => ({
+    .map((sponsor) => ({
       name: sponsor.name ?? sponsor.login,
       login: sponsor.login,
       avatar: sponsor.avatar,
@@ -251,6 +261,7 @@ async function writeSponsorsData(sponsors: Sponsor[]): Promise<void> {
     }))
 
   await writeFile(path.join(ROOT_DIR, SPONSORS_OUTPUT_FILE), generatedModule(entries))
+  // oxlint-disable-next-line no-console
   console.log(`Wrote ${entries.length} sponsors to ${SPONSORS_OUTPUT_FILE}.`)
 }
 
@@ -262,9 +273,9 @@ async function writeSponsorsData(sponsors: Sponsor[]): Promise<void> {
  */
 async function writeSlotsData(sponsors: Sponsor[]): Promise<void> {
   const entries = sponsors
-    .filter(sponsor => sponsor.slot !== undefined && sponsor.tierLevel > 0 && sponsor.amount > 0)
-    .sort((a, b) => a.slot! - b.slot!)
-    .map(sponsor => ({
+    .filter((sponsor) => sponsor.slot !== undefined && sponsor.tierLevel > 0 && sponsor.amount > 0)
+    .toSorted((a, b) => a.slot! - b.slot!)
+    .map((sponsor) => ({
       position: sponsor.slot!,
       name: sponsor.name ?? sponsor.login,
       description: sponsor.description ?? '',
@@ -276,6 +287,7 @@ async function writeSlotsData(sponsors: Sponsor[]): Promise<void> {
     }))
 
   await writeFile(path.join(ROOT_DIR, SLOTS_OUTPUT_FILE), generatedModule(entries))
+  // oxlint-disable-next-line no-console
   console.log(`Wrote ${entries.length} ad slots to ${SLOTS_OUTPUT_FILE}.`)
 }
 
@@ -287,7 +299,7 @@ async function main(): Promise<void> {
   }
 
   // Links arrive with their tracking params already baked in upstream.
-  const sponsors = await response.json() as Sponsor[]
+  const sponsors = (await response.json()) as Sponsor[]
   const readmeFiles = await findReadmes(ROOT_DIR)
   const replacement = buildSponsorsSection(sponsors)
 
@@ -295,7 +307,7 @@ async function main(): Promise<void> {
   await writeSlotsData(sponsors)
 
   const readmeContents = await Promise.all(
-    readmeFiles.map(readmePath => readFile(readmePath, 'utf8')),
+    readmeFiles.map((readmePath) => readFile(readmePath, 'utf8')),
   )
 
   const writePromises: Promise<void>[] = []
@@ -311,6 +323,7 @@ async function main(): Promise<void> {
   }
 
   await Promise.all(writePromises)
+  // oxlint-disable-next-line no-console
   console.log(`Updated sponsors section in ${updatedCount} README files.`)
 }
 

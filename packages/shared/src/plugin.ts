@@ -12,9 +12,7 @@ export interface OrderablePlugin {
 /**
  * Sorts plugins based on their `before` and `after` dependencies.
  */
-export function sortPlugins<T extends OrderablePlugin>(
-  plugins: T[],
-): T[] {
+export function sortPlugins<T extends OrderablePlugin>(plugins: T[]): T[] {
   const pluginCount = plugins.length
 
   const pluginIdToIndices = new Map<string, number[]>()
@@ -25,8 +23,7 @@ export function sortPlugins<T extends OrderablePlugin>(
     const indices = pluginIdToIndices.get(plugin.name)
     if (indices === undefined) {
       pluginIdToIndices.set(plugin.name, [i])
-    }
-    else {
+    } else {
       indices.push(i)
     }
   }
@@ -65,10 +62,14 @@ export function sortPlugins<T extends OrderablePlugin>(
   const placed = new Set<number>()
 
   while (sorted.length < pluginCount) {
-    const next = plugins.findIndex((_, i) => !placed.has(i) && dependencies[i]!.every(dependency => placed.has(dependency)))
+    const next = plugins.findIndex(
+      (_, i) => !placed.has(i) && dependencies[i]!.every((dependency) => placed.has(dependency)),
+    )
 
     if (next === -1) {
-      throw new Error(`Circular dependency detected involving plugin "${findCyclicPlugin(plugins, dependencies, placed).name}"`)
+      throw new Error(
+        `Circular dependency detected involving plugin "${findCyclicPlugin(plugins, dependencies, placed).name}"`,
+      )
     }
 
     placed.add(next)
@@ -88,7 +89,7 @@ function findCyclicPlugin<T extends OrderablePlugin>(
 
   while (!seen.has(current)) {
     seen.add(current)
-    current = dependencies[current]!.find(dependency => !placed.has(dependency))!
+    current = dependencies[current]!.find((dependency) => !placed.has(dependency))!
   }
 
   return plugins[current]!

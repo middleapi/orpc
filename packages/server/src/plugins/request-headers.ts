@@ -1,6 +1,7 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
 import { toArray } from '@orpc/shared'
 import { toFetchHeaders } from '@standard-server/fetch'
+
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
 
 /**
  * The context shape into which the Request Headers Plugin injects `reqHeaders`.
@@ -20,7 +21,9 @@ export interface RequestHeadersHandlerPluginContext {
  *
  * @see {@link https://orpc.dev/docs/plugins/request-headers | Request Headers Plugin}
  */
-export class RequestHeadersHandlerPlugin<T extends RequestHeadersHandlerPluginContext> implements StandardHandlerPlugin<T> {
+export class RequestHeadersHandlerPlugin<
+  T extends RequestHeadersHandlerPluginContext,
+> implements StandardHandlerPlugin<T> {
   name = '~request-headers'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -28,7 +31,9 @@ export class RequestHeadersHandlerPlugin<T extends RequestHeadersHandlerPluginCo
       ...options,
       interceptors: [
         (interceptorOptions) => {
-          const reqHeaders = interceptorOptions.context.reqHeaders ?? toFetchHeaders(interceptorOptions.request.headers)
+          const reqHeaders =
+            interceptorOptions.context.reqHeaders ??
+            toFetchHeaders(interceptorOptions.request.headers)
 
           return interceptorOptions.next({
             ...interceptorOptions,

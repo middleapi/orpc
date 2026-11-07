@@ -1,9 +1,10 @@
-import type { UpstashPublisherOptions } from './upstash'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { Redis } from '@upstash/redis'
-import { UpstashPublisher } from './upstash'
+
+import type { UpstashPublisherOptions } from './upstash.ts'
+import { UpstashPublisher } from './upstash.ts'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
@@ -16,7 +17,10 @@ describe.concurrent(
   'upstashPublisher',
   {
     // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
-    skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN || process.versions.node.startsWith('26.'),
+    skip:
+      !UPSTASH_REDIS_REST_URL ||
+      !UPSTASH_REDIS_REST_TOKEN ||
+      process.versions.node.startsWith('26.'),
     timeout: 20000,
   },
   () => {
@@ -31,13 +35,10 @@ describe.concurrent(
         useRedis?: Redis
       } = {},
     ) {
-      const publisher = new UpstashPublisher<Record<string, object>>(
-        useRedis,
-        {
-          prefix: `upstash:${crypto.randomUUID()}:`,
-          ...options,
-        },
-      )
+      const publisher = new UpstashPublisher<Record<string, object>>(useRedis, {
+        prefix: `upstash:${crypto.randomUUID()}:`,
+        ...options,
+      })
 
       ;(publisher as any).xTrimExactness = '=' // for easier testing
 
@@ -72,30 +73,41 @@ describe.concurrent(
 
       await publisher.publish(ignoredEvent, { order: 99 })
       await publisher.publish(liveEvent, { order: 1 })
-      await publisher.publish(liveEvent, withEventMeta({ order: 2 }, { id: '__id__', comments: ['__comment__'] }))
+      await publisher.publish(
+        liveEvent,
+        withEventMeta({ order: 2 }, { id: '__id__', comments: ['__comment__'] }),
+      )
 
       await vi.waitFor(() => {
         expect(listener).toHaveBeenCalledTimes(2)
       })
 
-      expect(listener).toHaveBeenNthCalledWith(1, expect.toSatisfy((payload) => {
-        expect(payload).toEqual({ order: 1 })
-        expect(getEventMeta(payload)).toEqual(undefined)
+      expect(listener).toHaveBeenNthCalledWith(
+        1,
+        expect.toSatisfy((payload) => {
+          expect(payload).toEqual({ order: 1 })
+          expect(getEventMeta(payload)).toEqual(undefined)
 
-        return true
-      }))
+          return true
+        }),
+      )
 
-      expect(listener).toHaveBeenNthCalledWith(2, expect.toSatisfy((payload) => {
-        expect(payload).toEqual({ order: 2 })
-        expect(getEventMeta(payload)).toEqual({ id: '__id__', comments: ['__comment__'] })
+      expect(listener).toHaveBeenNthCalledWith(
+        2,
+        expect.toSatisfy((payload) => {
+          expect(payload).toEqual({ order: 2 })
+          expect(getEventMeta(payload)).toEqual({ id: '__id__', comments: ['__comment__'] })
 
-        return true
-      }))
+          return true
+        }),
+      )
 
       await unsubscribe()
 
       const resumeAttempt = vi.fn()
-      const unsubscribeResumeAttempt = await publisher.subscribe(liveEvent, resumeAttempt, { lastEventId: '0' })
+      const unsubscribeResumeAttempt = await publisher.subscribe(liveEvent, resumeAttempt, {
+        lastEventId: '0',
+      })
 
       await sleep(300)
 
@@ -106,15 +118,18 @@ describe.concurrent(
 
     it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
       const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
       })
-      const event = ('orders')
+      const event = 'orders'
       const liveListener = vi.fn()
 
       const unsubscribeLive = await publisher.subscribe(event, liveListener)
 
       const firstPayload = { order: 1 }
-      const secondPayload = withEventMeta({ order: 2 }, { id: 'client-id', comments: ['audit-log'] })
+      const secondPayload = withEventMeta(
+        { order: 2 },
+        { id: 'client-id', comments: ['audit-log'] },
+      )
       const thirdPayload = { order: 3 }
 
       await publisher.publish(event, firstPayload)
@@ -159,9 +174,9 @@ describe.concurrent(
 
     it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
       const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
       })
-      const event = ('empty-backlog')
+      const event = 'empty-backlog'
       const listener = vi.fn()
 
       const unsubscribe = await publisher.subscribe(event, listener, { lastEventId: '0' })
@@ -203,10 +218,13 @@ describe.concurrent(
         },
       )
 
-      const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 10_000 },
-      }, { useRedis: redis })
-      const event = ('timeline')
+      const publisher = createTestingPublisher(
+        {
+          resume: { ttl: 10_000 },
+        },
+        { useRedis: redis },
+      )
+      const event = 'timeline'
 
       await publisher.publish(event, { order: 1 })
       await publisher.publish(event, { order: 2 })
@@ -224,7 +242,7 @@ describe.concurrent(
         expect(listener).toHaveBeenCalledTimes(4)
       })
 
-      expect(listener.mock.calls.map(call => call[0].order)).toEqual([1, 2, 3, 4])
+      expect(listener.mock.calls.map((call) => call[0].order)).toEqual([1, 2, 3, 4])
 
       await unsubscribe()
     })
@@ -236,7 +254,7 @@ describe.concurrent(
       })
       const subscribeSpy = vi.spyOn(dedicatedRedis, 'subscribe')
       const publisher = createTestingPublisher({}, { useRedis: dedicatedRedis })
-      const event = ('shared-subscription')
+      const event = 'shared-subscription'
       const listener1 = vi.fn()
       const listener2 = vi.fn()
 
@@ -269,7 +287,7 @@ describe.concurrent(
       const prefix = `concurrent:${crypto.randomUUID()}:`
       const event = 'orders'
       const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
         prefix,
       })
       const listener = vi.fn()
@@ -277,13 +295,17 @@ describe.concurrent(
       const unsubscribe = await publisher.subscribe(event, listener)
 
       // Each command is a separate HTTP request, like publishers in different processes.
-      await Promise.all(Array.from({ length: 50 }, (_, order) => publisher.publish(event, { order })))
+      await Promise.all(
+        Array.from({ length: 50 }, (_, order) => publisher.publish(event, { order })),
+      )
 
       await vi.waitFor(() => {
         expect(listener).toHaveBeenCalledTimes(50)
       })
 
-      const streamIds = (await redis.xread(`${prefix}${event}`, '0') as any)[0][1].map(([id]: [string]) => id)
+      const streamIds = ((await redis.xread(`${prefix}${event}`, '0')) as any)[0][1].map(
+        ([id]: [string]) => id,
+      )
       expect(listener.mock.calls.map(([payload]) => getEventMeta(payload)?.id)).toEqual(streamIds)
 
       await unsubscribe()
@@ -294,7 +316,7 @@ describe.concurrent(
       const event = 'orders'
       const key = `${prefix}${event}`
       const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 1_000 },
+        resume: { ttl: 1_000 },
         prefix,
       })
 
@@ -304,13 +326,13 @@ describe.concurrent(
         publisher.publish(event, { order: 3 }),
       ])
 
-      const beforeCleanup = await redis.xread(key, '0') as any
+      const beforeCleanup = (await redis.xread(key, '0')) as any
       expect(beforeCleanup[0][1].length).toBe(3)
 
       await sleep(1100)
       await publisher.publish(event, { order: 4 })
 
-      const afterCleanup = await redis.xread(key, '0') as any
+      const afterCleanup = (await redis.xread(key, '0')) as any
       expect(afterCleanup[0][1].length).toBe(1)
 
       const ttl = await redis.ttl(key)
@@ -327,21 +349,21 @@ describe.concurrent(
         constructor(
           public name: string,
           public date: Date,
-        ) { }
+        ) {}
       }
 
       const serializer = new RPCJsonSerializer({
         handlers: {
           person: {
-            condition: p => p instanceof Person,
-            serialize: p => ({ name: p.name, date: p.date }),
+            condition: (p) => p instanceof Person,
+            serialize: (p) => ({ name: p.name, date: p.date }),
             deserialize: (p: any) => new Person(p.name, p.date),
           },
         },
       })
 
       const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
         serializer,
         prefix: `custom:${crypto.randomUUID()}:`,
       })
@@ -380,16 +402,18 @@ describe.concurrent(
 
     it('reports resume errors while subscribing', async () => {
       const publisher = createTestingPublisher({
-        resume: { enabled: true, ttl: 10_000 },
+        resume: { ttl: 10_000 },
       })
-      const event = ('resume-errors')
+      const event = 'resume-errors'
       const listener = vi.fn()
       const onError = vi.fn()
 
-      await expect(publisher.subscribe(event, listener, {
-        lastEventId: 'invalid-id-format',
-        onError,
-      })).rejects.toThrow()
+      await expect(
+        publisher.subscribe(event, listener, {
+          lastEventId: 'invalid-id-format',
+          onError,
+        }),
+      ).rejects.toThrow()
 
       await publisher.publish(event, { order: 1 })
 
@@ -467,8 +491,8 @@ describe.concurrent(
         retry: false,
       })
       const publisher = createTestingPublisher({}, { useRedis: invalidRedis })
-      const event1 = ('connection-error')
-      const event2 = ('connection-error')
+      const event1 = 'connection-error'
+      const event2 = 'connection-error'
       const listener1 = vi.fn()
       const listener2 = vi.fn()
       const onError1 = vi.fn()
@@ -488,7 +512,7 @@ describe.concurrent(
 
     it('does not crash if teardown runs after internal maps were already pruned', async () => {
       const publisher = createTestingPublisher()
-      const event = ('defensive-cleanup')
+      const event = 'defensive-cleanup'
       const listener = vi.fn()
       const onError = vi.fn()
 
@@ -508,13 +532,16 @@ describe.concurrent(
     })
 
     it('works with clients that disable automatic deserialization', async () => {
-      const publisher = createTestingPublisher({ resume: { enabled: true, ttl: 10_000 } }, {
-        useRedis: new Redis({
-          url: UPSTASH_REDIS_REST_URL,
-          token: UPSTASH_REDIS_REST_TOKEN,
-          automaticDeserialization: false,
-        }),
-      })
+      const publisher = createTestingPublisher(
+        { resume: { ttl: 10_000 } },
+        {
+          useRedis: new Redis({
+            url: UPSTASH_REDIS_REST_URL,
+            token: UPSTASH_REDIS_REST_TOKEN,
+            automaticDeserialization: false,
+          }),
+        },
+      )
       const event = 'orders'
       const listener = vi.fn()
 
@@ -526,7 +553,10 @@ describe.concurrent(
       })
 
       expect(listener.mock.calls[0]![0]).toEqual({ order: 1 })
-      expect(getEventMeta(listener.mock.calls[0]![0])).toEqual({ id: expect.any(String), comments: ['audit'] })
+      expect(getEventMeta(listener.mock.calls[0]![0])).toEqual({
+        id: expect.any(String),
+        comments: ['audit'],
+      })
 
       await unsubscribe()
 
@@ -545,6 +575,7 @@ describe.concurrent(
     it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
       const publisher = createTestingPublisher()
       const event = 'self-unsubscribe'
+      // oxlint-disable-next-line prefer-const -- assigned after the callback that reads it is created
       let unsubscribeFirst: () => Promise<void>
       const first = vi.fn(() => {
         void unsubscribeFirst()
@@ -597,7 +628,7 @@ describe.concurrent(
         publisher.subscribe(event, listener3),
       ])
 
-      expect(results.map(result => result.status)).toEqual(['rejected', 'fulfilled', 'fulfilled'])
+      expect(results.map((result) => result.status)).toEqual(['rejected', 'fulfilled', 'fulfilled'])
       expect(subscribes).toBe(1)
 
       await publisher.publish(event, { order: 1 })
@@ -616,12 +647,15 @@ describe.concurrent(
 
     it('fan-outs subscription errors to every registered onError handler', async () => {
       const subscription = createFakeSubscription()
-      const publisher = createTestingPublisher({}, {
-        useRedis: withFakeSubscribe(redis, () => {
-          queueMicrotask(() => subscription.emit('subscribe', 1))
-          return subscription
-        }),
-      })
+      const publisher = createTestingPublisher(
+        {},
+        {
+          useRedis: withFakeSubscribe(redis, () => {
+            queueMicrotask(() => subscription.emit('subscribe', 1))
+            return subscription
+          }),
+        },
+      )
       const event = 'connection-lost'
       const onError1 = vi.fn()
       const onError2 = vi.fn()
@@ -643,20 +677,28 @@ describe.concurrent(
 
     it('tears down a subscription that fails before it is established', async () => {
       const subscription = createFakeSubscription()
-      const publisher = createTestingPublisher({}, {
-        useRedis: withFakeSubscribe(redis, () => {
-          queueMicrotask(() => subscription.emit('error', new Error('connection refused')))
-          return subscription
-        }),
-      })
+      const publisher = createTestingPublisher(
+        {},
+        {
+          useRedis: withFakeSubscribe(redis, () => {
+            queueMicrotask(() => subscription.emit('error', new Error('connection refused')))
+            return subscription
+          }),
+        },
+      )
 
-      await expect(publisher.subscribe('unreachable', vi.fn())).rejects.toThrow('connection refused')
+      await expect(publisher.subscribe('unreachable', vi.fn())).rejects.toThrow(
+        'connection refused',
+      )
 
       expect(subscription.unsubscribe).toHaveBeenCalledTimes(1)
     })
 
     it('opens a fresh subscription when subscribing while the previous one is being torn down', async () => {
-      const dedicatedRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
+      const dedicatedRedis = new Redis({
+        url: UPSTASH_REDIS_REST_URL,
+        token: UPSTASH_REDIS_REST_TOKEN,
+      })
       const subscribeSpy = vi.spyOn(dedicatedRedis, 'subscribe')
       const publisher = createTestingPublisher({}, { useRedis: dedicatedRedis })
       const event = 'resubscribe'
@@ -664,7 +706,10 @@ describe.concurrent(
       const second = vi.fn()
 
       const unsubscribeFirst = await publisher.subscribe(event, first)
-      const [, unsubscribeSecond] = await Promise.all([unsubscribeFirst(), publisher.subscribe(event, second)])
+      const [, unsubscribeSecond] = await Promise.all([
+        unsubscribeFirst(),
+        publisher.subscribe(event, second),
+      ])
       await publisher.publish(event, { order: 1 })
 
       await vi.waitFor(() => {
@@ -684,9 +729,10 @@ function createFakeSubscription() {
 
   return {
     on: (type: string, handler: (event: unknown) => void) => {
-      handlers.set(type, [...handlers.get(type) ?? [], handler])
+      handlers.set(type, [...(handlers.get(type) ?? []), handler])
     },
-    emit: (type: string, event: unknown) => handlers.get(type)?.forEach(handler => handler(event)),
+    emit: (type: string, event: unknown) =>
+      handlers.get(type)?.forEach((handler) => handler(event)),
     unsubscribe: vi.fn(async () => {}),
   }
 }
@@ -721,13 +767,17 @@ it('does not broadcast a throwing onError to other subscribers', async () => {
   const listener2 = vi.fn()
   const onError2 = vi.fn()
 
-  const unsubscribe1 = await publisher.subscribe('room', () => {
-    throw new Error('listener failed')
-  }, {
-    onError: () => {
-      throw new Error('onError failed')
+  const unsubscribe1 = await publisher.subscribe(
+    'room',
+    () => {
+      throw new Error('listener failed')
     },
-  })
+    {
+      onError: () => {
+        throw new Error('onError failed')
+      },
+    },
+  )
   const unsubscribe2 = await publisher.subscribe('room', listener2, { onError: onError2 })
 
   await publisher.publish('room', { order: 1 })
@@ -735,8 +785,7 @@ it('does not broadcast a throwing onError to other subscribers', async () => {
   // Like Upstash, which emits a throw from a message handler as an `error` event.
   try {
     subscription.emit('message', { channel: 'room', message: messages[0] })
-  }
-  catch (error) {
+  } catch (error) {
     subscription.emit('error', error)
   }
 

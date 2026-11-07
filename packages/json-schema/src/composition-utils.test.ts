@@ -1,5 +1,3 @@
-import type { JsonSchema } from './types'
-import type { JsonObjectSchema } from './utils'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
@@ -9,7 +7,9 @@ import {
   flattenJsonUnionSchema,
   isJsonObjectLikeSchema,
   matchArrayableJsonSchema,
-} from './composition-utils'
+} from './composition-utils.ts'
+import type { JsonSchema } from './types.ts'
+import type { JsonObjectSchema } from './utils.ts'
 
 describe('extractJsonObjectSchemaEntries', () => {
   it('returns undefined for non object-able schemas', () => {
@@ -20,18 +20,20 @@ describe('extractJsonObjectSchemaEntries', () => {
     expect(extractJsonObjectSchemaEntries({ anyOf: [{ type: 'string' }] })).toBeUndefined()
     expect(extractJsonObjectSchemaEntries({ oneOf: [{ type: 'string' }] })).toBeUndefined()
     expect(extractJsonObjectSchemaEntries({ allOf: [{ type: 'string' }] })).toBeUndefined()
-    expect(extractJsonObjectSchemaEntries({
-      $ref: '#/$defs/Missing',
-      $defs: {
-        Present: {
-          type: 'object',
-          properties: {
-            value: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        $ref: '#/$defs/Missing',
+        $defs: {
+          Present: {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+            },
           },
         },
-      },
-    })).toBeUndefined()
-    expect(extractJsonObjectSchemaEntries({ })).toBeUndefined()
+      }),
+    ).toBeUndefined()
+    expect(extractJsonObjectSchemaEntries({})).toBeUndefined()
   })
 
   it('return empty array for empty object like schemas', () => {
@@ -61,20 +63,9 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 
   it('resolves local refs before parsing direct object entries', () => {
-    expect(extractJsonObjectSchemaEntries({
-      $ref: '#/$defs/Node',
-      $defs: {
-        Node: {
-          type: 'object',
-          properties: {
-            value: { type: 'string' },
-          },
-          required: ['value'],
-        },
-      },
-    })).toEqual([
-      ['value', {
-        type: 'string',
+    expect(
+      extractJsonObjectSchemaEntries({
+        $ref: '#/$defs/Node',
         $defs: {
           Node: {
             type: 'object',
@@ -84,7 +75,24 @@ describe('extractJsonObjectSchemaEntries', () => {
             required: ['value'],
           },
         },
-      }, false],
+      }),
+    ).toEqual([
+      [
+        'value',
+        {
+          type: 'string',
+          $defs: {
+            Node: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+              },
+              required: ['value'],
+            },
+          },
+        },
+        false,
+      ],
     ])
   })
 
@@ -126,145 +134,152 @@ describe('extractJsonObjectSchemaEntries', () => {
 
     expect(extractJsonObjectSchemaEntries(schema)).toEqual([
       ['left', { type: 'string', $defs: schema.$defs }, true],
-      ['shared', {
-        allOf: [
-          { minLength: 1, type: 'string' },
-          {
-            anyOf: [
-              { type: 'string' },
-              { maxLength: 10, type: 'string' },
-            ],
-          },
-        ],
-        $defs: schema.$defs,
-      }, false],
-      ['shared2', {
-        $defs: {
-          Shared: {
-            type: 'boolean',
-          },
+      [
+        'shared',
+        {
+          allOf: [
+            { minLength: 1, type: 'string' },
+            {
+              anyOf: [{ type: 'string' }, { maxLength: 10, type: 'string' }],
+            },
+          ],
+          $defs: schema.$defs,
         },
-        anyOf: [{ type: 'number' }, { type: 'boolean' }],
-      }, true],
+        false,
+      ],
+      [
+        'shared2',
+        {
+          $defs: {
+            Shared: {
+              type: 'boolean',
+            },
+          },
+          anyOf: [{ type: 'number' }, { type: 'boolean' }],
+        },
+        true,
+      ],
       ['right', { type: 'number', $defs: schema.$defs }, true],
       ['fixed', { const: 'x', $defs: schema.$defs }, true],
     ])
   })
 
   it('includes same-level object properties when composition keywords are also present', () => {
-    expect(extractJsonObjectSchemaEntries({
-      type: 'object',
-      oneOf: [
-        {
-          type: 'object',
-          properties: {
-            branch: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        type: 'object',
+        oneOf: [
+          {
+            type: 'object',
+            properties: {
+              branch: { type: 'string' },
+            },
           },
-        },
-      ],
-    })).toEqual([
-      ['branch', { type: 'string' }, true],
-    ])
+        ],
+      }),
+    ).toEqual([['branch', { type: 'string' }, true]])
   })
 
   it('wraps pure union property merges in anyOf', () => {
-    expect(extractJsonObjectSchemaEntries({
-      anyOf: [
-        {
-          type: 'object',
-          properties: {
-            value: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        anyOf: [
+          {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+            },
           },
-        },
-        {
-          type: 'object',
-          properties: {
-            value: { type: 'number' },
+          {
+            type: 'object',
+            properties: {
+              value: { type: 'number' },
+            },
           },
-        },
-      ],
-    })).toEqual([
-      ['value', { anyOf: [{ type: 'string' }, { type: 'number' }] }, true],
-    ])
+        ],
+      }),
+    ).toEqual([['value', { anyOf: [{ type: 'string' }, { type: 'number' }] }, true]])
   })
 
   it('wraps pure intersection property merges in allOf', () => {
-    expect(extractJsonObjectSchemaEntries({
-      allOf: [
-        {
-          type: 'object',
-          properties: {
-            value: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        allOf: [
+          {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+            },
           },
-        },
-        {
-          type: 'object',
-          properties: {
-            value: { minLength: 1 },
+          {
+            type: 'object',
+            properties: {
+              value: { minLength: 1 },
+            },
           },
-        },
-      ],
-    })).toEqual([
-      ['value', { allOf: [{ type: 'string' }, { minLength: 1 }] }, true],
-    ])
+        ],
+      }),
+    ).toEqual([['value', { allOf: [{ type: 'string' }, { minLength: 1 }] }, true]])
   })
 
   it('deduplicates identical union and intersection property schemas', () => {
-    expect(extractJsonObjectSchemaEntries({
-      anyOf: [
-        {
-          type: 'object',
-          properties: {
-            a: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        anyOf: [
+          {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+            },
+            required: ['a'],
           },
-          required: ['a'],
-        },
-      ],
-      allOf: [
-        {
-          type: 'object',
-          properties: {
-            a: { type: 'string' },
+        ],
+        allOf: [
+          {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+            },
           },
-        },
-      ],
-    })).toEqual([
-      ['a', { type: 'string' }, false],
-    ])
+        ],
+      }),
+    ).toEqual([['a', { type: 'string' }, false]])
   })
 
   it('marks union properties optional unless every branch requires them', () => {
-    expect(extractJsonObjectSchemaEntries({
-      anyOf: [
-        {
-          type: 'object',
-          properties: {
-            p1: { type: 'boolean' },
-            p2: { type: 'boolean' },
-            p3: { type: 'boolean' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        anyOf: [
+          {
+            type: 'object',
+            properties: {
+              p1: { type: 'boolean' },
+              p2: { type: 'boolean' },
+              p3: { type: 'boolean' },
+            },
+            required: ['p1', 'p2'],
           },
-          required: ['p1', 'p2'],
-        },
-        {
-          type: 'object',
-          properties: {
-            p1: { type: 'boolean' },
-            p2: { type: 'boolean' },
-            p3: { type: 'boolean' },
+          {
+            type: 'object',
+            properties: {
+              p1: { type: 'boolean' },
+              p2: { type: 'boolean' },
+              p3: { type: 'boolean' },
+            },
+            required: ['p1', 'p3'],
           },
-          required: ['p1', 'p3'],
-        },
-        {
-          type: 'object',
-          properties: {
-            p1: { type: 'boolean' },
-            p2: { type: 'boolean' },
-            p3: { type: 'boolean' },
+          {
+            type: 'object',
+            properties: {
+              p1: { type: 'boolean' },
+              p2: { type: 'boolean' },
+              p3: { type: 'boolean' },
+            },
+            required: ['p1', 'p2', 'p3'],
           },
-          required: ['p1', 'p2', 'p3'],
-        },
-      ],
-    })).toEqual([
+        ],
+      }),
+    ).toEqual([
       ['p1', { type: 'boolean' }, false],
       ['p2', { type: 'boolean' }, true],
       ['p3', { type: 'boolean' }, true],
@@ -272,36 +287,38 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 
   it('marks intersection properties required when any branch requires them', () => {
-    expect(extractJsonObjectSchemaEntries({
-      allOf: [
-        {
-          type: 'object',
-          properties: {
-            p1: { type: 'boolean' },
-            p2: { type: 'boolean' },
-            p3: { type: 'boolean' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        allOf: [
+          {
+            type: 'object',
+            properties: {
+              p1: { type: 'boolean' },
+              p2: { type: 'boolean' },
+              p3: { type: 'boolean' },
+            },
+            required: ['p2'],
           },
-          required: ['p2'],
-        },
-        {
-          type: 'object',
-          properties: {
-            p1: { type: 'boolean' },
-            p2: { type: 'boolean' },
-            p3: { type: 'boolean' },
+          {
+            type: 'object',
+            properties: {
+              p1: { type: 'boolean' },
+              p2: { type: 'boolean' },
+              p3: { type: 'boolean' },
+            },
+            required: ['p3'],
           },
-          required: ['p3'],
-        },
-        {
-          type: 'object',
-          properties: {
-            p1: { type: 'boolean' },
-            p2: { type: 'boolean' },
-            p3: { type: 'boolean' },
+          {
+            type: 'object',
+            properties: {
+              p1: { type: 'boolean' },
+              p2: { type: 'boolean' },
+              p3: { type: 'boolean' },
+            },
           },
-        },
-      ],
-    })).toEqual([
+        ],
+      }),
+    ).toEqual([
       ['p1', { type: 'boolean' }, true],
       ['p2', { type: 'boolean' }, false],
       ['p3', { type: 'boolean' }, false],
@@ -322,42 +339,52 @@ describe('extractJsonObjectSchemaEntries', () => {
     }
 
     expect(extractJsonObjectSchemaEntries(schema)).toEqual([
-      ['self', {
-        $ref: '#/$defs/__schema0',
-        $defs: {
-          Leaf: { type: 'string' },
-          __schema0: {
-            type: 'object',
-            properties: {
-              self: { $ref: '#/$defs/__schema0' },
-              leaf: { $ref: '#/$defs/Leaf' },
+      [
+        'self',
+        {
+          $ref: '#/$defs/__schema0',
+          $defs: {
+            Leaf: { type: 'string' },
+            __schema0: {
+              type: 'object',
+              properties: {
+                self: { $ref: '#/$defs/__schema0' },
+                leaf: { $ref: '#/$defs/Leaf' },
+              },
+              required: ['self'],
             },
-            required: ['self'],
           },
         },
-      }, false],
-      ['leaf', {
-        $ref: '#/$defs/Leaf',
-        $defs: {
-          Leaf: { type: 'string' },
-          __schema0: {
-            type: 'object',
-            properties: {
-              self: { $ref: '#/$defs/__schema0' },
-              leaf: { $ref: '#/$defs/Leaf' },
+        false,
+      ],
+      [
+        'leaf',
+        {
+          $ref: '#/$defs/Leaf',
+          $defs: {
+            Leaf: { type: 'string' },
+            __schema0: {
+              type: 'object',
+              properties: {
+                self: { $ref: '#/$defs/__schema0' },
+                leaf: { $ref: '#/$defs/Leaf' },
+              },
+              required: ['self'],
             },
-            required: ['self'],
           },
         },
-      }, true],
+        true,
+      ],
     ])
   })
 
   it('stops on cyclic alias refs', () => {
-    expect(extractJsonObjectSchemaEntries({
-      $ref: '#/$defs/A',
-      $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } },
-    })).toEqual([])
+    expect(
+      extractJsonObjectSchemaEntries({
+        $ref: '#/$defs/A',
+        $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } },
+      }),
+    ).toEqual([])
   })
 
   it('extracts properties from recursive $ref nested unions and intersections', () => {
@@ -422,22 +449,24 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 
   it('marks nested anyOf properties optional unless every allOf branch requires them', () => {
-    expect(extractJsonObjectSchemaEntries({
-      anyOf: [
-        {
-          allOf: [
-            { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
-            { properties: { left: { type: 'string' } }, required: ['left'] },
-          ],
-        },
-        {
-          allOf: [
-            { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
-            { properties: { right: { type: 'number' } }, required: ['right'] },
-          ],
-        },
-      ],
-    })).toEqual([
+    expect(
+      extractJsonObjectSchemaEntries({
+        anyOf: [
+          {
+            allOf: [
+              { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
+              { properties: { left: { type: 'string' } }, required: ['left'] },
+            ],
+          },
+          {
+            allOf: [
+              { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
+              { properties: { right: { type: 'number' } }, required: ['right'] },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
       ['shared', { type: 'boolean' }, false],
       ['left', { type: 'string' }, true],
       ['right', { type: 'number' }, true],
@@ -445,22 +474,24 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 
   it('marks nested oneOf properties optional unless every allOf branch requires them', () => {
-    expect(extractJsonObjectSchemaEntries({
-      oneOf: [
-        {
-          allOf: [
-            { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
-            { properties: { left: { type: 'string' } }, required: ['left'] },
-          ],
-        },
-        {
-          allOf: [
-            { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
-            { properties: { right: { type: 'number' } }, required: ['right'] },
-          ],
-        },
-      ],
-    })).toEqual([
+    expect(
+      extractJsonObjectSchemaEntries({
+        oneOf: [
+          {
+            allOf: [
+              { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
+              { properties: { left: { type: 'string' } }, required: ['left'] },
+            ],
+          },
+          {
+            allOf: [
+              { properties: { shared: { type: 'boolean' } }, required: ['shared'] },
+              { properties: { right: { type: 'number' } }, required: ['right'] },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
       ['shared', { type: 'boolean' }, false],
       ['left', { type: 'string' }, true],
       ['right', { type: 'number' }, true],
@@ -468,36 +499,38 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 
   it('preserves required properties from nested anyOf branches when merged through outer allOf', () => {
-    expect(extractJsonObjectSchemaEntries({
-      allOf: [
-        {
-          anyOf: [
-            {
-              type: 'object',
-              properties: {
-                shared: { type: 'string' },
-                left: { type: 'boolean' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        allOf: [
+          {
+            anyOf: [
+              {
+                type: 'object',
+                properties: {
+                  shared: { type: 'string' },
+                  left: { type: 'boolean' },
+                },
+                required: ['shared', 'left'],
               },
-              required: ['shared', 'left'],
-            },
-            {
-              type: 'object',
-              properties: {
-                shared: { type: 'string' },
-                right: { type: 'number' },
+              {
+                type: 'object',
+                properties: {
+                  shared: { type: 'string' },
+                  right: { type: 'number' },
+                },
+                required: ['shared'],
               },
-              required: ['shared'],
-            },
-          ],
-        },
-        {
-          properties: {
-            extra: { type: 'null' },
+            ],
           },
-          required: ['extra'],
-        },
-      ],
-    })).toEqual([
+          {
+            properties: {
+              extra: { type: 'null' },
+            },
+            required: ['extra'],
+          },
+        ],
+      }),
+    ).toEqual([
       ['shared', { type: 'string' }, false],
       ['left', { type: 'boolean' }, true],
       ['right', { type: 'number' }, true],
@@ -506,41 +539,41 @@ describe('extractJsonObjectSchemaEntries', () => {
   })
 
   it('includes top-level required for object schemas with properties and composition', () => {
-    expect(extractJsonObjectSchemaEntries({
-      type: 'object',
-      properties: {
-        a: { type: 'string' },
-      },
-      required: ['a'],
-      allOf: [
-        {
-          type: 'object',
-          properties: {
-            b: { type: 'number' },
-          },
+    expect(
+      extractJsonObjectSchemaEntries({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
         },
-      ],
-    })).toEqual([
+        required: ['a'],
+        allOf: [
+          {
+            type: 'object',
+            properties: {
+              b: { type: 'number' },
+            },
+          },
+        ],
+      }),
+    ).toEqual([
       ['a', { type: 'string' }, false],
       ['b', { type: 'number' }, true],
     ])
   })
 
   it('applies top-level required to properties only composition branches declare', () => {
-    expect(extractJsonObjectSchemaEntries({
-      type: 'object',
-      required: ['a', 'b', 'c'],
-      anyOf: [
-        { type: 'object', properties: { a: { type: 'string' } } },
-        { type: 'object', properties: { a: { type: 'number' } } },
-      ],
-      oneOf: [
-        { type: 'object', properties: { b: { type: 'string' } } },
-      ],
-      allOf: [
-        { type: 'object', properties: { c: { type: 'string' }, d: { type: 'string' } } },
-      ],
-    })).toEqual([
+    expect(
+      extractJsonObjectSchemaEntries({
+        type: 'object',
+        required: ['a', 'b', 'c'],
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' } } },
+          { type: 'object', properties: { a: { type: 'number' } } },
+        ],
+        oneOf: [{ type: 'object', properties: { b: { type: 'string' } } }],
+        allOf: [{ type: 'object', properties: { c: { type: 'string' }, d: { type: 'string' } } }],
+      }),
+    ).toEqual([
       ['a', { anyOf: [{ type: 'string' }, { type: 'number' }] }, false],
       ['b', { type: 'string' }, false],
       ['c', { type: 'string' }, false],
@@ -548,111 +581,131 @@ describe('extractJsonObjectSchemaEntries', () => {
     ])
 
     // the same inside a nested composition
-    expect(extractJsonObjectSchemaEntries({
-      allOf: [
-        {
-          required: ['a'],
-          anyOf: [
-            { type: 'object', properties: { a: { type: 'string' } } },
-            { type: 'object', properties: { b: { type: 'string' } } },
-          ],
-        },
-      ],
-    })).toEqual([
+    expect(
+      extractJsonObjectSchemaEntries({
+        allOf: [
+          {
+            required: ['a'],
+            anyOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'string' } } },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
       ['a', { type: 'string' }, false],
       ['b', { type: 'string' }, true],
     ])
   })
 
   it('handles top-level object with properties but no required', () => {
-    expect(extractJsonObjectSchemaEntries({
-      type: 'object',
-      properties: {
-        a: { type: 'string' },
-      },
-      allOf: [
-        {
-          type: 'object',
-          properties: {
-            b: { type: 'number' },
-          },
+    expect(
+      extractJsonObjectSchemaEntries({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
         },
-      ],
-    })).toEqual([
+        allOf: [
+          {
+            type: 'object',
+            properties: {
+              b: { type: 'number' },
+            },
+          },
+        ],
+      }),
+    ).toEqual([
       ['a', { type: 'string' }, true],
       ['b', { type: 'number' }, true],
     ])
   })
 
   it('handles composition branches that are object schemas without properties', () => {
-    expect(extractJsonObjectSchemaEntries({
-      anyOf: [
-        { type: 'object' },
-        {
-          type: 'object',
-          properties: {
-            a: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        anyOf: [
+          { type: 'object' },
+          {
+            type: 'object',
+            properties: {
+              a: { type: 'string' },
+            },
           },
-        },
-      ],
-    })).toEqual([
-      ['a', { type: 'string' }, true],
-    ])
+        ],
+      }),
+    ).toEqual([['a', { type: 'string' }, true]])
   })
 
   it('sorts anyOf and oneOf groups after allOf groups', () => {
-    expect(extractJsonObjectSchemaEntries({
-      anyOf: [
-        {
-          type: 'object',
-          properties: {
-            shared: { type: 'string' },
+    expect(
+      extractJsonObjectSchemaEntries({
+        anyOf: [
+          {
+            type: 'object',
+            properties: {
+              shared: { type: 'string' },
+            },
           },
-        },
-      ],
-      oneOf: [
-        {
-          type: 'object',
-          properties: {
-            shared: { type: 'number' },
+        ],
+        oneOf: [
+          {
+            type: 'object',
+            properties: {
+              shared: { type: 'number' },
+            },
           },
-        },
-      ],
-    })).toEqual([
-      ['shared', { allOf: [{ type: 'string' }, { type: 'number' }] }, true],
-    ])
+        ],
+      }),
+    ).toEqual([['shared', { allOf: [{ type: 'string' }, { type: 'number' }] }, true]])
   })
 })
 
 describe('extractJsonObjectSchemaAdditionalProperties', () => {
   it('returns undefined when the root declares no additionalProperties', () => {
     expect(extractJsonObjectSchemaAdditionalProperties(true)).toBeUndefined()
-    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', properties: { a: { type: 'string' } } })).toBeUndefined()
+    expect(
+      extractJsonObjectSchemaAdditionalProperties({
+        type: 'object',
+        properties: { a: { type: 'string' } },
+      }),
+    ).toBeUndefined()
   })
 
   it('returns the root additionalProperties', () => {
-    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: false })).toBe(false)
-    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: { type: 'number' } })).toEqual({ type: 'number' })
+    expect(
+      extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: false }),
+    ).toBe(false)
+    expect(
+      extractJsonObjectSchemaAdditionalProperties({
+        type: 'object',
+        additionalProperties: { type: 'number' },
+      }),
+    ).toEqual({ type: 'number' })
   })
 
   it('ignores additionalProperties declared only by composition branches', () => {
-    expect(extractJsonObjectSchemaAdditionalProperties({
-      anyOf: [
-        { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false },
-        { type: 'object', properties: { b: { type: 'string' } } },
-      ],
-    })).toBeUndefined()
+    expect(
+      extractJsonObjectSchemaAdditionalProperties({
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false },
+          { type: 'object', properties: { b: { type: 'string' } } },
+        ],
+      }),
+    ).toBeUndefined()
   })
 
   it('resolves local refs and preserves root $defs', () => {
-    expect(extractJsonObjectSchemaAdditionalProperties({
-      $ref: '#/$defs/Thing',
-      $defs: {
-        Thing: { $ref: '#/$defs/Strict' },
-        Strict: { type: 'object', additionalProperties: { $ref: '#/$defs/Value' } },
-        Value: { type: 'number' },
-      },
-    })).toEqual({
+    expect(
+      extractJsonObjectSchemaAdditionalProperties({
+        $ref: '#/$defs/Thing',
+        $defs: {
+          Thing: { $ref: '#/$defs/Strict' },
+          Strict: { type: 'object', additionalProperties: { $ref: '#/$defs/Value' } },
+          Value: { type: 'number' },
+        },
+      }),
+    ).toEqual({
       $ref: '#/$defs/Value',
       $defs: {
         Thing: { $ref: '#/$defs/Strict' },
@@ -663,10 +716,12 @@ describe('extractJsonObjectSchemaAdditionalProperties', () => {
   })
 
   it('uses hoisted defs for recursive root refs', () => {
-    expect(extractJsonObjectSchemaAdditionalProperties({
-      type: 'object',
-      additionalProperties: { $ref: '#' },
-    })).toEqual({
+    expect(
+      extractJsonObjectSchemaAdditionalProperties({
+        type: 'object',
+        additionalProperties: { $ref: '#' },
+      }),
+    ).toEqual({
       $ref: '#/$defs/__schema0',
       $defs: {
         __schema0: {
@@ -680,15 +735,21 @@ describe('extractJsonObjectSchemaAdditionalProperties', () => {
 
 describe('combineJsonObjectSchemaEntries', () => {
   it('combines entries into a single object schema', () => {
-    expect(combineJsonObjectSchemaEntries([
-      ['requiredRef', {
-        $ref: '#/$defs/Shared',
-        $defs: {
-          Shared: { type: 'string' },
-        },
-      }, false],
-      ['optionalNever', false, true],
-    ])).toEqual({
+    expect(
+      combineJsonObjectSchemaEntries([
+        [
+          'requiredRef',
+          {
+            $ref: '#/$defs/Shared',
+            $defs: {
+              Shared: { type: 'string' },
+            },
+          },
+          false,
+        ],
+        ['optionalNever', false, true],
+      ]),
+    ).toEqual({
       type: 'object',
       properties: {
         requiredRef: {
@@ -704,17 +765,23 @@ describe('combineJsonObjectSchemaEntries', () => {
   })
 
   it('rewrites absolute refs to the property path when embedding property schemas', () => {
-    expect(combineJsonObjectSchemaEntries([
-      ['node', {
-        type: 'object',
-        properties: {
-          self: { $ref: '#' },
-          brother: { $ref: '#/properties/self' },
-          unchanged: { $ref: '0/unchanged' },
-        },
-        required: ['self'],
-      }, false],
-    ])).toEqual({
+    expect(
+      combineJsonObjectSchemaEntries([
+        [
+          'node',
+          {
+            type: 'object',
+            properties: {
+              self: { $ref: '#' },
+              brother: { $ref: '#/properties/self' },
+              unchanged: { $ref: '0/unchanged' },
+            },
+            required: ['self'],
+          },
+          false,
+        ],
+      ]),
+    ).toEqual({
       type: 'object',
       properties: {
         node: {
@@ -732,22 +799,32 @@ describe('combineJsonObjectSchemaEntries', () => {
   })
 
   it('dedupe and renames conflicting defs while hoisting property schemas', () => {
-    expect(combineJsonObjectSchemaEntries([
-      ['left', {
-        $ref: '#/$defs/Shared',
-        $defs: {
-          Node: { type: 'string' },
-          Shared: { type: 'string' },
-        },
-      }, false],
-      ['right', {
-        allOf: [{ $ref: '#/$defs/Shared' }],
-        $defs: {
-          Node: { type: 'string' },
-          Shared: { type: 'number' },
-        },
-      }, true],
-    ])).toEqual({
+    expect(
+      combineJsonObjectSchemaEntries([
+        [
+          'left',
+          {
+            $ref: '#/$defs/Shared',
+            $defs: {
+              Node: { type: 'string' },
+              Shared: { type: 'string' },
+            },
+          },
+          false,
+        ],
+        [
+          'right',
+          {
+            allOf: [{ $ref: '#/$defs/Shared' }],
+            $defs: {
+              Node: { type: 'string' },
+              Shared: { type: 'number' },
+            },
+          },
+          true,
+        ],
+      ]),
+    ).toEqual({
       type: 'object',
       properties: {
         left: {
@@ -780,10 +857,12 @@ describe('combineJsonObjectSchemaEntries', () => {
       },
     }
 
-    expect(combineJsonObjectSchemaEntries(
-      extractJsonObjectSchemaEntries(schema)!,
-      extractJsonObjectSchemaAdditionalProperties(schema),
-    )).toEqual(schema)
+    expect(
+      combineJsonObjectSchemaEntries(
+        extractJsonObjectSchemaEntries(schema)!,
+        extractJsonObjectSchemaAdditionalProperties(schema),
+      ),
+    ).toEqual(schema)
   })
 
   it('sets additionalProperties when given', () => {
@@ -796,18 +875,24 @@ describe('combineJsonObjectSchemaEntries', () => {
   })
 
   it('promotes additionalProperties defs and rebases its root pointers', () => {
-    expect(combineJsonObjectSchemaEntries([
-      ['name', {
-        $ref: '#/$defs/Shared',
-        $defs: { Shared: { type: 'string' } },
-      }, false],
-    ], {
-      anyOf: [
-        { $ref: '#/$defs/Shared' },
-        { type: 'array', items: { $ref: '#' } },
-      ],
-      $defs: { Shared: { type: 'number' } },
-    })).toEqual({
+    expect(
+      combineJsonObjectSchemaEntries(
+        [
+          [
+            'name',
+            {
+              $ref: '#/$defs/Shared',
+              $defs: { Shared: { type: 'string' } },
+            },
+            false,
+          ],
+        ],
+        {
+          anyOf: [{ $ref: '#/$defs/Shared' }, { type: 'array', items: { $ref: '#' } }],
+          $defs: { Shared: { type: 'number' } },
+        },
+      ),
+    ).toEqual({
       type: 'object',
       properties: {
         name: { $ref: '#/$defs/Shared' },
@@ -827,49 +912,56 @@ describe('combineJsonObjectSchemaEntries', () => {
   })
 
   it('keeps unknown refs untouched while deduplicating and renaming promoted defs', () => {
-    expect(combineJsonObjectSchemaEntries([
-      ['first', {
-        anyOf: [
-          { $ref: '#/$defs/Shared' },
-          { $ref: '#/$defs/External' },
-          { $ref: '../External' },
-          { $ref: '#/$defs/Shared/properties/value' },
-          { $ref: '#/nonExists' },
-        ],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              value: { type: 'string' },
+    expect(
+      combineJsonObjectSchemaEntries([
+        [
+          'first',
+          {
+            anyOf: [
+              { $ref: '#/$defs/Shared' },
+              { $ref: '#/$defs/External' },
+              { $ref: '../External' },
+              { $ref: '#/$defs/Shared/properties/value' },
+              { $ref: '#/nonExists' },
+            ],
+            $defs: {
+              Shared: {
+                type: 'object',
+                properties: {
+                  value: { type: 'string' },
+                },
+              },
+              Shared2: {
+                type: 'boolean',
+              },
+              Equal: {
+                type: 'null',
+              },
+              Missing: undefined as any,
             },
           },
-          Shared2: {
-            type: 'boolean',
-          },
-          Equal: {
-            type: 'null',
-          },
-          Missing: undefined as any,
-        },
-      }, true],
-      ['second', {
-        allOf: [
-          { $ref: '#/$defs/Shared' },
-          { $ref: '#/$defs/Shared/properties/value' },
+          true,
         ],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              value: { type: 'number' },
+        [
+          'second',
+          {
+            allOf: [{ $ref: '#/$defs/Shared' }, { $ref: '#/$defs/Shared/properties/value' }],
+            $defs: {
+              Shared: {
+                type: 'object',
+                properties: {
+                  value: { type: 'number' },
+                },
+              },
+              Equal: {
+                type: 'null',
+              },
             },
           },
-          Equal: {
-            type: 'null',
-          },
-        },
-      }, true],
-    ])).toEqual({
+          true,
+        ],
+      ]),
+    ).toEqual({
       type: 'object',
       properties: {
         first: {
@@ -882,10 +974,7 @@ describe('combineJsonObjectSchemaEntries', () => {
           ],
         },
         second: {
-          allOf: [
-            { $ref: '#/$defs/Shared3' },
-            { $ref: '#/$defs/Shared3/properties/value' },
-          ],
+          allOf: [{ $ref: '#/$defs/Shared3' }, { $ref: '#/$defs/Shared3/properties/value' }],
         },
       },
       $defs: {
@@ -925,14 +1014,18 @@ describe('combineJsonObjectSchemaEntries', () => {
         Sibling: { $ref: '#/properties/value' },
         Dangling: { $ref: '#/nonExists' },
         Leaf: { type: 'string' },
-        Wrapper: { allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }] },
+        Wrapper: {
+          allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }],
+        },
       },
     }
 
-    expect(combineJsonObjectSchemaEntries([
-      ['left', entry, false],
-      ['right', entry, true],
-    ])).toEqual({
+    expect(
+      combineJsonObjectSchemaEntries([
+        ['left', entry, false],
+        ['right', entry, true],
+      ]),
+    ).toEqual({
       type: 'object',
       properties: {
         left: {
@@ -952,24 +1045,38 @@ describe('combineJsonObjectSchemaEntries', () => {
         Sibling: { $ref: '#/properties/left/properties/value' },
         Dangling: { $ref: '#/nonExists' },
         Leaf: { type: 'string' },
-        Wrapper: { allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }] },
+        Wrapper: {
+          allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }],
+        },
         Self2: { $ref: '#/properties/right' },
         Sibling2: { $ref: '#/properties/right/properties/value' },
-        Wrapper2: { allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self2' }, { $ref: '#/$defs/Sibling2' }] },
+        Wrapper2: {
+          allOf: [
+            { $ref: '#/$defs/Leaf' },
+            { $ref: '#/$defs/Self2' },
+            { $ref: '#/$defs/Sibling2' },
+          ],
+        },
       },
     })
   })
 
   it('encodes the property name when rebasing entry root pointers', () => {
-    expect(combineJsonObjectSchemaEntries([
-      ['a/b', {
-        type: 'object',
-        properties: {
-          self: { $ref: '#' },
-          deep: { $ref: '#/properties/self' },
-        },
-      }, false],
-    ])).toEqual({
+    expect(
+      combineJsonObjectSchemaEntries([
+        [
+          'a/b',
+          {
+            type: 'object',
+            properties: {
+              self: { $ref: '#' },
+              deep: { $ref: '#/properties/self' },
+            },
+          },
+          false,
+        ],
+      ]),
+    ).toEqual({
       type: 'object',
       properties: {
         'a/b': {
@@ -986,10 +1093,16 @@ describe('combineJsonObjectSchemaEntries', () => {
 
   it('keeps a property named __proto__ as an own key', () => {
     // an own __proto__ key can neither be written as an object literal nor compared with toEqual
-    expect(JSON.stringify(combineJsonObjectSchemaEntries([
-      ['__proto__', { type: 'string' }, false],
-      ['safe', { type: 'number' }, true],
-    ]))).toBe('{"type":"object","properties":{"__proto__":{"type":"string"},"safe":{"type":"number"}},"required":["__proto__"]}')
+    expect(
+      JSON.stringify(
+        combineJsonObjectSchemaEntries([
+          ['__proto__', { type: 'string' }, false],
+          ['safe', { type: 'number' }, true],
+        ]),
+      ),
+    ).toBe(
+      '{"type":"object","properties":{"__proto__":{"type":"string"},"safe":{"type":"number"}},"required":["__proto__"]}',
+    )
   })
 })
 
@@ -1005,7 +1118,12 @@ describe('flattenJsonUnionSchema', () => {
       { type: 'number' },
     ])
 
-    expect(flattenJsonUnionSchema({ description: 'metadata', oneOf: [{ type: 'boolean' }, { type: 'null' }] })).toEqual([
+    expect(
+      flattenJsonUnionSchema({
+        description: 'metadata',
+        oneOf: [{ type: 'boolean' }, { type: 'null' }],
+      }),
+    ).toEqual([
       { description: 'metadata', type: 'boolean' },
       { description: 'metadata', type: 'null' },
     ])
@@ -1144,7 +1262,9 @@ describe('flattenJsonUnionSchema', () => {
 
   it('flattening recursive union $ref branches', () => {
     const schema = {
-      $defs: { Shared: { anyOf: [{ type: 'number' }, { type: 'boolean' }, { $ref: '#/$defs/Shared' }] } },
+      $defs: {
+        Shared: { anyOf: [{ type: 'number' }, { type: 'boolean' }, { $ref: '#/$defs/Shared' }] },
+      },
       anyOf: [{ $ref: '#/$defs/Shared' }, { type: 'string' }],
     } satisfies JsonSchema
 
@@ -1200,101 +1320,128 @@ describe('flattenJsonUnionSchema', () => {
 
 it('matchArrayableJsonSchema', () => {
   expect(matchArrayableJsonSchema({ type: 'string' })).toBeUndefined()
-  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'string' }, { type: 'number' }] })).toBeUndefined()
-  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'number' }] })).toBeUndefined()
-  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'array' }, { type: 'number' }] })).toBeUndefined()
+  expect(
+    matchArrayableJsonSchema({ anyOf: [{ type: 'string' }, { type: 'number' }] }),
+  ).toBeUndefined()
+  expect(
+    matchArrayableJsonSchema({
+      anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'number' }],
+    }),
+  ).toBeUndefined()
+  expect(
+    matchArrayableJsonSchema({ anyOf: [{ type: 'array' }, { type: 'number' }] }),
+  ).toBeUndefined()
 
-  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' }, description: 'many strings' }] })).toEqual([
+  expect(
+    matchArrayableJsonSchema({
+      anyOf: [
+        { type: 'string' },
+        { type: 'array', items: { type: 'string' }, description: 'many strings' },
+      ],
+    }),
+  ).toEqual([
     { type: 'string' },
     { type: 'array', items: { type: 'string' }, description: 'many strings' },
   ])
-  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'array', items: { type: 'string' }, minItems: 1 }, { type: 'string' }] })).toEqual([
-    { type: 'string' },
-    { type: 'array', items: { type: 'string' }, minItems: 1 },
-  ])
+  expect(
+    matchArrayableJsonSchema({
+      anyOf: [{ type: 'array', items: { type: 'string' }, minItems: 1 }, { type: 'string' }],
+    }),
+  ).toEqual([{ type: 'string' }, { type: 'array', items: { type: 'string' }, minItems: 1 }])
 
-  expect(matchArrayableJsonSchema({
-    anyOf: [
-      { type: 'string', description: 'ignore1' },
-      { type: 'array', items: { type: 'string', description: 'ignore2' }, description: 'many strings' },
-    ],
-  })).toEqual([
+  expect(
+    matchArrayableJsonSchema({
+      anyOf: [
+        { type: 'string', description: 'ignore1' },
+        {
+          type: 'array',
+          items: { type: 'string', description: 'ignore2' },
+          description: 'many strings',
+        },
+      ],
+    }),
+  ).toEqual([
     { type: 'string', description: 'ignore1' },
-    { type: 'array', items: { type: 'string', description: 'ignore2' }, description: 'many strings' },
+    {
+      type: 'array',
+      items: { type: 'string', description: 'ignore2' },
+      description: 'many strings',
+    },
   ])
 
-  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'array' }, { }] })).toEqual([{}, { type: 'array' }])
+  expect(matchArrayableJsonSchema({ anyOf: [{ type: 'array' }, {}] })).toEqual([
+    {},
+    { type: 'array' },
+  ])
 })
 
 describe('combineJsonSchemasWithComposition', () => {
   it('when schemas.length <= 1', () => {
     expect(combineJsonSchemasWithComposition('anyOf', [])).toEqual(true)
-    expect(combineJsonSchemasWithComposition('anyOf', [{ type: 'string' }])).toEqual({ type: 'string' })
+    expect(combineJsonSchemasWithComposition('anyOf', [{ type: 'string' }])).toEqual({
+      type: 'string',
+    })
   })
 
   it('returns a plain allOf wrapper when no branch defines $defs', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      { type: 'string' },
-      false,
-    ])).toEqual({
-      allOf: [
-        { type: 'string' },
-        false,
-      ],
+    expect(combineJsonSchemasWithComposition('allOf', [{ type: 'string' }, false])).toEqual({
+      allOf: [{ type: 'string' }, false],
     })
   })
 
   it('promotes branch defs to the root', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          left: { $ref: '#/$defs/Shared' },
-        },
-        required: ['left'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              left: { type: 'string' },
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            left: { $ref: '#/$defs/Shared' },
+          },
+          required: ['left'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                left: { type: 'string' },
+              },
+              required: ['left'],
             },
-            required: ['left'],
           },
         },
-      },
-      {
-        type: 'object',
-        properties: {
-          right: { $ref: '#/$defs/SharedRight' },
-        },
-        required: ['right'],
-        $defs: {
-          SharedRight: {
-            type: 'object',
-            properties: {
-              right: { type: 'number' },
+        {
+          type: 'object',
+          properties: {
+            right: { $ref: '#/$defs/SharedRight' },
+          },
+          required: ['right'],
+          $defs: {
+            SharedRight: {
+              type: 'object',
+              properties: {
+                right: { type: 'number' },
+              },
+              required: ['right'],
             },
-            required: ['right'],
           },
         },
-      },
-      {
-        type: 'object',
-        properties: {
-          third: { $ref: '#/$defs/SharedThird' },
-        },
-        required: ['third'],
-        $defs: {
-          SharedThird: {
-            type: 'object',
-            properties: {
-              third: { type: 'boolean' },
+        {
+          type: 'object',
+          properties: {
+            third: { $ref: '#/$defs/SharedThird' },
+          },
+          required: ['third'],
+          $defs: {
+            SharedThird: {
+              type: 'object',
+              properties: {
+                third: { type: 'boolean' },
+              },
+              required: ['third'],
             },
-            required: ['third'],
           },
         },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       allOf: [
         {
           type: 'object',
@@ -1345,86 +1492,87 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('renames conflicting defs across branches and rewrites refs across supported schema keywords in the current scope', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          left: { $ref: '#/$defs/Shared' },
-        },
-        required: ['left'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              left: { type: 'string' },
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            left: { $ref: '#/$defs/Shared' },
+          },
+          required: ['left'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                left: { type: 'string' },
+              },
+              required: ['left'],
             },
-            required: ['left'],
           },
         },
-      },
-      {
-        type: 'object',
-        allOf: [{ $ref: '#/$defs/Shared' }],
-        anyOf: [{ $ref: '#/$defs/Shared' }],
-        oneOf: [{ $ref: '#/$defs/Shared' }],
-        items: { $ref: '#/$defs/Shared' },
-        additionalProperties: { $ref: '#/$defs/Shared' },
-        not: { $ref: '#/$defs/Shared' },
-        if: { $ref: '#/$defs/Shared' },
-        then: { $ref: '#/$defs/Shared' },
-        else: { $ref: '#/$defs/Shared' },
-        prefixItems: [{ $ref: '#/$defs/Shared' }],
-        properties: {
-          right: { $ref: '#/$defs/Shared' },
-          rightDeep: { $ref: '#/$defs/Shared/properties/right' },
-        },
-        required: ['right'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              right: { type: 'number' },
+        {
+          type: 'object',
+          allOf: [{ $ref: '#/$defs/Shared' }],
+          anyOf: [{ $ref: '#/$defs/Shared' }],
+          oneOf: [{ $ref: '#/$defs/Shared' }],
+          items: { $ref: '#/$defs/Shared' },
+          additionalProperties: { $ref: '#/$defs/Shared' },
+          not: { $ref: '#/$defs/Shared' },
+          if: { $ref: '#/$defs/Shared' },
+          // oxlint-disable-next-line unicorn/no-thenable
+          then: { $ref: '#/$defs/Shared' },
+          else: { $ref: '#/$defs/Shared' },
+          prefixItems: [{ $ref: '#/$defs/Shared' }],
+          properties: {
+            right: { $ref: '#/$defs/Shared' },
+            rightDeep: { $ref: '#/$defs/Shared/properties/right' },
+          },
+          required: ['right'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                right: { type: 'number' },
+              },
+              required: ['right'],
             },
-            required: ['right'],
+          },
+          examples: [{ $ref: '#/$defs/Shared' }],
+        },
+        {
+          type: 'object',
+          properties: {
+            duplicate: { $ref: '#/$defs/Shared' },
+          },
+          required: ['duplicate'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                left: { type: 'string' },
+              },
+              required: ['left'],
+            },
           },
         },
-        examples: [
-          { $ref: '#/$defs/Shared' },
-        ],
-      },
-      {
-        type: 'object',
-        properties: {
-          duplicate: { $ref: '#/$defs/Shared' },
-        },
-        required: ['duplicate'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              left: { type: 'string' },
+        {
+          type: 'object',
+          properties: {
+            third: { $ref: '#/$defs/Shared' },
+          },
+          required: ['third'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                third: { type: 'boolean' },
+              },
+              required: ['third'],
             },
-            required: ['left'],
           },
         },
-      },
-      {
-        type: 'object',
-        properties: {
-          third: { $ref: '#/$defs/Shared' },
-        },
-        required: ['third'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              third: { type: 'boolean' },
-            },
-            required: ['third'],
-          },
-        },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       allOf: [
         {
           type: 'object',
@@ -1442,6 +1590,7 @@ describe('combineJsonSchemasWithComposition', () => {
           additionalProperties: { $ref: '#/$defs/Shared2' },
           not: { $ref: '#/$defs/Shared2' },
           if: { $ref: '#/$defs/Shared2' },
+          // oxlint-disable-next-line unicorn/no-thenable
           then: { $ref: '#/$defs/Shared2' },
           else: { $ref: '#/$defs/Shared2' },
           prefixItems: [{ $ref: '#/$defs/Shared2' }],
@@ -1450,9 +1599,7 @@ describe('combineJsonSchemasWithComposition', () => {
             rightDeep: { $ref: '#/$defs/Shared2/properties/right' },
           },
           required: ['right'],
-          examples: [
-            { $ref: '#/$defs/Shared' },
-          ],
+          examples: [{ $ref: '#/$defs/Shared' }],
         },
         {
           type: 'object',
@@ -1496,40 +1643,42 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('reuses the same def name when conflicting defs are equal', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          left: { $ref: '#/$defs/Shared' },
-        },
-        required: ['left'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              value: { type: 'string' },
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            left: { $ref: '#/$defs/Shared' },
+          },
+          required: ['left'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+              },
+              required: ['value'],
             },
-            required: ['value'],
           },
         },
-      },
-      {
-        type: 'object',
-        properties: {
-          right: { $ref: '#/$defs/Shared' },
-        },
-        required: ['right'],
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              value: { type: 'string' },
+        {
+          type: 'object',
+          properties: {
+            right: { $ref: '#/$defs/Shared' },
+          },
+          required: ['right'],
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+              },
+              required: ['value'],
             },
-            required: ['value'],
           },
         },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       allOf: [
         {
           type: 'object',
@@ -1560,25 +1709,24 @@ describe('combineJsonSchemasWithComposition', () => {
 
   it('only dedupes against the def sharing its name', () => {
     // the renamed body is byte-identical to `B`, but `B` is not a dedupe candidate for `A`
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }],
-        $defs: {
-          A: { type: 'string' },
-          B: { type: 'number' },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }],
+          $defs: {
+            A: { type: 'string' },
+            B: { type: 'number' },
+          },
         },
-      },
-      {
-        $ref: '#/$defs/A',
-        $defs: {
-          A: { type: 'number' },
+        {
+          $ref: '#/$defs/A',
+          $defs: {
+            A: { type: 'number' },
+          },
         },
-      },
-    ])).toEqual({
-      anyOf: [
-        { allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }] },
-        { $ref: '#/$defs/A2' },
-      ],
+      ]),
+    ).toEqual({
+      anyOf: [{ allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }] }, { $ref: '#/$defs/A2' }],
       $defs: {
         A: { type: 'string' },
         B: { type: 'number' },
@@ -1588,26 +1736,25 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('rewrites refs inside promoted def bodies so renamed defs stay reachable', () => {
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        $ref: '#/$defs/Wrapper',
-        $defs: {
-          Leaf: { type: 'string' },
-          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          $ref: '#/$defs/Wrapper',
+          $defs: {
+            Leaf: { type: 'string' },
+            Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+          },
         },
-      },
-      {
-        $ref: '#/$defs/Wrapper',
-        $defs: {
-          Leaf: { type: 'number' },
-          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        {
+          $ref: '#/$defs/Wrapper',
+          $defs: {
+            Leaf: { type: 'number' },
+            Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+          },
         },
-      },
-    ])).toEqual({
-      anyOf: [
-        { $ref: '#/$defs/Wrapper' },
-        { $ref: '#/$defs/Wrapper2' },
-      ],
+      ]),
+    ).toEqual({
+      anyOf: [{ $ref: '#/$defs/Wrapper' }, { $ref: '#/$defs/Wrapper2' }],
       $defs: {
         Leaf: { type: 'string' },
         Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
@@ -1617,26 +1764,25 @@ describe('combineJsonSchemasWithComposition', () => {
     })
 
     // referencing defs still dedupe when everything they point at dedupes too
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        $ref: '#/$defs/Wrapper',
-        $defs: {
-          Leaf: { type: 'string' },
-          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          $ref: '#/$defs/Wrapper',
+          $defs: {
+            Leaf: { type: 'string' },
+            Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+          },
         },
-      },
-      {
-        $ref: '#/$defs/Wrapper',
-        $defs: {
-          Leaf: { type: 'string' },
-          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        {
+          $ref: '#/$defs/Wrapper',
+          $defs: {
+            Leaf: { type: 'string' },
+            Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+          },
         },
-      },
-    ])).toEqual({
-      anyOf: [
-        { $ref: '#/$defs/Wrapper' },
-        { $ref: '#/$defs/Wrapper' },
-      ],
+      ]),
+    ).toEqual({
+      anyOf: [{ $ref: '#/$defs/Wrapper' }, { $ref: '#/$defs/Wrapper' }],
       $defs: {
         Leaf: { type: 'string' },
         Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
@@ -1656,14 +1802,13 @@ describe('combineJsonSchemasWithComposition', () => {
       },
     })
 
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      chain({ type: 'string' }),
-      chain({ type: 'number' }),
-    ])).toEqual({
-      anyOf: [
-        { $ref: '#/$defs/Outer' },
-        { $ref: '#/$defs/Outer2' },
-      ],
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        chain({ type: 'string' }),
+        chain({ type: 'number' }),
+      ]),
+    ).toEqual({
+      anyOf: [{ $ref: '#/$defs/Outer' }, { $ref: '#/$defs/Outer2' }],
       $defs: {
         Outer: { type: 'object', properties: { value: { $ref: '#/$defs/Middle' } } },
         Middle: { type: 'array', items: { $ref: '#/$defs/Inner' } },
@@ -1676,21 +1821,23 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('never renames a def onto a name another def in the same branch already claims', () => {
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        $ref: '#/$defs/Shared',
-        $defs: {
-          Shared: { type: 'string' },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          $ref: '#/$defs/Shared',
+          $defs: {
+            Shared: { type: 'string' },
+          },
         },
-      },
-      {
-        allOf: [{ $ref: '#/$defs/Shared' }, { $ref: '#/$defs/Shared2' }],
-        $defs: {
-          Shared: { type: 'number' },
-          Shared2: { type: 'boolean' },
+        {
+          allOf: [{ $ref: '#/$defs/Shared' }, { $ref: '#/$defs/Shared2' }],
+          $defs: {
+            Shared: { type: 'number' },
+            Shared2: { type: 'boolean' },
+          },
         },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       anyOf: [
         { $ref: '#/$defs/Shared' },
         { allOf: [{ $ref: '#/$defs/Shared3' }, { $ref: '#/$defs/Shared2' }] },
@@ -1704,23 +1851,25 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('promotes def names that shadow Object.prototype members', () => {
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        allOf: [{ $ref: '#/$defs/toString' }, { $ref: '#/$defs/valueOf' }],
-        $defs: {
-          // Object.prototype member names get a method contextual type, `satisfies` keeps `type` literal
-          toString: { type: 'string' } satisfies JsonSchema,
-          constructor: { type: 'boolean' } satisfies JsonSchema,
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          allOf: [{ $ref: '#/$defs/toString' }, { $ref: '#/$defs/valueOf' }],
+          $defs: {
+            // Object.prototype member names get a method contextual type, `satisfies` keeps `type` literal
+            toString: { type: 'string' } satisfies JsonSchema,
+            constructor: { type: 'boolean' } satisfies JsonSchema,
+          },
         },
-      },
-      {
-        $ref: '#/$defs/toString',
-        $defs: {
-          toString: { type: 'number' } satisfies JsonSchema,
-          constructor: { type: 'boolean' } satisfies JsonSchema,
+        {
+          $ref: '#/$defs/toString',
+          $defs: {
+            toString: { type: 'number' } satisfies JsonSchema,
+            constructor: { type: 'boolean' } satisfies JsonSchema,
+          },
         },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       anyOf: [
         { allOf: [{ $ref: '#/$defs/toString' }, { $ref: '#/$defs/valueOf' }] },
         { $ref: '#/$defs/toString2' },
@@ -1733,31 +1882,41 @@ describe('combineJsonSchemasWithComposition', () => {
     })
 
     // a def literally named __proto__ has to survive as an own key
-    expect(JSON.stringify(combineJsonSchemasWithComposition('anyOf', [
-      JSON.parse('{"$ref":"#/$defs/__proto__","$defs":{"__proto__":{"type":"string"}}}'),
-      { type: 'object' },
-    ]))).toBe('{"anyOf":[{"$ref":"#/$defs/__proto__"},{"type":"object"}],"$defs":{"__proto__":{"type":"string"}}}')
+    expect(
+      JSON.stringify(
+        combineJsonSchemasWithComposition('anyOf', [
+          JSON.parse('{"$ref":"#/$defs/__proto__","$defs":{"__proto__":{"type":"string"}}}'),
+          { type: 'object' },
+        ]),
+      ),
+    ).toBe(
+      '{"anyOf":[{"$ref":"#/$defs/__proto__"},{"type":"object"}],"$defs":{"__proto__":{"type":"string"}}}',
+    )
   })
 
   it('never lets two renames in the same branch land on the same target', () => {
     // A skips the taken A2..A11 and lands on A12, which A1 would otherwise take as its own first choice
     const taken = Object.fromEntries(
-      ['A', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11'].map((name): [string, JsonSchema] => [name, { type: 'string' }]),
+      ['A', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11'].map(
+        (name): [string, JsonSchema] => [name, { type: 'string' }],
+      ),
     )
 
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }],
-        $defs: taken,
-      },
-      {
-        allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }],
-        $defs: {
-          A: { type: 'number' },
-          A1: { type: 'boolean' },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }],
+          $defs: taken,
         },
-      },
-    ])).toEqual({
+        {
+          allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }],
+          $defs: {
+            A: { type: 'number' },
+            A1: { type: 'boolean' },
+          },
+        },
+      ]),
+    ).toEqual({
       anyOf: [
         { allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }] },
         { allOf: [{ $ref: '#/$defs/A12' }, { $ref: '#/$defs/A13' }] },
@@ -1812,36 +1971,38 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('ignore relative refs unchanged', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          direct: { $ref: '#/$defs/Shared' },
-          unchanged: { $ref: '1/Unknown' },
-          unchanged2: { $ref: '../Unknown' },
-          childSchema: {
-            type: 'object',
-            properties: {
-              inner: { $ref: '#/properties/childSchema/$defs/Shared' },
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            direct: { $ref: '#/$defs/Shared' },
+            unchanged: { $ref: '1/Unknown' },
+            unchanged2: { $ref: '../Unknown' },
+            childSchema: {
+              type: 'object',
+              properties: {
+                inner: { $ref: '#/properties/childSchema/$defs/Shared' },
+              },
+              required: ['inner'],
+              $defs: {
+                Shared: { type: 'integer' },
+              },
             },
-            required: ['inner'],
-            $defs: {
-              Shared: { type: 'integer' },
+          },
+          $defs: {
+            Shared: {
+              type: 'object',
+              properties: {
+                left: { type: 'string' },
+              },
+              required: ['left'],
             },
           },
         },
-        $defs: {
-          Shared: {
-            type: 'object',
-            properties: {
-              left: { type: 'string' },
-            },
-            required: ['left'],
-          },
-        },
-      },
-      { type: 'object' },
-    ])).toEqual({
+        { type: 'object' },
+      ]),
+    ).toEqual({
       allOf: [
         {
           type: 'object',
@@ -1876,16 +2037,18 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('decodes encoded segments when rebasing root pointers', () => {
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        type: 'object',
-        properties: {
-          'a/b': { type: 'string' },
-          'ref': { $ref: '#/properties/a~1b' },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          type: 'object',
+          properties: {
+            'a/b': { type: 'string' },
+            'ref': { $ref: '#/properties/a~1b' },
+          },
         },
-      },
-      { type: 'object' },
-    ])).toEqual({
+        { type: 'object' },
+      ]),
+    ).toEqual({
       anyOf: [
         {
           type: 'object',
@@ -1900,23 +2063,25 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('preserves encoded pointer refs', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          encoded: { $ref: '#/$defs/path~1name' },
-          toggle: { $ref: '#/$defs/Flag' },
-        },
-        required: ['encoded', 'toggle'],
-        $defs: {
-          'path/name': {
-            type: 'string',
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            encoded: { $ref: '#/$defs/path~1name' },
+            toggle: { $ref: '#/$defs/Flag' },
           },
-          'Flag': true,
+          required: ['encoded', 'toggle'],
+          $defs: {
+            'path/name': {
+              type: 'string',
+            },
+            'Flag': true,
+          },
         },
-      },
-      { type: 'object' },
-    ])).toEqual({
+        { type: 'object' },
+      ]),
+    ).toEqual({
       allOf: [
         {
           type: 'object',
@@ -1938,20 +2103,22 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('renames encoded def names and re-encodes the rewritten refs', () => {
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }],
-        $defs: {
-          'path/name': { type: 'object', properties: { x: { type: 'string' } } },
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }],
+          $defs: {
+            'path/name': { type: 'object', properties: { x: { type: 'string' } } },
+          },
         },
-      },
-      {
-        allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }],
-        $defs: {
-          'path/name': { type: 'object', properties: { x: { type: 'number' } } },
+        {
+          allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }],
+          $defs: {
+            'path/name': { type: 'object', properties: { x: { type: 'number' } } },
+          },
         },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       anyOf: [
         { allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }] },
         { allOf: [{ $ref: '#/$defs/path~1name2' }, { $ref: '#/$defs/path~1name2/properties/x' }] },
@@ -1964,20 +2131,22 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('ignores undefined defs entries while promoting valid defs', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          value: { $ref: '#/$defs/Real' },
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            value: { $ref: '#/$defs/Real' },
+          },
+          $defs: {
+            Real: { type: 'string' },
+            Missing: undefined as any,
+          },
         },
-        $defs: {
-          Real: { type: 'string' },
-          Missing: undefined as any,
-        },
-      },
-      { type: 'object' },
-    // toEqual would treat a `Missing: undefined` key as absent, so this has to be strict
-    ])).toStrictEqual({
+        { type: 'object' },
+        // toEqual would treat a `Missing: undefined` key as absent, so this has to be strict
+      ]),
+    ).toStrictEqual({
       allOf: [
         {
           type: 'object',
@@ -1994,18 +2163,20 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('rewrites absolute refs to the exact allOf branch path', () => {
-    expect(combineJsonSchemasWithComposition('allOf', [
-      {
-        type: 'object',
-        properties: {
-          child: { $ref: '#' },
-          brother: { $ref: '#/properties/child' },
-          nonExists: { $ref: '#/nonExists' },
+    expect(
+      combineJsonSchemasWithComposition('allOf', [
+        {
+          type: 'object',
+          properties: {
+            child: { $ref: '#' },
+            brother: { $ref: '#/properties/child' },
+            nonExists: { $ref: '#/nonExists' },
+          },
+          required: ['child'],
         },
-        required: ['child'],
-      },
-      { type: 'object' },
-    ])).toEqual({
+        { type: 'object' },
+      ]),
+    ).toEqual({
       allOf: [
         {
           type: 'object',
@@ -2022,28 +2193,30 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('supports anyOf', () => {
-    expect(combineJsonSchemasWithComposition('anyOf', [
-      {
-        type: 'object',
-        properties: {
-          left: { $ref: '#/$defs/Shared' },
-        },
-        required: ['left'],
-        $defs: {
-          Shared: {
-            type: 'string',
+    expect(
+      combineJsonSchemasWithComposition('anyOf', [
+        {
+          type: 'object',
+          properties: {
+            left: { $ref: '#/$defs/Shared' },
+          },
+          required: ['left'],
+          $defs: {
+            Shared: {
+              type: 'string',
+            },
           },
         },
-      },
-      {
-        type: 'object',
-        properties: {
-          right: { $ref: '#' },
-          nested: { $ref: '#/properties/right' },
+        {
+          type: 'object',
+          properties: {
+            right: { $ref: '#' },
+            nested: { $ref: '#/properties/right' },
+          },
+          required: ['right', 'nested'],
         },
-        required: ['right', 'nested'],
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       anyOf: [
         {
           type: 'object',
@@ -2070,39 +2243,41 @@ describe('combineJsonSchemasWithComposition', () => {
   })
 
   it('supports oneOf', () => {
-    expect(combineJsonSchemasWithComposition('oneOf', [
-      {
-        type: 'object',
-        properties: {
-          left: { $ref: '#/$defs/Shared' },
-        },
-        required: ['left'],
-        $defs: {
-          Shared: {
-            type: 'string',
+    expect(
+      combineJsonSchemasWithComposition('oneOf', [
+        {
+          type: 'object',
+          properties: {
+            left: { $ref: '#/$defs/Shared' },
           },
-        },
-      },
-      {
-        type: 'object',
-        properties: {
-          right: { $ref: '#/$defs/Shared' },
-          childSchema: {
-            type: 'object',
-            properties: {
-              nested: { $ref: '#/properties/right' },
+          required: ['left'],
+          $defs: {
+            Shared: {
+              type: 'string',
             },
-            required: ['nested'],
           },
         },
-        required: ['right', 'childSchema'],
-        $defs: {
-          Shared: {
-            type: 'number',
+        {
+          type: 'object',
+          properties: {
+            right: { $ref: '#/$defs/Shared' },
+            childSchema: {
+              type: 'object',
+              properties: {
+                nested: { $ref: '#/properties/right' },
+              },
+              required: ['nested'],
+            },
+          },
+          required: ['right', 'childSchema'],
+          $defs: {
+            Shared: {
+              type: 'number',
+            },
           },
         },
-      },
-    ])).toEqual({
+      ]),
+    ).toEqual({
       oneOf: [
         {
           type: 'object',
@@ -2142,49 +2317,40 @@ describe('deduplicateJsonSchemas', () => {
   it('removes structurally identical schemas while preserving the first occurrence order', () => {
     const shared = { type: 'string', minLength: 1 } satisfies JsonSchema
 
-    expect(deduplicateJsonSchemas([
-      shared,
-      { type: 'number' },
-      { type: 'string', minLength: 1 },
-      { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
-      { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
-    ])).toEqual([
-      shared,
-      { type: 'number' },
-      { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
-    ])
+    expect(
+      deduplicateJsonSchemas([
+        shared,
+        { type: 'number' },
+        { type: 'string', minLength: 1 },
+        { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+        { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+      ]),
+    ).toEqual([shared, { type: 'number' }, { anyOf: [{ type: 'boolean' }, { type: 'null' }] }])
   })
 
   it('keeps distinct boolean and object schemas', () => {
-    expect(deduplicateJsonSchemas([
-      true,
-      false,
-      true,
-      { const: 'x' },
-      { const: 'x' },
-      false,
-    ])).toEqual([
-      true,
-      false,
-      { const: 'x' },
-    ])
+    expect(
+      deduplicateJsonSchemas([true, false, true, { const: 'x' }, { const: 'x' }, false]),
+    ).toEqual([true, false, { const: 'x' }])
   })
 
   it('treats schemas with different defs as distinct', () => {
-    expect(deduplicateJsonSchemas([
-      {
-        $ref: '#/$defs/Shared',
-        $defs: {
-          Shared: { type: 'string' },
+    expect(
+      deduplicateJsonSchemas([
+        {
+          $ref: '#/$defs/Shared',
+          $defs: {
+            Shared: { type: 'string' },
+          },
         },
-      },
-      {
-        $ref: '#/$defs/Shared',
-        $defs: {
-          Shared: { type: 'number' },
+        {
+          $ref: '#/$defs/Shared',
+          $defs: {
+            Shared: { type: 'number' },
+          },
         },
-      },
-    ])).toEqual([
+      ]),
+    ).toEqual([
       {
         $ref: '#/$defs/Shared',
         $defs: {
@@ -2203,11 +2369,13 @@ describe('deduplicateJsonSchemas', () => {
   it('keeps schemas whose date defaults are different instances', () => {
     const date = new Date(0)
 
-    expect(deduplicateJsonSchemas([
-      { type: 'string', default: date },
-      { type: 'string', default: new Date(1) },
-      { type: 'string', default: date },
-    ])).toEqual([
+    expect(
+      deduplicateJsonSchemas([
+        { type: 'string', default: date },
+        { type: 'string', default: new Date(1) },
+        { type: 'string', default: date },
+      ]),
+    ).toEqual([
       { type: 'string', default: new Date(0) },
       { type: 'string', default: new Date(1) },
     ])
@@ -2247,7 +2415,12 @@ describe('isJsonObjectLikeSchema', () => {
 
     expect(isJsonObjectLikeSchema({ $ref: '#/$defs/object', $defs })).toBe(true)
     expect(isJsonObjectLikeSchema({ $ref: '#/$defs/string', $defs })).toBe(false)
-    expect(isJsonObjectLikeSchema({ anyOf: [{ $ref: '#/$defs/object' }, { $ref: '#/$defs/string' }], $defs })).toBe(false)
+    expect(
+      isJsonObjectLikeSchema({
+        anyOf: [{ $ref: '#/$defs/object' }, { $ref: '#/$defs/string' }],
+        $defs,
+      }),
+    ).toBe(false)
     // a cycle never proves the schema describes an object
     expect(isJsonObjectLikeSchema({ $ref: '#/$defs/union', $defs })).toBe(false)
   })

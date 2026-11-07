@@ -1,6 +1,6 @@
 ---
-title: "Contract Implementation"
-description: "Learn how to implement a contract with the implement function, adding type-checked handlers, middleware, and routers to every procedure."
+title: 'Contract Implementation'
+description: 'Learn how to implement a contract with the implement function, adding type-checked handlers, middleware, and routers to every procedure.'
 ---
 
 ## Implementer
@@ -12,8 +12,7 @@ import { contract } from './shared/planet'
 // ---cut---
 import { implement } from '@orpc/server'
 
-const implementer = implement(contract)
-  .$context<{ something?: string }>() // <- define initial context
+const implementer = implement(contract).$context<{ something?: string }>() // <- define initial context
 
 implementer.planet.list
 //                 ^|
@@ -55,11 +54,9 @@ const listPlanet = implementer.planet.list
 If middleware needs to wrap validation, apply it at the router level instead. In this example, use `implementer.use` to apply it globally or `implementer.planet.use` to apply it to the `planet` router before `.list`.
 
 ```ts
-const listPlanet = implementer
-  .planet
+const listPlanet = implementer.planet
   .use(requireAuth) // <- middleware wraps validation
-  .list
-  .handler(({ input }) => {
+  .list.handler(({ input }) => {
     // Your logic for listing planets
     return []
   })
@@ -95,8 +92,20 @@ const router = implementer.use(requireAuth).router({
 })
 ```
 
-:::info
-Router-level middleware that a procedure already has from the same implementer is skipped. See [Dedupe Middleware](/docs/recipes/dedupe-middleware).
+:::warning
+Router-level middleware runs again, even if a procedure already uses it:
+
+```ts
+const authed = implementer.use(requireAuth)
+
+const router = authed.router({
+  planet: {
+    list: authed.planet.list.handler(() => []), // requireAuth runs twice
+  },
+})
+```
+
+Apply it at one level only, or see [Dedupe Middleware](/docs/recipes/dedupe-middleware).
 :::
 
 ## Creating Middleware
@@ -135,7 +144,7 @@ const listPlanets = pub.planet.list.handler(({ input }) => {
 
 const createPlanet = authed.planet.create.handler(({ input }) => {
   // Your logic for creating planets with authentication
-  return { }
+  return {}
 })
 ```
 

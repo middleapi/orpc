@@ -1,8 +1,8 @@
 ---
-title: "Nuxt Adapter"
-description: "Use oRPC inside a Nuxt project by mounting a handler in a server route and setting up an SSR-compatible client in a Nuxt plugin."
+title: 'Nuxt Adapter'
+description: 'Use oRPC inside a Nuxt project by mounting a handler in a server route and setting up an SSR-compatible client in a Nuxt plugin.'
 sidebar:
-  label: "Nuxt"
+  label: 'Nuxt'
 ---
 
 [Nuxt](https://nuxt.com/) is a popular Vue.js framework for building server-side applications. Its server engine follows web standards, so oRPC integrates through the [Fetch API Adapter](/docs/adapters/fetch-api).
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (response) {

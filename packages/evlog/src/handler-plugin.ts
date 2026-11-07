@@ -1,18 +1,41 @@
-import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
-import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import type { StandardRequest } from '@standard-server/core'
-import type { LogLevel, RequestLogger } from 'evlog'
-import type { BaseEvlogOptions, FrameworkIntegrationHelpers, FrameworkIntegrationSpec } from 'evlog/toolkit'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
-import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '@orpc/server/standard'
+import {
+  isAbortError,
+  isAsyncIteratorObject,
+  ORPC_NAME,
+  override,
+  sleep,
+  toArray,
+  wrapReadableStream,
+} from '@orpc/shared'
+import type { StandardRequest } from '@standard-server/core'
+import {
+  EventStreamErrorEvent,
+  flattenStandardHeader,
+  parseStandardUrl,
+} from '@standard-server/core'
+import type { LogLevel, RequestLogger } from 'evlog'
+import type {
+  BaseEvlogOptions,
+  FrameworkIntegrationHelpers,
+  FrameworkIntegrationSpec,
+} from 'evlog/toolkit'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 
 export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlogOptions {
   /**
    * AsyncLocalStorage instance backing `useLogger()`.
    */
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents
   storage?: FrameworkIntegrationSpec<{ request: StandardRequest }>['storage'] | undefined
 
   /**
@@ -51,13 +74,19 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
   before: string[] = ['~tracing', '~batch', '~hibernation']
 
   private readonly logAbort: Exclude<EvlogHandlerPluginOptions<T>['logAbort'], undefined>
-  private readonly procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<T>['procedureErrorLevel'], undefined>
+  private readonly procedureErrorLevel: Exclude<
+    EvlogHandlerPluginOptions<T>['procedureErrorLevel'],
+    undefined
+  >
   private readonly integration: FrameworkIntegrationHelpers<{ request: StandardRequest }>
   private readonly evlogOptions: BaseEvlogOptions
 
-  constructor(
-    { storage, logAbort, procedureErrorLevel, ...evlogOptions }: EvlogHandlerPluginOptions<T> = {},
-  ) {
+  constructor({
+    storage,
+    logAbort,
+    procedureErrorLevel,
+    ...evlogOptions
+  }: EvlogHandlerPluginOptions<T> = {}) {
     this.evlogOptions = evlogOptions
     this.logAbort = logAbort ?? false
     this.procedureErrorLevel = procedureErrorLevel ?? ((_, level) => level)
@@ -81,21 +110,29 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
-      const { skipped, finish, runWith, logger } = this.integration.start(interceptorOptions, this.evlogOptions)
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
+      const { skipped, finish, runWith, logger } = this.integration.start(
+        interceptorOptions,
+        this.evlogOptions,
+      )
 
       if (skipped) {
         return next()
       }
 
       try {
-        const result = await runWith(() => next({
-          ...interceptorOptions,
-          context: {
-            ...interceptorOptions.context,
-            [LOGGER_CONTEXT_SYMBOL]: logger,
-          },
-        }))
+        const result = await runWith(() =>
+          next({
+            ...interceptorOptions,
+            context: {
+              ...interceptorOptions.context,
+              [LOGGER_CONTEXT_SYMBOL]: logger,
+            },
+          }),
+        )
 
         if (result.matched) {
           if (isAsyncIteratorObject(result.response.body)) {
@@ -107,23 +144,26 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
                  * @remarks
                  * **Warning**: Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
-                body: override(result.response.body, wrapAsyncIteratorPreservingEventMeta(result.response.body, {
-                  runWith,
-                  onError: (error) => {
-                    /**
-                     * Errors here are internal (interceptor/framework) failures,
-                     * except `ErrorEvent`: a business error the protocol delivers
-                     * inside the event stream, already logged by the client interceptor.
-                     */
-                    if (!(error instanceof ErrorEvent)) {
-                      logger.error(toErrorOrString(error))
-                    }
-                  },
-                  onFinish: async () => {
-                    await sleep(0) // dealing with "log.error() called after the wide event was emitted"
-                    await finish({ status: result.response?.status })
-                  },
-                })),
+                body: override(
+                  result.response.body,
+                  wrapAsyncIteratorPreservingEventMeta(result.response.body, {
+                    runWith,
+                    onError: (error) => {
+                      /**
+                       * Errors here are internal (interceptor/framework) failures,
+                       * except `EventStreamErrorEvent`: a business error the protocol delivers
+                       * inside the event stream, already logged by the client interceptor.
+                       */
+                      if (!(error instanceof EventStreamErrorEvent)) {
+                        logger.error(toErrorOrString(error))
+                      }
+                    },
+                    onFinish: async () => {
+                      await sleep(0) // dealing with "log.error() called after the wide event was emitted"
+                      await finish({ status: result.response?.status })
+                    },
+                  }),
+                ),
               },
             }
           }
@@ -137,33 +177,34 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
                  * @remarks
                  * **Warning**: Remember use `override` for ReadableStream to remain other special properties
                  */
-                body: override(result.response.body, wrapReadableStream(result.response.body, {
-                  runWith,
-                  onError: (error) => {
-                    /**
-                     * Any error here is internal (interceptor/framework), not business logic.
-                     * Indicates unexpected handler failure.
-                     */
-                    logger.error(toErrorOrString(error))
-                  },
-                  onFinish: async () => {
-                    await sleep(0) // dealing with "log.error() called after the wide event was emitted"
-                    await finish({ status: result.response?.status })
-                  },
-                })),
+                body: override(
+                  result.response.body,
+                  wrapReadableStream(result.response.body, {
+                    runWith,
+                    onError: (error) => {
+                      /**
+                       * Any error here is internal (interceptor/framework), not business logic.
+                       * Indicates unexpected handler failure.
+                       */
+                      logger.error(toErrorOrString(error))
+                    },
+                    onFinish: async () => {
+                      await sleep(0) // dealing with "log.error() called after the wide event was emitted"
+                      await finish({ status: result.response?.status })
+                    },
+                  }),
+                ),
               },
             }
           }
-        }
-        else {
+        } else {
           logger.set({ message: 'No procedure matched' })
         }
 
         await finish({ status: result.response?.status })
 
         return result
-      }
-      catch (error) {
+      } catch (error) {
         /**
          * Any error here is internal (interceptor/framework), not business logic.
          * Indicates unexpected handler failure.
@@ -188,29 +229,34 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
               reason: String(signal.reason),
             },
           })
-        }
-        else {
-          signal?.addEventListener('abort', () => {
-            logger?.set({
-              abort: {
-                reason: String(signal.reason),
-                abortedAt: new Date().toISOString(),
-              },
-            })
-          }, { once: true })
+        } else {
+          signal?.addEventListener(
+            'abort',
+            () => {
+              logger?.set({
+                abort: {
+                  reason: String(signal.reason),
+                  abortedAt: new Date().toISOString(),
+                },
+              })
+            },
+            { once: true },
+          )
         }
       }
 
       try {
         return await next()
-      }
-      catch (error) {
+      } catch (error) {
         logProcedureError(logger, error, this.procedureErrorLevel)
         throw error
       }
     }
 
-    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async ({ next, context }) => {
+    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async ({
+      next,
+      context,
+    }) => {
       const logger = getLogger(context)
       const output = await next()
 
@@ -219,11 +265,14 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
          * @remarks
          * **Warning**: Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
-          onError: (error) => {
-            logProcedureError(logger, error, this.procedureErrorLevel)
-          },
-        }))
+        return override(
+          output,
+          wrapAsyncIteratorPreservingEventMeta(output, {
+            onError: (error) => {
+              logProcedureError(logger, error, this.procedureErrorLevel)
+            },
+          }),
+        )
       }
 
       if (output instanceof ReadableStream) {
@@ -231,11 +280,14 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
          * @remarks
          * **Warning**: Remember use `override` for ReadableStream to remain other special properties
          */
-        return override(output, wrapReadableStream(output, {
-          onError: (error) => {
-            logProcedureError(logger, error, this.procedureErrorLevel)
-          },
-        }))
+        return override(
+          output,
+          wrapReadableStream(output, {
+            onError: (error) => {
+              logProcedureError(logger, error, this.procedureErrorLevel)
+            },
+          }),
+        )
       }
 
       return output
@@ -243,18 +295,9 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
-      interceptors: [
-        interceptor,
-        ...toArray(options.interceptors),
-      ],
-      clientInterceptors: [
-        clientInterceptor,
-        ...toArray(options.clientInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
+      interceptors: [interceptor, ...toArray(options.interceptors)],
+      clientInterceptors: [clientInterceptor, ...toArray(options.clientInterceptors)],
     }
   }
 }

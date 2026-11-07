@@ -1,8 +1,17 @@
 import type { ErrorMap, Schema } from '@orpc/contract'
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
-import type { Context } from '../context'
-import type { ProcedureClientInterceptor } from '../procedure-client'
-import { AbortError, anyAbortSignal, AsyncIteratorClass, isAsyncIteratorObject, override, runWithSignal, toArray } from '@orpc/shared'
+import {
+  AbortError,
+  anyAbortSignal,
+  AsyncIteratorClass,
+  isAsyncIteratorObject,
+  override,
+  runWithSignal,
+  toArray,
+} from '@orpc/shared'
+
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
+import type { ProcedureClientInterceptor } from '../procedure-client.ts'
 
 /**
  * Keeps the request signal and a streaming output (async iterator object or readable stream) in sync:
@@ -15,7 +24,10 @@ export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandl
   name = '~signal-sync'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async (interceptorOptions) => {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
+    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async (
+      interceptorOptions,
+    ) => {
       const controller = new AbortController()
       const signal = anyAbortSignal([interceptorOptions.signal, controller.signal])!
       const cancel = () => controller.abort(new AbortError('The response body was cancelled'))
@@ -33,22 +45,28 @@ export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandl
       return output
     }
 
-    return { ...options, clientInterceptors: [clientInterceptor, ...toArray(options.clientInterceptors)] }
+    return {
+      ...options,
+      clientInterceptors: [clientInterceptor, ...toArray(options.clientInterceptors)],
+    }
   }
 }
 
 function listenAbort(signal: AbortSignal, onAbort: () => void): () => void {
   if (signal.aborted) {
     onAbort()
-  }
-  else {
+  } else {
     signal.addEventListener('abort', onAbort, { once: true })
   }
 
   return () => signal.removeEventListener('abort', onAbort)
 }
 
-function syncAsyncIterator(iterator: AsyncIterator<unknown, unknown>, signal: AbortSignal, cancel: () => void) {
+function syncAsyncIterator(
+  iterator: AsyncIterator<unknown, unknown>,
+  signal: AbortSignal,
+  cancel: () => void,
+) {
   let cancelling: Promise<unknown> | undefined
 
   const unlisten = listenAbort(signal, () => {
@@ -69,43 +87,48 @@ function syncAsyncIterator(iterator: AsyncIterator<unknown, unknown>, signal: Ab
   )
 }
 
-function syncReadableStream(stream: ReadableStream<unknown>, signal: AbortSignal, cancel: () => void) {
+function syncReadableStream(
+  stream: ReadableStream<unknown>,
+  signal: AbortSignal,
+  cancel: () => void,
+) {
   const reader = stream.getReader()
   let cancelling: Promise<void> | undefined
   let unlisten: () => void
 
-  return new ReadableStream({
-    start(controller) {
-      unlisten = listenAbort(signal, () => {
-        controller.error(signal.reason)
-        cancelling = reader.cancel(signal.reason)
-        cancelling.catch(() => {}) // only awaited when the consumer cancels
-      })
-    },
-    async pull(controller) {
-      try {
-        const { done, value } = await reader.read()
+  return new ReadableStream(
+    {
+      start(controller) {
+        unlisten = listenAbort(signal, () => {
+          controller.error(signal.reason)
+          cancelling = reader.cancel(signal.reason)
+          cancelling.catch(() => {}) // only awaited when the consumer cancels
+        })
+      },
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read()
 
-        if (signal.aborted) {
-          return
-        }
+          if (signal.aborted) {
+            return
+          }
 
-        if (done) {
+          if (done) {
+            unlisten()
+            controller.close()
+          } else {
+            controller.enqueue(value)
+          }
+        } catch (error) {
           unlisten()
-          controller.close()
+          throw error
         }
-        else {
-          controller.enqueue(value)
-        }
-      }
-      catch (error) {
-        unlisten()
-        throw error
-      }
+      },
+      async cancel() {
+        cancel()
+        await cancelling
+      },
     },
-    async cancel() {
-      cancel()
-      await cancelling
-    },
-  }, { highWaterMark: 0 })
+    { highWaterMark: 0 },
+  )
 }

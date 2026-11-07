@@ -1,6 +1,6 @@
 ---
-title: "Error Handling"
-description: "Handle errors in oRPC with the ORPCError class, typesafe error definitions, reusable error factories, and custom error conversion."
+title: 'Error Handling'
+description: 'Handle errors in oRPC with the ORPCError class, typesafe error definitions, reusable error factories, and custom error conversion.'
 ---
 
 ## `ORPCError` Class
@@ -19,19 +19,17 @@ import { ORPCError, os } from '@orpc/server'
 const rateLimitMiddleware = os.middleware(async ({ next }) => {
   throw new ORPCError('RATE_LIMITED', {
     message: 'You are being rate limited',
-    data: { retryAfter: 60 }
+    data: { retryAfter: 60 },
   })
 
   return next()
 })
 
-const example = os
-  .use(rateLimitMiddleware)
-  .handler(async ({ input }) => {
-    if (notFound) {
-      throw new ORPCError('NOT_FOUND')
-    }
-  })
+const example = os.use(rateLimitMiddleware).handler(async ({ input }) => {
+  if (notFound) {
+    throw new ORPCError('NOT_FOUND')
+  }
+})
 ```
 
 ## Typesafe Errors
@@ -59,7 +57,7 @@ const rateLimitMiddleware = os
   .middleware(async ({ next, errors }) => {
     throw errors.RATE_LIMITED({
       message: 'You are being rate limited',
-      data: { retryAfter: 60 }
+      data: { retryAfter: 60 },
     })
 
     return next()
@@ -130,20 +128,18 @@ const RateLimitedError = error('RATE_LIMITED', {
   }),
 })
 
-const procedure = os
-  .handler(async () => {
-    throw new RateLimitedError({ data: { retryAfter: 60 } })
-  })
+const procedure = os.handler(async () => {
+  throw new RateLimitedError({ data: { retryAfter: 60 } })
+})
 ```
 
 :::tip
 You can also register error factories in `.errors`. This makes them part of the [typesafe errors](#typesafe-errors) flow and visible in generated specifications.
 
 ```ts
-const procedure = os
-  .errors({
-    [RateLimitedError.code]: RateLimitedError,
-  })
+const procedure = os.errors({
+  [RateLimitedError.code]: RateLimitedError,
+})
 ```
 
 :::
@@ -163,7 +159,8 @@ if (err instanceof RateLimitedError) {
 By default, oRPC allows any string as an error code and suggests common HTTP codes like `NOT_FOUND` and `UNAUTHORIZED`. You can override this with your own set of allowed error codes for better type safety and consistency.
 
 ```ts
-declare module '@orpc/server' { // or '@orpc/client'
+declare module '@orpc/server' {
+  // or '@orpc/client'
   interface Registry {
     ORPCErrorCode: 'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED' | 'MY_CUSTOM_ERROR' | (string & {})
   }
@@ -181,14 +178,12 @@ By default, oRPC can convert non-`ORPCError` into an `ORPCError` with code `INTE
 :::
 
 ```ts
-class MyCustomError extends Error {
-}
+class MyCustomError extends Error {}
 
 const customErrorConverterMiddleware = os.middleware(async ({ next }) => {
   try {
     return await next()
-  }
-  catch (err) {
+  } catch (err) {
     if (err instanceof MyCustomError) {
       throw new ORPCError('MY_CUSTOM_ERROR', { message: err.message, cause: err })
     }

@@ -1,14 +1,36 @@
-import type { AnyNestedClient, ClientContext, InferClientContext, InferClientError } from '@orpc/client'
-import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, Meta, MetaPlugin, ORPCErrorFromErrorMap, RouterContract } from '@orpc/contract'
-import type { ThrowableError } from '@orpc/shared'
-import type { OperationKeyBaseOptions } from './key'
-import type { RouterUtilsPlugin } from './plugin'
-import type { ProcedureUtilsOptions } from './procedure-utils'
+import type {
+  AnyNestedClient,
+  ClientContext,
+  InferClientContext,
+  InferClientError,
+} from '@orpc/client'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  Meta,
+  MetaPlugin,
+  ORPCErrorFromErrorMap,
+  RouterContract,
+} from '@orpc/contract'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
-import { mergeProcedureUtilsOptions } from './procedure-utils'
+import type { ThrowableError } from '@orpc/shared'
 
-export type TanstackQueryMetaOptions<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, keyof OperationKeyBaseOptions>
+import type { OperationKeyBaseOptions } from './key.ts'
+import type { RouterUtilsPlugin } from './plugin.ts'
+import type { ProcedureUtilsOptions } from './procedure-utils.ts'
+import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
+
+export type TanstackQueryMetaOptions<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Omit<
+  ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
+  keyof OperationKeyBaseOptions
+>
 
 export interface TanstackQueryMetaPlugin<
   TInputSchema extends AnySchema,
@@ -43,7 +65,9 @@ export function tanstackQuery<
   return {
     name: '~tanstack-query',
     init(meta) {
-      const current = meta['~tanstack-query'] as ProcedureUtilsOptions<ClientContext, any, any, any> | undefined
+      const current = meta['~tanstack-query'] as
+        | ProcedureUtilsOptions<ClientContext, any, any, any>
+        | undefined
 
       return {
         ...meta,
@@ -53,10 +77,12 @@ export function tanstackQuery<
   }
 }
 
-export function getTanstackQueryMeta(
-  procedureOrLazy: { '~orpc': { meta: Meta } },
-): TanstackQueryMetaOptions<ClientContext, unknown, unknown, ThrowableError> | undefined {
-  return procedureOrLazy['~orpc'].meta['~tanstack-query'] as TanstackQueryMetaOptions<ClientContext, unknown, unknown, ThrowableError> | undefined
+export function getTanstackQueryMeta(procedureOrLazy: {
+  '~orpc': { meta: Meta }
+}): TanstackQueryMetaOptions<ClientContext, unknown, unknown, ThrowableError> | undefined {
+  return procedureOrLazy['~orpc'].meta['~tanstack-query'] as
+    | TanstackQueryMetaOptions<ClientContext, unknown, unknown, ThrowableError>
+    | undefined
 }
 
 /**
@@ -69,12 +95,12 @@ export function getTanstackQueryMeta(
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-options-plugin | TanStack Query Integration - Contract Options Plugin}
  */
-export class ContractOptionsUtilsPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
+export class ContractOptionsUtilsPlugin<
+  T extends AnyNestedClient = AnyNestedClient,
+> implements RouterUtilsPlugin<T> {
   readonly name = '~contract-options'
 
-  constructor(
-    private readonly contract: RouterContract,
-  ) {}
+  constructor(private readonly contract: RouterContract) {}
 
   initProcedureOptions(
     path: string[],

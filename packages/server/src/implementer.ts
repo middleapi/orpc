@@ -1,28 +1,17 @@
 import type { RouterContract } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
-import type { BuilderConfig, DefaultInitialContext } from './builder'
-import type { Context } from './context'
-import type { RouterImplementer } from './implementer-router'
-import type { ProcedureConfig } from './procedure'
-import { isTypescriptObject } from '@orpc/shared'
-import { createRouterImplementer } from './implementer-router'
+import { isNonPrimitive } from '@orpc/shared'
 
-/**
- * Configuration of `implement`: the procedure configuration,
- * plus options only read when the implementer augments a router with `.router` or `.lazy`.
- */
-export interface ImplementerConfig extends ProcedureConfig, Pick<BuilderConfig, 'dedupeLeadingMiddlewares'> {
-}
+import type { DefaultInitialContext } from './builder.ts'
+import type { Context } from './context.ts'
+import type { RouterImplementer } from './implementer-router.ts'
+import { createRouterImplementer } from './implementer-router.ts'
+import type { ProcedureConfig } from './procedure.ts'
 
-export type Implementer<
-  TContract extends RouterContract,
-  TInitialContext extends Context,
->
-  = & {
-    $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>
-    $config(config: ImplementerConfig): Implementer<TContract, TInitialContext>
-  }
-  & RouterImplementer<TContract, TInitialContext>
+export type Implementer<TContract extends RouterContract, TInitialContext extends Context> = {
+  $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>
+  $config(config: ProcedureConfig): Implementer<TContract, TInitialContext>
+} & RouterImplementer<TContract, TInitialContext>
 
 /**
  * Turns a contract into an implementer, used to implement the contract's
@@ -30,9 +19,12 @@ export type Implementer<
  *
  * @see {@link https://orpc.dev/docs/contract/implementation#implementer | Contract Implementation - Implementer}
  */
-export function implement<TContract extends RouterContract, TInitialContext extends Context = DefaultInitialContext>(
+export function implement<
+  TContract extends RouterContract,
+  TInitialContext extends Context = DefaultInitialContext,
+>(
   contract: TContract,
-  config: ImplementerConfig = {},
+  config: ProcedureConfig = {},
 ): Implementer<TContract, TInitialContext & object> {
   // Using `& object` avoids "has no properties in common with type" errors
   // when combining procedures or routers with compatible but non-overlapping contexts.
@@ -44,15 +36,14 @@ export function implement<TContract extends RouterContract, TInitialContext exte
       let method: undefined | AnyFunction
       if (p === '$context') {
         method = () => implementer
-      }
-      else if (p === '$config') {
-        method = (incoming: ImplementerConfig) => implement(contract, { ...config, ...incoming })
+      } else if (p === '$config') {
+        method = (incoming: ProcedureConfig) => implement(contract, { ...config, ...incoming })
       }
 
       const value = Reflect.get(routerImplementer, p)
 
       if (method) {
-        if (!isTypescriptObject(value)) {
+        if (!isNonPrimitive(value)) {
           return method
         }
 

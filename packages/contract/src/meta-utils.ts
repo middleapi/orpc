@@ -1,8 +1,8 @@
-import type { ContractBuilderConfig } from './builder'
-import type { ErrorMap } from './error'
-import type { AnyMetaPlugin, Meta, MetaPlugin } from './meta'
-import type { AnySchema } from './schema'
 import { toArray } from '@orpc/shared'
+
+import type { ErrorMap } from './error.ts'
+import type { AnyMetaPlugin, Meta, MetaPlugin } from './meta.ts'
+import type { AnySchema } from './schema.ts'
 
 export function resolveMetaPlugins<
   TInputSchema extends AnySchema,
@@ -32,35 +32,6 @@ export function resolveMetaPlugins<
   }
 
   return [meta, plugins]
-}
-
-/**
- * Resolves the metadata of a procedure (or lazy router) when a router-level builder
- * applies its own metadata plugins to it. Behaves like {@link resolveMetaPlugins},
- * except that the leading target plugins shared with the router-level plugins
- * (for example, both are built from the same base builder) are already included
- * in `routerMeta`, so they are deduplicated instead of being applied again,
- * unless `config.dedupeLeadingMetaPlugins` is `false`.
- */
-export function resolveAugmentedMetaPlugins<
-  TInputSchema extends AnySchema,
-  TOutputSchema extends AnySchema,
-  TErrorMap extends ErrorMap,
->(
-  routerMeta: Meta,
-  routerPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
-  targetPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
-  config: Pick<ContractBuilderConfig, 'dedupeLeadingMetaPlugins'>,
-): [meta: Meta, plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]] {
-  routerPlugins = toArray(routerPlugins)
-  targetPlugins = toArray(targetPlugins)
-
-  let shared = 0
-  while ((config.dedupeLeadingMetaPlugins ?? true) && shared < routerPlugins.length && routerPlugins[shared] === targetPlugins[shared]) {
-    shared++
-  }
-
-  return resolveMetaPlugins(routerMeta, routerPlugins, targetPlugins.slice(shared))
 }
 
 /**
@@ -126,7 +97,8 @@ export function defineMeta<TName extends string, TData>(
     },
   })
 
-  const getMeta = (procedureOrLazy: { '~orpc': { meta: Meta } }) => procedureOrLazy['~orpc'].meta[name] as TData | undefined
+  const getMeta = (procedureOrLazy: { '~orpc': { meta: Meta } }) =>
+    procedureOrLazy['~orpc'].meta[name] as TData | undefined
 
   return [metaPlugin, getMeta]
 }

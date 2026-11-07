@@ -1,5 +1,5 @@
-import type { ClientLink } from './types'
-import { DynamicLink } from './dynamic-link'
+import { DynamicLink } from './dynamic-link.ts'
+import type { ClientLink } from './types.ts'
 
 describe('dynamicLink', () => {
   it('pass correct context', () => {
@@ -11,10 +11,10 @@ describe('dynamicLink', () => {
   })
 
   it('required return a valid link', () => {
-    void new DynamicLink(() => ({} as ClientLink<any>))
-    void new DynamicLink<{ batch?: boolean }>(() => ({} as ClientLink<{ batch?: boolean }>))
+    void new DynamicLink(() => ({}) as ClientLink<any>)
+    void new DynamicLink<{ batch?: boolean }>(() => ({}) as ClientLink<{ batch?: boolean }>)
     // @ts-expect-error - context is mismatch
-    void new DynamicLink<{ batch?: boolean }>(() => ({} as ClientLink<{ batch?: string }>))
+    void new DynamicLink<{ batch?: boolean }>(() => ({}) as ClientLink<{ batch?: string }>)
     // @ts-expect-error - must return a ClientLink
     void new DynamicLink<{ batch?: boolean }>(() => ({}))
   })

@@ -1,9 +1,11 @@
+import { sleep } from '@orpc/shared'
 import { act, renderHook } from '@testing-library/react'
 import useSWR, { mutate } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
-import { orpc, streamHandler } from './__shared__/orpc'
+
+import { orpc, streamHandler } from './__shared__/orpc.ts'
 
 beforeEach(async () => {
   vi.clearAllMocks()
@@ -15,10 +17,7 @@ it('case: useSWR & mutate & useSWRMutation', async () => {
   const fetcher = vi.fn(orpc.static.fetcher())
 
   const { result } = renderHook(() => {
-    const swr = useSWR(
-      orpc.nested.static.key({ input: { input: 123 } }),
-      fetcher,
-    )
+    const swr = useSWR(orpc.nested.static.key({ input: { input: 123 } }), fetcher)
     const mutation = useSWRMutation(
       orpc.nested.static.key({ input: { input: 123 } }),
       orpc.static.mutator(),
@@ -59,7 +58,7 @@ it('case: useSWR & mutate & useSWRMutation', async () => {
 it('case: useSWRInfinite', async () => {
   const { result } = renderHook(() => {
     const swr = useSWRInfinite(
-      index => orpc.nested.static.key({ input: { input: index + 1 } }),
+      (index) => orpc.nested.static.key({ input: { input: index + 1 } }),
       orpc.static.fetcher(),
     )
 
@@ -70,16 +69,20 @@ it('case: useSWRInfinite', async () => {
 
   await act(async () => {
     await vi.waitFor(() => expect(result.current.swr.data).toEqual([{ output: '1' }]))
-    result.current.swr.setSize(2)
+    void result.current.swr.setSize(2)
   })
 
   await act(async () => {
-    await vi.waitFor(() => expect(result.current.swr.data).toEqual([{ output: '1' }, { output: '2' }]))
-    result.current.swr.setSize(3)
+    await vi.waitFor(() =>
+      expect(result.current.swr.data).toEqual([{ output: '1' }, { output: '2' }]),
+    )
+    void result.current.swr.setSize(3)
   })
 
   await act(async () => {
-    await vi.waitFor(() => expect(result.current.swr.data).toEqual([{ output: '1' }, { output: '2' }, { output: '3' }]))
+    await vi.waitFor(() =>
+      expect(result.current.swr.data).toEqual([{ output: '1' }, { output: '2' }, { output: '3' }]),
+    )
   })
 })
 
@@ -96,37 +99,48 @@ it('case: useSWRSubscription & .subscriber', async () => {
   expect(result.current.subscription.data).toBeUndefined()
 
   await act(async () => {
-    await vi.waitFor(() => expect(result.current.subscription.data).toEqual([{ output: '1' }, { output: '2' }]))
+    await vi.waitFor(() =>
+      expect(result.current.subscription.data).toEqual([{ output: '1' }, { output: '2' }]),
+    )
   })
 })
 
-it('case: useSWRSubscription & .subscriber refetchMode=replace', async () => {
-  const first = renderHook(() => useSWRSubscription(
-    orpc.stream.key({ input: { input: 3 } }),
-    orpc.stream.subscriber({ refetchMode: 'replace' }),
-  ))
+it('case: useSWRSubscription & .subscriber keeps data until the new stream connects', async () => {
+  const first = renderHook(() =>
+    useSWRSubscription(orpc.stream.key({ input: { input: 3 } }), orpc.stream.subscriber()),
+  )
 
   await act(async () => {
-    await vi.waitFor(() => expect(first.result.current.data).toEqual([{ output: '0' }, { output: '1' }, { output: '2' }]))
+    await vi.waitFor(() =>
+      expect(first.result.current.data).toEqual([
+        { output: '0' },
+        { output: '1' },
+        { output: '2' },
+      ]),
+    )
   })
 
   first.unmount()
 
   streamHandler.mockImplementationOnce(async function* () {
-    yield { output: '__replaced__' }
+    await sleep(50)
+    yield { output: '__new__' }
   })
 
-  const second = renderHook(() => useSWRSubscription(
-    orpc.stream.key({ input: { input: 3 } }),
-    orpc.stream.subscriber({ refetchMode: 'replace' }),
-  ))
+  const second = renderHook(() =>
+    useSWRSubscription(orpc.stream.key({ input: { input: 3 } }), orpc.stream.subscriber()),
+  )
 
-  // previous data is preserved while the new stream is buffering
+  // previous data stays until the new stream connects
   expect(second.result.current.data).toEqual([{ output: '0' }, { output: '1' }, { output: '2' }])
 
   await act(async () => {
-    // append mode would end with 4 events here, replace keeps only the new stream's events
-    await vi.waitFor(() => expect(second.result.current.data).toEqual([{ output: '__replaced__' }]))
+    // reset: the data becomes [] when the new stream connects
+    await vi.waitFor(() => expect(second.result.current.data).toEqual([]), { interval: 1 })
+  })
+
+  await act(async () => {
+    await vi.waitFor(() => expect(second.result.current.data).toEqual([{ output: '__new__' }]))
   })
 })
 

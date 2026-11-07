@@ -1,6 +1,6 @@
 ---
-title: "Getting Started"
-description: "Build your first end-to-end typesafe API with oRPC, from defining procedures to serving and calling them from a client."
+title: 'Getting Started'
+description: 'Build your first end-to-end typesafe API with oRPC, from defining procedures to serving and calling them from a client.'
 sidebar:
   icon: rocket
 ---
@@ -33,21 +33,18 @@ A procedure is a function that clients can call remotely. Build one with the `os
 import { os } from '@orpc/server'
 import * as z from 'zod'
 
-export const listPlanets = os
-  .handler(async () => {
-    // replace with your database query
-    return [
-      { id: 1, name: 'Earth' },
-      { id: 2, name: 'Mars' },
-    ]
-  })
+export const listPlanets = os.handler(async () => {
+  // replace with your database query
+  return [
+    { id: 1, name: 'Earth' },
+    { id: 2, name: 'Mars' },
+  ]
+})
 
-export const findPlanet = os
-  .input(z.object({ id: z.number() }))
-  .handler(async ({ input }) => {
-    // replace with your database query
-    return { id: input.id, name: 'Earth' }
-  })
+export const findPlanet = os.input(z.object({ id: z.number() })).handler(async ({ input }) => {
+  // replace with your database query
+  return { id: input.id, name: 'Earth' }
+})
 
 export const createPlanet = os
   .input(z.object({ name: z.string(), description: z.string().optional() }))

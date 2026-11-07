@@ -1,9 +1,10 @@
-import type { ErrorMap } from './error'
-import type { Meta, MetaPlugin } from './meta'
-import type { RouterContract } from './router'
-import type { AnySchema } from './schema'
-import { isTypescriptObject } from '@orpc/shared'
-import { ProcedureContract } from './procedure'
+import { isNonPrimitive } from '@orpc/shared'
+
+import type { ErrorMap } from './error.ts'
+import type { Meta, MetaPlugin } from './meta.ts'
+import { ProcedureContract } from './procedure.ts'
+import type { RouterContract } from './router.ts'
+import type { AnySchema } from './schema.ts'
 
 export interface PathMetaPlugin<
   TInputSchema extends AnySchema,
@@ -21,11 +22,7 @@ export interface PathMetaPlugin<
  * @see {@link https://orpc.dev/docs/contract/client-factory | Contract Client Factory}
  */
 export const meta = {
-  path<
-    TInputSchema extends AnySchema,
-    TOutputSchema extends AnySchema,
-    TErrorMap extends ErrorMap,
-  >(
+  path<TInputSchema extends AnySchema, TOutputSchema extends AnySchema, TErrorMap extends ErrorMap>(
     path: string[],
   ): PathMetaPlugin<TInputSchema, TOutputSchema, TErrorMap> {
     return {
@@ -51,7 +48,10 @@ export function getPathMeta(procedureOrLazy: { '~orpc': { meta: Meta } }): strin
  *
  * Returns `undefined` when no procedure-contract defines `meta.path`.
  */
-export function resolveBasePathMeta(contract: RouterContract, currentPath: string[] = []): string[] | undefined {
+export function resolveBasePathMeta(
+  contract: RouterContract,
+  currentPath: string[] = [],
+): string[] | undefined {
   if (contract instanceof ProcedureContract) {
     const path = getPathMeta(contract)
 
@@ -70,7 +70,7 @@ export function resolveBasePathMeta(contract: RouterContract, currentPath: strin
     return base
   }
 
-  if (isTypescriptObject(contract)) {
+  if (isNonPrimitive(contract)) {
     for (const [key, child] of Object.entries(contract)) {
       const base = resolveBasePathMeta(child, [...currentPath, key])
 

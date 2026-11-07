@@ -1,8 +1,8 @@
 ---
-title: "Next.js Integration"
-description: "Use oRPC in Next.js applications with server functions, form actions, and React hooks for optimistic updates and typesafe error handling."
+title: 'Next.js Integration'
+description: 'Use oRPC in Next.js applications with server functions, form actions, and React hooks for optimistic updates and typesafe error handling.'
 sidebar:
-  label: "Next.js"
+  label: 'Next.js'
 ---
 
 ## Installation
@@ -24,10 +24,11 @@ import { createServerFunction } from '@orpc/next'
 const procedure = os.handler(async () => 'Hello from oRPC + Next.js!')
 
 export const serverFunction = createServerFunction(procedure, {
-  context: async () => { // <- provide initial context if needed
+  context: async () => {
+    // <- provide initial context if needed
     return { user: { id: '123', name: 'Alice' } }
   },
-  interceptors: [] // <- add interceptors if needed
+  interceptors: [], // <- add interceptors if needed
 })
 ```
 
@@ -75,12 +76,10 @@ export default function Page() {
     if (error) {
       if (error.defined) {
         // handle typesafe error
-      }
-      else {
+      } else {
         // handle unknown error
       }
-    }
-    else {
+    } else {
       // handle success case
     }
   }
@@ -123,7 +122,9 @@ return (
   <form action={submit}>
     <input name="title" />
     <span>{getIssueMessage(error, 'title')}</span>
-    <button type="submit" disabled={isPending}>Submit</button>
+    <button type="submit" disabled={isPending}>
+      Submit
+    </button>
   </form>
 )
 ```
@@ -140,14 +141,15 @@ If you reuse the same options across multiple server functions, `createServerFun
 import { createServerFunctionable } from '@orpc/next'
 
 const functionable = createServerFunctionable({
-  context: async () => { // <- provide initial context if needed
+  context: async () => {
+    // <- provide initial context if needed
     return { user: { id: '123', name: 'Alice' } }
   },
 })
 
 // Works as both a server function and a procedure.
 export const functionableProcedure = functionable(
-  os.handler(async () => 'Hello from oRPC + Next.js!')
+  os.handler(async () => 'Hello from oRPC + Next.js!'),
 )
 ```
 
@@ -161,7 +163,8 @@ Import `@orpc/next/extensions/actionable` from a module that always runs during 
 export const functionableProcedure = base
   .handler(async () => 'Hello from oRPC + Next.js!')
   .actionable({
-    context: async () => { // <- provide initial context if needed
+    context: async () => {
+      // <- provide initial context if needed
       return { user: { id: '123', name: 'Alice' } }
     },
   })
@@ -187,11 +190,7 @@ This integration also includes React hooks for server functions. `useServerFunct
 'use client'
 
 import { isDefinedError } from '@orpc/client'
-import {
-  getIssueMessage,
-  onErrorDeferred,
-  parseFormData,
-} from '@orpc/next'
+import { getIssueMessage, onErrorDeferred, parseFormData } from '@orpc/next'
 import { useServerFunction } from '@orpc/next/hooks'
 
 export function MyComponent() {
@@ -207,7 +206,7 @@ export function MyComponent() {
   })
 
   return (
-    <form action={form => execute(parseFormData(form))}>
+    <form action={(form) => execute(parseFormData(form))}>
       <input type="text" name="name" required />
       <span>{getIssueMessage(error, 'name')}</span>
 
@@ -222,11 +221,7 @@ export function MyComponent() {
 'use client'
 
 import { useOptimisticServerAction } from '@orpc/next/hooks'
-import {
-  getIssueMessage,
-  onSuccessDeferred,
-  parseFormData,
-} from '@orpc/next'
+import { getIssueMessage, onSuccessDeferred, parseFormData } from '@orpc/next'
 
 export function MyComponent() {
   const [todos, setTodos] = useState<Todo[]>([])
@@ -235,7 +230,7 @@ export function MyComponent() {
     optimisticReducer: (currentState, newTodo) => [...currentState, newTodo],
     interceptors: [
       onSuccessDeferred(({ data }) => {
-        setTodos(prevTodos => [...prevTodos, data])
+        setTodos((prevTodos) => [...prevTodos, data])
       }),
     ],
   })
@@ -243,11 +238,11 @@ export function MyComponent() {
   return (
     <div>
       <ul>
-        {optimisticState.map(todo => (
+        {optimisticState.map((todo) => (
           <li key={todo.todo}>{todo.todo}</li>
         ))}
       </ul>
-      <form action={form => execute(parseFormData(form))}>
+      <form action={(form) => execute(parseFormData(form))}>
         <input type="text" name="todo" required />
         <span>{getIssueMessage(error, 'todo')}</span>
 
@@ -290,19 +285,17 @@ export default function Page() {
 
 import { redirect } from 'next/navigation'
 
-const procedure = os
-  .input(z.object({ name: z.string() }))
-  .handler(async ({ input }) => {
-    // do something
-  })
+const procedure = os.input(z.object({ name: z.string() })).handler(async ({ input }) => {
+  // do something
+})
 
 export const serverFormFunction = createServerFormFunction(procedure, {
   interceptors: [
     async ({ next }) => {
       await next()
       redirect('/thank-you') // redirect on success
-    }
-  ]
+    },
+  ],
 })
 ```
 
@@ -316,13 +309,14 @@ If you reuse the same options across multiple form actions, `createServerFormFun
 import { createServerFormFunctionable } from '@orpc/next'
 
 const formFunctionable = createServerFormFunctionable({
-  context: async () => { // <- provide initial context if needed
+  context: async () => {
+    // <- provide initial context if needed
     return { user: { id: '123', name: 'Alice' } }
   },
 })
 
 // Works as both a server form function and a procedure.
 export const formFunctionableProcedure = formFunctionable(
-  os.handler(async () => 'Hello from oRPC + Next.js!')
+  os.handler(async () => 'Hello from oRPC + Next.js!'),
 )
 ```

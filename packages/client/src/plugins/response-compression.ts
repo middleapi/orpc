@@ -1,8 +1,13 @@
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard'
-import type { ClientContext } from '../types'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
+
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+} from '../adapters/standard/index.ts'
+import type { ClientContext } from '../types.ts'
 
 /**
  * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
@@ -27,7 +32,9 @@ export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> 
  *
  * @see {@link https://orpc.dev/docs/plugins/response-compression | Response Compression Plugin}
  */
-export class ResponseCompressionLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
+export class ResponseCompressionLinkPlugin<
+  T extends ClientContext,
+> implements StandardLinkPlugin<T> {
   name = '~response-compression'
 
   /**
@@ -35,7 +42,10 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
    */
   after: string[] = ['~batch']
 
-  private readonly encodings: Exclude<ResponseCompressionLinkPluginOptions<T>['encodings'], undefined>
+  private readonly encodings: Exclude<
+    ResponseCompressionLinkPluginOptions<T>['encodings'],
+    undefined
+  >
 
   constructor(options: ResponseCompressionLinkPluginOptions<T> = {}) {
     this.encodings = options.encodings ?? ['gzip', 'deflate']
@@ -44,7 +54,10 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const acceptEncodingHeader = this.encodings.join(', ')
 
-    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const response = await next({
         ...interceptorOptions,
         request: {
@@ -103,10 +116,7 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
 
     return {
       ...options,
-      transportInterceptors: [
-        ...toArray(options.transportInterceptors),
-        transportInterceptor,
-      ],
+      transportInterceptors: [...toArray(options.transportInterceptors), transportInterceptor],
     }
   }
 }
@@ -128,7 +138,5 @@ function parseContentEncodings(header: string | undefined): string[] {
     return []
   }
 
-  return header
-    .split(',')
-    .map(part => part.trim().toLowerCase())
+  return header.split(',').map((part) => part.trim().toLowerCase())
 }

@@ -1,15 +1,16 @@
-import type { HttpHandler } from 'msw'
 import { oc } from '@orpc/contract'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { RPCHandler } from '@orpc/server/fetch'
-import z from 'zod'
-import { createHTTPUtils } from './http-router-utils'
+import type { HttpHandler } from 'msw'
+import * as z from 'zod'
 
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+import { createHTTPUtils } from './http-router-utils.ts'
+
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 const baseErrorMap = {
-  BASE: { data: z.object({ id: z.number().transform(n => `${n}`) }) },
+  BASE: { data: z.object({ id: z.number().transform((n) => `${n}`) }) },
   SIMPLE: {},
 }
 
@@ -20,7 +21,10 @@ const contract = {
   },
 }
 
-const utils = createHTTPUtils(contract, { prefix: '/rpc', handler: router => new RPCHandler(router) })
+const utils = createHTTPUtils(contract, {
+  prefix: '/rpc',
+  handler: (router) => new RPCHandler(router),
+})
 
 it('handler', () => {
   const handler = utils.ping.handler(({ input, errors, context, signal, lastEventId }) => {
@@ -74,7 +78,7 @@ it('loading', () => {
 it('context option', () => {
   const contextUtils = createHTTPUtils(contract, {
     context: () => ({ userId: '1' }),
-    handler: router => new RPCHandler(router),
+    handler: (router) => new RPCHandler(router),
   })
 
   contextUtils.ping.handler(({ context }) => {
@@ -93,12 +97,12 @@ it('context option', () => {
   // required when an empty object cannot satisfy it
   createHTTPUtils(contract, {
     context: (): { userId: string } => ({ userId: '1' }),
-    handler: router => new RPCHandler(router),
+    handler: (router) => new RPCHandler(router),
   })
 
   // @ts-expect-error --- context is required
   createHTTPUtils<typeof contract, { userId: string }>(contract, {
-    handler: router => new RPCHandler(router),
+    handler: (router) => new RPCHandler(router),
   })
 })
 
@@ -107,14 +111,22 @@ it('passthrough', () => {
 })
 
 it('options', () => {
-  createHTTPUtils(contract, { handler: router => new RPCHandler(router) })
-  createHTTPUtils(contract, { origin: '*', prefix: '/rpc', handler: router => new RPCHandler(router) })
-  createHTTPUtils(contract, { origin: 'http://localhost:3000', prefix: '/api', handler: router => new OpenAPIHandler(router) })
+  createHTTPUtils(contract, { handler: (router) => new RPCHandler(router) })
+  createHTTPUtils(contract, {
+    origin: '*',
+    prefix: '/rpc',
+    handler: (router) => new RPCHandler(router),
+  })
+  createHTTPUtils(contract, {
+    origin: 'http://localhost:3000',
+    prefix: '/api',
+    handler: (router) => new OpenAPIHandler(router),
+  })
 
   // @ts-expect-error --- handler is required
   createHTTPUtils(contract, { origin: '*' })
   // @ts-expect-error --- must return a fetch handler
   createHTTPUtils(contract, { handler: () => ({}) })
   // @ts-expect-error --- prefix must start with /
-  createHTTPUtils(contract, { prefix: 'rpc', handler: router => new RPCHandler(router) })
+  createHTTPUtils(contract, { prefix: 'rpc', handler: (router) => new RPCHandler(router) })
 })

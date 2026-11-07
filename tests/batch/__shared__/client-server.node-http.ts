@@ -1,12 +1,14 @@
-import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
 import * as http from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/node'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
-import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
+
+import type { CreateBatchClientServerTest } from './client-server.ts'
+import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
 
 export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
   router,

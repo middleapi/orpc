@@ -1,66 +1,34 @@
 {
   "name": "@orpc/client",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Consume oRPC and OpenAPI APIs with end-to-end type safety over HTTP, WebSocket, or message ports",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "client",
+    "fetch",
+    "openapi",
+    "orpc",
+    "rpc",
+    "typesafe",
+    "typescript",
+    "websocket"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/client"
   },
-  "keywords": [
-    "orpc",
-    "rpc",
-    "api",
-    "typescript",
-    "typesafe",
-    "client",
-    "fetch",
-    "websocket",
-    "openapi"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./plugins": {
-        "types": "./dist/plugins/index.d.mts",
-        "import": "./dist/plugins/index.mjs",
-        "default": "./dist/plugins/index.mjs"
-      },
-      "./standard": {
-        "types": "./dist/adapters/standard/index.d.mts",
-        "import": "./dist/adapters/standard/index.mjs",
-        "default": "./dist/adapters/standard/index.mjs"
-      },
-      "./fetch": {
-        "types": "./dist/adapters/fetch/index.d.mts",
-        "import": "./dist/adapters/fetch/index.mjs",
-        "default": "./dist/adapters/fetch/index.mjs"
-      },
-      "./websocket": {
-        "types": "./dist/adapters/websocket/index.d.mts",
-        "import": "./dist/adapters/websocket/index.mjs",
-        "default": "./dist/adapters/websocket/index.mjs"
-      },
-      "./message-port": {
-        "types": "./dist/adapters/message-port/index.d.mts",
-        "import": "./dist/adapters/message-port/index.mjs",
-        "default": "./dist/adapters/message-port/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
@@ -70,22 +38,53 @@
     "./websocket": "./src/adapters/websocket/index.ts",
     "./message-port": "./src/adapters/message-port/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./plugins": {
+        "types": "./dist/plugins/index.d.ts",
+        "import": "./dist/plugins/index.js",
+        "default": "./dist/plugins/index.js"
+      },
+      "./standard": {
+        "types": "./dist/adapters/standard/index.d.ts",
+        "import": "./dist/adapters/standard/index.js",
+        "default": "./dist/adapters/standard/index.js"
+      },
+      "./fetch": {
+        "types": "./dist/adapters/fetch/index.d.ts",
+        "import": "./dist/adapters/fetch/index.js",
+        "default": "./dist/adapters/fetch/index.js"
+      },
+      "./websocket": {
+        "types": "./dist/adapters/websocket/index.d.ts",
+        "import": "./dist/adapters/websocket/index.js",
+        "default": "./dist/adapters/websocket/index.js"
+      },
+      "./message-port": {
+        "types": "./dist/adapters/message-port/index.d.ts",
+        "import": "./dist/adapters/message-port/index.js",
+        "default": "./dist/adapters/message-port/index.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.14.0",
-    "@standard-server/fetch": "~0.14.0",
-    "@standard-server/peer": "~0.14.0"
+    "@standard-server/core": "~0.15.0",
+    "@standard-server/fetch": "~0.15.0",
+    "@standard-server/peer": "~0.15.0"
   },
   "devDependencies": {
     "@types/ws": "^8.18.2",
-    "ws": "^8.22.0",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   }
 }

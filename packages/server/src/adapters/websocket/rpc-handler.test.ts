@@ -1,9 +1,11 @@
-import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
+import type { AddressInfo } from 'node:net'
+
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
-import WebSocket, { WebSocketServer } from 'ws'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import { WebSocket, WebSocketServer } from 'ws'
+
+import { os } from '../../builder.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   beforeEach(() => {
@@ -11,14 +13,17 @@ describe('rpcHandler', () => {
   })
 
   const createHandler = (options: ConstructorParameters<typeof RPCHandler>[1] = {}) => {
-    return new RPCHandler({
-      ping: os.handler(async ({ signal }) => {
-        await new Promise(resolve => setTimeout(resolve, 10))
-        signal?.throwIfAborted()
+    return new RPCHandler(
+      {
+        ping: os.handler(async ({ signal }) => {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          signal?.throwIfAborted()
 
-        return 'pong'
-      }),
-    }, options)
+          return 'pong'
+        }),
+      },
+      options,
+    )
   }
 
   const createWs = () => {
@@ -36,24 +41,25 @@ describe('rpcHandler', () => {
   const createRequestMessage = async ({
     prefix,
     url = '/ping',
-  }: { prefix?: string, url?: `/${string}` } = {}) => {
-    return encodePeerMessage({
-      id: '19',
-      kind: 'request',
-      json: {
-        url,
-        body: { json: 'input' },
-        headers: {},
-        method: 'POST',
+  }: { prefix?: string; url?: `/${string}` } = {}) => {
+    return encodePeerMessage(
+      {
+        id: '19',
+        kind: 'request',
+        json: {
+          url,
+          body: { json: 'input' },
+          headers: {},
+          method: 'POST',
+        },
       },
-    }, prefix ? { prefix } : undefined)
+      prefix ? { prefix } : undefined,
+    )
   }
 
   it('accepts context and prefix option in message method', async () => {
     const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     const ws = createWs()
@@ -77,18 +83,27 @@ describe('rpcHandler', () => {
 
   it.each([
     ['string', () => createRequestMessage()],
-    ['bytes', async () => {
-      const message = await createRequestMessage()
-      return new TextEncoder().encode(message as string)
-    }],
-    ['arrayBuffer', async () => {
-      const message = await createRequestMessage()
-      return new TextEncoder().encode(message as string).buffer
-    }],
-    ['arrayBuffer parts', async () => {
-      const message = await createRequestMessage()
-      return [new TextEncoder().encode(message as string).buffer]
-    }],
+    [
+      'bytes',
+      async () => {
+        const message = await createRequestMessage()
+        return new TextEncoder().encode(message as string)
+      },
+    ],
+    [
+      'arrayBuffer',
+      async () => {
+        const message = await createRequestMessage()
+        return new TextEncoder().encode(message as string).buffer
+      },
+    ],
+    [
+      'arrayBuffer parts',
+      async () => {
+        const message = await createRequestMessage()
+        return [new TextEncoder().encode(message as string).buffer]
+      },
+    ],
   ])('handles %s request', async (_type, createMessage) => {
     const handler = createHandler()
     const ws = createWs()
@@ -207,14 +222,14 @@ describe('rpcHandler', () => {
     const handler = createHandler()
 
     const wss = new WebSocketServer({ port: 0 })
-    wss.on('connection', ws => handler.upgrade(ws))
+    wss.on('connection', (ws) => handler.upgrade(ws))
     onTestFinished(() => wss.close())
 
     const client = new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`)
     await once(client, 'open')
 
     // `ws` rejects text frames carrying invalid UTF-8 by emitting `error` on the server socket
-    client.send(new Uint8Array([0xFF]), { binary: false })
+    client.send(new Uint8Array([0xff]), { binary: false })
 
     const [code] = await once(client, 'close')
     expect(code).toBe(1007)

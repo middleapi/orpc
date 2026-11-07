@@ -1,4 +1,4 @@
-import { defer, isAsyncGeneratorFunction, once, tryOrUndefined } from './function'
+import { defer, isAsyncGeneratorFunction, once, tryOrUndefined } from './function.ts'
 
 it('once', () => {
   const fn = vi.fn(() => ({}))
@@ -23,7 +23,7 @@ describe('defer', () => {
 
     expect(callback1).toHaveBeenCalledTimes(0)
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     expect(callback1).toHaveBeenCalledTimes(1)
     expect(callback2).toHaveBeenCalledBefore(callback1)
@@ -58,7 +58,7 @@ describe('defer', () => {
 
     expect(callback1).toHaveBeenCalledTimes(0)
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     expect(callback1).toHaveBeenCalledTimes(1)
     expect(callback2).toHaveBeenCalledBefore(callback1)
@@ -71,9 +71,11 @@ describe('tryOrUndefined', () => {
   })
 
   it('returns undefined on throw', () => {
-    expect(tryOrUndefined(() => {
-      throw new Error('TEST')
-    })).toBeUndefined()
+    expect(
+      tryOrUndefined(() => {
+        throw new Error('TEST')
+      }),
+    ).toBeUndefined()
   })
 
   it('preserves falsy values', () => {
@@ -91,13 +93,14 @@ describe('isAsyncGeneratorFunction', () => {
     expect(isAsyncGeneratorFunction(gen)).toBe(true)
     expect(isAsyncGeneratorFunction(gen.bind(null))).toBe(true)
     expect(isAsyncGeneratorFunction(async function* () {})).toBe(true)
-    expect(isAsyncGeneratorFunction({ async* method() {} }.method)).toBe(true)
+    expect(isAsyncGeneratorFunction({ async *method() {} }.method)).toBe(true)
   })
 
   it('returns false for anything else', () => {
     expect(isAsyncGeneratorFunction(function* () {})).toBe(false)
     expect(isAsyncGeneratorFunction(async () => {})).toBe(false)
     expect(isAsyncGeneratorFunction(() => {})).toBe(false)
+    // oxlint-disable-next-line typescript/no-extraneous-class
     expect(isAsyncGeneratorFunction(class {})).toBe(false)
     expect(isAsyncGeneratorFunction((async function* () {})())).toBe(false)
     expect(isAsyncGeneratorFunction({})).toBe(false)

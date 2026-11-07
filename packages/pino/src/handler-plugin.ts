@@ -1,12 +1,26 @@
-import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
-import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
-import type { Logger } from 'pino'
-import type { LoggerContext } from './context'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
+import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
+} from '@orpc/server/standard'
+import {
+  isAbortError,
+  isAsyncIteratorObject,
+  ORPC_NAME,
+  override,
+  toArray,
+  wrapReadableStream,
+} from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
+import type { Logger } from 'pino'
 import pino from 'pino'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+
+import type { LoggerContext } from './context.ts'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 
 export interface PinoHandlerPluginOptions<T extends Context> {
   /**
@@ -67,24 +81,33 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
   before: string[] = ['~tracing', '~batch', '~hibernation']
 
   private readonly logger: Exclude<PinoHandlerPluginOptions<T>['logger'], undefined>
-  private readonly generateRequestId: Exclude<PinoHandlerPluginOptions<T>['generateRequestId'], undefined>
+  private readonly generateRequestId: Exclude<
+    PinoHandlerPluginOptions<T>['generateRequestId'],
+    undefined
+  >
   private readonly logLifecycle: Exclude<PinoHandlerPluginOptions<T>['logLifecycle'], undefined>
   private readonly logAbort: Exclude<PinoHandlerPluginOptions<T>['logAbort'], undefined>
-  private readonly procedureErrorLevel: Exclude<PinoHandlerPluginOptions<T>['procedureErrorLevel'], undefined>
+  private readonly procedureErrorLevel: Exclude<
+    PinoHandlerPluginOptions<T>['procedureErrorLevel'],
+    undefined
+  >
 
-  constructor(
-    options: PinoHandlerPluginOptions<T> = {},
-  ) {
+  constructor(options: PinoHandlerPluginOptions<T> = {}) {
     this.logger = options.logger ?? pino()
-    this.generateRequestId = options.generateRequestId
-      ?? (({ request }) => flattenStandardHeader(request.headers['x-request-id']) ?? crypto.randomUUID())
+    this.generateRequestId =
+      options.generateRequestId ??
+      (({ request }) =>
+        flattenStandardHeader(request.headers['x-request-id']) ?? crypto.randomUUID())
     this.logLifecycle = options.logLifecycle ?? false
     this.logAbort = options.logAbort ?? false
     this.procedureErrorLevel = options.procedureErrorLevel ?? ((_, level) => level)
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const startMs = Date.now()
 
       const logger = (
@@ -132,15 +155,13 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
               },
               responseTime: Date.now() - startMs,
             })
-          }
-          else {
+          } else {
             logger?.info('no matching procedure found')
           }
         }
 
         return result
-      }
-      catch (error) {
+      } catch (error) {
         /**
          * Any error here is internal (interceptor/framework), not business logic.
          * Indicates unexpected handler failure.
@@ -159,24 +180,29 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
         if (signal?.aborted) {
           logger?.info(`request was aborted before handling (${String(signal.reason)})`)
-        }
-        else {
-          signal?.addEventListener('abort', () => {
-            logger?.info(`request is aborted (${String(signal.reason)})`)
-          }, { once: true })
+        } else {
+          signal?.addEventListener(
+            'abort',
+            () => {
+              logger?.info(`request is aborted (${String(signal.reason)})`)
+            },
+            { once: true },
+          )
         }
       }
 
       try {
         return await next()
-      }
-      catch (error) {
+      } catch (error) {
         logProcedureError(logger, error, this.procedureErrorLevel)
         throw error
       }
     }
 
-    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async ({ next, context }) => {
+    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async ({
+      next,
+      context,
+    }) => {
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {
@@ -184,11 +210,14 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          * @remarks
          * **Warning**: Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
-          onError: (error) => {
-            logProcedureError(getLogger(context), error, this.procedureErrorLevel)
-          },
-        }))
+        return override(
+          output,
+          wrapAsyncIteratorPreservingEventMeta(output, {
+            onError: (error) => {
+              logProcedureError(getLogger(context), error, this.procedureErrorLevel)
+            },
+          }),
+        )
       }
 
       if (output instanceof ReadableStream) {
@@ -196,11 +225,14 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          * @remarks
          * **Warning**: Remember use `override` for ReadableStream to remain other special properties
          */
-        return override(output, wrapReadableStream(output, {
-          onError: (error) => {
-            logProcedureError(getLogger(context), error, this.procedureErrorLevel)
-          },
-        }))
+        return override(
+          output,
+          wrapReadableStream(output, {
+            onError: (error) => {
+              logProcedureError(getLogger(context), error, this.procedureErrorLevel)
+            },
+          }),
+        )
       }
 
       return output
@@ -208,18 +240,9 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
-      interceptors: [
-        interceptor,
-        ...toArray(options.interceptors),
-      ],
-      clientInterceptors: [
-        clientInterceptor,
-        ...toArray(options.clientInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
+      interceptors: [interceptor, ...toArray(options.interceptors)],
+      clientInterceptors: [clientInterceptor, ...toArray(options.clientInterceptors)],
     }
   }
 }

@@ -28,7 +28,6 @@ allowBuilds:
   msw: false
   protobufjs: false
   sharp: false
-  simple-git-hooks: false
   spawn-sync: false
   tree-sitter: false
   tree-sitter-json: false
@@ -39,15 +38,15 @@ allowBuilds:
 # Entries go inert once the version ages past it, so prune them on the next bump
 # instead of letting versions accumulate.
 minimumReleaseAgeExclude:
-  - '@openapi-spec/downgrader@0.6.0'
-  - '@openapi-spec/router@0.6.0'
-  - '@openapi-spec/types@0.6.0'
-  - '@standard-server/aws-lambda@0.14.0'
-  - '@standard-server/core@0.14.0'
-  - '@standard-server/fastify@0.14.0'
-  - '@standard-server/fetch@0.14.0'
-  - '@standard-server/node@0.14.0'
-  - '@standard-server/peer@0.14.0'
-  - '@standard-server/shared@0.14.0'
+  - '@openapi-spec/downgrader@0.7.1'
+  - '@openapi-spec/router@0.7.1'
+  - '@openapi-spec/types@0.7.1'
+  - '@standard-server/aws-lambda@0.15.0'
+  - '@standard-server/core@0.15.0'
+  - '@standard-server/fastify@0.15.0'
+  - '@standard-server/fetch@0.15.0'
+  - '@standard-server/node@0.15.0'
+  - '@standard-server/peer@0.15.0'
+  - '@standard-server/shared@0.15.0'
   - blume@2.2.1
   - effect@4.0.0

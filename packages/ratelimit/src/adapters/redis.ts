@@ -1,6 +1,7 @@
 import type { RedisClientType } from 'redis'
-import type { BaseRedisRateLimiterOptions } from './base-redis'
-import { BaseRedisRateLimiter } from './base-redis'
+
+import type { BaseRedisRateLimiterOptions } from './base-redis.ts'
+import { BaseRedisRateLimiter } from './base-redis.ts'
 
 export interface RedisRateLimiterOptions extends BaseRedisRateLimiterOptions {}
 
@@ -24,7 +25,10 @@ export class RedisRateLimiter extends BaseRedisRateLimiter {
    * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
    */
   prefix(prefix: string): RedisRateLimiter {
-    return new RedisRateLimiter(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
+    return new RedisRateLimiter(this.redis, {
+      ...this.options,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
   protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {

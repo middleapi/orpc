@@ -1,11 +1,12 @@
-import type { Locker } from './types'
 import { os, type } from '@orpc/server'
-import { lock } from './middleware'
+
+import { lock } from './middleware.ts'
+import type { Locker } from './types.ts'
 
 describe('lock', () => {
   it('can infer context & input & meta types', () => {
     const procedure = os
-      .$context<{ userId: string, locker: Locker }>()
+      .$context<{ userId: string; locker: Locker }>()
       .input(type<{ id: string }>())
       .use(({ next }) => {
         return next({

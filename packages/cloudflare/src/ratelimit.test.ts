@@ -1,7 +1,8 @@
-import type { CloudflareRateLimiterOptions } from './ratelimit'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { CloudflareRateLimiter } from './ratelimit'
+
+import type { CloudflareRateLimiterOptions } from './ratelimit.ts'
+import { CloudflareRateLimiter } from './ratelimit.ts'
 
 describe('cloudflareRateLimiter', () => {
   const PERIOD_MS = 10_000
@@ -20,9 +21,11 @@ describe('cloudflareRateLimiter', () => {
       try {
         await spend(`user:${crypto.randomUUID()}`)
         return
-      }
-      catch (error) {
-        if (remaining === 1 || Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)) {
+      } catch (error) {
+        if (
+          remaining === 1 ||
+          Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)
+        ) {
           throw error
         }
       }

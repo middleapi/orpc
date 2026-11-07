@@ -3,9 +3,10 @@ import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { generateText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
-import z from 'zod'
-import { createToolFactory, implementToolFactory } from './tool'
-import { aiSdkTool } from './tool-meta'
+import * as z from 'zod'
+
+import { aiSdkTool } from './tool-meta.ts'
+import { createToolFactory, implementToolFactory } from './tool.ts'
 
 function toolCallModel(toolName: string, args: unknown) {
   return new MockLanguageModelV4({
@@ -60,7 +61,9 @@ describe('implementToolFactory', () => {
     const implementTool = implementToolFactory()
 
     const tool1 = implementTool(oc.input(inputSchema), { description: 'First tool' })
-    const tool2 = implementTool(oc.input(inputSchema).output(outputSchema), { description: 'Second tool' })
+    const tool2 = implementTool(oc.input(inputSchema).output(outputSchema), {
+      description: 'Second tool',
+    })
 
     expect(tool1.description).toBe('First tool')
     expect(tool2.description).toBe('Second tool')
@@ -69,9 +72,7 @@ describe('implementToolFactory', () => {
 
   it('support aiSdkTool meta to provide default tool options', () => {
     const contract = oc
-      .meta(
-        aiSdkTool({ metadata: { source: 'weather-service' }, description: 'Meta description' }),
-      )
+      .meta(aiSdkTool({ metadata: { source: 'weather-service' }, description: 'Meta description' }))
       .input(inputSchema)
 
     const tool = implementToolFactory()(contract, {
@@ -111,9 +112,12 @@ describe('implementToolFactory', () => {
     })
 
     it('combines input schema fragments nested one level deep', async () => {
-      const contract = oc
-        .input(z.object({ params: z.object({ id: z.string() }) }))
-        .input(z.object({ params: z.object({ slug: z.string() }), query: z.object({ page: z.number() }) }))
+      const contract = oc.input(z.object({ params: z.object({ id: z.string() }) })).input(
+        z.object({
+          params: z.object({ slug: z.string() }),
+          query: z.object({ page: z.number() }),
+        }),
+      )
 
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
@@ -139,28 +143,26 @@ describe('implementToolFactory', () => {
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
 
-      await expect(
-        combined['~standard'].validate({ id: '5', name: 'NAME' }),
-      ).resolves.toEqual({ value: { id: 5, name: 'NAME' } })
+      await expect(combined['~standard'].validate({ id: '5', name: 'NAME' })).resolves.toEqual({
+        value: { id: 5, name: 'NAME' },
+      })
     })
 
     it('combines non-object input schemas by piping validation in order', async () => {
       const contract = oc
-        .input(type<string, string>(value => `first__${value}`))
-        .input(type<string, string>(value => `second__${value}`))
+        .input(type<string, string>((value) => `first__${value}`))
+        .input(type<string, string>((value) => `second__${value}`))
 
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
 
-      await expect(
-        combined['~standard'].validate('INPUT'),
-      ).resolves.toEqual({ value: 'second__first__INPUT' })
+      await expect(combined['~standard'].validate('INPUT')).resolves.toEqual({
+        value: 'second__first__INPUT',
+      })
     })
 
     it('combines input json schemas with allOf and hoists $schema to the root', () => {
-      const contract = oc
-        .input(z.object({ name: z.string() }))
-        .input(extraInputSchema)
+      const contract = oc.input(z.object({ name: z.string() })).input(extraInputSchema)
 
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
@@ -181,27 +183,32 @@ describe('implementToolFactory', () => {
     })
 
     it('promotes $defs to the root and rewrites $ref pointers', () => {
-      const jsonSchemaSupportedSchema = (jsonSchema: Record<string, unknown>) => ({
-        '~standard': {
-          vendor: 'custom',
-          version: 1,
-          validate: (value: unknown) => ({ value }),
-          jsonSchema: {
-            input: () => jsonSchema,
-            output: () => jsonSchema,
+      const jsonSchemaSupportedSchema = (jsonSchema: Record<string, unknown>) =>
+        ({
+          '~standard': {
+            vendor: 'custom',
+            version: 1,
+            validate: (value: unknown) => ({ value }),
+            jsonSchema: {
+              input: () => jsonSchema,
+              output: () => jsonSchema,
+            },
           },
-        },
-      }) as any
+        }) as any
 
       const contract = oc
-        .input(jsonSchemaSupportedSchema({
-          $defs: { user: { type: 'object' } },
-          $ref: '#/$defs/user',
-        }))
-        .input(jsonSchemaSupportedSchema({
-          $defs: { user: { type: 'string' } },
-          properties: { friend: { $ref: '#/$defs/user' }, self: { $ref: '#' } },
-        }))
+        .input(
+          jsonSchemaSupportedSchema({
+            $defs: { user: { type: 'object' } },
+            $ref: '#/$defs/user',
+          }),
+        )
+        .input(
+          jsonSchemaSupportedSchema({
+            $defs: { user: { type: 'string' } },
+            properties: { friend: { $ref: '#/$defs/user' }, self: { $ref: '#' } },
+          }),
+        )
 
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
@@ -219,9 +226,7 @@ describe('implementToolFactory', () => {
     })
 
     it('converts json schema using only the schemas that support it', () => {
-      const contract = oc
-        .input(z.object({ name: z.string() }))
-        .input(type<{ age: number }>())
+      const contract = oc.input(z.object({ name: z.string() })).input(type<{ age: number }>())
 
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
@@ -232,9 +237,7 @@ describe('implementToolFactory', () => {
     })
 
     it('omits json schema conversion when no schema supports it', () => {
-      const contract = oc
-        .input(type<{ name: string }>())
-        .input(type<{ age: number }>())
+      const contract = oc.input(type<{ name: string }>()).input(type<{ age: number }>())
 
       const tool = implementToolFactory()(contract)
       const combined = tool.inputSchema as any
@@ -247,21 +250,25 @@ describe('implementToolFactory', () => {
 
       const contract = oc
         .input(inputSchema)
-        .output(type<{ greeting: string }>((value) => {
-          order.push('first')
-          return value
-        }))
-        .output(type<{ greeting: string }>((value) => {
-          order.push('second')
-          return value
-        }))
+        .output(
+          type<{ greeting: string }>((value) => {
+            order.push('first')
+            return value
+          }),
+        )
+        .output(
+          type<{ greeting: string }>((value) => {
+            order.push('second')
+            return value
+          }),
+        )
 
       const tool = implementToolFactory()(contract)
       const combined = tool.outputSchema as any
 
-      await expect(
-        combined['~standard'].validate({ greeting: 'Hello, Alice!' }),
-      ).resolves.toEqual({ value: { greeting: 'Hello, Alice!' } })
+      await expect(combined['~standard'].validate({ greeting: 'Hello, Alice!' })).resolves.toEqual({
+        value: { greeting: 'Hello, Alice!' },
+      })
 
       expect(order).toEqual(['second', 'first'])
     })
@@ -280,9 +287,7 @@ describe('implementToolFactory', () => {
       prompt: 'Greet Alice',
     })
 
-    expect(result.toolResults).toEqual([
-      expect.objectContaining({ output: { greeting: 123 } }),
-    ])
+    expect(result.toolResults).toEqual([expect.objectContaining({ output: { greeting: 123 } })])
   })
 
   describe('async iterator output schema', () => {
@@ -291,23 +296,33 @@ describe('implementToolFactory', () => {
 
     it('use yield schema as output schema', () => {
       expect(
-        implementToolFactory()(oc.input(inputSchema).output(asyncIteratorObject(yieldSchema))).outputSchema,
+        implementToolFactory()(oc.input(inputSchema).output(asyncIteratorObject(yieldSchema)))
+          .outputSchema,
       ).toBe(yieldSchema)
 
       expect(
-        implementToolFactory()(oc.input(inputSchema).output(asyncIteratorObject(yieldSchema, returnSchema))).outputSchema,
+        implementToolFactory()(
+          oc.input(inputSchema).output(asyncIteratorObject(yieldSchema, returnSchema)),
+        ).outputSchema,
       ).toBe(yieldSchema)
     })
   })
 
   describe('model output', () => {
-    const toModelOutput = (tool: any, output: unknown) => tool.toModelOutput({ toolCallId: 'call-1', input: {}, output })
+    const toModelOutput = (tool: any, output: unknown) =>
+      tool.toModelOutput({ toolCallId: 'call-1', input: {}, output })
     const pdfBase64 = btoa('pdf')
 
     it('serializes outputs like OpenAPI responses', async () => {
       const tool = implementToolFactory()(oc)
 
-      await expect(toModelOutput(tool, { date: new Date('2024-01-01T00:00:00.000Z'), big: 1n, set: new Set([1, 2]) })).resolves.toEqual({
+      await expect(
+        toModelOutput(tool, {
+          date: new Date('2024-01-01T00:00:00.000Z'),
+          big: 1n,
+          set: new Set([1, 2]),
+        }),
+      ).resolves.toEqual({
         type: 'json',
         value: { date: '2024-01-01T00:00:00.000Z', big: '1', set: [1, 2] },
       })
@@ -321,19 +336,37 @@ describe('implementToolFactory', () => {
 
       await expect(toModelOutput(tool, pdf)).resolves.toEqual({
         type: 'content',
-        value: [{ type: 'file', mediaType: 'application/pdf', data: { type: 'data', data: pdfBase64 }, filename: 'q3.pdf' }],
+        value: [
+          {
+            type: 'file',
+            mediaType: 'application/pdf',
+            data: { type: 'data', data: pdfBase64 },
+            filename: 'q3.pdf',
+          },
+        ],
       })
 
       await expect(toModelOutput(tool, new Blob(['bytes']))).resolves.toEqual({
         type: 'content',
-        value: [{ type: 'file', mediaType: 'application/octet-stream', data: { type: 'data', data: btoa('bytes') } }],
+        value: [
+          {
+            type: 'file',
+            mediaType: 'application/octet-stream',
+            data: { type: 'data', data: btoa('bytes') },
+          },
+        ],
       })
 
       await expect(toModelOutput(tool, { title: 'Q3', files: [pdf] })).resolves.toEqual({
         type: 'content',
         value: [
           { type: 'text', text: '{"title":"Q3","files":[{}]}' },
-          { type: 'file', mediaType: 'application/pdf', data: { type: 'data', data: pdfBase64 }, filename: 'files/0/q3.pdf' },
+          {
+            type: 'file',
+            mediaType: 'application/pdf',
+            data: { type: 'data', data: pdfBase64 },
+            filename: 'files/0/q3.pdf',
+          },
         ],
       })
     })
@@ -344,10 +377,18 @@ describe('implementToolFactory', () => {
       }
 
       const serializer = new OpenAPIJsonSerializer({
-        handlers: { money: { condition: data => data instanceof Money, serialize: (data: Money) => `$${data.cents / 100}`, isTerminal: true } },
+        handlers: {
+          money: {
+            condition: (data) => data instanceof Money,
+            serialize: (data: Money) => `$${data.cents / 100}`,
+            isTerminal: true,
+          },
+        },
       })
 
-      await expect(toModelOutput(implementToolFactory({ serializer })(oc), { price: new Money(150) })).resolves.toEqual({
+      await expect(
+        toModelOutput(implementToolFactory({ serializer })(oc), { price: new Money(150) }),
+      ).resolves.toEqual({
         type: 'json',
         value: { price: '$1.5' },
       })
@@ -357,7 +398,9 @@ describe('implementToolFactory', () => {
       const custom = () => ({ type: 'text' as const, value: 'custom' })
 
       expect(implementToolFactory()(oc, { toModelOutput: custom }).toModelOutput).toBe(custom)
-      expect(implementToolFactory()(oc.meta(aiSdkTool({ toModelOutput: custom }))).toModelOutput).toBe(custom)
+      expect(
+        implementToolFactory()(oc.meta(aiSdkTool({ toModelOutput: custom }))).toModelOutput,
+      ).toBe(custom)
     })
 
     it('sends files to the model through the AI SDK', async () => {
@@ -365,17 +408,33 @@ describe('implementToolFactory', () => {
         execute: async () => new File(['pdf'], 'q3.pdf', { type: 'application/pdf' }),
       })
 
-      const result = await generateText({ model: toolCallModel('report', {}), tools: { report }, prompt: 'Report' })
+      const result = await generateText({
+        model: toolCallModel('report', {}),
+        tools: { report },
+        prompt: 'Report',
+      })
 
-      expect(result.response.messages.at(-1)?.content).toEqual([expect.objectContaining({
-        output: { type: 'content', value: [{ type: 'file', mediaType: 'application/pdf', data: { type: 'data', data: pdfBase64 }, filename: 'q3.pdf' }] },
-      })])
+      expect(result.response.messages.at(-1)?.content).toEqual([
+        expect.objectContaining({
+          output: {
+            type: 'content',
+            value: [
+              {
+                type: 'file',
+                mediaType: 'application/pdf',
+                data: { type: 'data', data: pdfBase64 },
+                filename: 'q3.pdf',
+              },
+            ],
+          },
+        }),
+      ])
     })
   })
 })
 
 describe('createToolFactory', () => {
-  const abortSignal = (new AbortController()).signal
+  const abortSignal = new AbortController().signal
 
   const inputSchema = z.object({
     name: z.string().describe('Name of the person'),
@@ -406,13 +465,18 @@ describe('createToolFactory', () => {
     expect(tool.outputSchema).toBe(outputSchema)
     expect(tool.description).toBe('Greet a person')
 
-    await expect((tool as any).execute({ name: 'Alice' }, { abortSignal })).resolves.toEqual({ greeting: 'Hello, Alice!' })
+    await expect((tool as any).execute({ name: 'Alice' }, { abortSignal })).resolves.toEqual({
+      greeting: 'Hello, Alice!',
+    })
 
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({
-      signal: abortSignal,
-      input: { name: 'Alice' },
-      context: { authToken: 'auth-token' },
-    }), { name: 'Alice' })
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: abortSignal,
+        input: { name: 'Alice' },
+        context: { authToken: 'auth-token' },
+      }),
+      { name: 'Alice' },
+    )
   })
 
   it('always passes the tool call signal to the procedure', async () => {
@@ -426,17 +490,18 @@ describe('createToolFactory', () => {
         return { greeting: `Hello, ${input.name}!` }
       })
 
-    const streamingProcedure = os
-      .input(inputSchema)
-      .handler(async function* ({ input, signal }) {
-        signals.push(signal)
-        yield { greeting: `Hello, ${input.name}!` }
-      })
+    const streamingProcedure = os.input(inputSchema).handler(async function* ({ input, signal }) {
+      signals.push(signal)
+      yield { greeting: `Hello, ${input.name}!` }
+    })
 
     const createTool = createToolFactory({ signal: undefined } as any)
 
     await (createTool(procedure) as any).execute({ name: 'Alice' }, { abortSignal })
-    for await (const _ of (createTool(streamingProcedure) as any).execute({ name: 'Alice' }, { abortSignal })) {
+    for await (const _ of (createTool(streamingProcedure) as any).execute(
+      { name: 'Alice' },
+      { abortSignal },
+    )) {
       // consume
     }
 
@@ -463,14 +528,13 @@ describe('createToolFactory', () => {
   it('disable input validation at oRPC level to avoid validating twice', async () => {
     const handler = vi.fn(() => ({ greeting: 'Hello!' }))
 
-    const procedure = os
-      .input(inputSchema)
-      .output(outputSchema)
-      .handler(handler)
+    const procedure = os.input(inputSchema).output(outputSchema).handler(handler)
 
     const tool = createToolFactory()(procedure)
 
-    await expect(tool.execute?.('invalid' as any, { abortSignal } as any)).resolves.toEqual({ greeting: 'Hello!' })
+    await expect(tool.execute?.('invalid' as any, { abortSignal } as any)).resolves.toEqual({
+      greeting: 'Hello!',
+    })
 
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ input: 'invalid' }), 'invalid')
   })
@@ -483,7 +547,9 @@ describe('createToolFactory', () => {
 
     const tool = createToolFactory()(procedure)
 
-    await expect(tool.execute?.({ name: 'Alice' }, { abortSignal } as any)).rejects.toThrow('Output validation failed')
+    await expect(tool.execute?.({ name: 'Alice' }, { abortSignal } as any)).rejects.toThrow(
+      'Output validation failed',
+    )
   })
 
   describe('async iterator output', () => {
@@ -520,8 +586,7 @@ describe('createToolFactory', () => {
           try {
             yield { message: 'one' }
             yield { message: 'two' }
-          }
-          finally {
+          } finally {
             finallyCalled = true
           }
         })
@@ -564,13 +629,11 @@ describe('createToolFactory', () => {
     })
 
     it('streams events when the handler is an async generator without an output schema', async () => {
-      const procedure = os
-        .input(inputSchema)
-        .handler(async function* ({ input }) {
-          yield { message: `one ${input.name}` }
-          yield { message: `two ${input.name}` }
-          return { count: 2 }
-        })
+      const procedure = os.input(inputSchema).handler(async function* ({ input }) {
+        yield { message: `one ${input.name}` }
+        yield { message: `two ${input.name}` }
+        return { count: 2 }
+      })
 
       const tool = createToolFactory()(procedure)
 
@@ -604,11 +667,11 @@ describe('createToolFactory', () => {
     })
 
     it('does not stream when a non-generator handler returns an async iterator without an asyncIteratorObject schema', async () => {
-      const procedure = os
-        .input(inputSchema)
-        .handler(async () => (async function* () {
+      const procedure = os.input(inputSchema).handler(async () =>
+        (async function* () {
           yield { message: 'one' }
-        })())
+        })(),
+      )
 
       const tool = createToolFactory()(procedure)
 

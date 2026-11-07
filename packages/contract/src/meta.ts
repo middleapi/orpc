@@ -1,6 +1,7 @@
-import type { ErrorMap } from './error'
-import type { AnySchema } from './schema'
-import { isTypescriptObject } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
+
+import type { ErrorMap } from './error.ts'
+import type { AnySchema } from './schema.ts'
 
 /**
  * Arbitrary metadata attached to a procedure.
@@ -63,13 +64,17 @@ export type AnyMetaPlugin = MetaPlugin<any, any, any>
 const HIDDEN_META_PLUGINS_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_META_PLUGINS')
 
 export function getHiddenMetaPlugins(container: unknown): AnyMetaPlugin[] | undefined {
-  if (!isTypescriptObject(container)) {
+  if (!isNonPrimitive(container)) {
     return undefined
   }
 
   return container[HIDDEN_META_PLUGINS_SYMBOL] as AnyMetaPlugin[] | undefined
 }
 
-export function setHiddenMetaPlugins<T extends object>(container: T, metaPlugins: AnyMetaPlugin[]): void {
-  (container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
+export function setHiddenMetaPlugins<T extends object>(
+  container: T,
+  metaPlugins: AnyMetaPlugin[],
+): void {
+  ;(container as any)[HIDDEN_META_PLUGINS_SYMBOL] = metaPlugins
 }

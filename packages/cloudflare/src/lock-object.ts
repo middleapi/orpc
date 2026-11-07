@@ -7,9 +7,12 @@ import { DurableObject } from 'cloudflare:workers'
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
-export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
+export class experimental_DurableLockObject<
+  Env = Cloudflare.Env,
+  Props = unknown,
+> extends DurableObject<Env, Props> {
   override fetch(): Response {
-    const held = this.ctx.getWebSockets().some(ws => ws.readyState === WebSocket.OPEN)
+    const held = this.ctx.getWebSockets().some((ws) => ws.readyState === WebSocket.OPEN)
     const { '0': client, '1': server } = new WebSocketPair()
 
     server.serializeAttachment({ holder: !held })
@@ -29,7 +32,8 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
 
     const sockets = this.ctx.getWebSockets() // newest first
 
-    for (let i = sockets.length - 1; i >= 0; i--) { // oldest first
+    for (let i = sockets.length - 1; i >= 0; i--) {
+      // oldest first
       const next = sockets[i]!
 
       if (next.readyState !== WebSocket.OPEN) {

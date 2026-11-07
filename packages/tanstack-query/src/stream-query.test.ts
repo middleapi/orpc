@@ -1,6 +1,16 @@
-import { sleep } from '@orpc/shared'
-import { QueryClient } from '@tanstack/query-core'
-import { serializableStreamedQuery } from './stream-query'
+import { promiseWithResolvers, sleep } from '@orpc/shared'
+import type { QueryKey, QueryState } from '@tanstack/query-core'
+import {
+  dehydrate,
+  hashKey,
+  hydrate,
+  QueryCache,
+  QueryClient,
+  QueryObserver,
+} from '@tanstack/query-core'
+
+import { distinctData } from '../tests/__shared__/utils.ts'
+import { serializableStreamedQuery } from './stream-query.ts'
 
 describe('serializableStreamedQuery', () => {
   const queryClient = new QueryClient({
@@ -15,444 +25,250 @@ describe('serializableStreamedQuery', () => {
     queryClient.clear()
   })
 
+  function stream<T>(chunks: T[], delay = 10) {
+    return async () => {
+      await sleep(delay)
+      return (async function* () {
+        for (const chunk of chunks) {
+          await sleep(delay)
+          yield chunk
+        }
+      })()
+    }
+  }
+
+  function recordStates(key: QueryKey, client = queryClient) {
+    const states: Pick<QueryState, 'status' | 'fetchStatus' | 'data'>[] = []
+    const unsubscribe = client.getQueryCache().subscribe(({ query }) => {
+      if (query.queryHash === hashKey(key)) {
+        const { status, fetchStatus, data } = query.state
+        states.push({ status, fetchStatus, data })
+      }
+    })
+    onTestFinished(unsubscribe)
+    return states
+  }
+
   describe('refetchMode option', () => {
-    it('works with reset refetch mode (default)', async () => {
-      const key = ['refetch-test']
-
-      const queryFn1 = serializableStreamedQuery(async () => {
-        await sleep(50)
-        return (async function* () {
-          await sleep(50)
-          yield 'initial1'
-          await sleep(50)
-          yield 'initial2'
-        }())
-      })
-
-      const promise1 = expect(queryFn1({
-        queryKey: key,
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['initial1', 'initial2'])
-
-      // not define anything on initial
-      await sleep(0)
-      expect(queryClient.getQueryState(key)).toBeUndefined()
-      expect(queryClient.getQueryData(key)).toBeUndefined()
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual([])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await promise1
-
-      // Refetch with reset mode (default)
-      const queryFn2 = serializableStreamedQuery(async () => {
-        await sleep(50)
-        return (async function* () {
-          await sleep(50)
-          yield 'refetch1'
-          await sleep(50)
-          yield 'refetch2'
-        }())
-      })
-
-      const resultPromise = expect(queryFn2({
-        queryKey: key,
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['refetch1', 'refetch2'])
-
-      // should reset status to pending
-      await sleep(0)
-      expect(queryClient.getQueryState(key)?.status).toBe('pending')
-      expect(queryClient.getQueryData(key)).toBeUndefined()
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual([])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['refetch1'])
-
-      await resultPromise
-    })
-
-    it('works with append refetch mode', async () => {
-      const key = ['append-test']
-
-      // First query
-      const queryFn1 = serializableStreamedQuery(async () => {
-        await sleep(50)
-        return (async function* () {
-          await sleep(50)
-          yield 'initial1'
-          await sleep(50)
-          yield 'initial2'
-        }())
-      })
-
-      const promise1 = expect(
-        queryFn1({
+    const origins: Record<string, (key: QueryKey) => Promise<{ initialData?: string[] }>> = {
+      'initialData': async () => ({ initialData: ['x1', 'x2'] }),
+      'setQueryData': async (key) => {
+        queryClient.setQueryData(key, ['x1', 'x2'])
+        return {}
+      },
+      'a previous fetch': async (key) => {
+        await queryClient.fetchQuery({
           queryKey: key,
-          signal: new AbortController().signal,
-          client: queryClient,
-        } as any),
-      ).resolves.toEqual(['initial1', 'initial2'])
+          queryFn: serializableStreamedQuery(stream(['x1', 'x2'])),
+        })
+        return {}
+      },
+      'hydrate': async (key) => {
+        const server = new QueryClient()
+        server.setQueryData(key, ['x1', 'x2'])
+        hydrate(queryClient, dehydrate(server))
+        return {}
+      },
+    }
 
-      await sleep(0)
-      expect(queryClient.getQueryState(key)).toBeUndefined()
-      expect(queryClient.getQueryData(key)).toBeUndefined()
+    it.each(
+      Object.keys(origins).flatMap(
+        (origin) =>
+          [
+            [origin, 'reset', [['x1', 'x2'], [], ['c1'], ['c1', 'c2']]],
+            [
+              origin,
+              'append',
+              [
+                ['x1', 'x2'],
+                ['x1', 'x2', 'c1'],
+                ['x1', 'x2', 'c1', 'c2'],
+              ],
+            ],
+          ] as const,
+      ),
+    )(
+      'keeps data from %s until the stream connects, never pending (%s)',
+      async (origin, refetchMode, expected) => {
+        const key = ['refetch-test', origin, refetchMode]
+        const options = await origins[origin]!(key)
+        const states = recordStates(key)
 
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual([])
+        await expect(
+          queryClient.fetchQuery({
+            queryKey: key,
+            queryFn: serializableStreamedQuery(stream(['c1', 'c2']), { refetchMode }),
+            ...options,
+          }),
+        ).resolves.toEqual(expected.at(-1))
 
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await promise1
-
-      // Refetch with append mode
-      const queryFn2 = serializableStreamedQuery(async () => {
-        await sleep(50)
-        return (async function* () {
-          await sleep(50)
-          yield 'append1'
-          await sleep(50)
-          yield 'append2'
-        }())
-      }, { refetchMode: 'append' })
-
-      const promise2 = expect(queryFn2({
-        queryKey: key,
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['initial1', 'initial2', 'append1', 'append2'])
-
-      await sleep(0)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2', 'append1'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2', 'append1', 'append2'])
-
-      await promise2
-    })
-
-    it('works with replace refetch mode', async () => {
-      const key = ['replace-test']
-
-      const queryFn1 = serializableStreamedQuery(async () => {
-        await sleep(50)
-        return (async function* () {
-          await sleep(50)
-          yield 'initial1'
-          await sleep(50)
-          yield 'initial2'
-        }())
-      })
-
-      const promise1 = expect(queryFn1({
-        queryKey: key,
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['initial1', 'initial2'])
-
-      await sleep(0)
-      expect(queryClient.getQueryState(key)).toBeUndefined()
-      expect(queryClient.getQueryData(key)).toBeUndefined()
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual([])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await promise1
-
-      // Refetch with replace mode
-      const queryFn2 = serializableStreamedQuery(async () => {
-        await sleep(50)
-        return (async function* () {
-          await sleep(50)
-          yield 'replace1'
-          await sleep(50)
-          yield 'replace2'
-        }())
-      }, { refetchMode: 'replace' })
-
-      const promise2 = expect(queryFn2({
-        queryKey: key,
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['replace1', 'replace2'])
-
-      await sleep(0)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['initial1', 'initial2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryState(key)?.status).toBe('success')
-      expect(queryClient.getQueryData(key)).toEqual(['replace1', 'replace2'])
-
-      await promise2
-    })
+        expect(distinctData(states)).toEqual(expected)
+        expect(states.map((state) => state.status)).not.toContain('pending')
+        expect(states.find((state) => state.fetchStatus === 'fetching')).toEqual({
+          status: 'success',
+          fetchStatus: 'fetching',
+          data: ['x1', 'x2'],
+        })
+        expect(states.at(-1)).toMatchObject({ status: 'success', fetchStatus: 'idle' })
+      },
+    )
   })
 
   describe('maxChunks option', () => {
-    it('works with append & parallel', async () => {
-      const queryFn = serializableStreamedQuery(async () => {
+    it.each([
+      [
+        'append',
+        [
+          ['pre5', 'pre6'],
+          ['pre6', 'chunk1'],
+        ],
+      ],
+      ['reset', [[], ['chunk1']]],
+    ] as const)(
+      'works with %s & parallel',
+      async (refetchMode, [afterConnect, afterFirstChunk]) => {
+        const key = ['max-chunks-test']
+        const queryFn = serializableStreamedQuery(
+          async () => {
+            await sleep(50)
+
+            return (async function* () {
+              await sleep(50)
+              yield 'chunk1'
+              await sleep(50)
+              yield 'chunk2'
+              await sleep(50)
+              yield 'chunk3'
+              await sleep(50)
+              yield 'chunk4'
+              await sleep(50)
+            })()
+          },
+          { maxChunks: 2, refetchMode },
+        )
+
+        queryClient.setQueryData(key, ['pre1', 'pre2', 'pre3'])
+
+        const resultPromise = expect(
+          queryFn({
+            queryKey: key,
+            signal: new AbortController().signal,
+            client: queryClient,
+          } as any),
+        ).resolves.toEqual(['parallel5', 'parallel6'])
+
+        await sleep(0)
+        expect(queryClient.getQueryData(key)).toEqual(['pre1', 'pre2', 'pre3'])
+
+        queryClient.setQueryData(key, ['pre4', 'pre5', 'pre6'])
         await sleep(50)
+        expect(queryClient.getQueryData(key)).toEqual(afterConnect)
 
-        return (async function* () {
-          await sleep(50)
-          yield 'chunk1'
-          await sleep(50)
-          yield 'chunk2'
-          await sleep(50)
-          yield 'chunk3'
-          await sleep(50)
-          yield 'chunk4'
-          await sleep(50)
-        }())
-      }, { maxChunks: 2, refetchMode: 'append' })
-
-      const controller = new AbortController()
-
-      // exceed maxChunks with pre-existing data - should keep only the latest 2 chunks
-      queryClient.setQueryData(['max-chunks-test'], ['pre1', 'pre2', 'pre3'])
-
-      const resultPromise = expect(queryFn({
-        queryKey: ['max-chunks-test'],
-        signal: controller.signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['parallel5', 'parallel6'])
-
-      await sleep(0)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre2', 'pre3'])
-
-      // exceed while still resolve streaming
-      queryClient.setQueryData(['max-chunks-test'], ['pre4', 'pre5', 'pre6'])
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre5', 'pre6'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre6', 'chunk1'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['chunk1', 'chunk2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['chunk2', 'chunk3'])
-
-      // parallel during streaming
-      queryClient.setQueryData(['max-chunks-test'], ['parallel1', 'parallel2', 'parallel3'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['parallel3', 'chunk4'])
-
-      // parallel during streaming
-      queryClient.setQueryData(['max-chunks-test'], ['parallel4', 'parallel5', 'parallel6'])
-
-      await resultPromise
-    })
-
-    it('works with reset & parallel', async () => {
-      const queryFn = serializableStreamedQuery(async () => {
         await sleep(50)
+        expect(queryClient.getQueryData(key)).toEqual(afterFirstChunk)
 
-        return (async function* () {
-          await sleep(50)
-          yield 'chunk1'
-          await sleep(50)
-          yield 'chunk2'
-          await sleep(50)
-          yield 'chunk3'
-          await sleep(50)
-          yield 'chunk4'
-          await sleep(50)
-        }())
-      }, { maxChunks: 2, refetchMode: 'reset' })
-
-      const controller = new AbortController()
-
-      // exceed maxChunks with pre-existing data - should keep only the latest 2 chunks
-      queryClient.setQueryData(['max-chunks-test'], ['pre1', 'pre2', 'pre3'])
-
-      const resultPromise = expect(queryFn({
-        queryKey: ['max-chunks-test'],
-        signal: controller.signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['parallel5', 'parallel6'])
-
-      await sleep(0)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(undefined)
-
-      // exceed while still resolve streaming
-      queryClient.setQueryData(['max-chunks-test'], ['pre4', 'pre5', 'pre6'])
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre5', 'pre6'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre6', 'chunk1'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['chunk1', 'chunk2'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['chunk2', 'chunk3'])
-
-      // parallel during streaming
-      queryClient.setQueryData(['max-chunks-test'], ['parallel1', 'parallel2', 'parallel3'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['parallel3', 'chunk4'])
-
-      // parallel during streaming
-      queryClient.setQueryData(['max-chunks-test'], ['parallel4', 'parallel5', 'parallel6'])
-
-      await resultPromise
-    })
-
-    it('works with replace & parallel', async () => {
-      const queryFn = serializableStreamedQuery(async () => {
         await sleep(50)
+        expect(queryClient.getQueryData(key)).toEqual(['chunk1', 'chunk2'])
 
-        return (async function* () {
-          await sleep(50)
-          yield 'chunk1'
-          await sleep(50)
-          yield 'chunk2'
-          await sleep(50)
-          yield 'chunk3'
-          await sleep(50)
-          yield 'chunk4'
-          await sleep(50)
-        }())
-      }, { maxChunks: 2, refetchMode: 'replace' })
+        await sleep(50)
+        expect(queryClient.getQueryData(key)).toEqual(['chunk2', 'chunk3'])
 
-      const controller = new AbortController()
+        queryClient.setQueryData(key, ['parallel1', 'parallel2', 'parallel3'])
 
-      // exceed maxChunks with pre-existing data - should keep only the latest 2 chunks
-      queryClient.setQueryData(['max-chunks-test'], ['pre1', 'pre2', 'pre3'])
+        await sleep(50)
+        expect(queryClient.getQueryData(key)).toEqual(['parallel3', 'chunk4'])
 
-      const resultPromise = expect(queryFn({
-        queryKey: ['max-chunks-test'],
-        signal: controller.signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['chunk3', 'chunk4'])
+        queryClient.setQueryData(key, ['parallel4', 'parallel5', 'parallel6'])
 
-      await sleep(0)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre2', 'pre3'])
-
-      // exceed while still resolve streaming
-      queryClient.setQueryData(['max-chunks-test'], ['pre4', 'pre5', 'pre6'])
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre5', 'pre6'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre5', 'pre6'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre5', 'pre6'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['pre5', 'pre6'])
-
-      // parallel during streaming
-      queryClient.setQueryData(['max-chunks-test'], ['parallel1', 'parallel2', 'parallel3'])
-
-      await sleep(50)
-      expect(queryClient.getQueryData(['max-chunks-test'])).toEqual(['parallel1', 'parallel2', 'parallel3'])
-
-      // parallel during streaming
-      queryClient.setQueryData(['max-chunks-test'], ['parallel4', 'parallel5', 'parallel6'])
-
-      await resultPromise
-    })
-
-    it('with value Infinite (unlimited)', async () => {
-      const queryFn = serializableStreamedQuery(async function* () {
-        yield 'chunk1'
-        yield 'chunk2'
-        yield 'chunk3'
-        yield 'chunk4'
-        yield 'chunk5'
-      }, { maxChunks: Number.POSITIVE_INFINITY })
-
-      const result = await queryFn({
-        queryKey: ['unlimited-chunks'],
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)
-
-      expect(result).toEqual(['chunk1', 'chunk2', 'chunk3', 'chunk4', 'chunk5'])
-      expect(queryClient.getQueryData(['unlimited-chunks'])).toEqual(['chunk1', 'chunk2', 'chunk3', 'chunk4', 'chunk5'])
-    })
+        await resultPromise
+      },
+    )
   })
 
   describe('abort signal handling', () => {
+    it('marks the query stale when aborted before the stream connects', async () => {
+      const key = ['abort-before-connect']
+      queryClient.setQueryData(key, ['old'])
+      const controller = new AbortController()
+      const queryFn = serializableStreamedQuery(async () => {
+        controller.abort()
+        return stream(['new'])()
+      })
+
+      await expect(
+        queryFn({ queryKey: key, signal: controller.signal, client: queryClient } as any),
+      ).rejects.toBe(controller.signal.reason)
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['old'], isInvalidated: true })
+    })
+
+    it('does not mark a replacing fetch stale when the cancelled stream notices the abort late', async () => {
+      const key = ['superseded-test']
+      const connect = vi.fn(async () =>
+        connect.mock.calls.length > 1
+          ? (async function* () {
+              yield 'new'
+            })()
+          : // ignores the abort until its next chunk
+            (async function* () {
+              yield 'old1'
+              await sleep(50)
+              yield 'old2'
+            })(),
+      )
+      const observer = new QueryObserver(queryClient, {
+        queryKey: key,
+        queryFn: serializableStreamedQuery(connect),
+        staleTime: Number.POSITIVE_INFINITY,
+      })
+      onTestFinished(observer.subscribe(() => {}))
+      await vi.waitFor(() => expect(queryClient.getQueryData(key)).toEqual(['old1']))
+
+      await observer.refetch()
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['new'], isInvalidated: false })
+
+      await sleep(80)
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['new'], isInvalidated: false })
+    })
+
+    it('marks the query stale when the signal is aborted before the query function runs', async () => {
+      const key = ['aborted-before-call']
+      queryClient.setQueryData(key, ['old'])
+      const signal = AbortSignal.abort()
+
+      await expect(
+        serializableStreamedQuery(stream(['new']))({
+          queryKey: key,
+          signal,
+          client: queryClient,
+        } as any),
+      ).rejects.toBe(signal.reason)
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['old'], isInvalidated: true })
+    })
+
     it('handles abort signal during streaming', async () => {
       let cleanupCalled = false
-      const yieldFn = vi.fn(v => v)
+      const yieldFn = vi.fn((v) => v)
       const queryFn = serializableStreamedQuery(async function* () {
         try {
           yield yieldFn('chunk1')
-          await new Promise(resolve => setTimeout(resolve, 50))
+          await sleep(50)
           yield yieldFn('chunk2')
-          await new Promise(resolve => setTimeout(resolve, 50))
+          await sleep(50)
           yield yieldFn('chunk3')
-        }
-        finally {
+        } finally {
           cleanupCalled = true
         }
       })
 
       const controller = new AbortController()
 
-      const resultPromise = expect(queryFn({
-        queryKey: ['abort-test'],
-        signal: controller.signal,
-        client: queryClient,
-      } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
+      const resultPromise = expect(
+        queryFn({
+          queryKey: ['abort-test'],
+          signal: controller.signal,
+          client: queryClient,
+        } as any),
+      ).rejects.toSatisfy((err) => err === controller.signal.reason)
 
       await vi.waitFor(() => {
         expect(queryClient.getQueryData(['abort-test'])).toEqual(['chunk1'])
@@ -466,43 +282,58 @@ describe('serializableStreamedQuery', () => {
       expect(queryClient.getQueryData(['abort-test'])).toEqual(['chunk1'])
     })
 
-    it('handles abort signal with replace refetch mode', async () => {
-    // First query
-      const queryFn1 = serializableStreamedQuery(async function* () {
-        yield 'initial1'
-        yield 'initial2'
-      })
-
-      await queryFn1({
-        queryKey: ['abort-replace-test'],
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)
-
-      expect(queryClient.getQueryData(['abort-replace-test'])).toEqual(['initial1', 'initial2'])
-
-      // Refetch with replace mode and abort
-      const queryFn2 = serializableStreamedQuery(async function* () {
-        yield 'replace1'
-        await new Promise(resolve => setTimeout(resolve, 50))
-        yield 'replace2'
-      }, { refetchMode: 'replace' })
-
+    it('does not write or start the stream when aborted before it connects', async () => {
+      const key = ['abort-before-connect-test']
+      queryClient.setQueryData(key, ['x'])
+      const started = vi.fn()
       const controller = new AbortController()
 
-      const resultPromise = expect(queryFn2({
-        queryKey: ['abort-replace-test'],
-        signal: controller.signal,
-        client: queryClient,
-      } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
+      await expect(
+        serializableStreamedQuery(async () => {
+          controller.abort()
+          return (async function* () {
+            started()
+            yield 'chunk1'
+          })()
+        })({
+          queryKey: key,
+          signal: controller.signal,
+          client: queryClient,
+        } as any),
+      ).rejects.toSatisfy((err) => err === controller.signal.reason)
 
-      await new Promise(resolve => setTimeout(resolve, 25))
-      controller.abort()
+      expect(started).not.toHaveBeenCalled()
+      expect(queryClient.getQueryState(key)).toMatchObject({ data: ['x'], dataUpdateCount: 1 })
+    })
 
-      await resultPromise
+    it('keeps the chunks received before cancelQueries and writes no more', async () => {
+      const key = ['cancel-test']
+      const cleanup = vi.fn()
+      const gate = promiseWithResolvers<void>()
+      const promise = queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: serializableStreamedQuery(async function* () {
+          try {
+            yield 'c1'
+            await gate.promise
+            yield 'c2'
+          } finally {
+            cleanup()
+          }
+        }),
+      })
 
-      // Should not replace cache when aborted
-      expect(queryClient.getQueryData(['abort-replace-test'])).toEqual(['initial1', 'initial2'])
+      await vi.waitFor(() => expect(queryClient.getQueryData(key)).toEqual(['c1']))
+      await queryClient.cancelQueries({ queryKey: key })
+      await expect(promise).resolves.toEqual(['c1'])
+
+      gate.resolve()
+      await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1))
+      expect(queryClient.getQueryState(key)).toMatchObject({
+        status: 'success',
+        fetchStatus: 'idle',
+        data: ['c1'],
+      })
     })
   })
 
@@ -515,36 +346,92 @@ describe('serializableStreamedQuery', () => {
         await sleep(100)
       })
 
-      const promise1 = expect(queryFn({
-        queryKey: key,
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).resolves.toEqual(['chunk1'])
+      const promise1 = expect(
+        queryFn({
+          queryKey: key,
+          signal: new AbortController().signal,
+          client: queryClient,
+        } as any),
+      ).resolves.toEqual(['chunk1'])
 
       await sleep(0)
       expect(queryClient.getQueryData(key)).toEqual(['chunk1'])
 
-      // reset data before stream ends
-      queryClient.resetQueries({ queryKey: key, exact: true })
+      void queryClient.resetQueries({ queryKey: key, exact: true })
 
       await promise1
+    })
+
+    it('keeps a null written after the last chunk', async () => {
+      const key = ['null-after-stream']
+
+      await expect(
+        queryClient.fetchQuery({
+          queryKey: key,
+          queryFn: serializableStreamedQuery(async function* () {
+            yield 1
+            queryClient.setQueryData(key, null)
+          }),
+        }),
+      ).resolves.toBeNull()
+      expect(queryClient.getQueryData(key)).toBeNull()
     })
 
     it('handles error in stream', async () => {
       const queryFn = serializableStreamedQuery(async function* () {
         yield 'chunk1'
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await sleep(50)
         throw new Error('Stream error')
       })
 
-      await expect(queryFn({
-        queryKey: ['error-stream'],
-        signal: new AbortController().signal,
-        client: queryClient,
-      } as any)).rejects.toThrow('Stream error')
+      await expect(
+        queryFn({
+          queryKey: ['error-stream'],
+          signal: new AbortController().signal,
+          client: queryClient,
+        } as any),
+      ).rejects.toThrow('Stream error')
 
-      // Should still have the chunk that was yielded before error
       expect(queryClient.getQueryData(['error-stream'])).toEqual(['chunk1'])
     })
+  })
+
+  describe('settleOnFirstData option', () => {
+    it.each([
+      ['reset', []],
+      ['append', ['x2', 'x3']],
+    ] as const)(
+      'settles at connect without starting the stream when true (%s)',
+      async (refetchMode, expected) => {
+        const onSuccess = vi.fn()
+        const client = new QueryClient({ queryCache: new QueryCache({ onSuccess }) })
+        const key = ['settle-test']
+        client.setQueryData(key, ['x1', 'x2', 'x3'])
+        const started = vi.fn()
+
+        await expect(
+          client.fetchQuery({
+            queryKey: key,
+            queryFn: serializableStreamedQuery(
+              async () => {
+                return (async function* () {
+                  started()
+                  yield 'c1'
+                })()
+              },
+              { refetchMode, maxChunks: 2, settleOnFirstData: true },
+            ),
+          }),
+        ).resolves.toEqual(expected)
+
+        expect(client.getQueryState(key)).toMatchObject({
+          status: 'success',
+          fetchStatus: 'idle',
+          data: expected,
+        })
+        expect(started).not.toHaveBeenCalled()
+        expect(onSuccess).toHaveBeenCalledTimes(1)
+      },
+    )
   })
 })

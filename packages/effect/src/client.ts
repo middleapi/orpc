@@ -1,6 +1,6 @@
 import type { AnyNestedClient, Client, ClientContext, ClientRest } from '@orpc/client'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS, resolveClientRest } from '@orpc/client'
-import { anyAbortSignal, isTypescriptObject } from '@orpc/shared'
+import { anyAbortSignal, isNonPrimitive } from '@orpc/shared'
 import { Effect } from 'effect'
 
 function callAsEffect<TClientContext extends ClientContext, TInput, TOutput, TError>(
@@ -10,16 +10,17 @@ function callAsEffect<TClientContext extends ClientContext, TInput, TOutput, TEr
   const [input, options] = resolveClientRest(rest)
 
   return Effect.tryPromise({
-    try: signal => client(input, {
-      ...options,
-      signal: anyAbortSignal([options.signal, signal]),
-    }),
-    catch: error => error as TError,
+    try: (signal) =>
+      client(input, {
+        ...options,
+        signal: anyAbortSignal([options.signal, signal]),
+      }),
+    catch: (error) => error as TError,
   })
 }
 
-export type EffectClient<T extends AnyNestedClient>
-  = T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
+export type EffectClient<T extends AnyNestedClient> =
+  T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Effect.Effect<UOutput, UError>
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? EffectClient<T[K]> : never
@@ -36,28 +37,32 @@ export type EffectClient<T extends AnyNestedClient>
 export function createEffectClient<T extends AnyNestedClient>(client: T): EffectClient<T> {
   const cache = new Map<string, EffectClient<AnyNestedClient>>()
 
-  const proxy = new Proxy((...rest: any[]) => callAsEffect(client as Client<ClientContext, unknown, unknown, unknown>, ...rest), {
-    get(target, prop) {
-      if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
-        return Reflect.get(target, prop)
-      }
-
-      let effectClient = cache.get(prop)
-
-      if (effectClient === undefined) {
-        const value = (client as Record<string, unknown>)[prop]
-
-        if (!isTypescriptObject(value)) {
-          return value
+  const proxy = new Proxy(
+    (...rest: any[]) =>
+      callAsEffect(client as Client<ClientContext, unknown, unknown, unknown>, ...rest),
+    {
+      get(target, prop) {
+        if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
+          return Reflect.get(target, prop)
         }
 
-        effectClient = createEffectClient(value as AnyNestedClient)
-        cache.set(prop, effectClient)
-      }
+        let effectClient = cache.get(prop)
 
-      return effectClient
+        if (effectClient === undefined) {
+          const value = (client as Record<string, unknown>)[prop]
+
+          if (!isNonPrimitive(value)) {
+            return value
+          }
+
+          effectClient = createEffectClient(value as AnyNestedClient)
+          cache.set(prop, effectClient)
+        }
+
+        return effectClient
+      },
     },
-  })
+  )
 
   return proxy as EffectClient<T>
 }

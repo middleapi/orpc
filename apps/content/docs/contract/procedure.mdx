@@ -1,6 +1,6 @@
 ---
-title: "Procedure Contract"
-description: "Define procedure contracts that describe input, output, errors, and metadata without business logic, keeping implementations aligned."
+title: 'Procedure Contract'
+description: 'Define procedure contracts that describe input, output, errors, and metadata without business logic, keeping implementations aligned.'
 ---
 
 ## Overview
@@ -45,13 +45,9 @@ Unlike a [procedure](/docs/procedure), a contract has no `.handler` chain. If yo
 `.input` and `.output` can be called multiple times. Each call adds another schema instead of replacing an earlier one, and the value must satisfy all of them.
 
 ```ts
-const base = oc
-  .input(z.object({ name: z.string() }))
-  .output(z.looseObject({ name: z.string() }))
+const base = oc.input(z.object({ name: z.string() })).output(z.looseObject({ name: z.string() }))
 
-const example = base
-  .input(z.object({ id: z.number() }))
-  .output(z.looseObject({ id: z.number() }))
+const example = base.input(z.object({ id: z.number() })).output(z.looseObject({ id: z.number() }))
 ```
 
 Object input schemas compose into a single flat value instead of being piped into each other, so a contract can extend a base contract without repeating its fields. Output schemas are still piped. Learn more in the [Procedure documentation](/docs/procedure#multiple-schemas).
@@ -76,11 +72,9 @@ Each builder call creates a new instance, which avoids reference issues and make
 const pub = oc // Base setup for procedures that publish
 const authed = pub.meta(requireAuthMeta) // Extends 'pub' with authentication
 
-const pubExample = pub
-  .input(z.object({ name: z.string() }))
+const pubExample = pub.input(z.object({ name: z.string() }))
 
-const authedExample = authed
-  .input(z.object({ id: z.number() }))
+const authedExample = authed.input(z.object({ id: z.number() }))
 ```
 
 This pattern helps prevent duplication while maintaining flexibility.

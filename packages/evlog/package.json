@@ -1,65 +1,64 @@
 {
   "name": "@orpc/evlog",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Evlog integration for oRPC: wide-event logging for typesafe APIs",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "evlog",
+    "logging",
+    "observability",
+    "orpc",
+    "typescript",
+    "wide-events"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/evlog"
   },
-  "keywords": [
-    "orpc",
-    "evlog",
-    "logging",
-    "wide-events",
-    "observability",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./node": {
-        "types": "./dist/adapters/node.d.mts",
-        "import": "./dist/adapters/node.mjs",
-        "default": "./dist/adapters/node.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./node": "./src/adapters/node.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./node": {
+        "types": "./dist/adapters/node.d.ts",
+        "import": "./dist/adapters/node.js",
+        "default": "./dist/adapters/node.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "evlog": ">=2.18.1"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.14.0"
+    "@standard-server/core": "~0.15.0"
   },
   "devDependencies": {
     "evlog": "^2.34.0"
+  },
+  "peerDependencies": {
+    "evlog": ">=2.18.1"
   }
 }

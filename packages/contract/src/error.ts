@@ -1,5 +1,6 @@
 import type { ORPCError, ORPCErrorCode } from '@orpc/client'
-import type { AnySchema, InferSchemaOutput, SchemaIssue } from './schema'
+
+import type { AnySchema, InferSchemaOutput, SchemaIssue } from './schema.ts'
 
 export interface ErrorMapItem {
   /**
@@ -26,9 +27,9 @@ export type ErrorMap = {
 export type ORPCErrorFromErrorMap<TErrorMap extends ErrorMap> = {
   [K in keyof TErrorMap]: TErrorMap[K] extends ErrorMapItem
     ? ORPCError<
-       K & ORPCErrorCode,
-       TErrorMap[K]['data'] extends AnySchema ? InferSchemaOutput<TErrorMap[K]['data']> : unknown
-    >
+        K & ORPCErrorCode,
+        TErrorMap[K]['data'] extends AnySchema ? InferSchemaOutput<TErrorMap[K]['data']> : unknown
+      >
     : never
 }[keyof TErrorMap]
 

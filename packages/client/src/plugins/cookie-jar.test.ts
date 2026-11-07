@@ -1,26 +1,42 @@
 import type { StandardHeaders, StandardLazyResponse } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
-import type { CookieJarLinkPluginOptions } from './cookie-jar'
-import { RPCLink } from '../adapters/fetch'
-import { StandardLink } from '../adapters/standard'
-import { createORPCClient } from '../client'
-import { BatchLinkPlugin } from './batch'
-import { CookieJar, CookieJarLinkPlugin } from './cookie-jar'
+
+import { RPCLink } from '../adapters/fetch/index.ts'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { createORPCClient } from '../client.ts'
+import { BatchLinkPlugin } from './batch.ts'
+import type { CookieJarLinkPluginOptions } from './cookie-jar.ts'
+import { CookieJar, CookieJarLinkPlugin } from './cookie-jar.ts'
 
 const origin = 'https://api.example.com'
 
-function createTransport(...responses: Partial<StandardLazyResponse>[]): StandardLinkTransport<any> {
+function createTransport(
+  ...responses: Partial<StandardLazyResponse>[]
+): StandardLinkTransport<any> {
   let index = 0
 
   return {
-    send: vi.fn(async () => ({ status: 200, headers: {}, resolveBody: async () => 'success', ...responses[index++] })),
+    send: vi.fn(async () => ({
+      status: 200,
+      headers: {},
+      resolveBody: async () => 'success',
+      ...responses[index++],
+    })),
   }
 }
 
-function createLink(options: Partial<CookieJarLinkPluginOptions<any>> = {}, transport = createTransport(), headers: StandardHeaders = {}) {
+function createLink(
+  options: Partial<CookieJarLinkPluginOptions<any>> = {},
+  transport = createTransport(),
+  headers: StandardHeaders = {},
+) {
   const codec: StandardLinkCodec<any> = {
-    encodeInput: async (_input, path) => ({ method: 'POST', url: `/rpc/${path.join('/')}`, headers }),
-    decodeResponse: async response => ({ kind: 'output', output: await response.resolveBody() }),
+    encodeInput: async (_input, path) => ({
+      method: 'POST',
+      url: `/rpc/${path.join('/')}`,
+      headers,
+    }),
+    decodeResponse: async (response) => ({ kind: 'output', output: await response.resolveBody() }),
   }
 
   return new StandardLink(codec, transport, {
@@ -33,7 +49,7 @@ function sentCookie(transport: StandardLinkTransport<any>, call: number) {
 }
 
 function pairs(jar: CookieJar, url?: string) {
-  return jar.getCookies(url).map(cookie => `${cookie.name}=${cookie.value}`)
+  return jar.getCookies(url).map((cookie) => `${cookie.name}=${cookie.value}`)
 }
 
 describe('cookieJarLinkPlugin', () => {
@@ -56,40 +72,59 @@ describe('cookieJarLinkPlugin', () => {
   })
 
   it('matches cookies against the origin', async () => {
-    const transport = createTransport({ headers: { 'set-cookie': ['host=1; Path=/', 'secure=1; Secure; Path=/'] } })
+    const transport = createTransport({
+      headers: { 'set-cookie': ['host=1; Path=/', 'secure=1; Secure; Path=/'] },
+    })
     const getOrigin = vi.fn(({ context }: { context: { origin: string } }) => context.origin)
     const link = createLink({ origin: getOrigin }, transport)
 
-    for (const requestOrigin of ['https://api.example.com/', 'https://api.example.com', 'http://api.example.com', 'https://other.com']) {
+    for (const requestOrigin of [
+      'https://api.example.com/',
+      'https://api.example.com',
+      'http://api.example.com',
+      'https://other.com',
+    ]) {
       await link.call(['ping'], 'input', { context: { origin: requestOrigin } })
     }
 
-    expect(getOrigin).toHaveBeenCalledWith(expect.objectContaining({ context: { origin: 'https://api.example.com/' }, path: ['ping'] }), ['ping'])
+    expect(getOrigin).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { origin: 'https://api.example.com/' }, path: ['ping'] }),
+      ['ping'],
+    )
     expect(sentCookie(transport, 1)).toBe('host=1; secure=1')
     expect(sentCookie(transport, 2)).toBe('host=1')
     expect(sentCookie(transport, 3)).toBeUndefined()
   })
 
-  it.each([undefined, '', '/api'])('does nothing when the origin resolves to %j', async (relativeOrigin) => {
-    const jar = new CookieJar()
-    jar.setCookie('session=abc; Path=/', origin)
-    const transport = createTransport({ headers: { 'set-cookie': 'theme=dark; Path=/' } })
+  it.each([undefined, '', '/api'])(
+    'does nothing when the origin resolves to %j',
+    async (relativeOrigin) => {
+      const jar = new CookieJar()
+      jar.setCookie('session=abc; Path=/', origin)
+      const transport = createTransport({ headers: { 'set-cookie': 'theme=dark; Path=/' } })
 
-    await createLink({ jar, origin: relativeOrigin }, transport).call(['ping'], 'input', { context: {} })
+      await createLink({ jar, origin: relativeOrigin }, transport).call(['ping'], 'input', {
+        context: {},
+      })
 
-    expect(sentCookie(transport, 0)).toBeUndefined()
-    expect(pairs(jar)).toEqual(['session=abc'])
-  })
+      expect(sentCookie(transport, 0)).toBeUndefined()
+      expect(pairs(jar)).toEqual(['session=abc'])
+    },
+  )
 
   it.each([
     ['', [], ''],
     [['a=1', 'b=2'], [], ['a=1', 'b=2']],
     [undefined, ['a=1', 'flag'], 'a=1; flag'],
-    ['session=explicit; lang=en', ['session=jar', 'theme=dark'], 'session=explicit; lang=en; theme=dark'],
+    [
+      'session=explicit; lang=en',
+      ['session=jar', 'theme=dark'],
+      'session=explicit; lang=en; theme=dark',
+    ],
     [['a=1', ' ', 'b=2'], ['a=jar', 'c=jar'], 'a=1; b=2; c=jar'],
   ])('sends cookie header %j with jar cookies %j as %j', async (cookie, jarCookies, expected) => {
     const jar = new CookieJar()
-    jarCookies.forEach(jarCookie => jar.setCookie(`${jarCookie}; Path=/`, origin))
+    jarCookies.forEach((jarCookie) => jar.setCookie(`${jarCookie}; Path=/`, origin))
     const transport = createTransport()
 
     await createLink({ jar }, transport, { cookie }).call(['ping'], 'input', { context: {} })
@@ -109,7 +144,9 @@ describe('cookieJarLinkPlugin', () => {
     await link.call(['ping'], 'input', { context: { user: 'alice' } })
     await link.call(['ping'], 'input', { context: { user: 'bob' } })
 
-    expect(jar).toHaveBeenCalledWith(expect.objectContaining({ context: { user: 'alice' }, path: ['ping'] }))
+    expect(jar).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { user: 'alice' }, path: ['ping'] }),
+    )
     expect(sentCookie(transport, 0)).toBe('session=alice')
     expect(sentCookie(transport, 1)).toBe('session=bob')
     expect(pairs(jars.alice)).toEqual(['session=alice'])
@@ -122,26 +159,39 @@ describe('cookieJarLinkPlugin', () => {
         const messages = JSON.parse(init.body as string) as { id: string }[]
 
         return Response.json(
-          messages.map(({ id }) => ({ id, kind: 'response', json: { status: 200, body: { json: 'pong' } } })),
-          { headers: [['set-cookie', 'session=def; Path=/'], ['set-cookie', 'theme=dark; Path=/']] },
+          messages.map(({ id }) => ({
+            id,
+            kind: 'response',
+            json: { status: 200, body: { json: 'pong' } },
+          })),
+          {
+            headers: [
+              ['set-cookie', 'session=def; Path=/'],
+              ['set-cookie', 'theme=dark; Path=/'],
+            ],
+          },
         )
       })
 
-      const client = createORPCClient<any>(new RPCLink<{ cookie?: string }>({
-        fetch,
-        url: '/rpc',
-        origin,
-        headers: ({ context }) => ({ cookie: context.cookie }),
-        plugins: [
-          new CookieJarLinkPlugin({ jar, origin }),
-          new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
-        ],
-      }))
+      const client = createORPCClient<any>(
+        new RPCLink<{ cookie?: string }>({
+          fetch,
+          url: '/rpc',
+          origin,
+          headers: ({ context }) => ({ cookie: context.cookie }),
+          plugins: [
+            new CookieJarLinkPlugin({ jar, origin }),
+            new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
+          ],
+        }),
+      )
 
       const sent = () => {
         expect(fetch).toHaveBeenCalledTimes(1)
         const [, init] = fetch.mock.calls[0]!
-        const subrequests = JSON.parse(init.body as string) as { json: { url: string, headers?: Record<string, string> } }[]
+        const subrequests = JSON.parse(init.body as string) as {
+          json: { url: string; headers?: Record<string, string> }
+        }[]
 
         return {
           cookie: new Headers(init.headers).get('cookie'),
@@ -161,7 +211,10 @@ describe('cookieJarLinkPlugin', () => {
 
       expect(sent()).toEqual({
         cookie: 'session=abc',
-        subrequestCookies: [['/rpc/a', undefined], ['/rpc/b', undefined]],
+        subrequestCookies: [
+          ['/rpc/a', undefined],
+          ['/rpc/b', undefined],
+        ],
       })
       expect(pairs(jar)).toEqual(['session=def', 'theme=dark'])
     })
@@ -207,15 +260,17 @@ describe('cookieJar', () => {
   it('stores a cookie and returns it for the same site', () => {
     jar.setCookie('session=abc; Path=/; HttpOnly', 'https://example.com/rpc/login')
 
-    expect(jar.getCookies('https://example.com/rpc/me')).toEqual([{
-      name: 'session',
-      value: 'abc',
-      domain: 'example.com',
-      hostOnly: true,
-      path: '/',
-      secure: false,
-      expires: undefined,
-    }])
+    expect(jar.getCookies('https://example.com/rpc/me')).toEqual([
+      {
+        name: 'session',
+        value: 'abc',
+        domain: 'example.com',
+        hostOnly: true,
+        path: '/',
+        secure: false,
+        expires: undefined,
+      },
+    ])
     expect(jar.getCookies('https://other.com/rpc/me')).toEqual([])
   })
 
@@ -235,11 +290,14 @@ describe('cookieJar', () => {
     expect(jar.getCookies()).toEqual([])
   })
 
-  it.each(['a=b\nc', 'a\u007F=b', 'a=b; Path=/\u0000'])('ignores a cookie with control characters: %j', (setCookie) => {
-    jar.setCookie(setCookie, site)
+  it.each(['a=b\nc', 'a\u007F=b', 'a=b; Path=/\u0000'])(
+    'ignores a cookie with control characters: %j',
+    (setCookie) => {
+      jar.setCookie(setCookie, site)
 
-    expect(jar.getCookies()).toEqual([])
-  })
+      expect(jar.getCookies()).toEqual([])
+    },
+  )
 
   it('replaces a cookie with the same name, domain, and path in place', () => {
     jar.setCookie('a=1; Path=/', site)
@@ -301,14 +359,17 @@ describe('cookieJar', () => {
       expect(jar.getCookies('https://example.com/')).toHaveLength(0)
     })
 
-    it.each(['example.com', '.example.com', 'EXAMPLE.com'])('sends a cookie with Domain=%s to the domain and its subdomains', (domain) => {
-      jar.setCookie(`a=1; Domain=${domain}; Path=/`, 'https://api.example.com/')
+    it.each(['example.com', '.example.com', 'EXAMPLE.com'])(
+      'sends a cookie with Domain=%s to the domain and its subdomains',
+      (domain) => {
+        jar.setCookie(`a=1; Domain=${domain}; Path=/`, 'https://api.example.com/')
 
-      expect(jar.getCookies()).toMatchObject([{ domain: 'example.com', hostOnly: false }])
-      expect(jar.getCookies('https://example.com/')).toHaveLength(1)
-      expect(jar.getCookies('https://auth.example.com/')).toHaveLength(1)
-      expect(jar.getCookies('https://notexample.com/')).toHaveLength(0)
-    })
+        expect(jar.getCookies()).toMatchObject([{ domain: 'example.com', hostOnly: false }])
+        expect(jar.getCookies('https://example.com/')).toHaveLength(1)
+        expect(jar.getCookies('https://auth.example.com/')).toHaveLength(1)
+        expect(jar.getCookies('https://notexample.com/')).toHaveLength(0)
+      },
+    )
 
     it.each([
       ['https://example.com/', 'other.com'],
@@ -356,12 +417,15 @@ describe('cookieJar', () => {
       ['session=; Max-Age=0; Path=/', 'http://example.com/'],
       ['session=evil; Path=/docs', 'http://example.com/'],
       ['session=evil; Path=/', 'http://api.example.com/'],
-    ])('does not let an insecure origin overwrite a secure cookie with %s from %s', (setCookie, url) => {
-      jar.setCookie('session=good; Secure; Domain=example.com; Path=/', site)
-      jar.setCookie(setCookie, url)
+    ])(
+      'does not let an insecure origin overwrite a secure cookie with %s from %s',
+      (setCookie, url) => {
+        jar.setCookie('session=good; Secure; Domain=example.com; Path=/', site)
+        jar.setCookie(setCookie, url)
 
-      expect(pairs(jar)).toEqual(['session=good'])
-    })
+        expect(pairs(jar)).toEqual(['session=good'])
+      },
+    )
 
     it('lets an insecure origin set other cookies next to a secure one', () => {
       jar.setCookie('session=good; Secure; Path=/docs', site)

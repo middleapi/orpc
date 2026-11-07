@@ -1,6 +1,7 @@
-import type { Value } from './value'
 import { getOrBind } from '@standard-server/shared'
-import { value } from './value'
+
+import type { Value } from './value.ts'
+import { value } from './value.ts'
 
 /**
  * Creates a proxy that overlays a `partial` object on top of a `target`.

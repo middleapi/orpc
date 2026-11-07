@@ -1,8 +1,8 @@
 ---
-title: "Lock Helpers"
-description: "Prevent the same work from running concurrently in oRPC with a unified Locker interface, storage adapters, and procedure middleware."
+title: 'Lock Helpers'
+description: 'Prevent the same work from running concurrently in oRPC with a unified Locker interface, storage adapters, and procedure middleware.'
 sidebar:
-  label: "Lock"
+  label: 'Lock'
 ---
 
 ## Installation
@@ -100,11 +100,7 @@ const procedure = os
 
 const locker = new MemoryLocker()
 
-const result = await call(
-  procedure,
-  { id: '123' },
-  { context: { locker } }
-)
+const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
 
 :::info[Automatic Deduplication]
@@ -283,14 +279,17 @@ Stores locks in Durable Objects, so every Worker instance shares the same locks.
 ```jsonc title="wrangler.jsonc"
 {
   "durable_objects": {
-    "bindings": [{ "name": "LOCK_DON", "class_name": "LockDO" }]
+    "bindings": [{ "name": "LOCK_DON", "class_name": "LockDO" }],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LockDO"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LockDO"] }],
 }
 ```
 
 ```ts cloudflare
-import { experimental_DurableLocker as DurableLocker, experimental_DurableLockObject as DurableLockObject } from '@orpc/cloudflare'
+import {
+  experimental_DurableLocker as DurableLocker,
+  experimental_DurableLockObject as DurableLockObject,
+} from '@orpc/cloudflare'
 
 export class LockDO extends DurableLockObject {}
 

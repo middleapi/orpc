@@ -1,7 +1,8 @@
 import type { ClientLink, ORPCError } from '@orpc/client'
-import type { PromiseWithError } from '@orpc/shared'
 import { oc, type } from '@orpc/contract'
-import { createContractJsonifiedClientFactory } from './client-factory'
+import type { PromiseWithError } from '@orpc/shared'
+
+import { createContractJsonifiedClientFactory } from './client-factory.ts'
 
 const contract = {
   ping: oc,
@@ -26,9 +27,7 @@ describe('createContractJsonifiedClientFactory', () => {
 
           const result = next()
 
-          expectTypeOf(result).toEqualTypeOf<
-            PromiseWithError<unknown, unknown>
-          >()
+          expectTypeOf(result).toEqualTypeOf<PromiseWithError<unknown, unknown>>()
 
           return result
         },
@@ -75,17 +74,11 @@ describe('createContractJsonifiedClientFactory', () => {
   it('returns a client & infers procedure return types', () => {
     const factory = createContractJsonifiedClientFactory(link)
 
-    expectTypeOf(
-      factory(contract.ping)(),
-    ).toEqualTypeOf<
-      PromiseWithError<unknown, Error>
-    >()
+    expectTypeOf(factory(contract.ping)()).toEqualTypeOf<PromiseWithError<unknown, Error>>()
 
     expectTypeOf(
       factory(contract.nested.pong)('string', { context: { cache: true } }),
-    ).toEqualTypeOf<
-      PromiseWithError<string, Error | ORPCError<'BAD_GATEWAY', string>>
-    >()
+    ).toEqualTypeOf<PromiseWithError<string, Error | ORPCError<'BAD_GATEWAY', string>>>()
   })
 
   it('returns a router client when a router contract is passed', () => {
@@ -93,15 +86,9 @@ describe('createContractJsonifiedClientFactory', () => {
 
     const client = factory(contract)
 
-    expectTypeOf(
-      client.ping(),
-    ).toEqualTypeOf<
-      PromiseWithError<unknown, Error>
-    >()
+    expectTypeOf(client.ping()).toEqualTypeOf<PromiseWithError<unknown, Error>>()
 
-    expectTypeOf(
-      client.nested.pong('string', { context: { cache: true } }),
-    ).toEqualTypeOf<
+    expectTypeOf(client.nested.pong('string', { context: { cache: true } })).toEqualTypeOf<
       PromiseWithError<string, Error | ORPCError<'BAD_GATEWAY', string>>
     >()
   })
@@ -110,13 +97,13 @@ describe('createContractJsonifiedClientFactory', () => {
     const factory = createContractJsonifiedClientFactory(link)
 
     // @ts-expect-error - invalid input
-    factory(contract.nested.pong)(123)
+    void factory(contract.nested.pong)(123)
   })
 
   it('rejects invalid context', () => {
     const factory = createContractJsonifiedClientFactory(link)
 
     // @ts-expect-error - invalid context
-    factory(contract.nested.pong)('string', { context: { cache: 'invalid' } })
+    void factory(contract.nested.pong)('string', { context: { cache: 'invalid' } })
   })
 })

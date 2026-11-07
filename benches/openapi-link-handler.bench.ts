@@ -1,12 +1,19 @@
-import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import { OpenAPISerializer } from '@orpc/openapi'
 import { OpenAPIHandlerCodec, OpenAPILinkCodec } from '@orpc/openapi/standard'
+import type { RouterClient } from '@orpc/server'
 import { os, type } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
-import { asSyncIteratorObject, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
+
+import {
+  asSyncIteratorObject,
+  drainBody,
+  EVENTS_10KB,
+  handlers,
+  PAYLOAD_10KB,
+} from './__shared__/payloads.ts'
 
 const serializer = new OpenAPISerializer({ handlers })
 
@@ -42,8 +49,6 @@ describe('openapi link + handler', () => {
   })
 
   bench('event stream', async () => {
-    await drainBody(
-      await client.ping(asSyncIteratorObject(EVENTS_10KB)),
-    )
+    await drainBody(await client.ping(asSyncIteratorObject(EVENTS_10KB)))
   })
 })

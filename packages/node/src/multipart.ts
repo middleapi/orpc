@@ -118,7 +118,7 @@ export async function parseMultipart(
         }
 
         // A close delimiter is `--` immediately after the boundary, everything after it is epilogue
-        if (buffer[0] === 0x2D && buffer[1] === 0x2D) {
+        if (buffer[0] === 0x2d && buffer[1] === 0x2d) {
           done = true
           buffer = Buffer.alloc(0)
           return
@@ -140,7 +140,7 @@ export async function parseMultipart(
           return
         }
 
-        if (buffer[0] !== 0x0D || buffer[1] !== 0x0A) {
+        if (buffer[0] !== 0x0d || buffer[1] !== 0x0a) {
           throw new TypeError('Invalid multipart body: expected CRLF after a boundary delimiter')
         }
 
@@ -150,8 +150,10 @@ export async function parseMultipart(
       }
 
       // A part without headers can never carry the required content-disposition
-      if (buffer[0] === 0x0D && buffer[1] === 0x0A) {
-        throw new TypeError('Invalid multipart body: part is missing the content-disposition header')
+      if (buffer[0] === 0x0d && buffer[1] === 0x0a) {
+        throw new TypeError(
+          'Invalid multipart body: part is missing the content-disposition header',
+        )
       }
 
       const headerWindow = MAX_PART_HEADER_SIZE + HEADER_BLOCK_END.length
@@ -159,7 +161,9 @@ export async function parseMultipart(
 
       if (headerEnd === -1) {
         if (buffer.length >= headerWindow) {
-          throw new TypeError('Invalid multipart body: part headers exceed the maximum allowed size')
+          throw new TypeError(
+            'Invalid multipart body: part headers exceed the maximum allowed size',
+          )
         }
 
         return
@@ -179,9 +183,10 @@ export async function parseMultipart(
     }
 
     // A bare view suffices when nothing is retained, skipping a copy
-    buffer = buffer.length === 0
-      ? Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
-      : Buffer.concat([buffer, chunk])
+    buffer =
+      buffer.length === 0
+        ? Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+        : Buffer.concat([buffer, chunk])
     await process()
   }
 
@@ -205,8 +210,7 @@ function parsePartHeaders(block: string, headerSize: number): MultipartPart {
 
     if (name === 'content-disposition') {
       contentDisposition = line.slice(colon + 1).trim()
-    }
-    else if (name === 'content-type') {
+    } else if (name === 'content-type') {
       contentType = line.slice(colon + 1).trim()
     }
   }
@@ -217,7 +221,11 @@ function parsePartHeaders(block: string, headerSize: number): MultipartPart {
 
   // The standard parser accepts no disposition type other than form-data, case-insensitively
   const semicolon = contentDisposition.indexOf(';')
-  const dispositionType = (semicolon === -1 ? contentDisposition : contentDisposition.slice(0, semicolon)).trim().toLowerCase()
+  const dispositionType = (
+    semicolon === -1 ? contentDisposition : contentDisposition.slice(0, semicolon)
+  )
+    .trim()
+    .toLowerCase()
 
   if (dispositionType !== 'form-data') {
     throw new TypeError('Invalid multipart body: content-disposition must be form-data')
@@ -227,7 +235,9 @@ function parsePartHeaders(block: string, headerSize: number): MultipartPart {
   const name = parameters.get('name')
 
   if (name === undefined) {
-    throw new TypeError('Invalid multipart body: content-disposition header is missing the name parameter')
+    throw new TypeError(
+      'Invalid multipart body: content-disposition header is missing the name parameter',
+    )
   }
 
   const filename = parameters.get('filename')
@@ -298,8 +308,7 @@ export function parseHeaderParameters(header: string): Map<string, string> {
       const closing = header.indexOf('"', index + 1)
       value = closing === -1 ? header.slice(index + 1) : header.slice(index + 1, closing)
       index = closing === -1 ? -1 : header.indexOf(';', closing + 1)
-    }
-    else {
+    } else {
       const semicolon = header.indexOf(';', index)
       value = (semicolon === -1 ? header.slice(index) : header.slice(index, semicolon)).trim()
       index = semicolon

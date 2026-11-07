@@ -2,8 +2,9 @@ import { openapi } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { AsyncIteratorClass, sleep } from '@standard-server/shared'
 import { z } from 'zod'
-import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
-import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
+
+import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch.ts'
+import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http.ts'
 
 describe.each([
   ['hono-fetch', createHonoFetchClientServerTest],
@@ -13,10 +14,12 @@ describe.each([
   const router = {
     ping: os
       .input(z.any())
-      .meta(openapi({
-        method: 'POST',
-        path: '/ping',
-      }))
+      .meta(
+        openapi({
+          method: 'POST',
+          path: '/ping',
+        }),
+      )
       .handler(handler),
   }
   const client = createClientServer(router)
@@ -30,7 +33,9 @@ describe.each([
 
     const controller = new AbortController()
 
-    const promise = expect(client.ping(null, { signal: controller.signal })).rejects.toThrowError('abort')
+    const promise = expect(client.ping(null, { signal: controller.signal })).rejects.toThrowError(
+      'abort',
+    )
 
     await sleep(100)
     expect(handler).toHaveBeenCalledTimes(1)
@@ -44,15 +49,14 @@ describe.each([
 
   it('server should cancel AsyncIteratorObject response and abort request when client cancels', async () => {
     const cancel = vi.fn()
-    handler.mockResolvedValueOnce(new AsyncIteratorClass(
-      async () => {
+    handler.mockResolvedValueOnce(
+      new AsyncIteratorClass(async () => {
         await sleep(200)
         return { value: 'data: hello\n\n', done: false }
-      },
-      cancel,
-    ))
+      }, cancel),
+    )
 
-    const iterator = await client.ping() as AsyncIteratorClass<string>
+    const iterator = (await client.ping()) as AsyncIteratorClass<string>
 
     await expect(iterator.next()).resolves.toEqual({ value: 'data: hello\n\n', done: false })
 
@@ -67,15 +71,17 @@ describe.each([
 
   it('server should cancel octet stream response and abort request when client cancels', async () => {
     const cancel = vi.fn()
-    handler.mockResolvedValueOnce(new ReadableStream({
-      async pull(controller) {
-        await sleep(200)
-        controller.enqueue(new TextEncoder().encode('hello'))
-      },
-      cancel,
-    }))
+    handler.mockResolvedValueOnce(
+      new ReadableStream({
+        async pull(controller) {
+          await sleep(200)
+          controller.enqueue(new TextEncoder().encode('hello'))
+        },
+        cancel,
+      }),
+    )
 
-    const result = await client.ping() as ReadableStream<Uint8Array>
+    const result = (await client.ping()) as ReadableStream<Uint8Array>
     const reader = result.getReader()
 
     const first = await reader.read()

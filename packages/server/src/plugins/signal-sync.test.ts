@@ -1,14 +1,17 @@
-import type { AnyProcedure } from '../procedure'
 import { AbortError, promiseWithResolvers } from '@orpc/shared'
-import { RPCHandler } from '../adapters/fetch'
-import { os } from '../builder'
-import { SignalSyncHandlerPlugin } from './signal-sync'
-import { TimeoutHandlerPlugin } from './timeout'
+
+import { RPCHandler } from '../adapters/fetch/index.ts'
+import { os } from '../builder.ts'
+import type { AnyProcedure } from '../procedure.ts'
+import { SignalSyncHandlerPlugin } from './signal-sync.ts'
+import { TimeoutHandlerPlugin } from './timeout.ts'
 
 describe('signalSyncHandlerPlugin', () => {
   async function handle(procedure: AnyProcedure, init?: RequestInit): Promise<Response> {
     const handler = new RPCHandler(procedure, { plugins: [new SignalSyncHandlerPlugin()] })
-    const { response } = await handler.handle(new Request('http://localhost', { method: 'POST', ...init }))
+    const { response } = await handler.handle(
+      new Request('http://localhost', { method: 'POST', ...init }),
+    )
     return response!
   }
 
@@ -18,7 +21,10 @@ describe('signalSyncHandlerPlugin', () => {
     })
   }
 
-  async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: string): Promise<void> {
+  async function readUntil(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    text: string,
+  ): Promise<void> {
     const decoder = new TextDecoder()
     let received = ''
 
@@ -38,18 +44,19 @@ describe('signalSyncHandlerPlugin', () => {
     let waiting = false
     let cleaned = false
 
-    const response = await handle(os.handler(async function* (options) {
-      signal = options.signal
+    const response = await handle(
+      os.handler(async function* (options) {
+        signal = options.signal
 
-      try {
-        yield 'first'
-        waiting = true
-        await waitForAbort(signal)
-      }
-      finally {
-        cleaned = true
-      }
-    }))
+        try {
+          yield 'first'
+          waiting = true
+          await waitForAbort(signal)
+        } finally {
+          cleaned = true
+        }
+      }),
+    )
 
     const reader = response.body!.getReader()
     await readUntil(reader, 'first')
@@ -70,11 +77,16 @@ describe('signalSyncHandlerPlugin', () => {
   it('should abort the signal before cancelling a readable stream body', async () => {
     const cancel = vi.fn()
 
-    const response = await handle(os.handler(({ signal }) => new ReadableStream({
-      cancel(reason) {
-        cancel(reason, signal?.reason)
-      },
-    })))
+    const response = await handle(
+      os.handler(
+        ({ signal }) =>
+          new ReadableStream({
+            cancel(reason) {
+              cancel(reason, signal?.reason)
+            },
+          }),
+      ),
+    )
 
     await response.body!.cancel()
 
@@ -89,17 +101,19 @@ describe('signalSyncHandlerPlugin', () => {
     let cleaned = false
 
     const controller = new AbortController()
-    const response = await handle(os.handler(async function* () {
-      try {
-        yield 'first'
-        waiting = true
-        await release // ignores the signal
-        yield 'second'
-      }
-      finally {
-        cleaned = true
-      }
-    }), { signal: controller.signal })
+    const response = await handle(
+      os.handler(async function* () {
+        try {
+          yield 'first'
+          waiting = true
+          await release // ignores the signal
+          yield 'second'
+        } finally {
+          cleaned = true
+        }
+      }),
+      { signal: controller.signal },
+    )
 
     const textPromise = response.text()
     await vi.waitFor(() => expect(waiting).toBe(true))
@@ -118,15 +132,24 @@ describe('signalSyncHandlerPlugin', () => {
     const cancel = vi.fn()
 
     const controller = new AbortController()
-    const response = await handle(os.handler(() => new ReadableStream({
-      start(streamController) {
-        streamController.enqueue(new TextEncoder().encode('first'))
-      },
-      cancel,
-    })), { signal: controller.signal })
+    const response = await handle(
+      os.handler(
+        () =>
+          new ReadableStream({
+            start(streamController) {
+              streamController.enqueue(new TextEncoder().encode('first'))
+            },
+            cancel,
+          }),
+      ),
+      { signal: controller.signal },
+    )
 
     const reader = response.body!.getReader()
-    await expect(reader.read()).resolves.toEqual({ done: false, value: new TextEncoder().encode('first') })
+    await expect(reader.read()).resolves.toEqual({
+      done: false,
+      value: new TextEncoder().encode('first'),
+    })
 
     const reason = new Error('timed out')
     controller.abort(reason)
@@ -140,10 +163,13 @@ describe('signalSyncHandlerPlugin', () => {
     const reason = new Error('timed out')
 
     const controller = new AbortController()
-    const response = await handle(os.handler(() => {
-      controller.abort(reason)
-      return new ReadableStream({ cancel })
-    }), { signal: controller.signal })
+    const response = await handle(
+      os.handler(() => {
+        controller.abort(reason)
+        return new ReadableStream({ cancel })
+      }),
+      { signal: controller.signal },
+    )
 
     await expect(response.body!.getReader().read()).rejects.toBe(reason)
     expect(cancel).toHaveBeenCalledExactlyOnceWith(reason)
@@ -152,47 +178,61 @@ describe('signalSyncHandlerPlugin', () => {
   it.each([
     ['before', false],
     ['after', true],
-  ])('should end streaming responses on streamingTimeout when registered %s the timeout plugin', async (_, reverse) => {
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const plugins = [
-      new SignalSyncHandlerPlugin(),
-      new TimeoutHandlerPlugin({ timeout: null, streamingTimeout: 50 }),
-    ]
+  ])(
+    'should end streaming responses on streamingTimeout when registered %s the timeout plugin',
+    async (_, reverse) => {
+      const { promise: release, resolve } = promiseWithResolvers<void>()
+      const plugins = [
+        new SignalSyncHandlerPlugin(),
+        new TimeoutHandlerPlugin({ timeout: null, streamingTimeout: 50 }),
+      ]
 
-    const handler = new RPCHandler(os.handler(async function* () {
-      yield 'first'
-      await release // ignores the signal
-      yield 'second'
-    }), {
-      plugins: reverse ? plugins.reverse() : plugins,
-    })
+      const handler = new RPCHandler(
+        os.handler(async function* () {
+          yield 'first'
+          await release // ignores the signal
+          yield 'second'
+        }),
+        {
+          plugins: reverse ? plugins.toReversed() : plugins,
+        },
+      )
 
-    const { response } = await handler.handle(new Request('http://localhost', { method: 'POST' }))
-    const text = await response!.text()
+      const { response } = await handler.handle(new Request('http://localhost', { method: 'POST' }))
+      const text = await response!.text()
 
-    expect(text).toContain('first')
-    expect(text).toContain('event: error')
-    expect(text).not.toContain('second')
-    resolve()
-  })
+      expect(text).toContain('first')
+      expect(text).toContain('event: error')
+      expect(text).not.toContain('second')
+      resolve()
+    },
+  )
 
   it.each([
-    ['an event iterator body finishes', async function* () {
-      yield 'first'
-    }],
-    ['an event iterator body ends with an error', async function* () {
-      yield 'first'
-      throw new Error('something went wrong')
-    }],
+    [
+      'an event iterator body finishes',
+      async function* () {
+        yield 'first'
+      },
+    ],
+    [
+      'an event iterator body ends with an error',
+      async function* () {
+        yield 'first'
+        throw new Error('something went wrong')
+      },
+    ],
     ['a readable stream body finishes', () => new Blob(['first']).stream()],
     ['the response is not streaming', () => 'first'],
   ])('should not abort the signal when %s', async (_, output) => {
     let signal: AbortSignal | undefined
 
-    const response = await handle(os.handler((options) => {
-      signal = options.signal
-      return output()
-    }))
+    const response = await handle(
+      os.handler((options) => {
+        signal = options.signal
+        return output()
+      }),
+    )
 
     await expect(response.text()).resolves.toContain('first')
     expect(signal?.aborted).toBe(false)
@@ -202,14 +242,16 @@ describe('signalSyncHandlerPlugin', () => {
     let signal: AbortSignal | undefined
     const error = new Error('read failed')
 
-    const response = await handle(os.handler((options) => {
-      signal = options.signal
-      return new ReadableStream({
-        pull() {
-          throw error
-        },
-      })
-    }))
+    const response = await handle(
+      os.handler((options) => {
+        signal = options.signal
+        return new ReadableStream({
+          pull() {
+            throw error
+          },
+        })
+      }),
+    )
 
     await expect(response.body!.getReader().read()).rejects.toBe(error)
     expect(signal?.aborted).toBe(false)
@@ -219,10 +261,13 @@ describe('signalSyncHandlerPlugin', () => {
     let signal: AbortSignal | undefined
 
     const controller = new AbortController()
-    const promise = handle(os.handler(async (options) => {
-      signal = options.signal
-      await waitForAbort(signal)
-    }), { signal: controller.signal })
+    const promise = handle(
+      os.handler(async (options) => {
+        signal = options.signal
+        await waitForAbort(signal)
+      }),
+      { signal: controller.signal },
+    )
 
     await vi.waitFor(() => expect(signal).toBeDefined())
     const reason = new Error('user cancelled')

@@ -1,5 +1,5 @@
 it('exports OpenAPIReferenceHandlerPlugin', async () => {
-  await expect(import('.')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     OpenAPIReferenceHandlerPlugin: expect.any(Function),
   })
 })

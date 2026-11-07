@@ -1,17 +1,41 @@
-import type { JsonSchema } from './types'
-import { containsJsonFileSchema, ensureJsonSchemaObject, isJsonArraySchema, isJsonFileSchema, isJsonObjectSchema, isJsonPrimitiveSchema, isUnconstrainedSchema } from './utils'
+import type { JsonSchema } from './types.ts'
+import {
+  containsJsonFileSchema,
+  ensureJsonSchemaObject,
+  isJsonArraySchema,
+  isJsonFileSchema,
+  isJsonObjectSchema,
+  isJsonPrimitiveSchema,
+  isUnconstrainedSchema,
+} from './utils.ts'
 
 it('isJsonPrimitiveSchema', () => {
   expect(isJsonPrimitiveSchema({ type: 'string' })).toBe(true)
   expect(isJsonPrimitiveSchema({ const: 'fixed' })).toBe(true)
   expect(isJsonPrimitiveSchema({ enum: ['a', 'b'] })).toBe(true)
+  expect(isJsonPrimitiveSchema({ type: ['string', 'null'] })).toBe(true)
+  expect(isJsonPrimitiveSchema({ type: ['string', 'number', 'integer', 'boolean'] })).toBe(true)
+  expect(isJsonPrimitiveSchema({ type: ['string', 'object'] })).toBe(false)
+  expect(isJsonPrimitiveSchema({ type: ['array', 'null'] })).toBe(false)
+  expect(isJsonPrimitiveSchema({ type: [] })).toBe(false)
 
   expect(isJsonPrimitiveSchema(true)).toBe(false)
-  expect(isJsonPrimitiveSchema({ type: 'object', properties: { a: { type: 'string' } } })).toBe(false)
-  expect(isJsonPrimitiveSchema({ anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] })).toBe(false)
+  expect(isJsonPrimitiveSchema({ type: 'object', properties: { a: { type: 'string' } } })).toBe(
+    false,
+  )
+  expect(
+    isJsonPrimitiveSchema({
+      anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+    }),
+  ).toBe(false)
 
   // does not support union - need manually flattenJsonUnionSchema.every
-  expect(isJsonPrimitiveSchema({ description: 'primitive union', anyOf: [{ type: 'number' }, { oneOf: [{ type: 'boolean' }, { const: 'x' }] }] })).toBe(false)
+  expect(
+    isJsonPrimitiveSchema({
+      description: 'primitive union',
+      anyOf: [{ type: 'number' }, { oneOf: [{ type: 'boolean' }, { const: 'x' }] }],
+    }),
+  ).toBe(false)
 })
 
 it('isJsonFileSchema', () => {
@@ -29,11 +53,28 @@ it('isJsonFileSchema', () => {
 
 it('containsJsonFileSchema', () => {
   expect(containsJsonFileSchema({ type: 'string', contentMediaType: 'image/png' })).toBe(true)
-  expect(containsJsonFileSchema({ type: 'object', properties: { avatar: { type: 'string', format: 'binary' } } })).toBe(true)
-  expect(containsJsonFileSchema({ type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'string', contentEncoding: 'binary' }] } })).toBe(true)
-  expect(containsJsonFileSchema({ $ref: '#/$defs/File', $defs: { File: { type: 'string', contentMediaType: '*/*' } } })).toBe(true)
+  expect(
+    containsJsonFileSchema({
+      type: 'object',
+      properties: { avatar: { type: 'string', format: 'binary' } },
+    }),
+  ).toBe(true)
+  expect(
+    containsJsonFileSchema({
+      type: 'array',
+      items: { anyOf: [{ type: 'number' }, { type: 'string', contentEncoding: 'binary' }] },
+    }),
+  ).toBe(true)
+  expect(
+    containsJsonFileSchema({
+      $ref: '#/$defs/File',
+      $defs: { File: { type: 'string', contentMediaType: '*/*' } },
+    }),
+  ).toBe(true)
 
-  expect(containsJsonFileSchema({ type: 'object', properties: { name: { type: 'string' } } })).toBe(false)
+  expect(containsJsonFileSchema({ type: 'object', properties: { name: { type: 'string' } } })).toBe(
+    false,
+  )
   expect(containsJsonFileSchema(true)).toBe(false)
 })
 
@@ -41,23 +82,63 @@ it('containsJsonFileSchema follows only reachable refs', () => {
   const $defs: Record<string, JsonSchema> = {
     File: { type: 'string', contentMediaType: '*/*' },
     WithFile: { type: 'object', properties: { file: { $ref: '#/$defs/File' } } },
-    Tree: { type: 'object', properties: { name: { type: 'string' }, children: { type: 'array', items: { $ref: '#/$defs/Tree' } } } },
-    TreeWithFile: { type: 'object', properties: { file: { $ref: '#/$defs/File' }, children: { type: 'array', items: { $ref: '#/$defs/TreeWithFile' } } } },
+    Tree: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        children: { type: 'array', items: { $ref: '#/$defs/Tree' } },
+      },
+    },
+    TreeWithFile: {
+      type: 'object',
+      properties: {
+        file: { $ref: '#/$defs/File' },
+        children: { type: 'array', items: { $ref: '#/$defs/TreeWithFile' } },
+      },
+    },
   }
 
-  expect(containsJsonFileSchema({ type: 'object', properties: { id: { type: 'string' } }, $defs })).toBe(false)
+  expect(
+    containsJsonFileSchema({ type: 'object', properties: { id: { type: 'string' } }, $defs }),
+  ).toBe(false)
   expect(containsJsonFileSchema({ $ref: '#/$defs/Tree', $defs })).toBe(false)
 
-  expect(containsJsonFileSchema({ type: 'object', properties: { nested: { $ref: '#/$defs/WithFile' } }, $defs })).toBe(true)
-  expect(containsJsonFileSchema({ anyOf: [{ $ref: '#/$defs/Tree' }, { $ref: '#/$defs/TreeWithFile' }], $defs })).toBe(true)
-  expect(containsJsonFileSchema({ type: 'object', properties: { file: { $ref: '#/$defs/WithFile/properties/file' } }, $defs })).toBe(true)
+  expect(
+    containsJsonFileSchema({
+      type: 'object',
+      properties: { nested: { $ref: '#/$defs/WithFile' } },
+      $defs,
+    }),
+  ).toBe(true)
+  expect(
+    containsJsonFileSchema({
+      anyOf: [{ $ref: '#/$defs/Tree' }, { $ref: '#/$defs/TreeWithFile' }],
+      $defs,
+    }),
+  ).toBe(true)
+  expect(
+    containsJsonFileSchema({
+      type: 'object',
+      properties: { file: { $ref: '#/$defs/WithFile/properties/file' } },
+      $defs,
+    }),
+  ).toBe(true)
 
-  expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' } } })).toBe(false)
-  expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' }, file: { type: 'string', format: 'binary' } } })).toBe(true)
+  expect(containsJsonFileSchema({ type: 'object', properties: { self: { $ref: '#' } } })).toBe(
+    false,
+  )
+  expect(
+    containsJsonFileSchema({
+      type: 'object',
+      properties: { self: { $ref: '#' }, file: { type: 'string', format: 'binary' } },
+    }),
+  ).toBe(true)
 
   expect(containsJsonFileSchema({ $ref: '#/$defs/Missing', $defs })).toBe(false)
 
-  expect(containsJsonFileSchema({ type: 'object', default: { type: 'string', format: 'binary' } })).toBe(false)
+  expect(
+    containsJsonFileSchema({ type: 'object', default: { type: 'string', format: 'binary' } }),
+  ).toBe(false)
 })
 
 it('isJsonObjectSchema', () => {

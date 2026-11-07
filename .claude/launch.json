@@ -16,31 +16,19 @@
     {
       "name": "next-playground",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@orpc/next-playground",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@orpc/next-playground", "dev"],
       "port": 3000
     },
     {
       "name": "nest-playground",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@orpc/nest-playground",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@orpc/nest-playground", "dev"],
       "port": 3000
     },
     {
       "name": "cloudflare-playground",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@orpc/cloudflare-playground",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@orpc/cloudflare-playground", "dev"],
       "port": 3000
     }
   ]

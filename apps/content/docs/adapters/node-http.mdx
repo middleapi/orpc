@@ -1,8 +1,8 @@
 ---
-title: "Node HTTP Adapter"
-description: "Use oRPC with Node HTTP, HTTPS, and HTTP2 servers via RPCHandler or OpenAPIHandler, with CORS and event stream options."
+title: 'Node HTTP Adapter'
+description: 'Use oRPC with Node HTTP, HTTPS, and HTTP2 servers via RPCHandler or OpenAPIHandler, with CORS and event stream options.'
 sidebar:
-  label: "Node HTTP"
+  label: 'Node HTTP'
 ---
 
 ## Server Usage
@@ -16,9 +16,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -29,7 +27,7 @@ const handler = new RPCHandler(router, {
 const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -50,9 +48,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 import { onError } from '@orpc/server'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -63,7 +59,7 @@ const handler = new OpenAPIHandler(router, {
 const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -99,14 +95,15 @@ You can configure how an [AsyncIteratorObject](/docs/async-iterator-object) is s
 const handler = new OpenAPIHandler(router, {
   sendStandardResponse: {
     eventStream: {
+      /**
+       * Initial comment sent immediately upon stream start to flush headers. This allows the
+       * receiving side to establish the connection without waiting for the first event.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       initialComment: {
-        /**
-         * If true, an initial comment is sent immediately upon stream start to flush headers.
-         * This allows the receiving side to establish the connection without waiting for the first event.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * The content of the initial comment sent upon stream start. Must not include newline characters.
          *
@@ -114,13 +111,14 @@ const handler = new OpenAPIHandler(router, {
          */
         comment: '',
       },
+      /**
+       * Ping comment sent periodically to keep the connection alive.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a ping comment is sent periodically to keep the connection alive.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between ping comments sent after the last event.
          *

@@ -1,18 +1,28 @@
 import type { Promisable } from '@orpc/shared'
-import type { UseQueryFnContext } from './types'
-import { stringifyJSON } from '@orpc/shared'
+import { stringifyJSON, throwIfAborted } from '@orpc/shared'
+
+import type { SettleOnFirstDataOptions } from './stream-query.ts'
+import type { UseQueryFnContext } from './types.ts'
 
 /**
  * A Pinia Colada query function that publishes each streamed chunk to the
  * cache entry as it arrives, replacing the previous value.
  */
 export function liveQuery<T>(
-  queryFn: (
-    context: UseQueryFnContext,
-  ) => Promisable<AsyncIterable<T>>,
+  queryFn: (context: UseQueryFnContext) => Promisable<AsyncIterable<T>>,
+  { settleOnFirstData = false }: SettleOnFirstDataOptions = {},
 ): (context: UseQueryFnContext) => Promise<T> {
   return async (context) => {
     const { entry, signal } = context
+
+    // a fetch cut short (cancelled, superseded, or its last component left) reopens when used again
+    const markStale = () => {
+      entry.when = 0
+    }
+    if (signal.aborted) {
+      markStale()
+    }
+    signal.addEventListener('abort', markStale, { once: true })
 
     const stream = await queryFn(context)
 
@@ -24,13 +34,18 @@ export function liveQuery<T>(
     let last: { chunk: T } | undefined
 
     for await (const chunk of stream) {
-      if (signal.aborted) {
-        throw signal.reason
-      }
+      throwIfAborted(signal)
 
       last = { chunk }
       entry.state.value = { status: 'success', data: chunk, error: null } as any
+
+      if (settleOnFirstData) {
+        break
+      }
     }
+
+    // a stream that ends on abort must not be stored as fresh data
+    throwIfAborted(signal)
 
     if (!last) {
       throw new TypeError(

@@ -1,6 +1,6 @@
 ---
 name: orpc-migrate
-description: "Migrate existing codebases to current oRPC, covering tRPC to oRPC (incremental wrapping via the @orpc/trpc integration or a full rewrite with the concept mapping) and oRPC v1 to v2 (package renames, breaking changes, and a safe order of operations). Use when asked to migrate from tRPC to oRPC, convert or wrap a tRPC router, upgrade oRPC v1 to v2, fix oRPC v2 breaking changes, or swap `@trpc/*` packages for `@orpc/*` equivalents. Biases toward retrieval from the oRPC docs over pre-trained knowledge. Not for greenfield oRPC work or new features in an already-migrated codebase: use the orpc skill for those."
+description: 'Migrate existing codebases to current oRPC, covering tRPC to oRPC (incremental wrapping via the @orpc/trpc integration or a full rewrite with the concept mapping) and oRPC v1 to v2 (package renames, breaking changes, and a safe order of operations). Use when asked to migrate from tRPC to oRPC, convert or wrap a tRPC router, upgrade oRPC v1 to v2, fix oRPC v2 breaking changes, or swap `@trpc/*` packages for `@orpc/*` equivalents. Biases toward retrieval from the oRPC docs over pre-trained knowledge. Not for greenfield oRPC work or new features in an already-migrated codebase: use the orpc skill for those.'
 license: MIT
 ---
 
@@ -53,8 +53,7 @@ Steps, in order, verifying after each:
 
    export const publicProcedure = o.use(timingMiddleware)
    export const protectedProcedure = publicProcedure.use(({ context, next }) => {
-     if (!context.session?.user)
-       throw new ORPCError('UNAUTHORIZED')
+     if (!context.session?.user) throw new ORPCError('UNAUTHORIZED')
      return next({ context: { session: context.session } })
    })
    ```
@@ -77,9 +76,9 @@ Steps, in order, verifying after each:
 6. **Client.** `RPCLink` plus `createORPCClient`, typed by `RouterClient`. Call sites drop the `.query()`/`.mutate()` suffixes:
 
    ```ts
-   import type { RouterClient } from '@orpc/server'
    import { createORPCClient } from '@orpc/client'
    import { RPCLink } from '@orpc/client/fetch'
+   import type { RouterClient } from '@orpc/server'
 
    const link = new RPCLink({ origin: 'http://localhost:3000', url: '/api/orpc' })
    export const client: RouterClient<typeof appRouter> = createORPCClient(link)
@@ -104,6 +103,7 @@ Most v1 names still compile through deprecated aliases (strike-through hints, no
    - `adapterInterceptors` was removed from handlers and links, because regular interceptors can now customize body parsing behavior.
 3. **Audit silent behavior changes** (compile fine, behave differently):
    - **Wire format changed:** a v1 link cannot talk to a v2 server, in either direction. Deploy the upgraded server and clients together.
+   - **Automatic middleware deduplication removed:** middleware applied at both router and procedure level now runs twice, with no warning. Guard shared middleware with the context-flag pattern from the dedupe-middleware recipe.
    - **Batch Plugin `exclude` became `filter` with the opposite meaning.** Usually delete `exclude`; if skipping is still needed, negate the predicate.
    - **`RPCHandler` rejects GET by default** (`allowMethods` defaults to POST/PUT/PATCH/DELETE). Simplest fix: stop sending GET from the link; only allow GET deliberately, with CSRF protection.
    - **Handler `filter` takes positional arguments now;** the v1 destructured form still type-checks but reads wrong values.

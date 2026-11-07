@@ -1,18 +1,20 @@
 import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
-import type { IntersectPick, Public } from '@orpc/shared'
-import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { ImplementerConfig } from './implementer'
-import type { AnyMiddleware, Middleware } from './middleware'
-import type { DecoratedMiddleware } from './middleware-decorated'
-import type { ContractedRouter } from './router'
-import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
-import { bindMethods } from '@orpc/shared'
-import { ProcedureImplementer } from './implementer-procedure'
-import { Lazy } from './lazy'
-import { decorateMiddleware } from './middleware-decorated'
-import { withHiddenRouterContract } from './router-hidden'
-import { augmentImplementedRouter } from './router-utils'
+import type { IntersectPick, Public } from '@orpc/shared'
+import { bindMethods, omit, setOwn } from '@orpc/shared'
+
+import type { Context, MergedContext, MergedInitialContext } from './context.ts'
+import { ProcedureImplementer } from './implementer-procedure.ts'
+import { Lazy } from './lazy.ts'
+import type { DecoratedMiddleware } from './middleware-decorated.ts'
+import { decorateMiddleware } from './middleware-decorated.ts'
+import type { AnyMiddleware, Middleware } from './middleware.ts'
+import type { AnyProcedure, ProcedureConfig } from './procedure.ts'
+import { Procedure } from './procedure.ts'
+import { withHiddenRouterContract } from './router-hidden.ts'
+import type { AugmentedRouterWithMiddlewares } from './router-utils.ts'
+import { augmentImplementedRouter } from './router-utils.ts'
+import type { ContractedRouter } from './router.ts'
 
 export class SharedRouterImplementer<
   TContract extends RouterContract,
@@ -20,31 +22,37 @@ export class SharedRouterImplementer<
 > {
   private constructor(
     private readonly contract: TContract,
-    private readonly config: ImplementerConfig,
+    private readonly config: ProcedureConfig,
     private readonly middlewares: AnyMiddleware[],
   ) {}
 
   static create<TContract extends RouterContract, TInitialContext extends Context>(
     contract: TContract,
-    config: ImplementerConfig
+    config: ProcedureConfig,
   ): SharedRouterImplementer<TContract, TInitialContext>
 
-  static create<TContract extends RouterContract, TInitialContext extends Context, TInjectedContext extends Context>(
+  static create<
+    TContract extends RouterContract,
+    TInitialContext extends Context,
+    TInjectedContext extends Context,
+  >(
     contract: TContract,
-    config: ImplementerConfig,
+    config: ProcedureConfig,
     middlewares: AnyMiddleware[],
   ): SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext>
 
-  static create<TContract extends RouterContract, TInitialContext extends Context, TInjectedContext extends Context>(
+  static create<
+    TContract extends RouterContract,
+    TInitialContext extends Context,
+    TInjectedContext extends Context,
+  >(
     contract: TContract,
-    config: ImplementerConfig,
+    config: ProcedureConfig,
     middlewares: AnyMiddleware[] = [],
-  ): SharedRouterImplementer<TContract, TInitialContext> | SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
-    return new SharedRouterImplementer(
-      contract,
-      config,
-      middlewares,
-    )
+  ):
+    | SharedRouterImplementer<TContract, TInitialContext>
+    | SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
+    return new SharedRouterImplementer(contract, config, middlewares)
   }
 
   use<
@@ -52,19 +60,16 @@ export class SharedRouterImplementer<
     $InContext extends Context = TInitialContext,
     $ErrorMap extends ErrorMap = InferRouterContractErrorMap<TContract>,
   >(
-    middleware: Middleware<
-      $InContext | TInitialContext,
-      $OutContext,
-      unknown,
-      unknown,
-      $ErrorMap
-    >,
+    middleware: Middleware<$InContext | TInitialContext, $OutContext, unknown, unknown, $ErrorMap>,
   ): RouterImplementerWithMiddlewares<
     TContract,
     MergedInitialContext<TInitialContext, object, $InContext>,
     $OutContext
   > {
-    return createRouterImplementerInternal(this.contract, this.config, [...this.middlewares, middleware]) as any
+    return createRouterImplementerInternal(this.contract, this.config, [
+      ...this.middlewares,
+      middleware,
+    ]) as any
   }
 
   middleware<
@@ -87,10 +92,7 @@ export class SharedRouterImplementer<
     $Output,
     object
   > {
-    const allMiddlewares = [
-      ...this.middlewares,
-      middleware,
-    ]
+    const allMiddlewares = [...this.middlewares, middleware]
 
     let current = decorateMiddleware(allMiddlewares.shift()!)
 
@@ -101,9 +103,7 @@ export class SharedRouterImplementer<
     return current
   }
 
-  router<T extends ContractedRouter<TContract, any>>(
-    router: T,
-  ): T {
+  router<T extends ContractedRouter<TContract, any>>(router: T): T {
     if (this.middlewares.length) {
       router = augmentImplementedRouter(router, {
         ...this.config,
@@ -114,9 +114,7 @@ export class SharedRouterImplementer<
     return withHiddenRouterContract(router, this.contract)
   }
 
-  lazy<T extends ContractedRouter<TContract, any>>(
-    loader: () => Promise<{ default: T }>,
-  ): Lazy<T> {
+  lazy<T extends ContractedRouter<TContract, any>>(loader: () => Promise<{ default: T }>): Lazy<T> {
     return new Lazy({
       loader: async () => {
         const { default: router } = await loader()
@@ -133,7 +131,10 @@ export interface SharedRouterImplementerWithMiddlewares<
   TInjectedContext extends Context,
 > {
   use<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $ErrorMap extends ErrorMap = InferRouterContractErrorMap<TContract>,
   >(
@@ -151,7 +152,10 @@ export interface SharedRouterImplementerWithMiddlewares<
   >
 
   middleware<
-    $OutContext extends IntersectPick<MergedContext<TInitialContext, TInjectedContext>, $OutContext>,
+    $OutContext extends IntersectPick<
+      MergedContext<TInitialContext, TInjectedContext>,
+      $OutContext
+    >,
     $Input,
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $Output = any, // $Output = any by default is important to make middleware can be used in any output by default
@@ -180,37 +184,80 @@ export interface SharedRouterImplementerWithMiddlewares<
   ): Lazy<AugmentedRouterWithMiddlewares<T, TInitialContext, TInjectedContext, object>>
 }
 
-export type RouterImplementer<
-  TContract extends RouterContract,
-  TInitialContext extends Context,
-> = TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
-  ? ProcedureImplementer<TInitialContext, object, $InputSchema, $OutputSchema, $ErrorMap>
-  : Public<SharedRouterImplementer<TContract, TInitialContext>> & {
-    [K in keyof TContract]: TContract[K] extends RouterContract
-      ? RouterImplementer<TContract[K], TInitialContext>
-      : never
-  }
+export type RouterImplementer<TContract extends RouterContract, TInitialContext extends Context> =
+  TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
+    ? ProcedureImplementer<TInitialContext, object, $InputSchema, $OutputSchema, $ErrorMap>
+    : Public<SharedRouterImplementer<TContract, TInitialContext>> & {
+        [K in keyof TContract]: TContract[K] extends RouterContract
+          ? RouterImplementer<TContract[K], TInitialContext>
+          : never
+      }
 
 export type RouterImplementerWithMiddlewares<
   TContract extends RouterContract,
   TInitialContext extends Context,
   TInjectedContext extends Context,
-> = TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
-  ? ProcedureImplementer<TInitialContext, TInjectedContext, $InputSchema, $OutputSchema, $ErrorMap>
-  : SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> & {
-    [K in keyof TContract]: TContract[K] extends RouterContract
-      ? RouterImplementerWithMiddlewares<TContract[K], TInitialContext, TInjectedContext>
-      : never
-  }
+> =
+  TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
+    ? ProcedureImplementer<
+        TInitialContext,
+        TInjectedContext,
+        $InputSchema,
+        $OutputSchema,
+        $ErrorMap
+      >
+    : SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> & {
+        [K in keyof TContract]: TContract[K] extends RouterContract
+          ? RouterImplementerWithMiddlewares<TContract[K], TInitialContext, TInjectedContext>
+          : never
+      }
 
 export function createRouterImplementer<
   TContract extends RouterContract,
   TInitialContext extends Context,
->(
-  contract: TContract,
-  config: ImplementerConfig,
-): RouterImplementer<TContract, TInitialContext> {
-  return createRouterImplementerInternal(contract, config, []) as any
+>(contract: TContract, config: ProcedureConfig): RouterImplementer<TContract, TInitialContext> {
+  return createRouterImplementerInternal(toPlainRouterContract(contract), config, []) as any
+}
+
+/**
+ * A normal router can be used as a contract (e.g. for mocking), but its procedures carry a handler,
+ * middlewares and config. Kept as is, unimplemented procedures would pass as procedures, their config
+ * would override the config passed to `implement`, and handlers serving the hidden contract would run
+ * the contract's procedures instead of the actual implementation.
+ *
+ * Rebuilds the contract with every procedure turned into a plain {@link ProcedureContract}
+ * (without `handler`, `orderedMiddlewares` and procedure config), copying only the routers that contain one,
+ * so contract-first contracts are returned as is.
+ */
+function toPlainRouterContract<T extends RouterContract>(contract: T): T {
+  if (contract instanceof ProcedureContract) {
+    if (!(contract instanceof Procedure)) {
+      return contract
+    }
+
+    // handler & orderedMiddlewares are what make a definition a procedure (see Procedure[Symbol.hasInstance])
+    return new ProcedureContract(
+      omit(contract['~orpc'] as AnyProcedure['~orpc'], [
+        'handler',
+        'orderedMiddlewares',
+        'disableInputValidation',
+        'disableOutputValidation',
+      ]),
+    ) as T
+  }
+
+  let copied: Record<string, RouterContract> | undefined
+
+  for (const [key, child] of Object.entries(contract as Record<string, RouterContract>)) {
+    const plainChild = toPlainRouterContract(child)
+
+    if (plainChild !== child) {
+      copied ??= { ...contract } as Record<string, RouterContract>
+      copied[key] = plainChild
+    }
+  }
+
+  return (copied ?? contract) as T
 }
 
 function createRouterImplementerInternal<
@@ -219,27 +266,33 @@ function createRouterImplementerInternal<
   TInjectedContext extends Context,
 >(
   contract: TContract,
-  config: ImplementerConfig,
+  config: ProcedureConfig,
   middlewares: AnyMiddleware[],
-): RouterImplementer<TContract, TInitialContext> | RouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
+):
+  | RouterImplementer<TContract, TInitialContext>
+  | RouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
   if (contract instanceof ProcedureContract) {
     return new ProcedureImplementer({
       ...config,
       ...contract['~orpc'],
-      orderedMiddlewares: middlewares.map(middleware => ({ middleware })),
+      orderedMiddlewares: middlewares.map((middleware) => ({ middleware })),
     }) as any
   }
 
   const implementer: Record<string, any> = {}
 
   for (const [key, child] of Object.entries(contract)) {
-    implementer[key] = createRouterImplementerInternal(child as RouterContract, config, middlewares)
+    setOwn(
+      implementer,
+      key,
+      createRouterImplementerInternal(child as RouterContract, config, middlewares),
+    )
   }
 
   const shared = bindMethods(SharedRouterImplementer.create(contract, config, middlewares))
 
   for (const [key, method] of Object.entries(shared)) {
-    if (key in implementer) {
+    if (Object.hasOwn(implementer, key)) {
       const child = implementer[key]
 
       implementer[key] = new Proxy(method, {
@@ -247,8 +300,7 @@ function createRouterImplementerInternal<
           return Reflect.get(child, p)
         },
       })
-    }
-    else {
+    } else {
       implementer[key] = method
     }
   }

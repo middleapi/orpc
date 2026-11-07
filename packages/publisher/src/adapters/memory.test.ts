@@ -1,5 +1,6 @@
 import { getEventMeta, withEventMeta } from '@standard-server/core'
-import { MemoryPublisher } from './memory'
+
+import { MemoryPublisher } from './memory.ts'
 
 type TestEvents = {
   message: { text: string }
@@ -13,29 +14,32 @@ async function delayMicrotasks(count: number): Promise<void> {
 }
 
 describe('memoryPublisher', () => {
-  it('delivers live events without resume when resume is disabled', async () => {
-    const publisher = new MemoryPublisher<TestEvents>()
-    const listener = vi.fn()
+  it.each([undefined, false])(
+    'delivers live events without resume when resume is %s',
+    async (resume) => {
+      const publisher = new MemoryPublisher<TestEvents>({ resume })
+      const listener = vi.fn()
 
-    const unsubscribe = await publisher.subscribe('message', listener)
-    const payload = { text: 'live event' }
+      const unsubscribe = await publisher.subscribe('message', listener)
+      const payload = { text: 'live event' }
 
-    await publisher.publish('notice', { text: 'ignored event' })
-    await publisher.publish('message', payload)
+      await publisher.publish('notice', { text: 'ignored event' })
+      await publisher.publish('message', payload)
 
-    expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith(payload)
-    expect(listener.mock.calls[0]![0]).toBe(payload)
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener).toHaveBeenCalledWith(payload)
+      expect(listener.mock.calls[0]![0]).toBe(payload)
 
-    await unsubscribe()
+      await unsubscribe()
 
-    const resumed = vi.fn()
-    const unsubscribeResumed = await publisher.subscribe('message', resumed, { lastEventId: '0' })
+      const resumed = vi.fn()
+      const unsubscribeResumed = await publisher.subscribe('message', resumed, { lastEventId: '0' })
 
-    expect(resumed).not.toHaveBeenCalled()
+      expect(resumed).not.toHaveBeenCalled()
 
-    await unsubscribeResumed()
-  })
+      await unsubscribeResumed()
+    },
+  )
 
   describe('with resume enabled', () => {
     beforeEach(() => {
@@ -49,9 +53,7 @@ describe('memoryPublisher', () => {
 
     it('resumes only events after lastEventId and rewrites event ids', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
-        resume: {
-          enabled: true,
-        },
+        resume: true,
       })
 
       const liveListener = vi.fn()
@@ -113,7 +115,6 @@ describe('memoryPublisher', () => {
     it('expires old events lazily for AsyncIteratorObject subscribers', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
-          enabled: true,
           ttl: 1_000,
         },
       })
@@ -149,7 +150,6 @@ describe('memoryPublisher', () => {
     it('stays consistent under heavy interleaving of publishes and repeated unsubscriptions', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
-          enabled: true,
           ttl: 1_000,
         },
       })
@@ -164,18 +164,22 @@ describe('memoryPublisher', () => {
       let activeRegistrations = unsubscribeFns.length
 
       unsubscribeFns.forEach((unsubscribe, index) => {
-        operations.push((async () => {
-          await delayMicrotasks(index * 2)
-          await publisher.publish('message', { text: `burst-${index}` })
-        })())
+        operations.push(
+          (async () => {
+            await delayMicrotasks(index * 2)
+            await publisher.publish('message', { text: `burst-${index}` })
+          })(),
+        )
 
         expectedCalls += activeRegistrations
         activeRegistrations -= 1
 
-        operations.push((async () => {
-          await delayMicrotasks(index * 2 + 1)
-          await Promise.all([unsubscribe(), unsubscribe(), unsubscribe(), unsubscribe()])
-        })())
+        operations.push(
+          (async () => {
+            await delayMicrotasks(index * 2 + 1)
+            await Promise.all([unsubscribe(), unsubscribe(), unsubscribe(), unsubscribe()])
+          })(),
+        )
       })
 
       await Promise.all(operations)
@@ -202,7 +206,6 @@ describe('memoryPublisher', () => {
     it('allows the same listener to be registered multiple times', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
-          enabled: true,
           ttl: 1_000,
         },
       })
@@ -233,7 +236,6 @@ describe('memoryPublisher', () => {
     it('lets each unsubscribe function be called multiple times safely', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
-          enabled: true,
           ttl: 1_000,
         },
       })
@@ -262,6 +264,7 @@ describe('memoryPublisher', () => {
     it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
       const publisher = new MemoryPublisher<TestEvents>()
 
+      // oxlint-disable-next-line prefer-const -- assigned after the callback that reads it is created
       let unsubscribeFirst: () => Promise<void>
       const first = vi.fn(() => {
         void unsubscribeFirst()
@@ -291,9 +294,13 @@ describe('memoryPublisher', () => {
     const onError = vi.fn()
     const listener = vi.fn()
 
-    const unsubscribe1 = await publisher.subscribe('message', () => {
-      throw error
-    }, { onError })
+    const unsubscribe1 = await publisher.subscribe(
+      'message',
+      () => {
+        throw error
+      },
+      { onError },
+    )
     const unsubscribe2 = await publisher.subscribe('message', listener)
 
     await expect(publisher.publish('message', { text: 'hello' })).resolves.toBeUndefined()

@@ -1,18 +1,41 @@
-import type { Context } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
-import type { Promisable, Value } from '@orpc/shared'
-import type { StandardBody, StandardBodyHint, StandardHeaders, StandardLazyRequest } from '@standard-server/core'
 import type { FilePropertyBag } from 'node:buffer'
 import { Buffer } from 'node:buffer'
 import { openAsBlob } from 'node:fs'
 import { appendFile, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+
+import type { Context } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
-import { isAsyncIteratorObject, override, toArray, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
-import { flattenStandardHeader, getFilenameFromContentDisposition, resolveStandardBodyHint } from '@standard-server/core'
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
+} from '@orpc/server/standard'
+import type { Promisable, Value } from '@orpc/shared'
+import {
+  isAsyncIteratorObject,
+  override,
+  toArray,
+  value,
+  wrapAsyncIterator,
+  wrapReadableStream,
+} from '@orpc/shared'
+import type {
+  StandardBody,
+  StandardBodyHint,
+  StandardHeaders,
+  StandardLazyRequest,
+} from '@standard-server/core'
+import {
+  flattenStandardHeader,
+  getFilenameFromContentDisposition,
+  resolveStandardBodyHint,
+} from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
-import { parseHeaderParameters, parseMultipart } from './multipart'
+
+import { parseHeaderParameters, parseMultipart } from './multipart.ts'
 
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
@@ -67,7 +90,12 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    *
    * @default unlimited for every kind
    */
-  maxBodySize?: Value<Promisable<TmpFileUploadHandlerPluginMaxBodySize>, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
+  maxBodySize?:
+    | Value<
+        Promisable<TmpFileUploadHandlerPluginMaxBodySize>,
+        [options: StandardHandlerRoutingInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * The size in bytes an uploaded file must exceed before it is spooled to a
@@ -146,7 +174,10 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
   before: string[] = ['~request-limit', '~request-compression']
 
   private readonly tmpDir: string
-  private readonly maxBodySize: Exclude<TmpFileUploadHandlerPluginOptions<T>['maxBodySize'], undefined>
+  private readonly maxBodySize: Exclude<
+    TmpFileUploadHandlerPluginOptions<T>['maxBodySize'],
+    undefined
+  >
   private readonly spoolThreshold: number
 
   constructor(options: TmpFileUploadHandlerPluginOptions<T> = {}) {
@@ -160,7 +191,10 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const tmpFiles = new RequestTmpFiles(this.tmpDir)
       let cleanupDeferred = false
 
@@ -169,7 +203,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
           ...interceptorOptions,
           request: {
             ...interceptorOptions.request,
-            resolveBody: hint => this.resolveBody(interceptorOptions, hint, tmpFiles),
+            resolveBody: (hint) => this.resolveBody(interceptorOptions, hint, tmpFiles),
           },
         })
 
@@ -194,7 +228,10 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
                  * @warning
                  * Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
-                body: override(body, wrapAsyncIterator(body, { onFinish: () => tmpFiles.cleanup() })),
+                body: override(
+                  body,
+                  wrapAsyncIterator(body, { onFinish: () => tmpFiles.cleanup() }),
+                ),
               },
             }
           }
@@ -210,15 +247,17 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
                  * @warning
                  * Remember use `override` for ReadableStream to remain other special properties
                  */
-                body: override(body, wrapReadableStream(body, { onFinish: () => tmpFiles.cleanup() })),
+                body: override(
+                  body,
+                  wrapReadableStream(body, { onFinish: () => tmpFiles.cleanup() }),
+                ),
               },
             }
           }
         }
 
         return result
-      }
-      finally {
+      } finally {
         if (!cleanupDeferred) {
           await tmpFiles.cleanup()
         }
@@ -267,7 +306,8 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     }
 
     // Streams are consumed on the fly, but the decoder buffers each event whole, however fast the stream is read
-    const eventLimit = resolvedHint === 'event-stream' ? maxBodySize.memory : Number.POSITIVE_INFINITY
+    const eventLimit =
+      resolvedHint === 'event-stream' ? maxBodySize.memory : Number.POSITIVE_INFINITY
     return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream, eventLimit)
   }
 
@@ -305,7 +345,11 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     return toStandardBody(response, { hint: resolvedHint })
   }
 
-  private async parseFileBody(request: StandardLazyRequest, tmpFiles: RequestTmpFiles, maxBodySize: TmpFileUploadHandlerPluginMaxBodySize): Promise<StandardBody> {
+  private async parseFileBody(
+    request: StandardLazyRequest,
+    tmpFiles: RequestTmpFiles,
+    maxBodySize: TmpFileUploadHandlerPluginMaxBodySize,
+  ): Promise<StandardBody> {
     assertContentLengthWithin(request.headers, maxBodySize.file)
 
     const stream = await request.resolveBody('octet-stream')
@@ -316,10 +360,18 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     }
 
     const contentDisposition = flattenStandardHeader(request.headers['content-disposition'])
-    const fileName = contentDisposition !== undefined ? getFilenameFromContentDisposition(contentDisposition) : undefined
+    const fileName =
+      contentDisposition !== undefined
+        ? getFilenameFromContentDisposition(contentDisposition)
+        : undefined
     const contentType = flattenStandardHeader(request.headers['content-type'])
 
-    const upload = new UploadWriter(tmpFiles, new Budget(maxBodySize.memory), new Budget(maxBodySize.file), this.spoolThreshold)
+    const upload = new UploadWriter(
+      tmpFiles,
+      new Budget(maxBodySize.memory),
+      new Budget(maxBodySize.file),
+      this.spoolThreshold,
+    )
 
     for await (const chunk of stream) {
       await upload.write(chunk)
@@ -328,12 +380,19 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     return upload.end(fileName ?? 'blob', contentType ?? '')
   }
 
-  private async parseMultipartBody(request: StandardLazyRequest, tmpFiles: RequestTmpFiles, maxBodySize: TmpFileUploadHandlerPluginMaxBodySize): Promise<StandardBody> {
+  private async parseMultipartBody(
+    request: StandardLazyRequest,
+    tmpFiles: RequestTmpFiles,
+    maxBodySize: TmpFileUploadHandlerPluginMaxBodySize,
+  ): Promise<StandardBody> {
     const contentType = flattenStandardHeader(request.headers['content-type'])
-    const boundary = contentType === undefined ? undefined : parseHeaderParameters(contentType).get('boundary')
+    const boundary =
+      contentType === undefined ? undefined : parseHeaderParameters(contentType).get('boundary')
 
     if (boundary === undefined || boundary === '') {
-      throw new TypeError('Invalid multipart body: content-type header is missing the boundary parameter')
+      throw new TypeError(
+        'Invalid multipart body: content-type header is missing the boundary parameter',
+      )
     }
 
     /**
@@ -351,7 +410,8 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return stream
     }
 
-    const limited = totalLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, totalLimit)
+    const limited =
+      totalLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, totalLimit)
 
     const form = new FormData()
     const memory = new Budget(maxBodySize.memory)
@@ -384,7 +444,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       const upload = new UploadWriter(tmpFiles, memory, file, this.spoolThreshold)
 
       return {
-        write: chunk => upload.write(chunk),
+        write: (chunk) => upload.write(chunk),
         end: async () => {
           form.append(name, await upload.end(filename, type))
         },
@@ -418,22 +478,24 @@ function limitStream(
 ): ReadableStream<Uint8Array> {
   let total = 0
 
-  return stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      total += chunk.byteLength
+  return stream.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        total += chunk.byteLength
 
-      if (total > limit || !fits(chunk)) {
-        controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
-        return
-      }
+        if (total > limit || !fits(chunk)) {
+          controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+          return
+        }
 
-      controller.enqueue(chunk)
-    },
-  }))
+        controller.enqueue(chunk)
+      },
+    }),
+  )
 }
 
-const CR = 0x0D
-const LF = 0x0A
+const CR = 0x0d
+const LF = 0x0a
 
 /**
  * Counts each event's bytes across chunks until its blank line, since the
@@ -469,8 +531,7 @@ function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolea
 
       if (byte === CR) {
         nextCR = indexOrEnd(bytes, CR, offset)
-      }
-      else {
+      } else {
         nextLF = indexOrEnd(bytes, LF, offset)
       }
 
@@ -487,8 +548,7 @@ function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolea
         // A blank line: the decoder releases the event
         eventSize = 0
         trailing = 'none'
-      }
-      else {
+      } else {
         trailing = byte === CR ? 'cr' : 'line'
       }
     }
@@ -544,7 +604,10 @@ class UploadWriter {
       return this.tmpFiles.append(this.tmpPath, chunk)
     }
 
-    if (this.heldSize + chunk.length <= this.spoolThreshold && this.memory.tryCharge(chunk.length)) {
+    if (
+      this.heldSize + chunk.length <= this.spoolThreshold &&
+      this.memory.tryCharge(chunk.length)
+    ) {
       // Chunks are only guaranteed until write returns, so holding one requires a copy
       this.held.push(Buffer.from(chunk))
       this.heldSize += chunk.length
@@ -594,8 +657,7 @@ class RequestTmpFiles {
       const tmpPath = path.join(await this.dir, String(this.count++))
       await appendFile(tmpPath, content)
       return tmpPath
-    }
-    catch (cause) {
+    } catch (cause) {
       throw new ORPCError('INTERNAL_SERVER_ERROR', { cause })
     }
   }
@@ -603,8 +665,7 @@ class RequestTmpFiles {
   async append(tmpPath: string, chunk: Uint8Array): Promise<void> {
     try {
       await appendFile(tmpPath, chunk)
-    }
-    catch (cause) {
+    } catch (cause) {
       throw new ORPCError('INTERNAL_SERVER_ERROR', { cause })
     }
   }
@@ -612,8 +673,7 @@ class RequestTmpFiles {
   async seal(tmpPath: string, name: string, type: string): Promise<TmpFile> {
     try {
       return new TmpFile(await openAsBlob(tmpPath), tmpPath, name, { type })
-    }
-    catch (cause) {
+    } catch (cause) {
       throw new ORPCError('INTERNAL_SERVER_ERROR', { cause })
     }
   }
@@ -622,8 +682,7 @@ class RequestTmpFiles {
     if (this.dir !== undefined) {
       try {
         await rm(await this.dir, { recursive: true, force: true })
-      }
-      catch {
+      } catch {
         // The request outcome must not change because removal failed
       }
     }

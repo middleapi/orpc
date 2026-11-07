@@ -1,6 +1,6 @@
 ---
-title: "Middleware"
-description: "Run code before and after oRPC handlers with composable middleware that can inject context, guard access, and modify input or output."
+title: 'Middleware'
+description: 'Run code before and after oRPC handlers with composable middleware that can inject context, guard access, and modify input or output.'
 ---
 
 ## Overview
@@ -16,20 +16,20 @@ const example = os
   .$context<{ something?: string }>() // <- define initial context
   .meta(someMeta) // <- attach metadata
   .errors({ RATE_LIMITED: {} }) // <- attach errors
-  .middleware(async ({ context, next, errors }) => { // <- middleware logic
+  .middleware(async ({ context, next, errors }) => {
+    // <- middleware logic
     try {
       // `await` is required to catch async errors
       return await next({
-        context: { // <- Inject additional context
-          user: { id: 1, name: 'John' }
-        }
+        context: {
+          // <- Inject additional context
+          user: { id: 1, name: 'John' },
+        },
       })
-    }
-    catch (error) {
+    } catch (error) {
       console.error(error)
       throw error
-    }
-    finally {
+    } finally {
       // Cleanup logic after execution
     }
   })
@@ -42,7 +42,28 @@ Learn more in the [Context Documentation](/docs/context).
 
 ## Metadata
 
-Use `.meta` to attach metadata to middleware. This metadata is applied to any procedures that use the middleware. Learn more in the [Metadata documentation](/docs/metadata).
+Use `.meta` to attach [metadata](/docs/metadata). Every procedure that uses the middleware gets it. For example, an auth middleware can add its OpenAPI security requirement:
+
+```ts
+const requireAuth = os
+  .meta(
+    openapi({
+      spec: (current) => ({ ...current, security: [{ bearerAuth: [] }] }),
+    }),
+  )
+  .middleware(async ({ next }) => {
+    // check auth...
+    return next()
+  })
+
+const getProfile = os
+  .use(requireAuth) // operation gets `security: [{ bearerAuth: [] }]`
+  .handler(() => ({}))
+```
+
+:::info
+`implement(contract)` ignores middleware metadata. Put it in the contract instead.
+:::
 
 ## Typesafe Errors
 
@@ -61,19 +82,20 @@ const setting = os
   .use(async ({ context, next }) => {
     return next({
       context: {
-        auth: await auth() // <- inject auth
-      }
+        auth: await auth(), // <- inject auth
+      },
     })
   })
   .use(async ({ context, next }) => {
-    if (!context.auth) { // <- guard auth
+    if (!context.auth) {
+      // <- guard auth
       throw new ORPCError('UNAUTHORIZED')
     }
 
     return next({
       context: {
-        auth: context.auth // <- override auth (now guaranteed to be non-null)
-      }
+        auth: context.auth, // <- override auth (now guaranteed to be non-null)
+      },
     })
   })
   .handler(async ({ context }) => {
@@ -104,7 +126,7 @@ const ping = os
 
 const pong = os
   .input(z.object({ id: z.number() }))
-  .use(canUpdate.adaptInput(input => input.id)) // <- adapt input to match middleware's expected shape
+  .use(canUpdate.adaptInput((input) => input.id)) // <- adapt input to match middleware's expected shape
   .handler(async ({ input }) => {
     // Handler logic
   })
@@ -182,9 +204,7 @@ const example = os
 Multiple middleware functions can be combined using `.use`.
 
 ```ts
-const mergedMiddleware = aMiddleware
-  .use(async ({ next }) => next())
-  .use(anotherMiddleware)
+const mergedMiddleware = aMiddleware.use(async ({ next }) => next()).use(anotherMiddleware)
 ```
 
 :::info

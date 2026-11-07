@@ -1,5 +1,5 @@
 it('exports oc', async () => {
-  await expect(import('./index')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     oc: expect.any(Object),
   })
 })

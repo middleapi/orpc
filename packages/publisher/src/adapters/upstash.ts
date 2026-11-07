@@ -1,8 +1,9 @@
 import type { ThrowableError } from '@orpc/shared'
-import type { Redis } from '@upstash/redis'
-import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
-import { BaseRedisPublisher } from './base-redis'
+import type { Redis } from '@upstash/redis'
+
+import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis.ts'
+import { BaseRedisPublisher } from './base-redis.ts'
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 
@@ -31,7 +32,10 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
    * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
    */
   prefix(prefix: string): UpstashPublisher<T> {
-    return new UpstashPublisher(this.redis, { ...this.options, prefix: `${this.eventPrefix}${prefix}` })
+    return new UpstashPublisher(this.redis, {
+      ...this.options,
+      prefix: `${this.eventPrefix}${prefix}`,
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -48,8 +52,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
     try {
       await this.subscribeIfNeeded(channel)
-    }
-    catch (error) {
+    } catch (error) {
       remove(this.listenersMap, channel, listener)
       await this.unsubscribeIfUnused(channel)
       throw error
@@ -76,10 +79,9 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
   }
 
   protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
-    const results = await this.redis.xread(key, lastId) as null | Array<[
-      key: string,
-      entries: Array<[id: string, fields: [name: string, value: unknown]]>,
-    ]>
+    const results = (await this.redis.xread(key, lastId)) as null | Array<
+      [key: string, entries: Array<[id: string, fields: [name: string, value: unknown]]>]
+    >
 
     return results?.[0]?.[1].map(([id, fields]) => ({ id, data: fields[1] })) ?? []
   }
@@ -99,11 +101,17 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     subscription.on('subscribe', () => resolve())
     subscription.on('error', (error) => {
       reject(error)
-      this.onErrorsMap.get(channel)?.slice().forEach(onError => onError(error))
+      this.onErrorsMap
+        .get(channel)
+        ?.slice()
+        .forEach((onError) => onError(error))
     })
     subscription.on('message', ({ message }) => {
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
-      this.listenersMap.get(channel)?.slice().forEach(listener => tryOrUndefined(() => listener(message)))
+      this.listenersMap
+        .get(channel)
+        ?.slice()
+        .forEach((listener) => tryOrUndefined(() => listener(message)))
     })
 
     this.pendingSubscriptionsMap.set(channel, promise)
@@ -111,12 +119,10 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     try {
       await promise
       this.subscriptionMap.set(channel, subscription)
-    }
-    catch (error) {
+    } catch (error) {
       await subscription.unsubscribe()
       throw error
-    }
-    finally {
+    } finally {
       this.pendingSubscriptionsMap.delete(channel)
     }
   }
@@ -136,7 +142,7 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   let values = map.get(key)
 
   if (!values) {
-    map.set(key, values = [])
+    map.set(key, (values = []))
   }
 
   values.push(value)

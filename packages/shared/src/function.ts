@@ -1,11 +1,14 @@
 export type AnyFunction = (...args: any[]) => any
 
-const AsyncGeneratorFunction = /* @__PURE__ */ (() => Object.getPrototypeOf(async function* () {}).constructor)()
+const AsyncGeneratorFunction = /* @__PURE__ */ (() =>
+  Object.getPrototypeOf(async function* () {}).constructor)()
 
 /**
  * Checks whether a value is an async generator function (`async function*`).
  */
-export function isAsyncGeneratorFunction(value: unknown): value is (...args: any[]) => AsyncGenerator {
+export function isAsyncGeneratorFunction(
+  value: unknown,
+): value is (...args: any[]) => AsyncGenerator {
   return value instanceof AsyncGeneratorFunction
 }
 
@@ -31,20 +34,17 @@ export function once<T>(fn: () => T): () => T {
 export function defer(callback: () => void, delay = 0): void {
   if (typeof setTimeout === 'function') {
     setTimeout(callback, delay)
-  }
-  else {
-    Promise.resolve()
-      .then(() => Promise.resolve()
-        .then(() => Promise.resolve()
-          .then(callback)))
+  } else {
+    void Promise.resolve().then(() =>
+      Promise.resolve().then(() => Promise.resolve().then(callback)),
+    )
   }
 }
 
 export function tryOrUndefined<T>(fn: () => T): undefined | T {
   try {
     return fn()
-  }
-  catch {
+  } catch {
     return undefined
   }
 }

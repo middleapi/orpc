@@ -1,8 +1,13 @@
-import { decodeBase64url, encodeBase64url } from './base64url'
+import { decodeBase64url, encodeBase64url } from './base64url.ts'
 
 const PBKDF2_CONFIG = {
   name: 'PBKDF2',
-  iterations: 60_000, // Recommended minimum iterations per current OWASP guidelines
+  /**
+   * Below the OWASP Password Storage Cheat Sheet recommendation of 600,000 iterations
+   * for PBKDF2-HMAC-SHA256. The output does not record the iteration count, so changing
+   * it would make existing ciphertexts undecryptable; raising it needs a versioned format.
+   */
+  iterations: 60_000,
   hash: 'SHA-256',
 } as const
 
@@ -52,11 +57,7 @@ export async function encrypt(value: string, secret: string): Promise<string> {
 
   const iv = crypto.getRandomValues(new Uint8Array(CRYPTO_CONSTANTS.IV_LENGTH))
 
-  const encrypted = await crypto.subtle.encrypt(
-    { name: AES_GCM_CONFIG.name, iv },
-    key,
-    data,
-  )
+  const encrypted = await crypto.subtle.encrypt({ name: AES_GCM_CONFIG.name, iv }, key, data)
 
   const result = new Uint8Array(salt.length + iv.length + encrypted.byteLength)
   result.set(salt, 0)
@@ -79,7 +80,10 @@ export async function encrypt(value: string, secret: string): Promise<string> {
  *
  * @see {@link https://orpc.dev/docs/helpers/encryption | Encryption Helpers}
  */
-export async function decrypt(encrypted: string | undefined | null, secret: string): Promise<string | undefined> {
+export async function decrypt(
+  encrypted: string | undefined | null,
+  secret: string,
+): Promise<string | undefined> {
   try {
     const data = decodeBase64url(encrypted)
 
@@ -91,7 +95,10 @@ export async function decrypt(encrypted: string | undefined | null, secret: stri
     const decoder = new TextDecoder()
 
     const salt = data.slice(0, CRYPTO_CONSTANTS.SALT_LENGTH)
-    const iv = data.slice(CRYPTO_CONSTANTS.SALT_LENGTH, CRYPTO_CONSTANTS.SALT_LENGTH + CRYPTO_CONSTANTS.IV_LENGTH)
+    const iv = data.slice(
+      CRYPTO_CONSTANTS.SALT_LENGTH,
+      CRYPTO_CONSTANTS.SALT_LENGTH + CRYPTO_CONSTANTS.IV_LENGTH,
+    )
     const encryptedData = data.slice(CRYPTO_CONSTANTS.SALT_LENGTH + CRYPTO_CONSTANTS.IV_LENGTH)
 
     const keyMaterial = await crypto.subtle.importKey(
@@ -117,8 +124,7 @@ export async function decrypt(encrypted: string | undefined | null, secret: stri
     )
 
     return decoder.decode(decrypted)
-  }
-  catch {
+  } catch {
     // Return undefined if decryption fails (invalid key, corrupted data, etc.)
     return undefined
   }

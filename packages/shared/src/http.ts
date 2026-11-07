@@ -26,11 +26,13 @@ export function matchesHttpPathPrefix(url: `/${string}`, prefix: `/${string}`): 
   const charAfterPrefix = url[prefix.length]
 
   // order by most common cases for better performance
-  return charAfterPrefix === '/'
-    || charAfterPrefix === '?'
-    || charAfterPrefix === '#'
-    || charAfterPrefix === undefined
-    || prefix[prefix.length - 1] === '/'
+  return (
+    charAfterPrefix === '/' ||
+    charAfterPrefix === '?' ||
+    charAfterPrefix === '#' ||
+    charAfterPrefix === undefined ||
+    prefix[prefix.length - 1] === '/'
+  )
 }
 
 export function matchesHttpPath(url: `/${string}`, path: `/${string}`): boolean {
@@ -47,9 +49,7 @@ export function matchesHttpPath(url: `/${string}`, path: `/${string}`): boolean 
   }
 
   // order by most common cases for better performance
-  return charAfterPrefix === undefined
-    || charAfterPrefix === '?'
-    || charAfterPrefix === '#'
+  return charAfterPrefix === undefined || charAfterPrefix === '?' || charAfterPrefix === '#'
 }
 
 const ACCEPT_ENCODING_QUALITY_REGEX = /^\s*q=([\d.]+)\s*$/i
@@ -72,7 +72,9 @@ export function parseAcceptEncodingQualities(header: string | undefined): Map<st
       continue
     }
 
-    const quality = params.map(param => ACCEPT_ENCODING_QUALITY_REGEX.exec(param)?.[1]).find(value => value !== undefined)
+    const quality = params
+      .map((param) => ACCEPT_ENCODING_QUALITY_REGEX.exec(param)?.[1])
+      .find((value) => value !== undefined)
 
     qualities.set(coding, quality === undefined ? 1 : Number(quality))
   }
@@ -101,10 +103,12 @@ export function varyByAcceptEncoding(vary: string | undefined): string {
     return 'accept-encoding'
   }
 
-  const fields = vary.split(',').map(field => field.trim().toLowerCase())
+  const fields = vary.split(',').map((field) => field.trim().toLowerCase())
 
   // `*` already forbids reuse across requests, so narrowing it would be a downgrade
-  return fields.includes('accept-encoding') || fields.includes('*') ? vary : `${vary}, accept-encoding`
+  return fields.includes('accept-encoding') || fields.includes('*')
+    ? vary
+    : `${vary}, accept-encoding`
 }
 
 /**
@@ -124,7 +128,8 @@ export function isNoTransformCacheControl(cacheControl: string | undefined): boo
 /**
  * inspired from Hono Compression Plugin
  */
-const COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|wasm|x-httpd-php|x-javascript|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml))(?:[;\s]|$)/i
+const COMPRESSIBLE_CONTENT_TYPE_REGEX =
+  /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|wasm|x-httpd-php|x-javascript|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml))(?:[;\s]|$)/i
 // Cap length to skip the regex on pathological inputs.
 const MAX_COMPRESSIBLE_CONTENT_TYPE_LENGTH = 1024
 

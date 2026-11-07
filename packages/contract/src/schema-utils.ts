@@ -1,10 +1,11 @@
 import type { IsEqual, Promisable } from '@orpc/shared'
-import type { Schema, SchemaIssue } from './schema'
-import { isPropertyKey, isTypescriptObject, ORPC_NAME } from '@orpc/shared'
+import { isPropertyKey, isNonPrimitive, ORPC_NAME } from '@orpc/shared'
 
-export type TypeRest<TInput, TOutput>
-  = | [map: (input: TInput) => Promisable<TOutput>]
-    | (IsEqual<TInput, TOutput> extends true ? [] : never)
+import type { Schema, SchemaIssue } from './schema.ts'
+
+export type TypeRest<TInput, TOutput> =
+  | [map: (input: TInput) => Promisable<TOutput>]
+  | (IsEqual<TInput, TOutput> extends true ? [] : never)
 
 /**
  * Create a schema for things can be trust without validation.
@@ -27,7 +28,7 @@ export function type<TInput, TOutput = TInput>(
       version: 1,
       async validate(value) {
         if (map) {
-          return { value: await map(value as TInput) as TOutput }
+          return { value: (await map(value as TInput)) as TOutput }
         }
 
         return { value: value as TOutput }
@@ -40,7 +41,7 @@ export function type<TInput, TOutput = TInput>(
  * Check if the given issue is following the standard-schema issue format.
  */
 export function isSchemaIssue(issue: unknown): issue is SchemaIssue {
-  if (!isTypescriptObject(issue) || typeof issue.message !== 'string') {
+  if (!isNonPrimitive(issue) || typeof issue.message !== 'string') {
     return false
   }
 
@@ -50,7 +51,10 @@ export function isSchemaIssue(issue: unknown): issue is SchemaIssue {
     }
 
     if (
-      !issue.path.every(segment => isPropertyKey(segment) || (isTypescriptObject(segment) && isPropertyKey(segment.key)))
+      !issue.path.every(
+        (segment) =>
+          isPropertyKey(segment) || (isNonPrimitive(segment) && isPropertyKey(segment.key)),
+      )
     ) {
       return false
     }

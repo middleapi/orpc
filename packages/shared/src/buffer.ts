@@ -5,9 +5,12 @@ import type { Arrayable } from 'type-fest'
  *
  * Prefers the newer `.bytes` method when available as it more efficient but not widely supported yet.
  */
-export async function loadBytes(source: Pick<Blob, 'arrayBuffer' | 'bytes'>): ReturnType<Blob['bytes']> {
+export async function loadBytes(
+  source: Pick<Blob, 'arrayBuffer' | 'bytes'>,
+): ReturnType<Blob['bytes']> {
+  // oxlint-disable-next-line no-restricted-properties
   if (typeof source.bytes === 'function') {
-    // eslint-disable-next-line ban/ban
+    // oxlint-disable-next-line no-restricted-properties
     return source.bytes()
   }
 
@@ -19,7 +22,11 @@ export async function loadBytes(source: Pick<Blob, 'arrayBuffer' | 'bytes'>): Re
  * - the original string value, or
  * - a Uint8Array view over the source bytes.
  */
-export function toStringOrBytes(source: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>): string | Awaited<ReturnType<Blob['bytes']>> {
+export function toStringOrBytes(
+  source: Arrayable<
+    string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>
+  >,
+): string | Awaited<ReturnType<Blob['bytes']>> {
   if (typeof source === 'string') {
     return source
   }
@@ -39,7 +46,12 @@ export function toStringOrBytes(source: Arrayable<string | ArrayBuffer | Pick<Ui
   return new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
 }
 
-function toBytes(item: string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>): Awaited<ReturnType<Blob['bytes']>> {
+function toBytes(
+  item:
+    | string
+    | ArrayBuffer
+    | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>,
+): Awaited<ReturnType<Blob['bytes']>> {
   if (typeof item === 'string') {
     return new TextEncoder().encode(item)
   }
@@ -55,7 +67,11 @@ function toBytes(item: string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buf
   return new Uint8Array(item.buffer, item.byteOffset, item.byteLength)
 }
 
-function concatBytes(items: Array<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>): Uint8Array<ArrayBuffer> {
+function concatBytes(
+  items: Array<
+    string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>
+  >,
+): Uint8Array<ArrayBuffer> {
   const chunks = items.map(toBytes)
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0)
 
@@ -71,9 +87,17 @@ function concatBytes(items: Array<string | ArrayBuffer | Pick<Uint8Array<ArrayBu
 
 interface NodeBuiltinModulesGlobal {
   process?: {
-    getBuiltinModule?: (id: 'node:buffer') => {
-      Buffer: { from: (buffer: ArrayBufferLike, byteOffset: number, length: number) => { toString: (encoding: 'base64') => string } }
-    } | undefined
+    getBuiltinModule?: (id: 'node:buffer') =>
+      | {
+          Buffer: {
+            from: (
+              buffer: ArrayBufferLike,
+              byteOffset: number,
+              length: number,
+            ) => { toString: (encoding: 'base64') => string }
+          }
+        }
+      | undefined
   }
 }
 
@@ -89,8 +113,9 @@ export function encodeBase64(bytes: Uint8Array): string {
   }
 
   // loaded at runtime, so the package keeps working on runtimes without Node.js built-ins
-  // eslint-disable-next-line node/prefer-global/process
-  const NodeBuffer = (globalThis as NodeBuiltinModulesGlobal).process?.getBuiltinModule?.('node:buffer')?.Buffer
+  const NodeBuffer = (globalThis as NodeBuiltinModulesGlobal).process?.getBuiltinModule?.(
+    'node:buffer',
+  )?.Buffer
 
   if (NodeBuffer !== undefined) {
     return NodeBuffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64')

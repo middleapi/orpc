@@ -1,18 +1,35 @@
-import type { AnySchema, ContractBuilderConfig, ErrorMap, InferSchemaInput, InferSchemaOutput, InitialInputSchema, InitialOutputSchema, MergedErrorMap, MetaPlugin, ORPCErrorConstructorMap, ProcedureContractDefinition, Schema } from '@orpc/contract'
-import type { IntersectPick } from '@orpc/shared'
-import type { BuilderWithInput, BuilderWithMiddlewares, BuilderWithOutput } from './builder-variants'
-import type { Context, MergedInitialContext } from './context'
-import type { Middleware } from './middleware'
-import type { DecoratedMiddleware } from './middleware-decorated'
-import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure'
-import type { AnyRouter } from './router'
-import type { AugmentedRouter } from './router-utils'
+import type {
+  AnySchema,
+  ErrorMap,
+  InferSchemaInput,
+  InferSchemaOutput,
+  InitialInputSchema,
+  InitialOutputSchema,
+  MergedErrorMap,
+  MetaPlugin,
+  ORPCErrorConstructorMap,
+  ProcedureContractDefinition,
+  Schema,
+} from '@orpc/contract'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
+import type { IntersectPick } from '@orpc/shared'
 import { toArray } from '@orpc/shared'
-import { Lazy } from './lazy'
-import { decorateMiddleware } from './middleware-decorated'
-import { DecoratedProcedure } from './procedure-decorated'
-import { augmentRouter } from './router-utils'
+
+import type {
+  BuilderWithInput,
+  BuilderWithMiddlewares,
+  BuilderWithOutput,
+} from './builder-variants.ts'
+import type { Context, MergedInitialContext } from './context.ts'
+import { Lazy } from './lazy.ts'
+import type { DecoratedMiddleware } from './middleware-decorated.ts'
+import { decorateMiddleware } from './middleware-decorated.ts'
+import type { Middleware } from './middleware.ts'
+import { DecoratedProcedure } from './procedure-decorated.ts'
+import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure.ts'
+import type { AugmentedRouter } from './router-utils.ts'
+import { augmentRouter } from './router-utils.ts'
+import type { AnyRouter } from './router.ts'
 
 /**
  * The initial context type used when `.$context` is not called.
@@ -21,33 +38,14 @@ import { augmentRouter } from './router-utils'
  *
  * @see {@link https://orpc.dev/docs/context#default-initial-context | Context - Default Initial Context}
  */
-export interface DefaultInitialContext {
-}
-
-/**
- * Configuration of the `os` builder: the procedure configuration,
- * plus options only read when the builder augments a router with `.router` or `.lazy`.
- */
-export interface BuilderConfig extends ProcedureConfig, ContractBuilderConfig {
-  /**
-   * When enabled, `.router` and `.lazy` skip this builder's middleware for every procedure
-   * whose middleware chain already starts with the same middleware, in the same order,
-   * applied before any `.input`/`.output` schema.
-   * This prevents middleware from running twice when the router and its procedures
-   * are built from the same builder. Only the value on the builder calling `.router` or `.lazy` is read.
-   *
-   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
-   *
-   * @default true
-   */
-  dedupeLeadingMiddlewares?: boolean | undefined
-}
+export interface DefaultInitialContext {}
 
 export interface BuilderDefinition<
   TInputSchema extends AnySchema,
   TInjectedContext extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap>, BuilderConfig {
+>
+  extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap>, ProcedureConfig {
   orderedMiddlewares: OrderedMiddleware[]
 }
 
@@ -57,17 +55,16 @@ export interface BuilderDefinition<
  *
  * @see {@link https://orpc.dev/docs/procedure | Procedure}
  */
-export class Builder<
-  TInitialContext extends Context,
-  TErrorMap extends ErrorMap,
-> {
+export class Builder<TInitialContext extends Context, TErrorMap extends ErrorMap> {
   '~orpc': BuilderDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>
 
   /**
    * Private constructor to prevent direct instantiation.
    * Use the static `create` method to initialize a new instance with a safe initial definition.
    */
-  private constructor(definition: BuilderDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>) {
+  private 'constructor'(
+    definition: BuilderDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>,
+  ) {
     this['~orpc'] = definition
   }
 
@@ -77,7 +74,10 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
-  static create<T extends Context = DefaultInitialContext>(): Builder<T & object, Record<never, never>> {
+  static 'create'<T extends Context = DefaultInitialContext>(): Builder<
+    T & object,
+    Record<never, never>
+  > {
     // Using `& object` avoids "has no properties in common with type" errors
     // when combining procedures or routers with compatible but non-overlapping contexts.
 
@@ -94,7 +94,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/context#initial-context | Context - Initial Context}
    */
-  $context<T extends Context = DefaultInitialContext>(): Builder<T & object, TErrorMap> {
+  '$context'<T extends Context = DefaultInitialContext>(): Builder<T & object, TErrorMap> {
     // Using `& object` avoids "has no properties in common with type" errors
     // when combining procedures or routers with compatible but non-overlapping contexts.
 
@@ -103,13 +103,12 @@ export class Builder<
   }
 
   /**
-   * Overrides the builder configuration, such as disabling runtime
-   * input/output validation or the automatic dedupe in `.router` and `.lazy`.
+   * Overrides the procedure configuration, such as disabling runtime
+   * input/output validation.
    *
    * @see {@link https://orpc.dev/docs/recipes/validation-customization | Validation Customization}
-   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
    */
-  $config(config: BuilderConfig): Builder<TInitialContext, TErrorMap> {
+  '$config'(config: ProcedureConfig): Builder<TInitialContext, TErrorMap> {
     return new Builder({
       ...this['~orpc'],
       ...config,
@@ -121,7 +120,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/metadata | Metadata}
    */
-  meta(
+  'meta'(
     ...plugins: MetaPlugin<InitialInputSchema, InitialOutputSchema, TErrorMap>[]
   ): Builder<TInitialContext, TErrorMap> {
     const [meta, metaPlugins] = resolveMetaPlugins(
@@ -143,9 +142,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/error-handling#typesafe-errors | Error Handling - Typesafe Errors}
    */
-  errors<U extends ErrorMap>(
-    errors: U,
-  ): Builder<TInitialContext, MergedErrorMap<TErrorMap, U>> {
+  'errors'<U extends ErrorMap>(errors: U): Builder<TInitialContext, MergedErrorMap<TErrorMap, U>> {
     let builder = new Builder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),
@@ -165,7 +162,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
-  use<
+  'use'<
     $OutContext extends IntersectPick<TInitialContext, $OutContext>,
     $InContext extends Context = TInitialContext,
     $ErrorMap extends ErrorMap = TErrorMap,
@@ -185,11 +182,14 @@ export class Builder<
     let builder = new Builder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(middleware['~orpc']?.errorMap ?? {}, this['~orpc'].errorMap),
-      orderedMiddlewares: [...this['~orpc'].orderedMiddlewares, {
-        middleware,
-        inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
-        outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
-      }],
+      orderedMiddlewares: [
+        ...this['~orpc'].orderedMiddlewares,
+        {
+          middleware,
+          inputSchemasLengthAtUse: this['~orpc'].inputSchemas?.length,
+          outputSchemasLengthAtUse: this['~orpc'].outputSchemas?.length,
+        },
+      ],
     })
 
     if (middleware['~orpc']?.metaPlugins) {
@@ -205,7 +205,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/middleware | Middleware}
    */
-  middleware<
+  'middleware'<
     $OutContext extends IntersectPick<TInitialContext, $OutContext>,
     $Input,
     $Output = any, // $Output = any by default is important to make middleware can be used in any output by default
@@ -240,7 +240,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/procedure#inputoutput-validation | Procedure - Input/Output Validation}
    */
-  input<$ extends AnySchema>(schema: $): BuilderWithInput<TInitialContext, object, $, TErrorMap> {
+  'input'<$ extends AnySchema>(schema: $): BuilderWithInput<TInitialContext, object, $, TErrorMap> {
     let builder = new Builder({
       ...this['~orpc'],
       inputSchemas: [...toArray(this['~orpc'].inputSchemas), schema],
@@ -259,7 +259,9 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/procedure#inputoutput-validation | Procedure - Input/Output Validation}
    */
-  output<$ extends AnySchema>(schema: $): BuilderWithOutput<TInitialContext, object, $, TErrorMap> {
+  'output'<$ extends AnySchema>(
+    schema: $,
+  ): BuilderWithOutput<TInitialContext, object, $, TErrorMap> {
     let builder = new Builder({
       ...this['~orpc'],
       outputSchemas: [...toArray(this['~orpc'].outputSchemas), schema],
@@ -279,15 +281,14 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
-  handler<T>(
-    handler: ProcedureHandler<TInitialContext, InferSchemaOutput<InitialInputSchema>, T, ORPCErrorConstructorMap<TErrorMap>>,
-  ): DecoratedProcedure<
-    TInitialContext,
-    object,
-    InitialInputSchema,
-    Schema<T>,
-    TErrorMap
-  > {
+  'handler'<T>(
+    handler: ProcedureHandler<
+      TInitialContext,
+      InferSchemaOutput<InitialInputSchema>,
+      T,
+      ORPCErrorConstructorMap<TErrorMap>
+    >,
+  ): DecoratedProcedure<TInitialContext, object, InitialInputSchema, Schema<T>, TErrorMap> {
     let procedure = new DecoratedProcedure({
       ...this['~orpc'],
       handler,
@@ -307,9 +308,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/router#extending-router | Router - Extending Router}
    */
-  router<T extends AnyRouter>(
-    router: T,
-  ): AugmentedRouter<T, TErrorMap> {
+  'router'<T extends AnyRouter>(router: T): AugmentedRouter<T, TErrorMap> {
     return augmentRouter(router, {
       ...this['~orpc'],
       middlewares: this['~orpc'].orderedMiddlewares.map(({ middleware }) => middleware),
@@ -322,7 +321,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/router#lazy-router | Router - Lazy Router}
    */
-  lazy<T extends AnyRouter>(
+  'lazy'<T extends AnyRouter>(
     loader: () => Promise<{ default: T }>,
   ): Lazy<AugmentedRouter<T, TErrorMap>> {
     return new Lazy({
@@ -344,4 +343,7 @@ export class Builder<
  *
  * @see {@link https://orpc.dev/docs/procedure | Procedure}
  */
-export const os: Builder<DefaultInitialContext & object, Record<never, never>> = /* @__PURE__ */ Builder.create()
+export const os: Builder<
+  DefaultInitialContext & object,
+  Record<never, never>
+> = /* @__PURE__ */ Builder.create()

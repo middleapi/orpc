@@ -1,5 +1,6 @@
 import pino from 'pino'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
 
 it('getLogger', async () => {
   expect(getLogger({})).toBeUndefined()

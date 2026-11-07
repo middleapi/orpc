@@ -1,8 +1,8 @@
 ---
-title: "Dedupe Plugin"
-description: "Prevent redundant requests by deduplicating similar in-flight requests, reducing the number of requests sent to the server."
+title: 'Dedupe Plugin'
+description: 'Prevent redundant requests by deduplicating similar in-flight requests, reducing the number of requests sent to the server.'
 sidebar:
-  label: "Dedupe"
+  label: 'Dedupe'
 ---
 
 ## Overview
@@ -81,21 +81,24 @@ const link = new RPCLink<ClientContext>({
       groups: [
         {
           condition: ({ context }) => context?.cache === 'force-cache',
-          context: { // used for the rest of the request lifecycle
+          context: {
+            // used for the rest of the request lifecycle
             cache: 'force-cache',
           },
         },
-        { // Fallback for all other requests. Keep this last.
+        {
+          // Fallback for all other requests. Keep this last.
           condition: () => true,
           context: {},
         },
       ],
     }),
   ],
-  fetch: (url, init, { context }) => globalThis.fetch(url, {
-    ...init,
-    cache: context?.cache,
-  }),
+  fetch: (url, init, { context }) =>
+    globalThis.fetch(url, {
+      ...init,
+      cache: context?.cache,
+    }),
 })
 ```
 

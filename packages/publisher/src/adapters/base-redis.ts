@@ -1,11 +1,16 @@
 import type { RPCJsonSerialization } from '@orpc/client'
-import type { Public, ThrowableError } from '@orpc/shared'
-import type { EventMeta } from '@standard-server/core'
-import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { Public, ThrowableError } from '@orpc/shared'
 import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
+import type { EventMeta } from '@standard-server/core'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
-import { Publisher } from '../publisher'
+
+import type {
+  PublisherOptions,
+  PublisherResumeOptions,
+  PublisherSubscribeListenerOptions,
+} from '../publisher.ts'
+import { Publisher } from '../publisher.ts'
 
 /**
  * Adds `ARGV[1]` to stream `KEYS[1]` and publishes it with its ID to the channel of the same name,
@@ -36,14 +41,15 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
   serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link PublisherResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: PublisherResumeOptions | undefined
+  resume?: boolean | PublisherResumeOptions | undefined
 }
 
 /**
@@ -95,8 +101,8 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
     this.eventPrefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeTtl = resume?.ttl ?? 300_000
+    this.resumeEnabled = resume !== undefined && resume !== false
+    this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
   }
 
   /**
@@ -192,10 +198,9 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
     const messageListener = (message: unknown) => {
       try {
-        const { id, data } = parseIfText(message) as { id?: string, data: SerializedEvent }
+        const { id, data } = parseIfText(message) as { id?: string; data: SerializedEvent }
         deduplicatingListener(this.deserializePayload(id, data) as T[K])
-      }
-      catch (error) {
+      } catch (error) {
         onError?.(error as ThrowableError)
       }
     }
@@ -214,8 +219,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
       const pending = pendingPayloads
       pendingPayloads = undefined
       pending.forEach(deduplicatingListener)
-    }
-    catch (error) {
+    } catch (error) {
       await unsubscribe()
       throw error
     }

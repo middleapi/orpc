@@ -1,9 +1,11 @@
-import type { CreateClientServerTest } from './client-server'
+import { afterAll } from 'bun:test'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RPCHandler } from '@orpc/server/fetch'
-import { afterAll } from 'bun:test'
-import { defaultSerializer } from './client-server'
+
+import type { CreateClientServerTest } from './client-server.ts'
+import { defaultSerializer } from './client-server.ts'
 
 export const createBunFetchClientServerTest: CreateClientServerTest = (
   router,
@@ -26,7 +28,7 @@ export const createBunFetchClientServerTest: CreateClientServerTest = (
   })
 
   afterAll(() => {
-    server.stop()
+    void server.stop()
   })
 
   const link = new RPCLink({

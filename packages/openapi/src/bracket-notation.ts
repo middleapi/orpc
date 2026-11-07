@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { getOwn, isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
+import { isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
 
 export type BracketNotationSerializeResult = [string, unknown][]
 
@@ -32,20 +32,21 @@ export class BracketNotationSerializer {
     return result
   }
 
-  private internalSerialize(data: unknown, path: string, isRoot: boolean, result: BracketNotationSerializeResult): void {
+  private internalSerialize(
+    data: unknown,
+    path: string,
+    isRoot: boolean,
+    result: BracketNotationSerializeResult,
+  ): void {
     if (Array.isArray(data)) {
       data.forEach((item, i) => {
         this.internalSerialize(item, isRoot ? i.toString() : `${path}[${i}]`, false, result)
       })
-    }
-
-    else if (isPlainObject(data)) {
+    } else if (isPlainObject(data)) {
       for (const key of Object.keys(data)) {
         this.internalSerialize(data[key], isRoot ? key : `${path}[${key}]`, false, result)
       }
-    }
-
-    else {
+    } else {
       result.push([path, data])
     }
   }
@@ -68,32 +69,39 @@ export class BracketNotationSerializer {
         const segment = segments[i]!
         const isLast = i === segments.length - 1
 
-        const existing: any = getOwn(currentRef, nextSegment)
+        const hasExisting = Object.hasOwn(currentRef, nextSegment)
+        const existing: any = hasExisting ? currentRef[nextSegment] : undefined
         let child: any = existing
         let key: string | number = segment
 
-        // A missing or primitive value is treated like an empty array, which becomes an object if it cannot stay one
+        // A missing value is treated like an empty array and a leaf value like a one-item array (as if its key
+        // were repeated), which becomes an object if it cannot stay one
         if (Array.isArray(child) || !isPlainObject(child)) {
+          if (hasExisting && !Array.isArray(child)) {
+            child = [child]
+          }
+
           const isArray = Array.isArray(child)
           const isPushStyle = isArray && !!arrayPushStyles?.has(child)
           const length = isArray ? child.length : 0
           const index = internalToArrayIndex(segment)
           const emptySlots = index === undefined ? 0 : Math.max(0, index - length)
 
-          const canBeArray = segment === ''
-            ? isLast && (isPushStyle || length === 0)
-            : index !== undefined && !(isLast && isPushStyle) && emptySlots <= emptySlotsLeft
+          const canBeArray =
+            segment === ''
+              ? isLast && (isPushStyle || length === 0)
+              : index !== undefined && !(isLast && isPushStyle) && emptySlots <= emptySlotsLeft
 
           if (canBeArray) {
             emptySlotsLeft -= emptySlots
             child = isArray ? child : []
             key = index ?? segment
-          }
-          else if (isArray) {
+          } else if (isArray) {
             arrayPushStyles?.delete(child)
-            child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
-          }
-          else {
+            child = isPushStyle
+              ? internalPushStyleArrayToObject(child)
+              : internalArrayToObject(child)
+          } else {
             child = new NullProtoObj()
           }
         }
@@ -110,18 +118,15 @@ export class BracketNotationSerializer {
         arrayPushStyles ??= new WeakSet()
         arrayPushStyles.add(currentRef)
         currentRef.push(value)
-      }
-      else if (Object.hasOwn(currentRef, nextSegment)) {
+      } else if (Object.hasOwn(currentRef, nextSegment)) {
         const current = currentRef[nextSegment]
 
         if (Array.isArray(current)) {
           current.push(value)
-        }
-        else {
+        } else {
           internalSetOwn(currentRef, nextSegment, [current, value])
         }
-      }
-      else {
+      } else {
         internalSetOwn(currentRef, nextSegment, value)
       }
     }
@@ -224,12 +229,21 @@ function internalPushStyleArrayToObject(array: readonly unknown[]): Record<strin
  * so a lone `{ 999: x }` takes ~12KB in V8. Holding `MAX_ARRAY_INDEX` switches an object to sparse storage
  * for good (V8 and JSC), so writing and deleting it keeps the object's integer keys cheap without a trace.
  */
-function internalSetOwn(container: Record<string, unknown>, key: string | number, value: unknown): void {
+function internalSetOwn(
+  container: Record<string, unknown>,
+  key: string | number,
+  value: unknown,
+): void {
   if (typeof key === 'string' && container instanceof NullProtoObj) {
     const index = internalToArrayIndex(key)
 
     // `0`, or the key right after an existing one, keeps the flat store filled
-    if (index !== undefined && index !== 0 && !Object.hasOwn(container, index - 1) && !Object.hasOwn(container, MAX_ARRAY_INDEX)) {
+    if (
+      index !== undefined &&
+      index !== 0 &&
+      !Object.hasOwn(container, index - 1) &&
+      !Object.hasOwn(container, MAX_ARRAY_INDEX)
+    ) {
       container[MAX_ARRAY_INDEX] = undefined
       delete container[MAX_ARRAY_INDEX]
     }

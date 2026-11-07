@@ -1,13 +1,15 @@
-import type { AnyTextAdapter, StreamChunk, TextOptions, UIMessage } from '@tanstack/ai'
 import type { AddressInfo } from 'node:net'
+
 import { serve } from '@hono/node-server'
 import { createORPCClient } from '@orpc/client'
 import { openapi } from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { os, type } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
+import type { AnyTextAdapter, StreamChunk, TextOptions, UIMessage } from '@tanstack/ai'
 import { chat, EventType } from '@tanstack/ai'
-import { fetchServerSentEvents } from '@tanstack/ai-client'
+import type { ChatFetcher } from '@tanstack/ai-client'
+import { ChatClient, fetchServerSentEvents } from '@tanstack/ai-client'
 
 /**
  * Minimal TextAdapter that echoes the last user message, so the real `chat()`
@@ -18,25 +20,36 @@ function mockText(): AnyTextAdapter {
     kind: 'text' as const,
     name: 'mock',
     model: 'mock-echo-1',
-    async* chatStream(options: TextOptions<Record<string, any>>): AsyncIterable<StreamChunk> {
+    async *chatStream(options: TextOptions): AsyncIterable<StreamChunk> {
       const runId = options.runId ?? 'run_mock'
       const threadId = options.threadId ?? 'thread_mock'
       const messageId = 'msg_mock'
 
       yield { type: EventType.RUN_STARTED, runId, threadId, timestamp: Date.now() }
-      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant', timestamp: Date.now() }
+      yield {
+        type: EventType.TEXT_MESSAGE_START,
+        messageId,
+        role: 'assistant',
+        timestamp: Date.now(),
+      }
 
-      const lastUser = [...(options.messages ?? [])].reverse().find(m => m.role === 'user')
-      const lastContent = typeof lastUser?.content === 'string'
-        ? lastUser.content
-        : JSON.stringify(lastUser?.content)
+      const lastUser = [...(options.messages ?? [])].toReversed().find((m) => m.role === 'user')
+      const lastContent =
+        typeof lastUser?.content === 'string' ? lastUser.content : JSON.stringify(lastUser?.content)
 
       for (const delta of ['echo: ', lastContent]) {
         yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, timestamp: Date.now() }
       }
 
       yield { type: EventType.TEXT_MESSAGE_END, messageId, timestamp: Date.now() }
-      yield { type: EventType.RUN_FINISHED, runId, threadId, model: 'mock-echo-1', timestamp: Date.now(), finishReason: 'stop' }
+      yield {
+        type: EventType.RUN_FINISHED,
+        runId,
+        threadId,
+        model: 'mock-echo-1',
+        timestamp: Date.now(),
+        finishReason: 'stop',
+      }
     },
     structuredOutput: async (): Promise<never> => {
       throw new Error('mock adapter does not support structured output')
@@ -50,7 +63,7 @@ function mockText(): AnyTextAdapter {
 const router = {
   streamChat: os
     .meta(openapi({ method: 'POST', path: '/chat' }))
-    .input(type<{ messages: UIMessage[] }>())
+    .input(type<{ messages: UIMessage[]; threadId: string; runId: string }>())
     .handler(({ input, signal }) => {
       const abortController = new AbortController()
       signal?.addEventListener('abort', () => abortController.abort(), { once: true })
@@ -58,6 +71,8 @@ const router = {
       return chat({
         adapter: mockText(),
         messages: input.messages,
+        threadId: input.threadId,
+        runId: input.runId,
         abortController,
       })
     }),
@@ -86,6 +101,8 @@ const userMessages: UIMessage[] = [
   { id: '1', role: 'user', parts: [{ type: 'text', content: 'ping' }] },
 ]
 
+const runContext = { threadId: 'thread_1', runId: 'run_1' }
+
 async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = []
   for await (const chunk of stream) {
@@ -96,32 +113,53 @@ async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[
 
 function collectText(chunks: StreamChunk[]): string {
   return chunks
-    .filter(chunk => chunk.type === EventType.TEXT_MESSAGE_CONTENT)
-    .map(chunk => chunk.delta)
+    .filter((chunk) => chunk.type === EventType.TEXT_MESSAGE_CONTENT)
+    .map((chunk) => chunk.delta)
     .join('')
 }
 
 function expectChatStream(chunks: StreamChunk[]): void {
-  expect(chunks.at(0)?.type).toBe(EventType.RUN_STARTED)
-  expect(chunks.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(chunks.at(0)).toMatchObject({ type: EventType.RUN_STARTED, ...runContext })
+  expect(chunks.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED, ...runContext })
   expect(collectText(chunks)).toContain('ping')
 }
 
 it('chat() returns an async iterator object, so procedures can return it directly', () => {
-  const stream = chat({ adapter: mockText(), messages: userMessages })
+  const stream = chat({ adapter: mockText(), messages: userMessages, ...runContext })
 
   expect(isAsyncIteratorObject(stream)).toBe(true)
 })
 
-it('streams through the oRPC client as an async iterator object, compatible with useChat fetcher', async () => {
-  const stream = await client.streamChat({ messages: userMessages })
+it('streams through the oRPC client as an async iterator object', async () => {
+  const stream = await client.streamChat({ messages: userMessages, ...runContext })
 
   expect(isAsyncIteratorObject(stream)).toBe(true)
   expectChatStream(await collect(stream))
 })
 
-it('is consumable by tanstack ai\'s built-in fetchServerSentEvents connection', async () => {
+it("works as the fetcher of tanstack ai's chat client (useChat)", async () => {
+  const fetcher = vi.fn<ChatFetcher>(({ messages, threadId, runId }, { signal }) =>
+    client.streamChat({ messages, threadId, runId }, { signal }),
+  )
+
+  const chatClient = new ChatClient({ threadId: 'thread_1', fetcher })
+  await chatClient.sendMessage('ping')
+
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(fetcher.mock.calls[0]![0].threadId).toBe('thread_1')
+
+  const [user, assistant] = chatClient.getMessages()
+  expect(user?.role).toBe('user')
+  expect(assistant?.role).toBe('assistant')
+  expect(assistant?.parts).toEqual([
+    expect.objectContaining({ type: 'text', content: expect.stringContaining('ping') }),
+  ])
+})
+
+it("is consumable by tanstack ai's built-in fetchServerSentEvents connection", async () => {
   const connection = fetchServerSentEvents(`${origin}/api/chat`)
 
-  expectChatStream(await collect(connection.connect(userMessages)))
+  expectChatStream(
+    await collect(connection.connect(userMessages, undefined, undefined, runContext)),
+  )
 })

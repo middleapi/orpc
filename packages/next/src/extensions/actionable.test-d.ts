@@ -1,7 +1,8 @@
 import type { DecoratedProcedure, Procedure } from '@orpc/server'
-import type { ProcedureServerFunction } from '../server-function'
 import { z } from 'zod'
-import './actionable'
+
+import type { ProcedureServerFunction } from '../server-function.ts'
+import './actionable.ts'
 
 const errorMap = {
   BASE: {
@@ -10,8 +11,8 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 it('adds .actionable method to DecoratedProcedure', async () => {
   const procedure = {} as DecoratedProcedure<
@@ -23,18 +24,14 @@ it('adds .actionable method to DecoratedProcedure', async () => {
   >
 
   expectTypeOf(procedure.actionable({ context: { auth: true } })).toEqualTypeOf<
-    & ProcedureServerFunction<
+    ProcedureServerFunction<typeof schema1, typeof schema2, typeof errorMap> &
+      Procedure<
+        { auth: boolean },
+        { extra: string },
         typeof schema1,
         typeof schema2,
         typeof errorMap
-    >
-    & Procedure<
-      { auth: boolean },
-      { extra: string },
-        typeof schema1,
-        typeof schema2,
-        typeof errorMap
-    >
+      >
   >()
 
   // @ts-expect-error - invalid initial context

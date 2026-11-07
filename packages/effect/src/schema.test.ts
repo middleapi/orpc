@@ -1,6 +1,7 @@
 import { getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
 import { Schema } from 'effect'
-import { toStandardSchema } from './schema'
+
+import { toStandardSchema } from './schema.ts'
 
 describe('toStandardSchema', () => {
   it('convert to standard schema', () => {

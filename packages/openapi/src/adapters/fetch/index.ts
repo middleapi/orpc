@@ -1,2 +1,2 @@
-export * from './openapi-handler'
-export * from './openapi-link'
+export * from './openapi-handler.ts'
+export * from './openapi-link.ts'

@@ -1,5 +1,5 @@
 it('exports openapi meta, OpenAPIGenerator, OpenAPISerializer, OpenAPIJsonSerializer, BracketNotationSerializer', async () => {
-  await expect(import('.')).resolves.toMatchObject({
+  await expect(import('./index.ts')).resolves.toMatchObject({
     openapi: expect.any(Function),
     OpenAPIGenerator: expect.any(Function),
     OpenAPISerializer: expect.any(Function),

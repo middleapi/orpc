@@ -1,18 +1,22 @@
-import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
 import { AbortError } from '@orpc/shared'
-import { StandardLink } from '../adapters/standard'
-import { TimeoutLinkPlugin } from './timeout'
+import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
+
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
+import { StandardLink } from '../adapters/standard/index.ts'
+import { TimeoutLinkPlugin } from './timeout.ts'
 
 function makeCodec(): StandardLinkCodec<any> {
   return {
-    encodeInput: vi.fn(async () => ({
-      method: 'POST',
-      url: '/test',
-      headers: {},
-      body: undefined,
-    } satisfies StandardRequest)),
-    decodeResponse: vi.fn(async response => ({
+    encodeInput: vi.fn(
+      async () =>
+        ({
+          method: 'POST',
+          url: '/test',
+          headers: {},
+          body: undefined,
+        }) satisfies StandardRequest,
+    ),
+    decodeResponse: vi.fn(async (response) => ({
       kind: 'output' as const,
       output: await response.resolveBody(),
     })),
@@ -21,19 +25,27 @@ function makeCodec(): StandardLinkCodec<any> {
 
 function makeTransport(): StandardLinkTransport<any> {
   return {
-    send: vi.fn(async () => ({
-      status: 200,
-      headers: {},
-      resolveBody: async () => 'success',
-    } satisfies StandardLazyResponse)),
+    send: vi.fn(
+      async () =>
+        ({
+          status: 200,
+          headers: {},
+          resolveBody: async () => 'success',
+        }) satisfies StandardLazyResponse,
+    ),
   }
 }
 
 function makeAbortableTransport(): StandardLinkTransport<any> {
   return {
-    send: vi.fn((request, path, options) => new Promise<StandardLazyResponse>((_, reject) => {
-      options.signal?.addEventListener('abort', () => reject(options.signal!.reason), { once: true })
-    })),
+    send: vi.fn(
+      (request, path, options) =>
+        new Promise<StandardLazyResponse>((_, reject) => {
+          options.signal?.addEventListener('abort', () => reject(options.signal!.reason), {
+            once: true,
+          })
+        }),
+    ),
   }
 }
 
@@ -79,9 +91,8 @@ describe('timeoutLinkPlugin', () => {
     expect(vi.getTimerCount()).toBe(1)
 
     await vi.advanceTimersByTimeAsync(1)
-    await expect(promise).rejects.toSatisfy(error =>
-      error instanceof AbortError
-      && error.message === 'Request timed out after 1000ms',
+    await expect(promise).rejects.toSatisfy(
+      (error) => error instanceof AbortError && error.message === 'Request timed out after 1000ms',
     )
   })
 
@@ -102,24 +113,33 @@ describe('timeoutLinkPlugin', () => {
     await expect(promise).rejects.toBeInstanceOf(AbortError)
 
     expect(timeout).toHaveBeenCalledTimes(1)
-    expect(timeout).toHaveBeenCalledWith(expect.objectContaining({
-      path: ['test'],
-      input: 'input',
-      context: { timeout: 1000 },
-    }))
+    expect(timeout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: ['test'],
+        input: 'input',
+        context: { timeout: 1000 },
+      }),
+    )
   })
 
   it.each([null, undefined])('should disable timeout when value is %s', async (timeout) => {
     const codec = makeCodec()
     const transport = makeTransport()
 
-    vi.mocked(transport.send).mockImplementation(() => new Promise((resolve) => {
-      setTimeout(() => resolve({
-        status: 200,
-        headers: {},
-        resolveBody: async () => 'success',
-      } satisfies StandardLazyResponse), 100_000)
-    }))
+    vi.mocked(transport.send).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                status: 200,
+                headers: {},
+                resolveBody: async () => 'success',
+              } satisfies StandardLazyResponse),
+            100_000,
+          )
+        }),
+    )
 
     const link = new StandardLink(codec, transport, {
       plugins: [new TimeoutLinkPlugin({ timeout })],
@@ -166,9 +186,8 @@ describe('timeoutLinkPlugin', () => {
     promise.catch(() => {})
 
     await vi.advanceTimersByTimeAsync(1000)
-    await expect(promise).rejects.toSatisfy(error =>
-      error instanceof AbortError
-      && error.message === 'Request timed out after 1000ms',
+    await expect(promise).rejects.toSatisfy(
+      (error) => error instanceof AbortError && error.message === 'Request timed out after 1000ms',
     )
   })
 })

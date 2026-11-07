@@ -1,66 +1,62 @@
 {
   "name": "@orpc/effect",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Effect integration for oRPC: build typesafe procedures with Effect",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "orpc",
+    "rpc",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/effect"
   },
-  "keywords": [
-    "orpc",
-    "effect",
-    "effect-ts",
-    "rpc",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": [
-    "./dist/extensions/effect.mjs",
-    "./dist/extensions/schema.mjs"
+    "./dist/extensions/effect.js",
+    "./dist/extensions/schema.js"
   ],
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./extensions/effect": {
-        "types": "./dist/extensions/effect.d.mts",
-        "import": "./dist/extensions/effect.mjs",
-        "default": "./dist/extensions/effect.mjs"
-      },
-      "./extensions/schema": {
-        "types": "./dist/extensions/schema.d.mts",
-        "import": "./dist/extensions/schema.mjs",
-        "default": "./dist/extensions/schema.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./extensions/effect": "./src/extensions/effect.ts",
     "./extensions/schema": "./src/extensions/schema.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./extensions/effect": {
+        "types": "./dist/extensions/effect.d.ts",
+        "import": "./dist/extensions/effect.js",
+        "default": "./dist/extensions/effect.js"
+      },
+      "./extensions/schema": {
+        "types": "./dist/extensions/schema.d.ts",
+        "import": "./dist/extensions/schema.js",
+        "default": "./dist/extensions/schema.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "effect": ">=4.0.0"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -70,6 +66,9 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "effect": "^4.1.0"
+    "effect": "^4.1.2"
+  },
+  "peerDependencies": {
+    "effect": ">=4.0.0"
   }
 }

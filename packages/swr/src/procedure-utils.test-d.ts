@@ -1,38 +1,30 @@
 import type { Client, ORPCError } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { OperationKey } from './key'
-import type { ProcedureUtils } from './procedure-utils'
 import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
 
+import type { OperationKey } from './key.ts'
+import type { ProcedureUtils } from './procedure-utils.ts'
+
 describe('procedureUtils', () => {
-  type UtilsInput = { search?: string, cursor?: number } | undefined
+  type UtilsInput = { search?: string; cursor?: number } | undefined
   type UtilsOutput = { title: string }[]
   type UtilsError = ORPCError<'BASE', { output: string }> | Error
   const condition = {} as boolean
 
-  const optionalUtils = {} as Public<ProcedureUtils<
-    { batch?: boolean },
-    UtilsInput,
-    UtilsOutput,
-    UtilsError
-  >>
+  const optionalUtils = {} as Public<
+    ProcedureUtils<{ batch?: boolean }, UtilsInput, UtilsOutput, UtilsError>
+  >
 
-  const requiredUtils = {} as Public<ProcedureUtils<
-    { batch: boolean },
-    'input',
-    UtilsOutput,
-    Error
-  >>
+  const requiredUtils = {} as Public<
+    ProcedureUtils<{ batch: boolean }, 'input', UtilsOutput, Error>
+  >
 
-  const streamUtils = {} as Public<ProcedureUtils<
-    { batch?: boolean },
-    UtilsInput,
-    AsyncIterable<UtilsOutput[number]>,
-    UtilsError
-  >>
+  const streamUtils = {} as Public<
+    ProcedureUtils<{ batch?: boolean }, UtilsInput, AsyncIterable<UtilsOutput[number]>, UtilsError>
+  >
 
   it('.call', () => {
     expectTypeOf(optionalUtils.call).toEqualTypeOf<
@@ -43,7 +35,7 @@ describe('procedureUtils', () => {
   describe('.key', () => {
     it('should handle optional `input` correctly', () => {
       optionalUtils.key()
-      optionalUtils.key({ })
+      optionalUtils.key({})
       optionalUtils.key({ input: { search: 'search' } })
     })
 
@@ -66,7 +58,9 @@ describe('procedureUtils', () => {
 
     it('return valid key', () => {
       expectTypeOf(optionalUtils.key()).toEqualTypeOf<OperationKey<UtilsInput>>()
-      expectTypeOf(optionalUtils.key({ input: { search: 'search' } })).toEqualTypeOf<OperationKey<UtilsInput>>()
+      expectTypeOf(optionalUtils.key({ input: { search: 'search' } })).toEqualTypeOf<
+        OperationKey<UtilsInput>
+      >()
     })
   })
 
@@ -88,7 +82,7 @@ describe('procedureUtils', () => {
 
     it('allow use `null` as key', () => {
       useSWR(condition ? null : optionalUtils.key(), optionalUtils.fetcher())
-      useSWRInfinite(() => condition ? null : optionalUtils.key(), optionalUtils.fetcher())
+      useSWRInfinite(() => (condition ? null : optionalUtils.key()), optionalUtils.fetcher())
     })
 
     it('should infer types for `context` correctly', () => {
@@ -114,7 +108,10 @@ describe('procedureUtils', () => {
       // FIXME: this should be typed
       // expectTypeOf(swr.error).toEqualTypeOf<UtilsError | undefined>()
 
-      const infinite = useSWRInfinite((index, previousPage) => optionalUtils.key(), optionalUtils.fetcher())
+      const infinite = useSWRInfinite(
+        (index, previousPage) => optionalUtils.key(),
+        optionalUtils.fetcher(),
+      )
       expectTypeOf(infinite.data).toEqualTypeOf<UtilsOutput[] | undefined>()
       // FIXME: this should be typed
       // expectTypeOf(infinite.error).toEqualTypeOf<UtilsError | undefined>()
@@ -149,8 +146,18 @@ describe('procedureUtils', () => {
       requiredUtils.subscriber({ context: { batch: 'invalid' } })
     })
 
+    it('should infer types for `refetchMode` correctly', () => {
+      optionalUtils.subscriber({ refetchMode: 'reset' })
+      optionalUtils.subscriber({ refetchMode: 'append' })
+      // @ts-expect-error - 'replace' is removed
+      optionalUtils.subscriber({ refetchMode: 'replace' })
+    })
+
     it('should infer types for `output` and `error` correctly', () => {
-      const subscription = useSWRSubscription(streamUtils.key(), streamUtils.subscriber({ maxChunks: 5 }))
+      const subscription = useSWRSubscription(
+        streamUtils.key(),
+        streamUtils.subscriber({ maxChunks: 5 }),
+      )
       expectTypeOf(subscription.data).toEqualTypeOf<UtilsOutput | undefined>()
       expectTypeOf(subscription.error).toEqualTypeOf<UtilsError | undefined>()
     })

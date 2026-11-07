@@ -1,54 +1,49 @@
 {
   "name": "@orpc/pinia-colada",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Pinia Colada integration for oRPC: typesafe queries and mutations for Vue",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "mutation",
+    "orpc",
+    "pinia",
+    "pinia-colada",
+    "query",
+    "typesafe",
+    "typescript",
+    "vue"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/pinia-colada"
   },
-  "keywords": [
-    "orpc",
-    "vue",
-    "pinia",
-    "pinia-colada",
-    "query",
-    "mutation",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "@pinia/colada": ">=1.2.0",
-    "vue": ">=3.5.17"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -57,10 +52,14 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@pinia/colada": "^1.4.8",
+    "@pinia/colada": "^1.4.9",
     "@vue/test-utils": "^2.5.1",
     "pinia": "^4.1.0",
     "vue": "^3.5.44",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@pinia/colada": ">=1.4.9",
+    "vue": ">=3.5.17"
   }
 }

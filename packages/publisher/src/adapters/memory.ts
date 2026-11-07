@@ -1,19 +1,25 @@
 import type { ThrowableError } from '@orpc/shared'
-import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { compareSequentialIds, once, SequentialIdGenerator } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
-import { Publisher } from '../publisher'
+
+import type {
+  PublisherOptions,
+  PublisherResumeOptions,
+  PublisherSubscribeListenerOptions,
+} from '../publisher.ts'
+import { Publisher } from '../publisher.ts'
 
 export interface MemoryPublisherOptions extends PublisherOptions {
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link PublisherResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: PublisherResumeOptions | undefined
+  resume?: boolean | PublisherResumeOptions | undefined
 }
 
 interface StoredEvent<T> {
@@ -36,8 +42,8 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
   constructor({ resume, ...options }: MemoryPublisherOptions = {}) {
     super(options)
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeTtl = resume?.ttl ?? 300_000
+    this.resumeEnabled = resume !== undefined && resume !== false
+    this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
@@ -48,7 +54,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
       let bucket = this.eventsMap.get(event)
       if (!bucket) {
-        this.eventsMap.set(event, bucket = [])
+        this.eventsMap.set(event, (bucket = []))
       }
 
       const [original, meta] = unwrapEvent(payload)
@@ -58,7 +64,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       bucket.push({ expiresAt, payload })
     }
 
-    this.listenersMap.get(event)?.forEach(listener => listener(payload))
+    this.listenersMap.get(event)?.forEach((listener) => listener(payload))
   }
 
   protected async subscribeListener<K extends keyof T & string>(
@@ -81,15 +87,14 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     const isolatedListener = (payload: T[K]) => {
       try {
         listener(payload)
-      }
-      catch (error) {
+      } catch (error) {
         options?.onError?.(error as ThrowableError)
       }
     }
 
     let listeners = this.listenersMap.get(event)
     if (!listeners) {
-      this.listenersMap.set(event, listeners = [])
+      this.listenersMap.set(event, (listeners = []))
     }
 
     listeners.push(isolatedListener)
@@ -102,8 +107,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
       if (remaining.length === 0) {
         this.listenersMap.delete(event)
-      }
-      else {
+      } else {
         this.listenersMap.set(event, remaining)
       }
     })
@@ -134,10 +138,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   }
 }
 
-function findResumeStartIndex<T>(
-  bucket: Array<StoredEvent<T>>,
-  lastEventId: string,
-): number {
+function findResumeStartIndex<T>(bucket: Array<StoredEvent<T>>, lastEventId: string): number {
   let lo = 0
   let hi = bucket.length
 
@@ -147,8 +148,7 @@ function findResumeStartIndex<T>(
 
     if (id !== undefined && compareSequentialIds(id, lastEventId) > 0) {
       hi = mid
-    }
-    else {
+    } else {
       lo = mid + 1
     }
   }
@@ -156,10 +156,7 @@ function findResumeStartIndex<T>(
   return lo
 }
 
-function findFirstUnexpiredIndex<T>(
-  bucket: Array<StoredEvent<T>>,
-  now: number,
-): number {
+function findFirstUnexpiredIndex<T>(bucket: Array<StoredEvent<T>>, now: number): number {
   let lo = 0
   let hi = bucket.length
 
@@ -168,8 +165,7 @@ function findFirstUnexpiredIndex<T>(
 
     if (bucket[mid]!.expiresAt <= now) {
       lo = mid + 1
-    }
-    else {
+    } else {
       hi = mid
     }
   }

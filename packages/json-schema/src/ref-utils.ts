@@ -3,9 +3,14 @@
  * and exclusively use absolute JSON pointers for `$ref` values.
  */
 
-import type { JsonSchema } from './types'
-import { get, setOwn } from '@orpc/shared'
-import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
+import { get, isPlainObject, setOwn } from '@orpc/shared'
+
+import {
+  JSON_SCHEMA_LITERAL_KEYWORDS,
+  JSON_SCHEMA_LOGIC_KEYWORDS,
+  JSON_SCHEMA_RECORD_KEYWORDS,
+} from './constants.ts'
+import type { JsonSchema } from './types.ts'
 
 /**
  * Encodes a JSON Pointer segment according to RFC 6901.
@@ -29,7 +34,10 @@ export function decodeJsonPointerSegment(segment: string): string {
  * Resolves a local JSON pointer ref (`#` or `#/...`) against the root schema.
  * Returns `undefined` for non-local refs and missing targets.
  */
-export function resolveJsonSchemaLocalPointer(root: JsonSchema, ref: string): JsonSchema | undefined {
+export function resolveJsonSchemaLocalPointer(
+  root: JsonSchema,
+  ref: string,
+): JsonSchema | undefined {
   if (ref === '#') {
     return root
   }
@@ -41,8 +49,71 @@ export function resolveJsonSchemaLocalPointer(root: JsonSchema, ref: string): Js
   return get(root, ref.slice(2).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
 }
 
+export type JsonSchemaKeywordKind = 'ref' | 'discriminator' | 'schema' | 'schema-record' | 'data'
+
+/**
+ * Classifies `value` under `key` in a schema object, as traversed by {@link visitJsonSchemaRefs}
+ * and {@link mapJsonSchemaRefs}: a `$ref` string, an OpenAPI `discriminator`, a subschema (or list
+ * of subschemas), a record of subschemas, or data that holds no refs (including `const`/`enum`).
+ *
+ * @param schemaLevel `false` when the object is itself a record of subschemas, e.g. `properties`.
+ */
+export function getJsonSchemaKeywordKind(
+  key: string,
+  value: unknown,
+  schemaLevel = true,
+): JsonSchemaKeywordKind {
+  if (key === '$ref' && typeof value === 'string') {
+    return 'ref'
+  }
+
+  if (!schemaLevel) {
+    return 'schema'
+  }
+
+  if (key === 'discriminator') {
+    return 'discriminator'
+  }
+
+  if (JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
+    return 'schema-record'
+  }
+
+  if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) && !JSON_SCHEMA_LITERAL_KEYWORDS.has(key)) {
+    return 'schema'
+  }
+
+  return 'data'
+}
+
+/**
+ * OpenAPI `discriminator.mapping` and `discriminator.defaultMapping` values are refs when they
+ * are local JSON pointers; other values (bare schema names, external refs) are left alone.
+ */
+function isDiscriminatorRef(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith('#')
+}
+
+function visitDiscriminatorRefs(discriminator: unknown, visit: (ref: string) => void): void {
+  if (!isPlainObject(discriminator)) {
+    return
+  }
+
+  const { mapping, defaultMapping } = discriminator
+  const values = isPlainObject(mapping)
+    ? [...Object.values(mapping), defaultMapping]
+    : [defaultMapping]
+
+  for (const value of values) {
+    if (isDiscriminatorRef(value)) {
+      visit(value)
+    }
+  }
+}
+
 /**
  * Visits every `$ref` in a schema, traversing the same keywords as {@link mapJsonSchemaRefs}.
+ * Local pointers in OpenAPI `discriminator.mapping`/`defaultMapping` values are visited too.
  * Shared or cyclic object instances are visited once.
  */
 export function visitJsonSchemaRefs(
@@ -66,14 +137,20 @@ export function visitJsonSchemaRefs(
 
   for (const key of Object.keys(value)) {
     const val = value[key]
-    if (key === '$ref' && typeof val === 'string') {
-      visit(val)
-    }
-    else if (!schemaLevel) {
-      visitJsonSchemaRefs(val as JsonSchema, visit, true, seen)
-    }
-    else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
-      visitJsonSchemaRefs(val as JsonSchema, visit, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), seen)
+
+    switch (getJsonSchemaKeywordKind(key, val, schemaLevel)) {
+      case 'ref':
+        visit(val as string)
+        break
+      case 'discriminator':
+        visitDiscriminatorRefs(val, visit)
+        break
+      case 'schema':
+        visitJsonSchemaRefs(val as JsonSchema, visit, true, seen)
+        break
+      case 'schema-record':
+        visitJsonSchemaRefs(val as JsonSchema, visit, false, seen)
+        break
     }
   }
 }
@@ -89,27 +166,72 @@ export function mapJsonSchemaRefs(
   }
 
   if (Array.isArray(value)) {
-    return value.map((item, index) => mapJsonSchemaRefs(item, map, schemaLevel, [...path, index])) as any
+    return value.map((item, index) =>
+      mapJsonSchemaRefs(item, map, schemaLevel, [...path, index]),
+    ) as any
   }
 
   const result: Record<string, unknown> = {}
   for (const key of Object.keys(value)) {
     const val = value[key]
-    if (key === '$ref' && typeof val === 'string') {
-      setOwn(result, key, map(val, [...path, key]))
-    }
-    else if (!schemaLevel) {
-      setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key]))
-    }
-    else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
-      setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), [...path, key]))
-    }
-    else {
-      setOwn(result, key, val)
+
+    switch (getJsonSchemaKeywordKind(key, val, schemaLevel)) {
+      case 'ref':
+        setOwn(result, key, map(val as string, [...path, key]))
+        break
+      case 'discriminator':
+        setOwn(result, key, mapDiscriminatorRefs(val, map, path))
+        break
+      case 'schema':
+        setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key]))
+        break
+      case 'schema-record':
+        setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, false, [...path, key]))
+        break
+      default:
+        setOwn(result, key, val)
     }
   }
 
   return result as JsonSchema
+}
+
+function mapDiscriminatorRefs(
+  discriminator: unknown,
+  map: (ref: string, path: Array<string | number>) => string,
+  path: Array<string | number>,
+): unknown {
+  if (!isPlainObject(discriminator)) {
+    return discriminator
+  }
+
+  const { mapping, defaultMapping } = discriminator
+  let mappedMapping: Record<PropertyKey, unknown> | undefined
+
+  if (isPlainObject(mapping)) {
+    for (const key of Object.keys(mapping)) {
+      const ref = mapping[key]
+
+      if (isDiscriminatorRef(ref)) {
+        mappedMapping ??= { ...mapping }
+        setOwn(mappedMapping, key, map(ref, [...path, 'discriminator', 'mapping', key]))
+      }
+    }
+  }
+
+  const hasDefaultMappingRef = isDiscriminatorRef(defaultMapping)
+
+  if (!mappedMapping && !hasDefaultMappingRef) {
+    return discriminator
+  }
+
+  return {
+    ...discriminator,
+    ...(mappedMapping && { mapping: mappedMapping }),
+    ...(hasDefaultMappingRef && {
+      defaultMapping: map(defaultMapping, [...path, 'discriminator', 'defaultMapping']),
+    }),
+  }
 }
 
 /**
@@ -120,8 +242,9 @@ export function hoistRecursiveRefToDef(schema: JsonSchema): JsonSchema {
     return schema
   }
 
-  const isRootRef = (ref: string) => ref === '#'
-    || (!ref.startsWith('#/$defs/') && resolveJsonSchemaLocalPointer(schema, ref) !== undefined)
+  const isRootRef = (ref: string) =>
+    ref === '#' ||
+    (!ref.startsWith('#/$defs/') && resolveJsonSchemaLocalPointer(schema, ref) !== undefined)
 
   // most schemas have no root ref, so detect one without copying the schema
   let hasRootRef = false
@@ -135,7 +258,9 @@ export function hoistRecursiveRefToDef(schema: JsonSchema): JsonSchema {
 
   const defName = findRecursiveJsonSchemaDefName(schema.$defs)
   const defRef = `#/$defs/${encodeJsonPointerSegment(defName)}`
-  const { $defs, ...rest } = mapJsonSchemaRefs(schema, ref => isRootRef(ref) ? `${defRef}${ref.slice(1)}` : ref) as Exclude<JsonSchema, boolean>
+  const { $defs, ...rest } = mapJsonSchemaRefs(schema, (ref) =>
+    isRootRef(ref) ? `${defRef}${ref.slice(1)}` : ref,
+  ) as Exclude<JsonSchema, boolean>
 
   return {
     $ref: defRef,
@@ -181,10 +306,17 @@ export function resolveJsonSchemaRootLocalRef(
   const followedRefs = new Set<string>()
   let current = schema
 
-  while (typeof current.$ref === 'string' && current.$ref.startsWith('#/$defs/') && !followedRefs.has(current.$ref)) {
+  while (
+    typeof current.$ref === 'string' &&
+    current.$ref.startsWith('#/$defs/') &&
+    !followedRefs.has(current.$ref)
+  ) {
     followedRefs.add(current.$ref)
 
-    const resolved = get($defs, current.$ref.slice('#/$defs/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+    const resolved = get(
+      $defs,
+      current.$ref.slice('#/$defs/'.length).split('/').map(decodeJsonPointerSegment),
+    ) as JsonSchema | undefined
 
     if (resolved === undefined) {
       return current
@@ -204,7 +336,9 @@ export function resolveJsonSchemaRootLocalRef(
   return current
 }
 
-function findRecursiveJsonSchemaDefName(defs: Exclude<JsonSchema, boolean>['$defs'] | undefined): string {
+function findRecursiveJsonSchemaDefName(
+  defs: Exclude<JsonSchema, boolean>['$defs'] | undefined,
+): string {
   let index = 0
 
   while (defs?.[`__schema${index}`] !== undefined) {

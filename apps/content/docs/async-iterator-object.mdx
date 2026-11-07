@@ -1,6 +1,6 @@
 ---
-title: "AsyncIteratorObject (SSE)"
-description: "Stream realtime typesafe data from oRPC procedures with async generators, event validation, resume support, and cleanup on disconnect."
+title: 'AsyncIteratorObject (SSE)'
+description: 'Stream realtime typesafe data from oRPC procedures with async generators, event validation, resume support, and cleanup on disconnect.'
 ---
 
 ## Overview
@@ -8,14 +8,13 @@ description: "Stream realtime typesafe data from oRPC procedures with async gene
 An `AsyncIteratorObject` is implemented as an [asynchronous generator function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function*) (or a compatible implementation). In the example below, the handler emits a new event every second:
 
 ```ts
-const example = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    while (true) {
-      signal?.throwIfAborted()
-      yield { message: 'Hello, world!' }
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-  })
+const example = os.handler(async function* ({ input, signal, lastEventId }) {
+  while (true) {
+    signal?.throwIfAborted()
+    yield { message: 'Hello, world!' }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+})
 ```
 
 :::info
@@ -35,7 +34,7 @@ const example = os
     while (true) {
       signal?.throwIfAborted()
       yield { message: 'Hello, world!' }
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000))
     }
   })
 ```
@@ -51,22 +50,17 @@ When used with the [Retry Plugin](/docs/plugins/retry) or [EventSource](https://
 ```ts
 import { withEventMeta } from '@orpc/server'
 
-const example = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    if (lastEventId) {
-      // Resume streaming from lastEventId
+const example = os.handler(async function* ({ input, signal, lastEventId }) {
+  if (lastEventId) {
+    // Resume streaming from lastEventId
+  } else {
+    while (true) {
+      signal?.throwIfAborted()
+      yield withEventMeta({ message: 'Hello, world!' }, { id: 'some-id', retry: 10_000 })
+      await new Promise((resolve) => setTimeout(resolve, 1000))
     }
-    else {
-      while (true) {
-        signal?.throwIfAborted()
-        yield withEventMeta(
-          { message: 'Hello, world!' },
-          { id: 'some-id', retry: 10_000 }
-        )
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-    }
-  })
+  }
+})
 ```
 
 ## Stop AsyncIteratorObject
@@ -78,19 +72,18 @@ This behavior is specific to oRPC. Standard [SSE](https://developer.mozilla.org/
 :::
 
 ```ts
-const example = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    while (true) {
-      signal?.throwIfAborted()
+const example = os.handler(async function* ({ input, signal, lastEventId }) {
+  while (true) {
+    signal?.throwIfAborted()
 
-      if (done) {
-        return
-      }
-
-      yield { message: 'Hello, world!' }
-      await new Promise(resolve => setTimeout(resolve, 1000))
+    if (done) {
+      return
     }
-  })
+
+    yield { message: 'Hello, world!' }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+})
 ```
 
 ## Signal and Side-Effects
@@ -98,19 +91,17 @@ const example = os
 When the client closes the connection or an unexpected error occurs, oRPC aborts the provided `signal`. Use it to exit loops and avoid resource leaks. Put cleanup logic in a `finally` block so it runs whether the stream ends normally, errors, or is cancelled.
 
 ```ts
-const example = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    try {
-      while (true) {
-        signal?.throwIfAborted()
-        yield { message: 'Hello, world!' }
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
+const example = os.handler(async function* ({ input, signal, lastEventId }) {
+  try {
+    while (true) {
+      signal?.throwIfAborted()
+      yield { message: 'Hello, world!' }
+      await new Promise((resolve) => setTimeout(resolve, 1000))
     }
-    finally {
-      console.log('Cleanup logic here')
-    }
-  })
+  } finally {
+    console.log('Cleanup logic here')
+  }
+})
 ```
 
 :::info
@@ -128,18 +119,15 @@ const publisher = new MemoryPublisher<{
   }
 }>()
 
-const live = os
-  .handler(async function* ({ input, signal, lastEventId }) {
-    const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
-    for await (const payload of iterator) {
-      // Handle payload here or yield directly to client
-      yield payload
-    }
-  })
+const live = os.handler(async function* ({ input, signal, lastEventId }) {
+  const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
+  for await (const payload of iterator) {
+    // Handle payload here or yield directly to client
+    yield payload
+  }
+})
 
-const publish = os
-  .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
-    await publisher.publish('something-updated', { id: input.id })
-  })
+const publish = os.input(z.object({ id: z.string() })).handler(async ({ input }) => {
+  await publisher.publish('something-updated', { id: input.id })
+})
 ```

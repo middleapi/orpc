@@ -1,8 +1,8 @@
 ---
-title: "AWS Lambda Adapter"
-description: "Use oRPC on AWS Lambda behind API Gateway (payload formats 1.0 and 2.0) and Lambda Function URLs using response streaming."
+title: 'AWS Lambda Adapter'
+description: 'Use oRPC on AWS Lambda behind API Gateway (payload formats 1.0 and 2.0) and Lambda Function URLs using response streaming.'
 sidebar:
-  label: "AWS Lambda"
+  label: 'AWS Lambda'
 ---
 
 :::warning
@@ -22,9 +22,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 declare const awslambda: AwsLambdaGlobal
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -32,22 +30,24 @@ const handler = new RPCHandler(router, {
   ],
 })
 
-export const rpc = awslambda.streamifyResponse<APIGatewayProxyEventV2>(async (event, responseStream, context) => {
-  const { matched } = await handler.handle(event, responseStream, {
-    prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
-  })
+export const rpc = awslambda.streamifyResponse<APIGatewayProxyEventV2>(
+  async (event, responseStream, context) => {
+    const { matched } = await handler.handle(event, responseStream, {
+      prefix: '/rpc',
+      context: {}, // Provide initial context if needed, can be an async function
+    })
 
-  if (matched) {
-    return
-  }
+    if (matched) {
+      return
+    }
 
-  awslambda.HttpResponseStream.from(responseStream, {
-    statusCode: 404,
-    headers: {},
-    cookies: [],
-  }).end('Not found')
-})
+    awslambda.HttpResponseStream.from(responseStream, {
+      statusCode: 404,
+      headers: {},
+      cookies: [],
+    }).end('Not found')
+  },
+)
 ```
 
 ```ts OpenAPI
@@ -59,9 +59,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 declare const awslambda: AwsLambdaGlobal
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -69,22 +67,24 @@ const handler = new OpenAPIHandler(router, {
   ],
 })
 
-export const api = awslambda.streamifyResponse<APIGatewayProxyEventV2>(async (event, responseStream, context) => {
-  const { matched } = await handler.handle(event, responseStream, {
-    prefix: '/api',
-    context: {} // Provide initial context if needed, can be an async function
-  })
+export const api = awslambda.streamifyResponse<APIGatewayProxyEventV2>(
+  async (event, responseStream, context) => {
+    const { matched } = await handler.handle(event, responseStream, {
+      prefix: '/api',
+      context: {}, // Provide initial context if needed, can be an async function
+    })
 
-  if (matched) {
-    return
-  }
+    if (matched) {
+      return
+    }
 
-  awslambda.HttpResponseStream.from(responseStream, {
-    statusCode: 404,
-    headers: {},
-    cookies: [],
-  }).end('Not found')
-})
+    awslambda.HttpResponseStream.from(responseStream, {
+      statusCode: 404,
+      headers: {},
+      cookies: [],
+    }).end('Not found')
+  },
+)
 ```
 
 </CodeGroup>
@@ -109,14 +109,15 @@ You can configure how an [AsyncIteratorObject](/docs/async-iterator-object) is s
 const handler = new OpenAPIHandler(router, {
   sendStandardResponse: {
     eventStream: {
+      /**
+       * Initial comment sent immediately upon stream start to flush headers. This allows the
+       * receiving side to establish the connection without waiting for the first event.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       initialComment: {
-        /**
-         * If true, an initial comment is sent immediately upon stream start to flush headers.
-         * This allows the receiving side to establish the connection without waiting for the first event.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * The content of the initial comment sent upon stream start. Must not include newline characters.
          *
@@ -124,13 +125,14 @@ const handler = new OpenAPIHandler(router, {
          */
         comment: '',
       },
+      /**
+       * Ping comment sent periodically to keep the connection alive.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a ping comment is sent periodically to keep the connection alive.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between ping comments sent after the last event.
          *

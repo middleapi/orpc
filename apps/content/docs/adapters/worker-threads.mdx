@@ -1,8 +1,8 @@
 ---
-title: "Worker Threads Adapter"
-description: "Use oRPC for typesafe communication between the Node.js main thread and Worker Threads by passing a MessagePort through the Message Port Adapter."
+title: 'Worker Threads Adapter'
+description: 'Use oRPC for typesafe communication between the Node.js main thread and Worker Threads by passing a MessagePort through the Message Port Adapter.'
 sidebar:
-  label: "Worker Threads"
+  label: 'Worker Threads'
 ---
 
 Use [Node.js Worker Threads](https://nodejs.org/api/worker_threads.html) with oRPC for typesafe inter-thread communication via the [Message Port Adapter](/docs/adapters/message-port).
@@ -32,7 +32,7 @@ parentPort?.on('message', (message) => {
        * that receives the per-call request as its first argument, and is **not**
        * related to the initial upgrade request.
        */
-      context: request => ({}),
+      context: (request) => ({}),
     })
 
     message.start()
@@ -55,7 +55,7 @@ const worker = new Worker(new URL('./some-worker.js', import.meta.url))
 worker.postMessage(serverPort, [serverPort])
 
 const link = new RPCLink({
-  port: clientPort
+  port: clientPort,
 })
 
 clientPort.start()

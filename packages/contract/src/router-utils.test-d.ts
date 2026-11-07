@@ -1,14 +1,15 @@
-import type { MergedErrorMap } from './error-utils'
-import type { ProcedureContract } from './procedure'
-import type { AugmentedContractRouter } from './router-utils'
-import type { Schema } from './schema'
 import { describe, expectTypeOf, it } from 'vitest'
 import { z } from 'zod'
-import { oc } from './builder'
+
+import { oc } from './builder.ts'
+import type { MergedErrorMap } from './error-utils.ts'
+import type { ProcedureContract } from './procedure.ts'
+import type { AugmentedContractRouter } from './router-utils.ts'
+import type { Schema } from './schema.ts'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.string().transform(s => Number(s)) })
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.string().transform((s) => Number(s)) })
 
 const ping = oc.input(inputSchema).output(outputSchema)
 const pong = oc.errors({ PONG: { message: 'pong' } })

@@ -1,5 +1,6 @@
 import type { AnySchema } from '@orpc/contract'
-import type { JsonSchema } from './types'
+
+import type { JsonSchema } from './types.ts'
 
 /**
  * The conversion direction: `input` targets the schema's input type, `output` targets its output type.
@@ -23,15 +24,19 @@ export interface JsonSchemaConverter {
   /**
    * Converts an ORPC schema to a JSON Schema representation.
    */
-  convert(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean]
+  convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean]
 }
 
 export class DelegatingJsonSchemaConverter implements Pick<JsonSchemaConverter, 'convert'> {
-  constructor(
-    private readonly converters: JsonSchemaConverter[] = [],
-  ) {}
+  constructor(private readonly converters: JsonSchemaConverter[] = []) {}
 
-  convert(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
+  convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
     for (const converter of this.converters) {
       if (converter.condition(schema, direction)) {
         return converter.convert(schema, direction)

@@ -1,10 +1,24 @@
-import { parseBigIntString } from './bigint'
+import { parseBigIntString } from './bigint.ts'
 
 it('parseBigIntString', () => {
   expect(parseBigIntString('0', 10)).toBe(0n)
 
   // `BigInt()` accepts these, but `bigint.toString()` never produces them
-  for (const value of ['0x10', '0o7', '0b1', '', ' ', ' 1 ', '1\n', '+1', '01', '-', '1e3', '1.0', '1n']) {
+  for (const value of [
+    '0x10',
+    '0o7',
+    '0b1',
+    '',
+    ' ',
+    ' 1 ',
+    '1\n',
+    '+1',
+    '01',
+    '-',
+    '1e3',
+    '1.0',
+    '1n',
+  ]) {
     expect(parseBigIntString(value, 10)).toBeUndefined()
   }
 
@@ -14,5 +28,7 @@ it('parseBigIntString', () => {
   expect(parseBigIntString('1000', 3)).toBeUndefined()
   expect(parseBigIntString('-1000', 3)).toBeUndefined()
 
-  expect(parseBigIntString('9'.repeat(10_000), Number.POSITIVE_INFINITY)).toBe(BigInt('9'.repeat(10_000)))
+  expect(parseBigIntString('9'.repeat(10_000), Number.POSITIVE_INFINITY)).toBe(
+    BigInt('9'.repeat(10_000)),
+  )
 })

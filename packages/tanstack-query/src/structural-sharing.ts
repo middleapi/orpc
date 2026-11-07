@@ -18,7 +18,12 @@ export function createStructuralSharing(serializer?: Public<RPCJsonSerializer>):
   return (oldData, newData) => replaceEqualDeep(oldData, newData, 0, serializer)
 }
 
-function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJsonSerializer> | undefined): any {
+function replaceEqualDeep(
+  a: any,
+  b: any,
+  depth: number,
+  serializer: Public<RPCJsonSerializer> | undefined,
+): any {
   if (Object.is(a, b)) {
     return a
   }
@@ -34,9 +39,12 @@ function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJ
   }
 
   if (
-    (proto === Date.prototype || proto === URL.prototype || proto === Set.prototype || proto === Map.prototype)
-    && !hasOwnEnumerableKey(a)
-    && !hasOwnEnumerableKey(b)
+    (proto === Date.prototype ||
+      proto === URL.prototype ||
+      proto === Set.prototype ||
+      proto === Map.prototype) &&
+    !hasOwnEnumerableKey(a) &&
+    !hasOwnEnumerableKey(b)
   ) {
     return replaceEqualBuiltIn(a, b, proto, depth, serializer)
   }
@@ -53,7 +61,12 @@ function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJ
   return replaceEqualSerialized(a, b, depth, serializer)
 }
 
-function replaceEqualArray(a: any[], b: any[], depth: number, serializer: Public<RPCJsonSerializer> | undefined): any[] {
+function replaceEqualArray(
+  a: any[],
+  b: any[],
+  depth: number,
+  serializer: Public<RPCJsonSerializer> | undefined,
+): any[] {
   let copy: any[] | undefined
 
   for (let i = 0; i < b.length; i++) {
@@ -88,7 +101,13 @@ function copyArrayPrefix(a: any[], end: number): any[] {
   return copy
 }
 
-function replaceEqualObject(a: any, b: any, proto: object | null, depth: number, serializer: Public<RPCJsonSerializer> | undefined): any {
+function replaceEqualObject(
+  a: any,
+  b: any,
+  proto: object | null,
+  depth: number,
+  serializer: Public<RPCJsonSerializer> | undefined,
+): any {
   const bKeys = Object.keys(b)
   let copy: any
 
@@ -112,7 +131,10 @@ function replaceEqualObject(a: any, b: any, proto: object | null, depth: number,
     assign(copy, key, value)
   }
 
-  return copy ?? (Object.keys(a).length === bKeys.length ? a : copyObjectPrefix(a, bKeys, bKeys.length, proto))
+  return (
+    copy ??
+    (Object.keys(a).length === bKeys.length ? a : copyObjectPrefix(a, bKeys, bKeys.length, proto))
+  )
 }
 
 function copyObjectPrefix(a: any, keys: string[], end: number, proto: object | null): any {
@@ -129,13 +151,18 @@ function assign(object: any, key: string, value: unknown): void {
   // same as always calling setOwn, but a plain assignment keeps the copy loops about 30% faster
   if (key === '__proto__') {
     setOwn(object, key, value)
-  }
-  else {
+  } else {
     object[key] = value
   }
 }
 
-function replaceEqualBuiltIn(a: any, b: any, proto: object, depth: number, serializer: Public<RPCJsonSerializer> | undefined): object {
+function replaceEqualBuiltIn(
+  a: any,
+  b: any,
+  proto: object,
+  depth: number,
+  serializer: Public<RPCJsonSerializer> | undefined,
+): object {
   if (proto === Date.prototype) {
     return Object.is(a.getTime(), b.getTime()) ? a : b
   }
@@ -171,8 +198,8 @@ function replaceEqualBuiltIn(a: any, b: any, proto: object, depth: number, seria
     const aValue = aValues.next().value
 
     if (
-      !Object.is(replaceEqualDeep(aKey, bKey, depth + 1, serializer), aKey)
-      || !Object.is(replaceEqualDeep(aValue, bValues.next().value, depth + 1, serializer), aValue)
+      !Object.is(replaceEqualDeep(aKey, bKey, depth + 1, serializer), aKey) ||
+      !Object.is(replaceEqualDeep(aValue, bValues.next().value, depth + 1, serializer), aValue)
     ) {
       return b
     }
@@ -181,7 +208,12 @@ function replaceEqualBuiltIn(a: any, b: any, proto: object, depth: number, seria
   return a
 }
 
-function replaceEqualSerialized(a: object, b: object, depth: number, serializer: Public<RPCJsonSerializer> | undefined): object {
+function replaceEqualSerialized(
+  a: object,
+  b: object,
+  depth: number,
+  serializer: Public<RPCJsonSerializer> | undefined,
+): object {
   const aSerialized = serializer?.serializeJson(a)
 
   if (!aSerialized?.meta?.length) {
@@ -190,8 +222,11 @@ function replaceEqualSerialized(a: object, b: object, depth: number, serializer:
 
   const bSerialized = serializer!.serializeJson(b)
 
-  return stringifyJSON(aSerialized.meta) === stringifyJSON(bSerialized.meta)
-    && Object.is(replaceEqualDeep(aSerialized.json, bSerialized.json, depth + 1, serializer), aSerialized.json)
+  return stringifyJSON(aSerialized.meta) === stringifyJSON(bSerialized.meta) &&
+    Object.is(
+      replaceEqualDeep(aSerialized.json, bSerialized.json, depth + 1, serializer),
+      aSerialized.json,
+    )
     ? a
     : b
 }

@@ -1,28 +1,36 @@
 import type { AnyORPCErrorJSON, SafeResult } from '@orpc/client'
-import type { Interceptor, PromiseWithError } from '@orpc/shared'
-import type { ServerFunction, ServerFunctionError } from '../server-function'
 import { createORPCErrorFromJson, safe } from '@orpc/client'
+import type { Interceptor, PromiseWithError } from '@orpc/shared'
 import { intercept, toArray } from '@orpc/shared'
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 
-export interface UserSeverFunctionOptions<TInput, TOutput, TError> {
+import type { ServerFunction, ServerFunctionError } from '../server-function.ts'
+
+export interface UseServerFunctionOptions<TInput, TOutput, TError> {
   interceptors?: Interceptor<{ input: TInput }, PromiseWithError<TOutput, TError>>[] | undefined
 }
 
-export interface UseServerFunctionExecuteOptions<TInput, TOutput, TError> extends Pick<UserSeverFunctionOptions<TInput, TOutput, TError>, 'interceptors'> {
-}
+export interface UseServerFunctionExecuteOptions<TInput, TOutput, TError> extends Pick<
+  UseServerFunctionOptions<TInput, TOutput, TError>,
+  'interceptors'
+> {}
 
-export type UseServerFunctionExecuteRest<TInput, TOutput, TError>
-  = undefined extends TInput
-    ? [input?: TInput, options?: UseServerFunctionExecuteOptions<TInput, TOutput, TError>]
-    : [input: TInput, options?: UseServerFunctionExecuteOptions<TInput, TOutput, TError>]
+export type UseServerFunctionExecuteRest<TInput, TOutput, TError> = undefined extends TInput
+  ? [input?: TInput, options?: UseServerFunctionExecuteOptions<TInput, TOutput, TError>]
+  : [input: TInput, options?: UseServerFunctionExecuteOptions<TInput, TOutput, TError>]
 
 export interface UseServerFunctionResultBase<TInput, TOutput, TError> {
   reset: () => void
-  execute: (...rest: UseServerFunctionExecuteRest<TInput, TOutput, TError>) => Promise<SafeResult<TOutput, TError>>
+  execute: (
+    ...rest: UseServerFunctionExecuteRest<TInput, TOutput, TError>
+  ) => Promise<SafeResult<TOutput, TError>>
 }
 
-export interface UseServerFunctionIdleResult<TInput, TOutput, TError> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
+export interface UseServerFunctionIdleResult<
+  TInput,
+  TOutput,
+  TError,
+> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
   input: undefined
   data: undefined
   error: null
@@ -34,7 +42,11 @@ export interface UseServerFunctionIdleResult<TInput, TOutput, TError> extends Us
   executedAt: undefined
 }
 
-export interface UseServerFunctionPendingResult<TInput, TOutput, TError> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
+export interface UseServerFunctionPendingResult<
+  TInput,
+  TOutput,
+  TError,
+> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
   input: TInput
   data: undefined
   error: null
@@ -46,7 +58,11 @@ export interface UseServerFunctionPendingResult<TInput, TOutput, TError> extends
   executedAt: Date
 }
 
-export interface UseServerFunctionSuccessResult<TInput, TOutput, TError> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
+export interface UseServerFunctionSuccessResult<
+  TInput,
+  TOutput,
+  TError,
+> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
   input: TInput
   data: TOutput
   error: null
@@ -58,7 +74,11 @@ export interface UseServerFunctionSuccessResult<TInput, TOutput, TError> extends
   executedAt: Date
 }
 
-export interface UseServerFunctionErrorResult<TInput, TOutput, TError> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
+export interface UseServerFunctionErrorResult<
+  TInput,
+  TOutput,
+  TError,
+> extends UseServerFunctionResultBase<TInput, TOutput, TError> {
   input: TInput
   data: undefined
   error: TError
@@ -70,11 +90,11 @@ export interface UseServerFunctionErrorResult<TInput, TOutput, TError> extends U
   executedAt: Date
 }
 
-export type UseServerFunctionResult<TInput, TOutput, TError>
-  = | UseServerFunctionIdleResult<TInput, TOutput, TError>
-    | UseServerFunctionSuccessResult<TInput, TOutput, TError>
-    | UseServerFunctionErrorResult<TInput, TOutput, TError>
-    | UseServerFunctionPendingResult<TInput, TOutput, TError>
+export type UseServerFunctionResult<TInput, TOutput, TError> =
+  | UseServerFunctionIdleResult<TInput, TOutput, TError>
+  | UseServerFunctionSuccessResult<TInput, TOutput, TError>
+  | UseServerFunctionErrorResult<TInput, TOutput, TError>
+  | UseServerFunctionPendingResult<TInput, TOutput, TError>
 
 const INITIAL_STATE = {
   data: undefined,
@@ -107,14 +127,19 @@ const PENDING_STATE = {
  */
 export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJSON>(
   fn: ServerFunction<TInput, TOutput, TError>,
-  options: UserSeverFunctionOptions<TInput, TOutput, ServerFunctionError<TError>> = {},
+  options: UseServerFunctionOptions<TInput, TOutput, ServerFunctionError<TError>> = {},
 ): UseServerFunctionResult<TInput, TOutput, ServerFunctionError<TError>> {
-  const [state, setState] = useState<Omit<
-    | UseServerFunctionIdleResult<TInput, TOutput, ServerFunctionError<TError>>
-    | UseServerFunctionSuccessResult<TInput, TOutput, ServerFunctionError<TError>>
-    | UseServerFunctionErrorResult<TInput, TOutput, ServerFunctionError<TError>>,
-    keyof UseServerFunctionResultBase<TInput, TOutput, ServerFunctionError<TError>> | 'executedAt' | 'input'
-  >>(INITIAL_STATE)
+  const [state, setState] =
+    useState<
+      Omit<
+        | UseServerFunctionIdleResult<TInput, TOutput, ServerFunctionError<TError>>
+        | UseServerFunctionSuccessResult<TInput, TOutput, ServerFunctionError<TError>>
+        | UseServerFunctionErrorResult<TInput, TOutput, ServerFunctionError<TError>>,
+        | keyof UseServerFunctionResultBase<TInput, TOutput, ServerFunctionError<TError>>
+        | 'executedAt'
+        | 'input'
+      >
+    >(INITIAL_STATE)
 
   const executedAtRef = useRef<Date | undefined>(undefined)
   const [input, setInput] = useState<TInput | undefined>(undefined)
@@ -129,50 +154,61 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
     setState({ ...INITIAL_STATE })
   }, [])
 
-  const execute = useCallback(async (input: TInput, executeOptions: UseServerFunctionExecuteOptions<TInput, TOutput, ServerFunctionError<TError>> = {}) => {
-    const executedAt = new Date()
-    executedAtRef.current = executedAt
+  const execute = useCallback(
+    async (
+      input: TInput,
+      executeOptions: UseServerFunctionExecuteOptions<
+        TInput,
+        TOutput,
+        ServerFunctionError<TError>
+      > = {},
+    ) => {
+      const executedAt = new Date()
+      executedAtRef.current = executedAt
 
-    setInput(input)
+      setInput(input)
 
-    return new Promise((resolve) => {
-      startTransition(async () => {
-        const result = await safe(intercept(
-          [...toArray(interceptorsRef.current), ...toArray(executeOptions.interceptors)],
-          { input: input as TInput },
-          async ({ input }) => fn(input).then(([error, data]) => {
-            if (error) {
-              throw createORPCErrorFromJson(error)
-            }
+      return new Promise((resolve) => {
+        startTransition(async () => {
+          const result = await safe(
+            intercept(
+              [...toArray(interceptorsRef.current), ...toArray(executeOptions.interceptors)],
+              { input: input as TInput },
+              async ({ input }) =>
+                fn(input).then(([error, data]) => {
+                  if (error) {
+                    throw createORPCErrorFromJson(error)
+                  }
 
-            return data as TOutput
-          }),
-        ))
+                  return data as TOutput
+                }),
+            ),
+          )
 
-        /**
-         * If multiple execute calls are made in parallel, only the last one will be effective.
-         */
-        if (executedAtRef.current === executedAt) {
-          setState({
-            data: result.data,
-            error: result.error as any,
-            isIdle: false,
-            isPending: false,
-            isSuccess: !result.error,
-            isError: !!result.error,
-            status: !result.error ? 'success' : 'error',
-          })
-        }
+          /**
+           * If multiple execute calls are made in parallel, only the last one will be effective.
+           */
+          if (executedAtRef.current === executedAt) {
+            setState({
+              data: result.data,
+              error: result.error as any,
+              isIdle: false,
+              isPending: false,
+              isSuccess: !result.error,
+              isError: !!result.error,
+              status: !result.error ? 'success' : 'error',
+            })
+          }
 
-        resolve(result)
+          resolve(result)
+        })
       })
-    })
-  }, [fn])
+    },
+    [fn],
+  )
 
   const result = useMemo(() => {
-    const currentState = isPending && executedAtRef.current !== undefined
-      ? PENDING_STATE
-      : state
+    const currentState = isPending && executedAtRef.current !== undefined ? PENDING_STATE : state
 
     return {
       ...currentState,

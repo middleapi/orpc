@@ -1,69 +1,64 @@
 {
   "name": "@orpc/next",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Next.js integration for oRPC: call typesafe procedures through Next.js Server Functions",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "next",
+    "nextjs",
+    "orpc",
+    "react",
+    "rpc",
+    "server-actions",
+    "server-functions",
+    "typesafe",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/next"
   },
-  "keywords": [
-    "orpc",
-    "nextjs",
-    "next",
-    "server-functions",
-    "server-actions",
-    "react",
-    "rpc",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": [
-    "./dist/extensions/actionable.mjs"
+    "./dist/extensions/actionable.js"
   ],
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./hooks": {
-        "types": "./dist/hooks/index.d.mts",
-        "import": "./dist/hooks/index.mjs",
-        "default": "./dist/hooks/index.mjs"
-      },
-      "./extensions/actionable": {
-        "types": "./dist/extensions/actionable.d.mts",
-        "import": "./dist/extensions/actionable.mjs",
-        "default": "./dist/extensions/actionable.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./hooks": "./src/hooks/index.ts",
     "./extensions/actionable": "./src/extensions/actionable.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./hooks": {
+        "types": "./dist/hooks/index.d.ts",
+        "import": "./dist/hooks/index.js",
+        "default": "./dist/hooks/index.js"
+      },
+      "./extensions/actionable": {
+        "types": "./dist/extensions/actionable.d.ts",
+        "import": "./dist/extensions/actionable.js",
+        "default": "./dist/extensions/actionable.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "next": ">=16.2.7",
-    "react": ">=19.2.7"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -72,7 +67,11 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "next": "^16.4.3",
+    "next": "^16.4.4",
     "react": "^19.3.1"
+  },
+  "peerDependencies": {
+    "next": ">=16.2.7",
+    "react": ">=19.2.7"
   }
 }

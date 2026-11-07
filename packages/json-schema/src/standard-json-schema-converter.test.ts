@@ -1,9 +1,16 @@
 import type { AnySchema } from '@orpc/contract'
 import * as arktype from 'arktype'
-import z from 'zod'
-import { isStandardSchemaOptional, StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import * as z from 'zod'
 
-function withStandardOverrides<TSchema extends AnySchema>(schema: TSchema, overrides: Record<string, unknown>): TSchema {
+import {
+  isStandardSchemaOptional,
+  StandardJsonSchemaConverter,
+} from './standard-json-schema-converter.ts'
+
+function withStandardOverrides<TSchema extends AnySchema>(
+  schema: TSchema,
+  overrides: Record<string, unknown>,
+): TSchema {
   Object.defineProperty(schema, '~standard', {
     value: {
       ...schema['~standard'],
@@ -29,17 +36,20 @@ describe('standardJsonSchemaConverter', () => {
   it.each([
     ['zod', z.number().transform(String).pipe(z.string()), 'number', 'string'],
     ['arktype', arktype.type('number'), 'number', 'number'],
-  ] as const)('uses %s standard json schema input and output generators', (_, schema, inputType, outputType) => {
-    expect(converter.convert(schema, 'input')).toEqual([
-      expect.objectContaining({ type: inputType }),
-      false,
-    ])
+  ] as const)(
+    'uses %s standard json schema input and output generators',
+    (_, schema, inputType, outputType) => {
+      expect(converter.convert(schema, 'input')).toEqual([
+        expect.objectContaining({ type: inputType }),
+        false,
+      ])
 
-    expect(converter.convert(schema, 'output')).toEqual([
-      expect.objectContaining({ type: outputType }),
-      false,
-    ])
-  })
+      expect(converter.convert(schema, 'output')).toEqual([
+        expect.objectContaining({ type: outputType }),
+        false,
+      ])
+    },
+  )
 
   it('infers optionality from zod and arktype', () => {
     expect(converter.convert(z.string().default('fallback'), 'input')).toEqual([
@@ -85,7 +95,9 @@ describe('standardJsonSchemaConverter', () => {
     ])
   })
 
-  it('does not leak a rejection when async standard validation fails on undefined', async ({ onTestFinished }) => {
+  it('does not leak a rejection when async standard validation fails on undefined', async ({
+    onTestFinished,
+  }) => {
     const unhandledRejectionHandler = vi.fn()
     process.on('unhandledRejection', unhandledRejectionHandler)
 
@@ -102,7 +114,7 @@ describe('standardJsonSchemaConverter', () => {
       false,
     ])
 
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(unhandledRejectionHandler).not.toHaveBeenCalled()
   })
 
@@ -147,7 +159,9 @@ describe('isStandardSchemaOptional', () => {
     expect(isStandardSchemaOptional(asyncSchema, 'input')).toBe(false)
   })
 
-  it('does not leak a rejection when async standard validation fails', async ({ onTestFinished }) => {
+  it('does not leak a rejection when async standard validation fails', async ({
+    onTestFinished,
+  }) => {
     const unhandledRejectionHandler = vi.fn()
     process.on('unhandledRejection', unhandledRejectionHandler)
 
@@ -161,7 +175,7 @@ describe('isStandardSchemaOptional', () => {
 
     expect(isStandardSchemaOptional(schema, 'input')).toBe(false)
 
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(unhandledRejectionHandler).not.toHaveBeenCalled()
   })
 })

@@ -50,7 +50,7 @@ const posts = (await getCollection('docs'))
     }
   })
   .filter(post => post.href)
-  .sort((a, b) => Number(b.date ?? 0) - Number(a.date ?? 0))
+  .toSorted((a, b) => Number(b.date ?? 0) - Number(a.date ?? 0))
 
 // Tabs come from the tags the posts actually use, most-used first.
 const tagCounts = new Map<string, number>()
@@ -60,7 +60,7 @@ for (const post of posts) {
   }
 }
 const tags = [...tagCounts.keys()]
-  .sort((a, b) => (tagCounts.get(b)! - tagCounts.get(a)!) || a.localeCompare(b))
+  .toSorted((a, b) => (tagCounts.get(b)! - tagCounts.get(a)!) || a.localeCompare(b))
 
 const feed = data.feeds.find(f => f.href.startsWith('/blog'))
 

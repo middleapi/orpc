@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract'
-import { getOpenAPIMeta, openapi } from './meta'
+
+import { getOpenAPIMeta, openapi } from './meta.ts'
 
 describe('openapi meta', () => {
   describe('openapi() function', () => {
@@ -50,9 +51,7 @@ describe('openapi meta', () => {
       })
 
       it('uses only existing tags when no incoming tags', () => {
-        const procedure = oc
-          .meta(openapi({ tags: ['existing'] }))
-          .meta(openapi({}))
+        const procedure = oc.meta(openapi({ tags: ['existing'] })).meta(openapi({}))
         expect(getOpenAPIMeta(procedure)?.tags).toEqual(['existing'])
       })
     })
@@ -80,9 +79,7 @@ describe('openapi meta', () => {
       })
 
       it('keeps existing query styles when later call omits them', () => {
-        const procedure = oc
-          .meta(openapi({ queryStyles: { tags: 'array' } }))
-          .meta(openapi({}))
+        const procedure = oc.meta(openapi({ queryStyles: { tags: 'array' } })).meta(openapi({}))
 
         expect(getOpenAPIMeta(procedure)?.queryStyles).toEqual({
           tags: 'array',
@@ -132,23 +129,21 @@ describe('openapi meta', () => {
 
       it('uses existing object spec when no incoming spec', () => {
         const existingSpec = { operationId: 'listUsers' }
-        const procedure = oc
-          .meta(openapi({ spec: existingSpec }))
-          .meta(openapi({}))
+        const procedure = oc.meta(openapi({ spec: existingSpec })).meta(openapi({}))
         expect(getOpenAPIMeta(procedure)?.spec).toBe(existingSpec)
       })
 
       it('composes two function specs: existing applied first, then incoming', () => {
         const procedure = oc
-          .meta(openapi({ spec: current => ({ ...current, a: 1, order: 1 }) }))
-          .meta(openapi({ spec: current => ({ ...current, b: 2, order: 2 }) }))
+          .meta(openapi({ spec: (current) => ({ ...current, a: 1, order: 1 }) }))
+          .meta(openapi({ spec: (current) => ({ ...current, b: 2, order: 2 }) }))
         const spec = getOpenAPIMeta(procedure)?.spec as any
         expect(spec({ c: 3 })).toEqual({ a: 1, b: 2, c: 3, order: 2 })
       })
 
       it('resolves existing function spec with incoming object spec eagerly', () => {
         const procedure = oc
-          .meta(openapi({ spec: current => ({ ...current, fromExisting: true }) }))
+          .meta(openapi({ spec: (current) => ({ ...current, fromExisting: true }) }))
           .meta(openapi({ spec: { operationId: 'override' } }))
         expect(getOpenAPIMeta(procedure)?.spec).toEqual({
           operationId: 'override',
@@ -159,7 +154,7 @@ describe('openapi meta', () => {
       it('applies incoming function spec to existing object spec eagerly', () => {
         const procedure = oc
           .meta(openapi({ spec: { operationId: 'base' } }))
-          .meta(openapi({ spec: current => ({ ...current, extra: true }) }))
+          .meta(openapi({ spec: (current) => ({ ...current, extra: true }) }))
         expect(getOpenAPIMeta(procedure)?.spec).toEqual({
           operationId: 'base',
           extra: true,
@@ -169,9 +164,7 @@ describe('openapi meta', () => {
 
     describe('prefix merging', () => {
       it('concatenates prefixes from multiple calls', () => {
-        const procedure = oc
-          .meta(openapi({ prefix: '/api' }))
-          .meta(openapi({ prefix: '/v1' }))
+        const procedure = oc.meta(openapi({ prefix: '/api' })).meta(openapi({ prefix: '/v1' }))
         expect(getOpenAPIMeta(procedure)?.prefix).toBe('/api/v1')
       })
 
@@ -181,16 +174,12 @@ describe('openapi meta', () => {
       })
 
       it('uses only existing prefix when no incoming prefix', () => {
-        const procedure = oc
-          .meta(openapi({ prefix: '/api' }))
-          .meta(openapi({}))
+        const procedure = oc.meta(openapi({ prefix: '/api' })).meta(openapi({}))
         expect(getOpenAPIMeta(procedure)?.prefix).toBe('/api')
       })
 
       it('normalizes prefixes when merging', () => {
-        const procedure = oc
-          .meta(openapi({ prefix: '/api/' }))
-          .meta(openapi({ prefix: '/v1/' }))
+        const procedure = oc.meta(openapi({ prefix: '/api/' })).meta(openapi({ prefix: '/v1/' }))
         expect(getOpenAPIMeta(procedure)?.prefix).toBe('/api/v1/')
       })
 
@@ -205,44 +194,48 @@ describe('openapi meta', () => {
 
     it('metadata resets to its default behavior when set to `undefined` in subsequent calls', () => {
       const procedure = oc
-        .meta(openapi({
-          method: 'GET',
-          path: '/users',
-          summary: 'List users',
-          deprecated: true,
-          description: 'des',
-          inputStructure: 'detailed',
-          operationId: 'id',
-          outputStructure: 'detailed',
-          paramsStyles: { id: 'comma-delimited-array' },
-          prefix: '/api',
-          queryStyles: { id: 'comma-delimited-object' },
-          requestBodyHint: 'file',
-          responseBodyHint: 'file',
-          spec: () => ({}),
-          successDescription: 'success',
-          successStatus: 201,
-          tags: ['a', 'b'],
-        }))
-        .meta(openapi({
-          method: undefined,
-          path: undefined,
-          summary: undefined,
-          deprecated: undefined,
-          description: undefined,
-          inputStructure: undefined,
-          operationId: undefined,
-          outputStructure: undefined,
-          paramsStyles: undefined,
-          prefix: undefined,
-          queryStyles: undefined,
-          requestBodyHint: undefined,
-          responseBodyHint: undefined,
-          spec: undefined,
-          successDescription: undefined,
-          successStatus: undefined,
-          tags: undefined,
-        }))
+        .meta(
+          openapi({
+            method: 'GET',
+            path: '/users',
+            summary: 'List users',
+            deprecated: true,
+            description: 'des',
+            inputStructure: 'detailed',
+            operationId: 'id',
+            outputStructure: 'detailed',
+            paramsStyles: { id: 'comma-delimited-array' },
+            prefix: '/api',
+            queryStyles: { id: 'comma-delimited-object' },
+            requestBodyHint: 'file',
+            responseBodyHint: 'file',
+            spec: () => ({}),
+            successDescription: 'success',
+            successStatus: 201,
+            tags: ['a', 'b'],
+          }),
+        )
+        .meta(
+          openapi({
+            method: undefined,
+            path: undefined,
+            summary: undefined,
+            deprecated: undefined,
+            description: undefined,
+            inputStructure: undefined,
+            operationId: undefined,
+            outputStructure: undefined,
+            paramsStyles: undefined,
+            prefix: undefined,
+            queryStyles: undefined,
+            requestBodyHint: undefined,
+            responseBodyHint: undefined,
+            spec: undefined,
+            successDescription: undefined,
+            successStatus: undefined,
+            tags: undefined,
+          }),
+        )
 
       expect(getOpenAPIMeta(procedure)).toEqual({})
     })

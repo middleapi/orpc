@@ -1,10 +1,16 @@
 import type { Value } from '@orpc/shared'
-import type { StandardLazyResponse } from '@standard-server/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
 import { isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
+import type { StandardLazyResponse } from '@standard-server/core'
 import { cancelStandardBody, flattenStandardHeader } from '@standard-server/core'
-import { COMMON_ERROR_STATUS_MAP } from '../error'
+
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+  StandardLinkTransportInterceptorOptions,
+} from '../adapters/standard/index.ts'
+import { COMMON_ERROR_STATUS_MAP } from '../error.ts'
+import type { ClientContext } from '../types.ts'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   /**
@@ -12,30 +18,36 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
    *
    * @default ((response) => response.status === 429 || response.status === 503)
    */
-  condition?: Value<boolean, [
-    response: StandardLazyResponse,
-    options: StandardLinkTransportInterceptorOptions<T>,
-  ]> | undefined
+  condition?:
+    | Value<
+        boolean,
+        [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * Maximum attempts before giving up retries.
    *
    * @default 3
    */
-  maxAttempts?: Value<number, [
-    response: StandardLazyResponse,
-    options: StandardLinkTransportInterceptorOptions<T>,
-  ]> | undefined
+  maxAttempts?:
+    | Value<
+        number,
+        [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * Maximum timeout in milliseconds to wait before giving up retries.
    *
    * @default 5 * 60 * 1000 (5 minutes)
    */
-  timeout?: Value<number, [
-    response: StandardLazyResponse,
-    options: StandardLinkTransportInterceptorOptions<T>,
-  ]> | undefined
+  timeout?:
+    | Value<
+        number,
+        [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
+      >
+    | undefined
 }
 
 /**
@@ -55,11 +67,11 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
   name = '~retry-after'
 
   constructor(options: RetryAfterLinkPluginOptions<T> = {}) {
-    this.condition = options.condition ?? (
-      response =>
-        response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS
-        || response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE
-    )
+    this.condition =
+      options.condition ??
+      ((response) =>
+        response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS ||
+        response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE)
 
     this.maxAttempts = options.maxAttempts ?? 3
     this.timeout = options.timeout ?? 5 * 60 * 1000 // 5 minutes
@@ -107,8 +119,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
 
         try {
           await sleep(retryAfterMs, { signal: interceptorOptions.signal })
-        }
-        catch {
+        } catch {
           // can throw if the signal is aborted while sleeping
         }
 
@@ -120,7 +131,10 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
       }
     }
 
-    return { ...options, transportInterceptors: [interceptor, ...toArray(options.transportInterceptors)] }
+    return {
+      ...options,
+      transportInterceptors: [interceptor, ...toArray(options.transportInterceptors)],
+    }
   }
 }
 
@@ -129,9 +143,12 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
  * so its connection (e.g. an undici keep-alive socket) is not held until garbage collection.
  */
 function discardResponseBody(response: StandardLazyResponse): void {
-  response.resolveBody('octet-stream').then(body => cancelStandardBody(body)).catch(() => {
-    // the body may already be consumed, or the transport may fail while cancelling
-  })
+  response
+    .resolveBody('octet-stream')
+    .then((body) => cancelStandardBody(body))
+    .catch(() => {
+      // the body may already be consumed, or the transport may fail while cancelling
+    })
 }
 
 function parseRetryAfterHeader(value: string | undefined): number | undefined {

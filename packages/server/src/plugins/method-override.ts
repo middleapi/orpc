@@ -1,8 +1,13 @@
-import type { StandardMethod, StandardUrl } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
 import { toArray } from '@orpc/shared'
+import type { StandardMethod, StandardUrl } from '@standard-server/core'
 import { parseStandardUrl } from '@standard-server/core'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index.ts'
+import type { Context } from '../context.ts'
 
 export interface MethodOverrideHandlerPluginOptions {
   /**
@@ -43,11 +48,16 @@ export class MethodOverrideHandlerPlugin<T extends Context> implements StandardH
 
   constructor(options: MethodOverrideHandlerPluginOptions = {}) {
     this.param = options.param ?? 'method'
-    this.methods = new Set((options.methods ?? ['PUT', 'PATCH', 'DELETE']).map(method => method.toUpperCase()))
+    this.methods = new Set(
+      (options.methods ?? ['PUT', 'PATCH', 'DELETE']).map((method) => method.toUpperCase()),
+    )
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const { request } = interceptorOptions
 
       if (request.method !== 'POST') {

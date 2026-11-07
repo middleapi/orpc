@@ -1,19 +1,21 @@
-import type { InstrumentationConfig, InstrumentationModuleDefinition } from '@opentelemetry/instrumentation'
-import { context, propagation, trace } from '@opentelemetry/api'
+import type { InstrumentationConfig } from '@opentelemetry/instrumentation'
 import { InstrumentationBase } from '@opentelemetry/instrumentation'
-import { setTracer } from '@orpc/shared'
+import { getTracer, setTracer } from '@orpc/shared'
+
 import pkg from '../package.json' with { type: 'json' }
-import { OpenTelemetryTracer } from './tracer'
+import type { OpenTelemetryPropagationOptions } from './tracer.ts'
+import { OpenTelemetryTracer } from './tracer.ts'
 
 export interface ORPCInstrumentationConfig extends InstrumentationConfig {
   /**
-   * Whether to enable automatic OpenTelemetry context/span propagation.
+   * Automatic OpenTelemetry context/span propagation. `false` disables it,
+   * {@link OpenTelemetryPropagationOptions} controls each direction separately.
    *
    * Disable this if propagation is handled elsewhere or managed manually.
    *
    * @default true
    */
-  propagationEnabled?: boolean | undefined
+  propagation?: boolean | OpenTelemetryPropagationOptions | undefined
 }
 
 /**
@@ -27,19 +29,22 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
     super(pkg.name, pkg.version, config)
   }
 
-  protected override init(): InstrumentationModuleDefinition | InstrumentationModuleDefinition[] | void {
-  }
+  protected override init(): void {}
 
   override enable(): void {
-    setTracer(new OpenTelemetryTracer({
-      tracer: () => this.tracer,
-      trace,
-      context,
-      propagation: (this._config.propagationEnabled ?? true) ? propagation : undefined,
-    }))
+    setTracer(
+      new OpenTelemetryTracer({
+        tracer: () => this.tracer,
+        propagation: this.getConfig().propagation,
+      }),
+    )
   }
 
   override disable(): void {
     setTracer(undefined)
+  }
+
+  override isEnabled(): boolean {
+    return getTracer() !== undefined
   }
 }

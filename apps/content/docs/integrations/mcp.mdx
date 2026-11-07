@@ -1,8 +1,8 @@
 ---
-title: "MCP Integration"
-description: "Expose oRPC procedures as Model Context Protocol tools, reusing their OpenAPI metadata, schemas, middleware, and error handling."
+title: 'MCP Integration'
+description: 'Expose oRPC procedures as Model Context Protocol tools, reusing their OpenAPI metadata, schemas, middleware, and error handling.'
 sidebar:
-  label: "MCP"
+  label: 'MCP'
 ---
 
 :::warning
@@ -41,23 +41,25 @@ Connect each server to a transport as described in the [MCP TypeScript SDK](http
 
 Tool definitions derive from [OpenAPI metadata](/docs/openapi/specification#metadata):
 
-| Tool field    | Derived from                                                                       |
-| ------------- | ---------------------------------------------------------------------------------- |
-| `name`        | `operationId`, otherwise the router path joined by `_`, such as `planet_list`      |
-| `title`       | `summary`                                                                          |
-| `description` | `description`, otherwise `summary`                                                 |
+| Tool field    | Derived from                                                                                         |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| `name`        | `operationId`, otherwise the router path joined by `_`, such as `planet_list`                        |
+| `title`       | `summary`                                                                                            |
+| `description` | `description`, otherwise `summary`                                                                   |
 | `annotations` | `method`: `GET`, `HEAD`, and `QUERY` imply `readOnlyHint`, `PUT` and `DELETE` imply `idempotentHint` |
 
 ```ts
 import { openapi } from '@orpc/openapi'
 
 const listPlanets = os
-  .meta(openapi({
-    method: 'GET',
-    operationId: 'listPlanets',
-    summary: 'List planets',
-    description: 'List planets, newest first, optionally limited to a number of results.',
-  }))
+  .meta(
+    openapi({
+      method: 'GET',
+      operationId: 'listPlanets',
+      summary: 'List planets',
+      description: 'List planets, newest first, optionally limited to a number of results.',
+    }),
+  )
   .input(z.object({ limit: z.number().int().min(1).max(100).optional() }))
   .output(z.array(PlanetSchema))
   .handler(async ({ input }) => {
@@ -77,13 +79,15 @@ Use `mcp.tool` [metadata](/docs/metadata) to override derived fields or set MCP-
 import { mcp } from '@orpc/mcp'
 
 const deletePlanet = os
-  .meta(mcp.tool({
-    name: 'delete_planet',
-    title: 'Delete a planet',
-    description: 'Permanently delete a planet. Ask the user to confirm first.',
-    annotations: { destructiveHint: true, openWorldHint: false },
-    icons: [{ src: 'https://example.com/planet.png', mimeType: 'image/png' }],
-  }))
+  .meta(
+    mcp.tool({
+      name: 'delete_planet',
+      title: 'Delete a planet',
+      description: 'Permanently delete a planet. Ask the user to confirm first.',
+      annotations: { destructiveHint: true, openWorldHint: false },
+      icons: [{ src: 'https://example.com/planet.png', mimeType: 'image/png' }],
+    }),
+  )
   .input(z.object({ id: z.number() }))
   .handler(async ({ input }) => {
     // ...
@@ -142,16 +146,16 @@ Tool arguments are always an object, so a non-object input, such as `z.string()`
 
 Outputs are serialized like [OpenAPI responses](/docs/openapi/serializer). Pass your OpenAPI handler's serializer as `serializer` to share [custom types](/docs/openapi/serializer#custom-serializers).
 
-| Output                                              | Tool result                                                                   |
-| --------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `undefined`                                         | Empty content                                                                 |
-| String                                              | Text content with the string, and structured content                          |
-| Other values                                        | Text content with the JSON, and [structured content](https://modelcontextprotocol.io/specification/latest/server/tools#structured-content) |
-| `Blob` or `File`                                    | Image or audio content by MIME type, otherwise embedded resource content      |
-| Other values containing a `Blob` or `File`          | Like other values, with each file also returned as embedded resource content named by its path, such as `file:///report/q3.pdf` |
-| `ReadableStream`                                    | Like a `Blob`, typed by the `content-type` response header, such as one set with the [Response Headers Plugin](/docs/plugins/response-headers) |
-| [AsyncIteratorObject](/docs/async-iterator-object)  | The last event, mapped as above, with every event reported as [progress](https://modelcontextprotocol.io/specification/latest/basic/utilities/progress) when requested |
-| Error                                               | [Tool execution error](#error-handling)                                       |
+| Output                                             | Tool result                                                                                                                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `undefined`                                        | Empty content                                                                                                                                                          |
+| String                                             | Text content with the string, and structured content                                                                                                                   |
+| Other values                                       | Text content with the JSON, and [structured content](https://modelcontextprotocol.io/specification/latest/server/tools#structured-content)                             |
+| `Blob` or `File`                                   | Image or audio content by MIME type, otherwise embedded resource content                                                                                               |
+| Other values containing a `Blob` or `File`         | Like other values, with each file also returned as embedded resource content named by its path, such as `file:///report/q3.pdf`                                        |
+| `ReadableStream`                                   | Like a `Blob`, typed by the `content-type` response header, such as one set with the [Response Headers Plugin](/docs/plugins/response-headers)                         |
+| [AsyncIteratorObject](/docs/async-iterator-object) | The last event, mapped as above, with every event reported as [progress](https://modelcontextprotocol.io/specification/latest/basic/utilities/progress) when requested |
+| Error                                              | [Tool execution error](#error-handling)                                                                                                                                |
 
 A tool advertises an output schema only when every result has structured content matching it, so not for optional outputs or outputs containing a `Blob` or `File`. For an AsyncIteratorObject, its yield schema is advertised, so it must yield at least once.
 
@@ -176,7 +180,7 @@ Other errors become `INTERNAL_SERVER_ERROR` without their message. Use [intercep
 
 ```ts
 await registrar.register(server, {
-  context: async ctx => ({ user: await findUser(ctx) }),
+  context: async (ctx) => ({ user: await findUser(ctx) }),
 })
 ```
 

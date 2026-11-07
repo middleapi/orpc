@@ -1,10 +1,14 @@
-import type { CreateClientServerTest } from './client-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/message-port'
 import { RequestCompressionLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/message-port'
-import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
-import { defaultSerializer } from './client-server'
+import {
+  RequestCompressionHandlerPlugin,
+  ResponseCompressionHandlerPlugin,
+} from '@orpc/server/plugins'
+
+import type { CreateClientServerTest } from './client-server.ts'
+import { defaultSerializer } from './client-server.ts'
 
 export const createCompressionMessagePortTransferClientServerTest: CreateClientServerTest = (
   router,

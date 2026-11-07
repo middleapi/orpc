@@ -11,7 +11,7 @@ export const handlers = {
   person: {
     condition: (value: unknown) => value instanceof Person,
     serialize: (person: Person) => ({ name: person.name, age: person.age }),
-    deserialize: (data: { name: string, age: number }) => new Person(data.name, data.age),
+    deserialize: (data: { name: string; age: number }) => new Person(data.name, data.age),
   },
 }
 
@@ -41,7 +41,7 @@ export const PAYLOAD_10KB = Array.from({ length: 10 }, (_, i) => createUnit(i))
 export const PAYLOAD_100KB = Array.from({ length: 100 }, (_, i) => createUnit(i))
 export const PAYLOAD_5MB = Array.from({ length: 5_000 }, (_, i) => createUnit(i))
 // 3/10 JSON (native types + Person), 7/10 files
-const FILE_BYTES = Math.floor(SIZE_5MB * 7 / 10 / 4)
+const FILE_BYTES = Math.floor((SIZE_5MB * 7) / 10 / 4)
 export const PAYLOAD_5MB_WITH_FILES = {
   items: Array.from({ length: 1_500 }, (_, i) => createUnit(i)),
   files: [
@@ -54,16 +54,24 @@ export const PAYLOAD_5MB_WITH_FILES = {
 
 export const EVENTS_1KB = [PAYLOAD_1KB]
 export const EVENTS_10KB = Array.from({ length: 10 }).fill(PAYLOAD_1KB)
-export const EVENTS_100KB = Array.from({ length: 50 }).fill([PAYLOAD_1KB, PAYLOAD_1KB])
-export const EVENTS_5MB = Array.from({ length: 1000 }).fill([PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB])
+export const EVENTS_100KB = Array.from({ length: 50 }, () => [PAYLOAD_1KB, PAYLOAD_1KB])
+export const EVENTS_5MB = Array.from({ length: 1000 }, () => [
+  PAYLOAD_1KB,
+  PAYLOAD_1KB,
+  PAYLOAD_1KB,
+  PAYLOAD_1KB,
+  PAYLOAD_1KB,
+])
 
 /** Fresh async generator over prebuilt event parts (one-shot per call). */
-export function asSyncIteratorObject(parts: readonly unknown[]): AsyncGenerator<unknown, void, undefined> {
+export function asSyncIteratorObject(
+  parts: readonly unknown[],
+): AsyncGenerator<unknown, void, undefined> {
   return (async function* () {
     for (const part of parts) {
       yield part
     }
-  }())
+  })()
 }
 
 export async function drainBody(body: unknown): Promise<void> {
@@ -91,8 +99,7 @@ export async function drainBody(body: unknown): Promise<void> {
           break
         }
       }
-    }
-    finally {
+    } finally {
       reader.releaseLock()
     }
   }

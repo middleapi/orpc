@@ -1,14 +1,13 @@
 import { z } from 'zod'
-import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
+
+import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
 
 describe('procedureImplementer', () => {
   const definition = {
     errorMap: {
       INTERNAL_SERVER_ERROR: { message: 'Internal Server Error' },
     },
-    orderedMiddlewares: [
-      { middleware: vi.fn() },
-    ],
+    orderedMiddlewares: [{ middleware: vi.fn() }],
     inputSchemas: [z.string()],
     outputSchemas: [z.number()],
     meta: { meta: true },

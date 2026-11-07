@@ -1,6 +1,7 @@
 import * as ServerModule from '@orpc/server'
-import * as ServerFunctionModule from './server-function'
-import { createServerFunctionable } from './server-functionable'
+
+import * as ServerFunctionModule from './server-function.ts'
+import { createServerFunctionable } from './server-functionable.ts'
 
 const createServerFunctionSpy = vi.spyOn(ServerFunctionModule, 'createServerFunction')
 const { os, type } = ServerModule
@@ -10,7 +11,10 @@ beforeEach(() => {
 })
 
 describe('createServerFunctionable', () => {
-  const procedure = os.input(type<any>()).output(type<any>()).handler(() => 'output')
+  const procedure = os
+    .input(type<any>())
+    .output(type<any>())
+    .handler(() => 'output')
 
   it('returns the wrapped server function and preserves the procedure metadata', () => {
     const client = vi.fn().mockResolvedValue([null, { output: 'pong' }]) as any

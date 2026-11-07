@@ -1,8 +1,8 @@
 ---
-title: "Batch Plugin"
-description: "Combine multiple requests into a single batch and receive their responses together, reducing the overhead of separate requests."
+title: 'Batch Plugin'
+description: 'Combine multiple requests into a single batch and receive their responses together, reducing the overhead of separate requests.'
 sidebar:
-  label: "Batch"
+  label: 'Batch'
 ---
 
 :::warning
@@ -19,9 +19,7 @@ Set up batching on both the server and the client. The server plugin handles inc
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new BatchHandlerPlugin(),
-  ],
+  plugins: [new BatchHandlerPlugin()],
 })
 ```
 
@@ -119,13 +117,14 @@ A streaming batch response may stay idle for long periods. The server plugin can
 const handler = new RPCHandler(router, {
   plugins: [
     new BatchHandlerPlugin({
+      /**
+       * Keep-alive frames sent periodically while the stream is idle.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a keep-alive frame is sent periodically while the stream is idle.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between keep-alive frames after the last message.
          *
@@ -146,10 +145,7 @@ A batch response might be left uncompressed by the [Response Compression Plugin]
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new BatchHandlerPlugin(),
-    new BatchResponseCompressionHandlerPlugin(),
-  ],
+  plugins: [new BatchHandlerPlugin(), new BatchResponseCompressionHandlerPlugin()],
 })
 ```
 
@@ -177,21 +173,24 @@ const link = new RPCLink<ClientContext>({
       groups: [
         {
           condition: ({ context }) => context?.cache === 'force-cache',
-          context: { // used for the rest of the request lifecycle
+          context: {
+            // used for the rest of the request lifecycle
             cache: 'force-cache',
           },
         },
-        { // Fallback for all other requests. Keep this last.
+        {
+          // Fallback for all other requests. Keep this last.
           condition: () => true,
           context: {},
         },
       ],
     }),
   ],
-  fetch: (url, init, { context }) => globalThis.fetch(url, {
-    ...init,
-    cache: context?.cache,
-  }),
+  fetch: (url, init, { context }) =>
+    globalThis.fetch(url, {
+      ...init,
+      cache: context?.cache,
+    }),
 })
 ```
 

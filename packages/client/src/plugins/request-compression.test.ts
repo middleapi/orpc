@@ -1,12 +1,16 @@
-import type { StandardLinkTransportInterceptor } from '../adapters/standard'
 import { RPCLink } from '@orpc/client/fetch'
-import { RequestCompressionLinkPlugin } from './request-compression'
+
+import type { StandardLinkTransportInterceptor } from '../adapters/standard/index.ts'
+import { RequestCompressionLinkPlugin } from './request-compression.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
-async function decompressStream(stream: ReadableStream, encoding: 'gzip' | 'deflate' | 'deflate-raw'): Promise<string> {
+async function decompressStream(
+  stream: ReadableStream,
+  encoding: 'gzip' | 'deflate' | 'deflate-raw',
+): Promise<string> {
   const decompressed = stream.pipeThrough(new DecompressionStream(encoding))
   const reader = decompressed.getReader()
   const chunks: Uint8Array[] = []
@@ -31,21 +35,24 @@ async function decompressStream(stream: ReadableStream, encoding: 'gzip' | 'defl
   return new TextDecoder().decode(result)
 }
 
-function createLink(options: {
-  pluginOptions?: ConstructorParameters<typeof RequestCompressionLinkPlugin>[0]
-  transportInterceptors?: StandardLinkTransportInterceptor<any>[]
-} = {}) {
+function createLink(
+  options: {
+    pluginOptions?: ConstructorParameters<typeof RequestCompressionLinkPlugin>[0]
+    transportInterceptors?: StandardLinkTransportInterceptor<any>[]
+  } = {},
+) {
   const fetch = vi.fn(
-    async (_url: string, init: { body: any, headers: Headers }) => new Response(JSON.stringify({ json: 'OK' }), { headers: { 'content-type': 'application/json' } }),
+    async (_url: string, init: { body: any; headers: Headers }) =>
+      new Response(JSON.stringify({ json: 'OK' }), {
+        headers: { 'content-type': 'application/json' },
+      }),
   )
 
   const link = new RPCLink({
     url: '/rpc',
     origin: 'http://localhost:3000',
     method: () => 'POST',
-    plugins: [
-      new RequestCompressionLinkPlugin(options.pluginOptions),
-    ],
+    plugins: [new RequestCompressionLinkPlugin(options.pluginOptions)],
     transportInterceptors: options.transportInterceptors,
     fetch,
   })
@@ -103,9 +110,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-disposition')).toBeNull()
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual(JSON.stringify({ json: largeObject }))
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        JSON.stringify({ json: largeObject }),
+      )
     })
   })
 
@@ -141,9 +148,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-disposition')).toContain('blob')
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual(await largeBlob.text())
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        await largeBlob.text(),
+      )
     })
 
     it('should not compress unsupported content-type blob', async () => {
@@ -163,21 +170,26 @@ describe('requestCompressionLinkPlugin', () => {
     })
 
     it('should respect existing content-disposition header for compressed blob body', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            headers: {
-              ...request.headers,
-              'content-disposition': '__CUSTOM__',
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              headers: {
+                ...request.headers,
+                'content-disposition': '__CUSTOM__',
+              },
             },
-          },
-        })
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
       const largeBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
 
       await expect(link.call(['test'], largeBlob, { context: {} })).resolves.toEqual('OK')
@@ -247,22 +259,27 @@ describe('requestCompressionLinkPlugin', () => {
 
   describe('readable stream body', () => {
     it('should compress ReadableStream body above threshold with compressible content-type', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            headers: {
-              ...request.headers,
-              'content-type': 'text/plain',
-              'content-length': '200',
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              headers: {
+                ...request.headers,
+                'content-type': 'text/plain',
+                'content-length': '200',
+              },
             },
-          },
-        })
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(new TextEncoder().encode('large content'.repeat(100)))
@@ -280,28 +297,33 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-length')).toBeNull()
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual('large content'.repeat(100))
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        'large content'.repeat(100),
+      )
     })
 
     it('should not compress ReadableStream body below threshold', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            headers: {
-              ...request.headers,
-              'content-type': 'text/plain',
-              'content-length': '50',
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              headers: {
+                ...request.headers,
+                'content-type': 'text/plain',
+                'content-length': '50',
+              },
             },
-          },
-        })
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(new TextEncoder().encode('small'))
@@ -318,22 +340,27 @@ describe('requestCompressionLinkPlugin', () => {
     })
 
     it('should not compress ReadableStream body with non-compressible content-type', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            headers: {
-              ...request.headers,
-              'content-type': 'image/png',
-              'content-length': '200',
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              headers: {
+                ...request.headers,
+                'content-type': 'image/png',
+                'content-length': '200',
+              },
             },
-          },
-        })
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(new TextEncoder().encode('large content'.repeat(100)))
@@ -350,21 +377,26 @@ describe('requestCompressionLinkPlugin', () => {
     })
 
     it('should compress ReadableStream body when content-length is unknown with compressible content-type', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            headers: {
-              ...request.headers,
-              'content-type': 'text/plain',
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              headers: {
+                ...request.headers,
+                'content-type': 'text/plain',
+              },
             },
-          },
-        })
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(new TextEncoder().encode('large content'.repeat(100)))
@@ -382,9 +414,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-length')).toBeNull()
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual('large content'.repeat(100))
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        'large content'.repeat(100),
+      )
     })
   })
 
@@ -508,19 +540,24 @@ describe('requestCompressionLinkPlugin', () => {
 
   describe('url search params body', () => {
     it('should compress URLSearchParams body above threshold', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
-        const params = new URLSearchParams({ value: 'a'.repeat(100) })
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
+          const params = new URLSearchParams({ value: 'a'.repeat(100) })
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            body: params,
-          },
-        })
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              body: params,
+            },
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
 
       await expect(link.call(['test'], { foo: 'bar' }, { context: {} })).resolves.toEqual('OK')
 
@@ -532,25 +569,30 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-length')).toBeNull()
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual(`value=${encodeURIComponent('a'.repeat(100))}`)
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        `value=${encodeURIComponent('a'.repeat(100))}`,
+      )
     })
 
     it('should not compress URLSearchParams body below threshold', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
-        const params = new URLSearchParams({ value: 'hi' })
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
+          const params = new URLSearchParams({ value: 'hi' })
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            body: params,
-          },
-        })
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              body: params,
+            },
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
 
       await expect(link.call(['test'], { foo: 'bar' }, { context: {} })).resolves.toEqual('OK')
 
@@ -593,7 +635,10 @@ describe('requestCompressionLinkPlugin', () => {
         name: 'URLSearchParams with a form content-type',
         body: () => new URLSearchParams({ text: largeText }),
         headers: { 'content-type': 'application/x-www-form-urlencoded; charset=utf-8' },
-        expected: { 'content-type': 'application/x-www-form-urlencoded; charset=utf-8', 'standard-server': null },
+        expected: {
+          'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
+          'standard-server': null,
+        },
       },
       {
         name: 'ReadableStream with a body hint',
@@ -608,23 +653,32 @@ describe('requestCompressionLinkPlugin', () => {
         expected: { 'content-type': 'text/csv', 'standard-server': 'octet-stream' },
       },
     ])('keeps them for $name body', async ({ body, headers, expected }) => {
-      const transportInterceptor: StandardLinkTransportInterceptor<any> = ({ next, ...interceptorOptions }) => next({
-        ...interceptorOptions,
-        request: {
-          ...interceptorOptions.request,
-          headers: { ...interceptorOptions.request.headers, ...headers },
-          body: body(),
-        },
-      })
+      const transportInterceptor: StandardLinkTransportInterceptor<any> = ({
+        next,
+        ...interceptorOptions
+      }) =>
+        next({
+          ...interceptorOptions,
+          request: {
+            ...interceptorOptions.request,
+            headers: { ...interceptorOptions.request.headers, ...headers },
+            body: body(),
+          },
+        })
 
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
+      })
       const { link: uncompressedLink, fetch: uncompressedFetch } = createLink({
         pluginOptions: { threshold: Infinity, isCompressibleContentType: () => false },
         transportInterceptors: [transportInterceptor],
       })
 
       await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
-      await expect(uncompressedLink.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
+      await expect(uncompressedLink.call(['test'], undefined, { context: {} })).resolves.toEqual(
+        'OK',
+      )
 
       const [, init] = fetch.mock.calls[0]!
       const [, uncompressedInit] = uncompressedFetch.mock.calls[0]!
@@ -635,8 +689,12 @@ describe('requestCompressionLinkPlugin', () => {
 
       expect(uncompressedInit.headers.get('content-encoding')).toBeNull()
       expect(init.headers.get('content-type')).toBe(uncompressedInit.headers.get('content-type'))
-      expect(init.headers.get('standard-server')).toBe(uncompressedInit.headers.get('standard-server'))
-      await expect(decompressStream(init.body, 'gzip')).resolves.toBe(await new Response(uncompressedInit.body).text())
+      expect(init.headers.get('standard-server')).toBe(
+        uncompressedInit.headers.get('standard-server'),
+      )
+      await expect(decompressStream(init.body, 'gzip')).resolves.toBe(
+        await new Response(uncompressedInit.body).text(),
+      )
     })
   })
 
@@ -658,21 +716,26 @@ describe('requestCompressionLinkPlugin', () => {
 
   describe('content-encoding header', () => {
     it('should not compress when content-encoding header is set', async () => {
-      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
-        const request = interceptorOptions.request
+      const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(
+        async ({ next, ...interceptorOptions }) => {
+          const request = interceptorOptions.request
 
-        return next({
-          ...interceptorOptions,
-          request: {
-            ...request,
-            headers: {
-              ...request.headers,
-              'content-encoding': '__CUSTOM__',
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...request,
+              headers: {
+                ...request.headers,
+                'content-encoding': '__CUSTOM__',
+              },
             },
-          },
-        })
+          })
+        },
+      )
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100 },
+        transportInterceptors: [transportInterceptor],
       })
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 }, transportInterceptors: [transportInterceptor] })
       const largeBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
 
       await expect(link.call(['test'], largeBlob, { context: {} })).resolves.toEqual('OK')
@@ -696,9 +759,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.body).toBeInstanceOf(ReadableStream)
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual(await largeBlob.text())
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        await largeBlob.text(),
+      )
     })
 
     it('always compresses when threshold is 0', async () => {
@@ -712,9 +775,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.body).toBeInstanceOf(ReadableStream)
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual(await smallBlob.text())
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        await smallBlob.text(),
+      )
     })
   })
 
@@ -730,13 +793,15 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.body).toBeInstanceOf(ReadableStream)
       expect(init.headers?.get('content-encoding')).toBe('deflate')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'deflate'),
-      ).resolves.toEqual(await largeBlob.text())
+      await expect(decompressStream(init.body as ReadableStream, 'deflate')).resolves.toEqual(
+        await largeBlob.text(),
+      )
     })
 
     it('should use deflate-raw algorithm when specified', async () => {
-      const { link, fetch } = createLink({ pluginOptions: { threshold: 100, encoding: 'deflate-raw' } })
+      const { link, fetch } = createLink({
+        pluginOptions: { threshold: 100, encoding: 'deflate-raw' },
+      })
       const largeBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
 
       await expect(link.call(['test'], largeBlob, { context: {} })).resolves.toEqual('OK')
@@ -746,9 +811,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.body).toBeInstanceOf(ReadableStream)
       expect(init.headers?.get('content-encoding')).toBe('deflate-raw')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'deflate-raw'),
-      ).resolves.toEqual(await largeBlob.text())
+      await expect(decompressStream(init.body as ReadableStream, 'deflate-raw')).resolves.toEqual(
+        await largeBlob.text(),
+      )
     })
   })
 
@@ -764,7 +829,9 @@ describe('requestCompressionLinkPlugin', () => {
           },
         },
       })
-      const binaryBlob = new Blob(['large content'.repeat(100)], { type: 'application/octet-stream' })
+      const binaryBlob = new Blob(['large content'.repeat(100)], {
+        type: 'application/octet-stream',
+      })
 
       await expect(link.call(['test'], binaryBlob, { context: {} })).resolves.toEqual('OK')
 
@@ -773,9 +840,9 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.body).toBeInstanceOf(ReadableStream)
       expect(init.headers?.get('content-encoding')).toBe('gzip')
 
-      await expect(
-        decompressStream(init.body as ReadableStream, 'gzip'),
-      ).resolves.toEqual(await binaryBlob.text())
+      await expect(decompressStream(init.body as ReadableStream, 'gzip')).resolves.toEqual(
+        await binaryBlob.text(),
+      )
     })
 
     it('does not compress a normally compressible content-type when the custom check rejects it', async () => {

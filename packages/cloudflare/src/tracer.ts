@@ -1,4 +1,11 @@
-import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
+import type {
+  Promisable,
+  Tracer,
+  TracingAttributeValue,
+  TracingException,
+  TracingExceptionLevel,
+  TracingSpan,
+} from '@orpc/shared'
 import { setTracer, toSpanAttributeValue } from '@orpc/shared'
 /**
  * A namespace import keeps `@orpc/cloudflare` loadable on runtimes that predate the
@@ -36,6 +43,15 @@ class CloudflareSpan implements TracingSpan {
 
 export { CloudflareSpan as experimental_CloudflareSpan }
 
+export interface experimental_CloudflarePropagationOptions {
+  /**
+   * Whether oRPC links send a W3C `traceparent` header, so servers outside Cloudflare join the trace.
+   *
+   * @default true
+   */
+  inject?: boolean | undefined
+}
+
 export interface experimental_CloudflareTracerOptions {
   /**
    * The Workers tracing API to record spans with.
@@ -45,11 +61,14 @@ export interface experimental_CloudflareTracerOptions {
   tracing?: Tracing | undefined
 
   /**
-   * Whether oRPC links send a W3C `traceparent` header, so servers outside Cloudflare join the trace.
+   * Context propagation. `false` disables it, {@link experimental_CloudflarePropagationOptions}
+   * controls each direction separately.
+   *
+   * Incoming context is never extracted: Workers already join service binding and Durable Object calls into one trace.
    *
    * @default true
    */
-  propagationEnabled?: boolean | undefined
+  propagation?: boolean | experimental_CloudflarePropagationOptions | undefined
 }
 
 /**
@@ -70,7 +89,12 @@ export class experimental_CloudflareTracer implements Tracer {
   constructor(options: experimental_CloudflareTracerOptions = {}) {
     this.tracing = options.tracing ?? workers.tracing
 
-    if (options.propagationEnabled ?? true) {
+    const enabled =
+      typeof options.propagation === 'object'
+        ? options.propagation
+        : { inject: options.propagation }
+
+    if (enabled.inject ?? true) {
       this.inject = (span, headers) => {
         const { traceId, spanId } = (span as CloudflareSpan).span.spanContext()
 
@@ -92,8 +116,12 @@ export class experimental_CloudflareTracer implements Tracer {
     return new CloudflareSpan(this.tracing.startSpan(name))
   }
 
-  startActiveSpan<T>(name: string, _parent: TracingSpan | undefined, fn: (span: TracingSpan) => Promise<T>): Promise<T> {
-    return this.tracing.startActiveSpan(name, span => fn(new CloudflareSpan(span)))
+  startActiveSpan<T>(
+    name: string,
+    _parent: TracingSpan | undefined,
+    fn: (span: TracingSpan) => Promise<T>,
+  ): Promise<T> {
+    return this.tracing.startActiveSpan(name, (span) => fn(new CloudflareSpan(span)))
   }
 
   getActiveSpan(): TracingSpan | undefined {

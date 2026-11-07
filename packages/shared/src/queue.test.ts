@@ -1,5 +1,6 @@
 import { AbortError } from '@standard-server/shared'
-import { AsyncIdQueue } from './queue'
+
+import { AsyncIdQueue } from './queue.ts'
 
 describe('asyncIdQueue', () => {
   let queue: AsyncIdQueue<string>
@@ -12,13 +13,17 @@ describe('asyncIdQueue', () => {
 
   it('should require queue to be opened before push', () => {
     expect(() => queue.push(queueId1, 'item1')).toThrow(
-      new Error(`[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`),
+      new Error(
+        `[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`,
+      ),
     )
   })
 
   it('should require queue to be opened before pull', async () => {
     await expect(queue.pull(queueId1)).rejects.toThrow(
-      new Error(`[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`),
+      new Error(
+        `[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`,
+      ),
     )
   })
 
@@ -61,10 +66,14 @@ describe('asyncIdQueue', () => {
 
     expect(queue.isOpen(queueId1)).toBe(false)
     expect(() => queue.push(queueId1, 'item2')).toThrow(
-      new Error(`[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`),
+      new Error(
+        `[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`,
+      ),
     )
     await expect(queue.pull(queueId1)).rejects.toThrow(
-      new Error(`[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`),
+      new Error(
+        `[AsyncIdQueue] Cannot access queue[${queueId1}] because it is not open or aborted.`,
+      ),
     )
   })
 
@@ -77,13 +86,17 @@ describe('asyncIdQueue', () => {
     queue.close({ id: queueId1 })
 
     await expect(pullPromise1).rejects.toThrow(
-      new AbortError(`[AsyncIdQueue] Queue[${queueId1}] was closed or aborted while waiting for pulling.`),
+      new AbortError(
+        `[AsyncIdQueue] Queue[${queueId1}] was closed or aborted while waiting for pulling.`,
+      ),
     )
 
     queue.close()
 
     await expect(pullPromise2).rejects.toThrow(
-      new AbortError(`[AsyncIdQueue] Queue[${queueId2}] was closed or aborted while waiting for pulling.`),
+      new AbortError(
+        `[AsyncIdQueue] Queue[${queueId2}] was closed or aborted while waiting for pulling.`,
+      ),
     )
   })
 

@@ -1,6 +1,6 @@
 ---
-title: "Context"
-description: "Use oRPC context for type-safe dependency injection, providing initial context explicitly or injecting values through middleware."
+title: 'Context'
+description: 'Use oRPC context for type-safe dependency injection, providing initial context explicitly or injecting values through middleware.'
 ---
 
 ## Initial Context
@@ -12,10 +12,9 @@ import { os } from '@orpc/server'
 // ---cut---
 const base = os.$context<{ env: { DB_URL: string } }>()
 
-export const getting = base
-  .handler(async ({ context }) => {
-    console.log(context.env)
-  })
+export const getting = base.handler(async ({ context }) => {
+  console.log(context.env)
+})
 ```
 
 :::info
@@ -28,7 +27,8 @@ const base = os.$context<{ env: { DB_URL: string } }>()
 const getting = base.handler(async ({ context }) => {})
 // ---cut---
 const output = await call(getting, undefined, {
-  context: { // <- initial context must be passed when calling
+  context: {
+    // <- initial context must be passed when calling
     env: { DB_URL: 'postgres://...' },
   },
 })
@@ -57,11 +57,13 @@ import { os } from '@orpc/server'
 
 declare const env: { DB_URL: string }
 // ---cut---
-const base = os.use(async ({ next }) => next({
-  context: {
-    env: { DB_URL: env.DB_URL },
-  },
-}))
+const base = os.use(async ({ next }) =>
+  next({
+    context: {
+      env: { DB_URL: env.DB_URL },
+    },
+  }),
+)
 
 export const getting = base.handler(async ({ context }) => {
   console.log(context.env)
@@ -76,11 +78,13 @@ import { call, os } from '@orpc/server'
 
 declare const env: { DB_URL: string }
 
-const base = os.use(async ({ next }) => next({
-  context: {
-    env: { DB_URL: env.DB_URL },
-  },
-}))
+const base = os.use(async ({ next }) =>
+  next({
+    context: {
+      env: { DB_URL: env.DB_URL },
+    },
+  }),
+)
 
 const getting = base.handler(async ({ context }) => {})
 // ---cut---
@@ -99,13 +103,10 @@ import { ORPCError, os } from '@orpc/server'
 
 declare function parseJWT(token: string | undefined, secret: string): { userId: number } | null
 // ---cut---
-const base = os.$context<{ headers: Headers, env: { JWT_SECRET: string } }>()
+const base = os.$context<{ headers: Headers; env: { JWT_SECRET: string } }>()
 
 const requireAuth = base.middleware(async ({ context, next }) => {
-  const user = parseJWT(
-    context.headers.get('authorization')?.split(' ')[1],
-    context.env.JWT_SECRET
-  )
+  const user = parseJWT(context.headers.get('authorization')?.split(' ')[1], context.env.JWT_SECRET)
 
   if (!user) {
     throw new ORPCError('UNAUTHORIZED')
@@ -114,10 +115,8 @@ const requireAuth = base.middleware(async ({ context, next }) => {
   return next({ context: { user } })
 })
 
-const getting = base
-  .use(requireAuth)
-  .handler(async ({ context }) => {
-    console.log(context.env)
-    console.log(context.user)
-  })
+const getting = base.use(requireAuth).handler(async ({ context }) => {
+  console.log(context.env)
+  console.log(context.user)
+})
 ```

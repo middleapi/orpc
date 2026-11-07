@@ -1,12 +1,20 @@
 import { getEventListeners } from 'node:events'
-import { allAbortSignal, anyAbortSignal, disposableAllAbortSignal, runWithSignal } from './signal'
+
+import {
+  allAbortSignal,
+  anyAbortSignal,
+  disposableAllAbortSignal,
+  runWithSignal,
+} from './signal.ts'
 
 describe('allAbortSignal', () => {
   it('should return undefined if contains undefined or empty array', () => {
     expect(allAbortSignal([])).toBe(undefined)
     expect(allAbortSignal([undefined])).toBe(undefined)
     expect(allAbortSignal([AbortSignal.timeout(100), undefined])).toBe(undefined)
-    expect(allAbortSignal([AbortSignal.timeout(100), undefined, AbortSignal.timeout(100)])).toBe(undefined)
+    expect(allAbortSignal([AbortSignal.timeout(100), undefined, AbortSignal.timeout(100)])).toBe(
+      undefined,
+    )
   })
 
   it('should return a non-aborted signal initially if not all inputs are aborted', () => {
@@ -147,7 +155,10 @@ describe('anyAbortSignal', () => {
   describe.each([
     { mode: 'native', description: 'built-in AbortSignal.any' },
     { mode: 'without-any', description: 'fallback implementation' },
-    { mode: 'without-global', description: 'fallback implementation without the AbortSignal global' },
+    {
+      mode: 'without-global',
+      description: 'fallback implementation without the AbortSignal global',
+    },
   ] as const)('with $description', ({ mode }) => {
     const originalAny = AbortSignal.any
 
@@ -208,11 +219,11 @@ describe('runWithSignal', () => {
   })
 
   it('rejects if fn rejects when no signal provided', async () => {
-    await expect(runWithSignal(undefined, async () => {
-      throw new Error('fail')
-    }))
-      .rejects
-      .toThrow('fail')
+    await expect(
+      runWithSignal(undefined, async () => {
+        throw new Error('fail')
+      }),
+    ).rejects.toThrow('fail')
   })
 
   it('throws immediately if signal already aborted', async () => {
@@ -232,16 +243,16 @@ describe('runWithSignal', () => {
 
   it('rejects if fn rejects when signal not aborted', async () => {
     const controller = new AbortController()
-    await expect(runWithSignal(controller.signal, async () => {
-      throw new Error('boom')
-    }))
-      .rejects
-      .toThrow('boom')
+    await expect(
+      runWithSignal(controller.signal, async () => {
+        throw new Error('boom')
+      }),
+    ).rejects.toThrow('boom')
   })
 
   it('rejects when signal aborts before fn resolves', async () => {
     const controller = new AbortController()
-    const fn = () => new Promise<number>(resolve => setTimeout(resolve, 1000, 42))
+    const fn = () => new Promise<number>((resolve) => setTimeout(resolve, 1000, 42))
 
     const promise = runWithSignal(controller.signal, fn)
     controller.abort(new Error('aborted mid-flight'))
@@ -251,7 +262,7 @@ describe('runWithSignal', () => {
 
   it('resolves if fn resolves before signal aborts', async () => {
     const controller = new AbortController()
-    const fn = () => new Promise<number>(resolve => setTimeout(resolve, 10, 42))
+    const fn = () => new Promise<number>((resolve) => setTimeout(resolve, 10, 42))
 
     const promise = runWithSignal(controller.signal, fn)
     setTimeout(() => controller.abort(new Error('too late')), 1000)
@@ -274,11 +285,11 @@ describe('runWithSignal', () => {
     const controller = new AbortController()
     const removeSpy = vi.spyOn(controller.signal, 'removeEventListener')
 
-    await expect(runWithSignal(controller.signal, async () => {
-      throw new Error('fail')
-    }))
-      .rejects
-      .toThrow('fail')
+    await expect(
+      runWithSignal(controller.signal, async () => {
+        throw new Error('fail')
+      }),
+    ).rejects.toThrow('fail')
 
     expect(removeSpy).toHaveBeenCalled()
   })

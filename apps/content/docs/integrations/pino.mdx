@@ -1,8 +1,8 @@
 ---
-title: "Pino Integration"
-description: "Add structured logging to oRPC with the Pino integration to track requests, monitor errors, and gain insight into application behavior."
+title: 'Pino Integration'
+description: 'Add structured logging to oRPC with the Pino integration to track requests, monitor errors, and gain insight into application behavior.'
 sidebar:
-  label: "Pino"
+  label: 'Pino'
 ---
 
 :::warning
@@ -78,16 +78,14 @@ import { getLogger, LoggerContext } from '@orpc/pino'
 
 interface ServerContext extends LoggerContext {} // [!code highlight]
 
-const procedure = os
-  .$context<ServerContext>()
-  .handler(({ context }) => {
-    const logger = getLogger(context) // [!code highlight]
+const procedure = os.$context<ServerContext>().handler(({ context }) => {
+  const logger = getLogger(context) // [!code highlight]
 
-    logger?.info('Processing request')
-    logger?.debug({ userId: 123 }, 'User data')
+  logger?.info('Processing request')
+  logger?.debug({ userId: 123 }, 'User data')
 
-    return { success: true }
-  })
+  return { success: true }
+})
 ```
 
 ## Providing Custom Logger per Request
@@ -95,11 +93,7 @@ const procedure = os
 You can provide a custom logger instance for specific requests by passing it through the context. This is especially useful when integrating with [pino-http](https://github.com/pinojs/pino-http) for enhanced HTTP logging:
 
 ```ts
-import {
-  LOGGER_CONTEXT_SYMBOL,
-  LoggerContext,
-  PinoHandlerPlugin
-} from '@orpc/pino'
+import { LOGGER_CONTEXT_SYMBOL, LoggerContext, PinoHandlerPlugin } from '@orpc/pino'
 
 const logger = pino()
 const httpLogger = pinoHttp({ logger })
@@ -107,7 +101,7 @@ const httpLogger = pinoHttp({ logger })
 interface ServerContext extends LoggerContext {} // [!code highlight]
 
 const router = {
-  ping: os.$context<ServerContext>().handler(() => 'pong')
+  ping: os.$context<ServerContext>().handler(() => 'pong'),
 }
 
 const handler = new RPCHandler(router, {

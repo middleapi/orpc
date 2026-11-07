@@ -1,10 +1,15 @@
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { NodeHttpRequest, NodeHttpResponse, SendStandardResponseOptions } from '@standard-server/node'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+import type {
+  NodeHttpRequest,
+  NodeHttpResponse,
+  SendStandardResponseOptions,
+} from '@standard-server/node'
 import { sendStandardResponse, toStandardLazyRequest } from '@standard-server/node'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
+
+import type { Context } from '../../context.ts'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index.ts'
 
 export type NodeHttpHandlerHandleResult = { matched: true } | { matched: false }
 

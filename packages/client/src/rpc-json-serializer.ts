@@ -1,10 +1,26 @@
 import type { Segment } from '@orpc/shared'
-import { copyOnWrite, DEFAULT_MAX_BIGINT_DIGITS, isPlainObject, NullProtoObj, parseBigIntString } from '@orpc/shared'
+import {
+  copyOnWrite,
+  DEFAULT_MAX_BIGINT_DIGITS,
+  isPlainObject,
+  NullProtoObj,
+  parseBigIntString,
+} from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
-export type RPCJsonSerialization
-  = | { json: unknown, meta?: RPCJsonSerializationMeta[] | undefined, maps?: undefined, blobs?: undefined }
-    | { json: unknown, meta?: RPCJsonSerializationMeta[] | undefined, maps: Segment[][], blobs: Blob[] }
+export type RPCJsonSerialization =
+  | {
+      json: unknown
+      meta?: RPCJsonSerializationMeta[] | undefined
+      maps?: undefined
+      blobs?: undefined
+    }
+  | {
+      json: unknown
+      meta?: RPCJsonSerializationMeta[] | undefined
+      maps: Segment[][]
+      blobs: Blob[]
+    }
 
 export interface RPCJsonSerializerHandler {
   condition(value: unknown): boolean
@@ -74,7 +90,9 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       const value = parseBigIntString(serialized, DEFAULT_MAX_BIGINT_DIGITS)
 
       if (value === undefined) {
-        throw invalidSerializedData(`type "bigint" expects a decimal integer string of at most ${DEFAULT_MAX_BIGINT_DIGITS} digits.`)
+        throw invalidSerializedData(
+          `type "bigint" expects a decimal integer string of at most ${DEFAULT_MAX_BIGINT_DIGITS} digits.`,
+        )
       }
 
       return value
@@ -93,7 +111,11 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toISOString()
     },
     deserialize(serialized: string | null): Date {
-      assertSerializedType(typeof serialized === 'string' || serialized === null, 'date', 'a string or null')
+      assertSerializedType(
+        typeof serialized === 'string' || serialized === null,
+        'date',
+        'a string or null',
+      )
       return new Date(serialized ?? Number.NaN)
     },
     isTerminal: true,
@@ -119,7 +141,11 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data > 0 ? 'Infinity' : '-Infinity'
     },
     deserialize(serialized: string): number {
-      assertSerializedType(serialized === 'Infinity' || serialized === '-Infinity', 'infinity', '"Infinity" or "-Infinity"')
+      assertSerializedType(
+        serialized === 'Infinity' || serialized === '-Infinity',
+        'infinity',
+        '"Infinity" or "-Infinity"',
+      )
       return serialized === 'Infinity' ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY
     },
     isTerminal: true,
@@ -287,7 +313,13 @@ export class RPCJsonSerializer {
    * `segments` is a shared mutable stack (push/pop while walking),
    * so it must be copied before being stored in `meta` or `maps`.
    */
-  private serializeValue(data: unknown, segments: Segment[], meta: RPCJsonSerializationMeta[], maps: Segment[][], blobs: Blob[]): unknown {
+  private serializeValue(
+    data: unknown,
+    segments: Segment[],
+    meta: RPCJsonSerializationMeta[],
+    maps: Segment[][],
+    blobs: Blob[],
+  ): unknown {
     const handlerEntries = this.handlerEntries
 
     /**
@@ -344,7 +376,13 @@ export class RPCJsonSerializer {
             return result
           }
           if (data instanceof Map) {
-            const result = this.serializeValue(Array.from(data.entries()), segments, meta, maps, blobs)
+            const result = this.serializeValue(
+              Array.from(data.entries()),
+              segments,
+              meta,
+              maps,
+              blobs,
+            )
             meta.push(['map', ...segments])
             return result
           }
@@ -439,7 +477,10 @@ export class RPCJsonSerializer {
       throw invalidSerializedData('"meta" must be an array.')
     }
 
-    if ((serialized.blobs?.length || serialized.maps !== undefined) && !Array.isArray(serialized.maps)) {
+    if (
+      (serialized.blobs?.length || serialized.maps !== undefined) &&
+      !Array.isArray(serialized.maps)
+    ) {
       throw invalidSerializedData('"maps" must be an array.')
     }
 
@@ -538,7 +579,7 @@ export class RPCJsonSerializer {
         currentRef[preSegment] = value
 
         if (isWalkable(value)) {
-          (restored ??= new Set()).add(value)
+          ;(restored ??= new Set()).add(value)
         }
       }
     }

@@ -1,7 +1,8 @@
-import type { ErrorMap } from './error'
 import * as ClientModule from '@orpc/client'
-import z from 'zod'
-import { mergeErrorMap, reconcileORPCError } from './error-utils'
+import * as z from 'zod'
+
+import { mergeErrorMap, reconcileORPCError } from './error-utils.ts'
+import type { ErrorMap } from './error.ts'
 
 const ORPCError = ClientModule.ORPCError
 const cloneORPCErrorSpy = vi.spyOn(ClientModule, 'cloneORPCError')
@@ -31,7 +32,7 @@ it('mergeErrorMap', () => {
 
 describe('reconcileORPCError', () => {
   describe('no map error matched', () => {
-    const map: ErrorMap = { }
+    const map: ErrorMap = {}
 
     it('should return error itself if error is not defined', async () => {
       const error = new ORPCError('CODE', { message: 'm', data: 'd' })

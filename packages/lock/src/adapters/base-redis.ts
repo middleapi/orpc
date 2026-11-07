@@ -1,7 +1,8 @@
 import type { Promisable } from '@orpc/shared'
-import type { LockCallbackOptions, Locker, LockOptions } from '../types'
 import { sleep, throwIfAborted } from '@orpc/shared'
-import { LockTimeoutError } from '../error'
+
+import { LockTimeoutError } from '../error.ts'
+import type { LockCallbackOptions, Locker, LockOptions } from '../types.ts'
 
 const RELEASE_LOCK_SCRIPT = `
 if redis.call('GET', KEYS[1]) == ARGV[1] then
@@ -82,7 +83,11 @@ export abstract class BaseRedisLocker implements Locker {
    */
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
-  async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
+  async lock<T>(
+    key: string,
+    fn: (options: LockCallbackOptions) => Promisable<T>,
+    options: LockOptions = {},
+  ): Promise<T> {
     const prefixedKey = `${this.keyPrefix}${key}`
     const ttl = options.ttl ?? this.ttl
     const deadline = Date.now() + (options.timeout ?? this.timeout)
@@ -104,9 +109,12 @@ export abstract class BaseRedisLocker implements Locker {
 
     try {
       return await fn({ waited })
-    }
-    finally {
-      await this.evalScript(RELEASE_LOCK_SCRIPT, [prefixedKey], [token])
+    } finally {
+      try {
+        await this.evalScript(RELEASE_LOCK_SCRIPT, [prefixedKey], [token])
+      } catch {
+        // the lock still expires through its TTL
+      }
     }
   }
 }

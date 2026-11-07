@@ -1,20 +1,25 @@
-import type { InferToolInput, InferToolOutput } from 'ai'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import { os } from '@orpc/server'
+import type { InferToolInput, InferToolOutput } from 'ai'
 import { generateText } from 'ai'
 import { z } from 'zod'
-import { createToolFactory, implementToolFactory } from './tool'
+
+import { createToolFactory, implementToolFactory } from './tool.ts'
 
 describe('implementToolFactory', () => {
   it('can use as a tool', () => {
     const contract = oc
-      .input(z.object({
-        location: z.string().describe('The location to get the weather for'),
-      }))
-      .output(z.object({
-        location: z.string(),
-        temperature: z.number().describe('The temperature in Fahrenheit'),
-      }))
+      .input(
+        z.object({
+          location: z.string().describe('The location to get the weather for'),
+        }),
+      )
+      .output(
+        z.object({
+          location: z.string(),
+          temperature: z.number().describe('The temperature in Fahrenheit'),
+        }),
+      )
 
     const weatherTool = implementToolFactory()(contract, {
       execute: async ({ location }) => ({
@@ -34,12 +39,16 @@ describe('implementToolFactory', () => {
 
   it('infer correct input & output', () => {
     const contract = oc
-      .input(z.object({
-        stringToNumber: z.string().transform(val => Number(val)),
-      }))
-      .output(z.object({
-        numberToBoolean: z.number().transform(val => Boolean(val)),
-      }))
+      .input(
+        z.object({
+          stringToNumber: z.string().transform((val) => Number(val)),
+        }),
+      )
+      .output(
+        z.object({
+          numberToBoolean: z.number().transform((val) => Boolean(val)),
+        }),
+      )
 
     const tool = implementToolFactory()(contract, {
       execute: async ({ stringToNumber }) => {
@@ -65,13 +74,17 @@ describe('implementToolFactory', () => {
 describe('createToolFactory', () => {
   it('can use as a tool', () => {
     const procedure = os
-      .input(z.object({
-        location: z.string().describe('The location to get the weather for'),
-      }))
-      .output(z.object({
-        location: z.string(),
-        temperature: z.number().describe('The temperature in Fahrenheit'),
-      }))
+      .input(
+        z.object({
+          location: z.string().describe('The location to get the weather for'),
+        }),
+      )
+      .output(
+        z.object({
+          location: z.string(),
+          temperature: z.number().describe('The temperature in Fahrenheit'),
+        }),
+      )
       .handler(async ({ input }) => {
         return {
           location: input.location,
@@ -92,12 +105,16 @@ describe('createToolFactory', () => {
 
   it('infer correct input & output', () => {
     const procedure = os
-      .input(z.object({
-        stringToNumber: z.string().transform(val => Number(val)),
-      }))
-      .output(z.object({
-        numberToBoolean: z.number().transform(val => Boolean(val)),
-      }))
+      .input(
+        z.object({
+          stringToNumber: z.string().transform((val) => Number(val)),
+        }),
+      )
+      .output(
+        z.object({
+          numberToBoolean: z.number().transform((val) => Boolean(val)),
+        }),
+      )
       .handler(async ({ input }) => {
         return {
           numberToBoolean: input.stringToNumber,
@@ -112,9 +129,11 @@ describe('createToolFactory', () => {
 
   it('execute is managed by the factory', () => {
     const procedure = os
-      .input(z.object({
-        location: z.string(),
-      }))
+      .input(
+        z.object({
+          location: z.string(),
+        }),
+      )
       .handler(async () => 'output')
 
     void createToolFactory()(procedure, {
@@ -126,9 +145,11 @@ describe('createToolFactory', () => {
   it('require provide initial context if required', () => {
     const procedure = os
       .$context<{ authToken: string }>()
-      .input(z.object({
-        location: z.string().describe('The location to get the weather for'),
-      }))
+      .input(
+        z.object({
+          location: z.string().describe('The location to get the weather for'),
+        }),
+      )
       .handler(async ({ context, input }) => {})
 
     void createToolFactory({
@@ -150,10 +171,7 @@ describe('createToolFactory', () => {
   it('infer output as yield type for async iterator outputs', () => {
     const procedure = os
       .input(z.object({ location: z.string() }))
-      .output(asyncIteratorObject(
-        z.object({ status: z.string() }),
-        z.object({ url: z.string() }),
-      ))
+      .output(asyncIteratorObject(z.object({ status: z.string() }), z.object({ url: z.string() })))
       .handler(async function* () {
         yield { status: 'building' }
         return { url: 'https://example.com' }
@@ -165,12 +183,10 @@ describe('createToolFactory', () => {
   })
 
   it('infer output as yield type for async generator handlers without an output schema', () => {
-    const procedure = os
-      .input(z.object({ location: z.string() }))
-      .handler(async function* () {
-        yield { status: 'building' }
-        return { url: 'https://example.com' }
-      })
+    const procedure = os.input(z.object({ location: z.string() })).handler(async function* () {
+      yield { status: 'building' }
+      return { url: 'https://example.com' }
+    })
 
     const tool = createToolFactory()(procedure)
 

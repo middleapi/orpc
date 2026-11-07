@@ -1,13 +1,34 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
-import type { DataTag, InfiniteData, MutationFunctionContext, QueryFunctionContext, QueryKey, SkipToken } from '@tanstack/query-core'
-import type { OperationKeyBaseOptions } from './key'
+import {
+  intercept,
+  isAsyncIteratorObject,
+  isNonPrimitive,
+  resolveMaybeOptionalOptions,
+  toArray,
+} from '@orpc/shared'
+import type {
+  DataTag,
+  InfiniteData,
+  MutationFunctionContext,
+  QueryFunctionContext,
+  QueryKey,
+  SkipToken,
+} from '@tanstack/query-core'
+import { skipToken } from '@tanstack/query-core'
+
+import type { OperationKeyBaseOptions } from './key.ts'
+import { liveQuery } from './live-query.ts'
+import { SharedUtils } from './shared-utils.ts'
+import { serializableStreamedQuery } from './stream-query.ts'
+import { createStructuralSharing } from './structural-sharing.ts'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
   InfiniteKeyOptions,
   InfiniteOptionsIn,
   InfiniteOptionsOut,
+  LiveOptionsIn,
   MutationKeyOptions,
   MutationOptionsIn,
   MutationOptionsOut,
@@ -18,46 +39,91 @@ import type {
   StreamedKeyOptions,
   StreamedOptionsIn,
   StreamedOptionsOut,
-} from './types'
-import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
-import { skipToken } from '@tanstack/query-core'
-import { liveQuery } from './live-query'
-import { SharedUtils } from './shared-utils'
-import { serializableStreamedQuery } from './stream-query'
-import { createStructuralSharing } from './structural-sharing'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+} from './types.ts'
+import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
 
-export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput> {
+export interface ProcedureUtilsQueryInterceptorOptions<
+  TClientContext extends ClientContext,
+  TInput,
+> {
   path: string[]
   context: TClientContext & OperationContext
   input: TInput | SkipToken
   fnContext: QueryFunctionContext
 }
-export type ProcedureUtilsQueryInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+export type ProcedureUtilsQueryInterceptor<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Interceptor<
+  ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput>,
+  PromiseWithError<TOutput, TError>
+>
 
-export interface ProcedureUtilsStreamedInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
-}
-export type ProcedureUtilsStreamedInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsStreamedInterceptorOptions<TClientContext, TInput>, PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>>
+export interface ProcedureUtilsStreamedInterceptorOptions<
+  TClientContext extends ClientContext,
+  TInput,
+> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {}
+export type ProcedureUtilsStreamedInterceptor<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Interceptor<
+  ProcedureUtilsStreamedInterceptorOptions<TClientContext, TInput>,
+  PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>
+>
 
-export interface ProcedureUtilsLiveInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
-}
-export type ProcedureUtilsLiveInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsLiveInterceptorOptions<TClientContext, TInput>, PromiseWithError<InferLiveQueryOutput<TOutput>, TError>>
+export interface ProcedureUtilsLiveInterceptorOptions<
+  TClientContext extends ClientContext,
+  TInput,
+> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {}
+export type ProcedureUtilsLiveInterceptor<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Interceptor<
+  ProcedureUtilsLiveInterceptorOptions<TClientContext, TInput>,
+  PromiseWithError<InferLiveQueryOutput<TOutput>, TError>
+>
 
-export interface ProcedureUtilsInfiniteInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
+export interface ProcedureUtilsInfiniteInterceptorOptions<
+  TClientContext extends ClientContext,
+  TInput,
+> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
   fnContext: QueryFunctionContext<QueryKey, any>
 }
-export type ProcedureUtilsInfiniteInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsInfiniteInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+export type ProcedureUtilsInfiniteInterceptor<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Interceptor<
+  ProcedureUtilsInfiniteInterceptorOptions<TClientContext, TInput>,
+  PromiseWithError<TOutput, TError>
+>
 
-export interface ProcedureUtilsMutationInterceptorOptions<TClientContext extends ClientContext, TInput> extends Omit<ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput>, 'input' | 'fnContext'> {
+export interface ProcedureUtilsMutationInterceptorOptions<
+  TClientContext extends ClientContext,
+  TInput,
+> extends Omit<
+  ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput>,
+  'input' | 'fnContext'
+> {
   input: TInput
   fnContext: MutationFunctionContext
 }
-export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsMutationInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+export type ProcedureUtilsMutationInterceptor<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> = Interceptor<
+  ProcedureUtilsMutationInterceptorOptions<TClientContext, TInput>,
+  PromiseWithError<TOutput, TError>
+>
 
 /**
  * Can be partial options for spread-merged options,
@@ -65,111 +131,138 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyBaseOptions {
+export interface ProcedureUtilsOptions<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> extends OperationKeyBaseOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  queryKey?: ProcedureUtilsModifier<
-    QueryKeyOptions<TInput>
-  > | undefined
+  queryKey?: ProcedureUtilsModifier<QueryKeyOptions<TInput>> | undefined
 
   /**
    * Interceptors that intercept queryFn inside .queryOptions, guaranteed to be executed.
    */
-  queryInterceptors?: ProcedureUtilsQueryInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
+  queryInterceptors?:
+    | ProcedureUtilsQueryInterceptor<TClientContext, TInput, TOutput, TError>[]
+    | undefined
 
   /**
    * Options modifier for .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  queryOptions?: ProcedureUtilsModifier<
-    QueryOptionsIn<TClientContext, TInput, TOutput, TError, unknown, unknown>
-  > | undefined
+  queryOptions?:
+    | ProcedureUtilsModifier<
+        QueryOptionsIn<TClientContext, TInput, TOutput, TError, unknown, unknown>
+      >
+    | undefined
 
   /**
    * Key options modifier for .streamedKey and .streamedOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  streamedKey?: ProcedureUtilsModifier<
-    StreamedKeyOptions<TInput>
-  > | undefined
+  streamedKey?: ProcedureUtilsModifier<StreamedKeyOptions<TInput>> | undefined
 
   /**
    * Interceptors that intercept queryFn inside .streamedOptions, guaranteed to be executed.
    */
-  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
+  streamedInterceptors?:
+    | ProcedureUtilsStreamedInterceptor<TClientContext, TInput, TOutput, TError>[]
+    | undefined
 
   /**
    * Options modifier for .streamedOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  streamedOptions?: ProcedureUtilsModifier<
-    StreamedOptionsIn<TClientContext, TInput, InferStreamedQueryOutput<TOutput>, TError, unknown, unknown>
-  > | undefined
+  streamedOptions?:
+    | ProcedureUtilsModifier<
+        StreamedOptionsIn<
+          TClientContext,
+          TInput,
+          InferStreamedQueryOutput<TOutput>,
+          TError,
+          unknown,
+          unknown
+        >
+      >
+    | undefined
 
   /**
    * Key options modifier for .liveKey and .liveOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  liveKey?: ProcedureUtilsModifier<
-    QueryKeyOptions<TInput>
-  > | undefined
+  liveKey?: ProcedureUtilsModifier<QueryKeyOptions<TInput>> | undefined
 
   /**
    * Interceptors that intercept queryFn inside .liveOptions, guaranteed to be executed.
    */
-  liveInterceptors?: ProcedureUtilsLiveInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
+  liveInterceptors?:
+    | ProcedureUtilsLiveInterceptor<TClientContext, TInput, TOutput, TError>[]
+    | undefined
 
   /**
    * Options modifier for .liveOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  liveOptions?: ProcedureUtilsModifier<
-    QueryOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, unknown, unknown>
-  > | undefined
+  liveOptions?:
+    | ProcedureUtilsModifier<
+        LiveOptionsIn<
+          TClientContext,
+          TInput,
+          InferLiveQueryOutput<TOutput>,
+          TError,
+          unknown,
+          unknown
+        >
+      >
+    | undefined
 
   /**
    * Key options modifier for .infiniteKey and .infiniteOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  infiniteKey?: ProcedureUtilsModifier<
-    InfiniteKeyOptions<TInput, unknown>
-  > | undefined
+  infiniteKey?: ProcedureUtilsModifier<InfiniteKeyOptions<TInput, unknown>> | undefined
 
   /**
    * Interceptors that intercept queryFn inside .infiniteOptions, guaranteed to be executed.
    */
-  infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
+  infiniteInterceptors?:
+    | ProcedureUtilsInfiniteInterceptor<TClientContext, TInput, TOutput, TError>[]
+    | undefined
 
   /**
    * Options modifier for .infiniteOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  infiniteOptions?: ProcedureUtilsModifier<
-    InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, unknown, unknown, unknown>
-  > | undefined
+  infiniteOptions?:
+    | ProcedureUtilsModifier<
+        InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, unknown, unknown, unknown>
+      >
+    | undefined
 
   /**
    * Key options modifier for .mutationKey and .mutationOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  mutationKey?: ProcedureUtilsModifier<
-    MutationKeyOptions
-  > | undefined
+  mutationKey?: ProcedureUtilsModifier<MutationKeyOptions> | undefined
 
   /**
    * Interceptors that intercept mutationFn inside .mutationOptions, guaranteed to be executed.
    */
-  mutationInterceptors?: ProcedureUtilsMutationInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
+  mutationInterceptors?:
+    | ProcedureUtilsMutationInterceptor<TClientContext, TInput, TOutput, TError>[]
+    | undefined
 
   /**
    * Options modifier for .mutationOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
    */
-  mutationOptions?: ProcedureUtilsModifier<
-    MutationOptionsIn<TClientContext, TInput, TOutput, TError, unknown>
-  > | undefined
+  mutationOptions?:
+    | ProcedureUtilsModifier<MutationOptionsIn<TClientContext, TInput, TOutput, TError, unknown>>
+    | undefined
 }
 
 const PROCEDURE_UTILS_INTERCEPTOR_KEYS: string[] = [
@@ -193,8 +286,10 @@ const PROCEDURE_UTILS_MODIFIER_KEYS: string[] = [
   'mutationOptions',
 ]
 
-export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtilsOptions<any, any, any, any> {
-  if (!isTypescriptObject(value)) {
+export function isProcedureUtilsOptions(
+  value: unknown,
+): value is ProcedureUtilsOptions<any, any, any, any> {
+  if (!isNonPrimitive(value)) {
     return false
   }
 
@@ -207,19 +302,16 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
       if (typeof value[key] !== 'string') {
         return false
       }
-    }
-    else if (key === 'serializer') {
-      if (!isTypescriptObject(value[key]) || typeof value[key].serializeJson !== 'function') {
+    } else if (key === 'serializer') {
+      if (!isNonPrimitive(value[key]) || typeof value[key].serializeJson !== 'function') {
         return false
       }
-    }
-    else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
-      if (!Array.isArray(value[key]) || value[key].some(i => typeof i !== 'function')) {
+    } else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
+      if (!Array.isArray(value[key]) || value[key].some((i) => typeof i !== 'function')) {
         return false
       }
-    }
-    else if (PROCEDURE_UTILS_MODIFIER_KEYS.includes(key)) {
-      if (!isTypescriptObject(value[key])) {
+    } else if (PROCEDURE_UTILS_MODIFIER_KEYS.includes(key)) {
+      if (!isNonPrimitive(value[key])) {
         return false
       }
     }
@@ -237,12 +329,12 @@ function mergeProcedureUtilsModifier<T extends object>(
       return { ...base, ...override } as Partial<T>
     }
 
-    return options => base({ ...override, ...options })
+    return (options) => base({ ...override, ...options })
   }
 
   const applyBase = typeof base === 'function' ? base : (options: T) => ({ ...base, ...options })
 
-  return options => override(applyBase(options))
+  return (options) => override(applyBase(options))
 }
 
 /**
@@ -252,15 +344,24 @@ function mergeProcedureUtilsModifier<T extends object>(
  * modifiers are combined so that, for object values, per-call options beat `override`,
  * which beats `base`. A function modifier receives the merged options and its result wins.
  */
-export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
+export function mergeProcedureUtilsOptions<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+>(
   base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
   override: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
 ): ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> {
   const merged: Record<string, unknown> = { ...base, ...override }
 
   for (const key of PROCEDURE_UTILS_INTERCEPTOR_KEYS) {
-    const baseValue = (base as Record<string, unknown>)[key] as ProcedureUtilsQueryInterceptor<any, any, any, any>[] | undefined
-    const overrideValue = (override as Record<string, unknown>)[key] as ProcedureUtilsQueryInterceptor<any, any, any, any>[] | undefined
+    const baseValue = (base as Record<string, unknown>)[key] as
+      | ProcedureUtilsQueryInterceptor<any, any, any, any>[]
+      | undefined
+    const overrideValue = (override as Record<string, unknown>)[key] as
+      | ProcedureUtilsQueryInterceptor<any, any, any, any>[]
+      | undefined
 
     if (baseValue && overrideValue) {
       merged[key] = [...baseValue, ...overrideValue]
@@ -268,8 +369,12 @@ export function mergeProcedureUtilsOptions<TClientContext extends ClientContext,
   }
 
   for (const key of PROCEDURE_UTILS_MODIFIER_KEYS) {
-    const baseValue = (base as Record<string, unknown>)[key] as ProcedureUtilsModifier<any> | undefined
-    const overrideValue = (override as Record<string, unknown>)[key] as ProcedureUtilsModifier<any> | undefined
+    const baseValue = (base as Record<string, unknown>)[key] as
+      | ProcedureUtilsModifier<any>
+      | undefined
+    const overrideValue = (override as Record<string, unknown>)[key] as
+      | ProcedureUtilsModifier<any>
+      | undefined
 
     if (baseValue && overrideValue) {
       merged[key] = mergeProcedureUtilsModifier(baseValue, overrideValue)
@@ -279,7 +384,12 @@ export function mergeProcedureUtilsOptions<TClientContext extends ClientContext,
   return merged as ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>
 }
 
-export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
+export class ProcedureUtils<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> extends SharedUtils<TInput> {
   declare protected readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>
 
   /**
@@ -306,13 +416,12 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     if (typeof this.options.queryKey === 'function') {
       optionsIn = this.options.queryKey(optionsIn)
-    }
-    else if (this.options.queryKey) {
+    } else if (this.options.queryKey) {
       optionsIn = { ...this.options.queryKey, ...optionsIn }
     }
 
-    const queryKey = (optionsIn as any).queryKey
-      ?? this.key({ type: 'query', input: (optionsIn as any).input })
+    const queryKey =
+      (optionsIn as any).queryKey ?? this.key({ type: 'query', input: (optionsIn as any).input })
 
     return queryKey as DataTag<QueryKey, TOutput, TError>
   }
@@ -329,8 +438,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     if (typeof this.options.queryOptions === 'function') {
       optionsIn = this.options.queryOptions(optionsIn) as any
-    }
-    else if (this.options.queryOptions) {
+    } else if (this.options.queryOptions) {
       optionsIn = { ...this.options.queryOptions, ...optionsIn }
     }
 
@@ -338,7 +446,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     return {
       structuralSharing: createStructuralSharing(this.options.serializer),
-      ...optionsIn as any,
+      ...(optionsIn as any),
       queryKey,
       queryFn: (fnContext) => {
         return intercept(
@@ -368,7 +476,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           },
         )
       },
-      ...optionsIn.input === skipToken || optionsIn.queryFn === skipToken ? { enabled: false } : {},
+      ...(optionsIn.input === skipToken || optionsIn.queryFn === skipToken
+        ? { enabled: false }
+        : {}),
     }
   }
 
@@ -382,13 +492,17 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     if (typeof this.options.streamedKey === 'function') {
       optionsIn = this.options.streamedKey(optionsIn)
-    }
-    else if (this.options.streamedKey) {
+    } else if (this.options.streamedKey) {
       optionsIn = { ...this.options.streamedKey, ...optionsIn }
     }
 
-    const queryKey = (optionsIn as any).queryKey
-      ?? this.key({ type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).queryFnOptions })
+    const queryKey =
+      (optionsIn as any).queryKey ??
+      this.key({
+        type: 'streamed',
+        input: (optionsIn as any).input,
+        fnOptions: (optionsIn as any).queryFnOptions,
+      })
 
     return queryKey as DataTag<QueryKey, InferStreamedQueryOutput<TOutput>, TError>
   }
@@ -397,25 +511,35 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    * Configure queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * This is built on [TanStack Query streamedQuery](https://tanstack.com/query/latest/docs/reference/streamedQuery)
    * and works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
+   * The query never returns to pending once it has data.
    */
   streamedOptions<USelectData = InferStreamedQueryOutput<TOutput>, UInitialData = undefined>(
     ...rest: MaybeOptionalOptions<
-      StreamedOptionsIn<TClientContext, TInput, InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>
+      StreamedOptionsIn<
+        TClientContext,
+        TInput,
+        InferStreamedQueryOutput<TOutput>,
+        TError,
+        USelectData,
+        UInitialData
+      >
     >
-  ): NoInfer<StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>> {
+  ): NoInfer<
+    StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>
+  > {
     let optionsIn = resolveMaybeOptionalOptions(rest)
 
     if (typeof this.options.streamedOptions === 'function') {
       optionsIn = this.options.streamedOptions(optionsIn) as any
-    }
-    else if (this.options.streamedOptions) {
+    } else if (this.options.streamedOptions) {
       optionsIn = { ...this.options.streamedOptions, ...optionsIn }
     }
 
     const queryKey = this.streamedKey(optionsIn)
+    const { settleOnFirstData, ...queryOptions } = optionsIn
 
     return {
-      ...optionsIn as any,
+      ...(queryOptions as any),
       queryKey,
       queryFn: (fnContext) => {
         return intercept(
@@ -451,12 +575,14 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
                 return output
               },
-              optionsIn.queryFnOptions,
+              { ...optionsIn.queryFnOptions, settleOnFirstData },
             )(fnContext)
           },
         )
       },
-      ...optionsIn.input === skipToken || optionsIn.queryFn === skipToken ? { enabled: false } : {},
+      ...(optionsIn.input === skipToken || optionsIn.queryFn === skipToken
+        ? { enabled: false }
+        : {}),
     }
   }
 
@@ -470,13 +596,12 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     if (typeof this.options.liveKey === 'function') {
       optionsIn = this.options.liveKey(optionsIn)
-    }
-    else if (this.options.liveKey) {
+    } else if (this.options.liveKey) {
       optionsIn = { ...this.options.liveKey, ...optionsIn }
     }
 
-    const queryKey = (optionsIn as any).queryKey
-      ?? this.key({ type: 'live', input: (optionsIn as any).input })
+    const queryKey =
+      (optionsIn as any).queryKey ?? this.key({ type: 'live', input: (optionsIn as any).input })
 
     return queryKey as DataTag<QueryKey, InferLiveQueryOutput<TOutput>, TError>
   }
@@ -488,23 +613,30 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    */
   liveOptions<USelectData = InferLiveQueryOutput<TOutput>, UInitialData = undefined>(
     ...rest: MaybeOptionalOptions<
-      QueryOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, USelectData, UInitialData>
+      LiveOptionsIn<
+        TClientContext,
+        TInput,
+        InferLiveQueryOutput<TOutput>,
+        TError,
+        USelectData,
+        UInitialData
+      >
     >
   ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, USelectData, UInitialData>> {
     let optionsIn = resolveMaybeOptionalOptions(rest)
 
     if (typeof this.options.liveOptions === 'function') {
       optionsIn = this.options.liveOptions(optionsIn) as any
-    }
-    else if (this.options.liveOptions) {
+    } else if (this.options.liveOptions) {
       optionsIn = { ...this.options.liveOptions, ...optionsIn }
     }
 
     const queryKey = this.liveKey(optionsIn)
+    const { settleOnFirstData, ...queryOptions } = optionsIn
 
     return {
       structuralSharing: createStructuralSharing(this.options.serializer),
-      ...optionsIn as any,
+      ...(queryOptions as any),
       queryKey,
       queryFn: (fnContext) => {
         return intercept(
@@ -530,22 +662,27 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
               return optionsIn.queryFn(fnContext)
             }
 
-            return liveQuery(async (queryContext) => {
-              const output = await this.call(input, {
-                signal: queryContext.signal,
-                context,
-              })
+            return liveQuery(
+              async (queryContext) => {
+                const output = await this.call(input, {
+                  signal: queryContext.signal,
+                  context,
+                })
 
-              if (!isAsyncIteratorObject(output)) {
-                throw new Error('liveQuery requires an AsyncIteratorObject output')
-              }
+                if (!isAsyncIteratorObject(output)) {
+                  throw new Error('liveQuery requires an AsyncIteratorObject output')
+                }
 
-              return output
-            })(fnContext)
+                return output
+              },
+              { settleOnFirstData },
+            )(fnContext)
           },
         )
       },
-      ...optionsIn.input === skipToken || optionsIn.queryFn === skipToken ? { enabled: false } : {},
+      ...(optionsIn.input === skipToken || optionsIn.queryFn === skipToken
+        ? { enabled: false }
+        : {}),
     }
   }
 
@@ -557,15 +694,18 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   ): DataTag<QueryKey, InfiniteData<TOutput, UPageParam>, TError> {
     if (typeof this.options.infiniteKey === 'function') {
       optionsIn = this.options.infiniteKey(optionsIn as any) as any
-    }
-    else if (this.options.infiniteKey) {
+    } else if (this.options.infiniteKey) {
       optionsIn = { ...this.options.infiniteKey, ...optionsIn }
     }
 
-    const queryKey = (optionsIn as any).queryKey
-      ?? this.key({
+    const queryKey =
+      (optionsIn as any).queryKey ??
+      this.key({
         type: 'infinite',
-        input: (optionsIn as any).input === skipToken ? skipToken : (optionsIn as any).input((optionsIn as any).initialPageParam),
+        input:
+          (optionsIn as any).input === skipToken
+            ? skipToken
+            : (optionsIn as any).input((optionsIn as any).initialPageParam),
       })
 
     return queryKey as DataTag<QueryKey, InfiniteData<TOutput, any>, TError>
@@ -574,13 +714,24 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   /**
    * Generate options used for useInfiniteQuery/useSuspenseInfiniteQuery/prefetchInfiniteQuery/...
    */
-  infiniteOptions<UPageParam, USelectData = InfiniteData<TOutput, UPageParam>, UInitialData = undefined>(
-    optionsIn: InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, USelectData, UPageParam, UInitialData>,
+  infiniteOptions<
+    UPageParam,
+    USelectData = InfiniteData<TOutput, UPageParam>,
+    UInitialData = undefined,
+  >(
+    optionsIn: InfiniteOptionsIn<
+      TClientContext,
+      TInput,
+      TOutput,
+      TError,
+      USelectData,
+      UPageParam,
+      UInitialData
+    >,
   ): NoInfer<InfiniteOptionsOut<TOutput, TError, USelectData, UPageParam, UInitialData>> {
     if (typeof this.options.infiniteOptions === 'function') {
       optionsIn = this.options.infiniteOptions(optionsIn as any) as any
-    }
-    else if (this.options.infiniteOptions) {
+    } else if (this.options.infiniteOptions) {
       optionsIn = { ...this.options.infiniteOptions, ...optionsIn }
     }
 
@@ -588,7 +739,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     return {
       structuralSharing: createStructuralSharing(this.options.serializer),
-      ...optionsIn as any,
+      ...(optionsIn as any),
       queryKey,
       queryFn: (fnContext) => {
         return intercept(
@@ -602,7 +753,10 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
               },
               ...optionsIn.context,
             } satisfies OperationContext as any,
-            input: optionsIn.input === skipToken ? skipToken : optionsIn.input(fnContext.pageParam as any),
+            input:
+              optionsIn.input === skipToken
+                ? skipToken
+                : optionsIn.input(fnContext.pageParam as any),
             fnContext: fnContext as QueryFunctionContext<QueryKey, any>,
           },
           ({ context, input, fnContext }) => {
@@ -618,20 +772,19 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           },
         )
       },
-      ...optionsIn.input === skipToken || optionsIn.queryFn === skipToken ? { enabled: false } : {},
+      ...(optionsIn.input === skipToken || optionsIn.queryFn === skipToken
+        ? { enabled: false }
+        : {}),
     }
   }
 
   /**
    * Generate a **full matching** key for [Mutation Options](https://orpc.dev/docs/integrations/tanstack-query#mutation-options).
    */
-  mutationKey(
-    optionsIn: MutationKeyOptions = {},
-  ): DataTag<QueryKey, TOutput, TError> {
+  mutationKey(optionsIn: MutationKeyOptions = {}): DataTag<QueryKey, TOutput, TError> {
     if (typeof this.options.mutationKey === 'function') {
       optionsIn = this.options.mutationKey(optionsIn)
-    }
-    else if (this.options.mutationKey) {
+    } else if (this.options.mutationKey) {
       optionsIn = { ...this.options.mutationKey, ...optionsIn }
     }
 
@@ -651,8 +804,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     if (typeof this.options.mutationOptions === 'function') {
       optionsIn = this.options.mutationOptions(optionsIn as any) as any
-    }
-    else if (this.options.mutationOptions) {
+    } else if (this.options.mutationOptions) {
       optionsIn = { ...this.options.mutationOptions, ...optionsIn }
     }
 

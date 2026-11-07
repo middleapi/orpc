@@ -1,17 +1,17 @@
 import './instrumentation'
-
-import { serve } from 'bun'
-import index from './frontend/index.html'
-import { RPCHandler } from '@orpc/server/websocket'
-import { messagePublisher } from './context'
-import { router } from './routers'
+import { EvlogHandlerPlugin } from '@orpc/evlog'
+import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { OpenAPIReferenceHandlerPlugin } from '@orpc/openapi/plugins'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'
-import { EvlogHandlerPlugin } from '@orpc/evlog'
-import { OpenAPIGenerator } from '@orpc/openapi'
+import { RPCHandler } from '@orpc/server/websocket'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
-import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+import { serve } from 'bun'
+
+import { messagePublisher } from './context'
+import index from './frontend/index.html'
+import { router } from './routers'
 
 const zodConverter = new ZodToJsonSchemaConverter()
 
@@ -27,19 +27,20 @@ const openapiHandler = new OpenAPIHandler(router, {
     new EvlogHandlerPlugin({ logAbort: true }),
     new SmartCoercionHandlerPlugin({ converters: [zodConverter] }),
     new OpenAPIReferenceHandlerPlugin({
-      spec: () => openapiGenerator.generate(router, {
-        base: {
-          servers: [{ url: '/api' }],
-          components: {
-            securitySchemes: {
-              bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
+      spec: () =>
+        openapiGenerator.generate(router, {
+          base: {
+            servers: [{ url: '/api' }],
+            components: {
+              securitySchemes: {
+                bearerAuth: {
+                  type: 'http',
+                  scheme: 'bearer',
+                },
               },
             },
           },
-        },
-      }),
+        }),
       providerConfig: {
         authentication: {
           securitySchemes: {
@@ -54,9 +55,7 @@ const openapiHandler = new OpenAPIHandler(router, {
 })
 
 const rpcHandler = new RPCHandler(router, {
-  plugins: [
-    new EvlogHandlerPlugin({ logAbort: true }),
-  ],
+  plugins: [new EvlogHandlerPlugin({ logAbort: true })],
 })
 
 async function handleOpenAPIRequest(request: Request) {
@@ -86,19 +85,19 @@ const server = serve({
 
   websocket: {
     message(ws, message) {
-      rpcHandler.message(ws, message, {
+      void rpcHandler.message(ws, message, {
         /**
          * Provide initial context if needed. The context can be an async function
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({
+        context: (request) => ({
           messagePublisher,
         }),
       })
     },
     close(ws) {
-      rpcHandler.close(ws)
+      void rpcHandler.close(ws)
     },
   },
 

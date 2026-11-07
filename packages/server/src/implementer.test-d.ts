@@ -1,6 +1,7 @@
 import type { ProcedureContract, RouterContract } from '@orpc/contract'
-import type { Implementer } from './implementer'
-import type { RouterImplementer } from './implementer-router'
+
+import type { RouterImplementer } from './implementer-router.ts'
+import type { Implementer } from './implementer.ts'
 
 const contract = {
   ping: {} as ProcedureContract<any, any, any>,
@@ -24,10 +25,6 @@ describe('Implementer', () => {
 
   it('.$config', () => {
     const withConfig = implementer.$config({ disableInputValidation: true })
-
-    implementer.$config({ dedupeLeadingMiddlewares: false })
-    // @ts-expect-error - implementer routers never apply router-level meta plugins
-    implementer.$config({ dedupeLeadingMetaPlugins: false })
     expectTypeOf(withConfig).toEqualTypeOf<typeof implementer>()
   })
 
@@ -42,6 +39,8 @@ describe('Implementer', () => {
       Implementer<TContract['ping'], { auth: string } & object>
     >()
 
-    expectTypeOf(implementer).toExtend<RouterImplementer<TContract['ping'], { auth: boolean } & object>>()
+    expectTypeOf(implementer).toExtend<
+      RouterImplementer<TContract['ping'], { auth: boolean } & object>
+    >()
   })
 })

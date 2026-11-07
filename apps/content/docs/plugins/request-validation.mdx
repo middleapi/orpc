@@ -1,8 +1,8 @@
 ---
-title: "Request Validation Plugin"
-description: "Validate requests against your contract on the client before sending them to the server, catching invalid input early."
+title: 'Request Validation Plugin'
+description: 'Validate requests against your contract on the client before sending them to the server, catching invalid input early.'
 sidebar:
-  label: "Request Validation"
+  label: 'Request Validation'
 ---
 
 ## Setup
@@ -11,9 +11,7 @@ sidebar:
 import { RequestValidationLinkPlugin } from '@orpc/contract/plugins'
 
 const link = new RPCLink({
-  plugins: [
-    new RequestValidationLinkPlugin(contract),
-  ],
+  plugins: [new RequestValidationLinkPlugin(contract)],
 })
 ```
 
@@ -48,27 +46,24 @@ import { ORPCError } from '@orpc/client'
 import { ValidationError } from '@orpc/contract'
 
 const link = new RPCLink({
-  plugins: [
-    new RequestValidationLinkPlugin(contract),
-  ],
+  plugins: [new RequestValidationLinkPlugin(contract)],
   interceptors: [
     async ({ next }) => {
       try {
         return await next()
-      }
-      catch (error) {
+      } catch (error) {
         if (
-          error instanceof ORPCError
-          && error.code === 'BAD_REQUEST'
-          && error.cause instanceof ValidationError
+          error instanceof ORPCError &&
+          error.code === 'BAD_REQUEST' &&
+          error.cause instanceof ValidationError
         ) {
           throw new CustomInputValidationError(error.cause.issues)
         }
 
         throw error
       }
-    }
-  ]
+    },
+  ],
 })
 ```
 
@@ -86,8 +81,7 @@ export function ContactForm() {
     try {
       const output = await client.someProcedure(parseFormData(form))
       console.log(output)
-    }
-    catch (error) {
+    } catch (error) {
       setError(error)
     }
   }

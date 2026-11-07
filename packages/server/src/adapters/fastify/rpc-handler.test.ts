@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify'
-import type { StandardHandlerPlugin } from '../standard'
 import Fastify from 'fastify'
 import request from 'supertest'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+
+import { os } from '../../builder.ts'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   let app: FastifyInstance
@@ -19,9 +20,7 @@ describe('rpcHandler', () => {
 
   it('accepts context and prefix options in handle method', async () => {
     const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     app.all('/*', async (req, reply) => {
@@ -39,12 +38,18 @@ describe('rpcHandler', () => {
 
     await app.ready()
 
-    const res = await request(app.server).post('/api/v1/ping').set('content-type', 'application/json').send({ json: null })
+    const res = await request(app.server)
+      .post('/api/v1/ping')
+      .set('content-type', 'application/json')
+      .send({ json: null })
 
     expect(res.status).toBe(200)
     expect(res.text).toContain('u_123')
 
-    const mismatchRes = await request(app.server).post('/invalid/ping').set('content-type', 'application/json').send({ json: null })
+    const mismatchRes = await request(app.server)
+      .post('/invalid/ping')
+      .set('content-type', 'application/json')
+      .send({ json: null })
 
     expect(mismatchRes.status).toBe(404)
     expect(mismatchRes.text).toBe('not matched')
@@ -57,7 +62,10 @@ describe('rpcHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },
@@ -95,8 +103,9 @@ describe('rpcHandler', () => {
 
     await app.ready()
 
-    const res = await request(app.server)
-      .get(`/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`)
+    const res = await request(app.server).get(
+      `/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+    )
 
     expect(res.status).toBe(404)
     expect(res.text).toBe('not matched')
@@ -119,8 +128,9 @@ describe('rpcHandler', () => {
 
     await app.ready()
 
-    const res = await request(app.server)
-      .get(`/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`)
+    const res = await request(app.server).get(
+      `/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+    )
 
     expect(res.status).toBe(200)
     expect(res.text).toContain('pong')

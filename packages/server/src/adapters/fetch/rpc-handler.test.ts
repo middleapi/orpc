@@ -1,6 +1,6 @@
-import type { StandardHandlerPlugin } from '../standard'
-import { os } from '../../builder'
-import { RPCHandler } from './rpc-handler'
+import { os } from '../../builder.ts'
+import type { StandardHandlerPlugin } from '../standard/index.ts'
+import { RPCHandler } from './rpc-handler.ts'
 
 describe('rpcHandler', () => {
   beforeEach(() => {
@@ -9,9 +9,7 @@ describe('rpcHandler', () => {
 
   it('accepts context and prefix options in handle method', async () => {
     const contextHandler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     const { matched, response } = await contextHandler.handle(
@@ -53,7 +51,10 @@ describe('rpcHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },
@@ -73,11 +74,13 @@ describe('rpcHandler', () => {
     const middleware = vi.fn(({ next }) => next())
     const handler = new RPCHandler({ ping: os.use(middleware).handler(() => 'pong') })
 
-    const { response } = await handler.handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ json: '9'.repeat(1_000_000), meta: [['bigint']] }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: '9'.repeat(1_000_000), meta: [['bigint']] }),
+      }),
+    )
 
     expect(response?.status).toBe(400)
     expect(middleware).not.toHaveBeenCalled()
@@ -89,7 +92,9 @@ describe('rpcHandler', () => {
     })
 
     const result = await handler.handle(
-      new Request(`https://example.com/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`),
+      new Request(
+        `https://example.com/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+      ),
     )
 
     expect(result.matched).toBe(false)
@@ -125,7 +130,9 @@ describe('rpcHandler', () => {
     )
 
     const result = await handler.handle(
-      new Request(`https://example.com/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`),
+      new Request(
+        `https://example.com/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+      ),
     )
 
     expect(result.matched).toBe(true)
@@ -134,7 +141,10 @@ describe('rpcHandler', () => {
   })
 
   it('supports deciding allowMethods per procedure', async () => {
-    const allowMethods = vi.fn((method: string, _procedure: unknown, path: string[]) => method === 'GET' && path[0] === 'public')
+    const allowMethods = vi.fn(
+      (method: string, _procedure: unknown, path: string[]) =>
+        method === 'GET' && path[0] === 'public',
+    )
 
     const handler = new RPCHandler(
       {
@@ -147,7 +157,9 @@ describe('rpcHandler', () => {
     )
 
     const allowed = await handler.handle(
-      new Request(`https://example.com/public?data=${encodeURIComponent(JSON.stringify({ json: null }))}`),
+      new Request(
+        `https://example.com/public?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+      ),
     )
 
     expect(allowed.matched).toBe(true)
@@ -155,7 +167,9 @@ describe('rpcHandler', () => {
     await expect(allowed.response!.text()).resolves.toContain('public')
 
     const blocked = await handler.handle(
-      new Request(`https://example.com/private?data=${encodeURIComponent(JSON.stringify({ json: null }))}`),
+      new Request(
+        `https://example.com/private?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+      ),
     )
 
     expect(blocked.matched).toBe(false)
@@ -173,7 +187,10 @@ describe('rpcHandler lazy router prefix scan', () => {
     const url = `http://localhost/rpc/${'/'.repeat(16_000)}%25`
 
     // warm up so JIT compilation does not count toward the budget
-    await handler.handle(new Request(`http://localhost/rpc/${'/'.repeat(100)}%25`, { method: 'POST' }), { prefix: '/rpc' })
+    await handler.handle(
+      new Request(`http://localhost/rpc/${'/'.repeat(100)}%25`, { method: 'POST' }),
+      { prefix: '/rpc' },
+    )
 
     const start = performance.now()
     const result = await handler.handle(new Request(url, { method: 'POST' }), { prefix: '/rpc' })
@@ -184,7 +201,10 @@ describe('rpcHandler lazy router prefix scan', () => {
     expect(elapsed).toBeLessThan(100) // ~470ms when unbounded, a few ms once bounded
 
     // lazy routing still works
-    const ok = await handler.handle(new Request('http://localhost/rpc/planet/find', { method: 'POST' }), { prefix: '/rpc' })
+    const ok = await handler.handle(
+      new Request('http://localhost/rpc/planet/find', { method: 'POST' }),
+      { prefix: '/rpc' },
+    )
     expect(ok.matched).toBe(true)
     expect(loader).toHaveBeenCalledTimes(1)
   })

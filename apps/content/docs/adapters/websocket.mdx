@@ -1,8 +1,8 @@
 ---
-title: "WebSocket Adapters"
-description: "Use oRPC over WebSocket for low-latency, full-duplex communication, with adapters for ws, crossws, Bun, Deno, Cloudflare, and uWebSockets."
+title: 'WebSocket Adapters'
+description: 'Use oRPC over WebSocket for low-latency, full-duplex communication, with adapters for ws, crossws, Bun, Deno, Cloudflare, and uWebSockets.'
 sidebar:
-  label: "WebSocket"
+  label: 'WebSocket'
 ---
 
 ## Server Adapters
@@ -36,7 +36,7 @@ wss.on('connection', (ws) => {
      * that receives the per-call request as its first argument, and is **not**
      * related to the initial WebSocket upgrade request.
      */
-    context: request => ({}),
+    context: (request) => ({}),
   })
 })
 ```
@@ -66,7 +66,7 @@ const ws = crossws({
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({}),
+        context: (request) => ({}),
       })
     },
     close: async (peer) => {
@@ -113,13 +113,13 @@ Bun.serve({
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({}),
+        context: (request) => ({}),
       })
     },
     async close(ws) {
       await handler.close(ws)
     },
-  }
+  },
 })
 ```
 
@@ -148,7 +148,7 @@ Deno.serve((req) => {
      * that receives the per-call request as its first argument, and is **not**
      * related to the initial WebSocket upgrade request.
      */
-    context: request => ({}),
+    context: (request) => ({}),
   })
 
   return response
@@ -186,7 +186,7 @@ export class ChatRoom extends DurableObject {
        * that receives the per-call request as its first argument, and is **not**
        * related to the initial WebSocket upgrade request.
        */
-      context: request => ({}),
+      context: (request) => ({}),
     })
   }
 
@@ -218,7 +218,7 @@ const app = App()
          * that receives the per-call request as its first argument, and is **not**
          * related to the initial WebSocket upgrade request.
          */
-        context: request => ({}),
+        context: (request) => ({}),
       })
     },
     async close(ws, code, message) {
@@ -244,7 +244,7 @@ const app = App()
 import { RPCLink } from '@orpc/client/websocket'
 
 const link = new RPCLink({
-  connect: info => new WebSocket('ws://localhost:3000'),
+  connect: (info) => new WebSocket('ws://localhost:3000'),
   /**
    * Whether to connect immediately on initialization, instead of waiting
    * for the first call. Reduces latency for the first request.
@@ -257,7 +257,7 @@ const link = new RPCLink({
    * Optional headers to attach to each per-call request.
    * These can be accessed in the server context or via the Request Headers Plugin.
    */
-  headers: () => ({})
+  headers: () => ({}),
 })
 ```
 
@@ -267,24 +267,23 @@ The examples above only show how to configure the link. For examples of creating
 
 ### Auto Reconnect
 
-The client adapter has built-in support for reconnecting when the connection is lost. You can configure reconnect behavior with the `reconnect` option when creating the link.
+The client adapter has built-in support for reconnecting when the connection is lost. Enable it with `reconnect: true` when creating the link, or pass an object to customize it.
 
 ```ts
 const link = new RPCLink({
+  /**
+   * Whether to automatically reconnect when the connection is lost.
+   * `true` enables it, an object enables and customizes it.
+   *
+   * @default false
+   */
   reconnect: {
-    /**
-     * Whether to automatically reconnect when the connection is lost.
-     *
-     * @default false
-     */
-    enabled: true,
-
     /**
      * Delay before a (re)connect attempt, in milliseconds.
      *
      * @default info => info.attempt === 1 ? 0 : 2_000
      */
-    delay: info => info.attempt === 1 ? 0 : 2_000,
+    delay: (info) => (info.attempt === 1 ? 0 : 2_000),
 
     /**
      * Maximum number of consecutive failed attempts before giving up.
@@ -305,23 +304,22 @@ const link = new RPCLink({
      */
     maxTotalAttempt: Infinity,
 
+    /**
+     * Whether to proactively reconnect right after the socket closes,
+     * rather than waiting for the next call to trigger reconnection.
+     * Reduces latency for the next request.
+     * `true` enables it, an object enables and customizes it.
+     *
+     * @default false
+     */
     onClose: {
-      /**
-       * Whether to proactively reconnect right after the socket closes,
-       * rather than waiting for the next call to trigger reconnection.
-       * Reduces latency for the next request.
-       *
-       * @default false
-       */
-      enabled: false,
-
       /**
        * Delay before reconnecting after the socket closes, in milliseconds.
        *
        * @default 0
        */
-      delay: 0
-    }
-  }
+      delay: 0,
+    },
+  },
 })
 ```

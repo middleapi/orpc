@@ -1,6 +1,6 @@
-import { environmentManager, QueryClient } from '@tanstack/react-query'
 import { RPCJsonSerializer } from '@orpc/client'
 import { createHydrationOptions } from '@orpc/tanstack-query'
+import { environmentManager, QueryClient } from '@tanstack/react-query'
 
 let browserQueryClient: QueryClient | undefined
 

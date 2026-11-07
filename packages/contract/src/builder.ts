@@ -1,17 +1,21 @@
-import type { ProcedureContractBuilderWithInput, ProcedureContractBuilderWithOutput } from './builder-variants'
-import type { ErrorMap } from './error'
-import type { MergedErrorMap } from './error-utils'
-import type { MetaPlugin } from './meta'
-import type { ProcedureContractDefinition } from './procedure'
-import type { RouterContract } from './router'
-import type { AugmentedContractRouter } from './router-utils'
-import type { AnySchema, Schema } from './schema'
 import { toArray } from '@orpc/shared'
-import { mergeErrorMap } from './error-utils'
-import { getHiddenMetaPlugins } from './meta'
-import { resolveMetaPlugins } from './meta-utils'
-import { ProcedureContract } from './procedure'
-import { augmentContractRouter } from './router-utils'
+
+import type {
+  ProcedureContractBuilderWithInput,
+  ProcedureContractBuilderWithOutput,
+} from './builder-variants.ts'
+import type { MergedErrorMap } from './error-utils.ts'
+import { mergeErrorMap } from './error-utils.ts'
+import type { ErrorMap } from './error.ts'
+import { resolveMetaPlugins } from './meta-utils.ts'
+import type { MetaPlugin } from './meta.ts'
+import { getHiddenMetaPlugins } from './meta.ts'
+import type { ProcedureContractDefinition } from './procedure.ts'
+import { ProcedureContract } from './procedure.ts'
+import type { AugmentedContractRouter } from './router-utils.ts'
+import { augmentContractRouter } from './router-utils.ts'
+import type { RouterContract } from './router.ts'
+import type { AnySchema, Schema } from './schema.ts'
 
 /**
  * The input schema type used before `.input` is called.
@@ -25,24 +29,6 @@ export type InitialInputSchema = Schema<void, unknown>
  */
 export type InitialOutputSchema = Schema<unknown>
 
-export interface ContractBuilderConfig {
-  /**
-   * When enabled, `.router` (and `.lazy` on the `os` builder) skips this builder's metadata plugins
-   * that a procedure (or lazy router) already applies as its leading plugins, such as those from a common base builder.
-   * This prevents accumulating metadata, like OpenAPI `tags` and `prefix`, from being applied twice.
-   * Only the value on the builder calling `.router` or `.lazy` is read.
-   *
-   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
-   *
-   * @default true
-   */
-  dedupeLeadingMetaPlugins?: boolean | undefined
-}
-
-export interface ContractBuilderDefinition<TErrorMap extends ErrorMap>
-  extends ProcedureContractDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>, ContractBuilderConfig {
-}
-
 /**
  * The contract builder behind `oc`. Chain its methods to define procedure
  * contracts — metadata, errors, and input/output schemas — without any
@@ -50,16 +36,18 @@ export interface ContractBuilderDefinition<TErrorMap extends ErrorMap>
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export class ContractBuilder<
-  TErrorMap extends ErrorMap,
-> extends ProcedureContract<InitialInputSchema, InitialOutputSchema, TErrorMap> {
-  declare '~orpc': ContractBuilderDefinition<TErrorMap>
-
+export class ContractBuilder<TErrorMap extends ErrorMap> extends ProcedureContract<
+  InitialInputSchema,
+  InitialOutputSchema,
+  TErrorMap
+> {
   /**
    * Private constructor to prevent direct instantiation.
    * Use the static `create` method to initialize a new instance with a safe initial definition.
    */
-  private constructor(definition: ContractBuilderDefinition<TErrorMap>) {
+  private constructor(
+    definition: ProcedureContractDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>,
+  ) {
     super(definition)
   }
 
@@ -73,19 +61,6 @@ export class ContractBuilder<
     return new ContractBuilder({
       errorMap: {},
       meta: {},
-    })
-  }
-
-  /**
-   * Overrides the contract builder configuration, such as disabling
-   * the automatic dedupe of metadata plugins in `.router`.
-   *
-   * @see {@link https://orpc.dev/docs/recipes/dedupe-middleware | Dedupe Middleware}
-   */
-  $config(config: ContractBuilderConfig): ContractBuilder<TErrorMap> {
-    return new ContractBuilder({
-      ...this['~orpc'],
-      ...config,
     })
   }
 
@@ -115,9 +90,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#typesafe-errors | Procedure Contract - Typesafe Errors}
    */
-  errors<T extends ErrorMap>(
-    errors: T,
-  ): ContractBuilder<MergedErrorMap<TErrorMap, T>> {
+  errors<T extends ErrorMap>(errors: T): ContractBuilder<MergedErrorMap<TErrorMap, T>> {
     let result = new ContractBuilder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),
@@ -136,9 +109,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#inputoutput-validation | Procedure Contract - Input/Output Validation}
    */
-  input<T extends AnySchema>(
-    schema: T,
-  ): ProcedureContractBuilderWithInput<T, TErrorMap> {
+  input<T extends AnySchema>(schema: T): ProcedureContractBuilderWithInput<T, TErrorMap> {
     let result = new ContractBuilder({
       ...this['~orpc'],
       inputSchemas: [...toArray(this['~orpc'].inputSchemas), schema],
@@ -157,9 +128,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#inputoutput-validation | Procedure Contract - Input/Output Validation}
    */
-  output<T extends AnySchema>(
-    schema: T,
-  ): ProcedureContractBuilderWithOutput<T, TErrorMap> {
+  output<T extends AnySchema>(schema: T): ProcedureContractBuilderWithOutput<T, TErrorMap> {
     let result = new ContractBuilder({
       ...this['~orpc'],
       outputSchemas: [...toArray(this['~orpc'].outputSchemas), schema],
@@ -179,9 +148,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/router#extending-router | Router Contract - Extending Router}
    */
-  router<T extends RouterContract>(
-    router: T,
-  ): AugmentedContractRouter<T, TErrorMap> {
+  router<T extends RouterContract>(router: T): AugmentedContractRouter<T, TErrorMap> {
     return augmentContractRouter(router, this['~orpc'])
   }
 }

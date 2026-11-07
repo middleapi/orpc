@@ -1,10 +1,11 @@
-import type { StandardBody } from '@standard-server/core'
-import type { RPCJsonSerializerOptions } from './rpc-json-serializer'
 import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
-import { ErrorEvent } from '@standard-server/core'
-import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object'
-import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils'
-import { RPCJsonSerializer } from './rpc-json-serializer'
+import type { StandardBody } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
+
+import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object.ts'
+import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils.ts'
+import type { RPCJsonSerializerOptions } from './rpc-json-serializer.ts'
+import { RPCJsonSerializer } from './rpc-json-serializer.ts'
 
 export interface RPCSerializerSerializeOptions {
   /**
@@ -32,9 +33,7 @@ export interface RPCSerializerOptions extends RPCJsonSerializerOptions {
 export class RPCSerializer extends RPCJsonSerializer {
   private readonly defaultSerializeOptions: RPCSerializerOptions['serialize']
 
-  constructor(
-    options: RPCSerializerOptions = {},
-  ) {
+  constructor(options: RPCSerializerOptions = {}) {
     super(options)
     this.defaultSerializeOptions = options.serialize
   }
@@ -55,14 +54,17 @@ export class RPCSerializer extends RPCJsonSerializer {
 
           return { done: result.done, value: this.serializePayload(result.value, false) }
         },
-        mapError: e => new ErrorEvent(
-          this.serializePayload(toORPCError(e).toJSON(), false),
-          { cause: e },
-        ),
+        mapError: (e) =>
+          new EventStreamErrorEvent(this.serializePayload(toORPCError(e).toJSON(), false), {
+            cause: e,
+          }),
       })
     }
 
-    const useFormDataForBlobs = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
+    const useFormDataForBlobs =
+      options.useFormDataForBlobFields ??
+      this.defaultSerializeOptions?.useFormDataForBlobFields ??
+      true
     return this.serializePayload(data, useFormDataForBlobs)
   }
 
@@ -99,7 +101,7 @@ export class RPCSerializer extends RPCJsonSerializer {
           return { done: result.done, value: this.deserializePayload(result.value) }
         },
         mapError: (e) => {
-          if (!(e instanceof ErrorEvent) || e.data === undefined) {
+          if (!(e instanceof EventStreamErrorEvent) || e.data === undefined) {
             return e
           }
 
@@ -109,7 +111,7 @@ export class RPCSerializer extends RPCJsonSerializer {
             return createORPCErrorFromJson(deserialized, { cause: e })
           }
 
-          return new ErrorEvent(deserialized, { cause: e })
+          return new EventStreamErrorEvent(deserialized, { cause: e })
         },
       })
     }

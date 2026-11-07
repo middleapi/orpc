@@ -1,7 +1,8 @@
 import { Effect, Schema } from 'effect'
 import { z } from 'zod'
-import { EffectSchemaToJsonSchemaConverter } from './converter'
-import { toStandardSchema } from './schema'
+
+import { EffectSchemaToJsonSchemaConverter } from './converter.ts'
+import { toStandardSchema } from './schema.ts'
 
 describe('effectSchemaToJsonSchemaConverter', () => {
   const converter = new EffectSchemaToJsonSchemaConverter()
@@ -11,7 +12,11 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       ['effect schema', toStandardSchema(Schema.String), true],
       ['non-effect schema', z.string(), false],
       ['undefined schema', undefined, false],
-      ['effect vendor without an effect schema', { '~standard': { version: 1, vendor: 'effect', validate: () => ({ value: 1 }) } }, false],
+      [
+        'effect vendor without an effect schema',
+        { '~standard': { version: 1, vendor: 'effect', validate: () => ({ value: 1 }) } },
+        false,
+      ],
     ] as const)('matches %s', (_, schema, expected) => {
       expect(converter.condition(schema, 'input')).toBe(expected)
     })
@@ -19,9 +24,15 @@ describe('effectSchemaToJsonSchemaConverter', () => {
 
   it.each([
     ['input', { type: 'string' }],
-    ['output', { anyOf: [{ type: 'number' }, { type: 'string', enum: ['Infinity', '-Infinity', 'NaN'] }] }],
+    [
+      'output',
+      { anyOf: [{ type: 'number' }, { type: 'string', enum: ['Infinity', '-Infinity', 'NaN'] }] },
+    ],
   ] as const)('uses the requested %s direction', (direction, jsonSchema) => {
-    expect(converter.convert(toStandardSchema(Schema.NumberFromString), direction)).toEqual([jsonSchema, false])
+    expect(converter.convert(toStandardSchema(Schema.NumberFromString), direction)).toEqual([
+      jsonSchema,
+      false,
+    ])
   })
 
   it('does not mutate the schema', () => {
@@ -31,31 +42,57 @@ describe('effectSchemaToJsonSchemaConverter', () => {
   })
 
   it.each([
-    ['onExcessProperty', { onExcessProperty: 'error' }, Schema.Struct({ a: Schema.String }), { additionalProperties: false }],
-    ['includeAnnotationKey', { includeAnnotationKey: (key: string) => key === 'x-custom' }, Schema.String.annotate({ 'x-custom': 'value' }), { 'x-custom': 'value' }],
-    ['referencePolicy', { referencePolicy: () => undefined }, Schema.Struct({ a: Schema.String.annotate({ identifier: 'A' }) }), { properties: { a: { type: 'string' } } }],
-    ['generateDescriptions', { generateDescriptions: true }, Schema.String.check(Schema.isMinLength(2)), { description: 'a value with a length of at least 2' }],
+    [
+      'onExcessProperty',
+      { onExcessProperty: 'error' },
+      Schema.Struct({ a: Schema.String }),
+      { additionalProperties: false },
+    ],
+    [
+      'includeAnnotationKey',
+      { includeAnnotationKey: (key: string) => key === 'x-custom' },
+      Schema.String.annotate({ 'x-custom': 'value' }),
+      { 'x-custom': 'value' },
+    ],
+    [
+      'referencePolicy',
+      { referencePolicy: () => undefined },
+      Schema.Struct({ a: Schema.String.annotate({ identifier: 'A' }) }),
+      { properties: { a: { type: 'string' } } },
+    ],
+    [
+      'generateDescriptions',
+      { generateDescriptions: true },
+      Schema.String.check(Schema.isMinLength(2)),
+      { description: 'a value with a length of at least 2' },
+    ],
   ] as const)('forwards the %s option to Effect', (_, options, schema, expected) => {
     const converter = new EffectSchemaToJsonSchemaConverter({ cache: true, ...options })
     expect(converter.convert(toStandardSchema(schema), 'input')[0]).toMatchObject(expected)
   })
 
   describe('definitions', () => {
-    it.each(['input', 'output'] as const)('keeps class definitions in the %s direction', (direction) => {
-      class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
+    it.each(['input', 'output'] as const)(
+      'keeps class definitions in the %s direction',
+      (direction) => {
+        class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String }) {}
 
-      expect(converter.convert(toStandardSchema(Planet), direction)).toEqual([{
-        $ref: '#/$defs/PlanetEncoded',
-        $defs: {
-          PlanetEncoded: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name'],
-            additionalProperties: true,
+        expect(converter.convert(toStandardSchema(Planet), direction)).toEqual([
+          {
+            $ref: '#/$defs/PlanetEncoded',
+            $defs: {
+              PlanetEncoded: {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+                additionalProperties: true,
+              },
+            },
           },
-        },
-      }, false])
-    })
+          false,
+        ])
+      },
+    )
 
     it('resolves recursion into a $ref', () => {
       interface Category {
@@ -68,25 +105,30 @@ describe('effectSchemaToJsonSchemaConverter', () => {
         children: Schema.Array(Schema.suspend((): Schema.Codec<Category> => CategorySchema)),
       }).annotate({ identifier: 'Category' })
 
-      expect(converter.convert(toStandardSchema(CategorySchema), 'input')).toEqual([{
-        $ref: '#/$defs/Category',
-        $defs: {
-          Category: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              children: { type: 'array', items: { $ref: '#/$defs/Category' } },
+      expect(converter.convert(toStandardSchema(CategorySchema), 'input')).toEqual([
+        {
+          $ref: '#/$defs/Category',
+          $defs: {
+            Category: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                children: { type: 'array', items: { $ref: '#/$defs/Category' } },
+              },
+              required: ['name', 'children'],
+              additionalProperties: true,
             },
-            required: ['name', 'children'],
-            additionalProperties: true,
           },
         },
-      }, false])
+        false,
+      ])
     })
   })
 
   describe('optionality', () => {
-    const Defaulted = Schema.UndefinedOr(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed('fallback')))
+    const Defaulted = Schema.UndefinedOr(Schema.String).pipe(
+      Schema.withDecodingDefault(Effect.succeed('fallback')),
+    )
 
     it.each([
       ['defaulted input schema', Defaulted, 'input', true],
@@ -96,7 +138,10 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       ['required input schema', Schema.String, 'input', false],
       ['required output schema', Schema.String, 'output', false],
     ] as const)('marks %s correctly', (_, schema, direction, optional) => {
-      expect(converter.convert(toStandardSchema(schema), direction)).toEqual([expect.any(Object), optional])
+      expect(converter.convert(toStandardSchema(schema), direction)).toEqual([
+        expect.any(Object),
+        optional,
+      ])
     })
 
     it('marks as required if standard validation throws', () => {
@@ -114,7 +159,9 @@ describe('effectSchemaToJsonSchemaConverter', () => {
     // Effect cannot represent symbol property names in JSON Schema
     const schema = toStandardSchema(Schema.Struct({ [Symbol.for('key')]: Schema.String }))
 
-    expect(() => converter.convert(schema, 'input')).toThrow('Objects property names must be strings')
+    expect(() => converter.convert(schema, 'input')).toThrow(
+      'Objects property names must be strings',
+    )
   })
 
   describe('cache option', () => {

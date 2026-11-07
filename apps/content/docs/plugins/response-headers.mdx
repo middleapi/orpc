@@ -1,8 +1,8 @@
 ---
-title: "Response Headers Plugin"
-description: "Use ResponseHeadersHandlerPlugin to set response headers and cookies via context.resHeaders and merge them into the final response."
+title: 'Response Headers Plugin'
+description: 'Use ResponseHeadersHandlerPlugin to set response headers and cookies via context.resHeaders and merge them into the final response.'
 sidebar:
-  label: "Response Headers"
+  label: 'Response Headers'
 ---
 
 ## Context Access
@@ -25,7 +25,7 @@ const procedure = base
   .handler(({ context }) => {
     setCookie(context.resHeaders, 'session_id', 'abc123', {
       secure: true,
-      maxAge: 3600
+      maxAge: 3600,
     })
   })
 ```
@@ -44,9 +44,7 @@ Combine with [Cookie Helpers](/docs/helpers/cookie) for streamlined cookie manag
 import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new ResponseHeadersHandlerPlugin(),
-  ],
+  plugins: [new ResponseHeadersHandlerPlugin()],
 })
 ```
 

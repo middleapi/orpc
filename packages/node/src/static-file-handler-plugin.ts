@@ -1,11 +1,25 @@
-import type { Context } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import { getTracer, isAcceptableEncoding, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, toArray } from '@orpc/shared'
+
+import type { Context } from '@orpc/server'
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '@orpc/server/standard'
+import {
+  getTracer,
+  isAcceptableEncoding,
+  isCompressibleContentType,
+  matchesHttpPathPrefix,
+  mergeHttpPath,
+  parseAcceptEncodingQualities,
+  safeDecodeURIComponent,
+  toArray,
+} from '@orpc/shared'
+import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
@@ -113,29 +127,39 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     this.rootDir = path.resolve(options.rootDir)
     this.path = stripTrailingSlash(options.path ?? '/')
     this.indexFile = options.indexFile ?? 'index.html'
-    this.fallbackFilePath = options.fallbackFile === undefined ? undefined : path.join(this.rootDir, options.fallbackFile)
+    this.fallbackFilePath =
+      options.fallbackFile === undefined ? undefined : path.join(this.rootDir, options.fallbackFile)
     this.cacheControl = options.cacheControl ?? 'public, max-age=0'
-    this.unsafeSegmentRegex = options.dotfiles ? UNSAFE_SEGMENT_REGEX : UNSAFE_OR_DOTFILE_SEGMENT_REGEX
+    this.unsafeSegmentRegex = options.dotfiles
+      ? UNSAFE_SEGMENT_REGEX
+      : UNSAFE_OR_DOTFILE_SEGMENT_REGEX
     this.precompressed = options.precompressed ?? false
     this.mimeTypes = Object.assign(Object.create(null) as Record<string, string>, options.mimeTypes)
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, request, prefix }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      request,
+      prefix,
+    }) => {
       const result = await next()
 
       if (result.matched || (request.method !== 'GET' && request.method !== 'HEAD')) {
         return result
       }
 
-      const base = prefix === undefined ? this.path : stripTrailingSlash(mergeHttpPath(prefix, this.path))
+      const base =
+        prefix === undefined ? this.path : stripTrailingSlash(mergeHttpPath(prefix, this.path))
       const response = await this.serve(request, base)
 
       if (response === undefined) {
         return result
       }
 
-      getTracer()?.getActiveSpan()?.updateName(`${request.method} ${base === '/' ? '' : base}/* (static file)`)
+      getTracer()
+        ?.getActiveSpan()
+        ?.updateName(`${request.method} ${base === '/' ? '' : base}/* (static file)`)
 
       return { matched: true, response }
     }
@@ -146,7 +170,10 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
   }
 
-  private async serve(request: StandardLazyRequest, base: `/${string}`): Promise<StandardResponse | undefined> {
+  private async serve(
+    request: StandardLazyRequest,
+    base: `/${string}`,
+  ): Promise<StandardResponse | undefined> {
     const [pathname] = parseStandardUrl(request.url)
 
     if (base !== '/' && !matchesHttpPathPrefix(pathname, base)) {
@@ -200,7 +227,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     if (this.precompressed && isCompressibleContentType(contentType)) {
       headers.vary = 'accept-encoding'
 
-      const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
+      const qualities = parseAcceptEncodingQualities(
+        flattenStandardHeader(request.headers['accept-encoding']),
+      )
 
       for (const [encoding, extension] of PRECOMPRESSED_ENCODINGS) {
         if (!isAcceptableEncoding(qualities, encoding)) {
@@ -238,7 +267,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let start = 0
     let end = size - 1
 
-    const range = request.method === 'GET' ? flattenStandardHeader(request.headers.range) : undefined
+    const range =
+      request.method === 'GET' ? flattenStandardHeader(request.headers.range) : undefined
 
     if (range !== undefined && isRangeApplicable(request.headers, etag, lastModifiedTime)) {
       const parsed = parseByteRange(range, size)
@@ -261,9 +291,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     headers['content-type'] = contentType
     headers['content-length'] = `${end - start + 1}`
 
-    const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD'
-      ? new ReadableStream({ start: controller => controller.close() })
-      : toWebReadableStream(createReadStream(filePath, status === 206 ? { start, end } : undefined))
+    const body: ReadableStream<Uint8Array<ArrayBuffer>> =
+      request.method === 'HEAD'
+        ? new ReadableStream({ start: (controller) => controller.close() })
+        : toWebReadableStream(
+            createReadStream(filePath, status === 206 ? { start, end } : undefined),
+          )
 
     return { status, headers, body }
   }
@@ -291,17 +324,24 @@ function getStats(filePath: string): Promise<Stats | undefined> {
 }
 
 function stripTrailingSlash(path: `/${string}`): `/${string}` {
-  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) as `/${string}` : path
+  return path.length > 1 && path.endsWith('/') ? (path.slice(0, -1) as `/${string}`) : path
 }
 
-function isNotModified(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number): boolean {
+function isNotModified(
+  requestHeaders: StandardHeaders,
+  etag: string,
+  lastModifiedTime: number,
+): boolean {
   const ifNoneMatch = flattenStandardHeader(requestHeaders['if-none-match'])
 
   if (ifNoneMatch !== undefined) {
-    return ifNoneMatch.trim() === '*' || ifNoneMatch.split(',').some((tag) => {
-      tag = tag.trim()
-      return (tag.startsWith('W/') ? tag.slice(2) : tag) === etag
-    })
+    return (
+      ifNoneMatch.trim() === '*' ||
+      ifNoneMatch.split(',').some((tag) => {
+        tag = tag.trim()
+        return (tag.startsWith('W/') ? tag.slice(2) : tag) === etag
+      })
+    )
   }
 
   const ifModifiedSince = flattenStandardHeader(requestHeaders['if-modified-since'])
@@ -309,7 +349,11 @@ function isNotModified(requestHeaders: StandardHeaders, etag: string, lastModifi
   return ifModifiedSince !== undefined && lastModifiedTime <= Date.parse(ifModifiedSince)
 }
 
-function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number): boolean {
+function isRangeApplicable(
+  requestHeaders: StandardHeaders,
+  etag: string,
+  lastModifiedTime: number,
+): boolean {
   const ifRange = flattenStandardHeader(requestHeaders['if-range'])
 
   if (ifRange === undefined) {
@@ -321,7 +365,10 @@ function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastMo
     : Date.parse(ifRange) === lastModifiedTime
 }
 
-function parseByteRange(range: string, size: number): [start: number, end: number] | 'unsatisfiable' | undefined {
+function parseByteRange(
+  range: string,
+  size: number,
+): [start: number, end: number] | 'unsatisfiable' | undefined {
   const match = range.match(/^bytes=\s*(\d*)-(\d*)$/i)
 
   if (match === null || (match[1] === '' && match[2] === '')) {
@@ -330,7 +377,9 @@ function parseByteRange(range: string, size: number): [start: number, end: numbe
 
   if (match[1] === '') {
     const suffixLength = Number(match[2])
-    return suffixLength === 0 || size === 0 ? 'unsatisfiable' : [Math.max(0, size - suffixLength), size - 1]
+    return suffixLength === 0 || size === 0
+      ? 'unsatisfiable'
+      : [Math.max(0, size - suffixLength), size - 1]
   }
 
   const start = Number(match[1])

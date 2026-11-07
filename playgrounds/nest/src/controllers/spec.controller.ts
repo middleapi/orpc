@@ -1,6 +1,7 @@
 import { Controller, Get, Header } from '@nestjs/common'
 import { OpenAPIGenerator } from '@orpc/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
 import { contract } from '../contracts'
 
 const generator = new OpenAPIGenerator({
@@ -9,8 +10,6 @@ const generator = new OpenAPIGenerator({
 
 @Controller()
 export class SpecController {
-  constructor() {}
-
   @Get('/')
   @Header('Content-Type', 'text/html')
   scalar() {

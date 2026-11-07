@@ -1,16 +1,16 @@
 ---
-title: "Handling File Uploads Bigger Than Your RAM in JavaScript"
-description: "Stream large file uploads to disk in any JavaScript runtime while keeping the standard File API, with lazy blobs, temp file cleanup, and body size limits."
+title: 'Handling File Uploads Bigger Than Your RAM in JavaScript'
+description: 'Stream large file uploads to disk in any JavaScript runtime while keeping the standard File API, with lazy blobs, temp file cleanup, and body size limits.'
 type: blog
 date: 2026-08-17
 search:
   tags:
     - Engineering
 authors:
-    name: Định Lê
-    role: Creator of oRPC
-    url: https://github.com/dinwwwh
-    avatar: https://github.com/dinwwwh.png
+  name: Định Lê
+  role: Creator of oRPC
+  url: https://github.com/dinwwwh
+  avatar: https://github.com/dinwwwh.png
 ai:
   exclude: true
 ---
@@ -80,18 +80,14 @@ createServer(async (req, res) => {
     // constant memory, no matter how large the body is
     await pipeline(req, createWriteStream(tmpPath))
 
-    const file = new TmpFile(
-      await openAsBlob(tmpPath),
-      tmpPath,
-      'video.mp4',
-      { type: req.headers['content-type'] },
-    )
+    const file = new TmpFile(await openAsBlob(tmpPath), tmpPath, 'video.mp4', {
+      type: req.headers['content-type'],
+    })
 
     // hand it to anything that expects a standard File
     console.log(file.name, file.size, file instanceof File)
     res.end('ok')
-  }
-  finally {
+  } finally {
     await rm(dir, { recursive: true, force: true })
   }
 }).listen(3000)
@@ -105,7 +101,7 @@ If this were the whole story, the plugin would be fifty lines. The piece of the 
 
 Spooling bytes to disk is the easy 20%. Most of the plugin's design went into making them reliably disappear, and each problem applies to any implementation of this pattern.
 
-**When is a request "done"?** Deleting when the handler returns is wrong: a streaming response, like an event stream or a raw binary stream, may read the upload *while* transmitting, and would fail halfway. So the plugin inspects the response: if its body is a stream or an async iterator, deletion rides on the body finishing. That also covers clients that vanish mid-download, since cancelling the body reaches the same finish hook. Every other response is sent after removal. Temp files live exactly as long as anything can read them, and not a request longer.
+**When is a request "done"?** Deleting when the handler returns is wrong: a streaming response, like an event stream or a raw binary stream, may read the upload _while_ transmitting, and would fail halfway. So the plugin inspects the response: if its body is a stream or an async iterator, deletion rides on the body finishing. That also covers clients that vanish mid-download, since cancelling the body reaches the same finish hook. Every other response is sent after removal. Temp files live exactly as long as anything can read them, and not a request longer.
 
 **Open handles.** Each request gets its own directory under the OS temp dir, and content lands through self-contained appends instead of long-lived file handles: at most one transient descriptor per in-flight write, however many files the request carries. A burst of uploads cannot exhaust the descriptor table, and deletion never fights an open handle, which matters on Windows where deleting an open file is an error.
 
@@ -144,13 +140,11 @@ const handler = new RPCHandler(router, {
   ],
 })
 
-const uploadVideo = os
-  .input(z.object({ video: z.file() }))
-  .handler(async ({ input }) => {
-    if (input.video instanceof TmpFile) {
-      await rename(input.video.path, `./videos/${crypto.randomUUID()}`)
-    }
-  })
+const uploadVideo = os.input(z.object({ video: z.file() })).handler(async ({ input }) => {
+  if (input.video instanceof TmpFile) {
+    await rename(input.video.path, `./videos/${crypto.randomUUID()}`)
+  }
+})
 ```
 
 File bodies and multipart file parts spool to disk; JSON and text fields parse normally. Validation sees standard `File` objects, so schemas like `z.file()` just work, and `TmpFile.path` turns "save the upload" into a rename instead of a gigabyte copy.

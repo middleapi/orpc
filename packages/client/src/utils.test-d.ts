@@ -1,10 +1,15 @@
-import type { ORPCError } from './error'
-import type { Client, ClientContext } from './types'
-import { isDefinedError } from './error-utils'
-import { safe } from './utils'
+import { isDefinedError } from './error-utils.ts'
+import type { ORPCError } from './error.ts'
+import type { Client, ClientContext } from './types.ts'
+import { safe } from './utils.ts'
 
 describe('safe', async () => {
-  const client = {} as Client<ClientContext, string, number, Error | ORPCError<'BAD_GATEWAY', { val: string }>>
+  const client = {} as Client<
+    ClientContext,
+    string,
+    number,
+    Error | ORPCError<'BAD_GATEWAY', { val: string }>
+  >
 
   it('tuple style', async () => {
     const [error, data, definedError, isSuccess] = await safe(client('123'))
@@ -21,14 +26,12 @@ describe('safe', async () => {
       if (definedError) {
         expectTypeOf(error).toEqualTypeOf<ORPCError<'BAD_GATEWAY', { val: string }>>()
         expectTypeOf(definedError).toEqualTypeOf<ORPCError<'BAD_GATEWAY', { val: string }>>()
-      }
-      else {
+      } else {
         // TODO: FIX IT - ORPCError should not showing here
         expectTypeOf(error).toEqualTypeOf<Error | ORPCError<'BAD_GATEWAY', { val: string }>>()
         expectTypeOf(definedError).toEqualTypeOf<null>()
       }
-    }
-    else {
+    } else {
       expectTypeOf(error).toEqualTypeOf<null>()
       expectTypeOf(data).toEqualTypeOf<number>()
       expectTypeOf(definedError).toEqualTypeOf<null>()
@@ -50,14 +53,12 @@ describe('safe', async () => {
       if (definedError) {
         expectTypeOf(error).toEqualTypeOf<ORPCError<'BAD_GATEWAY', { val: string }>>()
         expectTypeOf(definedError).toEqualTypeOf<ORPCError<'BAD_GATEWAY', { val: string }>>()
-      }
-      else {
+      } else {
         // TODO: FIX IT - ORPCError should not showing here
         expectTypeOf(error).toEqualTypeOf<Error | ORPCError<'BAD_GATEWAY', { val: string }>>()
         expectTypeOf(definedError).toEqualTypeOf<null>()
       }
-    }
-    else {
+    } else {
       expectTypeOf(error).toEqualTypeOf<null>()
       expectTypeOf(data).toEqualTypeOf<number>()
       expectTypeOf(definedError).toEqualTypeOf<null>()

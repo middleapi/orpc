@@ -2,11 +2,12 @@ import { oc } from '@orpc/contract'
 import { implement, os } from '@orpc/server'
 import { describe, it } from 'vitest'
 import { z } from 'zod'
-import { Implement } from './implement'
 
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+import { Implement } from './implement.ts'
 
-const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+
+const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 describe('@Implement', () => {
   it('require return an implemented procedure that satisfy default initial context', () => {
@@ -20,7 +21,9 @@ describe('@Implement', () => {
 
       @Implement(contract)
       ping_with_middleware_context() {
-        return implement(contract).use(({ next }) => next({ context: { extra: 'value' } })).handler(() => ({}) as any)
+        return implement(contract)
+          .use(({ next }) => next({ context: { extra: 'value' } }))
+          .handler(() => ({}) as any)
       }
 
       // @ts-expect-error --- return invalid
@@ -32,7 +35,9 @@ describe('@Implement', () => {
       // @ts-expect-error --- initial context is not allowed
       @Implement(contract)
       ping_invalid_initial_context() {
-        return implement(contract).$context<{ a: string }>().handler(() => ({}) as any)
+        return implement(contract)
+          .$context<{ a: string }>()
+          .handler(() => ({}) as any)
       }
 
       // @ts-expect-error --- implement wrong contract
@@ -59,14 +64,18 @@ describe('@Implement', () => {
       @Implement(contract)
       ping_with_middleware_context() {
         return {
-          ping: implement(contract.ping).use(({ next }) => next({ context: { extra: 'value' } })).handler(() => ({}) as any),
+          ping: implement(contract.ping)
+            .use(({ next }) => next({ context: { extra: 'value' } }))
+            .handler(() => ({}) as any),
         }
       }
 
       @Implement(contract)
       ping_with_lazy() {
         return {
-          ping: os.lazy(() => Promise.resolve({ default: implement(contract.ping).handler(() => ({}) as any) })),
+          ping: os.lazy(() =>
+            Promise.resolve({ default: implement(contract.ping).handler(() => ({}) as any) }),
+          ),
         }
       }
 
@@ -80,7 +89,9 @@ describe('@Implement', () => {
       @Implement(contract)
       ping_invalid_initial_context() {
         return {
-          ping: implement(contract.ping).$context<{ a: string }>().handler(() => ({}) as any),
+          ping: implement(contract.ping)
+            .$context<{ a: string }>()
+            .handler(() => ({}) as any),
         }
       }
 
@@ -88,7 +99,13 @@ describe('@Implement', () => {
       @Implement(contract)
       ping_invalid_initial_context_lazy() {
         return {
-          ping: os.lazy(() => Promise.resolve({ default: implement(contract.ping).$context<{ a: string }>().handler(() => ({}) as any) })),
+          ping: os.lazy(() =>
+            Promise.resolve({
+              default: implement(contract.ping)
+                .$context<{ a: string }>()
+                .handler(() => ({}) as any),
+            }),
+          ),
         }
       }
 
@@ -104,7 +121,11 @@ describe('@Implement', () => {
       @Implement(contract)
       ping_wrong_implement_lazy() {
         return {
-          ping: os.lazy(() => Promise.resolve({ default: implement(oc.input(inputSchema)).handler(() => ({}) as any) })),
+          ping: os.lazy(() =>
+            Promise.resolve({
+              default: implement(oc.input(inputSchema)).handler(() => ({}) as any),
+            }),
+          ),
         }
       }
     }

@@ -1,6 +1,6 @@
+import { RPCSerializer } from '@orpc/client'
 import type { AnyRouter, Context, RouterClient } from '@orpc/server'
 import type { Public } from '@orpc/shared'
-import { RPCSerializer } from '@orpc/client'
 
 export interface ClientServerTestOptions {
   context?: Context
@@ -23,8 +23,8 @@ export class Person {
 export const defaultSerializer: RPCSerializer = new RPCSerializer({
   handlers: {
     person: {
-      condition: value => value instanceof Person,
-      serialize: person => ({ name: person.name, age: person.age }),
+      condition: (value) => value instanceof Person,
+      serialize: (person) => ({ name: person.name, age: person.age }),
       deserialize: (data: any) => new Person(data.name, data.age),
     },
   },

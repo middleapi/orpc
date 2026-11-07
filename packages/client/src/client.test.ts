@@ -1,5 +1,5 @@
-import type { ClientContext, ClientLink } from './types'
-import { createORPCClient } from './client'
+import { createORPCClient } from './client.ts'
+import type { ClientContext, ClientLink } from './types.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -20,7 +20,11 @@ describe('createORPCClient', () => {
     vi.clearAllMocks()
     expect(await client.nested.pong({ value: 'hello' })).toEqual('__mocked__')
     expect(mockedLink.call).toHaveBeenCalledTimes(1)
-    expect(mockedLink.call).toHaveBeenCalledWith(['nested', 'pong'], { value: 'hello' }, { context: {} })
+    expect(mockedLink.call).toHaveBeenCalledWith(
+      ['nested', 'pong'],
+      { value: 'hello' },
+      { context: {} },
+    )
   })
 
   it('works with signal', async () => {
@@ -30,15 +34,25 @@ describe('createORPCClient', () => {
 
     expect(await client.ping({ value: 'hello' }, { signal })).toEqual('__mocked__')
     expect(mockedLink.call).toHaveBeenCalledTimes(1)
-    expect(mockedLink.call).toHaveBeenCalledWith(['ping'], { value: 'hello' }, { signal, context: {} })
+    expect(mockedLink.call).toHaveBeenCalledWith(
+      ['ping'],
+      { value: 'hello' },
+      { signal, context: {} },
+    )
   })
 
   it('works with context', async () => {
     const client = createORPCClient(mockedLink) as any
 
-    expect(await client.ping({ value: 'hello' }, { context: { userId: '123' } })).toEqual('__mocked__')
+    expect(await client.ping({ value: 'hello' }, { context: { userId: '123' } })).toEqual(
+      '__mocked__',
+    )
     expect(mockedLink.call).toHaveBeenCalledTimes(1)
-    expect(mockedLink.call).toHaveBeenCalledWith(['ping'], { value: 'hello' }, { context: { userId: '123' } })
+    expect(mockedLink.call).toHaveBeenCalledWith(
+      ['ping'],
+      { value: 'hello' },
+      { context: { userId: '123' } },
+    )
   })
 
   it('works with base path', async () => {
@@ -46,7 +60,11 @@ describe('createORPCClient', () => {
 
     expect(await client.ping({ value: 'hello' })).toEqual('__mocked__')
     expect(mockedLink.call).toHaveBeenCalledTimes(1)
-    expect(mockedLink.call).toHaveBeenCalledWith(['base', 'ping'], { value: 'hello' }, { context: {} })
+    expect(mockedLink.call).toHaveBeenCalledWith(
+      ['base', 'ping'],
+      { value: 'hello' },
+      { context: {} },
+    )
   })
 
   it('works with interceptors', async () => {
@@ -98,7 +116,9 @@ describe('createORPCClient', () => {
       interceptors: [firstInterceptor, secondInterceptor],
     }) as any
 
-    expect(await client.ping({ value: 'hello' }, { context: { requestId: 'request_1' }, signal })).toEqual('__mocked__')
+    expect(
+      await client.ping({ value: 'hello' }, { context: { requestId: 'request_1' }, signal }),
+    ).toEqual('__mocked__')
     expect(order).toEqual(['first:before', 'second:before', 'second:after', 'first:after'])
 
     expect(firstInterceptor).toHaveBeenCalledTimes(1)
@@ -113,11 +133,13 @@ describe('createORPCClient', () => {
   })
 
   it('works with scoped', async () => {
-    const rootInterceptor = vi.fn(({ path, input, context, next }) => next({
-      path,
-      input,
-      context: { ...context, rootPath: path.join('.') },
-    }))
+    const rootInterceptor = vi.fn(({ path, input, context, next }) =>
+      next({
+        path,
+        input,
+        context: { ...context, rootPath: path.join('.') },
+      }),
+    )
 
     const pingScopedInterceptor = vi.fn(({ path, input, context, next }) => {
       expect(path).toEqual(['ping'])
@@ -157,8 +179,12 @@ describe('createORPCClient', () => {
       },
     } as any) as any
 
-    expect(await client.ping({ value: 'hello' }, { context: { requestId: 'request_1' } })).toEqual('__mocked__')
-    expect(await client.nested.pong({ value: 'world' }, { context: { requestId: 'request_2' } })).toEqual('__mocked__')
+    expect(await client.ping({ value: 'hello' }, { context: { requestId: 'request_1' } })).toEqual(
+      '__mocked__',
+    )
+    expect(
+      await client.nested.pong({ value: 'world' }, { context: { requestId: 'request_2' } }),
+    ).toEqual('__mocked__')
 
     expect(rootInterceptor).toHaveBeenCalledTimes(2)
     expect(pingScopedInterceptor).toHaveBeenCalledTimes(1)
@@ -208,7 +234,11 @@ describe('createORPCClient', () => {
     expect(mockedLink.call).toHaveBeenLastCalledWith(['ping'], { value: 'call' }, { context: {} })
 
     expect(await client.nested.pong.apply(undefined, [{ value: 'apply' }])).toEqual('__mocked__')
-    expect(mockedLink.call).toHaveBeenLastCalledWith(['nested', 'pong'], { value: 'apply' }, { context: {} })
+    expect(mockedLink.call).toHaveBeenLastCalledWith(
+      ['nested', 'pong'],
+      { value: 'apply' },
+      { context: {} },
+    )
 
     expect(await client.ping.bind(undefined)({ value: 'bind' })).toEqual('__mocked__')
     expect(mockedLink.call).toHaveBeenLastCalledWith(['ping'], { value: 'bind' }, { context: {} })

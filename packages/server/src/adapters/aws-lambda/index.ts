@@ -1,5 +1,5 @@
-export * from './handler'
-export * from './rpc-handler'
+export * from './handler.ts'
+export * from './rpc-handler.ts'
 
 export type {
   AnyAPIGatewayProxyEvent,

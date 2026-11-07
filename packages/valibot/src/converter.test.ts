@@ -1,7 +1,8 @@
 import { toJsonSchema } from '@valibot/to-json-schema'
 import * as v from 'valibot'
 import * as z from 'zod'
-import { ValibotToJsonSchemaConverter } from './converter'
+
+import { ValibotToJsonSchemaConverter } from './converter.ts'
 
 vi.mock('@valibot/to-json-schema', async (original) => {
   const mod = await original<typeof import('@valibot/to-json-schema')>()
@@ -28,12 +29,22 @@ describe('valibotToJsonSchemaConverter', () => {
   it.each([
     ['input', { type: 'number' }],
     ['output', { type: 'string' }],
-  ] as const)('uses the requested %s direction when generating json schema', (direction, jsonSchema) => {
-    const schema = v.pipe(v.number(), v.transform(n => n.toString()), v.string())
+  ] as const)(
+    'uses the requested %s direction when generating json schema',
+    (direction, jsonSchema) => {
+      const schema = v.pipe(
+        v.number(),
+        v.transform((n) => n.toString()),
+        v.string(),
+      )
 
-    expect(converter.convert(schema, direction)).toEqual([jsonSchema, false])
-    expect(converter.convert(v.set(schema), direction)).toEqual([{ 'type': 'array', 'uniqueItems': true, 'items': jsonSchema, 'x-native-type': 'set' }, false])
-  })
+      expect(converter.convert(schema, direction)).toEqual([jsonSchema, false])
+      expect(converter.convert(v.set(schema), direction)).toEqual([
+        { 'type': 'array', 'uniqueItems': true, 'items': jsonSchema, 'x-native-type': 'set' },
+        false,
+      ])
+    },
+  )
 
   it('forwards extended toJsonSchema options from the constructor', () => {
     const converter = new ValibotToJsonSchemaConverter({
@@ -67,7 +78,9 @@ describe('valibotToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
-  it('does not leak a rejection when async standard validation fails while checking optionality', async ({ onTestFinished }) => {
+  it('does not leak a rejection when async standard validation fails while checking optionality', async ({
+    onTestFinished,
+  }) => {
     const unhandledRejectionHandler = vi.fn()
     process.on('unhandledRejection', unhandledRejectionHandler)
 
@@ -75,33 +88,66 @@ describe('valibotToJsonSchemaConverter', () => {
       process.off('unhandledRejection', unhandledRejectionHandler)
     })
 
-    const schema = v.pipeAsync(v.optional(v.string()), v.transformAsync(async value => value!.trim()))
+    const schema = v.pipeAsync(
+      v.optional(v.string()),
+      v.transformAsync(async (value) => value!.trim()),
+    )
 
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
 
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(unhandledRejectionHandler).not.toHaveBeenCalled()
   })
 
   describe('optionality', () => {
     it.each([
-      ['defaulted input schema', v.optional(v.string(), 'fallback'), 'input', {
-        default: 'fallback',
-        type: 'string',
-      }, true],
-      ['defaulted output schema', v.optional(v.string(), 'fallback'), 'output', {
-        default: 'fallback',
-        type: 'string',
-      }, false],
-      ['undefined-producing output schema', v.optional(v.string()), 'output', {
-        type: 'string',
-      }, true],
-      ['required input schema', v.string(), 'input', {
-        type: 'string',
-      }, false],
-      ['required output schema', v.string(), 'output', {
-        type: 'string',
-      }, false],
+      [
+        'defaulted input schema',
+        v.optional(v.string(), 'fallback'),
+        'input',
+        {
+          default: 'fallback',
+          type: 'string',
+        },
+        true,
+      ],
+      [
+        'defaulted output schema',
+        v.optional(v.string(), 'fallback'),
+        'output',
+        {
+          default: 'fallback',
+          type: 'string',
+        },
+        false,
+      ],
+      [
+        'undefined-producing output schema',
+        v.optional(v.string()),
+        'output',
+        {
+          type: 'string',
+        },
+        true,
+      ],
+      [
+        'required input schema',
+        v.string(),
+        'input',
+        {
+          type: 'string',
+        },
+        false,
+      ],
+      [
+        'required output schema',
+        v.string(),
+        'output',
+        {
+          type: 'string',
+        },
+        false,
+      ],
     ] as const)('marks %s correctly', (_, schema, direction, jsonSchema, optional) => {
       expect(converter.convert(schema, direction)).toEqual([jsonSchema, optional])
     })
@@ -109,77 +155,119 @@ describe('valibotToJsonSchemaConverter', () => {
 
   describe('native type extensions', () => {
     it.each([
-      [v.bigint(), {
-        'type': 'string',
-        'x-native-type': 'bigint',
-        'pattern': '^-?[0-9]+$',
-      }],
-      [v.date(), {
-        'type': 'string',
-        'x-native-type': 'date',
-        'format': 'date-time',
-      }],
-      [v.set(v.string()), {
-        'type': 'array',
-        'x-native-type': 'set',
-        'uniqueItems': true,
-        'items': { type: 'string' },
-      }],
-      [v.map(v.string(), v.number()), {
-        'type': 'array',
-        'x-native-type': 'map',
-        'items': {
-          type: 'array',
-          prefixItems: [
-            { type: 'string' },
-            { type: 'number' },
-          ],
-          maxItems: 2,
-          minItems: 2,
+      [
+        v.bigint(),
+        {
+          'type': 'string',
+          'x-native-type': 'bigint',
+          'pattern': '^-?[0-9]+$',
         },
-      }],
+      ],
+      [
+        v.date(),
+        {
+          'type': 'string',
+          'x-native-type': 'date',
+          'format': 'date-time',
+        },
+      ],
+      [
+        v.set(v.string()),
+        {
+          'type': 'array',
+          'x-native-type': 'set',
+          'uniqueItems': true,
+          'items': { type: 'string' },
+        },
+      ],
+      [
+        v.map(v.string(), v.number()),
+        {
+          'type': 'array',
+          'x-native-type': 'map',
+          'items': {
+            type: 'array',
+            prefixItems: [{ type: 'string' }, { type: 'number' }],
+            maxItems: 2,
+            minItems: 2,
+          },
+        },
+      ],
     ] as const)('extends conversion for %s', (schema, jsonSchema) => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
-      expect(new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(
+        new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'input'),
+      ).toEqual([jsonSchema, false])
     })
 
     it.each([
-      ['set', (node: any) => v.set(node), { 'type': 'array', 'uniqueItems': true, 'items': { $ref: '#/$defs/0' }, 'x-native-type': 'set' }],
-      ['map', (node: any) => v.map(v.string(), node), {
-        'type': 'array',
-        'items': { type: 'array', prefixItems: [{ type: 'string' }, { $ref: '#/$defs/0' }], maxItems: 2, minItems: 2 },
-        'x-native-type': 'map',
-      }],
+      [
+        'set',
+        (node: any) => v.set(node),
+        {
+          'type': 'array',
+          'uniqueItems': true,
+          'items': { $ref: '#/$defs/0' },
+          'x-native-type': 'set',
+        },
+      ],
+      [
+        'map',
+        (node: any) => v.map(v.string(), node),
+        {
+          'type': 'array',
+          'items': {
+            type: 'array',
+            prefixItems: [{ type: 'string' }, { $ref: '#/$defs/0' }],
+            maxItems: 2,
+            minItems: 2,
+          },
+          'x-native-type': 'map',
+        },
+      ],
     ] as const)('resolves recursion through %s into a $ref', (_, wrap, children) => {
       const Node: v.GenericSchema = v.object({ children: wrap(v.lazy(() => Node)) })
 
-      expect(converter.convert(v.object({ tree: v.lazy(() => Node) }), 'input')).toEqual([{
-        type: 'object',
-        properties: { tree: { $ref: '#/$defs/0' } },
-        required: ['tree'],
-        $defs: {
-          0: {
-            type: 'object',
-            properties: { children },
-            required: ['children'],
+      expect(converter.convert(v.object({ tree: v.lazy(() => Node) }), 'input')).toEqual([
+        {
+          type: 'object',
+          properties: { tree: { $ref: '#/$defs/0' } },
+          required: ['tree'],
+          $defs: {
+            0: {
+              type: 'object',
+              properties: { children },
+              required: ['children'],
+            },
           },
         },
-      }, false])
+        false,
+      ])
     })
 
     it('resolves recursion through a set when the lazy getter creates a new schema on each call', () => {
       const node = (): v.GenericSchema => v.object({ children: v.set(v.lazy(node)) })
 
-      expect(converter.convert(v.lazy(node), 'input')).toEqual([{
-        $ref: '#/$defs/0',
-        $defs: {
-          0: {
-            type: 'object',
-            properties: { children: { 'type': 'array', 'uniqueItems': true, 'items': { $ref: '#/$defs/0' }, 'x-native-type': 'set' } },
-            required: ['children'],
+      expect(converter.convert(v.lazy(node), 'input')).toEqual([
+        {
+          $ref: '#/$defs/0',
+          $defs: {
+            0: {
+              type: 'object',
+              properties: {
+                children: {
+                  'type': 'array',
+                  'uniqueItems': true,
+                  'items': { $ref: '#/$defs/0' },
+                  'x-native-type': 'set',
+                },
+              },
+              required: ['children'],
+            },
           },
         },
-      }, false])
+        false,
+      ])
     })
 
     it('adds definitions created inside a set or map to the root $defs', () => {
@@ -187,52 +275,91 @@ describe('valibotToJsonSchemaConverter', () => {
       const B: v.GenericSchema = v.object({ b: v.lazy(() => B) })
       const C: v.GenericSchema = v.object({ c: v.lazy(() => C) })
 
-      expect(converter.convert(v.object({
-        a: v.lazy(() => A),
-        set: v.set(v.lazy(() => B)),
-        map: v.map(v.lazy(() => B), v.lazy(() => C)),
-      }), 'input')).toEqual([{
-        type: 'object',
-        properties: {
-          a: { $ref: '#/$defs/0' },
-          set: { 'type': 'array', 'uniqueItems': true, 'items': { $ref: '#/$defs/1' }, 'x-native-type': 'set' },
-          map: {
-            'type': 'array',
-            'items': { type: 'array', prefixItems: [{ $ref: '#/$defs/1' }, { $ref: '#/$defs/2' }], maxItems: 2, minItems: 2 },
-            'x-native-type': 'map',
+      expect(
+        converter.convert(
+          v.object({
+            a: v.lazy(() => A),
+            set: v.set(v.lazy(() => B)),
+            map: v.map(
+              v.lazy(() => B),
+              v.lazy(() => C),
+            ),
+          }),
+          'input',
+        ),
+      ).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: { $ref: '#/$defs/0' },
+            set: {
+              'type': 'array',
+              'uniqueItems': true,
+              'items': { $ref: '#/$defs/1' },
+              'x-native-type': 'set',
+            },
+            map: {
+              'type': 'array',
+              'items': {
+                type: 'array',
+                prefixItems: [{ $ref: '#/$defs/1' }, { $ref: '#/$defs/2' }],
+                maxItems: 2,
+                minItems: 2,
+              },
+              'x-native-type': 'map',
+            },
+          },
+          required: ['a', 'set', 'map'],
+          $defs: {
+            0: { type: 'object', properties: { a: { $ref: '#/$defs/0' } }, required: ['a'] },
+            1: { type: 'object', properties: { b: { $ref: '#/$defs/1' } }, required: ['b'] },
+            2: { type: 'object', properties: { c: { $ref: '#/$defs/2' } }, required: ['c'] },
           },
         },
-        required: ['a', 'set', 'map'],
-        $defs: {
-          0: { type: 'object', properties: { a: { $ref: '#/$defs/0' } }, required: ['a'] },
-          1: { type: 'object', properties: { b: { $ref: '#/$defs/1' } }, required: ['b'] },
-          2: { type: 'object', properties: { c: { $ref: '#/$defs/2' } }, required: ['c'] },
-        },
-      }, false])
+        false,
+      ])
     })
 
     it('references the definitions option inside a set or map', () => {
       const Item = v.object({ name: v.string() })
       const converter = new ValibotToJsonSchemaConverter({ definitions: { Item } })
 
-      expect(converter.convert(v.object({
-        set: v.set(Item),
-        map: v.map(v.string(), Item),
-      }), 'input')).toEqual([{
-        type: 'object',
-        properties: {
-          set: { 'type': 'array', 'uniqueItems': true, 'items': { $ref: '#/$defs/Item' }, 'x-native-type': 'set' },
-          map: {
-            'type': 'array',
-            'items': { type: 'array', prefixItems: [{ type: 'string' }, { $ref: '#/$defs/Item' }], maxItems: 2, minItems: 2 },
-            'x-native-type': 'map',
+      expect(
+        converter.convert(
+          v.object({
+            set: v.set(Item),
+            map: v.map(v.string(), Item),
+          }),
+          'input',
+        ),
+      ).toEqual([
+        {
+          type: 'object',
+          properties: {
+            set: {
+              'type': 'array',
+              'uniqueItems': true,
+              'items': { $ref: '#/$defs/Item' },
+              'x-native-type': 'set',
+            },
+            map: {
+              'type': 'array',
+              'items': {
+                type: 'array',
+                prefixItems: [{ type: 'string' }, { $ref: '#/$defs/Item' }],
+                maxItems: 2,
+                minItems: 2,
+              },
+              'x-native-type': 'map',
+            },
+          },
+          required: ['set', 'map'],
+          $defs: {
+            Item: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
           },
         },
-        required: ['set', 'map'],
-        $defs: {
-          Item: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
-        },
-      }, false])
+        false,
+      ])
     })
 
     it('converts a set or map inside the definitions option', () => {
@@ -240,34 +367,235 @@ describe('valibotToJsonSchemaConverter', () => {
         definitions: { Tag: v.object({ labels: v.set(v.string()) }) },
       })
 
-      expect(converter.convert(v.string(), 'input')).toEqual([{
-        type: 'string',
-        $defs: {
-          Tag: {
-            type: 'object',
-            properties: { labels: { 'type': 'array', 'uniqueItems': true, 'items': { type: 'string' }, 'x-native-type': 'set' } },
-            required: ['labels'],
+      expect(converter.convert(v.string(), 'input')).toEqual([
+        {
+          type: 'string',
+          $defs: {
+            Tag: {
+              type: 'object',
+              properties: {
+                labels: {
+                  'type': 'array',
+                  'uniqueItems': true,
+                  'items': { type: 'string' },
+                  'x-native-type': 'set',
+                },
+              },
+              required: ['labels'],
+            },
           },
         },
-      }, false])
+        false,
+      ])
+    })
+
+    it.each([
+      ['file', v.file(), { type: 'string', contentMediaType: '*/*' }],
+      ['blob', v.blob(), { type: 'string', contentMediaType: '*/*' }],
+      [
+        'file with a single mime type',
+        v.pipe(v.file(), v.mimeType(['image/png'])),
+        { type: 'string', contentMediaType: 'image/png' },
+      ],
+      [
+        'blob with multiple mime types',
+        v.pipe(v.blob(), v.mimeType(['image/png', 'image/jpeg']), v.description('image')),
+        {
+          anyOf: [
+            { type: 'string', contentMediaType: 'image/png' },
+            { type: 'string', contentMediaType: 'image/jpeg' },
+          ],
+          description: 'image',
+        },
+      ],
+      [
+        'file nested in an object',
+        v.object({ avatar: v.pipe(v.file(), v.mimeType(['image/png'])), name: v.string() }),
+        {
+          type: 'object',
+          properties: {
+            avatar: { type: 'string', contentMediaType: 'image/png' },
+            name: { type: 'string' },
+          },
+          required: ['avatar', 'name'],
+        },
+      ],
+      [
+        'file nested in a set',
+        v.set(v.pipe(v.file(), v.mimeType(['image/png']))),
+        {
+          'type': 'array',
+          'uniqueItems': true,
+          'items': { type: 'string', contentMediaType: 'image/png' },
+          'x-native-type': 'set',
+        },
+      ],
+    ] as const)('converts %s into a file schema', (_, schema, jsonSchema) => {
+      const converter = new ValibotToJsonSchemaConverter({ errorMode: 'throw' })
+
+      expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(converter.convert(schema, 'output')).toEqual([jsonSchema, false])
+    })
+
+    it('leaves the mimeType action on non-file schemas to the errorMode option', () => {
+      const schema = v.pipe(v.any(), v.mimeType(['image/png']))
+
+      expect(converter.convert(schema, 'input')).toEqual([{}, false])
+      expect(() =>
+        new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'input'),
+      ).toThrow('The "mime_type" action cannot be converted to JSON Schema.')
+    })
+
+    it('dedupes mime types and reads them through nested pipes', () => {
+      const schema = v.pipe(v.pipe(v.file(), v.mimeType(['image/png', 'image/png'])))
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        { type: 'string', contentMediaType: 'image/png' },
+        false,
+      ])
+    })
+
+    describe('with a mimeType requirement shape other than Valibot 1.x', () => {
+      const mimeType = (requirement: unknown) =>
+        ({ ...v.mimeType(['image/png']), requirement }) as unknown as v.MimeTypeAction<
+          File,
+          `${string}/${string}`[],
+          undefined
+        >
+
+      it('accepts a single mime type string', () => {
+        expect(converter.convert(v.pipe(v.file(), mimeType('image/png')), 'input')).toEqual([
+          { type: 'string', contentMediaType: 'image/png' },
+          false,
+        ])
+      })
+
+      it.each([[[]], [123], [undefined], [['image/png', 1]]])(
+        'leaves %j to the errorMode option',
+        (requirement) => {
+          const schema = v.pipe(v.file(), mimeType(requirement))
+
+          expect(converter.convert(schema, 'input')).toEqual([
+            { type: 'string', contentMediaType: '*/*' },
+            false,
+          ])
+          expect(() =>
+            new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(schema, 'input'),
+          ).toThrow('The "mime_type" action cannot be converted to JSON Schema.')
+        },
+      )
+    })
+
+    describe('when @valibot/to-json-schema converts files natively', () => {
+      // Simulates a future version that converts `file`/`blob` and `mime_type` itself
+      // before calling the override hooks.
+      beforeEach(async () => {
+        const { toJsonSchema: original } =
+          await vi.importActual<typeof import('@valibot/to-json-schema')>('@valibot/to-json-schema')
+
+        // Mirrors the library: a hook that returns nothing keeps the native conversion.
+        const withNative =
+          <T extends object>(
+            hook: (context: T) => any,
+            native: (context: T) => Record<string, unknown> | undefined,
+          ) =>
+          (context: T) => {
+            const jsonSchema = native(context)
+            return jsonSchema
+              ? (hook({ ...context, jsonSchema, errors: undefined }) ?? jsonSchema)
+              : hook(context)
+          }
+
+        vi.mocked(toJsonSchema).mockImplementationOnce((schema, config) =>
+          original(schema, {
+            ...config,
+            overrideSchema: withNative(config!.overrideSchema!, ({ valibotSchema }) =>
+              valibotSchema.type === 'file' ? { type: 'string', format: 'binary' } : undefined,
+            ),
+            overrideAction: withNative(config!.overrideAction!, ({ valibotAction }) =>
+              valibotAction.type === 'mime_type'
+                ? {
+                    anyOf: (valibotAction as any).requirement.map((contentMediaType: string) => ({
+                      type: 'string',
+                      contentMediaType,
+                    })),
+                  }
+                : undefined,
+            ),
+          }),
+        )
+      })
+
+      it('keeps emitting the oRPC file schema', () => {
+        expect(converter.convert(v.file(), 'input')).toEqual([
+          { type: 'string', contentMediaType: '*/*' },
+          false,
+        ])
+      })
+
+      it('keeps the native mimeType conversion when it is no longer a single file schema', () => {
+        const schema = v.pipe(v.file(), v.mimeType(['image/png', 'image/jpeg']))
+
+        expect(converter.convert(schema, 'input')).toEqual([
+          {
+            anyOf: [
+              { type: 'string', contentMediaType: 'image/png' },
+              { type: 'string', contentMediaType: 'image/jpeg' },
+            ],
+          },
+          false,
+        ])
+      })
+    })
+
+    it('passes the mimeType action to the overrideAction option without the conversion error', () => {
+      const overrideAction = vi.fn(({ valibotAction, jsonSchema }) =>
+        valibotAction.type === 'mime_type' ? { ...jsonSchema, title: 'image' } : undefined,
+      )
+      const converter = new ValibotToJsonSchemaConverter({ errorMode: 'throw', overrideAction })
+
+      expect(
+        converter.convert(
+          v.pipe(v.file(), v.mimeType(['image/png']), v.description('avatar')),
+          'input',
+        ),
+      ).toEqual([
+        { type: 'string', contentMediaType: 'image/png', title: 'image', description: 'avatar' },
+        false,
+      ])
+      expect(
+        overrideAction.mock.calls.map(([context]) => [context.valibotAction.type, context.errors]),
+      ).toEqual([
+        ['mime_type', undefined],
+        ['description', undefined],
+      ])
     })
 
     it('leaves other unsupported schemas to the errorMode option', () => {
       expect(converter.convert(v.symbol(), 'input')).toEqual([{}, false])
-      expect(() => new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(v.symbol(), 'input')).toThrow('The "symbol" schema cannot be converted to JSON Schema.')
+      expect(() =>
+        new ValibotToJsonSchemaConverter({ errorMode: 'throw' }).convert(v.symbol(), 'input'),
+      ).toThrow('The "symbol" schema cannot be converted to JSON Schema.')
     })
 
     it('passes native types to the overrideSchema option without the conversion error', () => {
-      const overrideSchema = vi.fn(({ valibotSchema, jsonSchema }) => valibotSchema.type === 'date' ? { ...jsonSchema, format: 'date' } : undefined)
+      const overrideSchema = vi.fn(({ valibotSchema, jsonSchema }) =>
+        valibotSchema.type === 'date' ? { ...jsonSchema, format: 'date' } : undefined,
+      )
       const converter = new ValibotToJsonSchemaConverter({ errorMode: 'throw', overrideSchema })
 
-      expect(converter.convert(v.set(v.date()), 'input')).toEqual([{
-        'type': 'array',
-        'uniqueItems': true,
-        'items': { 'type': 'string', 'format': 'date', 'x-native-type': 'date' },
-        'x-native-type': 'set',
-      }, false])
-      expect(overrideSchema.mock.calls.map(([context]) => [context.valibotSchema.type, context.errors])).toEqual([
+      expect(converter.convert(v.set(v.date()), 'input')).toEqual([
+        {
+          'type': 'array',
+          'uniqueItems': true,
+          'items': { 'type': 'string', 'format': 'date', 'x-native-type': 'date' },
+          'x-native-type': 'set',
+        },
+        false,
+      ])
+      expect(
+        overrideSchema.mock.calls.map(([context]) => [context.valibotSchema.type, context.errors]),
+      ).toEqual([
         ['date', undefined],
         ['set', undefined],
       ])
@@ -275,7 +603,11 @@ describe('valibotToJsonSchemaConverter', () => {
   })
 
   describe('cache option', () => {
-    const schema = v.pipe(v.number(), v.transform(n => n.toString()), v.string())
+    const schema = v.pipe(
+      v.number(),
+      v.transform((n) => n.toString()),
+      v.string(),
+    )
 
     it('reuses conversion results per schema and direction when enabled', () => {
       const converter = new ValibotToJsonSchemaConverter({ cache: true })

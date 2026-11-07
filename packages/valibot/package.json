@@ -1,52 +1,48 @@
 {
   "name": "@orpc/valibot",
-  "type": "module",
   "version": "2.0.0-beta.48",
   "description": "Valibot integration for oRPC: convert Valibot schemas into JSON Schema for OpenAPI generation",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "json-schema",
+    "openapi",
+    "orpc",
+    "typesafe",
+    "typescript",
+    "valibot",
+    "validation"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/valibot"
   },
-  "keywords": [
-    "orpc",
-    "valibot",
-    "json-schema",
-    "openapi",
-    "validation",
-    "typescript",
-    "typesafe"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "obuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "valibot": ">=1.5.0"
+  "scripts": {
+    "prepack": "tsc"
   },
   "dependencies": {
     "@orpc/json-schema": "workspace:*",
@@ -55,5 +51,8 @@
   "devDependencies": {
     "valibot": "^1.5.0",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "valibot": ">=1.5.0"
   }
 }

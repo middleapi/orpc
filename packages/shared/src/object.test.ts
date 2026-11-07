@@ -1,10 +1,28 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
-import z from 'zod'
-import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, pick, set, setOwn } from './object'
+import * as z from 'zod'
+
+import {
+  bindMethods,
+  clone,
+  copyOnWrite,
+  findDeepMatches,
+  get,
+  getConstructor,
+  getConstructors,
+  getOwn,
+  isPlainObject,
+  isPropertyKey,
+  mergeTwoLevels,
+  NullProtoObj,
+  omit,
+  pick,
+  set,
+  setOwn,
+} from './object.ts'
 
 it('findDeepMatches', () => {
-  const { maps, values } = findDeepMatches(v => typeof v === 'string', {
+  const { maps, values } = findDeepMatches((v) => typeof v === 'string', {
     array: ['v1', 'v2'],
     nested: {
       nested: [
@@ -26,12 +44,7 @@ it('findDeepMatches', () => {
     ['nested', 'nested', 1],
   ])
 
-  expect(values).toEqual([
-    'v1',
-    'v2',
-    'v3',
-    'v4',
-  ])
+  expect(values).toEqual(['v1', 'v2', 'v3', 'v4'])
 })
 
 it('getConstructor', () => {
@@ -41,7 +54,7 @@ it('getConstructor', () => {
 
   expect(getConstructor({})).toBe(Object)
   expect(getConstructor(new Error('hi'))).toBe(Error)
-  expect(getConstructor(() => { })).toBe(Function)
+  expect(getConstructor(() => {})).toBe(Function)
 })
 
 describe('getConstructors', () => {
@@ -62,6 +75,7 @@ describe('getConstructors', () => {
   })
 
   it('returns the full chain for class inheritance', () => {
+    // oxlint-disable-next-line typescript/no-extraneous-class
     class GrandParent {}
     class Parent extends GrandParent {}
     class Child extends Parent {}
@@ -90,6 +104,7 @@ describe('getConstructors', () => {
   })
 
   it('is lazy', () => {
+    // oxlint-disable-next-line typescript/no-extraneous-class
     class Parent {}
     class Child extends Parent {}
 
@@ -109,11 +124,13 @@ it('isPlainObject', () => {
 
   expect({}).toSatisfy(isPlainObject)
   expect(Object.create(null)).toSatisfy(isPlainObject)
-  expect((() => {
-    const obj = {}
-    Object.setPrototypeOf(obj, null)
-    return obj
-  })()).toSatisfy(isPlainObject)
+  expect(
+    (() => {
+      const obj = {}
+      Object.setPrototypeOf(obj, null)
+      return obj
+    })(),
+  ).toSatisfy(isPlainObject)
 })
 
 it('getOwn', () => {
@@ -127,9 +144,9 @@ it('get', () => {
   expect(get({ a: { b: 1 } }, ['a', 'b'])).toEqual(1)
   expect(get({ a: { b: 1 } }, ['a', 'b', 'c'])).toEqual(undefined)
   expect(get({ a: { b: 1 } }, ['a', 'b', 'c', 'd'])).toEqual(undefined)
-  expect(get({ a: { b: () => { } } }, ['a', 'b', 'name'])).toEqual('b')
-  expect(get({ a: { b: () => { } } }, ['a', 'b', 'uuuu'])).toEqual(undefined)
-  expect(get({ a: { b: () => { } } }, ['a', 'b', 'uuuu', 'zzzz'])).toEqual(undefined)
+  expect(get({ a: { b: () => {} } }, ['a', 'b', 'name'])).toEqual('b')
+  expect(get({ a: { b: () => {} } }, ['a', 'b', 'uuuu'])).toEqual(undefined)
+  expect(get({ a: { b: () => {} } }, ['a', 'b', 'uuuu', 'zzzz'])).toEqual(undefined)
   expect(get({}, ['__proto__'])).toEqual(undefined)
   expect(get({}, ['constructor'])).toEqual(undefined)
   expect(get({}, ['toString'])).toEqual(undefined)
@@ -215,7 +232,6 @@ describe('set', () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
     expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
     expect(Object.hasOwn(root, '__proto__')).toBe(true)
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toEqual({ polluted: 'yes' })
   })
 
@@ -235,7 +251,6 @@ describe('set', () => {
 
     expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
     expect(Object.hasOwn(root, '__proto__')).toBe(true)
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toBe('value')
   })
 })
@@ -278,7 +293,6 @@ describe('setOwn', () => {
 
     expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
     expect(getOwn(root, '__proto__')).toBe('value')
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toBe('value')
   })
 
@@ -328,19 +342,23 @@ describe('mergeTwoLevels', () => {
   })
 
   it('merges one level deeper', () => {
-    expect(mergeTwoLevels(
-      { user: { name: 'NAME', shared: 'first' } },
-      { user: { age: 1, shared: 'second' } },
-    )).toEqual({
+    expect(
+      mergeTwoLevels(
+        { user: { name: 'NAME', shared: 'first' } },
+        { user: { age: 1, shared: 'second' } },
+      ),
+    ).toEqual({
       user: { name: 'NAME', age: 1, shared: 'second' },
     })
   })
 
   it('replaces anything deeper than two levels', () => {
-    expect(mergeTwoLevels(
-      { user: { address: { city: 'CITY' } } },
-      { user: { address: { zip: 'ZIP' } } },
-    )).toEqual({
+    expect(
+      mergeTwoLevels(
+        { user: { address: { city: 'CITY' } } },
+        { user: { address: { zip: 'ZIP' } } },
+      ),
+    ).toEqual({
       user: { address: { zip: 'ZIP' } },
     })
   })
@@ -433,14 +451,14 @@ describe('pick', () => {
   })
 
   it('keeps keys explicitly set to undefined', () => {
-    const result = pick({ a: undefined, b: 2 } as { a?: number, b: number }, ['a'])
+    const result = pick({ a: undefined, b: 2 } as { a?: number; b: number }, ['a'])
 
     expect(result).toEqual({ a: undefined })
     expect(Object.hasOwn(result, 'a')).toBe(true)
   })
 
   it('skips missing and inherited keys', () => {
-    const obj = Object.create({ inherited: 1 }) as { inherited?: number, missing?: number }
+    const obj = Object.create({ inherited: 1 }) as { inherited?: number; missing?: number }
 
     expect(Object.keys(pick(obj, ['inherited', 'missing']))).toEqual([])
   })
@@ -460,13 +478,11 @@ it('nullProtoObj', () => {
   const obj = new NullProtoObj()
 
   obj.a = 1
-  // eslint-disable-next-line no-restricted-properties, no-proto
   obj.__proto__ = 2
 
   expect(obj).toSatisfy(isPlainObject)
 
   expect(obj.a).toBe(1)
-  // eslint-disable-next-line no-restricted-properties, no-proto
   expect(obj.__proto__).toBe(2)
 
   // compatible with common validation libs
@@ -476,7 +492,6 @@ it('nullProtoObj', () => {
 
   const clone = { ...obj }
   expect(Object.getPrototypeOf(clone).constructor).toBe(Object)
-  // eslint-disable-next-line no-restricted-properties, no-proto
   expect(clone.__proto__).toBe(2)
   expect(clone.a).toBe(1)
 })
@@ -548,18 +563,14 @@ describe('clone', () => {
     expect(Object.getPrototypeOf(cloned)).toBe(Object.prototype)
     expect(({} as any).polluted).toBeUndefined()
     expect(cloned.a).toBe(1)
-    // eslint-disable-next-line no-restricted-properties, no-proto
     expect(cloned.__proto__).toEqual({ polluted: true })
-    // eslint-disable-next-line no-restricted-properties, no-proto
     expect(cloned.__proto__).not.toBe(obj.__proto__)
 
     const nullProto = new NullProtoObj<any>()
-    // eslint-disable-next-line no-restricted-properties, no-proto
     nullProto.__proto__ = 2
     const clonedNullProto = clone(nullProto)
 
     expect(Object.getPrototypeOf(clonedNullProto)).toBe(Object.prototype)
-    // eslint-disable-next-line no-restricted-properties, no-proto
     expect(clonedNullProto.__proto__).toBe(2)
   })
 
@@ -718,15 +729,14 @@ describe('bindMethods', () => {
       return 'custom'
     }
 
-    // eslint-disable-next-line no-proto, no-restricted-properties
     obj.__proto__ = function () {
       return 'proto'
     }
 
     const methods = bindMethods(obj)
 
+    // oxlint-disable-next-line typescript/no-base-to-string
     expect(methods.toString()).toBe('custom')
-    // eslint-disable-next-line no-proto, no-restricted-properties
     expect(methods.__proto__()).toBe('proto')
   })
 
@@ -735,7 +745,7 @@ describe('bindMethods', () => {
       fn() {},
     })
 
-    expect(Object.getPrototypeOf(methods)).toBe(Object.getPrototypeOf((new NullProtoObj())))
+    expect(Object.getPrototypeOf(methods)).toBe(Object.getPrototypeOf(new NullProtoObj()))
   })
 
   it('returns an empty object when no methods exist', () => {

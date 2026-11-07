@@ -1,22 +1,24 @@
-import type { ContractBuilderConfig } from './builder'
-import type { ErrorMap } from './error'
-import type { MergedErrorMap } from './error-utils'
-import type { AnyMetaPlugin, Meta } from './meta'
-import type { AnyProcedureContract } from './procedure'
-import type { RouterContract } from './router'
-import { getOwn, isTypescriptObject } from '@orpc/shared'
-import { mergeErrorMap } from './error-utils'
-import { resolveAugmentedMetaPlugins } from './meta-utils'
-import { ProcedureContract } from './procedure'
+import { getOwn, isNonPrimitive, setOwn } from '@orpc/shared'
 
-export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap>
-  = T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
+import type { MergedErrorMap } from './error-utils.ts'
+import { mergeErrorMap } from './error-utils.ts'
+import type { ErrorMap } from './error.ts'
+import { resolveMetaPlugins } from './meta-utils.ts'
+import type { AnyMetaPlugin, Meta } from './meta.ts'
+import type { AnyProcedureContract } from './procedure.ts'
+import { ProcedureContract } from './procedure.ts'
+import type { RouterContract } from './router.ts'
+
+export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap> =
+  T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
     ? ProcedureContract<$InputSchema, $OutputSchema, MergedErrorMap<TErrorMap, $Errors>>
     : {
-        [K in keyof T]: T[K] extends RouterContract ? AugmentedContractRouter<T[K], TErrorMap> : never
+        [K in keyof T]: T[K] extends RouterContract
+          ? AugmentedContractRouter<T[K], TErrorMap>
+          : never
       }
 
-export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> extends ContractBuilderConfig {
+export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {
   meta: Meta
   metaPlugins?: AnyMetaPlugin[] | undefined
   errorMap: TErrorMap
@@ -30,11 +32,10 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
   options: AugmentContractRouterOptions<TErrorMap>,
 ): AugmentedContractRouter<T, TErrorMap> {
   if (router instanceof ProcedureContract) {
-    const [meta, metaPlugins] = resolveAugmentedMetaPlugins(
+    const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
       router['~orpc'].metaPlugins,
-      options,
     )
 
     const enhanced = new ProcedureContract({
@@ -47,26 +48,29 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
     return enhanced as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 
   const enhanced: Record<string, any> = {}
 
   for (const key of Object.keys(router)) {
-    enhanced[key] = augmentContractRouter(router[key]!, options)
+    setOwn(enhanced, key, augmentContractRouter(router[key]!, options))
   }
 
   return enhanced as any
 }
 
-export function getRouterContract(router: RouterContract, path: readonly string[]): RouterContract | undefined {
+export function getRouterContract(
+  router: RouterContract,
+  path: readonly string[],
+): RouterContract | undefined {
   let current: RouterContract | undefined = router
 
   for (let i = 0; i < path.length; i++) {
     const segment = path[i]!
 
-    if (!isTypescriptObject(current)) {
+    if (!isNonPrimitive(current)) {
       return undefined
     }
 
@@ -77,18 +81,23 @@ export function getRouterContract(router: RouterContract, path: readonly string[
     current = getOwn(current, segment)
   }
 
-  if (!isTypescriptObject(current)) {
+  if (!isNonPrimitive(current)) {
     return undefined
   }
 
   return current
 }
 
-export function getProcedureContractOrThrow(router: RouterContract, path: readonly string[]): AnyProcedureContract {
+export function getProcedureContractOrThrow(
+  router: RouterContract,
+  path: readonly string[],
+): AnyProcedureContract {
   const procedure = getRouterContract(router, path)
 
   if (!(procedure instanceof ProcedureContract)) {
-    throw new TypeError(`No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`)
+    throw new TypeError(
+      `No valid procedure found at path "${path.join('.')}", this may happen when the router contract is not properly configured.`,
+    )
   }
 
   return procedure
@@ -115,14 +124,14 @@ export function minifyRouterContract(router: RouterContract): RouterContract {
     return procedure
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router
   }
 
   const json: Record<string, RouterContract> = {}
 
   for (const [key, child] of Object.entries(router)) {
-    json[key] = minifyRouterContract(child)
+    setOwn(json, key, minifyRouterContract(child))
   }
 
   return json

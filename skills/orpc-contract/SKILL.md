@@ -1,6 +1,6 @@
 ---
 name: orpc-contract
-description: "Design oRPC v2 APIs contract-first, defining the API shape with oc from `@orpc/contract`, implementing it with implement from `@orpc/server`, and consuming the contract from typesafe clients. Use when a project depends on `@orpc/contract`, when defining a contract with oc, implementing a contract with implement, sharing an API contract between server and client packages, generating a contract from an existing OpenAPI spec, or publishing a typed API client to npm. Biases toward retrieval from the oRPC docs over pre-trained knowledge. For core builder, serving, and client work without a contract, use the orpc skill; for REST/OpenAPI exposure, spec generation, and OpenAPILink details, use the orpc-openapi skill."
+description: 'Design oRPC v2 APIs contract-first, defining the API shape with oc from `@orpc/contract`, implementing it with implement from `@orpc/server`, and consuming the contract from typesafe clients. Use when a project depends on `@orpc/contract`, when defining a contract with oc, implementing a contract with implement, sharing an API contract between server and client packages, generating a contract from an existing OpenAPI spec, or publishing a typed API client to npm. Biases toward retrieval from the oRPC docs over pre-trained knowledge. For core builder, serving, and client work without a contract, use the orpc skill; for REST/OpenAPI exposure, spec generation, and OpenAPILink details, use the orpc-openapi skill.'
 license: MIT
 ---
 
@@ -20,8 +20,7 @@ import * as z from 'zod'
 
 export const contract = {
   planet: {
-    list: oc
-      .output(z.array(z.object({ id: z.number(), name: z.string() }))),
+    list: oc.output(z.array(z.object({ id: z.number(), name: z.string() }))),
     find: oc
       .errors({ NOT_FOUND: {} })
       .input(z.object({ id: z.number() }))
@@ -53,8 +52,7 @@ const listPlanets = implementer.planet.list.handler(async ({ context }) => conte
 
 const findPlanet = implementer.planet.find.handler(async ({ input, context, errors }) => {
   const planet = await context.db.find(input.id)
-  if (!planet)
-    throw errors.NOT_FOUND()
+  if (!planet) throw errors.NOT_FOUND()
   return planet
 })
 
@@ -64,7 +62,7 @@ export const router = implementer.router({
 ```
 
 - `.$context` declares the initial context the procedures require, as on `os`.
-- Apply middleware per procedure with `.use(mw)` before `.handler`. That runs after input validation (the contract already registered `.input`); to wrap validation, apply it at router level: `implementer.use(mw)` for every procedure, or `implementer.planet.use(mw).list` for a subtree. Router-level middleware a procedure already has from the same implementer is skipped automatically; other overlaps run twice, so use the dedupe pattern from the `orpc` skill.
+- Apply middleware per procedure with `.use(mw)` before `.handler`. That runs after input validation (the contract already registered `.input`); to wrap validation, apply it at router level: `implementer.use(mw)` for every procedure, or `implementer.planet.use(mw).list` for a subtree. Router-level plus procedure-level `.use` can run the same middleware twice; use the dedupe pattern from the `orpc` skill.
 - `implementer.middleware(fn)` creates middleware that infers the contract's typesafe errors. When not every procedure defines a code, guard with the `in` operator: `if ('TOO_MANY_REQUESTS' in errors) throw errors.TOO_MANY_REQUESTS()`. Any type-compatible middleware also works.
 - The result is a normal router: serve it with `RPCHandler` (`orpc` skill) or `OpenAPIHandler` (`orpc-openapi` skill), call it in-process with `call` or `createRouterClient` from `@orpc/server`.
 
@@ -73,10 +71,10 @@ export const router = implementer.router({
 `RPCLink` needs only the contract type; `OpenAPILink` takes the contract as a runtime value to read each procedure's route. Get the client types exactly right:
 
 ```ts
-import type { RouterContractClient } from '@orpc/contract'
-import type { JsonifiedClient } from '@orpc/openapi'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+import type { RouterContractClient } from '@orpc/contract'
+import type { JsonifiedClient } from '@orpc/openapi'
 import { OpenAPILink } from '@orpc/openapi/fetch'
 
 // RPC protocol (server side is RPCHandler)
@@ -85,7 +83,8 @@ const client: RouterContractClient<typeof contract> = createORPCClient(rpcLink)
 
 // OpenAPI protocol (OpenAPIHandler or any spec-compliant server)
 const openapiLink = new OpenAPILink(contract, { origin: 'https://api.example.com', url: '/api' })
-const apiClient: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(openapiLink)
+const apiClient: JsonifiedClient<RouterContractClient<typeof contract>> =
+  createORPCClient(openapiLink)
 ```
 
 - Router-first equivalents use `RouterClient<typeof router>` from `@orpc/server` in the same positions.
@@ -100,6 +99,7 @@ When the contract is derived from a router, importing it on the client is heavy 
 
 ```ts
 import fs from 'node:fs'
+
 import { minifyRouterContract } from '@orpc/contract'
 import { unlazyRouter } from '@orpc/server'
 
@@ -112,9 +112,9 @@ fs.writeFileSync('./contract.json', JSON.stringify(minified))
 To publish a typed SDK to npm, export a factory that pairs the contract with a link:
 
 ```ts
-import type { RouterContractClient } from '@orpc/contract'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+import type { RouterContractClient } from '@orpc/contract'
 
 export function createMyApi(apiKey: string): RouterContractClient<typeof contract> {
   const link = new RPCLink({

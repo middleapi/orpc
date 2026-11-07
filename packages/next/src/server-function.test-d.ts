@@ -2,7 +2,8 @@ import type { ORPCErrorCode } from '@orpc/server'
 import { os } from '@orpc/server'
 import { useActionState } from 'react'
 import { z } from 'zod'
-import { createServerFunction } from './server-function'
+
+import { createServerFunction } from './server-function.ts'
 
 const errorMap = {
   BASE: {
@@ -11,8 +12,8 @@ const errorMap = {
   },
 }
 
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 describe('createServerFunction', () => {
   const procedure = os
@@ -32,9 +33,9 @@ describe('createServerFunction', () => {
     const fn = createServerFunction(procedure, { context: () => ({ auth: true }) })
 
     // @ts-expect-error missing input
-    fn()
+    void fn()
     // @ts-expect-error invalid input
-    fn('invalid')
+    void fn('invalid')
     const [error, data] = await fn({ schema1: 123 })
 
     if (error) {
@@ -42,13 +43,11 @@ describe('createServerFunction', () => {
         if (error.code === 'BASE') {
           expectTypeOf(error.data).toEqualTypeOf<{ id: string }>()
         }
-      }
-      else {
+      } else {
         expectTypeOf(error.code).toEqualTypeOf<ORPCErrorCode>()
         expectTypeOf(error.data).toEqualTypeOf<unknown>()
       }
-    }
-    else {
+    } else {
       expectTypeOf(data).toEqualTypeOf<{ schema2: string }>()
     }
   })

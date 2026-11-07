@@ -1,7 +1,8 @@
 import type { OrderablePlugin } from '@orpc/shared'
-import type { Context } from '../../context'
-import type { StandardHandlerOptions } from './handler'
 import { sortPlugins } from '@orpc/shared'
+
+import type { Context } from '../../context.ts'
+import type { StandardHandlerOptions } from './handler.ts'
 
 export interface StandardHandlerPlugin<T extends Context> extends OrderablePlugin {
   /**

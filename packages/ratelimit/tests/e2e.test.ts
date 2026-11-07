@@ -1,9 +1,10 @@
-import type { RateLimiter } from '../src'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { z } from 'zod'
-import { ratelimit, RateLimitHandlerPlugin } from '../src'
-import { MemoryRateLimiter } from '../src/adapters/memory'
+
+import { MemoryRateLimiter } from '../src/adapters/memory.ts'
+import type { RateLimiter } from '../src/index.ts'
+import { ratelimit, RateLimitHandlerPlugin } from '../src/index.ts'
 
 it('works', async () => {
   const router = {
@@ -22,9 +23,7 @@ it('works', async () => {
   }
 
   const handler = new RPCHandler(router, {
-    plugins: [
-      new RateLimitHandlerPlugin(),
-    ],
+    plugins: [new RateLimitHandlerPlugin()],
   })
 
   const request = new Request('https://example.com/login', {
