@@ -1,6 +1,6 @@
 {
   "name": "@orpc/json-schema",
-  "version": "2.0.0-beta.48",
+  "version": "2.0.0-beta.49",
   "description": "JSON Schema conversion and smart request coercion for oRPC and OpenAPI",
   "keywords": [
     "coercion",

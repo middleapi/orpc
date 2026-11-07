@@ -1,6 +1,6 @@
 {
   "name": "@orpc/publisher",
-  "version": "2.0.0-beta.48",
+  "version": "2.0.0-beta.49",
   "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, and Upstash adapters",
   "keywords": [
     "event-iterator",

@@ -1,6 +1,6 @@
 {
   "name": "@orpc/server",
-  "version": "2.0.0-beta.48",
+  "version": "2.0.0-beta.49",
   "description": "Build typesafe APIs with oRPC: RPC and OpenAPI support, middleware, and adapters for Node.js, Bun, Deno, Fetch, Fastify, WebSocket, AWS Lambda, and more",
   "keywords": [
     "api",

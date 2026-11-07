@@ -1,6 +1,6 @@
 {
   "name": "@orpc/zod",
-  "version": "2.0.0-beta.48",
+  "version": "2.0.0-beta.49",
   "description": "Zod integration for oRPC: convert Zod schemas into JSON Schema for OpenAPI generation",
   "keywords": [
     "json-schema",

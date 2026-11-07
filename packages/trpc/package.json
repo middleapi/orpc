@@ -1,6 +1,6 @@
 {
   "name": "@orpc/trpc",
-  "version": "2.0.0-beta.48",
+  "version": "2.0.0-beta.49",
   "description": "tRPC interop for oRPC: reuse existing tRPC routers with oRPC clients and OpenAPI",
   "keywords": [
     "interop",

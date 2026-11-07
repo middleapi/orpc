@@ -1,6 +1,6 @@
 {
   "name": "@orpc/msw",
-  "version": "2.0.0-beta.48",
+  "version": "2.0.0-beta.49",
   "description": "MSW integration for oRPC: mock procedures at the network level with typed MSW request handlers",
   "keywords": [
     "mock-service-worker",
