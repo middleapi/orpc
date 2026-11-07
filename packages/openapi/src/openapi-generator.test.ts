@@ -798,6 +798,50 @@ describe('openAPIGenerator version', () => {
     },
   )
 
+  it.each(['3.2.0', '3.1.1', '3.0.4'] as const)(
+    'keeps discriminator mapping refs resolvable in OpenAPI %s',
+    async (version) => {
+      const doc = await generator.generate(
+        {
+          adopt: oc.meta(openapi({ method: 'POST', path: '/adopt' })).input(
+            testSchema({
+              type: 'object',
+              properties: {
+                pet: {
+                  oneOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }],
+                  discriminator: {
+                    propertyName: 'kind',
+                    mapping: { cat: '#/$defs/Cat', dog: '#/$defs/Dog' },
+                  },
+                },
+              },
+              $defs: {
+                Cat: { type: 'object', properties: { kind: { const: 'cat' } } },
+                Dog: { type: 'object', properties: { kind: { const: 'dog' } } },
+              },
+            }),
+          ),
+        },
+        { version, componentName: (defName) => `X${defName}` },
+      )
+
+      expect(
+        (doc.paths?.['/adopt']?.post?.requestBody as any)?.content?.['application/json']?.schema,
+      ).toMatchObject({
+        properties: {
+          pet: {
+            oneOf: [{ $ref: '#/components/schemas/XCat' }, { $ref: '#/components/schemas/XDog' }],
+            discriminator: {
+              propertyName: 'kind',
+              mapping: { cat: '#/components/schemas/XCat', dog: '#/components/schemas/XDog' },
+            },
+          },
+        },
+      })
+      expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['XCat', 'XDog'])
+    },
+  )
+
   it('serializes non-JSON values before downgrading', async () => {
     const doc = await generator.generate(
       {},

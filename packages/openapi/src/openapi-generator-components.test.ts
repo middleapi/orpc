@@ -130,6 +130,208 @@ describe('openAPIComponentRegistry', () => {
       expect(componentName).toHaveBeenNthCalledWith(2, 'Moon', {})
     })
 
+    describe('discriminator mapping', () => {
+      interface DiscriminatorOverrides {
+        mapping?: Record<string, string>
+        defaultMapping?: string
+      }
+
+      const petSchema = (overrides: DiscriminatorOverrides = {}) =>
+        ({
+          type: 'object',
+          properties: {
+            pet: {
+              oneOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }, { $ref: '#/$defs/Bird' }],
+              discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                  cat: '#/$defs/Cat',
+                  dog: '#/$defs/Dog',
+                  bird: 'Bird',
+                  ...overrides.mapping,
+                },
+                defaultMapping: overrides.defaultMapping ?? '#/$defs/Cat',
+              },
+            },
+          },
+          $defs: {
+            Cat: { type: 'object', properties: { kind: { const: 'cat' } } },
+            Dog: { type: 'object', properties: { kind: { const: 'dog' } } },
+            Bird: { type: 'object', properties: { kind: { const: 'bird' } } },
+          },
+        }) satisfies JsonSchema
+
+      // the union lives in a `Pet` def, so its mapping is rewritten inside a hoisted component
+      const wrappedPetSchema = (overrides?: DiscriminatorOverrides) => {
+        const { $defs, ...pet } = petSchema(overrides)
+        return { $ref: '#/$defs/Pet', $defs: { ...$defs, Pet: pet } }
+      }
+
+      it.each([
+        ['def names', undefined, ''],
+        ['componentName names', (defName: string) => `X${defName}`, 'X'],
+      ] as const)('rewrites discriminator mapping refs to %s', (_, componentName, prefix) => {
+        const { doc, registry } = createRegistry({ componentName })
+
+        expect(registry.hoistDefs(petSchema())).toEqual({
+          type: 'object',
+          properties: {
+            pet: {
+              oneOf: [
+                { $ref: `#/components/schemas/${prefix}Cat` },
+                { $ref: `#/components/schemas/${prefix}Dog` },
+                { $ref: `#/components/schemas/${prefix}Bird` },
+              ],
+              discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                  cat: `#/components/schemas/${prefix}Cat`,
+                  dog: `#/components/schemas/${prefix}Dog`,
+                  // bare schema names are not refs
+                  bird: 'Bird',
+                },
+                defaultMapping: `#/components/schemas/${prefix}Cat`,
+              },
+            },
+          },
+        })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(
+          ['Cat', 'Dog', 'Bird'].map((name) => `${prefix}${name}`),
+        )
+      })
+
+      it('rewrites mapping refs inside hoisted components and reuses them', () => {
+        const { doc, registry } = createRegistry()
+
+        expect(registry.hoistDefs(wrappedPetSchema())).toEqual({
+          $ref: '#/components/schemas/Pet',
+        })
+        expect(doc.components?.schemas?.Pet).toMatchObject({
+          properties: {
+            pet: {
+              discriminator: {
+                mapping: {
+                  cat: '#/components/schemas/Cat',
+                  dog: '#/components/schemas/Dog',
+                  bird: 'Bird',
+                },
+                defaultMapping: '#/components/schemas/Cat',
+              },
+            },
+          },
+        })
+
+        const components = structuredClone(doc.components?.schemas)
+
+        expect(registry.hoistDefs(wrappedPetSchema())).toEqual({
+          $ref: '#/components/schemas/Pet',
+        })
+        expect(doc.components?.schemas).toEqual(components)
+      })
+
+      it.each<[name: string, overrides: DiscriminatorOverrides, expected: object]>([
+        [
+          'mapping',
+          { mapping: { cat: '#/$defs/Dog', dog: '#/$defs/Cat' } },
+          { mapping: { cat: '#/components/schemas/Dog', dog: '#/components/schemas/Cat' } },
+        ],
+        [
+          'defaultMapping',
+          { defaultMapping: '#/$defs/Dog' },
+          { defaultMapping: '#/components/schemas/Dog' },
+        ],
+      ])(
+        'does not reuse components whose discriminator %s targets differ',
+        (_, overrides, expected) => {
+          const { doc, registry } = createRegistry()
+
+          registry.hoistDefs(wrappedPetSchema())
+
+          expect(registry.hoistDefs(wrappedPetSchema(overrides))).toEqual({
+            $ref: '#/components/schemas/Pet2',
+          })
+          expect(doc.components?.schemas?.Pet2).toMatchObject({
+            properties: { pet: { discriminator: expected } },
+          })
+        },
+      )
+
+      it('treats a property named discriminator as a subschema', () => {
+        const { doc, registry } = createRegistry()
+        const schema = (): JsonSchema => ({
+          $ref: '#/$defs/Pet',
+          $defs: {
+            Pet: { type: 'object', properties: { discriminator: { $ref: '#/$defs/Kind' } } },
+            Kind: { type: 'string' },
+          },
+        })
+
+        registry.hoistDefs(schema())
+
+        expect(registry.hoistDefs(schema())).toEqual({ $ref: '#/components/schemas/Pet' })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Pet', 'Kind'])
+      })
+
+      // ref-shaped literal data is never rewritten, so it must not compare by ref target either
+      it.each([
+        ['const', (value: unknown) => value],
+        ['enum', (value: unknown) => [value]],
+        ['default', (value: unknown) => value],
+        ['examples', (value: unknown) => [value]],
+      ] as const)('compares ref-shaped %s data as is', (keyword, wrap) => {
+        const literal = (prefix: string) =>
+          wrap({ $ref: `${prefix}Cat`, discriminator: { mapping: { cat: `${prefix}Cat` } } })
+        const { doc, registry } = createRegistry({
+          schemas: {
+            Cat: { type: 'string' },
+            Pet: { type: 'object', [keyword]: literal('#/components/schemas/') },
+          },
+        })
+
+        expect(
+          registry.hoistDefs({
+            $ref: '#/$defs/Pet',
+            $defs: {
+              Cat: { type: 'string' },
+              Pet: { type: 'object', [keyword]: literal('#/$defs/') },
+            },
+          }),
+        ).toEqual({ $ref: '#/components/schemas/Pet2' })
+        expect(doc.components?.schemas?.Pet2).toEqual({
+          type: 'object',
+          [keyword]: literal('#/$defs/'),
+        })
+      })
+
+      // malformed discriminators from arbitrary JSON schemas fall back to structural comparison
+      it.each<[name: string, discriminator: any, otherDiscriminator: any]>([
+        ['a non-object discriminator', 'kind', 'type'],
+        [
+          'non-string mapping values',
+          { propertyName: 'kind', mapping: { cat: 1 } },
+          { propertyName: 'kind', mapping: { cat: 2 } },
+        ],
+      ])('compares %s structurally', (_, discriminator, otherDiscriminator) => {
+        const { doc, registry } = createRegistry({
+          schemas: { Pet: { type: 'object', discriminator: structuredClone(discriminator) } },
+        })
+
+        expect(
+          registry.hoistDefs({
+            $ref: '#/$defs/Pet',
+            $defs: { Pet: { type: 'object', discriminator } },
+          }),
+        ).toEqual({ $ref: '#/components/schemas/Pet' })
+        expect(
+          registry.hoistDefs({
+            $ref: '#/$defs/Pet',
+            $defs: { Pet: { type: 'object', discriminator: otherDiscriminator } },
+          }),
+        ).toEqual({ $ref: '#/components/schemas/Pet2' })
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Pet', 'Pet2'])
+      })
+    })
+
     it('keeps the def name when componentName returns undefined', () => {
       const { doc, registry } = createRegistry({
         componentName: (defName) => (defName === 'Planet' ? 'World' : undefined),
