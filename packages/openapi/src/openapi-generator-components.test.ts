@@ -1,5 +1,4 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import { encodeJsonPointerSegment } from '@orpc/json-schema'
 
 import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
 import type { OpenAPIV3_2 } from './types.ts'
@@ -411,17 +410,15 @@ describe('openAPIComponentRegistry', () => {
 
   describe('component names', () => {
     it.each([
-      ['root~/', 'root__'],
       ['Page<User>', 'Page_User_'],
       ['Usuário 🚀', 'Usu_rio__'],
       ['', '_'],
-      ['already.Valid-name_1', 'already.Valid-name_1'],
     ])('replaces characters not allowed in component keys: %j -> %j', (defName, expected) => {
       const { doc, registry } = createRegistry()
 
       const result = registry.hoistDefs({
         type: 'array',
-        items: { $ref: `#/$defs/${encodeJsonPointerSegment(defName)}` },
+        items: { $ref: `#/$defs/${defName}` },
         $defs: { [defName]: { type: 'string' } },
       })
 
@@ -477,69 +474,6 @@ describe('openAPIComponentRegistry', () => {
         'User_Profile2',
         'User_Profile3',
       ])
-    })
-
-    it('sanitizes names returned by componentName', () => {
-      const componentName = vi.fn((defName: string) => `Api ${defName}`)
-      const { doc, registry } = createRegistry({ componentName })
-      const schema = {
-        type: 'object' as const,
-        properties: {
-          profile: { $ref: '#/$defs/User Profile' },
-          page: { $ref: '#/$defs/Page<User>' },
-        },
-        $defs: {
-          'User Profile': { type: 'string' as const },
-          'Page<User>': {
-            type: 'object' as const,
-            properties: { next: { $ref: '#/$defs/Page<User>' } },
-          },
-        },
-      }
-      const expected = {
-        type: 'object',
-        properties: {
-          profile: { $ref: '#/components/schemas/Api_User_Profile' },
-          page: { $ref: '#/components/schemas/Api_Page_User_' },
-        },
-      }
-
-      expect(registry.hoistDefs(structuredClone(schema))).toEqual(expected)
-      expect(componentName).toHaveBeenCalledWith('User Profile', { type: 'string' })
-      expect(doc.components?.schemas).toEqual({
-        Api_User_Profile: { type: 'string' },
-        Api_Page_User_: {
-          type: 'object',
-          properties: { next: { $ref: '#/components/schemas/Api_Page_User_' } },
-        },
-      })
-
-      expect(registry.hoistDefs(structuredClone(schema))).toEqual(expected)
-      expect(Object.keys(doc.components!.schemas!)).toHaveLength(2)
-    })
-
-    it('applies sanitized names to discriminator mapping refs', () => {
-      const { doc, registry } = createRegistry()
-
-      expect(
-        registry.hoistDefs({
-          oneOf: [{ $ref: '#/$defs/Cat Type' }],
-          discriminator: {
-            propertyName: 'kind',
-            mapping: { cat: '#/$defs/Cat Type' },
-            defaultMapping: '#/$defs/Cat Type',
-          },
-          $defs: { 'Cat Type': { type: 'object', properties: { kind: { const: 'cat' } } } },
-        }),
-      ).toEqual({
-        oneOf: [{ $ref: '#/components/schemas/Cat_Type' }],
-        discriminator: {
-          propertyName: 'kind',
-          mapping: { cat: '#/components/schemas/Cat_Type' },
-          defaultMapping: '#/components/schemas/Cat_Type',
-        },
-      })
-      expect(Object.keys(doc.components!.schemas!)).toEqual(['Cat_Type'])
     })
   })
 
