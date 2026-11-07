@@ -1,8 +1,13 @@
-import type { AsyncIteratorClass, InterceptorOptions, Value } from '@orpc/shared'
+import type {
+  AsyncIteratorClass,
+  DisposableAllAbortSignal,
+  InterceptorOptions,
+  Value,
+} from '@orpc/shared'
 import {
-  allAbortSignal,
   captureAsyncContext,
   defer,
+  disposableAllAbortSignal,
   isAsyncIteratorObject,
   replicateAsyncIterator,
   replicateReadableStream,
@@ -197,6 +202,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
   ): Promise<void> {
     const first = activeCallers[0]!
     const matchedOptions = activeCallers.map((caller) => caller.options)
+    let sharedSignal: DisposableAllAbortSignal | undefined
 
     try {
       if (!shouldDedupe(matchedOptions)) {
@@ -207,10 +213,11 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
       const context = value(group.context, matchedOptions) as T
       const signals = matchedOptions.map((options) => options.request.signal)
+      sharedSignal = disposableAllAbortSignal(signals)
 
       const request: StandardRequest = {
         ...first.options.request,
-        signal: allAbortSignal(signals),
+        signal: sharedSignal.signal,
       }
 
       const response = await first.options.next({
@@ -220,10 +227,16 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      const replicatedResponses = replicateLazyResponse(response, signals)
+      const { dispose } = sharedSignal
+      const replicatedResponses = replicateLazyResponse(
+        { ...response, resolveBody: (hint) => response.resolveBody(hint).finally(dispose) },
+        signals,
+      )
 
       activeCallers.forEach((caller, index) => caller.resolve(replicatedResponses[index]!))
     } catch (error) {
+      sharedSignal?.dispose()
+
       for (const caller of activeCallers) {
         caller.reject(error)
       }

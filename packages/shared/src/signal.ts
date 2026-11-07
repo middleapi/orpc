@@ -2,42 +2,45 @@ import { throwIfAborted } from '@standard-server/shared'
 
 import { promiseWithResolvers } from './promise.ts'
 
+export interface DisposableAllAbortSignal {
+  signal: AbortSignal | undefined
+  dispose: () => void
+}
+
 /**
- * Returns a signal that aborts only after all provided signals are aborted.
+ * Returns a signal that aborts only after all provided signals are aborted,
+ * and a `dispose` function that removes the listeners added to the input signals.
  */
-export function allAbortSignal(
+export function disposableAllAbortSignal(
   signals: readonly (AbortSignal | undefined)[],
-): AbortSignal | undefined {
+): DisposableAllAbortSignal {
   const realSignals = signals.filter((signal) => signal !== undefined)
 
   if (realSignals.length === 0 || realSignals.length !== signals.length) {
-    return undefined
+    return { signal: undefined, dispose: () => {} }
   }
 
   const controller = new AbortController()
+  const listenersController = new AbortController()
+  const dispose = () => listenersController.abort()
 
   const abortIfAllAborted = () => {
     if (realSignals.every((signal) => signal.aborted)) {
       controller.abort()
+      dispose()
     }
   }
 
   abortIfAllAborted()
 
   for (const signal of realSignals) {
-    signal.addEventListener(
-      'abort',
-      () => {
-        abortIfAllAborted()
-      },
-      {
-        once: true,
-        signal: controller.signal,
-      },
-    )
+    signal.addEventListener('abort', abortIfAllAborted, {
+      once: true,
+      signal: listenersController.signal,
+    })
   }
 
-  return controller.signal
+  return { signal: controller.signal, dispose }
 }
 
 /**

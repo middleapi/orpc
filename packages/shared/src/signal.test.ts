@@ -1,60 +1,96 @@
-import { allAbortSignal, anyAbortSignal, runWithSignal } from './signal.ts'
+import { getEventListeners } from 'node:events'
 
-describe('allAbortSignal', () => {
-  it('should return undefined if contains undefined or empty array', () => {
-    expect(allAbortSignal([])).toBe(undefined)
-    expect(allAbortSignal([undefined])).toBe(undefined)
-    expect(allAbortSignal([AbortSignal.timeout(100), undefined])).toBe(undefined)
-    expect(allAbortSignal([AbortSignal.timeout(100), undefined, AbortSignal.timeout(100)])).toBe(
-      undefined,
-    )
+import { anyAbortSignal, disposableAllAbortSignal, runWithSignal } from './signal.ts'
+
+describe('disposableAllAbortSignal', () => {
+  it('returns an undefined signal and a no-op dispose if contains undefined or empty array', () => {
+    const signal = new AbortController().signal
+
+    for (const signals of [[], [undefined], [signal, undefined], [signal, undefined, signal]]) {
+      const result = disposableAllAbortSignal(signals)
+      expect(result.signal).toBe(undefined)
+      expect(() => result.dispose()).not.toThrow()
+    }
+
+    expect(getEventListeners(signal, 'abort')).toHaveLength(0)
   })
 
-  it('should return a non-aborted signal initially if not all inputs are aborted', () => {
+  it('aborts once all signals abort, and then removes its listeners', () => {
     const controller1 = new AbortController()
     const controller2 = new AbortController()
 
-    expect(allAbortSignal([controller1.signal, controller2.signal])?.aborted).toBe(false)
+    const { signal } = disposableAllAbortSignal([controller1.signal, controller2.signal])
+
+    expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(1)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(1)
 
     controller1.abort()
-    expect(allAbortSignal([controller1.signal, controller2.signal])?.aborted).toBe(false)
+    expect(signal?.aborted).toBe(false)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(1)
+
+    controller2.abort()
+    expect(signal?.aborted).toBe(true)
+    expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(0)
   })
 
-  it('should return an aborted signal initially if all valid inputs are already aborted', () => {
+  it('fires abort once, when the last pending signal aborts', () => {
+    const preAborted = new AbortController()
+    const later1 = new AbortController()
+    const later2 = new AbortController()
+    preAborted.abort()
+
+    const { signal } = disposableAllAbortSignal([preAborted.signal, later1.signal, later2.signal])
+    const abortSpy = vi.fn()
+    signal?.addEventListener('abort', abortSpy)
+
+    expect(signal?.aborted).toBe(false)
+
+    later1.abort()
+    expect(signal?.aborted).toBe(false)
+    expect(abortSpy).not.toHaveBeenCalled()
+
+    later2.abort()
+    expect(signal?.aborted).toBe(true)
+    expect(abortSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes its listeners on dispose, after which the signal never aborts', () => {
+    const longLived = new AbortController()
+    const other = new AbortController()
+
+    const { signal, dispose } = disposableAllAbortSignal([longLived.signal, other.signal])
+    dispose()
+    dispose()
+
+    expect(getEventListeners(longLived.signal, 'abort')).toHaveLength(0)
+    expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
+
+    longLived.abort()
+    other.abort()
+    expect(signal?.aborted).toBe(false)
+  })
+
+  it('adds no listeners if all signals are already aborted', () => {
     const controller1 = new AbortController()
     const controller2 = new AbortController()
     controller1.abort()
     controller2.abort()
 
-    const batchSignal = allAbortSignal([controller1.signal, controller2.signal])
-    expect(batchSignal?.aborted).toBe(true)
+    const { signal } = disposableAllAbortSignal([controller1.signal, controller2.signal])
+
+    expect(signal?.aborted).toBe(true)
+    expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(0)
   })
 
-  it('should fire abort event when all signals abort', () => {
-    const controllerPreAborted = new AbortController()
-    const controllerLater1 = new AbortController()
-    const controllerLater2 = new AbortController()
+  it('handles the same signal passed more than once', () => {
+    const controller = new AbortController()
 
-    controllerPreAborted.abort()
+    const { signal, dispose } = disposableAllAbortSignal([controller.signal, controller.signal])
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(1)
 
-    const batchSignal = allAbortSignal([
-      controllerPreAborted.signal,
-      controllerLater1.signal,
-      controllerLater2.signal,
-    ])
-
-    expect(batchSignal?.aborted).toBe(false)
-
-    const abortSpy = vi.fn()
-    batchSignal?.addEventListener('abort', abortSpy)
-
-    controllerLater1.abort()
-    expect(batchSignal?.aborted).toBe(false)
-    expect(abortSpy).not.toHaveBeenCalled()
-
-    controllerLater2.abort()
-    expect(batchSignal?.aborted).toBe(true)
-    expect(abortSpy).toHaveBeenCalledTimes(1)
+    controller.abort()
+    expect(signal?.aborted).toBe(true)
+    expect(() => dispose()).not.toThrow()
   })
 })
 
