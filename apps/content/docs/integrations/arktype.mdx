@@ -17,7 +17,7 @@ npm install @orpc/arktype@beta arktype
 
 ## JSON Schema Converter
 
-`ArkTypeToJsonSchemaConverter` wraps [ArkType's built-in toJsonSchema](https://arktype.io/docs/type-api#tojsonschema) and adds support for additional types such as `bigint` and `Date`. Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator) and [Smart Coercion](/docs/plugins/smart-coercion). It accepts the same options as ArkType's `toJsonSchema`, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/arktype/src/converter.ts) and ArkType's [JSON Schema configuration docs](https://arktype.io/docs/configuration#tojsonschema) for implementation details.
+`ArkTypeToJsonSchemaConverter` wraps [ArkType's built-in toJsonSchema](https://arktype.io/docs/type-api#tojsonschema) and adds support for additional types such as `bigint`, `Date`, `File`, and `Blob`. Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator) and [Smart Coercion](/docs/plugins/smart-coercion). It accepts the same options as ArkType's `toJsonSchema`, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/arktype/src/converter.ts) and ArkType's [JSON Schema configuration docs](https://arktype.io/docs/configuration#tojsonschema) for implementation details.
 
 ```ts
 import { OpenAPIGenerator } from '@orpc/openapi'
