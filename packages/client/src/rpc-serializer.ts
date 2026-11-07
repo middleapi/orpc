@@ -105,7 +105,13 @@ export class RPCSerializer extends RPCJsonSerializer {
             return e
           }
 
-          const deserialized = this.deserializePayload(e.data)
+          let deserialized: unknown
+
+          try {
+            deserialized = this.deserializePayload(e.data)
+          } catch {
+            return e
+          }
 
           if (isORPCErrorJson(deserialized)) {
             return createORPCErrorFromJson(deserialized, { cause: e })
@@ -124,17 +130,22 @@ export class RPCSerializer extends RPCJsonSerializer {
       return this.deserializeJson(assertEnvelope(data, false))
     }
 
-    const raw = data.get('data')
-    // like a missing `json`, a missing `data` field means `undefined`
-    const serialized =
-      raw === null ? { json: undefined } : assertEnvelope(JSON.parse(raw as string), true)
-
+    let raw: string | undefined
     const blobs: Blob[] = []
+
     for (const [key, value] of data) {
-      if (value instanceof Blob) {
+      if (key === 'data' && raw === undefined && typeof value === 'string') {
+        raw = value
+      } else if (value instanceof Blob && BLOB_KEY_REGEX.test(key)) {
         blobs[Number(key)] = value
+      } else {
+        throw invalidFormat()
       }
     }
+
+    // like a missing `json`, a missing `data` field means `undefined`
+    const serialized =
+      raw === undefined ? { json: undefined } : assertEnvelope(JSON.parse(raw), true)
 
     if (blobs.length > 0 && serialized.maps === undefined) {
       throw invalidFormat()
@@ -143,6 +154,8 @@ export class RPCSerializer extends RPCJsonSerializer {
     return this.deserializeJson({ ...serialized, blobs } as RPCJsonSerialization)
   }
 }
+
+const BLOB_KEY_REGEX = /^(?:0|[1-9]\d*)$/
 
 function invalidFormat(): TypeError {
   return new TypeError('Invalid RPC serialized data format.')
@@ -153,7 +166,7 @@ function assertEnvelope(value: unknown, allowMaps: boolean): RPCJsonSerializatio
     throw invalidFormat()
   }
 
-  for (const key in value) {
+  for (const key of Object.keys(value)) {
     if (key !== 'json' && key !== 'meta' && (!allowMaps || key !== 'maps')) {
       throw invalidFormat()
     }

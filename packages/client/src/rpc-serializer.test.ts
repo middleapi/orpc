@@ -259,6 +259,18 @@ describe('rpcSerializer', () => {
       await expect(iterator.next()).rejects.toBe(event)
     })
 
+    it('keeps an error event with malformed data as is', async () => {
+      const event = new EventStreamErrorEvent('Upstream is down')
+
+      const iterator = serializer.deserialize(
+        (async function* () {
+          throw event
+        })(),
+      ) as any
+
+      await expect(iterator.next()).rejects.toBe(event)
+    })
+
     it('deserialize an invalid ORPCError json', async () => {
       const iterator = serializer.deserialize(
         (async function* () {
@@ -364,6 +376,31 @@ describe('rpcSerializer', () => {
       expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
     })
 
+    it.each([
+      ['an unknown file part', [['a', new Blob(['x'])]]],
+      [
+        'a non-canonical file part index',
+        [
+          ['data', JSON.stringify({ json: [null], maps: [[0]] })],
+          ['00', new Blob(['x'])],
+        ],
+      ],
+      ['a string at a file part index', [['0', 'x']]],
+      ['a file as data', [['data', new Blob(['{}'])]]],
+      [
+        'a duplicated data',
+        [
+          ['data', '{}'],
+          ['data', '{}'],
+        ],
+      ],
+    ] as const)('rejects form data with %s', (_, entries) => {
+      const form = new FormData()
+      entries.forEach(([key, value]) => form.append(key, value))
+
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
+    })
+
     it('rejects form data file parts without maps', () => {
       const form = new FormData()
       form.set('data', JSON.stringify({ json: [null] }))
@@ -375,10 +412,13 @@ describe('rpcSerializer', () => {
     it('treats a missing json as undefined, as the spec allows', () => {
       expect(serializer.deserialize({} as any)).toBeUndefined()
 
-      const form = new FormData()
-      form.set('a', new Blob(['x']))
+      expect(serializer.deserialize(new FormData())).toBeUndefined()
+    })
 
-      expect(serializer.deserialize(form)).toBeUndefined()
+    it('ignores inherited enumerable keys', () => {
+      const proto = Object.assign(Object.create(null), { extra: 1 })
+
+      expect(serializer.deserialize(Object.assign(Object.create(proto), { json: 1 }))).toBe(1)
     })
 
     it('accepts a null-prototype envelope', () => {
