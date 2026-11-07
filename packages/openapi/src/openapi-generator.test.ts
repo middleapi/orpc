@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import type { JsonSchema } from '@orpc/json-schema'
 import { visitJsonSchemaRefs } from '@orpc/json-schema'
 import * as arktype from 'arktype'
 import * as z from 'zod'
@@ -883,7 +884,7 @@ describe('openAPIGenerator version', () => {
     },
   )
 
-  it('serializes non-JSON values after downgrading', async () => {
+  it('serializes non-JSON values', async () => {
     const doc = await generator.generate(
       {},
       {
@@ -900,4 +901,20 @@ describe('openAPIGenerator version', () => {
 
     expect(doc.info['x-generated-at']).toBe('2020-01-01T00:00:00.000Z')
   })
+
+  it.each(['3.1.0', '3.0.4'] as const)(
+    'downgrades non-JSON schema values as their serialized form in OpenAPI %s',
+    async (version) => {
+      const routerWith = (value: JsonSchema) => ({
+        ping: oc
+          .meta(openapi({ method: 'GET', path: '/ping' }))
+          .output(testSchema({ type: 'object', properties: { value } })),
+      })
+
+      const infinity = await generator.generate(routerWith({ const: Infinity }), { version })
+      const serialized = await generator.generate(routerWith({ const: null }), { version })
+
+      expect(infinity).toEqual(serialized)
+    },
+  )
 })
