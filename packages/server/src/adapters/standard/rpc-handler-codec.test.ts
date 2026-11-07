@@ -174,68 +174,24 @@ describe('rpcHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith('__output__')
     })
 
-    it('treats outputStatus undefined or null as fallback to 200', () => {
+    it('supports a static outputStatus', () => {
       const serializer = {
-        serialize: vi
-          .fn()
-          .mockReturnValueOnce('__serialized_null__')
-          .mockReturnValueOnce('__serialized_undefined__'),
+        serialize: vi.fn().mockReturnValueOnce('__serialized__'),
         deserialize: vi.fn(),
       } as any
 
-      const outputStatus = vi.fn((output: unknown) => {
-        if (output === '__output_null__') {
-          return null
-        }
-
-        return undefined
-      })
-
       const codec = new RPCHandlerCodec(router, {
         serializer,
-        outputStatus,
+        outputStatus: 202,
       })
 
-      const nullStatusResponse = codec.encodeOutput(
-        '__output_null__',
-        procedure as any,
-        ['ping'],
-        options as any,
-      )
-      expect(nullStatusResponse).toEqual({
+      const response = codec.encodeOutput('__output__', procedure as any, ['ping'], options as any)
+
+      expect(response).toEqual({
         headers: {},
-        status: 200,
-        body: '__serialized_null__',
+        status: 202,
+        body: '__serialized__',
       })
-
-      const undefinedStatusResponse = codec.encodeOutput(
-        '__output_undefined__',
-        procedure as any,
-        ['ping'],
-        options as any,
-      )
-      expect(undefinedStatusResponse).toEqual({
-        headers: {},
-        status: 200,
-        body: '__serialized_undefined__',
-      })
-
-      expect(outputStatus).toHaveBeenCalledTimes(2)
-      expect(outputStatus).toHaveBeenNthCalledWith(
-        1,
-        '__output_null__',
-        procedure,
-        ['ping'],
-        options,
-      )
-      expect(outputStatus).toHaveBeenNthCalledWith(
-        2,
-        '__output_undefined__',
-        procedure,
-        ['ping'],
-        options,
-      )
-      expect(serializer.serialize).toHaveBeenCalledTimes(2)
     })
   })
 

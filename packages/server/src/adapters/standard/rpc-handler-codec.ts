@@ -27,13 +27,12 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
    * Resolve HTTP status for encoded successful outputs.
    *
    * Value should be in the `2xx` range and must be less than `400`.
-   * Return `undefined` or `null` to fallback to default
    *
    * @default DEFAULT_SUCCESS_STATUS (200)
    */
   outputStatus?:
     | Value<
-        number | undefined | null,
+        number,
         [
           output: unknown,
           procedure: AnyProcedure,
@@ -57,13 +56,13 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
   private readonly matcher: RPCMatcher
   private readonly serializer: Public<RPCSerializer>
   private readonly errorStatusMap: Exclude<RPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly outputStatus: RPCHandlerCodecOptions<T>['outputStatus']
+  private readonly outputStatus: Exclude<RPCHandlerCodecOptions<T>['outputStatus'], undefined>
 
   constructor(router: AnyRouter, options: RPCHandlerCodecOptions<T> = {}) {
     this.matcher = new RPCMatcher(router, options)
     this.serializer = options.serializer ?? new RPCSerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.outputStatus = options.outputStatus
+    this.outputStatus = options.outputStatus ?? DEFAULT_SUCCESS_STATUS
   }
 
   async resolveProcedure(
@@ -100,7 +99,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
   ): Promisable<StandardResponse> {
     return {
       headers: {},
-      status: value(this.outputStatus, output, procedure, path, options) ?? DEFAULT_SUCCESS_STATUS,
+      status: value(this.outputStatus, output, procedure, path, options),
       body: this.serializer.serialize(output),
     }
   }
