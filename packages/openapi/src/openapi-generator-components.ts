@@ -6,14 +6,7 @@ import {
   getJsonSchemaKeywordKind,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
-import {
-  getOwn,
-  isDeepEqual,
-  isPlainObject,
-  safeDecodeURIComponent,
-  safeEncodeURIComponent,
-  setOwn,
-} from '@orpc/shared'
+import { getOwn, isDeepEqual, isPlainObject, safeDecodeURIComponent, setOwn } from '@orpc/shared'
 
 import type { OpenAPIV3_2 } from './types.ts'
 
@@ -26,12 +19,6 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 const INVALID_COMPONENT_NAME_CHARS = /[^\w.-]/gu
 
 /**
- * Characters a URI fragment cannot carry unencoded (RFC 3986 `fragment`).
- * `%` is encoded as well, so names containing it decode back to themselves.
- */
-const NON_URI_FRAGMENT_CHARS = /[^\w.~!$&'()*+,;=:@/?-]/gu
-
-/**
  * Replaces characters OpenAPI does not allow in component keys with `_`,
  * e.g. `User Profile` becomes `User_Profile` and `Page<User>` becomes `Page_User_`.
  */
@@ -39,11 +26,11 @@ function toValidComponentName(name: string): string {
   return name.replace(INVALID_COMPONENT_NAME_CHARS, '_') || '_'
 }
 
+/**
+ * Minted component names are always valid keys, which need no JSON Pointer or URI escaping.
+ */
 function toComponentRef(componentName: string): string {
-  return (
-    COMPONENTS_REF_PREFIX +
-    encodeJsonPointerSegment(componentName).replace(NON_URI_FRAGMENT_CHARS, safeEncodeURIComponent)
-  )
+  return COMPONENTS_REF_PREFIX + componentName
 }
 
 /**
@@ -55,7 +42,7 @@ function toComponentRef(componentName: string): string {
  */
 export class OpenAPIComponentRegistry {
   /**
-   * The unsanitized name each minted component was registered for, so distinct names
+   * The unsanitized name each minted component was requested under, so distinct names
    * that sanitize to the same key (`User Profile`, `User_Profile`) are never merged.
    */
   private readonly componentSources = new Map<string, string>()
@@ -63,7 +50,7 @@ export class OpenAPIComponentRegistry {
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
     private readonly componentName:
-      | ((defName: string, defSchema: JsonSchema) => string | undefined)
+      | ((defName: string, defSchema: JsonSchema) => string)
       | undefined,
   ) {}
 
@@ -121,13 +108,12 @@ export class OpenAPIComponentRegistry {
       []
 
     for (const [defName, cleanSchema] of defs) {
-      const customName = this.componentName?.(defName, cleanSchema)
-      const sourceName = customName ?? defName
+      const sourceName = this.componentName ? this.componentName(defName, cleanSchema) : defName
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
         new Set(renameMap.values()),
         defName,
-        customName ?? toValidComponentName(defName),
+        toValidComponentName(sourceName),
         (name) => {
           const existingSource = this.componentSources.get(name)
           return existingSource === undefined || existingSource === sourceName

@@ -856,36 +856,15 @@ describe('openAPIGenerator version', () => {
         })
       })
 
-      it('keeps componentName overrides and writes their refs as valid URI references', async () => {
+      it('sanitizes names returned by componentName', async () => {
         const doc = await zodGenerator.generate(contract, {
           version,
-          componentName: (defName) => defName,
+          componentName: (defName) => `Api ${defName}`,
         })
+        const keys = ['Api_root__', 'Api_User_Profile', 'Api_api_User', 'Api_Page_User_']
 
-        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(ids)
-
-        const refs = collectRefs(doc.paths)
-        const expectedRefs = [
-          '#/components/schemas/root~0~1',
-          '#/components/schemas/User%20Profile',
-          '#/components/schemas/api:User',
-          '#/components/schemas/Page%3CUser%3E',
-        ]
-        // the 3.0 downgrade inlines percent-encoded refs, which 3.0 tooling handles poorly
-        expect(refs).toEqual(
-          version.startsWith('3.0.')
-            ? expectedRefs.filter((ref) => !ref.includes('%'))
-            : expectedRefs,
-        )
-
-        for (const ref of refs) {
-          // every ref resolves to a component after URI and JSON Pointer decoding
-          const name = decodeURIComponent(ref.slice('#/components/schemas/'.length))
-            .replaceAll('~1', '/')
-            .replaceAll('~0', '~')
-          expect(doc.components?.schemas).toHaveProperty([name])
-          expect(ref).not.toMatch(/[\s<>]/)
-        }
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(keys)
+        expect(collectRefs(doc.paths)).toEqual(keys.map((key) => `#/components/schemas/${key}`))
       })
     },
   )
