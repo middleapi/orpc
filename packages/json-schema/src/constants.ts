@@ -64,3 +64,8 @@ export const JSON_SCHEMA_RECORD_KEYWORDS: Set<string> = /* @__PURE__ */ new Set(
   'dependencies',
   '$defs',
 ])
+
+/**
+ * Keywords whose values are literal instance data, never subschemas.
+ */
+export const JSON_SCHEMA_LITERAL_KEYWORDS: Set<string> = /* @__PURE__ */ new Set(['const', 'enum'])
