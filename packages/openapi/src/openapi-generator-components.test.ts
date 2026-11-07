@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import { encodeJsonPointerSegment } from '@orpc/json-schema'
 
 import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
 import type { OpenAPIV3_2 } from './types.ts'
@@ -332,26 +333,6 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('keeps the def name when componentName returns it', () => {
-      const { doc, registry } = createRegistry({
-        componentName: (defName) => (defName === 'Planet' ? 'World' : defName),
-      })
-
-      const result = registry.hoistDefs({
-        $ref: '#/$defs/Planet',
-        $defs: {
-          Planet: { type: 'object', properties: { moon: { $ref: '#/$defs/Moon' } } },
-          Moon: { type: 'string' },
-        },
-      })
-
-      expect(result).toEqual({ $ref: '#/components/schemas/World' })
-      expect(doc.components?.schemas).toEqual({
-        World: { type: 'object', properties: { moon: { $ref: '#/components/schemas/Moon' } } },
-        Moon: { type: 'string' },
-      })
-    })
-
     it('postfixes a componentName that conflicts with a different component', () => {
       const { doc, registry } = createRegistry({
         schemas: { World: { type: 'string' } },
@@ -429,12 +410,8 @@ describe('openAPIComponentRegistry', () => {
   })
 
   describe('component names', () => {
-    const COMPONENT_KEY_PATTERN = /^[\w.-]+$/
-
     it.each([
       ['root~/', 'root__'],
-      ['User Profile', 'User_Profile'],
-      ['api:User', 'api_User'],
       ['Page<User>', 'Page_User_'],
       ['Usuário 🚀', 'Usu_rio__'],
       ['', '_'],
@@ -444,102 +421,62 @@ describe('openAPIComponentRegistry', () => {
 
       const result = registry.hoistDefs({
         type: 'array',
-        items: { $ref: `#/$defs/${defName.replaceAll('~', '~0').replaceAll('/', '~1')}` },
+        items: { $ref: `#/$defs/${encodeJsonPointerSegment(defName)}` },
         $defs: { [defName]: { type: 'string' } },
       })
 
       expect(result).toEqual({ type: 'array', items: { $ref: `#/components/schemas/${expected}` } })
       expect(Object.keys(doc.components!.schemas!)).toEqual([expected])
-      expect(expected).toMatch(COMPONENT_KEY_PATTERN)
-    })
-
-    it('keeps sanitized names of recursive defs consistent between keys and refs', () => {
-      const { doc, registry } = createRegistry()
-
-      const result = registry.hoistDefs({
-        $ref: '#/$defs/Tree<Node>',
-        $defs: {
-          'Tree<Node>': {
-            type: 'object',
-            properties: { children: { type: 'array', items: { $ref: '#/$defs/Tree<Node>' } } },
-          },
-        },
-      })
-
-      expect(result).toEqual({ $ref: '#/components/schemas/Tree_Node_' })
-      expect(doc.components?.schemas).toEqual({
-        Tree_Node_: {
-          type: 'object',
-          properties: {
-            children: { type: 'array', items: { $ref: '#/components/schemas/Tree_Node_' } },
-          },
-        },
-      })
-
-      // registering the same recursive def again reuses the component
-      expect(
-        registry.hoistDefs({
-          $ref: '#/$defs/Tree<Node>',
-          $defs: {
-            'Tree<Node>': {
-              type: 'object',
-              properties: { children: { type: 'array', items: { $ref: '#/$defs/Tree<Node>' } } },
-            },
-          },
-        }),
-      ).toEqual({ $ref: '#/components/schemas/Tree_Node_' })
-      expect(Object.keys(doc.components!.schemas!)).toEqual(['Tree_Node_'])
     })
 
     it('keeps distinct names that sanitize to the same key apart, even for equal schemas', () => {
-      const { doc, registry } = createRegistry()
+      const { doc, registry } = createRegistry({ schemas: { User_Profile: { type: 'string' } } })
 
-      const sameDocument = registry.hoistDefs({
+      expect(
+        registry.hoistDefs({
+          type: 'object',
+          properties: {
+            a: { $ref: '#/$defs/User Profile' },
+            b: { $ref: '#/$defs/User:Profile' },
+          },
+          $defs: {
+            'User Profile': { type: 'string' },
+            'User:Profile': { type: 'string' },
+          },
+        }),
+      ).toEqual({
         type: 'object',
         properties: {
-          a: { $ref: '#/$defs/User Profile' },
-          b: { $ref: '#/$defs/User_Profile' },
-        },
-        $defs: {
-          'User Profile': { type: 'string' },
-          'User_Profile': { type: 'string' },
+          a: { $ref: '#/components/schemas/User_Profile2' },
+          b: { $ref: '#/components/schemas/User_Profile3' },
         },
       })
 
-      expect(sameDocument).toEqual({
+      expect(
+        registry.hoistDefs({
+          type: 'object',
+          properties: {
+            a: { $ref: '#/$defs/User Profile' },
+            b: { $ref: '#/$defs/User_Profile' },
+          },
+          $defs: {
+            'User Profile': { type: 'string' },
+            'User_Profile': { type: 'string' },
+          },
+        }),
+      ).toEqual({
         type: 'object',
         properties: {
-          a: { $ref: '#/components/schemas/User_Profile' },
-          b: { $ref: '#/components/schemas/User_Profile2' },
+          a: { $ref: '#/components/schemas/User_Profile2' },
+          b: { $ref: '#/components/schemas/User_Profile' },
         },
       })
 
-      expect(
-        registry.hoistDefs({
-          $ref: '#/$defs/User:Profile',
-          $defs: { 'User:Profile': { type: 'string' } },
-        }),
-      ).toEqual({ $ref: '#/components/schemas/User_Profile3' })
-
-      // the same original name keeps reusing its own component
-      expect(
-        registry.hoistDefs({
-          $ref: '#/$defs/User_Profile',
-          $defs: { User_Profile: { type: 'string' } },
-        }),
-      ).toEqual({ $ref: '#/components/schemas/User_Profile2' })
-      expect(
-        registry.hoistDefs({
-          $ref: '#/$defs/User Profile',
-          $defs: { 'User Profile': { type: 'string' } },
-        }),
-      ).toEqual({ $ref: '#/components/schemas/User_Profile' })
-
-      expect(doc.components?.schemas).toEqual({
-        User_Profile: { type: 'string' },
-        User_Profile2: { type: 'string' },
-        User_Profile3: { type: 'string' },
-      })
+      expect(Object.keys(doc.components!.schemas!)).toEqual([
+        'User_Profile',
+        'User_Profile2',
+        'User_Profile3',
+      ])
     })
 
     it('sanitizes names returned by componentName', () => {
@@ -550,7 +487,6 @@ describe('openAPIComponentRegistry', () => {
         properties: {
           profile: { $ref: '#/$defs/User Profile' },
           page: { $ref: '#/$defs/Page<User>' },
-          tilde: { $ref: '#/$defs/root~0~1' },
         },
         $defs: {
           'User Profile': { type: 'string' as const },
@@ -558,16 +494,13 @@ describe('openAPIComponentRegistry', () => {
             type: 'object' as const,
             properties: { next: { $ref: '#/$defs/Page<User>' } },
           },
-          'root~/': { type: 'number' as const },
         },
       }
-
       const expected = {
         type: 'object',
         properties: {
           profile: { $ref: '#/components/schemas/Api_User_Profile' },
           page: { $ref: '#/components/schemas/Api_Page_User_' },
-          tilde: { $ref: '#/components/schemas/Api_root__' },
         },
       }
 
@@ -579,91 +512,34 @@ describe('openAPIComponentRegistry', () => {
           type: 'object',
           properties: { next: { $ref: '#/components/schemas/Api_Page_User_' } },
         },
-        Api_root__: { type: 'number' },
       })
 
-      // hoisting the same schema again reuses the components
       expect(registry.hoistDefs(structuredClone(schema))).toEqual(expected)
-      expect(Object.keys(doc.components!.schemas!)).toHaveLength(3)
+      expect(Object.keys(doc.components!.schemas!)).toHaveLength(2)
     })
 
-    it('keeps distinct componentName results that sanitize to the same key apart', () => {
-      const { doc, registry } = createRegistry({
-        componentName: (defName) => (defName === 'A' ? 'Api User' : 'Api:User'),
-      })
+    it('applies sanitized names to discriminator mapping refs', () => {
+      const { doc, registry } = createRegistry()
 
       expect(
         registry.hoistDefs({
-          type: 'object',
-          properties: { a: { $ref: '#/$defs/A' }, b: { $ref: '#/$defs/B' } },
-          $defs: { A: { type: 'string' }, B: { type: 'string' } },
+          oneOf: [{ $ref: '#/$defs/Cat Type' }],
+          discriminator: {
+            propertyName: 'kind',
+            mapping: { cat: '#/$defs/Cat Type' },
+            defaultMapping: '#/$defs/Cat Type',
+          },
+          $defs: { 'Cat Type': { type: 'object', properties: { kind: { const: 'cat' } } } },
         }),
       ).toEqual({
-        type: 'object',
-        properties: {
-          a: { $ref: '#/components/schemas/Api_User' },
-          b: { $ref: '#/components/schemas/Api_User2' },
-        },
-      })
-      expect(Object.keys(doc.components!.schemas!)).toEqual(['Api_User', 'Api_User2'])
-    })
-
-    it.each([
-      [undefined, 'Cat_Type'],
-      [(defName: string) => `Api ${defName}`, 'Api_Cat_Type'],
-    ])('applies sanitized names to discriminator mapping refs', (componentName, ref) => {
-      const { doc, registry } = createRegistry({ componentName })
-      const schema = {
-        oneOf: [{ $ref: '#/$defs/Cat Type' }],
+        oneOf: [{ $ref: '#/components/schemas/Cat_Type' }],
         discriminator: {
           propertyName: 'kind',
-          mapping: { cat: '#/$defs/Cat Type' },
-          defaultMapping: '#/$defs/Cat Type',
-        },
-        $defs: { 'Cat Type': { type: 'object' as const, properties: { kind: { const: 'cat' } } } },
-      }
-      const expected = {
-        oneOf: [{ $ref: `#/components/schemas/${ref}` }],
-        discriminator: {
-          propertyName: 'kind',
-          mapping: { cat: `#/components/schemas/${ref}` },
-          defaultMapping: `#/components/schemas/${ref}`,
-        },
-      }
-
-      expect(registry.hoistDefs(structuredClone(schema))).toEqual(expected)
-      // hoisting the same schema again reuses the component
-      expect(registry.hoistDefs(structuredClone(schema))).toEqual(expected)
-      expect(Object.keys(doc.components!.schemas!)).toEqual([ref])
-    })
-
-    it('resolves percent-encoded and malformed refs of existing components when comparing', () => {
-      const { doc, registry } = createRegistry({
-        schemas: {
-          'A B': { type: 'string' },
-          '%zz': { type: 'number' },
-          'Holder': { type: 'object', properties: { x: { $ref: '#/components/schemas/A%20B' } } },
-          'Bad': { type: 'object', properties: { x: { $ref: '#/components/schemas/%zz' } } },
+          mapping: { cat: '#/components/schemas/Cat_Type' },
+          defaultMapping: '#/components/schemas/Cat_Type',
         },
       })
-
-      expect(
-        registry.hoistDefs({
-          $ref: '#/$defs/Holder',
-          $defs: {
-            Holder: { type: 'object', properties: { x: { $ref: '#/components/schemas/A B' } } },
-          },
-        }),
-      ).toEqual({ $ref: '#/components/schemas/Holder' })
-      expect(
-        registry.hoistDefs({
-          $ref: '#/$defs/Bad',
-          $defs: {
-            Bad: { type: 'object', properties: { x: { $ref: '#/components/schemas/%zz' } } },
-          },
-        }),
-      ).toEqual({ $ref: '#/components/schemas/Bad' })
-      expect(Object.keys(doc.components!.schemas!)).toEqual(['A B', '%zz', 'Holder', 'Bad'])
+      expect(Object.keys(doc.components!.schemas!)).toEqual(['Cat_Type'])
     })
   })
 

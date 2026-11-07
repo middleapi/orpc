@@ -73,7 +73,6 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    * - Characters OpenAPI does not allow in component keys (anything but `a-z`, `A-Z`, `0-9`, `.`, `_`, `-`)
    *   are replaced by `_` in the returned name, e.g. `User Profile` becomes `User_Profile`.
    * - The returned name is a preference, conflicting names are still postfixed (`Planet`, `PlanetInput`, `Planet2`, ...).
-   * - Return `defName` to keep the default name.
    *
    * @default defName => defName
    */

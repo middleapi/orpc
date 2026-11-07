@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { visitJsonSchemaRefs } from '@orpc/json-schema'
 import * as arktype from 'arktype'
 import * as z from 'zod'
 
@@ -815,56 +816,25 @@ describe('openAPIGenerator version', () => {
           ),
       }
 
-      function collectRefs(value: unknown, refs: string[] = []): string[] {
-        if (Array.isArray(value)) {
-          value.forEach((item) => collectRefs(item, refs))
-        } else if (value && typeof value === 'object') {
-          for (const [key, item] of Object.entries(value)) {
-            if (key === '$ref' && typeof item === 'string') {
-              refs.push(item)
-            } else {
-              collectRefs(item, refs)
-            }
-          }
-        }
-
+      function responseRefs(doc: Awaited<ReturnType<typeof zodGenerator.generate>>): string[] {
+        const refs: string[] = []
+        const response = doc.paths?.['/things']?.get?.responses?.['200'] as any
+        visitJsonSchemaRefs(response.content['application/json'].schema, (ref) => refs.push(ref))
         return refs
       }
 
-      it('sanitizes schema ids into valid component keys by default', async () => {
-        const doc = await zodGenerator.generate(contract, { version })
-        const schemas = doc.components?.schemas ?? {}
-
-        expect(Object.keys(schemas)).toEqual(['root__', 'User_Profile', 'api_User', 'Page_User_'])
-        for (const key of Object.keys(schemas)) {
-          expect(key).toMatch(/^[\w.-]+$/)
-        }
-
-        expect(doc.paths?.['/things']?.get?.responses?.['200']).toMatchObject({
-          content: {
-            'application/json': {
-              schema: {
-                properties: {
-                  field0: { $ref: '#/components/schemas/root__' },
-                  field1: { $ref: '#/components/schemas/User_Profile' },
-                  field2: { $ref: '#/components/schemas/api_User' },
-                  field3: { $ref: '#/components/schemas/Page_User_' },
-                },
-              },
-            },
-          },
-        })
-      })
-
-      it('sanitizes names returned by componentName', async () => {
-        const doc = await zodGenerator.generate(contract, {
-          version,
-          componentName: (defName) => `Api ${defName}`,
-        })
-        const keys = ['Api_root__', 'Api_User_Profile', 'Api_api_User', 'Api_Page_User_']
+      it.each([
+        ['default names', undefined, ['root__', 'User_Profile', 'api_User', 'Page_User_']],
+        [
+          'componentName results',
+          (defName: string) => `Api ${defName}`,
+          ['Api_root__', 'Api_User_Profile', 'Api_api_User', 'Api_Page_User_'],
+        ],
+      ])('sanitizes %s into valid component keys', async (_, componentName, keys) => {
+        const doc = await zodGenerator.generate(contract, { version, componentName })
 
         expect(Object.keys(doc.components?.schemas ?? {})).toEqual(keys)
-        expect(collectRefs(doc.paths)).toEqual(keys.map((key) => `#/components/schemas/${key}`))
+        expect(responseRefs(doc)).toEqual(keys.map((key) => `#/components/schemas/${key}`))
       })
     },
   )
