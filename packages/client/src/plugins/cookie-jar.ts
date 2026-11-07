@@ -1,5 +1,5 @@
 import type { Value } from '@orpc/shared'
-import { matchesHttpPathPrefix, toArray, value } from '@orpc/shared'
+import { matchesHttpPathPrefix, toArray, TRAILING_SLASH_REGEX, value } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
 
 import type { FetchLinkTransportOptions } from '../adapters/fetch/index.ts'
@@ -67,7 +67,7 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
       }
 
       const jar = value(this.jar, interceptorOptions)
-      const url = `${origin.replace(/\/$/, '')}${request.url}`
+      const url = `${origin.replace(TRAILING_SLASH_REGEX, '')}${request.url}`
       const cookie = mergeCookieHeader(request.headers.cookie, jar.getCookies(url))
 
       const response = await next(

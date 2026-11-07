@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { throwIfAborted } from '@orpc/shared'
+import { limitArraySize, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
 export interface SerializableStreamedQueryOptions {
@@ -101,12 +101,4 @@ export function serializableStreamedQuery<
       signal.removeEventListener('abort', markStale)
     }
   }
-}
-
-function limitArraySize<T>(items: T[], maxSize: number): T[] {
-  if (items.length <= maxSize) {
-    return items
-  }
-
-  return items.slice(items.length - maxSize)
 }

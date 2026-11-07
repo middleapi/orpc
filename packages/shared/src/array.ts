@@ -6,6 +6,17 @@ export function toArray<T>(
   ) as any
 }
 
+/**
+ * Keeps only the last `maxSize` items, returning `items` itself when it already fits.
+ */
+export function limitArraySize<T>(items: T[], maxSize: number): T[] {
+  if (items.length <= maxSize) {
+    return items
+  }
+
+  return items.slice(items.length - maxSize)
+}
+
 export function splitInHalf<T>(arr: readonly T[]): [T[], T[]] {
   const half = Math.ceil(arr.length / 2)
   return [arr.slice(0, half), arr.slice(half)]

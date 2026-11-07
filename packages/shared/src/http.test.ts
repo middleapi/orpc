@@ -1,12 +1,15 @@
 import {
+  COMPRESSION_ENCODINGS,
   isAcceptableEncoding,
   isCompressibleContentType,
+  isCompressionEncoding,
   isNoTransformCacheControl,
   matchesHttpPath,
   matchesHttpPathPrefix,
   mergeHttpPath,
   normalizeHttpPath,
   parseAcceptEncodingQualities,
+  parseContentEncodings,
   pathToHttpPath,
   varyByAcceptEncoding,
 } from './http.ts'
@@ -184,6 +187,31 @@ describe('isCompressibleContentType', () => {
 
   it('returns false for excessively long content-type values without running the regex', () => {
     expect(isCompressibleContentType(`text/plain; ${'a'.repeat(1024)}`)).toBe(false)
+  })
+})
+
+describe('isCompressionEncoding', () => {
+  it.each(COMPRESSION_ENCODINGS)('accepts %s', (encoding) => {
+    expect(isCompressionEncoding(encoding)).toBe(true)
+  })
+
+  it.each(['br', 'zstd', 'identity', 'GZIP', ''])('rejects %j', (encoding) => {
+    expect(isCompressionEncoding(encoding)).toBe(false)
+  })
+})
+
+describe('parseContentEncodings', () => {
+  it('returns no codings without a header', () => {
+    expect(parseContentEncodings(undefined)).toEqual([])
+  })
+
+  it('keeps the order codings were applied, trimmed and lowercased', () => {
+    expect(parseContentEncodings(' GZip ,deflate')).toEqual(['gzip', 'deflate'])
+  })
+
+  it('keeps empty codings so callers can reject them', () => {
+    expect(parseContentEncodings('')).toEqual([''])
+    expect(parseContentEncodings('gzip,,deflate')).toEqual(['gzip', '', 'deflate'])
   })
 })
 

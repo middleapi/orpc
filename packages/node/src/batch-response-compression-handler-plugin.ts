@@ -12,6 +12,7 @@ import type {
   StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
 } from '@orpc/server/standard'
+import type { CompressionEncoding } from '@orpc/shared'
 import { toArray } from '@orpc/shared'
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { flattenStandardHeader } from '@standard-server/core'
@@ -25,7 +26,7 @@ export interface BatchResponseCompressionHandlerPluginOptions {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
+  encodings?: readonly CompressionEncoding[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.

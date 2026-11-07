@@ -1,5 +1,11 @@
 import type { Promisable, Public, Value } from '@orpc/shared'
-import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
+import {
+  isAsyncIteratorObject,
+  pathToHttpPath,
+  stringifyJSON,
+  TRAILING_SLASH_REGEX,
+  value,
+} from '@orpc/shared'
 import type {
   StandardHeaders,
   StandardLazyResponse,
@@ -74,8 +80,6 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
   serializer?: Public<RPCSerializer> | undefined
 }
 
-const END_SLASH_REGEX = /\/$/
-
 export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<RPCLinkCodecOptions<T>['url'], undefined>
   private readonly maxUrlLength: Exclude<RPCLinkCodecOptions<T>['maxUrlLength'], undefined>
@@ -108,7 +112,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     const [pathname, search, hash] = parseStandardUrl(baseUrl)
     const newPathname =
-      `${pathname.replace(END_SLASH_REGEX, '')}${pathToHttpPath(path)}` as StandardUrl
+      `${pathname.replace(TRAILING_SLASH_REGEX, '')}${pathToHttpPath(path)}` as StandardUrl
     const serialized = this.serializer.serialize(input)
 
     if (

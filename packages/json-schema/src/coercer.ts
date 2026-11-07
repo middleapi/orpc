@@ -1,6 +1,7 @@
 import {
   DEFAULT_MAX_BIGINT_DIGITS,
   getOwn,
+  INTEGER_REGEX,
   isPlainObject,
   isNonPrimitive,
   parseBigIntString,
@@ -591,9 +592,8 @@ function stringToNumber(value: string): number | string {
   return num
 }
 
-const INTEGER_PATTERN = /^-?(?:0|[1-9]\d*)$/
 function stringToInteger(value: string): number | string {
-  if (!INTEGER_PATTERN.test(value)) {
+  if (!INTEGER_REGEX.test(value)) {
     return value
   }
 

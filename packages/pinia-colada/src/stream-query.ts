@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { throwIfAborted } from '@orpc/shared'
+import { limitArraySize, throwIfAborted } from '@orpc/shared'
 
 import type { UseQueryFnContext } from './types.ts'
 
@@ -105,12 +105,4 @@ export function serializableStreamedQuery<T>(
     // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
     return Array.isArray(cached) ? limitArraySize(cached, maxChunks) : cached
   }
-}
-
-function limitArraySize<T>(items: T[], maxSize: number): T[] {
-  if (items.length <= maxSize) {
-    return items
-  }
-
-  return items.slice(items.length - maxSize)
 }

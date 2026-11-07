@@ -1,3 +1,4 @@
+import type { CompressionEncoding } from '@orpc/shared'
 import {
   isAcceptableEncoding,
   isAsyncIteratorObject,
@@ -31,7 +32,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
+  encodings?: readonly CompressionEncoding[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.

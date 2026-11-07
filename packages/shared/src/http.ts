@@ -52,6 +52,29 @@ export function matchesHttpPath(url: `/${string}`, path: `/${string}`): boolean 
   return charAfterPrefix === undefined || charAfterPrefix === '?' || charAfterPrefix === '#'
 }
 
+/**
+ * Content codings that `CompressionStream` and `DecompressionStream` support.
+ */
+export const COMPRESSION_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
+export type CompressionEncoding = (typeof COMPRESSION_ENCODINGS)[number]
+
+export function isCompressionEncoding(encoding: string): encoding is CompressionEncoding {
+  return (COMPRESSION_ENCODINGS as readonly string[]).includes(encoding)
+}
+
+/**
+ * Parse Content-Encoding into ordered codings (order applied).
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
+ */
+export function parseContentEncodings(header: string | undefined): string[] {
+  if (header === undefined) {
+    return []
+  }
+
+  return header.split(',').map((part) => part.trim().toLowerCase())
+}
+
 const ACCEPT_ENCODING_QUALITY_REGEX = /^\s*q=([\d.]+)\s*$/i
 
 /**
