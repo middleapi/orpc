@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import type { JsonSchema } from '@orpc/json-schema'
 import { visitJsonSchemaRefs } from '@orpc/json-schema'
 import * as arktype from 'arktype'
 import * as z from 'zod'
@@ -10,6 +11,7 @@ import {
 } from '../tests/__shared__/schema.ts'
 import { openapi } from './meta.ts'
 import { OpenAPIGenerator, OpenAPIGeneratorError } from './openapi-generator.ts'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
 
 describe('openAPIGenerator basic & options', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
@@ -883,7 +885,57 @@ describe('openAPIGenerator version', () => {
     },
   )
 
-  it('serializes non-JSON values after downgrading', async () => {
+  it.each(['3.1.0', '3.0.4'] as const)(
+    'omits undefined fields in OpenAPI %s when the serializer keeps them',
+    async (version) => {
+      const generator = new OpenAPIGenerator({
+        converters: [testSchemaConverter],
+        serializer: new OpenAPIJsonSerializer({ omitUndefinedProperties: false }),
+      })
+
+      const doc = await generator.generate(
+        {
+          ping: oc.meta(openapi({ method: 'GET', path: '/ping/{id}' })).input(
+            testSchema({
+              type: 'object',
+              properties: { id: { type: 'string' } },
+              required: ['id'],
+            }),
+          ),
+        },
+        { version },
+      )
+
+      const operation = doc.paths?.['/ping/{id}']?.get
+      expect(operation).not.toHaveProperty('summary')
+      expect(operation).not.toHaveProperty('tags')
+      expect(operation?.parameters).toEqual([
+        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
+      ])
+    },
+  )
+
+  it.each(['3.1.0', '3.0.4'] as const)(
+    'keeps __proto__ properties in OpenAPI %s',
+    async (version) => {
+      const properties = JSON.parse('{"__proto__":{"type":"string"}}')
+      const doc = await generator.generate(
+        {
+          ping: oc
+            .meta(openapi({ method: 'POST', path: '/ping' }))
+            .input(testSchema({ type: 'object', properties, required: ['__proto__'] })),
+        },
+        { version },
+      )
+
+      const schema = (doc.paths?.['/ping']?.post?.requestBody as any).content['application/json']
+        .schema
+      expect(Object.keys(schema.properties)).toEqual(['__proto__'])
+      expect(schema.required).toEqual(['__proto__'])
+    },
+  )
+
+  it('serializes non-JSON values', async () => {
     const doc = await generator.generate(
       {},
       {
@@ -900,4 +952,20 @@ describe('openAPIGenerator version', () => {
 
     expect(doc.info['x-generated-at']).toBe('2020-01-01T00:00:00.000Z')
   })
+
+  it.each(['3.1.0', '3.0.4'] as const)(
+    'downgrades non-JSON schema values as their serialized form in OpenAPI %s',
+    async (version) => {
+      const routerWith = (value: JsonSchema) => ({
+        ping: oc
+          .meta(openapi({ method: 'GET', path: '/ping' }))
+          .output(testSchema({ type: 'object', properties: { value } })),
+      })
+
+      const infinity = await generator.generate(routerWith({ const: Infinity }), { version })
+      const serialized = await generator.generate(routerWith({ const: null }), { version })
+
+      expect(infinity).toEqual(serialized)
+    },
+  )
 })

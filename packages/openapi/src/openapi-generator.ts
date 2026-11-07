@@ -15,7 +15,15 @@ import {
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
-import { clone, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
+import {
+  clone,
+  isPlainObject,
+  mergeHttpPath,
+  NullProtoObj,
+  pathToHttpPath,
+  toArray,
+  value,
+} from '@orpc/shared'
 
 import { DEFAULT_OPENAPI_METHOD } from './constants.ts'
 import type { OpenAPIMeta } from './meta.ts'
@@ -262,8 +270,11 @@ export class OpenAPIGenerator {
       )
     }
 
-    const versioned = toVersionedOpenAPIDocument(doc, version)
-    return this.serializer.serializeJson(versioned).json as OpenAPIDocument<TVersion>
+    // the downgraders skip `undefined` properties; drop them first so a serializer that keeps them
+    // (as `null`) can't turn them into invalid fields such as `summary: null`
+    const source = version.startsWith('3.2.') ? doc : omitUndefinedProperties(doc)
+    const serialized = this.serializer.serializeJson(source).json as OpenAPIV3_2.OpenAPIObject
+    return toVersionedOpenAPIDocument(serialized, version) as OpenAPIDocument<TVersion>
   }
 
   private convertSchema(
@@ -307,6 +318,25 @@ function toVersionedOpenAPIDocument(
       : downgradeSpecV31ToV30(downgradeSpecV32ToV31(doc))
 
   return { ...downgraded, openapi: version } as OpenAPIDocument<OpenAPIVersion>
+}
+
+function omitUndefinedProperties<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(omitUndefinedProperties) as T
+  }
+
+  if (!isPlainObject(value)) {
+    return value
+  }
+
+  // null prototype, so a `__proto__` key stays an own property
+  const result: Record<string, unknown> = new NullProtoObj()
+  for (const key of Object.keys(value)) {
+    if (value[key] !== undefined) {
+      result[key] = omitUndefinedProperties(value[key])
+    }
+  }
+  return result as T
 }
 
 function strip$schemaField(schema: JsonSchema): JsonSchema {
