@@ -1,3 +1,4 @@
+import type { CompressionEncoding } from '@orpc/shared'
 import { isAsyncIteratorObject, isCompressibleContentType, toArray } from '@orpc/shared'
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
@@ -21,7 +22,7 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default 'gzip'
    */
-  encoding?: 'gzip' | 'deflate' | 'deflate-raw' | undefined
+  encoding?: CompressionEncoding | undefined
 
   /**
    * The minimum request size in bytes required to trigger compression.

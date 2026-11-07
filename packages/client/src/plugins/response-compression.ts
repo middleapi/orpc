@@ -1,4 +1,4 @@
-import { toArray } from '@orpc/shared'
+import { isCompressionEncoding, parseContentEncodings, toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
@@ -73,7 +73,7 @@ export class ResponseCompressionLinkPlugin<
         flattenStandardHeader(response.headers['content-encoding']),
       )
 
-      if (encodings.length === 0 || !encodings.every(isSupportedEncoding)) {
+      if (encodings.length === 0 || !encodings.every(isCompressionEncoding)) {
         return response
       }
 
@@ -119,24 +119,4 @@ export class ResponseCompressionLinkPlugin<
       transportInterceptors: [...toArray(options.transportInterceptors), transportInterceptor],
     }
   }
-}
-
-const SUPPORTED_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
-type SupportedEncoding = (typeof SUPPORTED_ENCODINGS)[number]
-
-function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
-  return (SUPPORTED_ENCODINGS as readonly string[]).includes(encoding)
-}
-
-/**
- * Parse Content-Encoding into ordered codings (order applied).
- *
- * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
- */
-function parseContentEncodings(header: string | undefined): string[] {
-  if (header === undefined) {
-    return []
-  }
-
-  return header.split(',').map((part) => part.trim().toLowerCase())
 }

@@ -1,12 +1,14 @@
 import {
   isAcceptableEncoding,
   isCompressibleContentType,
+  isCompressionEncoding,
   isNoTransformCacheControl,
   matchesHttpPath,
   matchesHttpPathPrefix,
   mergeHttpPath,
   normalizeHttpPath,
   parseAcceptEncodingQualities,
+  parseContentEncodings,
   pathToHttpPath,
   varyByAcceptEncoding,
 } from './http.ts'
@@ -237,6 +239,29 @@ describe('parseAcceptEncodingQualities', () => {
   it('returns an empty map for a missing or empty header', () => {
     expect(parseAcceptEncodingQualities(undefined)).toEqual(new Map())
     expect(parseAcceptEncodingQualities('')).toEqual(new Map())
+  })
+})
+
+describe('isCompressionEncoding', () => {
+  it.each([
+    ['gzip', true],
+    ['deflate', true],
+    ['deflate-raw', true],
+    ['br', false],
+    ['identity', false],
+    ['GZIP', false],
+  ])('%s: %s', (encoding, expected) => {
+    expect(isCompressionEncoding(encoding)).toBe(expected)
+  })
+})
+
+describe('parseContentEncodings', () => {
+  it('returns no codings when the header is missing', () => {
+    expect(parseContentEncodings(undefined)).toEqual([])
+  })
+
+  it('keeps the order codings were applied in, trimmed and lowercased', () => {
+    expect(parseContentEncodings(' GZIP , deflate')).toEqual(['gzip', 'deflate'])
   })
 })
 
