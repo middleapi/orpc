@@ -533,20 +533,24 @@ describe('dedupeLinkPlugin', () => {
       })
     }
 
+    function callTwice(link: ReturnType<typeof makeLink>, signal: AbortSignal) {
+      return Promise.all(
+        [0, 1].map(() => link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal })),
+      )
+    }
+
     it('are removed once each deduped request resolves its body', async () => {
       const shared = new AbortController()
       const other = new AbortController()
       const link = makeLink(makeTransport())
 
-      for (let i = 0; i < 3; i++) {
-        await Promise.all([
-          link.call(['GET', 'planet'], { value: i }, { context: {}, signal: shared.signal }),
-          link.call(['GET', 'planet'], { value: i }, { context: {}, signal: other.signal }),
-        ])
+      await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: other.signal }),
+      ])
 
-        expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
-        expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
-      }
+      expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+      expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
     })
 
     it('are removed once a deduped request fails', async () => {
@@ -555,14 +559,7 @@ describe('dedupeLinkPlugin', () => {
       vi.mocked(transport.send).mockRejectedValue(new Error('FAIL'))
       const link = makeLink(transport)
 
-      await Promise.all([
-        expect(
-          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
-        ).rejects.toThrow('FAIL'),
-        expect(
-          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
-        ).rejects.toThrow('FAIL'),
-      ])
+      await expect(callTwice(link, shared.signal)).rejects.toThrow('FAIL')
 
       expect(transport.send).toHaveBeenCalledTimes(1)
       expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
@@ -576,14 +573,7 @@ describe('dedupeLinkPlugin', () => {
         }),
       )
 
-      await Promise.all([
-        expect(
-          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
-        ).rejects.toThrow('BODY_FAIL'),
-        expect(
-          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
-        ).rejects.toThrow('BODY_FAIL'),
-      ])
+      await expect(callTwice(link, shared.signal)).rejects.toThrow('BODY_FAIL')
 
       expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
     })

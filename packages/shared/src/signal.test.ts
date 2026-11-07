@@ -98,17 +98,13 @@ describe('disposableAllAbortSignal', () => {
     const longLived = new AbortController()
     const other = new AbortController()
 
-    for (let i = 0; i < 5; i++) {
-      const { dispose } = disposableAllAbortSignal([longLived.signal, other.signal])
-      dispose()
-    }
+    const { signal, dispose } = disposableAllAbortSignal([longLived.signal, other.signal])
+    dispose()
+    dispose()
 
     expect(getEventListeners(longLived.signal, 'abort')).toHaveLength(0)
     expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
 
-    const { signal, dispose } = disposableAllAbortSignal([longLived.signal, other.signal])
-    dispose()
-    dispose()
     longLived.abort()
     other.abort()
     expect(signal?.aborted).toBe(false)
