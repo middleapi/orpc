@@ -101,7 +101,7 @@ export class RPCSerializer extends RPCJsonSerializer {
           return { done: result.done, value: this.deserializePayload(result.value) }
         },
         mapError: (e) => {
-          if (!(e instanceof EventStreamErrorEvent)) {
+          if (!(e instanceof EventStreamErrorEvent) || e.data === undefined) {
             return e
           }
 
