@@ -31,7 +31,8 @@ export class OpenAPIComponentRegistry {
   /**
    * The unsanitized name each minted component was requested under, so distinct names
    * that sanitize to the same key (`User Profile`, `User_Profile`) are never merged.
-   * Components the registry did not mint count as requested under their sanitized name.
+   * Components the registry did not mint are reusable only when the requested name needs
+   * no sanitizing, which keeps `base.components` family reuse (`Planet`, `Planet2`) intact.
    */
   private readonly componentSources = new Map<string, string>()
 
