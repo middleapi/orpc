@@ -1,10 +1,10 @@
-import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
+import { isAsyncIteratorObject, isPlainObject, stringifyJSON } from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
 import { EventStreamErrorEvent } from '@standard-server/core'
 
 import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object.ts'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils.ts'
-import type { RPCJsonSerializerOptions } from './rpc-json-serializer.ts'
+import type { RPCJsonSerialization, RPCJsonSerializerOptions } from './rpc-json-serializer.ts'
 import { RPCJsonSerializer } from './rpc-json-serializer.ts'
 
 export interface RPCSerializerSerializeOptions {
@@ -105,7 +105,13 @@ export class RPCSerializer extends RPCJsonSerializer {
             return e
           }
 
-          const deserialized = this.deserializePayload(e.data)
+          let deserialized: unknown
+
+          try {
+            deserialized = this.deserializePayload(e.data)
+          } catch {
+            return e
+          }
 
           if (isORPCErrorJson(deserialized)) {
             return createORPCErrorFromJson(deserialized, { cause: e })
@@ -119,20 +125,60 @@ export class RPCSerializer extends RPCJsonSerializer {
     return this.deserializePayload(data)
   }
 
-  private deserializePayload(data: any): unknown {
+  private deserializePayload(data: unknown): unknown {
     if (!(data instanceof FormData)) {
-      return this.deserializeJson(data)
+      return this.deserializeJson(assertEnvelope(data, false))
     }
 
-    const serialized = JSON.parse(data.get('data') as string)
-
+    let raw: string | undefined
+    let hasBlobs = false
     const blobs: Blob[] = []
+
     for (const [key, value] of data) {
-      if (value instanceof Blob) {
+      if (key === 'data' && raw === undefined && typeof value === 'string') {
+        raw = value
+      } else if (value instanceof Blob && BLOB_KEY_REGEX.test(key)) {
         blobs[Number(key)] = value
+        hasBlobs = true
+      } else {
+        throw invalidFormat()
       }
     }
 
-    return this.deserializeJson({ ...serialized, blobs })
+    const serialized =
+      raw === undefined ? { json: undefined } : assertEnvelope(JSON.parse(raw), true)
+
+    if (hasBlobs && serialized.maps === undefined) {
+      throw invalidFormat()
+    }
+
+    return this.deserializeJson({ ...serialized, blobs } as RPCJsonSerialization)
   }
+}
+
+const BLOB_KEY_REGEX = /^(?:0|[1-9]\d*)$/
+
+function invalidFormat(): TypeError {
+  return new TypeError('Invalid RPC serialized data format.')
+}
+
+function assertEnvelope(value: unknown, allowMaps: boolean): RPCJsonSerialization {
+  if (!isPlainObject(value)) {
+    throw invalidFormat()
+  }
+
+  for (const key of Object.keys(value)) {
+    if (key !== 'json' && key !== 'meta' && (!allowMaps || key !== 'maps')) {
+      throw invalidFormat()
+    }
+  }
+
+  if (
+    (value.meta !== undefined && !Array.isArray(value.meta)) ||
+    (value.maps !== undefined && !Array.isArray(value.maps))
+  ) {
+    throw invalidFormat()
+  }
+
+  return value as RPCJsonSerialization
 }

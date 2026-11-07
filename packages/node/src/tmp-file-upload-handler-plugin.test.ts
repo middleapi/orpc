@@ -1662,11 +1662,18 @@ describe('tmpFileUploadHandlerPlugin', () => {
         },
       })
 
-      const { body } = createMultipartBody(
-        Array.from({ length: 5000 }, () => ({
-          header: 'Content-Disposition: form-data; name="a"; filename=""',
+      const { body } = createMultipartBody([
+        {
+          header: 'Content-Disposition: form-data; name="data"',
+          content: JSON.stringify({
+            json: Array.from({ length: 5000 }, () => ({})),
+            maps: Array.from({ length: 5000 }, (_, i) => [i]),
+          }),
+        },
+        ...Array.from({ length: 5000 }, (_, i) => ({
+          header: `Content-Disposition: form-data; name="${i}"; filename=""`,
         })),
-      )
+      ])
 
       const res = await agent.post('/upload').set(multipartHeaders).send(body)
 
