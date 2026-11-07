@@ -396,6 +396,51 @@ describe('serializableStreamedQuery', () => {
     })
   })
 
+  describe('queryKeyHashFn option', () => {
+    const queryKeyHashFn = (key: QueryKey) => `custom:${hashKey(key)}`
+
+    it('writes to the query hashed with its own queryKeyHashFn', async () => {
+      const key = ['custom-hash-test']
+      // an entry with the same key, hashed with the client defaults
+      queryClient.setQueryData(key, ['stray'])
+
+      const observer = new QueryObserver(queryClient, {
+        queryKey: key,
+        queryKeyHashFn,
+        queryFn: serializableStreamedQuery(stream(['c1', 'c2'])),
+      })
+      const results: { data: unknown }[] = []
+      onTestFinished(observer.subscribe((result) => results.push(result)))
+
+      await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('idle'))
+
+      expect(distinctData(results)).toEqual([undefined, [], ['c1'], ['c1', 'c2']])
+      expect(queryClient.getQueryCache().get(queryKeyHashFn(key))?.state.data).toEqual(['c1', 'c2'])
+      expect(queryClient.getQueryData(key)).toEqual(['stray'])
+      expect(queryClient.getQueryCache().getAll()).toHaveLength(2)
+    })
+
+    it('marks the query hashed with its own queryKeyHashFn stale when aborted', async () => {
+      const key = ['custom-hash-abort-test']
+      const observer = new QueryObserver(queryClient, {
+        queryKey: key,
+        queryKeyHashFn,
+        queryFn: serializableStreamedQuery(stream(['c1', 'c2'], 50)),
+      })
+      const unsubscribe = observer.subscribe(() => {})
+      await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual(['c1']))
+
+      unsubscribe()
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryCache().get(queryKeyHashFn(key))?.state).toMatchObject({
+          data: ['c1'],
+          isInvalidated: true,
+        }),
+      )
+      expect(queryClient.getQueryCache().getAll()).toHaveLength(1)
+    })
+  })
+
   describe('settleOnFirstData option', () => {
     it.each([
       ['reset', []],

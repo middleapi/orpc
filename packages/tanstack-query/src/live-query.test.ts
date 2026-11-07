@@ -1,5 +1,6 @@
 import { sleep } from '@orpc/shared'
-import { QueryClient, QueryObserver } from '@tanstack/query-core'
+import type { QueryKey } from '@tanstack/query-core'
+import { hashKey, QueryClient, QueryObserver } from '@tanstack/query-core'
 
 import { liveQuery } from './live-query.ts'
 
@@ -112,6 +113,32 @@ describe('liveQuery', async () => {
       })({ queryKey: key, signal, client: queryClient } as any),
     ).rejects.toBe(signal.reason)
     expect(queryClient.getQueryState(key)).toMatchObject({ data: 0, isInvalidated: true })
+  })
+
+  it('writes to the query hashed with its own queryKeyHashFn', async () => {
+    const key = ['live-custom-hash']
+    const queryKeyHashFn = (key: QueryKey) => `custom:${hashKey(key)}`
+    // an entry with the same key, hashed with the client defaults
+    queryClient.setQueryData(key, 0)
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryKeyHashFn,
+      queryFn: liveQuery(async function* () {
+        yield 1
+        await sleep(20)
+        yield 2
+      }),
+    })
+    const data: unknown[] = []
+    onTestFinished(observer.subscribe((result) => data.push(result.data)))
+
+    await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('idle'))
+
+    expect([...new Set(data)]).toEqual([undefined, 1, 2])
+    expect(queryClient.getQueryCache().get(queryKeyHashFn(key))?.state.data).toEqual(2)
+    expect(queryClient.getQueryData(key)).toEqual(0)
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(2)
   })
 
   it('throw if no data yielded', async () => {

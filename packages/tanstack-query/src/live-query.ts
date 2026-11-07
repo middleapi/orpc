@@ -2,6 +2,7 @@ import type { Promisable } from '@orpc/shared'
 import { stringifyJSON, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
+import { getFetchingQuery } from './fetching-query.ts'
 import type { SettleOnFirstDataOptions } from './stream-query.ts'
 
 export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = QueryKey>(
@@ -10,10 +11,11 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
 ): QueryFunction<TQueryFnData, TQueryKey> {
   return async (context) => {
     const { client, queryKey, signal } = context
+    const query = getFetchingQuery<TQueryFnData>(client, queryKey)
 
     // a stream cut short (cancelled, or its last observer left) reopens when observed again;
     // marked at abort, so the writes of a fetch that replaces this one clear it
-    const markStale = () => client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
+    const markStale = () => query.invalidate()
     if (signal.aborted) {
       markStale()
     }
@@ -33,7 +35,7 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
         throwIfAborted(signal)
 
         last = { chunk }
-        client.setQueryData<TQueryFnData>(queryKey, chunk)
+        query.setData(() => chunk)
 
         if (settleOnFirstData) {
           break
