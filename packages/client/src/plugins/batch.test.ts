@@ -1563,6 +1563,46 @@ describe('batchLinkPlugin', () => {
         ),
       ])
     })
+
+    it('cancels a still-open streamed batch response on a decode error', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const cancel = vi.fn()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        const bytes = await toLengthPrefixedBytes(['INVALID'])
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () =>
+            new ReadableStream({
+              start(controller) {
+                // never closed: the server would keep streaming
+                controller.enqueue(bytes)
+              },
+              cancel,
+            }),
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toThrow(
+          'Invalid batch response: invalid message.',
+        ),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toThrow(
+          'Invalid batch response: invalid message.',
+        ),
+      ])
+
+      expect(cancel).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ message: 'Invalid batch response: invalid message.' }),
+      )
+    })
   })
 
   describe('error batch responses', () => {
