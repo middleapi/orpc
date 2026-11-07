@@ -64,7 +64,10 @@ beforeEach(() => {
 })
 
 describe('dedupeLinkPlugin', () => {
-  const allAbortSignalSpy = vi.spyOn(SharedExperimentalV2Module, 'allAbortSignal')
+  const disposableAllAbortSignalSpy = vi.spyOn(
+    SharedExperimentalV2Module,
+    'disposableAllAbortSignal',
+  )
 
   it('dedupes identical requests and reuses the resolved body', async () => {
     const signal1 = AbortSignal.timeout(1000)
@@ -104,17 +107,17 @@ describe('dedupeLinkPlugin', () => {
 
     expect(request).toEqual({
       ...(await vi.mocked(codec.encodeInput).mock.results[0]!.value),
-      signal: allAbortSignalSpy.mock.results[0]!.value,
+      signal: disposableAllAbortSignalSpy.mock.results[0]!.value.signal,
     })
     expect(path).toEqual(['GET', 'planet'])
     expect(callOptions).toMatchObject({
       context: { group: true },
-      signal: allAbortSignalSpy.mock.results[0]!.value,
+      signal: disposableAllAbortSignalSpy.mock.results[0]!.value.signal,
     })
     expect((callOptions as any).next).toEqual(expect.any(Function))
 
-    expect(allAbortSignalSpy).toHaveBeenCalledTimes(1)
-    expect(allAbortSignalSpy).toHaveBeenCalledWith([signal1, signal2])
+    expect(disposableAllAbortSignalSpy).toHaveBeenCalledTimes(1)
+    expect(disposableAllAbortSignalSpy).toHaveBeenCalledWith([signal1, signal2])
 
     expect(groupCondition).toHaveBeenCalledTimes(2)
     expect(groupCondition).toHaveBeenNthCalledWith(
@@ -517,6 +520,100 @@ describe('dedupeLinkPlugin', () => {
     await expect(promise1).rejects.toThrow('FAIL')
     await expect(promise2).rejects.toThrow('FAIL')
     expect(transport.send).toHaveBeenCalledTimes(1)
+  })
+
+  describe('listeners on long-lived caller signals', () => {
+    function makeLink(transport: StandardLinkTransport<TestContext>) {
+      return new StandardLink(makeCodec(), transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+    }
+
+    it('are removed once each deduped request resolves its body', async () => {
+      const shared = new AbortController()
+      const other = new AbortController()
+      const link = makeLink(makeTransport())
+
+      for (let i = 0; i < 3; i++) {
+        await Promise.all([
+          link.call(['GET', 'planet'], { value: i }, { context: {}, signal: shared.signal }),
+          link.call(['GET', 'planet'], { value: i }, { context: {}, signal: other.signal }),
+        ])
+
+        expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+        expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
+      }
+    })
+
+    it('are removed once a deduped request fails', async () => {
+      const shared = new AbortController()
+      const transport = makeTransport()
+      vi.mocked(transport.send).mockRejectedValue(new Error('FAIL'))
+      const link = makeLink(transport)
+
+      await Promise.all([
+        expect(
+          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
+        ).rejects.toThrow('FAIL'),
+        expect(
+          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
+        ).rejects.toThrow('FAIL'),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+    })
+
+    it('are removed once a deduped body fails to resolve', async () => {
+      const shared = new AbortController()
+      const link = makeLink(
+        makeTransport(async () => {
+          throw new Error('BODY_FAIL')
+        }),
+      )
+
+      await Promise.all([
+        expect(
+          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
+        ).rejects.toThrow('BODY_FAIL'),
+        expect(
+          link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
+        ).rejects.toThrow('BODY_FAIL'),
+      ])
+
+      expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+    })
+
+    it('still abort the shared request when every caller aborts before the body resolves', async () => {
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+      const body = promiseWithResolvers<StandardBody>()
+      const transport = makeTransport(() => body.promise)
+      const link = makeLink(transport)
+
+      const promise1 = link
+        .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal })
+        .catch((e) => e)
+      const promise2 = link
+        .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal })
+        .catch((e) => e)
+
+      await vi.waitFor(() => expect(transport.send).toHaveBeenCalledTimes(1))
+      const sharedSignal = vi.mocked(transport.send).mock.calls[0]![0].signal!
+
+      controller1.abort()
+      expect(sharedSignal.aborted).toBe(false)
+      controller2.abort()
+      expect(sharedSignal.aborted).toBe(true)
+
+      body.resolve({ value: '__body__' })
+      await expect(promise1).resolves.toBe(controller1.signal.reason)
+      await expect(promise2).resolves.toBe(controller2.signal.reason)
+    })
   })
 
   it('rejects only the aborted caller while the shared request continues for the rest', async () => {
