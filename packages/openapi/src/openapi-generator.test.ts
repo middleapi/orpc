@@ -11,7 +11,6 @@ import {
 } from '../tests/__shared__/schema.ts'
 import { openapi } from './meta.ts'
 import { OpenAPIGenerator, OpenAPIGeneratorError } from './openapi-generator.ts'
-import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
 
 describe('openAPIGenerator basic & options', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
@@ -882,20 +881,6 @@ describe('openAPIGenerator version', () => {
         },
       })
       expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['XCat', 'XDog'])
-    },
-  )
-
-  it.each(['3.2.0', '3.1.0', '3.0.4'] as const)(
-    'omits undefined fields in OpenAPI %s when the serializer keeps them',
-    async (version) => {
-      const keepingGenerator = new OpenAPIGenerator({
-        converters: [testSchemaConverter],
-        serializer: new OpenAPIJsonSerializer({ omitUndefinedProperties: false }),
-      })
-
-      expect(await keepingGenerator.generate(router, { version })).toEqual(
-        await generator.generate(router, { version }),
-      )
     },
   )
 
