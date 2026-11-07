@@ -401,10 +401,18 @@ describe('rpcSerializer', () => {
       expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
     })
 
-    it('rejects form data file parts without maps', () => {
+    it.each([
+      [
+        'with data',
+        [
+          ['data', JSON.stringify({ json: [null] })],
+          ['0', new Blob(['x'])],
+        ],
+      ],
+      ['beyond the array index range', [['4294967295', new Blob(['x'])]]],
+    ] as const)('rejects form data file parts without maps %s', (_, entries) => {
       const form = new FormData()
-      form.set('data', JSON.stringify({ json: [null] }))
-      form.set('0', new Blob(['x']))
+      entries.forEach(([key, value]) => form.append(key, value))
 
       expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
     })

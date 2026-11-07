@@ -131,6 +131,7 @@ export class RPCSerializer extends RPCJsonSerializer {
     }
 
     let raw: string | undefined
+    let hasBlobs = false
     const blobs: Blob[] = []
 
     for (const [key, value] of data) {
@@ -138,16 +139,16 @@ export class RPCSerializer extends RPCJsonSerializer {
         raw = value
       } else if (value instanceof Blob && BLOB_KEY_REGEX.test(key)) {
         blobs[Number(key)] = value
+        hasBlobs = true
       } else {
         throw invalidFormat()
       }
     }
 
-    // like a missing `json`, a missing `data` field means `undefined`
     const serialized =
       raw === undefined ? { json: undefined } : assertEnvelope(JSON.parse(raw), true)
 
-    if (blobs.length > 0 && serialized.maps === undefined) {
+    if (hasBlobs && serialized.maps === undefined) {
       throw invalidFormat()
     }
 
