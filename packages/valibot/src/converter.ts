@@ -5,6 +5,7 @@ import type {
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
 import {
+  isJsonFileSchema,
   isStandardSchemaOptional,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
@@ -12,6 +13,7 @@ import {
 import type {
   ConversionConfig,
   ConversionContext,
+  OverrideActionContext,
   OverrideSchemaContext,
   JsonSchema as ValibotJsonSchema,
 } from '@valibot/to-json-schema'
@@ -39,7 +41,7 @@ const NESTED_CONVERSION_SENTINEL = /* @__PURE__ */ any()
 
 /**
  * Converts Valibot schemas into JSON Schema using Valibot's built-in `toJsonSchema`,
- * with additional support for types such as `v.bigint()`, `v.date()`, `v.set()`, and `v.map()`.
+ * with additional support for types such as `v.bigint()`, `v.date()`, `v.set()`, `v.map()`, `v.file()`, and `v.blob()`.
  *
  * @see {@link https://orpc.dev/docs/integrations/valibot | Valibot Integration}
  */
@@ -109,19 +111,23 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
       target: 'draft-2020-12',
       typeMode: direction,
       overrideSchema: (context) => this.overrideSchema(context, direction),
+      overrideAction: (context) => this.overrideAction(context),
     }
+  }
+
+  private overrideAction(context: OverrideActionContext): ValibotJsonSchema | null | undefined {
+    return applyOverride(context, convertAction(context), this.conversionConfig.overrideAction)
   }
 
   private overrideSchema(
     context: OverrideSchemaContext,
     direction: JsonSchemaConverterDirection,
   ): ValibotJsonSchema | null | undefined {
-    const jsonSchema = this.convertNativeType(context, direction)
-
-    return jsonSchema
-      ? (this.conversionConfig.overrideSchema?.({ ...context, jsonSchema, errors: undefined }) ??
-          jsonSchema)
-      : this.conversionConfig.overrideSchema?.(context)
+    return applyOverride(
+      context,
+      this.convertNativeType(context, direction),
+      this.conversionConfig.overrideSchema,
+    )
   }
 
   private convertNativeType(
@@ -167,6 +173,10 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
           'x-native-type': JsonSchemaXNativeType.Map,
         } as ValibotJsonSchema
       }
+      case 'blob':
+      case 'file':
+        // `v.mimeType()` narrows `contentMediaType` in `convertAction`.
+        return { type: 'string', contentMediaType: '*/*' }
     }
 
     return undefined
@@ -201,6 +211,63 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
 
     return prefixItems!.slice(1) as ValibotJsonSchema[]
   }
+}
+
+function convertAction({
+  valibotAction,
+  jsonSchema,
+}: OverrideActionContext): ValibotJsonSchema | undefined {
+  if (valibotAction.type !== 'mime_type' || !isJsonFileSchema(jsonSchema as JsonSchema)) {
+    return undefined
+  }
+
+  const mimeTypes = toMimeTypes((valibotAction as { requirement?: unknown }).requirement)
+
+  if (!mimeTypes) {
+    return undefined
+  }
+
+  if (mimeTypes.length === 1) {
+    return { ...jsonSchema, contentMediaType: mimeTypes[0] }
+  }
+
+  // One branch per media type, so the OpenAPI generator documents each one.
+  return { anyOf: mimeTypes.map((contentMediaType) => ({ ...jsonSchema, contentMediaType })) }
+}
+
+/**
+ * Reads the `v.mimeType()` requirement defensively, since it is not part of
+ * `@valibot/to-json-schema`'s contract: Valibot 1.x requires an array, and a single
+ * string is accepted in case a future version allows one. Anything else is left to
+ * the errorMode option instead of throwing a TypeError.
+ */
+function toMimeTypes(requirement: unknown): string[] | undefined {
+  const values = typeof requirement === 'string' ? [requirement] : requirement
+
+  if (
+    !Array.isArray(values) ||
+    values.length === 0 ||
+    !values.every((value) => typeof value === 'string')
+  ) {
+    return undefined
+  }
+
+  return [...new Set<string>(values)]
+}
+
+/**
+ * Runs the user's override on top of oRPC's conversion, or on its own when oRPC has none.
+ */
+function applyOverride<
+  T extends { readonly jsonSchema: ValibotJsonSchema; readonly errors: unknown },
+>(
+  context: T,
+  jsonSchema: ValibotJsonSchema | undefined,
+  override: ((context: T) => ValibotJsonSchema | null | undefined) | undefined,
+): ValibotJsonSchema | null | undefined {
+  return jsonSchema
+    ? (override?.({ ...context, jsonSchema, errors: undefined }) ?? jsonSchema)
+    : override?.(context)
 }
 
 function mergeConversionContext(target: ConversionContext, source: ConversionContext): void {
