@@ -133,13 +133,6 @@ export interface OpenAPIJsonSerializerOptions {
    * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | OpenAPIJsonSerializerHandler> | undefined
-
-  /**
-   * If true, properties with undefined values will be omitted during serialization.
-   *
-   * @default true
-   */
-  omitUndefinedProperties?: boolean | undefined
 }
 
 /**
@@ -151,11 +144,8 @@ export interface OpenAPIJsonSerializerOptions {
 export class OpenAPIJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
   private readonly handlerEntries: OpenAPIJsonSerializerHandler[] | undefined
-  private readonly omitUndefinedProperties: boolean
 
   constructor(options: OpenAPIJsonSerializerOptions = {}) {
-    this.omitUndefinedProperties = options.omitUndefinedProperties !== false
-
     const customHandlers = options.handlers
 
     if (customHandlers === undefined) {
@@ -323,7 +313,7 @@ export class OpenAPIJsonSerializer {
           continue
         }
 
-        if (v === undefined && this.omitUndefinedProperties) {
+        if (v === undefined) {
           continue
         }
 

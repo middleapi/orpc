@@ -380,11 +380,6 @@ describe('openAPISerializer', () => {
       expect(s.serialize({ value: date })).toEqual({ value: `___TEST___${date.getTime()}` })
     })
 
-    it('passes omitUndefinedProperties to OpenAPIJsonSerializer', () => {
-      const s = new OpenAPISerializer({ omitUndefinedProperties: false })
-      expect(s.serialize({ a: 1, b: undefined })).toEqual({ a: 1, b: null })
-    })
-
     it('passes BracketNotationSerializerOptions to BracketNotationSerializer', () => {
       const form = new FormData()
       form.append('tags[0]', 'a')

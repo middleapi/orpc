@@ -99,7 +99,7 @@ describe('openAPIJsonSerializer', () => {
       })
     })
 
-    it('omits undefined object properties by default', () => {
+    it('omits undefined object properties', () => {
       expect(serializer.serializeJson({ a: 1, b: undefined }).json).not.toHaveProperty('b')
     })
 
@@ -351,11 +351,6 @@ describe('openAPIJsonSerializer', () => {
           null,
         ])
       })
-    })
-
-    it('can disable omitting undefined properties', () => {
-      const custom = new OpenAPIJsonSerializer({ omitUndefinedProperties: false })
-      expect(custom.serializeJson({ a: 1, b: undefined }).json).toEqual({ a: 1, b: null })
     })
   })
 
