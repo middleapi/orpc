@@ -1,79 +1,18 @@
 import { getEventListeners } from 'node:events'
 
-import {
-  allAbortSignal,
-  anyAbortSignal,
-  disposableAllAbortSignal,
-  runWithSignal,
-} from './signal.ts'
-
-describe('allAbortSignal', () => {
-  it('should return undefined if contains undefined or empty array', () => {
-    expect(allAbortSignal([])).toBe(undefined)
-    expect(allAbortSignal([undefined])).toBe(undefined)
-    expect(allAbortSignal([AbortSignal.timeout(100), undefined])).toBe(undefined)
-    expect(allAbortSignal([AbortSignal.timeout(100), undefined, AbortSignal.timeout(100)])).toBe(
-      undefined,
-    )
-  })
-
-  it('should return a non-aborted signal initially if not all inputs are aborted', () => {
-    const controller1 = new AbortController()
-    const controller2 = new AbortController()
-
-    expect(allAbortSignal([controller1.signal, controller2.signal])?.aborted).toBe(false)
-
-    controller1.abort()
-    expect(allAbortSignal([controller1.signal, controller2.signal])?.aborted).toBe(false)
-  })
-
-  it('should return an aborted signal initially if all valid inputs are already aborted', () => {
-    const controller1 = new AbortController()
-    const controller2 = new AbortController()
-    controller1.abort()
-    controller2.abort()
-
-    const batchSignal = allAbortSignal([controller1.signal, controller2.signal])
-    expect(batchSignal?.aborted).toBe(true)
-  })
-
-  it('should fire abort event when all signals abort', () => {
-    const controllerPreAborted = new AbortController()
-    const controllerLater1 = new AbortController()
-    const controllerLater2 = new AbortController()
-
-    controllerPreAborted.abort()
-
-    const batchSignal = allAbortSignal([
-      controllerPreAborted.signal,
-      controllerLater1.signal,
-      controllerLater2.signal,
-    ])
-
-    expect(batchSignal?.aborted).toBe(false)
-
-    const abortSpy = vi.fn()
-    batchSignal?.addEventListener('abort', abortSpy)
-
-    controllerLater1.abort()
-    expect(batchSignal?.aborted).toBe(false)
-    expect(abortSpy).not.toHaveBeenCalled()
-
-    controllerLater2.abort()
-    expect(batchSignal?.aborted).toBe(true)
-    expect(abortSpy).toHaveBeenCalledTimes(1)
-  })
-})
+import { anyAbortSignal, disposableAllAbortSignal, runWithSignal } from './signal.ts'
 
 describe('disposableAllAbortSignal', () => {
   it('returns an undefined signal and a no-op dispose if contains undefined or empty array', () => {
-    const empty = disposableAllAbortSignal([])
-    expect(empty.signal).toBe(undefined)
-    expect(() => empty.dispose()).not.toThrow()
+    const signal = new AbortController().signal
 
-    const withUndefined = disposableAllAbortSignal([new AbortController().signal, undefined])
-    expect(withUndefined.signal).toBe(undefined)
-    expect(() => withUndefined.dispose()).not.toThrow()
+    for (const signals of [[], [undefined], [signal, undefined], [signal, undefined, signal]]) {
+      const result = disposableAllAbortSignal(signals)
+      expect(result.signal).toBe(undefined)
+      expect(() => result.dispose()).not.toThrow()
+    }
+
+    expect(getEventListeners(signal, 'abort')).toHaveLength(0)
   })
 
   it('aborts once all signals abort, and then removes its listeners', () => {
@@ -92,6 +31,27 @@ describe('disposableAllAbortSignal', () => {
     controller2.abort()
     expect(signal?.aborted).toBe(true)
     expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(0)
+  })
+
+  it('fires abort once, when the last pending signal aborts', () => {
+    const preAborted = new AbortController()
+    const later1 = new AbortController()
+    const later2 = new AbortController()
+    preAborted.abort()
+
+    const { signal } = disposableAllAbortSignal([preAborted.signal, later1.signal, later2.signal])
+    const abortSpy = vi.fn()
+    signal?.addEventListener('abort', abortSpy)
+
+    expect(signal?.aborted).toBe(false)
+
+    later1.abort()
+    expect(signal?.aborted).toBe(false)
+    expect(abortSpy).not.toHaveBeenCalled()
+
+    later2.abort()
+    expect(signal?.aborted).toBe(true)
+    expect(abortSpy).toHaveBeenCalledTimes(1)
   })
 
   it('removes its listeners on dispose, after which the signal never aborts', () => {

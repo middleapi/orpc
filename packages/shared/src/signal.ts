@@ -8,8 +8,8 @@ export interface DisposableAllAbortSignal {
 }
 
 /**
- * Like {@link allAbortSignal}, but also returns a `dispose` function
- * that removes the listeners added to the input signals.
+ * Returns a signal that aborts only after all provided signals are aborted,
+ * and a `dispose` function that removes the listeners added to the input signals.
  */
 export function disposableAllAbortSignal(
   signals: readonly (AbortSignal | undefined)[],
@@ -41,15 +41,6 @@ export function disposableAllAbortSignal(
   }
 
   return { signal: controller.signal, dispose }
-}
-
-/**
- * Returns a signal that aborts only after all provided signals are aborted.
- */
-export function allAbortSignal(
-  signals: readonly (AbortSignal | undefined)[],
-): AbortSignal | undefined {
-  return disposableAllAbortSignal(signals).signal
 }
 
 /**
