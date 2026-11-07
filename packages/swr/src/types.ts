@@ -53,15 +53,15 @@ export type FetcherOptions<TClientContext extends ClientContext> = object extend
 export type SubscriberOptions<TClientContext extends ClientContext> =
   FetcherOptions<TClientContext> & {
     /**
-     * Determines how data is handled when the subscription is subscribed again
+     * Determines how data is handled when the subscription is subscribed again.
+     * Existing data stays until the new stream connects.
      *
-     * - `'reset'`: Clears existing data before streaming new data.
-     * - `'append'`: Adds new streamed chunks to the existing data.
-     * - `'replace'`: Buffers streamed data and replaces existing data after the stream completes.
+     * - `'reset'`: The data becomes `[]` when the stream connects.
+     * - `'append'`: New chunks are added to the existing data.
      *
      * @default 'reset'
      */
-    refetchMode?: 'append' | 'reset' | 'replace' | undefined
+    refetchMode?: 'append' | 'reset' | undefined
 
     /**
      * Maximum number of chunks to store.

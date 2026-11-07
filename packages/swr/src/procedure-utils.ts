@@ -119,50 +119,24 @@ export class ProcedureUtils<
             return
           }
 
-          let hasPreviousData = false
-
           if (refetchMode === 'reset') {
-            next(undefined, undefined)
-          } else if (refetchMode === 'replace') {
-            /**
-             * The updater is invoked synchronously with the current data,
-             * so we can use it to detect whether previous data exists.
-             */
-            next(undefined, (old) => {
-              hasPreviousData = old !== undefined
-              return old as InferSubscriberOutput<TOutput>
-            })
+            next(undefined, [] as unknown as InferSubscriberOutput<TOutput>)
           }
-
-          const shouldUpdateDataDuringStream = refetchMode !== 'replace' || !hasPreviousData
-          let buffer: unknown[] = []
 
           for await (const event of iterator) {
             if (controller.signal.aborted) {
               break
             }
 
-            if (shouldUpdateDataDuringStream) {
-              next(undefined, (old) => {
-                const newData = Array.isArray(old) ? [...old, event] : [event]
+            next(undefined, (old) => {
+              const newData = Array.isArray(old) ? [...old, event] : [event]
 
-                if (typeof maxChunks === 'number' && newData.length > maxChunks) {
-                  return newData.slice(newData.length - maxChunks) as InferSubscriberOutput<TOutput>
-                }
-
-                return newData as InferSubscriberOutput<TOutput>
-              })
-            } else {
-              buffer = [...buffer, event]
-
-              if (typeof maxChunks === 'number' && buffer.length > maxChunks) {
-                buffer = buffer.slice(buffer.length - maxChunks)
+              if (typeof maxChunks === 'number' && newData.length > maxChunks) {
+                return newData.slice(newData.length - maxChunks) as InferSubscriberOutput<TOutput>
               }
-            }
-          }
 
-          if (!shouldUpdateDataDuringStream && !controller.signal.aborted) {
-            next(undefined, buffer as InferSubscriberOutput<TOutput>)
+              return newData as InferSubscriberOutput<TOutput>
+            })
           }
         } catch (error) {
           /**

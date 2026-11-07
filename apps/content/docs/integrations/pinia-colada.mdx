@@ -61,45 +61,58 @@ Options accept plain values only. For reactive inputs, pass a callback to `useQu
 
 ## Streamed Query Options Utility
 
-Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. It works with `useQuery` and any other API that accepts query options.
+Use `.streamedOptions` for a procedure that returns an [AsyncIteratorObject](/docs/async-iterator-object). The data is an array of chunks: each new chunk is appended, and `maxChunks` keeps only the latest.
 
 ```ts
 const query = useQuery(
   orpc.streamed.streamedOptions({
-    input: { id: 123 }, // Specify input if needed
-    context: { cache: true }, // Provide client context if needed
-    fnOptions: {
-      // Configure streamed query behavior
-      refetchMode: 'reset',
-      maxChunks: 3,
-    },
-    // additional options...
+    input: { id: 123 },
+    fnOptions: { refetchMode: 'append', maxChunks: 3 },
   }),
 )
 ```
 
-:::info
-`refetchMode` determines how data is handled when the query is fetched again:
+On refetch, existing data stays until the new stream connects. Then `refetchMode` decides what happens to it:
 
-- `'reset'` _(default)_: Clears existing data and returns the query to a pending state.
-- `'append'`: Adds new streamed chunks to the existing data.
-- `'replace'`: Buffers streamed data and replaces the cache after the stream completes.
+| `refetchMode`         | When the stream connects             |
+| --------------------- | ------------------------------------ |
+| `'reset'` _(default)_ | Data becomes `[]`                    |
+| `'append'`            | Data is kept, trimmed to `maxChunks` |
 
-:::
+:::warning
+`fnOptions` is part of the query key, except for default values:
+
+- Queries with different options get separate cache entries and separate streams. To share one, use the same options, and show fewer chunks when reading, e.g. `computed(() => data.value?.slice(-3))`.
+- To read or write the cache by key, pass the same options: `streamedKey({ input, fnOptions })`.
+  :::
 
 ## Live Query Options Utility
 
-Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. It works with `useQuery` and any other API that accepts query options.
+Use `.liveOptions` for a procedure that returns an [AsyncIteratorObject](/docs/async-iterator-object). The data is always the latest chunk.
 
 ```ts
 const query = useQuery(
   orpc.live.liveOptions({
-    input: { id: 123 }, // Specify input if needed
-    context: { cache: true }, // Provide client context if needed
-    // additional options...
+    input: { id: 123 },
   }),
 )
 ```
+
+### Settle on First Data
+
+By default, a streamed or live fetch resolves only when its stream ends. A stream also closes once the last component using it unmounts. Set `settleOnFirstData: true` to resolve at the first data instead: when a streamed query connects, or on a live query's first event. The stream then closes and the data is kept. [`StreamQuerySSRUtilsPlugin`](#streamed-and-live-queries-in-ssr) sets it on the server.
+
+```ts
+const options = orpc.live.liveOptions({
+  input: { id: 123 },
+  settleOnFirstData: true,
+  staleTime: 0,
+})
+```
+
+- Use `staleTime: 0` so the stream reopens when a component mounts the query.
+- Pass it only to a fetch no component uses. A refetch while a component uses the query would also settle, closing its stream.
+- Not part of the query key, and ignored with a custom `query`.
 
 ## Infinite Query Options Utility
 
@@ -386,6 +399,38 @@ app.use(PiniaColada, {
 ```
 
 </Expandable>
+
+## Streamed and Live Queries in SSR
+
+`StreamQuerySSRUtilsPlugin` renders [streamed](#streamed-query-options-utility) and [live](#live-query-options-utility) queries on the server without waiting for the stream to end, then reopens the streams in the browser.
+
+```ts
+import { StreamQuerySSRUtilsPlugin } from '@orpc/pinia-colada'
+
+export const orpc = createPiniaColadaUtils(client, {
+  plugins: [new StreamQuerySSRUtilsPlugin()],
+})
+```
+
+It sets these defaults on `.streamedOptions` and `.liveOptions`. Per-call and [default options](#default-options) override them.
+
+| Option                                       | Server | Browser |
+| -------------------------------------------- | ------ | ------- |
+| [`settleOnFirstData`](#settle-on-first-data) | `true` | -       |
+| `staleTime`                                  | -      | `0`     |
+
+- The server renders the first data.
+- In the browser, mounting the query reopens the stream while the hydrated data stays visible. Fetches follow the stream to its end, so don't await an endless stream, for example in a navigation guard.
+
+To make this work:
+
+- On the server, call `useQuery` in a component setup, so the fetch runs in `onServerPrefetch`.
+- Keep `refetchOnMount` at its default. `'always'` restarts a stream that is already open.
+- An environment without `window` (or Deno) counts as the server. Pass `isServer` to override.
+
+:::info
+With `staleTime: 0`, a finite stream that has ended refetches when the window regains focus. Set `refetchOnWindowFocus: false` to avoid this.
+:::
 
 ## Client Context
 

@@ -9,6 +9,7 @@ import * as z from 'zod'
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
 import type {
   InfiniteOptionsIn,
+  LiveOptionsIn,
   MutationKeyOptions,
   MutationOptionsIn,
   QueryKeyOptions,
@@ -113,6 +114,23 @@ describe('ProcedureUtils', () => {
       streamUtils.streamedOptions({ fnOptions: { refetchMode: 'invalid' } })
       // @ts-expect-error invalid input
       streamUtils.liveOptions({ input: 'invalid' })
+      // @ts-expect-error 'replace' is removed
+      streamUtils.streamedOptions({ fnOptions: { refetchMode: 'replace' } })
+    })
+
+    it('accepts settleOnFirstData on .streamedOptions & .liveOptions only', () => {
+      streamUtils.streamedOptions({ settleOnFirstData: true })
+      streamUtils.liveOptions({ settleOnFirstData: false })
+      // @ts-expect-error invalid settleOnFirstData
+      streamUtils.liveOptions({ settleOnFirstData: 'unobserved' })
+      // @ts-expect-error invalid settleOnFirstData
+      streamUtils.streamedOptions({ settleOnFirstData: 'invalid' })
+      // @ts-expect-error invalid settleOnFirstData
+      streamUtils.liveOptions({ settleOnFirstData: 'invalid' })
+      // @ts-expect-error settleOnFirstData is not part of fnOptions
+      streamUtils.streamedOptions({ fnOptions: { settleOnFirstData: true } })
+      // @ts-expect-error settleOnFirstData is not a query option
+      streamUtils.queryOptions({ settleOnFirstData: true })
     })
   })
 
@@ -608,7 +626,7 @@ describe('ProcedureUtilsOptions', () => {
     }
   })
 
-  it('liveOptions should accept Partial<QueryOptionsIn> | modifier function', () => {
+  it('liveOptions should accept Partial<LiveOptionsIn> | modifier function', () => {
     const _defaults: TestOptions = {
       liveOptions: {
         input: { search: 'test' },
@@ -626,7 +644,7 @@ describe('ProcedureUtilsOptions', () => {
     const _defaults2: TestOptions = {
       liveOptions: (options) => {
         expectTypeOf(options).toEqualTypeOf<
-          QueryOptionsIn<TestClientContext, TestInput, never, TestError, undefined>
+          LiveOptionsIn<TestClientContext, TestInput, never, TestError, undefined>
         >()
 
         return {

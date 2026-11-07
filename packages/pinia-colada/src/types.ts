@@ -12,7 +12,7 @@ import type {
   UseQueryOptions,
 } from '@pinia/colada'
 
-import type { SerializableStreamedQueryOptions } from './stream-query.ts'
+import type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query.ts'
 
 export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
 export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never
@@ -87,13 +87,21 @@ export type StreamedOptionsIn<
   TInitialData extends TOutput | undefined,
 > = QueryOptionsIn<TClientContext, TInput, TOutput, TError, TInitialData> & {
   fnOptions?: SerializableStreamedQueryOptions | undefined
-}
+} & SettleOnFirstDataOptions
 
 export type StreamedOptionsOut<
   TOutput,
   TError,
   TInitialData extends TOutput | undefined,
 > = QueryOptionsOut<TOutput, TError, TInitialData>
+
+export type LiveOptionsIn<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+  TInitialData extends TOutput | undefined,
+> = QueryOptionsIn<TClientContext, TInput, TOutput, TError, TInitialData> & SettleOnFirstDataOptions
 
 export type InfiniteKeyOptions<TInput, TPageParam> =
   | Pick<InfiniteOptionsIn<any, TInput, any, any, TPageParam, any>, 'input' | 'initialPageParam'>

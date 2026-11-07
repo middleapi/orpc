@@ -10,7 +10,7 @@ import type {
   SkipToken,
 } from '@tanstack/query-core'
 
-import type { SerializableStreamedQueryOptions } from './stream-query.ts'
+import type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query.ts'
 
 export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
 export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never
@@ -83,7 +83,7 @@ export type StreamedOptionsIn<
   TInitialData,
 > = QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData> & {
   queryFnOptions?: SerializableStreamedQueryOptions | undefined
-}
+} & SettleOnFirstDataOptions
 
 export type StreamedOptionsOut<TOutput, TError, TSelectData, TInitialData> = QueryOptionsOut<
   TOutput,
@@ -91,6 +91,16 @@ export type StreamedOptionsOut<TOutput, TError, TSelectData, TInitialData> = Que
   TSelectData,
   TInitialData
 >
+
+export type LiveOptionsIn<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+  TSelectData,
+  TInitialData,
+> = QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData> &
+  SettleOnFirstDataOptions
 
 export type InfiniteKeyOptions<TInput, TPageParam> =
   | Pick<

@@ -26,7 +26,7 @@ export * from './router-utils.ts'
 export { createRouterUtils as createTanstackQueryUtils } from './router-utils.ts'
 export { SharedUtils } from './shared-utils.ts'
 export * from './ssr.ts'
-export type { SerializableStreamedQueryOptions } from './stream-query.ts'
+export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query.ts'
 export * from './structural-sharing.ts'
 export * from './types.ts'
 export {

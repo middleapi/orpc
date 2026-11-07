@@ -20,6 +20,7 @@ import * as z from 'zod'
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
 import type {
   InfiniteOptionsIn,
+  LiveOptionsIn,
   MutationKeyOptions,
   MutationOptionsIn,
   QueryKeyOptions,
@@ -294,10 +295,15 @@ describe('ProcedureUtils', () => {
           input: { search: 'search' },
           queryFnOptions: {
             maxChunks: 1,
-            refetchMode: 'replace',
+            refetchMode: 'append',
           },
         }),
       ).toExtend<QueryKey>()
+
+      // @ts-expect-error - 'replace' is no longer a refetch mode
+      optionalUtils.streamedKey({ queryFnOptions: { refetchMode: 'replace' } })
+      // @ts-expect-error - settleOnFirstData is not part of the key
+      optionalUtils.streamedKey({ settleOnFirstData: true })
     })
 
     it('.getQueryState is typed correctly', () => {
@@ -367,6 +373,24 @@ describe('ProcedureUtils', () => {
       streamUtils.streamedOptions({ initialData: () => [{ title: '' }] })
       // @ts-expect-error - Invalid Initial Data
       streamUtils.streamedOptions({ initialData: () => 'invalid' })
+    })
+
+    it('accepts settleOnFirstData and serializable queryFnOptions', () => {
+      streamUtils.streamedOptions({ settleOnFirstData: true })
+      streamUtils.streamedOptions({ settleOnFirstData: false })
+      // @ts-expect-error - invalid settleOnFirstData
+      streamUtils.streamedOptions({ settleOnFirstData: 'unobserved' })
+      // @ts-expect-error - settleOnFirstData is only for streamed and live queries
+      streamUtils.queryOptions({ settleOnFirstData: true })
+      streamUtils.infiniteOptions({
+        input: () => ({}),
+        initialPageParam: 0,
+        getNextPageParam: () => 1,
+        // @ts-expect-error - settleOnFirstData is only for streamed and live queries
+        settleOnFirstData: true,
+      })
+
+      streamUtils.streamedOptions({ queryFnOptions: { refetchMode: 'reset', maxChunks: 10 } })
     })
 
     it('return valid streamed options', () => {
@@ -526,6 +550,13 @@ describe('ProcedureUtils', () => {
       streamUtils.liveOptions({ initialData: () => ({ title: '' }) })
       // @ts-expect-error - Invalid initialData
       streamUtils.liveOptions({ initialData: () => 'invalid' })
+    })
+
+    it('accepts settleOnFirstData', () => {
+      streamUtils.liveOptions({ settleOnFirstData: true })
+      streamUtils.liveOptions({ settleOnFirstData: false })
+      // @ts-expect-error - invalid settleOnFirstData
+      streamUtils.liveOptions({ settleOnFirstData: 'unobserved' })
     })
 
     it('return valid streamed options', () => {
@@ -1134,6 +1165,7 @@ describe('ProcedureUtilsOptions', () => {
       streamedOptions: {
         input: { search: 'test' },
         staleTime: 1000,
+        settleOnFirstData: true,
       },
     }
 
@@ -1214,11 +1246,12 @@ describe('ProcedureUtilsOptions', () => {
     }
   })
 
-  it('liveOptions should accept Partial<StreamedOptionsIn> | modifier function', () => {
+  it('liveOptions should accept Partial<LiveOptionsIn> | modifier function', () => {
     const _defaults: TestOptions = {
       liveOptions: {
         input: { search: 'test' },
         staleTime: 1000,
+        settleOnFirstData: true,
       },
     }
 
@@ -1232,7 +1265,7 @@ describe('ProcedureUtilsOptions', () => {
     const _defaults2: TestOptions = {
       liveOptions: (options) => {
         expectTypeOf(options).toEqualTypeOf<
-          QueryOptionsIn<TestClientContext, TestInput, never, TestError, unknown, unknown>
+          LiveOptionsIn<TestClientContext, TestInput, never, TestError, unknown, unknown>
         >()
 
         return {

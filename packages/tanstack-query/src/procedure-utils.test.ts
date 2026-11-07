@@ -185,7 +185,7 @@ describe('procedureUtils', () => {
         input: { search: '__search__' },
         context: { batch: '__batch__' },
         queryFnOptions: {
-          refetchMode: 'replace',
+          refetchMode: 'append',
         },
       })
 
@@ -197,7 +197,7 @@ describe('procedureUtils', () => {
         type: 'streamed',
         input: { search: '__search__' },
         fnOptions: {
-          refetchMode: 'replace',
+          refetchMode: 'append',
         },
       })
       expect(options.queryKey).toBe(generateOperationKeySpy.mock.results[0]!.value)
@@ -212,7 +212,8 @@ describe('procedureUtils', () => {
       ).resolves.toEqual(['__1__', '__2__'])
       expect(streamedQuerySpy).toHaveBeenCalledTimes(1)
       expect(streamedQuerySpy).toHaveBeenCalledWith(expect.any(Function), {
-        refetchMode: 'replace',
+        refetchMode: 'append',
+        settleOnFirstData: undefined,
       })
       expect(queryClient.getQueryData(options.queryKey)).toEqual(['__1__', '__2__'])
 
@@ -220,7 +221,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          signal,
+          signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
             [OPERATION_CONTEXT_SYMBOL]: {
@@ -230,6 +231,30 @@ describe('procedureUtils', () => {
           },
         },
       )
+    })
+
+    it('passes settleOnFirstData to the query function, not to the key or the query options', async () => {
+      const options = utils.streamedOptions({
+        input: { search: '__search__' },
+        queryFnOptions: { maxChunks: 2 },
+        settleOnFirstData: true,
+      })
+
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'streamed',
+        input: { search: '__search__' },
+        fnOptions: { maxChunks: 2 },
+      })
+      expect(options).not.toHaveProperty('settleOnFirstData')
+
+      client.mockImplementationOnce(async function* () {
+        yield '__1__'
+      })
+      await options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)
+      expect(streamedQuerySpy).toHaveBeenCalledWith(expect.any(Function), {
+        maxChunks: 2,
+        settleOnFirstData: true,
+      })
     })
 
     it('with skipToken', () => {
@@ -264,7 +289,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          signal,
+          signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
             [OPERATION_CONTEXT_SYMBOL]: {
@@ -333,14 +358,16 @@ describe('procedureUtils', () => {
         options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any),
       ).resolves.toEqual('__2__')
       expect(liveQuerySpy).toHaveBeenCalledTimes(1)
-      expect(liveQuerySpy).toHaveBeenCalledWith(expect.any(Function))
+      expect(liveQuerySpy).toHaveBeenCalledWith(expect.any(Function), {
+        settleOnFirstData: undefined,
+      })
       expect(queryClient.getQueryData(options.queryKey)).toEqual('__2__')
 
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          signal,
+          signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
             [OPERATION_CONTEXT_SYMBOL]: {
@@ -350,6 +377,25 @@ describe('procedureUtils', () => {
           },
         },
       )
+    })
+
+    it('passes settleOnFirstData to the query function, not to the key or the query options', async () => {
+      const options = utils.liveOptions({
+        input: { search: '__search__' },
+        settleOnFirstData: true,
+      })
+
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        type: 'live',
+        input: { search: '__search__' },
+      })
+      expect(options).not.toHaveProperty('settleOnFirstData')
+
+      client.mockImplementationOnce(async function* () {
+        yield '__1__'
+      })
+      await options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)
+      expect(liveQuerySpy).toHaveBeenCalledWith(expect.any(Function), { settleOnFirstData: true })
     })
 
     it('with skipToken', () => {
@@ -384,7 +430,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          signal,
+          signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
             [OPERATION_CONTEXT_SYMBOL]: {
@@ -1320,12 +1366,16 @@ describe('createProcedureUtils with interceptors', () => {
           type: 'streamed',
         },
       },
-      fnContext: { signal, client: queryClient, queryKey: options.queryKey },
+      fnContext: {
+        signal: expect.any(AbortSignal),
+        client: queryClient,
+        queryKey: options.queryKey,
+      },
     })
     expect(client).toHaveBeenCalledWith(
       { search: '__intercepted__' },
       {
-        signal,
+        signal: expect.any(AbortSignal),
         context: {
           batch: '__intercepted_batch__',
           [OPERATION_CONTEXT_SYMBOL]: {
@@ -1378,12 +1428,16 @@ describe('createProcedureUtils with interceptors', () => {
           type: 'live',
         },
       },
-      fnContext: { signal, client: queryClient, queryKey: options.queryKey },
+      fnContext: {
+        signal: expect.any(AbortSignal),
+        client: queryClient,
+        queryKey: options.queryKey,
+      },
     })
     expect(client).toHaveBeenCalledWith(
       { search: '__intercepted__' },
       {
-        signal,
+        signal: expect.any(AbortSignal),
         context: {
           batch: '__intercepted_batch__',
           [OPERATION_CONTEXT_SYMBOL]: {

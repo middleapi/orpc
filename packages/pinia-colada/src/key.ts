@@ -70,7 +70,7 @@ export function generateOperationKey<TType extends OperationType, TInput>(
         ? serializeInput(options.serializer ?? defaultSerializer, options.input)
         : {}),
       ...(options.type !== undefined ? { type: options.type } : {}),
-      ...(options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {}),
+      ...streamedKeyOptions(options.fnOptions),
     },
   ] as OperationKey<TType, TInput>
 }
@@ -89,4 +89,19 @@ function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown) {
   }
 
   return { input: json, inputMeta }
+}
+
+/**
+ * Leaves out default streamed options, so passing a default gives the same key as omitting it.
+ */
+function streamedKeyOptions(options: SerializableStreamedQueryOptions | undefined): {
+  fnOptions?: SerializableStreamedQueryOptions
+} {
+  const { refetchMode, maxChunks } = options ?? {}
+  const fnOptions = {
+    ...(refetchMode !== undefined && refetchMode !== 'reset' ? { refetchMode } : {}),
+    ...(maxChunks !== undefined && maxChunks !== Number.POSITIVE_INFINITY ? { maxChunks } : {}),
+  }
+
+  return Object.keys(fnOptions).length > 0 ? { fnOptions } : {}
 }

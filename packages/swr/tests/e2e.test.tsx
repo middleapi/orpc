@@ -1,3 +1,4 @@
+import { sleep } from '@orpc/shared'
 import { act, renderHook } from '@testing-library/react'
 import useSWR, { mutate } from 'swr'
 import useSWRInfinite from 'swr/infinite'
@@ -104,12 +105,9 @@ it('case: useSWRSubscription & .subscriber', async () => {
   })
 })
 
-it('case: useSWRSubscription & .subscriber refetchMode=replace', async () => {
+it('case: useSWRSubscription & .subscriber keeps data until the new stream connects', async () => {
   const first = renderHook(() =>
-    useSWRSubscription(
-      orpc.stream.key({ input: { input: 3 } }),
-      orpc.stream.subscriber({ refetchMode: 'replace' }),
-    ),
+    useSWRSubscription(orpc.stream.key({ input: { input: 3 } }), orpc.stream.subscriber()),
   )
 
   await act(async () => {
@@ -125,22 +123,24 @@ it('case: useSWRSubscription & .subscriber refetchMode=replace', async () => {
   first.unmount()
 
   streamHandler.mockImplementationOnce(async function* () {
-    yield { output: '__replaced__' }
+    await sleep(50)
+    yield { output: '__new__' }
   })
 
   const second = renderHook(() =>
-    useSWRSubscription(
-      orpc.stream.key({ input: { input: 3 } }),
-      orpc.stream.subscriber({ refetchMode: 'replace' }),
-    ),
+    useSWRSubscription(orpc.stream.key({ input: { input: 3 } }), orpc.stream.subscriber()),
   )
 
-  // previous data is preserved while the new stream is buffering
+  // previous data stays until the new stream connects
   expect(second.result.current.data).toEqual([{ output: '0' }, { output: '1' }, { output: '2' }])
 
   await act(async () => {
-    // append mode would end with 4 events here, replace keeps only the new stream's events
-    await vi.waitFor(() => expect(second.result.current.data).toEqual([{ output: '__replaced__' }]))
+    // reset: the data becomes [] when the new stream connects
+    await vi.waitFor(() => expect(second.result.current.data).toEqual([]), { interval: 1 })
+  })
+
+  await act(async () => {
+    await vi.waitFor(() => expect(second.result.current.data).toEqual([{ output: '__new__' }]))
   })
 })
 

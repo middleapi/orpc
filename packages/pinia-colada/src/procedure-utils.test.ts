@@ -172,13 +172,40 @@ describe('procedureUtils', () => {
       expect(streamedQuerySpy).toHaveBeenCalledWith(expect.any(Function), { maxChunks: 3 })
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(1, {
-        signal,
+        signal: expect.any(AbortSignal),
         context: {
           [OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'streamed',
           },
         },
+      })
+    })
+
+    it('passes settleOnFirstData to serializableStreamedQuery, not to the key or pinia colada', async () => {
+      const options = utils.streamedOptions({
+        input: 1,
+        fnOptions: { refetchMode: 'append' },
+        settleOnFirstData: true,
+      }) as any
+
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        prefix: undefined,
+        type: 'streamed',
+        input: 1,
+        fnOptions: { refetchMode: 'append' },
+      })
+      expect(options).not.toHaveProperty('settleOnFirstData')
+
+      client.mockResolvedValueOnce(stream('a'))
+      await options.query({
+        signal,
+        entry: { ...entry, state: { value: { ...entry.state.value } } },
+      })
+
+      expect(streamedQuerySpy).toHaveBeenCalledWith(expect.any(Function), {
+        refetchMode: 'append',
+        settleOnFirstData: true,
       })
     })
 
@@ -251,7 +278,7 @@ describe('procedureUtils', () => {
       )
 
       expect(client).toHaveBeenCalledWith('__override__', {
-        signal,
+        signal: expect.any(AbortSignal),
         context: {
           batch: true,
           [OPERATION_CONTEXT_SYMBOL]: {
@@ -369,7 +396,7 @@ describe('procedureUtils', () => {
       expect(liveQuerySpy).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(1, {
-        signal,
+        signal: expect.any(AbortSignal),
         context: {
           [OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
@@ -377,6 +404,24 @@ describe('procedureUtils', () => {
           },
         },
       })
+    })
+
+    it('passes settleOnFirstData to liveQuery, not to the key or pinia colada', async () => {
+      const options = utils.liveOptions({ input: 1, settleOnFirstData: true }) as any
+
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], {
+        prefix: undefined,
+        type: 'live',
+        input: 1,
+      })
+      expect(options).not.toHaveProperty('settleOnFirstData')
+
+      client.mockResolvedValueOnce(stream('a', 'b'))
+      await expect(
+        options.query({ signal, entry: { ...entry, state: { value: { ...entry.state.value } } } }),
+      ).resolves.toEqual('a')
+
+      expect(liveQuerySpy).toHaveBeenCalledWith(expect.any(Function), { settleOnFirstData: true })
     })
 
     it('throws when output is not an AsyncIteratorObject', async () => {
@@ -448,7 +493,7 @@ describe('procedureUtils', () => {
       )
 
       expect(client).toHaveBeenCalledWith('__override__', {
-        signal,
+        signal: expect.any(AbortSignal),
         context: {
           batch: true,
           [OPERATION_CONTEXT_SYMBOL]: {
