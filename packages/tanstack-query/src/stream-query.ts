@@ -74,9 +74,12 @@ export function serializableStreamedQuery<
         throw signal.reason
       }
 
-      let data = query.setData((current) =>
-        refetchMode === 'append' && current ? limitArraySize(current, maxChunks) : [],
-      )!
+      let data = query.setData(
+        refetchMode === 'append' && query.state.data
+          ? limitArraySize(query.state.data, maxChunks)
+          : [],
+        { manual: true },
+      )
 
       if (settleOnFirstData) {
         await stream[Symbol.asyncIterator]().return?.()
@@ -87,11 +90,13 @@ export function serializableStreamedQuery<
         throwIfAborted(signal)
 
         // read the cache, so writes made during the stream are kept
-        data = query.setData((current = []) => limitArraySize([...current, chunk], maxChunks))!
+        data = query.setData(limitArraySize([...(query.state.data ?? []), chunk], maxChunks), {
+          manual: true,
+        })
       }
 
       // the returned data is written again, so return the cache to keep later writes
-      const cached = query.getData()
+      const cached = query.state.data
       if (cached === undefined) {
         return data
       }

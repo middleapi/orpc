@@ -420,6 +420,21 @@ describe('serializableStreamedQuery', () => {
       expect(queryClient.getQueryCache().getAll()).toHaveLength(2)
     })
 
+    it('does not run the queryKeyHashFn of other queries on its key', async () => {
+      // a hash function that only handles its own key shape
+      queryClient.getQueryCache().build(queryClient, {
+        queryKey: ['user', { id: 2 }],
+        queryKeyHashFn: (key) => `user:${(key[1] as { id: number }).id}`,
+      })
+
+      await expect(
+        queryClient.fetchQuery({
+          queryKey: ['other-hash-test'],
+          queryFn: serializableStreamedQuery(stream(['c1'])),
+        }),
+      ).resolves.toEqual(['c1'])
+    })
+
     it('marks the query hashed with its own queryKeyHashFn stale when aborted', async () => {
       const key = ['custom-hash-abort-test']
       const observer = new QueryObserver(queryClient, {

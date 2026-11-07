@@ -35,7 +35,10 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
         throwIfAborted(signal)
 
         last = { chunk }
-        query.setData(() => chunk)
+        // skipped like `setQueryData` does, since query data cannot be `undefined`
+        if (chunk !== undefined) {
+          query.setData(chunk, { manual: true })
+        }
 
         if (settleOnFirstData) {
           break
