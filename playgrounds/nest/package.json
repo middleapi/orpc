@@ -21,7 +21,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
     "@opentelemetry/instrumentation": "^0.300.0",
     "@opentelemetry/instrumentation-http": "^0.300.0",
-    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/resources": "^3.0.0",
     "@opentelemetry/sdk-trace-node": "^2.12.0",
     "@opentelemetry/semantic-conventions": "^1.44.0",
     "@orpc/client": "beta",
