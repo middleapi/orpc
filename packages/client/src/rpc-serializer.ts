@@ -1,10 +1,10 @@
-import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
+import { isAsyncIteratorObject, isPlainObject, stringifyJSON } from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
 import { EventStreamErrorEvent } from '@standard-server/core'
 
 import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object.ts'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils.ts'
-import type { RPCJsonSerializerOptions } from './rpc-json-serializer.ts'
+import type { RPCJsonSerialization, RPCJsonSerializerOptions } from './rpc-json-serializer.ts'
 import { RPCJsonSerializer } from './rpc-json-serializer.ts'
 
 export interface RPCSerializerSerializeOptions {
@@ -119,12 +119,15 @@ export class RPCSerializer extends RPCJsonSerializer {
     return this.deserializePayload(data)
   }
 
-  private deserializePayload(data: any): unknown {
+  private deserializePayload(data: unknown): unknown {
     if (!(data instanceof FormData)) {
-      return this.deserializeJson(data)
+      return this.deserializeJson(assertEnvelope(data, false))
     }
 
-    const serialized = JSON.parse(data.get('data') as string)
+    const raw = data.get('data')
+    // like a missing `json`, a missing `data` field means `undefined`
+    const serialized =
+      raw === null ? { json: undefined } : assertEnvelope(JSON.parse(raw as string), true)
 
     const blobs: Blob[] = []
     for (const [key, value] of data) {
@@ -133,6 +136,35 @@ export class RPCSerializer extends RPCJsonSerializer {
       }
     }
 
-    return this.deserializeJson({ ...serialized, blobs })
+    if (blobs.length > 0 && serialized.maps === undefined) {
+      throw invalidFormat()
+    }
+
+    return this.deserializeJson({ ...serialized, blobs } as RPCJsonSerialization)
   }
+}
+
+function invalidFormat(): TypeError {
+  return new TypeError('Invalid RPC serialized data format.')
+}
+
+function assertEnvelope(value: unknown, allowMaps: boolean): RPCJsonSerialization {
+  if (!isPlainObject(value)) {
+    throw invalidFormat()
+  }
+
+  for (const key in value) {
+    if (key !== 'json' && key !== 'meta' && (!allowMaps || key !== 'maps')) {
+      throw invalidFormat()
+    }
+  }
+
+  if (
+    (value.meta !== undefined && !Array.isArray(value.meta)) ||
+    (value.maps !== undefined && !Array.isArray(value.maps))
+  ) {
+    throw invalidFormat()
+  }
+
+  return value as RPCJsonSerialization
 }

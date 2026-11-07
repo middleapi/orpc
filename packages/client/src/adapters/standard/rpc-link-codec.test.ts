@@ -370,5 +370,69 @@ describe('rpcLinkCodec', () => {
       expect(error.response).toEqual({ status: 200, headers: {}, body: { meta: 123 } })
       expect(error.cause).toBeInstanceOf(Error)
     })
+
+    it.each([
+      ['a string', 'hello'],
+      ['an array', [1, 2, 3]],
+      ['null', null],
+      ['an object with unknown keys', { status: 'maintenance' }],
+    ])('throws MalformedResponseError on a success body that is %s', async (_, body) => {
+      const error: any = await codec
+        .decodeResponse({
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          resolveBody: () => Promise.resolve(body),
+        })
+        .then(
+          () => null,
+          (e) => e,
+        )
+
+      expect(error).toBeInstanceOf(MalformedResponseError)
+      expect(error.message).toBe('Invalid RPC response format.')
+      expect(error.response).toEqual({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body,
+      })
+      expect(error.cause).toBeInstanceOf(TypeError)
+      expect(error.cause.message).toBe('Invalid RPC serialized data format.')
+    })
+
+    it.each([
+      [{}, undefined],
+      [{ json: null }, null],
+      [undefined, undefined],
+    ])('still decodes a success body of %o', async (body, output) => {
+      await expect(
+        codec.decodeResponse({
+          status: 200,
+          headers: {},
+          resolveBody: () => Promise.resolve(body),
+        }),
+      ).resolves.toEqual({ kind: 'output', output })
+    })
+
+    it('infers the message of a non-envelope error body', async () => {
+      const error: any = await codec
+        .decodeResponse({
+          status: 502,
+          headers: { 'content-type': 'text/plain' },
+          resolveBody: () => Promise.resolve('Upstream is down'),
+        })
+        .then(
+          () => null,
+          (e) => e,
+        )
+
+      expect(error).toBeInstanceOf(MalformedResponseError)
+      expect(error.message).toBe('Upstream is down')
+      expect(error.response).toEqual({
+        status: 502,
+        headers: { 'content-type': 'text/plain' },
+        body: 'Upstream is down',
+      })
+      expect(error.cause).toBeInstanceOf(TypeError)
+    })
   })
 })

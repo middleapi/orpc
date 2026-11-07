@@ -155,7 +155,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
         return this.serializer.deserialize(body)
       } catch (cause) {
         throw new MalformedResponseError({
-          message: 'Invalid RPC response format.',
+          message: isOk ? 'Invalid RPC response format.' : undefined,
           response: { status: response.status, headers: response.headers, body },
           cause,
         })
