@@ -468,7 +468,7 @@ export class RPCJsonSerializer {
   }
 
   deserializeJson(serialized: RPCJsonSerialization): unknown {
-    // `serialized` usually comes from the wire, so reject non-envelopes instead of resolving to `undefined`
+    // `serialized` usually comes from the wire: reject non-envelopes instead of resolving to `undefined`
     if (!isPlainObject(serialized)) {
       throw invalidSerializedData('expected an object.')
     }

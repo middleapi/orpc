@@ -158,7 +158,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     const deserialized = await (async () => {
       try {
-        // unlike requests, where `{}` means no input, a success body without `json` is not an RPC envelope
+        // unlike requests, where `{}` means no input, a success body needs `json` to be an envelope
         if (isOk && isPlainObject(body) && !Object.hasOwn(body, 'json')) {
           throw new TypeError('Missing "json" in RPC response body.')
         }

@@ -227,8 +227,12 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      // Streamed replicas cancel the source once all are cancelled, so the shared signal is not needed past the body
-      const replicatedResponses = replicateLazyResponse(response, signals, sharedSignal.dispose)
+      // Streamed replicas cancel the source once all are cancelled, so drop the shared signal after the body
+      const { dispose } = sharedSignal
+      const replicatedResponses = replicateLazyResponse(
+        { ...response, resolveBody: (hint) => response.resolveBody(hint).finally(dispose) },
+        signals,
+      )
 
       activeCallers.forEach((caller, index) => caller.resolve(replicatedResponses[index]!))
     } catch (error) {
@@ -279,7 +283,6 @@ function createRequestKey(path: string[], request: StandardRequest): string {
 function replicateLazyResponse(
   response: StandardLazyResponse,
   signals: (AbortSignal | undefined)[],
-  onBodySettled: () => void,
 ): StandardLazyResponse[] {
   let bodiesPromise: Promise<StandardBody[]> | undefined
 
@@ -287,24 +290,21 @@ function replicateLazyResponse(
     ...response,
     resolveBody: (hint) =>
       runWithSignal(signal, async () => {
-        bodiesPromise ??= response
-          .resolveBody(hint)
-          .finally(onBodySettled)
-          .then((body) => {
-            if (isAsyncIteratorObject(body)) {
-              return replicateAsyncIterator(body, signals.length).map((replica, index) =>
-                closeAsyncIteratorOnAbort(replica, signals[index]),
-              )
-            }
+        bodiesPromise ??= response.resolveBody(hint).then((body) => {
+          if (isAsyncIteratorObject(body)) {
+            return replicateAsyncIterator(body, signals.length).map((replica, index) =>
+              closeAsyncIteratorOnAbort(replica, signals[index]),
+            )
+          }
 
-            if (body instanceof ReadableStream) {
-              return replicateReadableStream(body, signals.length).map((replica, index) =>
-                closeReadableStreamOnAbort(replica, signals[index]),
-              )
-            }
+          if (body instanceof ReadableStream) {
+            return replicateReadableStream(body, signals.length).map((replica, index) =>
+              closeReadableStreamOnAbort(replica, signals[index]),
+            )
+          }
 
-            return signals.map(() => body)
-          })
+          return signals.map(() => body)
+        })
 
         return (await bodiesPromise)[i]
       }),
