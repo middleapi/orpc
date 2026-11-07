@@ -1,6 +1,6 @@
 import { getEventListeners } from 'node:events'
 
-import { anyAbortSignal, disposableAllAbortSignal, runWithSignal } from './signal.ts'
+import { anyAbortSignal, disposableAllAbortSignal, listenAbort, runWithSignal } from './signal.ts'
 
 describe('disposableAllAbortSignal', () => {
   it('returns an undefined signal and a no-op dispose if contains undefined or empty array', () => {
@@ -248,5 +248,42 @@ describe('runWithSignal', () => {
     ).rejects.toThrow('fail')
 
     expect(removeSpy).toHaveBeenCalled()
+  })
+})
+
+describe('listenAbort', () => {
+  it('calls the listener right away when already aborted', () => {
+    const controller = new AbortController()
+    controller.abort()
+    const onAbort = vi.fn()
+
+    listenAbort(controller.signal, onAbort)
+
+    expect(onAbort).toHaveBeenCalledTimes(1)
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+  })
+
+  it('calls the listener once on abort', () => {
+    const controller = new AbortController()
+    const onAbort = vi.fn()
+
+    listenAbort(controller.signal, onAbort)
+    expect(onAbort).not.toHaveBeenCalled()
+
+    controller.abort()
+    controller.abort()
+    expect(onAbort).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns a function that removes the listener', () => {
+    const controller = new AbortController()
+    const onAbort = vi.fn()
+
+    const remove = listenAbort(controller.signal, onAbort)
+    remove()
+    controller.abort()
+
+    expect(onAbort).not.toHaveBeenCalled()
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
   })
 })

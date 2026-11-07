@@ -69,6 +69,15 @@ export function isPlainObject(value: unknown): value is Record<PropertyKey, unkn
 }
 
 /**
+ * Checks whether a value is an array or a plain object, i.e. something whose keys can be walked.
+ */
+export function isPlainObjectOrArray(
+  value: unknown,
+): value is unknown[] | Record<PropertyKey, unknown> {
+  return Array.isArray(value) || isPlainObject(value)
+}
+
+/**
  * Returns `object[key]` only when it is an own property, so keys like
  * `toString` do not resolve through the prototype chain.
  */

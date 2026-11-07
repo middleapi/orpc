@@ -4,6 +4,7 @@ import {
   anyAbortSignal,
   AsyncIteratorClass,
   isAsyncIteratorObject,
+  listenAbort,
   override,
   runWithSignal,
   toArray,
@@ -50,16 +51,6 @@ export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandl
       clientInterceptors: [clientInterceptor, ...toArray(options.clientInterceptors)],
     }
   }
-}
-
-function listenAbort(signal: AbortSignal, onAbort: () => void): () => void {
-  if (signal.aborted) {
-    onAbort()
-  } else {
-    signal.addEventListener('abort', onAbort, { once: true })
-  }
-
-  return () => signal.removeEventListener('abort', onAbort)
 }
 
 function syncAsyncIterator(

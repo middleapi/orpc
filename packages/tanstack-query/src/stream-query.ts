@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { throwIfAborted } from '@orpc/shared'
+import { takeLast, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
 export interface SerializableStreamedQueryOptions {
@@ -72,7 +72,7 @@ export function serializableStreamedQuery<
       }
 
       let data = client.setQueryData<TQueryFnData[]>(queryKey, (current) =>
-        refetchMode === 'append' && current ? limitArraySize(current, maxChunks) : [],
+        refetchMode === 'append' && current ? takeLast(current, maxChunks) : [],
       )!
 
       if (settleOnFirstData) {
@@ -85,7 +85,7 @@ export function serializableStreamedQuery<
 
         // read the cache, so writes made during the stream are kept
         data = client.setQueryData<TQueryFnData[]>(queryKey, (current = []) =>
-          limitArraySize([...current, chunk], maxChunks),
+          takeLast([...current, chunk], maxChunks),
         )!
       }
 
@@ -96,17 +96,9 @@ export function serializableStreamedQuery<
       }
 
       // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
-      return Array.isArray(cached) ? limitArraySize(cached, maxChunks) : cached
+      return Array.isArray(cached) ? takeLast(cached, maxChunks) : cached
     } finally {
       signal.removeEventListener('abort', markStale)
     }
   }
-}
-
-function limitArraySize<T>(items: T[], maxSize: number): T[] {
-  if (items.length <= maxSize) {
-    return items
-  }
-
-  return items.slice(items.length - maxSize)
 }

@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { throwIfAborted } from '@orpc/shared'
+import { takeLast, throwIfAborted } from '@orpc/shared'
 
 import type { UseQueryFnContext } from './types.ts'
 
@@ -78,7 +78,7 @@ export function serializableStreamedQuery<T>(
     }
 
     const current = entry.state.value.data as T[] | undefined
-    let data = write(refetchMode === 'append' && current ? limitArraySize(current, maxChunks) : [])
+    let data = write(refetchMode === 'append' && current ? takeLast(current, maxChunks) : [])
 
     if (settleOnFirstData) {
       await stream[Symbol.asyncIterator]().return?.()
@@ -90,7 +90,7 @@ export function serializableStreamedQuery<T>(
 
       // read the entry, so writes made during the stream are kept
       const current = (entry.state.value.data as T[] | undefined) ?? []
-      data = write(limitArraySize([...current, chunk], maxChunks))
+      data = write(takeLast([...current, chunk], maxChunks))
     }
 
     // a stream that ends on abort must not be stored as fresh data
@@ -103,14 +103,6 @@ export function serializableStreamedQuery<T>(
     }
 
     // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
-    return Array.isArray(cached) ? limitArraySize(cached, maxChunks) : cached
+    return Array.isArray(cached) ? takeLast(cached, maxChunks) : cached
   }
-}
-
-function limitArraySize<T>(items: T[], maxSize: number): T[] {
-  if (items.length <= maxSize) {
-    return items
-  }
-
-  return items.slice(items.length - maxSize)
 }

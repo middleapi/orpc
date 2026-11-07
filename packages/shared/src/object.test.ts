@@ -12,6 +12,7 @@ import {
   getConstructors,
   getOwn,
   isPlainObject,
+  isPlainObjectOrArray,
   isPropertyKey,
   mergeTwoLevels,
   NullProtoObj,
@@ -806,4 +807,14 @@ describe('bindMethods', () => {
     expect(methods.getValue.call({ value: 5 })).toBe(5)
     expect(methods.double()).toBe(246)
   })
+})
+
+it('isPlainObjectOrArray', () => {
+  expect(isPlainObjectOrArray([])).toBe(true)
+  expect(isPlainObjectOrArray({})).toBe(true)
+  expect(isPlainObjectOrArray(Object.create(null))).toBe(true)
+  expect(isPlainObjectOrArray(new Date())).toBe(false)
+  expect(isPlainObjectOrArray(new Map())).toBe(false)
+  expect(isPlainObjectOrArray(null)).toBe(false)
+  expect(isPlainObjectOrArray('a')).toBe(false)
 })

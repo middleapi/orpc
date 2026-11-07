@@ -35,6 +35,35 @@ export function matchesHttpPathPrefix(url: `/${string}`, prefix: `/${string}`): 
   )
 }
 
+/**
+ * Removes `prefix` from `pathname`, or returns `undefined` when `pathname` is not under `prefix`.
+ * The rest of the path must start at a segment boundary, so `/apis` is not under `/api`.
+ */
+export function stripHttpPathPrefix(
+  pathname: `/${string}`,
+  prefix: `/${string}`,
+): `/${string}` | undefined {
+  if (!pathname.startsWith(prefix)) {
+    return undefined
+  }
+
+  const charAfterPrefix = pathname[prefix.length]
+
+  if (charAfterPrefix === '/') {
+    return pathname.slice(prefix.length) as `/${string}`
+  }
+
+  if (charAfterPrefix === undefined) {
+    return '/'
+  }
+
+  if (prefix[prefix.length - 1] === '/') {
+    return pathname.slice(prefix.length - 1) as `/${string}`
+  }
+
+  return undefined
+}
+
 export function matchesHttpPath(url: `/${string}`, path: `/${string}`): boolean {
   const pathWithoutEndSlash = path.endsWith('/') ? path.slice(0, path.length - 1) : path
 
@@ -74,6 +103,49 @@ export function parseContentEncodings(header: string | undefined): string[] {
   }
 
   return header.split(',').map((part) => part.trim().toLowerCase())
+}
+
+/**
+ * Rough UTF-8 bytes per string character. Mostly ASCII text stays close to 1 byte/char;
+ * occasional multi-byte characters increase the average.
+ */
+export const AVG_UTF8_BYTES_PER_CHAR = 1.2
+
+// approx bytes for boundary + Content-Disposition/Content-Type headers per part
+const FORM_DATA_PART_OVERHEAD = 64
+
+/**
+ * Estimates how many bytes of a FormData body are worth compressing. Non-compressible blobs count
+ * against the total. Returns `Infinity` when a compressible blob has an unknown size, and
+ * `-Infinity` when a non-compressible one does, since the estimate is then unreliable.
+ */
+export function estimateCompressibleFormDataSize(
+  formData: FormData,
+  isCompressible: (contentType: string) => boolean,
+): number {
+  let size = 0
+
+  for (const [key, value] of formData) {
+    size += FORM_DATA_PART_OVERHEAD + key.length
+
+    if (value instanceof Blob) {
+      if (!Number.isFinite(value.size)) {
+        // Bun-s3 can use NaN for size
+        if (!isCompressible(value.type)) {
+          return -Infinity
+        }
+
+        // Unknown size for compressible content - still apply compression
+        size = Infinity
+      } else {
+        size += isCompressible(value.type) ? value.size : -value.size
+      }
+    } else {
+      size += value.length * AVG_UTF8_BYTES_PER_CHAR
+    }
+  }
+
+  return size
 }
 
 const ACCEPT_ENCODING_QUALITY_REGEX = /^\s*q=([\d.]+)\s*$/i

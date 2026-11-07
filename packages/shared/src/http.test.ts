@@ -1,4 +1,6 @@
 import {
+  AVG_UTF8_BYTES_PER_CHAR,
+  estimateCompressibleFormDataSize,
   isAcceptableEncoding,
   isCompressibleContentType,
   isCompressionEncoding,
@@ -10,6 +12,7 @@ import {
   parseAcceptEncodingQualities,
   parseContentEncodings,
   pathToHttpPath,
+  stripHttpPathPrefix,
   varyByAcceptEncoding,
 } from './http.ts'
 
@@ -117,6 +120,20 @@ describe('matchesHttpPathPrefix', () => {
     ['/other/api', '/api', false, 'rejects non-prefix paths'],
   ] as const)('returns %s for url=%s prefix=%s (%s)', (url, prefix, expected, _description) => {
     expect(matchesHttpPathPrefix(url, prefix)).toBe(expected)
+  })
+})
+
+describe('stripHttpPathPrefix', () => {
+  it.each([
+    ['/api/ping', '/api', '/ping'],
+    ['/api', '/api', '/'],
+    ['/api/', '/api', '/'],
+    ['/api/ping', '/api/', '/ping'],
+    ['/apis/ping', '/api', undefined],
+    ['/other', '/api', undefined],
+    ['/api?x', '/api', undefined],
+  ] as const)('%s without %s is %s', (pathname, prefix, expected) => {
+    expect(stripHttpPathPrefix(pathname, prefix)).toBe(expected)
   })
 })
 
@@ -312,5 +329,40 @@ describe('isNoTransformCacheControl', () => {
 
   it('does not match a directive that merely contains the token', () => {
     expect(isNoTransformCacheControl('no-transform-extension')).toBe(false)
+  })
+})
+
+describe('estimateCompressibleFormDataSize', () => {
+  const isCompressible = (type: string) => type.startsWith('text/')
+
+  it('counts strings, compressible blobs, and per-part overhead', () => {
+    const form = new FormData()
+    form.append('a', 'x'.repeat(10))
+    form.append('b', new Blob(['y'.repeat(100)], { type: 'text/plain' }))
+
+    expect(estimateCompressibleFormDataSize(form, isCompressible)).toBe(
+      64 + 1 + 10 * AVG_UTF8_BYTES_PER_CHAR + 64 + 1 + 100,
+    )
+  })
+
+  it('subtracts non-compressible blobs', () => {
+    const form = new FormData()
+    form.append('a', new Blob(['y'.repeat(100)], { type: 'image/png' }))
+
+    expect(estimateCompressibleFormDataSize(form, isCompressible)).toBe(64 + 1 - 100)
+  })
+
+  it('handles blobs with an unknown size', () => {
+    const compressible = new Blob(['a'], { type: 'text/plain' })
+    Object.defineProperty(compressible, 'size', { value: Number.NaN })
+    const nonCompressible = new Blob(['a'], { type: 'image/png' })
+    Object.defineProperty(nonCompressible, 'size', { value: Number.NaN })
+
+    const form = new FormData()
+    form.append('a', compressible)
+    expect(estimateCompressibleFormDataSize(form, isCompressible)).toBe(Infinity)
+
+    form.append('b', nonCompressible)
+    expect(estimateCompressibleFormDataSize(form, isCompressible)).toBe(-Infinity)
   })
 })

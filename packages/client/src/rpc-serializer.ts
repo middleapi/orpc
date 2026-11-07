@@ -1,4 +1,9 @@
-import { isAsyncIteratorObject, isPlainObject, stringifyJSON } from '@orpc/shared'
+import {
+  isAsyncIteratorObject,
+  isPlainObject,
+  NON_NEGATIVE_INTEGER_REGEX,
+  stringifyJSON,
+} from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
 import { EventStreamErrorEvent } from '@standard-server/core'
 
@@ -137,7 +142,7 @@ export class RPCSerializer extends RPCJsonSerializer {
     for (const [key, value] of data) {
       if (key === 'data' && raw === undefined && typeof value === 'string') {
         raw = value
-      } else if (value instanceof Blob && BLOB_KEY_REGEX.test(key)) {
+      } else if (value instanceof Blob && NON_NEGATIVE_INTEGER_REGEX.test(key)) {
         blobs[Number(key)] = value
         hasBlobs = true
       } else {
@@ -155,8 +160,6 @@ export class RPCSerializer extends RPCJsonSerializer {
     return this.deserializeJson({ ...serialized, blobs } as RPCJsonSerialization)
   }
 }
-
-const BLOB_KEY_REGEX = /^(?:0|[1-9]\d*)$/
 
 function invalidFormat(): TypeError {
   return new TypeError('Invalid RPC serialized data format.')

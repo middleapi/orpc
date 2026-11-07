@@ -6,7 +6,7 @@ import {
   getJsonSchemaKeywordKind,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
+import { getOwn, isDeepEqual, isPlainObject, isPlainObjectOrArray, setOwn } from '@orpc/shared'
 
 import type { OpenAPIV3_2 } from './types.ts'
 
@@ -234,10 +234,6 @@ interface ReuseComparisonContext {
   visited: WeakMap<object, WeakSet<object>>
 }
 
-function isSchemaContainer(value: unknown): value is unknown[] | Record<PropertyKey, unknown> {
-  return Array.isArray(value) || isPlainObject(value)
-}
-
 /**
  * Where a value sits, mirroring how hoisting rewrites refs: only refs in subschemas are
  * rewritten, so literal data (`const`, `default`, `examples`, ...) is compared as is.
@@ -255,7 +251,7 @@ function areSchemasEquivalentForReuse(
   }
 
   // Only arrays and plain objects carry schema structure; primitives and values like Date are compared as a whole
-  if (!isSchemaContainer(candidate) || !isSchemaContainer(existing)) {
+  if (!isPlainObjectOrArray(candidate) || !isPlainObjectOrArray(existing)) {
     return isDeepEqual(candidate, existing)
   }
 

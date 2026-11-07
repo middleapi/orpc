@@ -3,6 +3,7 @@ import {
   copyOnWrite,
   DEFAULT_MAX_BIGINT_DIGITS,
   isPlainObject,
+  isPlainObjectOrArray,
   NullProtoObj,
   parseBigIntString,
 } from '@orpc/shared'
@@ -50,14 +51,10 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
   }
 }
 
-function isWalkable(value: unknown): boolean {
-  return Array.isArray(value) || isPlainObject(value)
-}
-
 function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
   const value = parent[key]
 
-  if (!isWalkable(value) || restored?.has(value)) {
+  if (!isPlainObjectOrArray(value) || restored?.has(value)) {
     throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
   }
 
@@ -562,7 +559,7 @@ export class RPCJsonSerializer {
         const value = handler.deserialize(currentRef[preSegment])
         currentRef[preSegment] = value
 
-        if (isWalkable(value)) {
+        if (isPlainObjectOrArray(value)) {
           ;(restored ??= new Set()).add(value)
         }
       }

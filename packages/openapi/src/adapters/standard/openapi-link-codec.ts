@@ -93,7 +93,6 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   errorResponseContentType?: string | undefined
 }
 
-const END_SLASH_REGEX = /\/$/
 const DOT_SEGMENT_REGEX = /(?:^|\/)\.{1,2}(?:\/|$)/
 
 export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
@@ -170,7 +169,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         data = Object.keys(remaining).length > 0 ? remaining : undefined
       }
 
-      pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+      pathname = mergeHttpPath(basePathname, pathname)
 
       if (isBodylessMethod(method)) {
         const queryString = this.serializeQueryString(data, meta?.queryStyles)
@@ -236,7 +235,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       headers = mergeStandardHeaders(headers, serializeHeaders(input.headers, this.serializer))
     }
 
-    pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+    pathname = mergeHttpPath(basePathname, pathname)
     const queryString = this.serializeQueryString(input?.query, meta?.queryStyles)
     const search = combineSearch(baseSearch, queryString)
     const url = `${pathname}${search ?? ''}${baseHash ?? ''}` as StandardUrl

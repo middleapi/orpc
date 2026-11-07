@@ -8,7 +8,7 @@ import {
   walkProcedureContractsSync,
 } from '@orpc/server'
 import type { Value } from '@orpc/shared'
-import { mergeHttpPath, pathToHttpPath, value } from '@orpc/shared'
+import { mergeHttpPath, pathToHttpPath, stripHttpPathPrefix, value } from '@orpc/shared'
 
 import { DEFAULT_OPENAPI_METHOD } from '../../constants.ts'
 import { getOpenAPIMeta } from '../../meta.ts'
@@ -90,21 +90,13 @@ export class OpenAPIMatcher {
     | undefined
   > {
     if (prefix) {
-      if (!pathname.startsWith(prefix)) {
+      const stripped = stripHttpPathPrefix(pathname, prefix)
+
+      if (stripped === undefined) {
         return undefined
       }
 
-      const charAfterPrefix = pathname[prefix.length]
-
-      if (charAfterPrefix === '/') {
-        pathname = pathname.slice(prefix.length) as `/${string}`
-      } else if (charAfterPrefix === undefined) {
-        pathname = '/'
-      } else if (prefix[prefix.length - 1] === '/') {
-        pathname = pathname.slice(prefix.length - 1) as `/${string}`
-      } else {
-        return undefined
-      }
+      pathname = stripped
     }
 
     // most requests `await undefined` so conditionally await it to save a microtask turn
