@@ -725,6 +725,10 @@ async function decodeLengthPrefixedStream(
         break
       }
     }
+  } catch (error) {
+    // Free the response body so the server stops streaming to a reader that is gone
+    reader.cancel(error).catch(() => {})
+    throw error
   } finally {
     reader.releaseLock()
   }
