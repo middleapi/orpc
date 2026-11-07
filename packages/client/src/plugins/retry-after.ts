@@ -1,7 +1,7 @@
 import type { Value } from '@orpc/shared'
 import { isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
 import type { StandardLazyResponse } from '@standard-server/core'
-import { flattenStandardHeader } from '@standard-server/core'
+import { cancelStandardBody, flattenStandardHeader } from '@standard-server/core'
 
 import type {
   StandardLinkOptions,
@@ -126,6 +126,8 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
         if (interceptorOptions.signal?.aborted) {
           return response
         }
+
+        discardResponseBody(response)
       }
     }
 
@@ -134,6 +136,19 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
       transportInterceptors: [interceptor, ...toArray(options.transportInterceptors)],
     }
   }
+}
+
+/**
+ * Releases the body of a response that is being replaced by a retry,
+ * so its connection (e.g. an undici keep-alive socket) is not held until garbage collection.
+ */
+function discardResponseBody(response: StandardLazyResponse): void {
+  response
+    .resolveBody('octet-stream')
+    .then((body) => cancelStandardBody(body))
+    .catch(() => {
+      // the body may already be consumed, or the transport may fail while cancelling
+    })
 }
 
 function parseRetryAfterHeader(value: string | undefined): number | undefined {
