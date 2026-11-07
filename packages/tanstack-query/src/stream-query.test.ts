@@ -401,7 +401,6 @@ describe('serializableStreamedQuery', () => {
 
     it('writes to the query hashed with its own queryKeyHashFn', async () => {
       const key = ['custom-hash-test']
-      // an entry with the same key, hashed with the client defaults
       queryClient.setQueryData(key, ['stray'])
 
       const observer = new QueryObserver(queryClient, {
@@ -421,7 +420,6 @@ describe('serializableStreamedQuery', () => {
     })
 
     it('does not run the queryKeyHashFn of other queries on its key', async () => {
-      // a hash function that only handles its own key shape
       queryClient.getQueryCache().build(queryClient, {
         queryKey: ['user', { id: 2 }],
         queryKeyHashFn: (key) => `user:${(key[1] as { id: number }).id}`,

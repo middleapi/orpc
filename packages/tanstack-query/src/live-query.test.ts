@@ -118,7 +118,6 @@ describe('liveQuery', async () => {
   it('writes to the query hashed with its own queryKeyHashFn', async () => {
     const key = ['live-custom-hash']
     const queryKeyHashFn = (key: QueryKey) => `custom:${hashKey(key)}`
-    // an entry with the same key, hashed with the client defaults
     queryClient.setQueryData(key, 0)
 
     const observer = new QueryObserver(queryClient, {
