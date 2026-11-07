@@ -70,12 +70,13 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    * Use this to customize the component name of a hoisted def.
    *
    * @remarks
+   * - Characters OpenAPI does not allow in component keys (anything but `a-z`, `A-Z`, `0-9`, `.`, `_`, `-`)
+   *   are replaced by `_` in the returned name, e.g. `User Profile` becomes `User_Profile`.
    * - The returned name is a preference, conflicting names are still postfixed (`Planet`, `PlanetInput`, `Planet2`, ...).
-   * - Return `undefined` to keep the original def name.
    *
    * @default defName => defName
    */
-  componentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
+  componentName?: ((defName: string, defSchema: JsonSchema) => string) | undefined
 
   /**
    * Filter procedures. Return `false` to exclude a procedure from the OpenAPI specification.

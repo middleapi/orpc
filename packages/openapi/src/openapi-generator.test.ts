@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { visitJsonSchemaRefs } from '@orpc/json-schema'
 import * as arktype from 'arktype'
 import * as z from 'zod'
 
@@ -793,6 +794,47 @@ describe('openAPIGenerator version', () => {
         PenguinNameBanned: { title: 'PENGUIN_NAME_BANNED' },
         PenguinColonyFull: { title: 'PENGUIN_COLONY_FULL' },
         UndefinedError: { title: 'UndefinedError' },
+      })
+    },
+  )
+
+  describe.each(['3.2.0', '3.1.1', '3.0.4'] as const)(
+    'component names in OpenAPI %s',
+    (version) => {
+      const zodGenerator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
+      const ids = ['root~/', 'User Profile', 'api:User', 'Page<User>']
+
+      const contract = {
+        list: oc
+          .meta(openapi({ method: 'GET', path: '/things' }))
+          .output(
+            z.object(
+              Object.fromEntries(
+                ids.map((id, i) => [`field${i}`, z.object({ value: z.literal(i) }).meta({ id })]),
+              ),
+            ),
+          ),
+      }
+
+      function responseRefs(doc: Awaited<ReturnType<typeof zodGenerator.generate>>): string[] {
+        const refs: string[] = []
+        const response = doc.paths?.['/things']?.get?.responses?.['200'] as any
+        visitJsonSchemaRefs(response.content['application/json'].schema, (ref) => refs.push(ref))
+        return refs
+      }
+
+      it.each([
+        ['default names', undefined, ['root__', 'User_Profile', 'api_User', 'Page_User_']],
+        [
+          'componentName results',
+          (defName: string) => `Api ${defName}`,
+          ['Api_root__', 'Api_User_Profile', 'Api_api_User', 'Api_Page_User_'],
+        ],
+      ])('sanitizes %s into valid component keys', async (_, componentName, keys) => {
+        const doc = await zodGenerator.generate(contract, { version, componentName })
+
+        expect(Object.keys(doc.components?.schemas ?? {})).toEqual(keys)
+        expect(responseRefs(doc)).toEqual(keys.map((key) => `#/components/schemas/${key}`))
       })
     },
   )

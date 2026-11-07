@@ -14,16 +14,32 @@ const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 
 /**
+ * Replaces characters OpenAPI does not allow in component keys (`^[a-zA-Z0-9._-]+$`) with `_`.
+ * Minted names are always valid keys, so refs to them need no JSON Pointer or URI escaping.
+ */
+function toValidComponentName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/gu, '_') || '_'
+}
+
+/**
  * Collects reusable schemas into `doc.components.schemas`.
  *
  * Equivalent schemas (including recursive ones) reuse a single component, and different
  * schemas competing for the same name get direction-suffixed or numbered postfixes.
  */
 export class OpenAPIComponentRegistry {
+  /**
+   * The unsanitized name each minted component was requested under, so distinct names
+   * that sanitize to the same key (`User Profile`, `User_Profile`) are never merged.
+   * Components the registry did not mint are reusable only when the requested name needs
+   * no sanitizing, which keeps `base.components` family reuse (`Planet`, `Planet2`) intact.
+   */
+  private readonly componentSources = new Map<string, string>()
+
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
     private readonly componentName:
-      | ((defName: string, defSchema: JsonSchema) => string | undefined)
+      | ((defName: string, defSchema: JsonSchema) => string)
       | undefined,
   ) {}
 
@@ -81,11 +97,14 @@ export class OpenAPIComponentRegistry {
       []
 
     for (const [defName, cleanSchema] of defs) {
+      const sourceName = this.componentName ? this.componentName(defName, cleanSchema) : defName
+      const preferredName = toValidComponentName(sourceName)
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
         new Set(renameMap.values()),
         defName,
-        this.componentName?.(defName, cleanSchema) ?? defName,
+        preferredName,
+        (name) => (this.componentSources.get(name) ?? preferredName) === sourceName,
         defs,
         direction,
       )
@@ -93,6 +112,7 @@ export class OpenAPIComponentRegistry {
       renameMap.set(defName, componentName)
 
       if (!reuseExisting) {
+        this.componentSources.set(componentName, sourceName)
         pendingSchemas.push({ cleanSchema, componentName })
       }
     }
@@ -127,6 +147,7 @@ function resolveComponentName(
   claimedNames: Set<string>,
   defName: string,
   preferredName: string,
+  isReusable: (componentName: string) => boolean,
   defs: ReadonlyMap<string, JsonSchema>,
   direction: JsonSchemaConverterDirection | undefined,
 ): [componentName: string, reuseExisting: boolean] {
@@ -150,9 +171,10 @@ function resolveComponentName(
     }
 
     if (
+      isReusable(componentName) &&
       areSchemaRefsEquivalentForReuse(
         DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
-        COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(componentName),
+        COMPONENTS_REF_PREFIX + componentName,
         {
           defs,
           componentsSchemas,
@@ -414,6 +436,6 @@ function rewriteComponentSchemaRefs(
       return ref
     }
 
-    return COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(renamedName)
+    return COMPONENTS_REF_PREFIX + renamedName
   })
 }

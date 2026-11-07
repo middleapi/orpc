@@ -7,7 +7,7 @@ describe('openAPIComponentRegistry', () => {
   function createRegistry(
     options: {
       schemas?: Record<string, any>
-      componentName?: (defName: string, defSchema: JsonSchema) => string | undefined
+      componentName?: (defName: string, defSchema: JsonSchema) => string
     } = {},
   ) {
     const doc: OpenAPIV3_2.OpenAPIObject = {
@@ -47,12 +47,12 @@ describe('openAPIComponentRegistry', () => {
         type: 'object',
         properties: {
           planet: { $ref: '#/components/schemas/Planet' },
-          domain: { $ref: '#/components/schemas/domain~1Planet' },
+          domain: { $ref: '#/components/schemas/domain_Planet' },
         },
       })
       expect(doc.components?.schemas).toEqual({
-        'Planet': { type: 'string' },
-        'domain/Planet': { type: 'number' },
+        Planet: { type: 'string' },
+        domain_Planet: { type: 'number' },
       })
     })
 
@@ -332,26 +332,6 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('keeps the def name when componentName returns undefined', () => {
-      const { doc, registry } = createRegistry({
-        componentName: (defName) => (defName === 'Planet' ? 'World' : undefined),
-      })
-
-      const result = registry.hoistDefs({
-        $ref: '#/$defs/Planet',
-        $defs: {
-          Planet: { type: 'object', properties: { moon: { $ref: '#/$defs/Moon' } } },
-          Moon: { type: 'string' },
-        },
-      })
-
-      expect(result).toEqual({ $ref: '#/components/schemas/World' })
-      expect(doc.components?.schemas).toEqual({
-        World: { type: 'object', properties: { moon: { $ref: '#/components/schemas/Moon' } } },
-        Moon: { type: 'string' },
-      })
-    })
-
     it('postfixes a componentName that conflicts with a different component', () => {
       const { doc, registry } = createRegistry({
         schemas: { World: { type: 'string' } },
@@ -425,6 +405,75 @@ describe('openAPIComponentRegistry', () => {
 
       expect(result).toEqual({ $ref: '#/components/schemas/constructor' })
       expect(doc.components?.schemas).toEqual({ constructor: { type: 'string' } })
+    })
+  })
+
+  describe('component names', () => {
+    it.each([
+      ['Page<User>', 'Page_User_'],
+      ['Usuário 🚀', 'Usu_rio__'],
+      ['', '_'],
+    ])('replaces characters not allowed in component keys: %j -> %j', (defName, expected) => {
+      const { doc, registry } = createRegistry()
+
+      const result = registry.hoistDefs({
+        type: 'array',
+        items: { $ref: `#/$defs/${defName}` },
+        $defs: { [defName]: { type: 'string' } },
+      })
+
+      expect(result).toEqual({ type: 'array', items: { $ref: `#/components/schemas/${expected}` } })
+      expect(Object.keys(doc.components!.schemas!)).toEqual([expected])
+    })
+
+    it('keeps distinct names that sanitize to the same key apart, even for equal schemas', () => {
+      const { doc, registry } = createRegistry({ schemas: { User_Profile: { type: 'string' } } })
+
+      expect(
+        registry.hoistDefs({
+          type: 'object',
+          properties: {
+            a: { $ref: '#/$defs/User Profile' },
+            b: { $ref: '#/$defs/User:Profile' },
+          },
+          $defs: {
+            'User Profile': { type: 'string' },
+            'User:Profile': { type: 'string' },
+          },
+        }),
+      ).toEqual({
+        type: 'object',
+        properties: {
+          a: { $ref: '#/components/schemas/User_Profile2' },
+          b: { $ref: '#/components/schemas/User_Profile3' },
+        },
+      })
+
+      expect(
+        registry.hoistDefs({
+          type: 'object',
+          properties: {
+            a: { $ref: '#/$defs/User Profile' },
+            b: { $ref: '#/$defs/User_Profile' },
+          },
+          $defs: {
+            'User Profile': { type: 'string' },
+            'User_Profile': { type: 'string' },
+          },
+        }),
+      ).toEqual({
+        type: 'object',
+        properties: {
+          a: { $ref: '#/components/schemas/User_Profile2' },
+          b: { $ref: '#/components/schemas/User_Profile' },
+        },
+      })
+
+      expect(Object.keys(doc.components!.schemas!)).toEqual([
+        'User_Profile',
+        'User_Profile2',
+        'User_Profile3',
+      ])
     })
   })
 
