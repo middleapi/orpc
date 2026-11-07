@@ -251,8 +251,6 @@ const spec = await generator.generate(router, {
 })
 ```
 
-OpenAPI only allows component keys matching `^[a-zA-Z0-9._-]+$`, so other characters in component names are replaced by `_`: a schema with id `User Profile` or `Page<User>` becomes the `User_Profile` or `Page_User_` component. Distinct names that end up with the same key are kept apart with a numbered postfix (`User_Profile2`).
-
 #### Custom Error Response Schemas
 
 If your [OpenAPI Handler](/docs/openapi/handler#custom-error-response) uses custom error response formats, configure `OpenAPIGenerator` with the same logic so the generated document matches the actual error response formats.
