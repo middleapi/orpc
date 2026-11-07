@@ -227,7 +227,6 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      // Streamed replicas cancel the source once all are cancelled, so drop the shared signal after the body
       const { dispose } = sharedSignal
       const replicatedResponses = replicateLazyResponse(
         { ...response, resolveBody: (hint) => response.resolveBody(hint).finally(dispose) },

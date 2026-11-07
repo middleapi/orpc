@@ -4,10 +4,6 @@ import { promiseWithResolvers } from './promise.ts'
 
 export interface DisposableAllAbortSignal {
   signal: AbortSignal | undefined
-  /**
-   * Removes the listeners added to the input signals, after which `signal` never aborts.
-   * Call it once `signal` is no longer needed, so long-lived input signals do not accumulate listeners.
-   */
   dispose: () => void
 }
 
