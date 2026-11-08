@@ -477,7 +477,10 @@ export class TypeToJsonSchemaConverter {
     return this.convertMembers(members)
   }
 
-  private convertUnion(members: readonly Type[]): JsonSchema | undefined {
+  private convertUnion(
+    members: readonly Type[],
+    convertValue: (value: Type) => JsonSchema = (value) => this.visit(value),
+  ): JsonSchema | undefined {
     const strings = new Set<string>()
     const numbers = new Set<number>()
     const booleans = new Set<boolean>()
@@ -494,7 +497,7 @@ export class TypeToJsonSchemaConverter {
           booleans.add(value)
         }
       } else if (!(member.flags & NULLISH_FLAGS)) {
-        schemas.push(this.visit(member))
+        schemas.push(convertValue(member))
       }
     }
 
@@ -645,7 +648,7 @@ export class TypeToJsonSchemaConverter {
       const serializable = this.getSerializableMembers(propertyType)
 
       let propertySchema = serializable
-        ? this.convertMembers(serializable)
+        ? this.convertMembers(serializable, convertValue)
         : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
 
       // an alias of a primitive or literal (`type Count = number`) leaves no trace in the type,
@@ -695,7 +698,7 @@ export class TypeToJsonSchemaConverter {
     // like properties, functions and symbols are dropped (`Record<string, string | (() => void)>`)
     const convertEntry = (value: Type) => {
       const serializable = this.getSerializableMembers(value)
-      return serializable ? this.convertMembers(serializable) : convertValue(value)
+      return serializable ? this.convertMembers(serializable, convertValue) : convertValue(value)
     }
 
     const keys = this.checker.getIndexInfosOfType(type).map((info) => ({
@@ -859,9 +862,12 @@ export class TypeToJsonSchemaConverter {
   /**
    * Converts some members of a union, `null` adds a `null` branch and `undefined` is left out.
    */
-  private convertMembers(members: readonly Type[]): JsonSchema {
+  private convertMembers(
+    members: readonly Type[],
+    convertValue?: (value: Type) => JsonSchema,
+  ): JsonSchema {
     return withNullBranch(
-      this.convertUnion(members),
+      this.convertUnion(members, convertValue),
       members.some((m) => m.flags & TypeFlags.Null),
     )
   }
@@ -925,24 +931,45 @@ export class TypeToJsonSchemaConverter {
       )
     }
 
-    // a branded primitive (`string & { __brand: 'UserId' }`) is serialized as the primitive
     if (
       !(resolved.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
-      this.types.getReferenceKind(resolved) !== undefined ||
-      (resolved.isIntersectionType() &&
-        this.types.getMembers(resolved).some((m) => m.flags & PRIMITIVE_FLAGS))
+      this.types.getReferenceKind(resolved) !== undefined
     ) {
       return this.visit(resolved)
     }
 
-    const symbol = resolved.getSymbol()
+    // a branded value is serialized as its base: the primitive of `string & { __brand: 'Id' }`,
+    // the items of `number[] & { ... }`, or the own fields of `Date & { ... }`
+    if (resolved.isIntersectionType()) {
+      const members = this.types.getMembers(resolved)
+
+      if (members.some((m) => m.flags & PRIMITIVE_FLAGS)) {
+        return this.visit(resolved)
+      }
+
+      const base = members.find(
+        (m) => this.types.getReferenceKind(m) !== undefined || this.isBuiltinObject(m),
+      )
+
+      if (base) {
+        return this.convertToJSONResult(base)
+      }
+    }
 
     // built-ins have no own enumerable data, except typed arrays
-    if (symbol && !TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(this.types, symbol)) {
+    if (this.isBuiltinObject(resolved)) {
       return { type: 'object' }
     }
 
     return this.convertObject(resolved, true)
+  }
+
+  /**
+   * A built-in object other than a typed array, like `Date` or `Set`.
+   */
+  private isBuiltinObject(type: Type): boolean {
+    const symbol = type.getSymbol()
+    return Boolean(symbol && !TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(this.types, symbol))
   }
 
   /**

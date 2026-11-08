@@ -90,6 +90,10 @@ describe('generated schemas match serialized outputs', async () => {
     ['functionValues', undefined],
     ['holdsDropJSON', undefined],
     ['holdsBrandedJSON', undefined],
+    ['setIndex', undefined],
+    ['setOrFunction', undefined],
+    ['walkedIntersections', undefined],
+    ['toBranded', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -136,6 +140,29 @@ describe('generated schemas match serialized outputs', async () => {
       k: { type: 'string' },
       ks: { type: 'array', items: { type: 'string' } },
     })
+  })
+
+  it('converts unions with functions in class instances under JSON.stringify rules', () => {
+    const schemas = spec.components?.schemas as any
+
+    expect(schemas.SetIndex.additionalProperties).toEqual({
+      anyOf: [{ type: 'number' }, { type: 'object' }],
+    })
+    expect(schemas.SetOrFunction.properties.tags).toEqual({ type: 'object' })
+  })
+
+  it('walks arrays with toJSON, and reads branded values toJSON returns', () => {
+    const schemas = spec.components?.schemas as any
+    expect(schemas.WalkedIntersections.required).toEqual(['list'])
+    expect(schemas.WalkedIntersections.properties.list).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+    })
+    expect(schemas.ToBrandedDate).toEqual({
+      type: 'object',
+      description: 'A date with a brand, serialized as an empty object',
+    })
+    expect(schemas.ToBrandedItems).toEqual({ type: 'array', items: { type: 'number' } })
   })
 
   it('describes class instances with JSON.stringify semantics', () => {

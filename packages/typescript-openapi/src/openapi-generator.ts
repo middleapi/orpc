@@ -34,7 +34,9 @@ import type { TypeScriptProjectOptions } from './project.ts'
 import { openTypeScriptProject } from './project.ts'
 import type { ResolvedRouterType } from './router-type.ts'
 import { RouterTypeResolver } from './router-type.ts'
+import { isPlain } from './schema-utils.ts'
 import type {
+  AsyncIteratorTypes,
   TypeToJsonSchemaConverterOptions,
   TypeToJsonSchemaConvertOptions,
 } from './type-converter.ts'
@@ -260,30 +262,68 @@ export class TypeScriptOpenAPIGenerator {
         return schemas
       }
 
-      if (!leaves.some(supported)) {
-        return [toInferredSchema(ctx.converter, type, inline[direction])]
+      /**
+       * Schemas inferred from the types, without the keys the kept schemas describe
+       * (which keeps query parameters primitive), and only when something is left.
+       */
+      const inferRest = (
+        kept: AnySchema[],
+        types: Type[],
+        options?: TypeToJsonSchemaConvertOptions,
+      ): AnySchema[] => {
+        const described = kept.flatMap((schema) => {
+          const [converted] = this.converters
+            .find((c) => c.condition(schema, direction))!
+            .convert(schema, direction)
+          return typeof converted === 'object' && converted.properties
+            ? Object.keys(converted.properties)
+            : []
+        })
+
+        return types.flatMap((t) => {
+          const [jsonSchema, optional] = ctx.converter.convert(t, options)
+          const rest = withoutProperties(jsonSchema, described)
+          return rest !== jsonSchema && isPlain(rest, 'object')
+            ? []
+            : [inferredSchema([rest, optional])]
+        })
       }
 
-      const iteratorTypes = iterator && ctx.converter.getAsyncIteratorTypes(type)
+      const iteratorTypes = getAllAsyncIteratorTypes(ctx.converter, type)
 
-      if (iteratorTypes) {
-        const complete = (parts: AnySchema[], partType: Type) =>
-          parts.every(supported)
-            ? parts
-            : [...parts.filter(supported), inferredSchema(ctx.converter.convert(partType))]
+      // event streams, completing the yield and return parts separately
+      if (iteratorTypes.length) {
+        const complete = (parts: AnySchema[], partTypes: (Type | undefined)[]) => {
+          if (parts.length && parts.every(supported)) {
+            return parts
+          }
 
-        const yields = complete(iterator!.yieldSchemas, iteratorTypes.yieldType)
-        const returns = complete(iterator!.returnSchemas, iteratorTypes.returnType)
+          const kept = parts.filter(supported)
+          return [
+            ...kept,
+            ...inferRest(
+              kept,
+              partTypes.filter((t) => t !== undefined),
+            ),
+          ]
+        }
+
+        const yields = complete(
+          iterator?.yieldSchemas ?? [],
+          iteratorTypes.map((t) => t.yieldType),
+        )
+        const returns = complete(
+          iterator?.returnSchemas ?? [],
+          iteratorTypes.map((t) => (hasReturn(t.returnType) ? t.returnType : undefined)),
+        )
 
         return Array.from({ length: Math.max(yields.length, returns.length) }, (_, i) =>
           asyncIteratorObject(yields[i] ?? yields[0]!, returns[i]),
         )
       }
 
-      return [
-        ...schemas!.filter(supported),
-        toInferredSchema(ctx.converter, type, inline[direction]),
-      ]
+      const kept = schemas?.filter(supported) ?? []
+      return [...kept, ...inferRest(kept, [type], inline[direction])]
     }
 
     const errorMap: ErrorMap = {}
@@ -300,7 +340,7 @@ export class TypeScriptOpenAPIGenerator {
       setOwn(
         errorMap,
         code,
-        dataType ? { ...config, data: toInferredSchema(ctx.converter, dataType, {}) } : config,
+        dataType ? { ...config, data: inferredSchema(ctx.converter.convert(dataType)) } : config,
       )
     }
 
@@ -333,28 +373,52 @@ function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType
 }
 
 /**
- * Infers a schema from a type, an async iterator becomes an `asyncIteratorObject` schema.
+ * The yield and return types of an async iterator, one per member of an intersection
+ * of async iterators (several `eventIterator` schemas).
  */
-function toInferredSchema(
+function getAllAsyncIteratorTypes(
   converter: TypeToJsonSchemaConverter,
   type: Type,
-  options: TypeToJsonSchemaConvertOptions,
-): AnySchema {
-  const iterator = converter.getAsyncIteratorTypes(type)
+): AsyncIteratorTypes[] {
+  const types = converter.getAsyncIteratorTypes(type)
 
-  if (iterator) {
-    const hasReturn = !(
-      iterator.returnType.flags &
-      (TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Any | TypeFlags.Unknown)
-    )
-
-    return asyncIteratorObject(
-      inferredSchema(converter.convert(iterator.yieldType)),
-      hasReturn ? inferredSchema(converter.convert(iterator.returnType)) : undefined,
-    )
+  if (types) {
+    return [types]
   }
 
-  return inferredSchema(converter.convert(type, options))
+  if (!type.isIntersectionType()) {
+    return []
+  }
+
+  const members = type.getTypes().map((member) => converter.getAsyncIteratorTypes(member))
+  return members.every((m) => m !== undefined) ? (members as AsyncIteratorTypes[]) : []
+}
+
+function hasReturn(type: Type): boolean {
+  return !(type.flags & (TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Any | TypeFlags.Unknown))
+}
+
+/**
+ * Removes properties from an object schema, when other schemas describe them.
+ */
+function withoutProperties(schema: JsonSchema, names: readonly string[]): JsonSchema {
+  if (typeof schema !== 'object' || !schema.properties || !names.length) {
+    return schema
+  }
+
+  const properties = Object.fromEntries(
+    Object.entries(schema.properties).filter(([name]) => !names.includes(name)),
+  )
+  const required = schema.required?.filter((name) => !names.includes(name))
+  const rest = { ...schema }
+  delete rest.properties
+  delete rest.required
+
+  return {
+    ...rest,
+    ...(Object.keys(properties).length ? { properties } : {}),
+    ...(required?.length ? { required } : {}),
+  }
 }
 
 /**

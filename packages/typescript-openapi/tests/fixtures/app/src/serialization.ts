@@ -448,6 +448,36 @@ export interface HoldsBrandedJSON {
   ks: BrandedJSON[]
 }
 
+export class SetIndex {
+  [key: string]: Set<string> | number | (() => void)
+}
+
+export class SetOrFunction {
+  tags: Set<string> | (() => void) = new Set(['a'])
+}
+
+export interface HiddenJSON {
+  toJSON(): undefined
+}
+
+/** Arrays are walked by the serializer, which never calls their `toJSON` */
+export interface WalkedIntersections {
+  list: string[] & HiddenJSON
+}
+
+/** A date with a brand, serialized as an empty object */
+export class ToBrandedDate {
+  toJSON(): Date & { __n: 1 } {
+    return new Date(0) as Date & { __n: 1 }
+  }
+}
+
+export class ToBrandedItems {
+  toJSON(): number[] & { __n: 1 } {
+    return [1] as number[] & { __n: 1 }
+  }
+}
+
 export const router = {
   post: os.handler(() => new Post()),
   posts: os.handler(() => [new Post(), new Post()]),
@@ -552,4 +582,10 @@ export const router = {
     k: new BrandedJSON(),
     ks: [new BrandedJSON()],
   })),
+  setIndex: os.handler((): SetIndex => Object.assign(new SetIndex(), { x: new Set(['a']) })),
+  setOrFunction: os.handler(() => new SetOrFunction()),
+  walkedIntersections: os.handler((): WalkedIntersections => ({
+    list: Object.assign(['a'], { toJSON: () => undefined }),
+  })),
+  toBranded: os.handler(() => ({ date: new ToBrandedDate(), items: new ToBrandedItems() })),
 }

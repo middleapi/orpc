@@ -119,18 +119,37 @@ export function getImplementedSymbol(checker: Checker, symbol: TSSymbol): TSSymb
       ? node.initializer
       : undefined
 
-  // walk down `.handler(...)`, `.use(...)`, and other builder calls to the implementer property
+  // walk down `.handler(...)`, `.use(...)`, and other builder calls to the implementer property.
+  // Called properties are builder methods or helpers (`withAuth(...)`), so they are skipped
+  // without asking the compiler.
+  let callee = false
+
   for (let depth = 0; expression && depth < 32; depth++) {
     if (expression.kind === SyntaxKind.CallExpression) {
       expression = expression.expression
+      callee = true
     } else if (expression.kind === SyntaxKind.PropertyAccessExpression) {
-      const property = checker.getSymbolAtLocation(expression.name)
+      if (!callee) {
+        const property = checker.getSymbolAtLocation(expression.name)
+        const declaration = property?.declarations[0]?.resolve() as any
+        const declared = declaration?.name && checker.getSymbolAtLocation(declaration.name)
 
-      if (property && property.flags & SymbolFlags.Property && property.id !== symbol.id) {
-        return property
+        // implementer properties are mapped from the contract: the contract declares them with
+        // another type. A property of a plain object (`procedures.authed`) has its declared type.
+        if (!property || !(property.flags & SymbolFlags.Property) || property.id === symbol.id) {
+          return undefined
+        }
+
+        const mappedType = checker.getTypeOfSymbol(property)
+        const declaredType = declared && checker.getTypeOfSymbol(declared)
+
+        return mappedType && declaredType && mappedType.id !== declaredType.id
+          ? property
+          : undefined
       }
 
       expression = expression.expression
+      callee = false
     } else {
       return undefined
     }

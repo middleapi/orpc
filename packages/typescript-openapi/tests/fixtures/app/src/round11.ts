@@ -8,6 +8,19 @@ import { getUser } from './round11/users'
 
 const list = impl.users.list.handler(() => [])
 
+const procedures = {
+  /** Requires a signed-in user */
+  authed: os.use(({ next }) => next()),
+}
+
+const helpers = {
+  /** Wraps a procedure with auth checks */
+  withAuth: <T>(procedure: T) => procedure,
+}
+
+const getMe = procedures.authed.handler(() => 'me')
+const secret = helpers.withAuth(os.handler(() => 'secret'))
+
 /**
  * JSDoc read through variables holding implemented procedures, and namespace members
  */
@@ -16,6 +29,8 @@ export const jsdoc = {
   ns: pings.ping,
   star: all.healthPing,
   healthPing,
+  getMe,
+  secret,
 }
 
 /**
@@ -35,5 +50,16 @@ export const mixed = {
     .handler(async function* () {
       yield { id: 'ab' }
       return { total: 1 }
+    }),
+  query: os
+    .route({ method: 'GET' })
+    .input(z.object({ a: z.string().min(3) }))
+    .input(type<{ b: number }>())
+    .handler(() => 'ok'),
+  iterators: os
+    .output(eventIterator(z.object({ id: z.string().min(2) })))
+    .output(eventIterator(type<{ n: number }>()))
+    .handler(async function* () {
+      yield { id: 'ab', n: 1 }
     }),
 }

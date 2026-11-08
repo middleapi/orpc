@@ -124,6 +124,18 @@ export function getToJSONResultType(
     return undefined
   }
 
+  // an array or plain object with a brand (`string[] & { toJSON(): undefined }`) is still walked
+  if (type.isIntersectionType()) {
+    const members = types.getMembers(type)
+
+    if (
+      members.some((m) => types.getReferenceKind(m) !== undefined) ||
+      (!stringify && members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m)))
+    ) {
+      return undefined
+    }
+  }
+
   const toJSON = getToJSON(types, type)
   return toJSON && getCallReturnType(types.checker, types.checker.getTypeOfSymbol(toJSON))
 }

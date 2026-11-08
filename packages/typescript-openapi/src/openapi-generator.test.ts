@@ -524,6 +524,10 @@ describe('typeScriptOpenAPIGenerator', () => {
       })
       expect(operation('/users/list').summary).toBe('List users')
 
+      // comments of builders and helpers are not the procedure's
+      expect(operation('/getMe').summary).toBeUndefined()
+      expect(operation('/secret').summary).toBeUndefined()
+
       for (const path of ['/ns', '/star', '/healthPing']) {
         expect(operation(path)).toMatchObject({
           summary: 'Ping the server',
@@ -538,10 +542,11 @@ describe('typeScriptOpenAPIGenerator', () => {
         source: { file: fixture('round11.ts'), export: 'mixed' },
       })
       const paths = spec.paths as any
+      // the inferred schema leaves out the keys the converted schemas describe
       const inferred = {
         type: 'object',
-        properties: { b: { type: 'number' }, a: { type: 'string' } },
-        required: ['b', 'a'],
+        properties: { b: { type: 'number' } },
+        required: ['b'],
       }
 
       expect(paths['/input'].post.requestBody.content['application/json'].schema).toEqual({
@@ -568,6 +573,23 @@ describe('typeScriptOpenAPIGenerator', () => {
         type: 'object',
         properties: { total: { type: 'number' } },
         required: ['total'],
+      })
+
+      // query parameters stay primitive
+      const parameters = paths['/query'].get.parameters
+      expect(parameters.map((p: any) => [p.name, p.schema, p.style])).toEqual([
+        ['a', { type: 'string', minLength: 3 }, undefined],
+        ['b', { type: 'number' }, undefined],
+      ])
+
+      // several event iterators are an intersection of iterators
+      const [streamMessage] =
+        paths['/iterators'].post.responses['200'].content['text/event-stream'].schema.oneOf
+      expect(streamMessage.properties.data).toEqual({
+        allOf: [
+          expect.objectContaining({ properties: { id: { type: 'string', minLength: 2 } } }),
+          { type: 'object', properties: { n: { type: 'number' } }, required: ['n'] },
+        ],
       })
     })
 
