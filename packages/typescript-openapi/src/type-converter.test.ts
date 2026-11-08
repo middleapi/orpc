@@ -1073,6 +1073,27 @@ describe('typeToJsonSchemaConverter', () => {
       }
     })
 
+    it('treats workspace packages linked into node_modules as project code', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/workspace/api/src/index.ts', import.meta.url),
+      })
+
+      try {
+        const [schema] = new TypeToJsonSchemaConverter(project.checker, project.program).convert(
+          project.getExportType('Planets').type,
+        ) as [any, boolean]
+
+        expect(schema.$defs.Planet).toEqual({
+          type: 'object',
+          properties: { id: { type: 'string', description: 'The id' }, name: { type: 'string' } },
+          required: ['id', 'name'],
+          description: 'A stored planet',
+        })
+      } finally {
+        project.close()
+      }
+    })
+
     it('describes web classes of the Node typings as class instances', () => {
       const project = openTypeScriptProject({
         file: new URL('../tests/fixtures/node-only/src/upload.ts', import.meta.url),

@@ -610,7 +610,12 @@ export class TypeToJsonSchemaConverter {
     return this.convertObject(type)
   }
 
-  private convertObject(type: Type, ignoreToJSON = false): JsonSchema {
+  /**
+   * `ignoreToJSON` converts the own fields of a type with `toJSON`, and `asPlainObject` converts
+   * them like a plain object the serializer walks, also when the type is a class instance
+   * (`Partial<Money>`, whose values may be plain objects).
+   */
+  private convertObject(type: Type, ignoreToJSON = false, asPlainObject = false): JsonSchema {
     const referenceKind = this.types.getReferenceKind(type)
 
     if (referenceKind === 'array') {
@@ -630,7 +635,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     // the class behind `Readonly<C>`, `Pick<C, K>`, or `C & { extra }` (`Object.freeze`, `Object.assign`)
-    const classType = getClassType(this.types, type)
+    const classType = asPlainObject ? undefined : getClassType(this.types, type)
 
     if (classType && classType.id !== type.id) {
       const subclass = this.convertBuiltinObject(classType)
@@ -647,8 +652,9 @@ export class TypeToJsonSchemaConverter {
     if (toJSONResult) {
       const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
 
+      // without `toJSON`, a value is its own fields, walked by the serializer outside class instances
       return hasOptionalToJSON(this.types, type)
-        ? { anyOf: dedupe([converted, this.convertObject(type, true)]) }
+        ? { anyOf: dedupe([converted, this.convertObject(type, true, !this.stringify)]) }
         : converted
     }
 
@@ -1028,8 +1034,11 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    // built-ins have no own enumerable data, except typed arrays
-    if (this.isBuiltinObject(resolved)) {
+    // built-ins have no own enumerable data, except typed arrays, also through `Readonly<Date>`
+    if (
+      this.isBuiltinObject(resolved) ||
+      getMappedBuiltin(this.types, resolved, true) !== undefined
+    ) {
       return { type: 'object' }
     }
 

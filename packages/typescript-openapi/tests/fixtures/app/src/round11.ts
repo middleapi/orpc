@@ -11,6 +11,13 @@ import { getUser } from './round11/users'
 
 const list = impl.users.list.handler(() => [])
 
+const Category = z.object({
+  name: z.string().optional(),
+  get children(): z.ZodArray<typeof Category> {
+    return z.array(Category)
+  },
+})
+
 /* oxlint-disable typescript/no-duplicate-enum-values -- duplicate values, which zod's enum keeps */
 enum Status {
   Active = 'a',
@@ -132,6 +139,10 @@ export const mixed = {
     .route({ method: 'GET' })
     .input(z.object({ s: z.enum(['a']) }))
     .input(type<{ s: 'a'; extra: string }>())
+    .handler(() => 'ok'),
+  recursive: os
+    .input(Category)
+    .input(type<{ name: string; extra: number }>())
     .handler(() => 'ok'),
   weaker: os
     .input(z.object({ tag: z.unknown() }))

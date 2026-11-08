@@ -100,6 +100,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['mixedSet', undefined],
     ['brandedSets', undefined],
     ['partialMoney', undefined],
+    ['mappedDates', undefined],
+    ['partialPlain', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -197,6 +199,9 @@ describe('generated schemas match serialized outputs', async () => {
       expect.objectContaining({ required: ['amount', 'currency'] }),
       expect.objectContaining({ type: 'object' }),
     ])
+    // `JSON.stringify` does not call `toJSON` of the returned date again
+    expect(schemas.ReadonlyDateJSON).toMatchObject({ type: 'object' })
+    expect(schemas.PartialDateJSON).toMatchObject({ type: 'object' })
     expect(schemas.MixedSet.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'number' }] })
   })
 

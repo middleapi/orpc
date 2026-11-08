@@ -26,7 +26,7 @@ import type {
 import { getOpenAPIMeta, OpenAPIGenerator, OpenAPIGeneratorError } from '@orpc/openapi'
 import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
-import { setOwn, toArray, value } from '@orpc/shared'
+import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { TypeFlags } from 'typescript/unstable/sync'
 
@@ -285,10 +285,13 @@ export class TypeScriptOpenAPIGenerator {
           const [jsonSchema, optional] = this.converters
             .find((c) => c.condition(schema, direction))!
             .convert(schema, direction)
-          const required = withRequiredFrom(
-            jsonSchema,
-            inferred.map(([s]) => s),
-          )
+          // a recursive schema (`$ref: '#'`) shares its levels, so the inferred part keeps them
+          const required = stringifyJSON(jsonSchema)!.includes('"$ref":"#')
+            ? jsonSchema
+            : withRequiredFrom(
+                jsonSchema,
+                inferred.map(([s]) => s),
+              )
 
           return {
             schema: required === jsonSchema ? schema : inferredSchema([required, optional]),

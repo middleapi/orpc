@@ -14,8 +14,8 @@ export interface JSDoc {
 }
 
 /**
- * Where a file comes from: the project, an external library (`node_modules`),
- * or the default library (`lib.*.d.ts`).
+ * Where a file comes from: the project (also workspace packages linked into `node_modules`),
+ * an external library (`node_modules`), or the default library (`lib.*.d.ts`).
  */
 export type SourceKind = 'project' | 'external' | 'default'
 
@@ -27,9 +27,11 @@ export function createSourceKindChecker(program: Program): (path: string) => Sou
 
     if (kind === undefined) {
       const metadata = program.getSourceFileMetadataByPath(path as any)
+      // a workspace package linked into `node_modules` (`@acme/db` -> `packages/db`)
+      // is resolved to its real path outside of it, and belongs to the project
       kind = metadata?.isDefaultLibrary
         ? 'default'
-        : metadata?.isFromExternalLibrary
+        : metadata?.isFromExternalLibrary && path.includes('/node_modules/')
           ? 'external'
           : 'project'
       cache.set(path, kind)

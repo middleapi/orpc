@@ -660,6 +660,16 @@ describe('typeScriptOpenAPIGenerator', () => {
         ['extra', { type: 'string' }, undefined],
       ])
 
+      // a recursive schema keeps its levels, the inferred part requires `name` at the root only
+      const recursive =
+        paths['/recursive'].post.requestBody.content['application/json'].schema.allOf
+      const category = (spec.components?.schemas as any)[
+        recursive[0].$ref.replace('#/components/schemas/', '')
+      ]
+      expect(category.required).toEqual(['children'])
+      expect(recursive[1].properties.extra).toEqual({ type: 'number' })
+      expect(recursive[1].required).toEqual(expect.arrayContaining(['name', 'extra']))
+
       // constraints only the type has
       expect(body('/constraints').properties.id).toEqual({
         type: 'string',

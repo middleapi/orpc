@@ -62,7 +62,10 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
     return schema
   }
 
-  const required = schema.required?.filter((name) => !removed.has(name))
+  // a key the type requires stays required, unless the other schema requires it already
+  const required = schema.required?.filter(
+    (name) => !removed.has(name) || !described.required?.includes(name),
+  )
   const rest: ObjectJsonSchema = { ...schema }
   delete rest.properties
   delete rest.required

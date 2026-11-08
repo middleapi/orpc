@@ -493,6 +493,29 @@ export class HoldsBrandedSets {
   sets: BrandedSets = [new Set(['a'])]
 }
 
+/** Returns a readonly date from `toJSON` */
+export class ReadonlyDateJSON {
+  toJSON(): Readonly<Date> {
+    return new Date(0)
+  }
+}
+
+/** Returns a partial date from `toJSON` */
+export class PartialDateJSON {
+  toJSON(): Partial<Date> {
+    return new Date(0)
+  }
+}
+
+export class TaggedJSON {
+  tags = new Set(['a'])
+  big = 1n
+
+  toJSON(): string {
+    return 'tagged'
+  }
+}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -633,5 +656,10 @@ export const router = {
   partialMoney: os.handler((): { m: Partial<Money>; list: Partial<Money>[] } => ({
     m: new Money(150),
     list: [new Money(1)],
+  })),
+  mappedDates: os.handler(() => ({ r: new ReadonlyDateJSON(), p: new PartialDateJSON() })),
+  partialPlain: os.handler((): { p: Partial<TaggedJSON>; list: Partial<TaggedJSON>[] } => ({
+    p: { tags: new Set(['a']) },
+    list: [{ tags: new Set(['b']), big: 2n }, new TaggedJSON()],
   })),
 }
