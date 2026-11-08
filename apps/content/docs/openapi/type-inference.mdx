@@ -77,6 +77,8 @@ For each input, output, and error `data` schema:
 
 Handlers returning an async iterator are documented as [event streams](/docs/async-iterator-object), from the yield and return types.
 
+Types carry no validation constraints, so an inferred schema has no `format: uuid`, `minLength`, or integer ranges unless you add them with [JSDoc tags](#jsdoc), like `@format uuid`, or keep the schema and its converter for that procedure.
+
 ## Type Mapping
 
 Types are converted as they look after [OpenAPI JSON serialization](/docs/openapi/serializer):
