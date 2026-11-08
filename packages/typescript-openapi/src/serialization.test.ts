@@ -56,6 +56,21 @@ describe('generated schemas match serialized outputs', async () => {
     ['spreadSizeRoom', undefined],
     ['selfRoom', undefined],
     ['nestedPromise', undefined],
+    ['selfOrNull', undefined],
+    ['maybeDate', undefined],
+    ['moneyOrNull', undefined],
+    ['hidden', undefined],
+    ['dict', undefined],
+    ['literalToJSON', undefined],
+    ['overrides', undefined],
+    ['tree', undefined],
+    ['trees', undefined],
+    ['taggedModel', undefined],
+    ['serializable', undefined],
+    ['jsonifiable', undefined],
+    ['fixedLength', undefined],
+    ['brandedKeys', undefined],
+    ['anything', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -125,5 +140,33 @@ describe('generated schemas match serialized outputs', async () => {
       required: ['cents'],
     })
     expect(schemas.Instant).toEqual({ type: 'object' })
+  })
+
+  it('has one component per model, named after it', () => {
+    const schemas = spec.components?.schemas ?? {}
+    const names = Object.keys(schemas)
+
+    // no numbered variant without its base, like `TaggedModel2` without `TaggedModel`
+    for (const name of names) {
+      const base = name.replace(/\d+$/u, '')
+      if (base !== name) {
+        expect(names).toContain(base)
+      }
+    }
+
+    // no two identical components
+    const bodies = names.map((name) => JSON.stringify(schemas[name]))
+    expect(new Set(bodies).size).toBe(bodies.length)
+  })
+
+  it('does not depend on the order of procedures', async () => {
+    const reversed = Object.fromEntries(Object.entries(router).toReversed())
+    const other = await new TypeScriptOpenAPIGenerator().generate(reversed as typeof router, {
+      source: { file: new URL('../tests/fixtures/app/src/serialization.ts', import.meta.url) },
+    })
+
+    expect(Object.keys(other.components?.schemas ?? {}).toSorted()).toEqual(
+      Object.keys(spec.components?.schemas ?? {}).toSorted(),
+    )
   })
 })

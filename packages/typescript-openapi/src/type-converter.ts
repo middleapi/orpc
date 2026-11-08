@@ -1,5 +1,4 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import { getJsonSchemaKeywordKind } from '@orpc/json-schema'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
@@ -123,37 +122,15 @@ const MAPPED_ACCESSOR_KINDS: ReadonlySet<SyntaxKind> = new Set([
   SyntaxKind.SetAccessor,
 ])
 
-const SERIALIZER_ONLY_NATIVE_TYPES = new Set(['set', 'map', 'bigint'])
-
-/**
- * Whether a schema (without following refs) reaches a value the serializer handles
- * but `JSON.stringify` does not: a `Set`, `Map`, `bigint`, or binary value.
- */
-function reachesSerializerOnlyValue(schema: JsonSchema, schemaLevel = true): boolean {
-  if (typeof schema !== 'object' || schema === null) {
-    return false
-  }
-
-  if (Array.isArray(schema)) {
-    return schema.some((item) => reachesSerializerOnlyValue(item, schemaLevel))
-  }
-
-  if (
-    schemaLevel &&
-    (SERIALIZER_ONLY_NATIVE_TYPES.has((schema as any)['x-native-type']) ||
-      typeof schema.contentMediaType === 'string')
-  ) {
-    return true
-  }
-
-  return Object.entries(schema).some(([key, value]) => {
-    const kind = getJsonSchemaKeywordKind(key, value, schemaLevel)
-    return (
-      (kind === 'schema' && reachesSerializerOnlyValue(value as JsonSchema, true)) ||
-      (kind === 'schema-record' && reachesSerializerOnlyValue(value as JsonSchema, false))
-    )
-  })
-}
+/** Built-ins the serializer handles, which `JSON.stringify` writes as `{}` */
+const MODE_SENSITIVE_BUILTINS = new Set([
+  'Set',
+  'ReadonlySet',
+  'Map',
+  'ReadonlyMap',
+  'Blob',
+  'File',
+])
 
 /** Members that identify a built-in through a mapped type over it, most specific first */
 const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]])[] = [
@@ -241,6 +218,10 @@ export class TypeToJsonSchemaConverter {
    * `Set`, `Map`, and `Blob` become `{}`, and `bigint` can not be serialized.
    */
   private stringify = false
+
+  private readonly sensitivity = new Map<number, boolean>()
+  private readonly sensitivityVisiting = new Set<number>()
+  private sensitivityAssumed = false
 
   private readonly membersCache = new Map<number, readonly Type[]>()
   private readonly propertiesCache = new Map<number, readonly TSSymbol[]>()
@@ -896,6 +877,22 @@ export class TypeToJsonSchemaConverter {
       return {}
     }
 
+    // the empty object type `{}` (also `NonNullable<unknown>`) accepts any value but `null` and `undefined`
+    if (
+      !properties.length &&
+      !isClassInstance &&
+      !this.isObjectLiteral(type) &&
+      !this.checker.getIndexInfosOfType(type).length &&
+      !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length
+    ) {
+      return {}
+    }
+
+    const arrayLike = this.convertArrayLikeObject(properties)
+    if (arrayLike !== undefined) {
+      return arrayLike
+    }
+
     const schema: ObjectJsonSchema & { properties: Record<string, JsonSchema> } = {
       type: 'object',
       properties: {},
@@ -908,8 +905,14 @@ export class TypeToJsonSchemaConverter {
       const property = dataProperties[i]!
       const propertyType = propertyTypes[i]
 
-      // functions, symbols, and always `undefined` values are dropped by JSON serialization
-      if (!propertyType || this.isDropped(propertyType)) {
+      // functions, symbols, and always `undefined` values are dropped by JSON serialization,
+      // also when `toJSON` returns them
+      const serialized = propertyType && this.getToJSONResultType(propertyType)
+      if (
+        !propertyType ||
+        this.isDropped(propertyType) ||
+        (serialized && this.isDropped(serialized))
+      ) {
         continue
       }
 
@@ -929,7 +932,11 @@ export class TypeToJsonSchemaConverter {
 
       schema.properties[property.name] = this.annotate(propertySchema, property)
 
-      if (!(property.flags & SymbolFlags.Optional) && !this.isOptional(propertyType)) {
+      if (
+        !(property.flags & SymbolFlags.Optional) &&
+        !this.isOptional(propertyType) &&
+        !(serialized && this.isOptional(serialized))
+      ) {
         required.push(property.name)
       }
     }
@@ -938,28 +945,35 @@ export class TypeToJsonSchemaConverter {
       schema.required = required
     }
 
-    const indexInfos = this.checker.getIndexInfosOfType(type)
-    // a string (or number) index covers every key, narrower template literal keys add nothing
+    const convertValue = (value: Type) =>
+      isClassInstance ? this.visitInClassInstance(value) : this.visit(value)
+
+    // a string (or number) index covers every key, narrower template literal keys add nothing.
+    // Branded keys (`Record<UserId, User>`) are keys of their primitive or template.
+    const keys = this.checker.getIndexInfosOfType(type).map((info) => ({
+      info,
+      key: this.getIndexKeyType(info.keyType),
+    }))
     const anyKey =
-      indexInfos.find((info) => info.keyType.flags & TypeFlags.String) ??
-      indexInfos.find((info) => info.keyType.flags & TypeFlags.Number)
-    const patternKeys = indexInfos.filter(
-      (info) => info.keyType.flags & (TypeFlags.TemplateLiteral | TypeFlags.StringMapping),
+      keys.find(({ key }) => key && key.flags & TypeFlags.String) ??
+      keys.find(({ key }) => key && key.flags & TypeFlags.Number)
+    const patternKeys = keys.filter(
+      ({ key }) => key && key.flags & (TypeFlags.TemplateLiteral | TypeFlags.StringMapping),
     )
 
     if (anyKey) {
-      schema.additionalProperties = this.visit(anyKey.valueType)
+      schema.additionalProperties = convertValue(anyKey.info.valueType)
     } else if (patternKeys.length === 1 && !Object.keys(schema.properties).length) {
       // like zod records with template literal keys, which keeps the value type in OpenAPI 3.0
       schema.propertyNames = {
         type: 'string',
-        pattern: `^${this.toPattern(patternKeys[0]!.keyType)}$`,
+        pattern: `^${this.toPattern(patternKeys[0]!.key!)}$`,
       }
-      schema.additionalProperties = this.visit(patternKeys[0]!.valueType)
+      schema.additionalProperties = convertValue(patternKeys[0]!.info.valueType)
     } else {
-      for (const info of patternKeys) {
+      for (const { info, key } of patternKeys) {
         schema.patternProperties ??= {}
-        schema.patternProperties[`^${this.toPattern(info.keyType)}$`] = this.visit(info.valueType)
+        schema.patternProperties[`^${this.toPattern(key!)}$`] = convertValue(info.valueType)
       }
     }
 
@@ -1037,9 +1051,12 @@ export class TypeToJsonSchemaConverter {
           ? this.getLeafBuiltinSchema(symbol.name)
           : undefined
 
+      // `JSON.stringify` calls the own `toJSON` of a built-in subclass, the serializer does not
       return (
         runtimeGlobal ??
-        (symbol.flags & SymbolFlags.Class ? this.convertBuiltinSubclass(type) : undefined)
+        (symbol.flags & SymbolFlags.Class && !(this.stringify && this.hasOwnToJSON(type))
+          ? this.convertBuiltinSubclass(type)
+          : undefined)
       )
     }
 
@@ -1091,31 +1108,7 @@ export class TypeToJsonSchemaConverter {
    * but the value is still the built-in and serialized like it.
    */
   private convertMappedBuiltin(type: Type): JsonSchema | undefined {
-    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
-      return undefined
-    }
-
-    const properties = this.getProperties(type)
-
-    if (!properties.length || !properties.every((p) => this.isBuiltinMember(p, false))) {
-      return undefined
-    }
-
-    // mapped members keep the declarations of the built-in they come from (`Date#getTime`),
-    // which tells `Map` apart from look-alikes such as `URLSearchParams`
-    const byName = new Map(properties.map((p) => [p.name, p]))
-    const builtin = MAPPED_BUILTIN_FINGERPRINTS.find(([name, members]) => {
-      const global = this.getGlobalType(name)
-
-      return (
-        global !== undefined &&
-        members.every((member) => {
-          const own = this.checker.getPropertyOfType(global, member)?.declarations[0]
-          const mapped = byName.get(member)?.declarations[0]
-          return own && mapped && own.path === mapped.path && own.index === mapped.index
-        })
-      )
-    })?.[0]
+    const builtin = this.getMappedBuiltinName(type)
 
     if (builtin === undefined) {
       return undefined
@@ -1139,6 +1132,38 @@ export class TypeToJsonSchemaConverter {
     }
 
     return this.getLeafBuiltinSchema(builtin)
+  }
+
+  /**
+   * The built-in a mapped type maps over, like `Date` for `DeepReadonly<Date>`: its members keep
+   * the built-in's own declarations (`Date#getTime`), which tells `Map` apart from look-alikes
+   * such as `URLSearchParams`.
+   */
+  private getMappedBuiltinName(type: Type): string | undefined {
+    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+      return undefined
+    }
+
+    const properties = this.getProperties(type)
+
+    if (!properties.length || !properties.every((p) => this.isBuiltinMember(p, false))) {
+      return undefined
+    }
+
+    const byName = new Map(properties.map((p) => [p.name, p]))
+
+    return MAPPED_BUILTIN_FINGERPRINTS.find(([name, members]) => {
+      const global = this.getGlobalType(name)
+
+      return (
+        global !== undefined &&
+        members.every((member) => {
+          const own = this.checker.getPropertyOfType(global, member)?.declarations[0]
+          const mapped = byName.get(member)?.declarations[0]
+          return own && mapped && own.path === mapped.path && own.index === mapped.index
+        })
+      )
+    })?.[0]
   }
 
   private getGlobalType(name: string): Type | undefined {
@@ -1658,6 +1683,30 @@ export class TypeToJsonSchemaConverter {
         ? (this.checker.getBaseConstraintOfType(type) ?? type)
         : type
 
+    // each member of `Date | string` or `this | null` is serialized once, by its own fields
+    if (resolved.isUnionType()) {
+      const members = this.getMembers(resolved)
+
+      if (
+        !members.some(
+          (m) => m.flags & (TypeFlags.Object | TypeFlags.Intersection | TypeFlags.TypeParameter),
+        )
+      ) {
+        return this.visit(resolved)
+      }
+
+      const schemas = dedupe(
+        members.filter((m) => !(m.flags & NULLISH_FLAGS)).map((m) => this.convertToJSONResult(m)),
+      )
+      const schema = schemas.length > 1 ? { anyOf: schemas } : schemas[0]
+
+      if (!members.some((m) => m.flags & TypeFlags.Null)) {
+        return schema ?? {}
+      }
+
+      return schema === undefined ? { type: 'null' } : withNull(schema)
+    }
+
     if (
       !(resolved.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
       this.getReferenceKind(resolved) !== undefined
@@ -1724,18 +1773,184 @@ export class TypeToJsonSchemaConverter {
    * under its rules only when they make a difference, so shared models keep one def.
    */
   private visitInClassInstance(type: Type): JsonSchema {
-    const schema = this.visit(type)
-
-    return !this.stringify && this.dependsOnSerializer(schema)
-      ? this.withStringify(() => this.visit(type))
-      : schema
+    return this.stringify || !this.isModeSensitive(type)
+      ? this.visit(type)
+      : this.withStringify(() => this.visit(type))
   }
 
   /**
    * Keys of conversion results, which differ between the serializer and `JSON.stringify`.
    */
   private key(type: Type): number {
-    return this.stringify ? -type.id : type.id
+    // a type converted the same way under both rules shares one result, and so one def
+    return this.stringify && this.isModeSensitive(type) ? -type.id : type.id
+  }
+
+  /**
+   * Whether a type converts differently under `JSON.stringify` than under the serializer:
+   * when it reaches a `Set`, `Map`, `Blob`, `File`, or `bigint`, a built-in subclass serialized
+   * through its own `toJSON`, or an object literal with `toJSON`. Class instances are always
+   * converted under `JSON.stringify` rules, so they convert the same way either way.
+   */
+  private isModeSensitive(type: Type): boolean {
+    const cached = this.sensitivity.get(type.id)
+
+    if (cached !== undefined) {
+      return cached
+    }
+
+    // a cycle: assume no, and do not cache answers that relied on it
+    if (this.sensitivityVisiting.has(type.id)) {
+      this.sensitivityAssumed = true
+      return false
+    }
+
+    const outerAssumed = this.sensitivityAssumed
+    this.sensitivityAssumed = false
+    this.sensitivityVisiting.add(type.id)
+
+    let sensitive: boolean
+    try {
+      sensitive = this.computeModeSensitive(type)
+    } finally {
+      this.sensitivityVisiting.delete(type.id)
+    }
+
+    if (sensitive || !this.sensitivityAssumed) {
+      this.sensitivity.set(type.id, sensitive)
+    }
+
+    this.sensitivityAssumed = outerAssumed || (this.sensitivityAssumed && !sensitive)
+    return sensitive
+  }
+
+  private computeModeSensitive(type: Type): boolean {
+    const flags = type.flags
+
+    if (flags & TypeFlags.BigIntLike) {
+      return true
+    }
+
+    if (flags & TypeFlags.UnionOrIntersection) {
+      return this.getMembers(type).some((m) => this.isModeSensitive(m))
+    }
+
+    if (flags & INSTANTIABLE_FLAGS) {
+      const constraint = this.checker.getBaseConstraintOfType(type)
+      return (
+        constraint !== undefined && constraint.id !== type.id && this.isModeSensitive(constraint)
+      )
+    }
+
+    if (!(flags & TypeFlags.Object)) {
+      return false
+    }
+
+    if (this.getReferenceKind(type) !== undefined) {
+      return this.getReferenceArguments(type).some((t) => this.isModeSensitive(t))
+    }
+
+    const symbol = type.getSymbol()
+
+    if (symbol && this.isBuiltinSymbol(symbol)) {
+      return MODE_SENSITIVE_BUILTINS.has(symbol.name)
+    }
+
+    if (symbol && symbol.flags & SymbolFlags.Class) {
+      const base = this.getBuiltinBaseName(type)
+      return base !== undefined && (MODE_SENSITIVE_BUILTINS.has(base) || this.hasOwnToJSON(type))
+    }
+
+    const mapped = this.getMappedBuiltinName(type)
+    if (mapped !== undefined) {
+      return MODE_SENSITIVE_BUILTINS.has(mapped)
+    }
+
+    const properties = this.getProperties(type)
+
+    if (this.isObjectLiteral(type) && properties.some((p) => p.name === 'toJSON')) {
+      return true
+    }
+
+    const data = properties.filter((p) => !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)))
+    const types = data.length ? this.checker.getTypeOfSymbol(data) : []
+
+    return (
+      types.some((t) => t !== undefined && this.isModeSensitive(t)) ||
+      this.checker.getIndexInfosOfType(type).some((info) => this.isModeSensitive(info.valueType))
+    )
+  }
+
+  /**
+   * An object type derived from an array or tuple, like type-fest's `FixedLengthArray<T, 3>`
+   * (a tuple without its length mutating methods), whose values are still arrays.
+   */
+  private convertArrayLikeObject(properties: readonly TSSymbol[]): JsonSchema | undefined {
+    const length = properties.find((p) => p.name === 'length')
+    const slice = properties.find((p) => p.name === 'slice')
+
+    if (!length || !slice || !this.isBuiltinMember(slice, false)) {
+      return undefined
+    }
+
+    const numeric = properties.filter((p) => /^\d+$/u.test(p.name))
+    // in index order, `0`, `1`, ...
+    const elements = numeric.map((_, i) => numeric.find((p) => p.name === String(i)))
+    const ordered = elements.every((e) => e !== undefined) ? (elements as TSSymbol[]) : numeric
+    const [lengthType, ...elementTypes] = this.checker.getTypeOfSymbol([length, ...ordered])
+    const fixed =
+      lengthType && lengthType.flags & TypeFlags.NumberLiteral
+        ? (lengthType as any).value
+        : undefined
+
+    if (fixed !== undefined && ordered === elements && numeric.length === fixed) {
+      return {
+        type: 'array',
+        prefixItems: elementTypes.map((t) => this.visitElement(t)),
+        minItems: fixed,
+        maxItems: fixed,
+      }
+    }
+
+    const items = dedupe(elementTypes.map((t) => this.visitElement(t)))
+    return { type: 'array', items: items.length > 1 ? { anyOf: items } : (items[0] ?? {}) }
+  }
+
+  /**
+   * The key type of an index signature, the primitive or template of a branded key.
+   */
+  private getIndexKeyType(key: Type): Type | undefined {
+    const keyFlags =
+      TypeFlags.String | TypeFlags.Number | TypeFlags.TemplateLiteral | TypeFlags.StringMapping
+
+    if (key.flags & keyFlags) {
+      return key
+    }
+
+    return key.isIntersectionType()
+      ? this.getMembers(key).find((member) => member.flags & keyFlags)
+      : undefined
+  }
+
+  /**
+   * What `toJSON` of a value of this type returns, when it is called during serialization.
+   */
+  private getToJSONResultType(type: Type): Type | undefined {
+    if (
+      !(type.flags & TypeFlags.Object) ||
+      this.getReferenceKind(type) !== undefined ||
+      (this.isObjectLiteral(type) && !this.stringify)
+    ) {
+      return undefined
+    }
+
+    const toJSON = this.getProperties(type).find((p) => p.name === 'toJSON')
+    return toJSON && getCallReturnType(this.checker, this.checker.getTypeOfSymbol(toJSON))
+  }
+
+  private hasOwnToJSON(type: Type): boolean {
+    const toJSON = this.getProperties(type).find((p) => p.name === 'toJSON')
+    return toJSON !== undefined && !this.isBuiltinMember(toJSON, false)
   }
 
   private withStringify<T>(fn: () => T): T {
@@ -1752,23 +1967,6 @@ export class TypeToJsonSchemaConverter {
    * Whether `JSON.stringify` serializes values of a schema differently than the serializer:
    * when it reaches a `Set`, `Map`, `bigint`, or binary value.
    */
-  private dependsOnSerializer(schema: JsonSchema): boolean {
-    if (reachesSerializerOnlyValue(schema)) {
-      return true
-    }
-
-    for (const name of this.collectDeps(collectDefRefs(schema))) {
-      const def = this.defsByName.get(name)!.schema
-
-      // still being converted, so undecided: convert under `JSON.stringify` rules to be safe
-      if (def === undefined || reachesSerializerOnlyValue(def)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
   private hasMember(type: Type, flags: number): boolean {
     return type.isUnionType() && this.getMembers(type).some((m) => m.flags & flags)
   }

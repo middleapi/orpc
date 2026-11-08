@@ -81,24 +81,25 @@ Handlers returning an async iterator are documented as [event streams](/docs/asy
 
 Types are converted as they look after [OpenAPI JSON serialization](/docs/openapi/serializer):
 
-| TypeScript                              | JSON Schema                                                       |
-| --------------------------------------- | ----------------------------------------------------------------- |
-| `string`, `number`, `boolean`, `null`   | `type` of the same name                                           |
-| Literals, enums, unions of literals     | `const` or `enum`                                                 |
-| Unions, discriminated unions            | `anyOf`                                                           |
-| Intersections, mapped and utility types | the resolved object                                               |
-| Branded primitives (`string & { … }`)   | the primitive                                                     |
-| Template literals                       | `string` with a `pattern`                                         |
-| Arrays, tuples (optional and rest)      | `items`, `prefixItems`                                            |
-| Index signatures, `Record`              | `additionalProperties`, `propertyNames` for template literal keys |
-| Optional or `undefined` properties      | not `required`                                                    |
-| `Date`, `bigint`, `URL`, `Set`, `Map`   | their serialized form, matching the Zod and Valibot converters    |
-| `Blob`, `File`                          | binary `string`, sent as `multipart/form-data`                    |
-| Classes with `toJSON`                   | the return type of `toJSON`                                       |
-| Class instances                         | their own fields, as `JSON.stringify` serializes them             |
-| Functions, symbols, methods             | omitted                                                           |
-| `any`, `unknown`                        | `{}`                                                              |
-| `number`                                | `number`, though `NaN` and `Infinity` are sent as `null`          |
+| TypeScript                               | JSON Schema                                                       |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| `string`, `number`, `boolean`, `null`    | `type` of the same name                                           |
+| Literals, enums, unions of literals      | `const` or `enum`                                                 |
+| Unions, discriminated unions             | `anyOf`                                                           |
+| Intersections, mapped and utility types  | the resolved object                                               |
+| Branded primitives (`string & { … }`)    | the primitive                                                     |
+| Template literals                        | `string` with a `pattern`                                         |
+| Arrays, tuples (optional and rest)       | `items`, `prefixItems`                                            |
+| Array-derived types (`FixedLengthArray`) | `items`, `prefixItems`                                            |
+| Index signatures, `Record`               | `additionalProperties`, `propertyNames` for template literal keys |
+| Optional or `undefined` properties       | not `required`                                                    |
+| `Date`, `bigint`, `URL`, `Set`, `Map`    | their serialized form, matching the Zod and Valibot converters    |
+| `Blob`, `File`                           | binary `string`, sent as `multipart/form-data`                    |
+| Classes with `toJSON`                    | what `toJSON` returns, serialized by its own fields               |
+| Class instances                          | their own fields, as `JSON.stringify` serializes them             |
+| Functions, symbols, methods              | omitted                                                           |
+| `any`, `unknown`, `{}`                   | `{}`                                                              |
+| `number`                                 | `number`, though `NaN` and `Infinity` are sent as `null`          |
 
 :::info
 Class instances are serialized by `JSON.stringify` rather than the OpenAPI JSON serializer, and documented that way: their `Set`, `Map`, `Blob`, and `File` fields become `{}`, `bigint` fields can not be serialized, and getters and methods on the prototype are left out.

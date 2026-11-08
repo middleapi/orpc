@@ -149,10 +149,7 @@ describe('typeToJsonSchemaConverter', () => {
       },
       false,
     ])
-    expect(convert('Empty')).toEqual([
-      { $ref: '#/$defs/Empty', $defs: { Empty: { type: 'object' } } },
-      false,
-    ])
+    expect(convert('Empty')).toEqual([{}, false])
     expect(convert('EmptyRecord')).toEqual([
       {
         $ref: '#/$defs/EmptyRecord',
@@ -566,14 +563,8 @@ describe('typeToJsonSchemaConverter', () => {
       },
       false,
     ])
-    expect(convert('Getters')).toEqual([
-      { $ref: '#/$defs/Getters_T', $defs: { Getters_T: { type: 'object' } } },
-      false,
-    ])
-    expect(convert('Nullify')).toEqual([
-      { $ref: '#/$defs/Nullify_T', $defs: { Nullify_T: { type: 'object' } } },
-      false,
-    ])
+    expect(convert('Getters')).toEqual([{}, false])
+    expect(convert('Nullify')).toEqual([{}, false])
     expect(convert('NullifiedUser')).toEqual([
       {
         $ref: '#/$defs/Nullify_User',
