@@ -981,6 +981,246 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('round four', () => {
+    let r4: TypeScriptProject
+
+    beforeAll(() => {
+      r4 = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round4.ts', import.meta.url),
+      })
+    })
+
+    afterAll(() => {
+      r4.close()
+    })
+
+    const convertR4 = (
+      name: string,
+      options?: ConstructorParameters<typeof TypeToJsonSchemaConverter>[2],
+    ) =>
+      new TypeToJsonSchemaConverter(r4.checker, r4.program, options).convert(
+        r4.getExportType(name).type,
+      )
+
+    const countEmpty = (value: unknown): number =>
+      (JSON.stringify(value).match(/:\{\}/gu) ?? []).length
+
+    it('fixture has no type errors', () => {
+      expect(r4.program.getSemanticDiagnostics(r4.sourceFile.fileName)).toEqual([])
+    })
+
+    it('never cuts sibling instantiations', () => {
+      expect(countEmpty(convertR4('ManyArrays'))).toBe(0)
+      const [boxes] = convertR4('ManyBoxes') as [any, boolean]
+      expect(Object.keys(boxes.$defs)).toHaveLength(71)
+      expect(countEmpty(boxes)).toBe(0)
+    })
+
+    it('never cuts a type revisited through named defs', () => {
+      const [hub] = convertR4('HubRoot') as [any, boolean]
+      expect(Object.keys(hub.$defs)).toHaveLength(21)
+      expect(countEmpty(hub)).toBe(0)
+    })
+
+    it('names class expressions after their variable', () => {
+      expect(convertR4('ExprInstance')).toEqual([
+        {
+          $ref: '#/$defs/Expr',
+          $defs: {
+            Expr: { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('detects growth through object literal arguments', () => {
+      expect(convertR4('StringThread')).toEqual([
+        {
+          $ref: '#/$defs/StringThread',
+          $defs: {
+            StringThread: {
+              type: 'object',
+              properties: {
+                item: { type: 'string' },
+                replies: { type: 'array', items: { $ref: '#/$defs/Thread' } },
+              },
+              required: ['item', 'replies'],
+            },
+            Thread: {
+              type: 'object',
+              properties: {
+                item: {
+                  type: 'object',
+                  properties: { parent: { type: 'string' } },
+                  required: ['parent'],
+                },
+                replies: { type: 'array', items: { $ref: '#/$defs/Thread2' } },
+              },
+              required: ['item', 'replies'],
+            },
+            Thread2: {
+              type: 'object',
+              properties: {
+                item: {
+                  type: 'object',
+                  properties: {
+                    parent: {
+                      type: 'object',
+                      properties: { parent: { type: 'string' } },
+                      required: ['parent'],
+                    },
+                  },
+                  required: ['parent'],
+                },
+                replies: { type: 'array', items: { $ref: '#/$defs/Thread3' } },
+              },
+              required: ['item', 'replies'],
+            },
+            Thread3: {
+              type: 'object',
+              properties: {
+                item: {
+                  type: 'object',
+                  properties: {
+                    parent: {
+                      type: 'object',
+                      properties: {
+                        parent: {
+                          type: 'object',
+                          properties: { parent: { type: 'string' } },
+                          required: ['parent'],
+                        },
+                      },
+                      required: ['parent'],
+                    },
+                  },
+                  required: ['parent'],
+                },
+                replies: { type: 'array', items: {} },
+              },
+              required: ['item', 'replies'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('keeps named nullable unions behind optional properties', () => {
+      expect(convertR4('Doc')).toEqual([
+        {
+          $ref: '#/$defs/Doc',
+          $defs: {
+            Doc: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                body: { $ref: '#/$defs/Json' },
+                status: { $ref: '#/$defs/Status' },
+                optionalJson: { $ref: '#/$defs/OptionalJson' },
+              },
+              required: ['id', 'optionalJson'],
+            },
+            OptionalJson: {
+              anyOf: [
+                { type: 'boolean' },
+                { type: 'string' },
+                { type: 'number' },
+                { type: 'array', items: { $ref: '#/$defs/OptionalJson' } },
+                { type: 'object', additionalProperties: { $ref: '#/$defs/OptionalJson' } },
+                { type: 'null' },
+              ],
+            },
+            Status: {
+              anyOf: [{ type: 'string', enum: ['closed', 'open'] }, { type: 'null' }],
+              description: 'Nullable status',
+            },
+            Json: {
+              anyOf: [
+                { type: 'boolean' },
+                { type: 'string' },
+                { type: 'number' },
+                { type: 'array', items: { $ref: '#/$defs/Json' } },
+                { type: 'object', additionalProperties: { $ref: '#/$defs/Json' } },
+                { type: 'null' },
+              ],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('ignores toJSON of plain object literals', () => {
+      expect(convertR4('PlainWithToJSON')).toEqual([
+        { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+        false,
+      ])
+    })
+
+    it('makes the def at the named type of a cycle, not at its wrapper', () => {
+      expect(convertR4('WrappersFirst', { defs: 'recursive' })).toEqual([
+        {
+          type: 'object',
+          properties: {
+            items: { type: 'array', items: { $ref: '#/$defs/TreeItem' } },
+            dicts: { type: 'object', additionalProperties: { $ref: '#/$defs/Dict' } },
+          },
+          required: ['items', 'dicts'],
+          $defs: {
+            Dict: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                entries: { type: 'object', additionalProperties: { $ref: '#/$defs/Dict' } },
+              },
+              required: ['name', 'entries'],
+            },
+            TreeItem: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                children: { type: 'array', items: { $ref: '#/$defs/TreeItem' } },
+              },
+              required: ['id', 'children'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('skips members inherited from runtime classes and package errors', () => {
+      expect(convertR4('MyStream')).toEqual([
+        {
+          $ref: '#/$defs/MyStream',
+          $defs: {
+            MyStream: {
+              type: 'object',
+              properties: { tag: { type: 'string' } },
+              required: ['tag'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR4('MyZodError')).toEqual([
+        {
+          $ref: '#/$defs/MyZodError',
+          $defs: {
+            MyZodError: {
+              type: 'object',
+              properties: { extra: { type: 'number' } },
+              required: ['extra'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+  })
+
   describe('round three', () => {
     let r3: TypeScriptProject
 

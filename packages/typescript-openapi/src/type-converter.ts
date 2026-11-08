@@ -112,6 +112,9 @@ const TYPED_ARRAYS = new Set([
   'BigUint64Array',
 ])
 
+/** Typings of runtime built-in modules, whose classes are not data holders */
+const RUNTIME_TYPINGS = /\/node_modules\/(?:@types\/(?:node|bun|deno)|bun-types)\//u
+
 /** Nested instantiations of one declaration, like `Maybe<A>` inside `Maybe<B>` */
 const MAX_NESTING = 16
 /** Distinct instantiations of one declaration in one conversion */
@@ -161,6 +164,11 @@ export class TypeToJsonSchemaConverter {
 
   /** Anonymous types being converted, with the named depth they were entered at */
   private readonly visiting = new Map<number, number>()
+  private readonly visitingStack: Type[] = []
+  /** Types that close a cycle, preferred over wrappers around them for the def */
+  private readonly cycleClosers = new Set<number>()
+  /** Non-null cores of named nullable unions, back to the union (`Json` without `null` -> `Json`) */
+  private readonly nullableCores = new Map<number, Type>()
   private namedDepth = 0
   private readonly expansions = new Map<number, Expansion[]>()
   private readonly instantiations = new Map<number, Set<number>>()
@@ -291,6 +299,12 @@ export class TypeToJsonSchemaConverter {
     }
 
     const stack = this.expansions.get(declaration) ?? []
+
+    // the same type again (through a named def) is not an expansion, the cycle logic handles it
+    if (stack.some((entry) => entry.type.id === type.id)) {
+      return this.visitStructured(type, singleMemberEnum)
+    }
+
     const growth = this.getExpansionGrowth(declaration, stack, type)
 
     if (growth === undefined) {
@@ -305,6 +319,11 @@ export class TypeToJsonSchemaConverter {
       return this.visitStructured(type, singleMemberEnum)
     } finally {
       stack.pop()
+
+      // the budget is per outermost instantiation, siblings (`A[]` next to `B[]`) are not nested
+      if (!stack.length) {
+        this.instantiations.delete(declaration)
+      }
     }
   }
 
@@ -319,6 +338,19 @@ export class TypeToJsonSchemaConverter {
     stack: readonly Expansion[],
     type: Type,
   ): number | undefined {
+    const outer = stack.at(-1)
+
+    // not nested in itself, so not an expansion
+    if (!outer) {
+      return 0
+    }
+
+    // default library types (`Array`, `Map`) only nest as deep as the type that uses them
+    const symbol = type.getAliasSymbol() ?? type.getSymbol()
+    if (symbol && this.getSymbolSourceKind(symbol) === 'default') {
+      return 0
+    }
+
     let seen = this.instantiations.get(declaration)
 
     if (!seen) {
@@ -327,18 +359,6 @@ export class TypeToJsonSchemaConverter {
     }
 
     seen.add(type.id)
-
-    const outer = stack.at(-1)
-
-    if (!outer) {
-      return seen.size > MAX_INSTANTIATIONS ? undefined : 0
-    }
-
-    // default library types (`Array`, `Map`) only nest as deep as the type that uses them
-    const symbol = type.getAliasSymbol() ?? type.getSymbol()
-    if (symbol && this.getSymbolSourceKind(symbol) === 'default') {
-      return 0
-    }
 
     if (stack.length >= MAX_NESTING || seen.size > MAX_INSTANTIATIONS) {
       return undefined
@@ -369,12 +389,23 @@ export class TypeToJsonSchemaConverter {
       return false
     }
 
-    const children =
-      type.flags & TypeFlags.UnionOrIntersection
-        ? this.getMembers(type)
-        : this.getTypeArguments(type)
+    let children: readonly (Type | undefined)[]
 
-    return children.some((child) => this.containsType(child, id, depth - 1))
+    if (type.flags & TypeFlags.UnionOrIntersection) {
+      children = this.getMembers(type)
+    } else if (
+      type.flags & TypeFlags.Object &&
+      (type as any).objectFlags & ObjectFlags.Anonymous &&
+      !type.getAliasSymbol()
+    ) {
+      // `Thread<{ parent: T }>` grows through the literal's properties
+      const properties = this.getProperties(type)
+      children = properties.length ? this.checker.getTypeOfSymbol(properties) : []
+    } else {
+      children = this.getTypeArguments(type)
+    }
+
+    return children.some((child) => child !== undefined && this.containsType(child, id, depth - 1))
   }
 
   private visitStructured(type: Type, singleMemberEnum: TSSymbol | undefined): JsonSchema {
@@ -411,15 +442,24 @@ export class TypeToJsonSchemaConverter {
     // the same anonymous type again, without a named def in between to stop at: a cycle.
     // Through a named def (`Tree[]` in `Tree`), converting it again ends at that def.
     if (enteredAt === this.namedDepth) {
-      return { $ref: toRef(this.createDef(type, this.getFallbackDefName(type)).name) }
+      const closer = this.getCycleCloser(type)
+
+      if (closer === undefined) {
+        return { $ref: toRef(this.createDef(type, this.getFallbackDefName(type)).name) }
+      }
+
+      // convert this wrapper (`TreeNode[]`) once more, so the cycle closes at `TreeNode` instead
+      this.cycleClosers.add(closer.id)
     }
 
     this.visiting.set(type.id, this.namedDepth)
+    this.visitingStack.push(type)
 
     let schema: JsonSchema
     try {
       schema = this.convertType(type)
     } finally {
+      this.visitingStack.pop()
       if (enteredAt === undefined) {
         this.visiting.delete(type.id)
       } else {
@@ -440,6 +480,33 @@ export class TypeToJsonSchemaConverter {
     }
 
     return schema
+  }
+
+  /**
+   * When a cycle comes back to a type without a good name, like `TreeNode[]` or
+   * `Record<string, Dict>`, returns the named type in the cycle (`TreeNode`) to make the def for.
+   */
+  private getCycleCloser(type: Type): Type | undefined {
+    if (this.cycleClosers.has(type.id) || this.hasCycleName(type)) {
+      return undefined
+    }
+
+    const start = this.visitingStack.findIndex((entry) => entry.id === type.id)
+
+    // converted once more already, the closer did not come back
+    if (this.visitingStack.lastIndexOf(type) !== start) {
+      return undefined
+    }
+
+    return this.visitingStack.slice(start + 1).find((entry) => this.hasCycleName(entry))
+  }
+
+  private hasCycleName(type: Type): boolean {
+    const symbol = this.getNamedSymbol(type)
+
+    return Boolean(
+      symbol && !symbol.name.startsWith('__') && this.getSymbolSourceKind(symbol) !== 'default',
+    )
   }
 
   private convertType(type: Type): JsonSchema {
@@ -542,11 +609,24 @@ export class TypeToJsonSchemaConverter {
       schema = this.visit(concrete[0]!)
     } else if (concrete.length > 1) {
       const core = this.checker.getNonNullableType(type)
+      const hasNull = members.some((m) => m.flags & TypeFlags.Null)
+
       // without `strictNullChecks` the checker returns the union itself
-      schema =
-        core && core.id !== type.id && !(core.flags & TypeFlags.Never)
-          ? this.visit(core)
-          : this.convertUnion(concrete)
+      if (core && core.id !== type.id && !(core.flags & TypeFlags.Never)) {
+        // `Json | undefined` inside `type Json = ... | null` is `Json` again
+        const named = this.nullableCores.get(core.id)
+        if (named && named.id !== type.id && hasNull) {
+          return this.visit(named)
+        }
+
+        if (hasNull && type.getAliasSymbol() && !this.hasMember(type, UNDEFINED_FLAGS)) {
+          this.nullableCores.set(core.id, type)
+        }
+
+        schema = this.visit(core)
+      } else {
+        schema = this.convertUnion(concrete)
+      }
     }
 
     if (!members.some((m) => m.flags & TypeFlags.Null)) {
@@ -646,7 +726,10 @@ export class TypeToJsonSchemaConverter {
 
     const properties = this.getProperties(type)
 
-    const toJSON = properties.find((p) => p.name === 'toJSON')
+    // the serializer walks plain objects key by key, only other objects go through `toJSON`
+    const toJSON = this.isObjectLiteral(type)
+      ? undefined
+      : properties.find((p) => p.name === 'toJSON')
     if (toJSON) {
       const returnType = getCallReturnType(this.checker, this.checker.getTypeOfSymbol(toJSON))
       if (returnType) {
@@ -655,6 +738,8 @@ export class TypeToJsonSchemaConverter {
     }
 
     const isClassInstance = Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.Class)
+    // members of `Error` subclasses from packages are not data either (`ZodError#issues` is a getter)
+    const isError = isClassInstance && this.getBuiltinBaseName(type) === 'Error'
 
     const dataProperties = properties.filter(
       (p) =>
@@ -664,8 +749,8 @@ export class TypeToJsonSchemaConverter {
         !p.escapedName.startsWith('__@') &&
         !p.escapedName.startsWith('__#') &&
         !isClassAccessor(p) &&
-        // members inherited from a built-in class (`Error#message`) are not own enumerable data
-        !(isClassInstance && this.isDefaultLibraryMember(p)),
+        // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
+        !(isClassInstance && this.isBuiltinMember(p, isError)),
     )
 
     if (
@@ -693,12 +778,14 @@ export class TypeToJsonSchemaConverter {
         continue
       }
 
-      let propertySchema = this.visit(propertyType)
+      let propertySchema = this.visit(
+        this.getNullableAliasType(property, propertyType) ?? propertyType,
+      )
 
       // an alias of a primitive or literal (`type Count = number`) leaves no trace in the type,
       // so its JSDoc is read through the property's type annotation
       if (isTrivialSchema(propertySchema) || isLiteralSchema(propertySchema)) {
-        propertySchema = this.annotate(propertySchema, this.getPrimitiveAliasSymbol(property))
+        propertySchema = this.annotate(propertySchema, this.getAnnotationAlias(property))
       }
 
       schema.properties[property.name] = this.annotate(propertySchema, property)
@@ -1022,7 +1109,10 @@ export class TypeToJsonSchemaConverter {
   }
 
   private getDefName(type: Type, symbol: TSSymbol): string {
-    if (symbol.flags & SymbolFlags.Enum || !this.getTypeArguments(type).length) {
+    // internal names like `__class` (class expressions) are not used
+    const internal = symbol.name.startsWith('__')
+
+    if (!internal && (symbol.flags & SymbolFlags.Enum || !this.getTypeArguments(type).length)) {
       return symbol.name
     }
 
@@ -1036,7 +1126,9 @@ export class TypeToJsonSchemaConverter {
           .replace(/[>\]]/gu, '')
           .replace(/_+/gu, '_')
           .replace(/_$/u, '')
-      : symbol.name
+      : internal
+        ? this.getFallbackDefName(type)
+        : symbol.name
   }
 
   private getFallbackDefName(type: Type): string {
@@ -1085,7 +1177,28 @@ export class TypeToJsonSchemaConverter {
   /**
    * The alias of a property's type annotation (`count: Count`), when it names a project type alias.
    */
-  private getPrimitiveAliasSymbol(property: TSSymbol): TSSymbol | undefined {
+  /**
+   * `status?: Status` with `type Status = 'open' | null` has the type `'open' | null | undefined`,
+   * which no longer carries the alias, and stripping `undefined` through the checker also strips
+   * `null`. The declared alias type keeps the def and its JSDoc.
+   */
+  private getNullableAliasType(property: TSSymbol, type: Type): Type | undefined {
+    if (!this.hasMember(type, UNDEFINED_FLAGS) || !this.hasMember(type, TypeFlags.Null)) {
+      return undefined
+    }
+
+    const alias = this.getAnnotationAlias(property)
+    const declared = alias && this.checker.getDeclaredTypeOfSymbol(alias)
+
+    return declared && this.hasMember(declared, TypeFlags.Null) && !this.isOptional(declared)
+      ? declared
+      : undefined
+  }
+
+  /**
+   * The project type alias a property's type annotation names, like `Count` in `count?: Count | null`.
+   */
+  private getAnnotationAlias(property: TSSymbol): TSSymbol | undefined {
     const declaration = property.declarations[0]
 
     if (!declaration || this.getSourceKind(declaration.path) !== 'project') {
@@ -1175,10 +1288,20 @@ export class TypeToJsonSchemaConverter {
     return path === undefined ? 'project' : this.getSourceKind(path)
   }
 
-  private isDefaultLibraryMember(symbol: TSSymbol): boolean {
+  /**
+   * Declared by the runtime: the default library, or typings of runtime modules like `node:stream`.
+   * For `Error` subclasses, everything declared outside the project.
+   */
+  private isBuiltinMember(symbol: TSSymbol, isError: boolean): boolean {
     return (
       symbol.declarations.length > 0 &&
-      symbol.declarations.every((declaration) => this.getSourceKind(declaration.path) === 'default')
+      symbol.declarations.every((declaration) => {
+        const kind = this.getSourceKind(declaration.path)
+        return (
+          kind === 'default' ||
+          (kind === 'external' && (isError || RUNTIME_TYPINGS.test(declaration.path)))
+        )
+      })
     )
   }
 
@@ -1199,7 +1322,7 @@ export class TypeToJsonSchemaConverter {
     if (
       !(type.flags & TypeFlags.Object) ||
       // object literals have no signatures
-      (type as any).objectFlags & ObjectFlags.ObjectLiteral ||
+      this.isObjectLiteral(type) ||
       this.getReferenceKind(type) !== undefined
     ) {
       return false
@@ -1215,6 +1338,13 @@ export class TypeToJsonSchemaConverter {
       this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
       this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0
     )
+  }
+
+  /**
+   * A type of an object literal expression (`{ a: 1 }`), whose values are plain objects.
+   */
+  private isObjectLiteral(type: Type): boolean {
+    return Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.ObjectLiteral)
   }
 
   private hasMember(type: Type, flags: number): boolean {
