@@ -180,7 +180,8 @@ describe('typeToJsonSchemaConverter', () => {
         $defs: {
           PrefixedDict: {
             type: 'object',
-            patternProperties: { '^x-[\\s\\S]*$': { type: 'string' } },
+            propertyNames: { type: 'string', pattern: '^x-[\\s\\S]*$' },
+            additionalProperties: { type: 'string' },
           },
         },
       },
@@ -973,6 +974,186 @@ describe('typeToJsonSchemaConverter', () => {
                 { anyOf: [{ type: 'number' }, { type: 'null' }] },
               ],
               maxItems: 2,
+            },
+          },
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('round six', () => {
+    let r6: TypeScriptProject
+
+    beforeAll(() => {
+      r6 = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round6.ts', import.meta.url),
+      })
+    })
+
+    afterAll(() => {
+      r6.close()
+    })
+
+    const convertR6 = (name: string) =>
+      new TypeToJsonSchemaConverter(r6.checker, r6.program).convert(r6.getExportType(name).type)
+
+    it('fixture has no type errors', () => {
+      expect(r6.program.getSemanticDiagnostics(r6.sourceFile.fileName)).toEqual([])
+    })
+
+    it('only sets JSDoc keywords to values of their type', () => {
+      expect(convertR6('KeywordTypes')).toEqual([
+        {
+          $ref: '#/$defs/KeywordTypes',
+          $defs: {
+            KeywordTypes: {
+              type: 'object',
+              properties: {
+                b: { type: 'string', pattern: '[123]' },
+                digits: { type: 'string', pattern: '123' },
+                year: { type: 'string', title: '2024' },
+                a: { type: 'string' },
+                inf: { type: 'number' },
+                min: { type: 'number', minimum: 1 },
+                ro: { type: 'string', readOnly: true },
+                list: { type: 'array', items: { type: 'string' } },
+                config: { type: 'object', default: { x: 1 } },
+              },
+              required: ['b', 'a', 'min', 'ro', 'list'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('template literal keys keep their value type in every OpenAPI version', () => {
+      expect(convertR6('TemplateKeys')).toEqual([
+        {
+          $ref: '#/$defs/TemplateKeys',
+          $defs: {
+            TemplateKeys: {
+              type: 'object',
+              properties: {
+                headers: {
+                  type: 'object',
+                  propertyNames: { type: 'string', pattern: '^x-[\\s\\S]*$' },
+                  additionalProperties: { type: 'string' },
+                },
+                big: { type: 'object', additionalProperties: { type: 'number' } },
+                mixed: {
+                  type: 'object',
+                  properties: { known: { type: 'string' } },
+                  required: ['known'],
+                  patternProperties: { '^x-[\\s\\S]*$': { type: 'string' } },
+                },
+              },
+              required: ['headers', 'big', 'mixed'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('mapped types are built-ins only when mapping over one', () => {
+      expect(convertR6('NotBuiltins')).toEqual([
+        {
+          $ref: '#/$defs/NotBuiltins',
+          $defs: {
+            NotBuiltins: {
+              type: 'object',
+              properties: {
+                times: { $ref: '#/$defs/Timestamps_Date' },
+                at: { $ref: '#/$defs/Versioned_Date' },
+                pair: { $ref: '#/$defs/Pair_Set_string_number' },
+              },
+              required: ['times', 'at', 'pair'],
+            },
+            Pair_Set_string_number: {
+              type: 'object',
+              properties: {
+                left: {
+                  'type': 'array',
+                  'uniqueItems': true,
+                  'items': { type: 'string' },
+                  'x-native-type': 'set',
+                },
+                right: { type: 'number' },
+              },
+              required: ['left', 'right'],
+            },
+            Versioned_Date: {
+              type: 'object',
+              properties: {
+                current: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+                previous: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+              },
+              required: ['current', 'previous'],
+            },
+            Timestamps_Date: {
+              type: 'object',
+              properties: {
+                createdAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+                updatedAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+              },
+              required: ['createdAt', 'updatedAt'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR6('PartialLookAlikes')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            params: {
+              type: 'object',
+              properties: {
+                size: {
+                  type: 'number',
+                  description:
+                    'The **`size`** read-only property of the URLSearchParams interface indicates the total number of search parameter entries.\n\n[MDN Reference](https://developer.mozilla.org/docs/Web/API/URLSearchParams/size)',
+                },
+              },
+            },
+            account: { type: 'object', properties: { id: { type: 'string' } } },
+            map: { 'type': 'array', 'items': {}, 'x-native-type': 'map' },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('names numeric literal arguments without collisions', () => {
+      expect(convertR6('NumericPages')).toEqual([
+        {
+          $ref: '#/$defs/NumericPages',
+          $defs: {
+            NumericPages: {
+              type: 'object',
+              properties: {
+                a: { $ref: '#/$defs/Page_neg1' },
+                b: { $ref: '#/$defs/Page_1' },
+                c: { $ref: '#/$defs/Page_12' },
+              },
+              required: ['a', 'b', 'c'],
+            },
+            Page_12: {
+              type: 'object',
+              properties: { item: { type: 'number', const: 12 } },
+              required: ['item'],
+            },
+            Page_1: {
+              type: 'object',
+              properties: { item: { type: 'number', const: 1 } },
+              required: ['item'],
+            },
+            Page_neg1: {
+              type: 'object',
+              properties: { item: { type: 'number', const: -1 } },
+              required: ['item'],
             },
           },
         },

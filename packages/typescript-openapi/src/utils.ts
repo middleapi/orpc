@@ -102,6 +102,35 @@ export function getAssignedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol 
   return undefined
 }
 
+/**
+ * For a procedure built from an implementer, like `os.todo.get.handler(...)` with
+ * `const os = implement(contract)`, returns the implemented property (`get`),
+ * which keeps the contract's declaration and JSDoc.
+ */
+export function getImplementedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol | undefined {
+  const node = symbol.declarations[0]?.resolve() as any
+  let expression = node?.kind === SyntaxKind.PropertyAssignment ? node.initializer : undefined
+
+  // walk down `.handler(...)`, `.use(...)`, and other builder calls to the implementer property
+  for (let depth = 0; expression && depth < 32; depth++) {
+    if (expression.kind === SyntaxKind.CallExpression) {
+      expression = expression.expression
+    } else if (expression.kind === SyntaxKind.PropertyAccessExpression) {
+      const property = checker.getSymbolAtLocation(expression.name)
+
+      if (property && property.flags & SymbolFlags.Property && property.id !== symbol.id) {
+        return property
+      }
+
+      expression = expression.expression
+    } else {
+      return undefined
+    }
+  }
+
+  return undefined
+}
+
 export function resolveAlias(checker: Checker, symbol: TSSymbol): TSSymbol {
   return symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
 }

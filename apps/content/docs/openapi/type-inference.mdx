@@ -81,23 +81,23 @@ Handlers returning an async iterator are documented as [event streams](/docs/asy
 
 Types are converted as they look after [OpenAPI JSON serialization](/docs/openapi/serializer):
 
-| TypeScript                              | JSON Schema                                                    |
-| --------------------------------------- | -------------------------------------------------------------- |
-| `string`, `number`, `boolean`, `null`   | `type` of the same name                                        |
-| Literals, enums, unions of literals     | `const` or `enum`                                              |
-| Unions, discriminated unions            | `anyOf`                                                        |
-| Intersections, mapped and utility types | the resolved object                                            |
-| Branded primitives (`string & { … }`)   | the primitive                                                  |
-| Template literals                       | `string` with a `pattern`                                      |
-| Arrays, tuples (optional and rest)      | `items`, `prefixItems`                                         |
-| Index signatures, `Record`              | `additionalProperties`, `patternProperties`                    |
-| Optional or `undefined` properties      | not `required`                                                 |
-| `Date`, `bigint`, `URL`, `Set`, `Map`   | their serialized form, matching the Zod and Valibot converters |
-| `Blob`, `File`                          | binary `string`, sent as `multipart/form-data`                 |
-| Classes with `toJSON`                   | the return type of `toJSON`                                    |
-| Class instances                         | their fields, without members inherited from built-ins         |
-| Functions, symbols, methods             | omitted                                                        |
-| `any`, `unknown`                        | `{}`                                                           |
+| TypeScript                              | JSON Schema                                                       |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `string`, `number`, `boolean`, `null`   | `type` of the same name                                           |
+| Literals, enums, unions of literals     | `const` or `enum`                                                 |
+| Unions, discriminated unions            | `anyOf`                                                           |
+| Intersections, mapped and utility types | the resolved object                                               |
+| Branded primitives (`string & { … }`)   | the primitive                                                     |
+| Template literals                       | `string` with a `pattern`                                         |
+| Arrays, tuples (optional and rest)      | `items`, `prefixItems`                                            |
+| Index signatures, `Record`              | `additionalProperties`, `propertyNames` for template literal keys |
+| Optional or `undefined` properties      | not `required`                                                    |
+| `Date`, `bigint`, `URL`, `Set`, `Map`   | their serialized form, matching the Zod and Valibot converters    |
+| `Blob`, `File`                          | binary `string`, sent as `multipart/form-data`                    |
+| Classes with `toJSON`                   | the return type of `toJSON`                                       |
+| Class instances                         | their fields, without members inherited from built-ins            |
+| Functions, symbols, methods             | omitted                                                           |
+| `any`, `unknown`                        | `{}`                                                              |
 
 :::warning
 The OpenAPI JSON serializer leaves class instances to `JSON.stringify`, so their `Set`, `Map`, and `bigint` fields do not match the documented schemas. Prefer plain objects for those values.
@@ -113,7 +113,7 @@ const generator = new TypeScriptOpenAPIGenerator({ defs: 'recursive' })
 
 JSDoc comments document the generated operations and schemas.
 
-On procedures, the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, and `@deprecated` are supported too, and `@tags a, b` adds tags. The comment can be on the router property, or on the variable assigned to it:
+On procedures (or the contract procedures they implement), the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, and `@deprecated` are supported too, and `@tags a, b` adds tags. The comment can be on the router property, or on the variable assigned to it:
 
 ```ts
 /** Ping the server */
@@ -142,7 +142,7 @@ interface User {
 }
 ```
 
-Supported keyword tags: `title`, `default`, `format`, `pattern`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`, `minLength`, `maxLength`, `minItems`, `maxItems`, `uniqueItems`, `minProperties`, `maxProperties`, `contentMediaType`, `contentEncoding`, `readOnly`, and `writeOnly`. Values are parsed as JSON when possible.
+Supported keyword tags: `title`, `default`, `format`, `pattern`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`, `minLength`, `maxLength`, `minItems`, `maxItems`, `uniqueItems`, `minProperties`, `maxProperties`, `contentMediaType`, `contentEncoding`, `readOnly`, and `writeOnly`. String keywords take the text as written, number keywords need a finite number, boolean keywords default to `true`, and `@default` and `@example` are parsed as JSON when possible. Tags with values of the wrong type are ignored.
 
 ## Converting Types Directly
 

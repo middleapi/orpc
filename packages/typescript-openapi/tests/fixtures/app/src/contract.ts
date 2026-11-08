@@ -9,6 +9,11 @@ export interface Todo {
 
 export const contract = {
   todo: {
+    /**
+     * Get a todo
+     * Fetches one todo.
+     * @tags todos
+     */
     get: oc.input(type<{ id: string }>()).output(type<Todo | undefined>()),
     list: oc.output(type<Todo[]>()),
   },

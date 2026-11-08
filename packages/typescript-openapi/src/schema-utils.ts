@@ -169,13 +169,18 @@ export function escapeRegExp(text: string): string {
 }
 
 /**
- * JSON Schema keywords that can be set through JSDoc tags of the same name, e.g. `@minimum 0`.
+ * JSON Schema keywords that can be set through JSDoc tags of the same name, e.g. `@minimum 0`,
+ * by the type of their value.
  */
-export const JSDOC_KEYWORD_TAGS: ReadonlySet<string> = new Set([
+const JSDOC_STRING_KEYWORDS = new Set([
   'title',
-  'default',
   'format',
   'pattern',
+  'contentMediaType',
+  'contentEncoding',
+])
+
+const JSDOC_NUMBER_KEYWORDS = new Set([
   'minimum',
   'maximum',
   'exclusiveMinimum',
@@ -185,14 +190,41 @@ export const JSDOC_KEYWORD_TAGS: ReadonlySet<string> = new Set([
   'maxLength',
   'minItems',
   'maxItems',
-  'uniqueItems',
   'minProperties',
   'maxProperties',
-  'contentMediaType',
-  'contentEncoding',
-  'readOnly',
-  'writeOnly',
 ])
+
+const JSDOC_BOOLEAN_KEYWORDS = new Set(['uniqueItems', 'readOnly', 'writeOnly'])
+
+const JSDOC_KEYWORD_TAGS: ReadonlySet<string> = new Set([
+  ...JSDOC_STRING_KEYWORDS,
+  ...JSDOC_NUMBER_KEYWORDS,
+  ...JSDOC_BOOLEAN_KEYWORDS,
+  'default',
+])
+
+/**
+ * The keyword value of a JSDoc tag, or `undefined` when the text is not a valid value for it:
+ * strings are taken as written (`@pattern [0-9]+`), numbers must be finite,
+ * booleans default to `true` (`@readOnly`), and `@default` is JSON when it parses.
+ */
+function getKeywordValue(keyword: string, text: string): unknown {
+  if (JSDOC_STRING_KEYWORDS.has(keyword)) {
+    return text === '' ? undefined : text
+  }
+
+  if (JSDOC_NUMBER_KEYWORDS.has(keyword)) {
+    const value = parseTagValue(text)
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+  }
+
+  if (JSDOC_BOOLEAN_KEYWORDS.has(keyword)) {
+    const value = text === '' ? true : parseTagValue(text)
+    return typeof value === 'boolean' ? value : undefined
+  }
+
+  return text === '' ? undefined : parseTagValue(text)
+}
 
 const JSON_SCHEMA_TYPES = new Set([
   'string',
@@ -239,7 +271,10 @@ export function applyJSDoc(
     } else if (tag.name === 'type' && JSON_SCHEMA_TYPES.has(text)) {
       annotated = overrideType(annotated, text)
     } else if (JSDOC_KEYWORD_TAGS.has(tag.name)) {
-      ;(annotated as Record<string, unknown>)[tag.name] = text === '' ? true : parseTagValue(text)
+      const value = getKeywordValue(tag.name, text)
+      if (value !== undefined) {
+        ;(annotated as Record<string, unknown>)[tag.name] = value
+      }
     }
   }
 

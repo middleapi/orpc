@@ -120,6 +120,8 @@ const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]
   ['Blob', ['size', 'arrayBuffer', 'slice', 'stream']],
   ['Map', ['get', 'set', 'has', 'delete', 'size']],
   ['Set', ['add', 'has', 'delete', 'size']],
+  ['ReadonlyMap', ['get', 'has', 'size', 'forEach']],
+  ['ReadonlySet', ['has', 'size', 'forEach']],
 ]
 
 /** Typings of runtime built-in modules, whose classes are not data holders */
@@ -197,6 +199,7 @@ export class TypeToJsonSchemaConverter {
   private readonly jsdocCache = new Map<number, JSDoc | undefined>()
   private readonly singleMemberEnumCache = new Map<number, TSSymbol | undefined>()
   private readonly annotationCache = new Map<number, { alias: TSSymbol; type: Type } | undefined>()
+  private readonly globalTypes = new Map<string, Type | undefined>()
 
   constructor(
     private readonly checker: Checker,
@@ -786,6 +789,12 @@ export class TypeToJsonSchemaConverter {
         !p.escapedName.startsWith('__@') &&
         !p.escapedName.startsWith('__#') &&
         !isClassAccessor(p) &&
+        // mapped types keep methods as properties (`DeepPartial<Account>`), still functions
+        !(
+          p.flags & SymbolFlags.Transient &&
+          (p.declarations[0]?.kind === SyntaxKind.MethodDeclaration ||
+            p.declarations[0]?.kind === SyntaxKind.MethodSignature)
+        ) &&
         // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
         !(isClassInstance && this.isBuiltinMember(p, isError)),
     )
@@ -839,18 +848,26 @@ export class TypeToJsonSchemaConverter {
       schema.required = required
     }
 
-    // a string index covers every key, so it describes additionalProperties over a number index
     const indexInfos = this.checker.getIndexInfosOfType(type)
+    // a string (or number) index covers every key, narrower template literal keys add nothing
+    const anyKey =
+      indexInfos.find((info) => info.keyType.flags & TypeFlags.String) ??
+      indexInfos.find((info) => info.keyType.flags & TypeFlags.Number)
+    const patternKeys = indexInfos.filter(
+      (info) => info.keyType.flags & (TypeFlags.TemplateLiteral | TypeFlags.StringMapping),
+    )
 
-    for (const info of [
-      ...indexInfos.filter((info) => info.keyType.flags & TypeFlags.String),
-      ...indexInfos.filter((info) => !(info.keyType.flags & TypeFlags.String)),
-    ]) {
-      const keyFlags = info.keyType.flags
-
-      if (keyFlags & (TypeFlags.String | TypeFlags.Number)) {
-        schema.additionalProperties ??= this.visit(info.valueType)
-      } else if (keyFlags & (TypeFlags.TemplateLiteral | TypeFlags.StringMapping)) {
+    if (anyKey) {
+      schema.additionalProperties = this.visit(anyKey.valueType)
+    } else if (patternKeys.length === 1 && !Object.keys(schema.properties).length) {
+      // like zod records with template literal keys, which keeps the value type in OpenAPI 3.0
+      schema.propertyNames = {
+        type: 'string',
+        pattern: `^${this.toPattern(patternKeys[0]!.keyType)}$`,
+      }
+      schema.additionalProperties = this.visit(patternKeys[0]!.valueType)
+    } else {
+      for (const info of patternKeys) {
         schema.patternProperties ??= {}
         schema.patternProperties[`^${this.toPattern(info.keyType)}$`] = this.visit(info.valueType)
       }
@@ -987,34 +1004,59 @@ export class TypeToJsonSchemaConverter {
       return undefined
     }
 
-    const [source] = this.getTypeArguments(type)
-
-    if (source && source.flags & TypeFlags.Object) {
-      return this.convertBuiltinObject(source)
-    }
-
-    // a resolved conditional (`T extends object ? { [K in keyof T]?: ... } : T`) has no alias
-    // arguments, so recognize the built-in by its members, which keep their library declarations
     const properties = this.getProperties(type)
 
     if (!properties.length || !properties.every((p) => this.isBuiltinMember(p, false))) {
       return undefined
     }
 
-    const names = new Set(properties.map((p) => p.name))
-    const builtin = MAPPED_BUILTIN_FINGERPRINTS.find(([, members]) =>
-      members.every((member) => names.has(member)),
-    )?.[0]
+    // mapped members keep the declarations of the built-in they come from (`Date#getTime`),
+    // which tells `Map` apart from look-alikes such as `URLSearchParams`
+    const byName = new Map(properties.map((p) => [p.name, p]))
+    const builtin = MAPPED_BUILTIN_FINGERPRINTS.find(([name, members]) => {
+      const global = this.getGlobalType(name)
 
-    if (builtin === 'Set') {
+      return (
+        global !== undefined &&
+        members.every((member) => {
+          const own = this.checker.getPropertyOfType(global, member)?.declarations[0]
+          const mapped = byName.get(member)?.declarations[0]
+          return own && mapped && own.path === mapped.path && own.index === mapped.index
+        })
+      )
+    })?.[0]
+
+    if (builtin === undefined) {
+      return undefined
+    }
+
+    // `DeepReadonly<Set<string>>` still knows its item type
+    const [source] = this.getTypeArguments(type)
+    if (source && source.flags & TypeFlags.Object && source.getSymbol()?.name === builtin) {
+      const precise = this.convertBuiltinObject(source)
+      if (precise !== undefined) {
+        return precise
+      }
+    }
+
+    if (builtin === 'Set' || builtin === 'ReadonlySet') {
       return setSchema({})
     }
 
-    if (builtin === 'Map') {
+    if (builtin === 'Map' || builtin === 'ReadonlyMap') {
       return mapSchema({})
     }
 
-    return builtin ? getLeafBuiltinSchema(builtin) : undefined
+    return getLeafBuiltinSchema(builtin)
+  }
+
+  private getGlobalType(name: string): Type | undefined {
+    if (!this.globalTypes.has(name)) {
+      const symbol = this.checker.resolveName(name, SymbolFlags.Type)
+      this.globalTypes.set(name, symbol && this.checker.getDeclaredTypeOfSymbol(symbol))
+    }
+
+    return this.globalTypes.get(name)
   }
 
   /**
@@ -1353,9 +1395,11 @@ export class TypeToJsonSchemaConverter {
   }
 
   private createDef(type: Type, preferredName: string): Def {
+    // `Page_1` and `Page_12` must not collide as `Page_12`
+    const separator = /\d$/u.test(preferredName) ? '_' : ''
     let name = preferredName
     for (let i = 2; this.defsByName.has(name); i++) {
-      name = `${preferredName}${i}`
+      name = `${preferredName}${separator}${i}`
     }
 
     const def: Def = { name, typeId: type.id }
@@ -1554,6 +1598,7 @@ function toDefName(text: string): string | undefined {
   return (
     text
       .replace(/\[\]/gu, 'Array')
+      .replace(/-(?=\d)/gu, 'neg')
       .replace(/[^\w$.]+/gu, '_')
       .replace(/^_+|_+$/gu, '') || undefined
   )

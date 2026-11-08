@@ -5,6 +5,7 @@ import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken.ts'
 import { contract, implemented } from '../tests/fixtures/app/src/contract.ts'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed.ts'
+import { router as headersRouter } from '../tests/fixtures/app/src/headers.ts'
 import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
@@ -201,6 +202,9 @@ describe('typeScriptOpenAPIGenerator', () => {
     }
 
     expect(spec.components?.schemas?.Todo).toEqual(todo)
+    expect(spec.paths?.['/todo/get']?.post?.summary).toBe('Get a todo')
+    expect(spec.paths?.['/todo/get']?.post?.description).toBe('Fetches one todo.')
+    expect(spec.paths?.['/todo/get']?.post?.tags).toEqual(['todos'])
     expect(spec.paths?.['/todo/get']?.post?.requestBody).toEqual({
       required: true,
       content: {
@@ -490,5 +494,17 @@ describe('typeScriptOpenAPIGenerator', () => {
         ),
       ).rejects.toThrow('Procedure at missing: Could not resolve its type')
     })
+  })
+
+  it('keeps the value type of template literal keys in OpenAPI 3.0', async () => {
+    const spec = await generator.generate(headersRouter, {
+      source: { file: fixture('headers.ts') },
+      version: '3.0.4',
+    })
+
+    expect(
+      (spec.paths?.['/headers']?.post?.responses?.['200'] as any).content['application/json'].schema
+        .properties.headers.additionalProperties,
+    ).toEqual({ type: 'string' })
   })
 })
