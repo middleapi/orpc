@@ -165,5 +165,9 @@ try {
 ```
 
 :::info
+Generic types that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels, since no value can be infinitely nested.
+:::
+
+:::info
 Types the compiler can not resolve, like an import whose path alias is missing from the `tsconfig.json`, throw instead of silently becoming `{}`.
 :::
