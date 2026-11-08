@@ -3,15 +3,29 @@ import { OpenAPIGenerator } from '@orpc/openapi'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
-import { router } from '../../../playgrounds/bun/src/routers/index.ts'
+import { router as bunRouter } from '../../../playgrounds/bun/src/routers/index.ts'
+import { router as cloudflareRouter } from '../../../playgrounds/cloudflare/worker/routers/index.ts'
+import { contract as nestContract } from '../../../playgrounds/nest/src/contracts/index.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
 
+const PLAYGROUNDS = [
+  ['bun', bunRouter, '../../../playgrounds/bun/src/routers/index.ts', 'router'],
+  [
+    'cloudflare',
+    cloudflareRouter,
+    '../../../playgrounds/cloudflare/worker/routers/index.ts',
+    'router',
+  ],
+  // contract-first, in a Node project without the DOM library (zod's `File` extends the Node one)
+  ['nest', nestContract, '../../../playgrounds/nest/src/contracts/index.ts', 'contract'],
+] as const
+
 /**
- * A real router (the Bun playground, with `@/` paths, zod, files, errors, and event streams):
+ * Real routers (the playgrounds, with `@/` paths, zod, files, errors, and event streams):
  * with every runtime schema removed, inference must produce the same operations as the zod schemas.
  * Only what exists at runtime alone differs, like `format: uuid` or `minLength`.
  */
-describe('playground router', async () => {
+describe.each(PLAYGROUNDS)('%s playground', async (_, router, file, exportName) => {
   const fromZod = await new OpenAPIGenerator({
     converters: [new ZodToJsonSchemaConverter()],
   }).generate(router)
@@ -37,7 +51,7 @@ describe('playground router', async () => {
   })
 
   const fromTypes = await new TypeScriptOpenAPIGenerator().generate(withoutSchemas, {
-    source: { file: new URL('../../../playgrounds/bun/src/routers/index.ts', import.meta.url) },
+    source: { file: new URL(file, import.meta.url), export: exportName },
   })
 
   const resolve = (doc: any, schema: any) =>

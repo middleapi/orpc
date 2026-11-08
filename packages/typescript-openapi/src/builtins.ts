@@ -233,7 +233,9 @@ export function getBuiltinBaseName(types: TypeQueries, type: Type, depth = 0): s
   for (const base of target.getBaseTypes() ?? []) {
     const symbol = base.getSymbol()
 
-    if (symbol && types.getSymbolSourceKind(symbol) === 'default') {
+    // also the runtime's globals, like `File` from `@types/node` without the DOM library,
+    // which zod's own `File` interface extends
+    if (symbol && isBuiltinSymbol(types, symbol)) {
       return symbol.name
     }
 
