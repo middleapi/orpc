@@ -432,9 +432,7 @@ function toStreamableFile(
   const type = flattenStandardHeader(headers['content-type'])
   headers['content-type'] = undefined
 
-  if (signal) {
-    listenAbort(signal, () => stream.destroy())
-  }
+  listenAbort(signal, () => stream.destroy())
 
   return new StreamableFile(stream, { type })
 }

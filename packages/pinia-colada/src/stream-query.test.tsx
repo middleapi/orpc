@@ -488,6 +488,22 @@ describe('serializableStreamedQuery', () => {
     await expect(queryCache.fetch(entry)).resolves.toMatchObject({ data: null })
   })
 
+  it('starts a new array when the entry data is cleared mid-stream', async () => {
+    const queryCache = createQueryCache()
+    const entry = queryCache.ensure({
+      key: ['stream'],
+      query: serializableStreamedQuery(async () =>
+        (async function* () {
+          yield 1
+          entry.state.value = { status: 'pending', data: undefined, error: null } as any
+          yield 2
+        })(),
+      ),
+    })
+
+    await expect(queryCache.fetch(entry)).resolves.toMatchObject({ data: [2] })
+  })
+
   it('resolves with the streamed data when the entry data is cleared after the last chunk', async () => {
     const queryCache = createQueryCache()
     const entry = queryCache.ensure({

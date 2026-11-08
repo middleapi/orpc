@@ -122,15 +122,24 @@ export async function runWithSignal<T>(
 }
 
 /**
- * Calls `onAbort` right away if the signal is already aborted, otherwise once when it aborts.
- * Returns a function that removes the listener.
+ * Calls `onAbort` with the abort reason right away if the signal is already aborted, otherwise once
+ * when it aborts. Does nothing without a signal. Returns a function that removes the listener.
  */
-export function listenAbort(signal: AbortSignal, onAbort: () => void): () => void {
-  if (signal.aborted) {
-    onAbort()
-  } else {
-    signal.addEventListener('abort', onAbort, { once: true })
+export function listenAbort(
+  signal: AbortSignal | undefined,
+  onAbort: (reason: unknown) => void,
+): () => void {
+  if (!signal) {
+    return () => {}
   }
 
-  return () => signal.removeEventListener('abort', onAbort)
+  const listener = () => onAbort(signal.reason)
+
+  if (signal.aborted) {
+    listener()
+  } else {
+    signal.addEventListener('abort', listener, { once: true })
+  }
+
+  return () => signal.removeEventListener('abort', listener)
 }

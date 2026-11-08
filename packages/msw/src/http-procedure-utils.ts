@@ -163,9 +163,7 @@ export class HTTPProcedureUtils<
     return this.handler(
       ({ signal }) =>
         new Promise<never>((_, reject) => {
-          if (signal) {
-            listenAbort(signal, () => reject(signal.reason))
-          }
+          listenAbort(signal, reject)
         }),
     )
   }

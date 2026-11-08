@@ -260,7 +260,17 @@ describe('listenAbort', () => {
     listenAbort(controller.signal, onAbort)
 
     expect(onAbort).toHaveBeenCalledTimes(1)
+    expect(onAbort).toHaveBeenCalledWith(controller.signal.reason)
     expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+  })
+
+  it('does nothing without a signal', () => {
+    const onAbort = vi.fn()
+
+    const remove = listenAbort(undefined, onAbort)
+    remove()
+
+    expect(onAbort).not.toHaveBeenCalled()
   })
 
   it('calls the listener once on abort', () => {
@@ -270,9 +280,10 @@ describe('listenAbort', () => {
     listenAbort(controller.signal, onAbort)
     expect(onAbort).not.toHaveBeenCalled()
 
-    controller.abort()
+    controller.abort('reason')
     controller.abort()
     expect(onAbort).toHaveBeenCalledTimes(1)
+    expect(onAbort).toHaveBeenCalledWith('reason')
   })
 
   it('returns a function that removes the listener', () => {

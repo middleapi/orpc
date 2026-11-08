@@ -344,10 +344,9 @@ function closeReadableStreamOnAbort<T>(
   }
 
   const reader = replica.getReader()
-  const removeAbortListener = listenAbort(
-    signal,
-    () => void reader.cancel(signal.reason).catch(() => {}),
-  )
+  const removeAbortListener = listenAbort(signal, (reason) => {
+    reader.cancel(reason).catch(() => {})
+  })
 
   return new ReadableStream<T>(
     {

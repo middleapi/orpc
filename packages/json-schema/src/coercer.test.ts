@@ -191,6 +191,9 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(DATE_SCHEMA, '2020-02-30T06:15:00Z')).toBe('2020-02-30T06:15:00Z')
       expect(coerce(DATE_SCHEMA, '2020-02-30 06:15')).toBe('2020-02-30 06:15')
       expect(coerce(DATE_SCHEMA, '0050-02-29')).toBe('0050-02-29')
+      // century years are leap years only when divisible by 400
+      expect(coerce(DATE_SCHEMA, '1900-02-29')).toBe('1900-02-29')
+      expect(coerce(DATE_SCHEMA, '2000-02-29')).toEqual(new Date('2000-02-29'))
 
       // real days stay coerced, including a leap day and years below 100
       expect(coerce(DATE_SCHEMA, '2020-02-29')).toEqual(new Date('2020-02-29'))

@@ -291,6 +291,19 @@ describe('rpcJsonSerializer: custom handlers', () => {
     expect(roundTripThroughWire(serializer, { value: date })).toEqual({ value: date })
   })
 
+  it('serializes like the defaults when no custom handler is set', () => {
+    const serializer = new RPCJsonSerializer({
+      handlers: {
+        unused: undefined,
+      },
+    })
+
+    const date = new Date('2023-01-01')
+    const data = { value: date, list: [undefined], text: 'a' }
+    expect(serializer.serializeJson(data)).toEqual(new RPCJsonSerializer().serializeJson(data))
+    expect(roundTripThroughWire(serializer, data)).toEqual(data)
+  })
+
   it('supports disabling default handlers', () => {
     const serializer = new RPCJsonSerializer({
       handlers: {
