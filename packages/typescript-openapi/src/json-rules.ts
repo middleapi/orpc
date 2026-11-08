@@ -172,44 +172,71 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
  */
 export class ModeSensitivity {
   private readonly cache = new Map<number, boolean>()
-  private readonly visiting = new Set<number>()
-  private assumed = false
+  /** Types on the current path, with their visit order, and whether they found a sensitive part */
+  private readonly onPath = new Map<number, { order: number; sensitive: boolean }>()
+  private readonly path: number[] = []
+  private order = 0
 
   constructor(private readonly types: TypeQueries) {}
 
   isSensitive(type: Type): boolean {
+    return this.visit(type).sensitive
+  }
+
+  /**
+   * Types that refer to each other (a cycle) reach the same parts, so they share one answer,
+   * decided once the first of them is done, like Tarjan's strongly connected components.
+   * `low` is the earliest type on the path the visit came back to.
+   */
+  private visit(type: Type): { sensitive: boolean; low: number } {
     const cached = this.cache.get(type.id)
 
     if (cached !== undefined) {
-      return cached
+      return { sensitive: cached, low: Infinity }
     }
 
-    // a cycle: assume no, and do not cache answers that relied on it
-    if (this.visiting.has(type.id)) {
-      this.assumed = true
-      return false
+    const current = this.onPath.get(type.id)
+
+    if (current !== undefined) {
+      return { sensitive: current.sensitive, low: current.order }
     }
 
-    const outerAssumed = this.assumed
-    this.assumed = false
-    this.visiting.add(type.id)
+    const entry = { order: this.order++, sensitive: false }
+    this.onPath.set(type.id, entry)
+    this.path.push(type.id)
 
-    let sensitive: boolean
-    try {
-      sensitive = this.compute(type)
-    } finally {
-      this.visiting.delete(type.id)
+    let low = entry.order
+    entry.sensitive = this.compute(type, (child) => {
+      const result = this.visit(child)
+      low = Math.min(low, result.low)
+      return result.sensitive
+    })
+
+    if (low < entry.order) {
+      // part of a cycle that started earlier, its first type decides for all of them
+      return { sensitive: entry.sensitive, low }
     }
 
-    if (sensitive || !this.assumed) {
-      this.cache.set(type.id, sensitive)
+    const members: number[] = []
+    let sensitive = false
+
+    for (let id = this.path.pop(); id !== undefined; id = this.path.pop()) {
+      members.push(id)
+      sensitive ||= this.onPath.get(id)!.sensitive
+      if (id === type.id) {
+        break
+      }
     }
 
-    this.assumed = outerAssumed || (this.assumed && !sensitive)
-    return sensitive
+    for (const id of members) {
+      this.onPath.delete(id)
+      this.cache.set(id, sensitive)
+    }
+
+    return { sensitive, low: Infinity }
   }
 
-  private compute(type: Type): boolean {
+  private compute(type: Type, isSensitive: (type: Type) => boolean): boolean {
     const types = this.types
     const flags = type.flags
 
@@ -218,12 +245,13 @@ export class ModeSensitivity {
     }
 
     if (flags & TypeFlags.UnionOrIntersection) {
-      return types.getMembers(type).some((m) => this.isSensitive(m))
+      // a class instance through `C & { ... }` is converted the same way either way
+      return getClassType(types, type) === undefined && types.getMembers(type).some(isSensitive)
     }
 
     if (flags & INSTANTIABLE_FLAGS) {
       const constraint = types.checker.getBaseConstraintOfType(type)
-      return constraint !== undefined && constraint.id !== type.id && this.isSensitive(constraint)
+      return constraint !== undefined && constraint.id !== type.id && isSensitive(constraint)
     }
 
     if (!(flags & TypeFlags.Object)) {
@@ -231,18 +259,43 @@ export class ModeSensitivity {
     }
 
     if (types.getReferenceKind(type) !== undefined) {
-      return types.getReferenceArguments(type).some((t) => this.isSensitive(t))
+      return types.getReferenceArguments(type).some(isSensitive)
     }
 
     const symbol = type.getSymbol()
 
-    if (symbol && isBuiltinSymbol(types, symbol)) {
+    // named built-ins, not the anonymous types of library aliases like `Partial<T>` or `Record<K, V>`
+    if (
+      symbol &&
+      symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class) &&
+      isBuiltinSymbol(types, symbol)
+    ) {
       return MODE_SENSITIVE_BUILTINS.has(symbol.name)
     }
 
-    if (symbol && symbol.flags & SymbolFlags.Class) {
-      const base = getBuiltinBaseName(types, type)
-      return base !== undefined && (MODE_SENSITIVE_BUILTINS.has(base) || hasOwnToJSON(types, type))
+    const classType = getClassType(types, type)
+    const extended =
+      symbol && symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class)
+        ? getBuiltinBaseName(types, classType ?? type)
+        : classType && getBuiltinBaseName(types, classType)
+
+    if (extended !== undefined) {
+      if (MODE_SENSITIVE_BUILTINS.has(extended) || hasOwnToJSON(types, classType ?? type)) {
+        return true
+      }
+
+      // `class Rows extends Array<Set<string>>` is an array of its items
+      if (extended === 'Array' || extended === 'ReadonlyArray') {
+        const item = types.checker
+          .getIndexInfosOfType(type)
+          .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+        return item !== undefined && isSensitive(item)
+      }
+    }
+
+    // class instances are converted under `JSON.stringify` rules either way
+    if (classType !== undefined) {
+      return false
     }
 
     const mapped = getMappedBuiltinName(types, type)
@@ -251,17 +304,20 @@ export class ModeSensitivity {
     }
 
     const properties = types.getProperties(type)
+    const hasToJSON = properties.some((p) => p.name === 'toJSON')
 
-    if (isObjectLiteral(type) && properties.some((p) => p.name === 'toJSON')) {
-      return true
+    // the serializer skips `toJSON` of object literals, `JSON.stringify` calls it.
+    // Other objects with `toJSON` are serialized through it either way.
+    if (hasToJSON) {
+      return isObjectLiteral(type)
     }
 
     const data = properties.filter((p) => !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)))
     const dataTypes = data.length ? types.checker.getTypeOfSymbol(data) : []
 
     return (
-      dataTypes.some((t) => t !== undefined && this.isSensitive(t)) ||
-      types.checker.getIndexInfosOfType(type).some((info) => this.isSensitive(info.valueType))
+      dataTypes.some((t) => t !== undefined && isSensitive(t)) ||
+      types.checker.getIndexInfosOfType(type).some((info) => isSensitive(info.valueType))
     )
   }
 }

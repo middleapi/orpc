@@ -18,6 +18,8 @@ export interface Def {
 export class DefRegistry {
   private readonly defs = new Map<number, Def>()
   private readonly defsByName = new Map<string, Def>()
+  /** Names emitted by discarded conversions */
+  private readonly reservedNames = new Set<string>()
   /** Named types whose schema is clearer inline, like `type UserId = string & { ... }` */
   private readonly inlined = new Map<number, JsonSchema>()
   /** Finished conversions of anonymous types, shared between their uses */
@@ -48,11 +50,14 @@ export class DefRegistry {
   }
 
   create(key: number, preferredName: string): Def {
+    // the `JSON.stringify` form of a type (negative keys) has its own name, so names do not
+    // depend on which form was converted first
+    const base = key < 0 ? `${preferredName}Json` : preferredName
     // `Page_1` and `Page_12` must not collide as `Page_12`
-    const separator = /\d$/u.test(preferredName) ? '_' : ''
-    let name = preferredName
-    for (let i = 2; this.defsByName.has(name); i++) {
-      name = `${preferredName}${separator}${i}`
+    const separator = /\d$/u.test(base) ? '_' : ''
+    let name = base
+    for (let i = 2; this.defsByName.has(name) || this.reservedNames.has(name); i++) {
+      name = `${base}${separator}${i}`
     }
 
     const def: Def = { name, key }
@@ -91,6 +96,8 @@ export class DefRegistry {
   discardCreated(): void {
     for (const def of this.createdDefs) {
       this.remove(def)
+      // it was emitted by the discarded conversion, a different schema must not take its name
+      this.reservedNames.add(def.name)
     }
     for (const key of this.createdInlined) {
       this.inlined.delete(key)

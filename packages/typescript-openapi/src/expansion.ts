@@ -4,7 +4,7 @@ import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 import type { TypeQueries } from './type-queries.ts'
 
 /** Nested instantiations of one declaration, like `Maybe<A>` inside `Maybe<B>` */
-const MAX_NESTING = 16
+const MAX_NESTING = 64
 /** Distinct instantiations nested in one outermost instantiation, once nested this deep */
 const MAX_INSTANTIATIONS = 256
 const MIN_BUDGET_NESTING = 4

@@ -10,9 +10,13 @@ import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
  * against the generated response schemas.
  */
 describe('generated schemas match serialized outputs', async () => {
+  const start = performance.now()
   const spec = await new TypeScriptOpenAPIGenerator().generate(router, {
     source: { file: new URL('../tests/fixtures/app/src/serialization.ts', import.meta.url) },
   })
+
+  // mutually recursive models (`MutualA`..`MutualI`) inside class instances stay fast
+  const generationTime = performance.now() - start
 
   const ajv = new Ajv2020({ strict: false, allErrors: true })
   ajv.addSchema(
@@ -71,6 +75,15 @@ describe('generated schemas match serialized outputs', async () => {
     ['fixedLength', undefined],
     ['brandedKeys', undefined],
     ['anything', undefined],
+    ['libraryMapped', undefined],
+    ['setRows', undefined],
+    ['cycleClass', undefined],
+    ['cyclePlain', undefined],
+    ['ownToJSON', undefined],
+    ['holdsOwnToJSON', undefined],
+    ['extendsBuiltins', undefined],
+    ['mutual', undefined],
+    ['holdsMutual', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -168,5 +181,17 @@ describe('generated schemas match serialized outputs', async () => {
     expect(Object.keys(other.components?.schemas ?? {}).toSorted()).toEqual(
       Object.keys(spec.components?.schemas ?? {}).toSorted(),
     )
+  })
+
+  it('generates quickly', () => {
+    expect(generationTime).toBeLessThan(10_000)
+  })
+
+  it('names the JSON.stringify form of a model apart from its serializer form', () => {
+    const names = Object.keys(spec.components?.schemas ?? {})
+    expect(names).toContain('CycleB')
+    expect(names).toContain('CycleBJson')
+    expect((spec.components?.schemas as any).CycleBJson.properties.tags).toEqual({ type: 'object' })
+    expect((spec.components?.schemas as any).CycleB.properties.tags['x-native-type']).toBe('set')
   })
 })

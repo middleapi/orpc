@@ -199,6 +199,181 @@ export type Serializable = string | number | { toJSON(): Serializable }
 
 export type UserId = Tagged<string, 'UserId'>
 
+export interface PlainTags {
+  tags: Set<string>
+}
+
+export class HasLibraryMapped {
+  partial: Partial<PlainTags> = { tags: new Set(['a']) }
+  pick: Pick<PlainTags, 'tags'> = { tags: new Set(['b']) }
+  record: Record<string, Set<string>> = { a: new Set(['x']) }
+}
+
+export class SetRows extends Array<Set<string>> {}
+
+export class HasSetRows {
+  rows: SetRows = SetRows.from([new Set(['x'])]) as SetRows
+}
+
+export class CycleA {
+  b: CycleB = { tags: new Set(['t']) }
+}
+
+export interface CycleB {
+  a?: CycleA
+  tags: Set<string>
+}
+
+export interface WithOwnToJSON {
+  tags: Set<string>
+  toJSON(): { n: number }
+}
+
+export class OwnToJSON implements WithOwnToJSON {
+  tags = new Set(['a'])
+
+  toJSON(): { n: number } {
+    return { n: 1 }
+  }
+}
+
+export class HoldsWithOwnToJSON {
+  w: WithOwnToJSON = new OwnToJSON()
+}
+
+export interface TagSetLike extends Set<string> {}
+export interface CountsLike extends Map<string, number> {}
+
+export interface MutualA {
+  id: string
+  onlyA?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualB {
+  id: string
+  onlyB?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualC {
+  id: string
+  onlyC?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualD {
+  id: string
+  onlyD?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualE {
+  id: string
+  onlyE?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualF {
+  id: string
+  onlyF?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualG {
+  id: string
+  onlyG?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualH {
+  id: string
+  onlyH?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export interface MutualI {
+  id: string
+  onlyI?: true
+  mA?: MutualA
+  mB?: MutualB
+  mC?: MutualC
+  mD?: MutualD
+  mE?: MutualE
+  mF?: MutualF
+  mG?: MutualG
+  mH?: MutualH
+  mI?: MutualI
+}
+
+export class HoldsMutual {
+  m: MutualA = { id: 'x' }
+}
+
 export type Status = 'draft' | 'published' | null
 
 export interface Plain {
@@ -287,6 +462,18 @@ export const router = {
     ['u1' as UserId]: { id: 'a', joinedAt: new Date(0) },
   })),
   anything: os.handler((): { v: NonNullable<unknown>; w: {} } => ({ v: 5, w: 'x' })),
+  libraryMapped: os.handler(() => new HasLibraryMapped()),
+  setRows: os.handler(() => new HasSetRows()),
+  cycleClass: os.handler(() => new CycleA()),
+  cyclePlain: os.handler((): CycleB => ({ tags: new Set(['t']), a: new CycleA() })),
+  ownToJSON: os.handler((): { w: WithOwnToJSON } => ({ w: new OwnToJSON() })),
+  holdsOwnToJSON: os.handler(() => new HoldsWithOwnToJSON()),
+  extendsBuiltins: os.handler((): { t: TagSetLike; c: CountsLike } => ({
+    t: new Set(['a']),
+    c: new Map([['a', 1]]),
+  })),
+  mutual: os.handler((): MutualA => ({ id: 'x' })),
+  holdsMutual: os.handler(() => new HoldsMutual()),
   nestedPromise: os.handler(async () => ({
     user: Promise.resolve({ id: 'u' }),
     list: [Promise.resolve(1)],

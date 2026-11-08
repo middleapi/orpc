@@ -2266,7 +2266,12 @@ describe('typeToJsonSchemaConverter', () => {
         false,
       ]
       expect(convertR2('Expanded', c)).toEqual(expected)
-      expect(convertR2('Expanded', c)).toEqual(expected)
+      // converted again, under fresh names: the first conversion emitted the others already
+      expect(
+        JSON.parse(
+          JSON.stringify(convertR2('Expanded', c)).replaceAll(/(?<=[A-Za-z])2(?=")/gu, ''),
+        ),
+      ).toEqual(expected)
     })
 
     it('applies JSDoc of named types with defs: recursive', () => {
