@@ -8,7 +8,12 @@ import type {
   ORPCErrorConstructorMap,
   ORPCErrorFromErrorMap,
 } from '@orpc/contract'
-import { createORPCErrorConstructorMap, reconcileORPCError, ValidationError } from '@orpc/contract'
+import {
+  createORPCErrorConstructorMap,
+  reconcileORPCError,
+  validateInputSchemas,
+  ValidationError,
+} from '@orpc/contract'
 import type {
   Interceptor,
   MaybeOptionalOptions,
@@ -252,21 +257,19 @@ async function executeProcedureInternal(
         ? inputSchemas.length
         : (orderedMiddlewares[midIndex]!.inputSchemasLengthAtUse ?? 0)
 
-    /**
-     * Each schema after the first validates the original input with the results so far applied, then
-     * its result is merged in, so no schema loses a field an earlier one stripped. Values that are not
-     * plain objects stay piped, which keeps schemas like `asyncIteratorObject` wrapping each other.
-     */
+    // Only the schemas between the previous middleware and this one run here, see validateInputSchemas.
     if (!procedure['~orpc'].disableInputValidation) {
-      for (let i = startInputIndex; i < endInputIndex; i++) {
-        const validated = await validateInput(
-          i,
-          inputSchemas[i]!,
-          i !== 0 ? mergeTwoLevels(options.input, currentInput) : currentInput,
-        )
+      const result = await validateInputSchemas(inputSchemas, options.input, {
+        from: startInputIndex,
+        to: endInputIndex,
+        current: currentInput,
+        // Throws instead of returning issues, so the error is recorded on the schema's span.
+        validate: async (schema, value, index) => ({
+          value: await validateInput(index, schema, value),
+        }),
+      })
 
-        currentInput = i !== 0 ? mergeTwoLevels(currentInput, validated) : validated
-      }
+      currentInput = (result as { value: unknown }).value
 
       middlewareInput =
         endInputIndex > 0 && endInputIndex < inputSchemas.length

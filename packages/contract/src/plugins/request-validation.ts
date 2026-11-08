@@ -1,11 +1,12 @@
 import type { ClientContext } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
-import { mergeTwoLevels, toArray } from '@orpc/shared'
+import { toArray } from '@orpc/shared'
 
 import { ValidationError } from '../error.ts'
 import { getProcedureContractOrThrow } from '../router-utils.ts'
 import type { RouterContract } from '../router.ts'
+import { validateInputSchemas } from '../schema-utils.ts'
 
 export interface RequestValidationLinkPluginOptions<_T extends ClientContext> {
   /**
@@ -46,35 +47,28 @@ export class RequestValidationLinkPlugin<T extends ClientContext> implements Sta
         async ({ next, ...interceptorOptions }) => {
           const procedure = getProcedureContractOrThrow(this.contract, interceptorOptions.path)
 
-          const inputSchemas = toArray(procedure['~orpc'].inputSchemas)
-          const originalInput = interceptorOptions.input
-          let currentInput = originalInput
+          // Mirrors the server's stacked input validation.
+          const result = await validateInputSchemas(
+            toArray(procedure['~orpc'].inputSchemas),
+            interceptorOptions.input,
+          )
 
-          for (const [index, schema] of inputSchemas.entries()) {
-            // Mirrors the server's stacked input validation.
-            const validating =
-              index !== 0 ? mergeTwoLevels(originalInput, currentInput) : currentInput
-            const result = await schema['~standard'].validate(validating)
-
-            if (result.issues) {
-              throw new ORPCError('BAD_REQUEST', {
+          if (result.issues) {
+            throw new ORPCError('BAD_REQUEST', {
+              message: 'Input validation failed',
+              data: {
+                issues: result.issues,
+              },
+              cause: new ValidationError({
                 message: 'Input validation failed',
-                data: {
-                  issues: result.issues,
-                },
-                cause: new ValidationError({
-                  message: 'Input validation failed',
-                  issues: result.issues,
-                  invalidData: validating,
-                }),
-              })
-            }
-
-            currentInput = index !== 0 ? mergeTwoLevels(currentInput, result.value) : result.value
+                issues: result.issues,
+                invalidData: result.invalidData,
+              }),
+            })
           }
 
           return this.forwardValidatedInput
-            ? next({ ...interceptorOptions, input: currentInput })
+            ? next({ ...interceptorOptions, input: result.value })
             : next()
         },
       ],

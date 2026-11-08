@@ -6,7 +6,7 @@ import type {
   ProcedureContract,
   Schema,
 } from '@orpc/contract'
-import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemasDetails, validateInputSchemas } from '@orpc/contract'
 import type { JsonSchema } from '@orpc/json-schema'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
@@ -17,7 +17,6 @@ import {
   encodeBase64,
   isAsyncGeneratorFunction,
   loadBytes,
-  mergeTwoLevels,
   ORPC_NAME,
   resolveMaybeOptionalOptions,
   stringifyJSON,
@@ -96,20 +95,23 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
       vendor: ORPC_NAME,
       version: 1,
       async validate(value: unknown) {
+        if (merge) {
+          // Mirrors the server's stacked input validation.
+          const result = await validateInputSchemas(schemas, value)
+          return result.issues ? { issues: result.issues } : { value: result.value }
+        }
+
+        // Output schemas stay piped.
         let current = value
 
-        // Mirrors the server's stacked input validation, output schemas stay piped.
-        for (const [index, schema] of schemas.entries()) {
-          const merging = merge && index !== 0
-          const result = await schema['~standard'].validate(
-            merging ? mergeTwoLevels(value, current) : current,
-          )
+        for (const schema of schemas) {
+          const result = await schema['~standard'].validate(current)
 
           if (result.issues) {
             return result
           }
 
-          current = merging ? mergeTwoLevels(current, result.value) : result.value
+          current = result.value
         }
 
         return { value: current }
