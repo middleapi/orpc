@@ -106,6 +106,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['readonlyBytes', undefined],
     ['wrappedOptionalToJSON', undefined],
     ['readonlyBinary', undefined],
+    ['bytesAndBoxes', undefined],
+    ['optionalToJSONViews', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -216,9 +218,30 @@ describe('generated schemas match serialized outputs', async () => {
     ].schema.properties
     expect(binary).toEqual({ buffer: { type: 'object' }, view: { type: 'object' } })
 
+    const bytes = { type: 'object', additionalProperties: { type: 'number' } }
+    expect(schemas.PlainBytes).toEqual({
+      ...bytes,
+      description: 'Bytes without fields of their own',
+    })
+    expect(schemas.LabeledBytes).toEqual({
+      ...bytes,
+      properties: { label: { type: 'string' } },
+      required: ['label'],
+    })
+    expect(schemas.Box_Uint8Array_ArrayBufferLike.properties.data).toEqual(bytes)
+
+    // a `#private` member allows only instances, `Partial` allows plain objects too
+    const views = (spec.paths as any)['/optionalToJSONViews'].post.responses['200'].content[
+      'application/json'
+    ].schema.properties
+    expect(views.plain.anyOf).toHaveLength(3)
+    expect(schemas.ExtendsPrivate.anyOf).toEqual([
+      { type: 'string' },
+      { type: 'object', properties: { tags: { type: 'object' } }, required: ['tags'] },
+    ])
+
     // the fields of a class instance are written by `JSON.stringify`
     expect(schemas.OptionalToJSONClass.anyOf[1].properties.tags).toEqual({ type: 'object' })
-    const bytes = { type: 'object', additionalProperties: { type: 'number' } }
     expect(schemas.ReadonlyBytesJSON).toEqual(bytes)
 
     // `JSON.stringify` does not call `toJSON` of the returned date again

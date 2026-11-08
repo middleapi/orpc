@@ -6,7 +6,7 @@ import type {
   Type,
   TypeReference,
 } from 'typescript/unstable/sync'
-import { SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import type { JSDoc, SourceKind } from './utils.ts'
 import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils.ts'
@@ -77,6 +77,27 @@ export class TypeQueries {
     }
 
     return cache.get(id) as T
+  }
+
+  /**
+   * The type a mapped type maps over by its own keys, like `T` of `Readonly<T>`, `Partial<T>`,
+   * or `Pick<T, K>`, not the argument of `{ [K in 'data']: T }`, whose values are not `T`.
+   */
+  getMappedSource(type: Type): Type | undefined {
+    return this.memo('mappedSource', type.id, () => {
+      if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+        return undefined
+      }
+
+      const [source] = this.getTypeArguments(type)
+
+      if (!source || !(source.flags & TypeFlags.Object)) {
+        return undefined
+      }
+
+      const keys = new Set(this.getProperties(source).map((p) => p.name))
+      return this.getProperties(type).every((p) => keys.has(p.name)) ? source : undefined
+    })
   }
 
   /**

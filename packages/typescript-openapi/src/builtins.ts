@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import { stringifyJSON } from '@orpc/shared'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
@@ -51,15 +52,19 @@ export type Builtin =
   | { kind: 'map-entries'; entries: readonly Type[] }
 
 /**
- * The built-in a value of this type is, like `Date`, `Set<T>`, a typed array, or a subclass
- * of one. `stringify` applies the rules of `JSON.stringify`, which writes `Set`, `Map`,
- * and binary values as `{}`.
+ * The built-in a value of this type is, like `Date`, `Set<T>`, a typed array, a subclass
+ * of one, or a mapped type over one (`Readonly<Date>`). `stringify` applies the rules of
+ * `JSON.stringify`, which writes `Set`, `Map`, and binary values as `{}`.
  */
 export function getBuiltin(
   types: TypeQueries,
   type: Type,
   stringify: boolean,
 ): Builtin | undefined {
+  if ((type as any).objectFlags & ObjectFlags.Mapped) {
+    return getMappedBuiltin(types, type, stringify)
+  }
+
   const symbol = type.getSymbol()
 
   if (!symbol) {
@@ -127,6 +132,19 @@ export function getBuiltin(
   return undefined
 }
 
+/**
+ * Whether the serializer and `JSON.stringify` write a built-in differently, like `Set`, `Map`,
+ * `Blob`, or a built-in subclass with its own `toJSON`, which only `JSON.stringify` calls.
+ */
+export function isModeSensitiveBuiltin(types: TypeQueries, type: Type): boolean {
+  const serialized = getBuiltin(types, type, false)
+  const stringified = getBuiltin(types, type, true)
+
+  return serialized?.kind === 'schema' && stringified?.kind === 'schema'
+    ? stringifyJSON(serialized.schema) !== stringifyJSON(stringified.schema)
+    : serialized?.kind !== stringified?.kind
+}
+
 /** Binary values, written by their own keys: typed arrays by index, the others as `{}` */
 const BINARY = new Set([...TYPED_ARRAYS, 'ArrayBuffer', 'SharedArrayBuffer', 'DataView'])
 
@@ -137,55 +155,71 @@ export const TYPED_ARRAY_SCHEMA: JsonSchema = {
 }
 
 /**
- * The binary built-in a mapped type maps over, like `Uint8Array` of `Readonly<Uint8Array>`
- * or `ArrayBuffer` of `Readonly<ArrayBuffer>`. With `subclasses`, also a class extending
- * a typed array, like Node's `Buffer`.
+ * Whether values of this type are typed arrays, also a subclass (Node's `Buffer`,
+ * `class Bytes extends Uint8Array`) or through a mapped type (`Readonly<Uint8Array>`).
+ * Unless `toJSON` is called, they are written by their index keys.
  */
-export function getMappedBinary(
-  types: TypeQueries,
-  type: Type,
-  subclasses = false,
-): Type | undefined {
-  const [source] =
-    (type as any).objectFlags & ObjectFlags.Mapped ? types.getTypeArguments(type) : []
+export function isTypedArray(types: TypeQueries, type: Type): boolean {
+  const source = (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(type) : type
   const symbol = source?.getSymbol()
 
   if (!symbol) {
-    return undefined
+    return false
   }
 
-  if (BINARY.has(symbol.name) && isBuiltinSymbol(types, symbol)) {
-    return source
+  if (TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(types, symbol)) {
+    return true
   }
 
-  const base = subclasses ? getBuiltinBaseName(types, source!) : undefined
-  return base !== undefined && TYPED_ARRAYS.has(base) ? source : undefined
+  const base =
+    symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
+      ? getBuiltinBaseName(types, source!)
+      : undefined
+  return base !== undefined && TYPED_ARRAYS.has(base)
+}
+
+/**
+ * A class or interface the runtime declares, like `Date` or `Readable`,
+ * not the anonymous types of library aliases like `Omit<User, 'password'>`.
+ */
+export function getDeclaredBuiltinName(types: TypeQueries, type: Type): string | undefined {
+  const symbol = type.getSymbol()
+
+  return symbol &&
+    symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class) &&
+    isBuiltinSymbol(types, symbol)
+    ? symbol.name
+    : undefined
+}
+
+/**
+ * How `JSON.stringify` writes a built-in by its own fields, as it writes what `toJSON` returned:
+ * typed arrays by their index keys, other built-ins have no own enumerable data.
+ * Also through a mapped type, like `Readonly<Uint8Array>` or `Readonly<Date>`.
+ */
+export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | undefined {
+  if (isTypedArray(types, type)) {
+    return TYPED_ARRAY_SCHEMA
+  }
+
+  const builtin = getDeclaredBuiltinName(types, type) ?? getMappedBuiltinName(types, type)
+  return builtin === undefined ? undefined : { type: 'object' }
 }
 
 /**
  * `DeepReadonly<Date>` or `DeepPartial<Set<string>>` maps over the built-in's methods,
  * but the value is still the built-in and serialized like it.
  */
-export function getMappedBuiltin(
-  types: TypeQueries,
-  type: Type,
-  stringify: boolean,
-): Builtin | undefined {
-  // `Readonly<Uint8Array>` is still a typed array
-  const binary = getMappedBinary(types, type)
-  if (binary) {
-    return getBuiltin(types, binary, stringify)
-  }
-
+function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): Builtin | undefined {
   const builtin = getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {
     return undefined
   }
 
-  // `DeepReadonly<Set<string>>` still knows its item type
-  const [source] = types.getTypeArguments(type)
-  if (source && source.flags & TypeFlags.Object && source.getSymbol()?.name === builtin) {
+  // `DeepReadonly<Set<string>>` still knows its item type, `Readonly<Uint8Array>` is still a typed array
+  const source = types.getMappedSource(type)
+  if (source && source.getSymbol()?.name === builtin) {
     const precise = getBuiltin(types, source, stringify)
     if (precise !== undefined) {
       return precise
@@ -204,13 +238,18 @@ export function getMappedBuiltin(
 }
 
 /**
- * The built-in a mapped type maps over, like `Date` for `DeepReadonly<Date>`: its members keep
- * the built-in's own declarations (`Date#getTime`), which tells `Map` apart from look-alikes
- * such as `URLSearchParams`.
+ * The built-in a mapped type maps over, like `Date` for `DeepReadonly<Date>`: a binary one
+ * by its source (`Readonly<Uint8Array>`), the others by their members, which keep the built-in's
+ * own declarations (`Date#getTime`) and tell `Map` apart from look-alikes like `URLSearchParams`.
  */
 export function getMappedBuiltinName(types: TypeQueries, type: Type): string | undefined {
   if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
     return undefined
+  }
+
+  const source = types.getMappedSource(type)?.getSymbol()
+  if (source && BINARY.has(source.name) && isBuiltinSymbol(types, source)) {
+    return source.name
   }
 
   const properties = types.getProperties(type)

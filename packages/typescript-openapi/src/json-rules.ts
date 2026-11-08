@@ -5,10 +5,11 @@ import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/u
 import {
   getBuiltin,
   getBuiltinBaseName,
+  getDeclaredBuiltinName,
   getMappedBuiltinName,
   getToJSON,
-  hasOwnToJSON,
   isBuiltinSymbol,
+  isModeSensitiveBuiltin,
 } from './builtins.ts'
 import type { TypeQueries } from './type-queries.ts'
 import { INSTANTIABLE_FLAGS, isObjectLiteral, UNDEFINED_FLAGS } from './type-queries.ts'
@@ -27,16 +28,6 @@ const MAPPED_METHOD_KINDS: ReadonlySet<SyntaxKind> = new Set([
 const MAPPED_ACCESSOR_KINDS: ReadonlySet<SyntaxKind> = new Set([
   SyntaxKind.GetAccessor,
   SyntaxKind.SetAccessor,
-])
-
-/** Built-ins the serializer handles, which `JSON.stringify` writes as `{}` */
-const MODE_SENSITIVE_BUILTINS = new Set([
-  'Set',
-  'ReadonlySet',
-  'Map',
-  'ReadonlyMap',
-  'Blob',
-  'File',
 ])
 
 /**
@@ -171,6 +162,21 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
     return type
   }
 
+  // only instances of a class with `#private` members are assignable to an interface extending it
+  if (symbol && symbol.flags & SymbolFlags.Interface) {
+    const target = type.isTypeReference() ? type.getTarget() : type
+    const privateBase = (target.getBaseTypes() ?? []).find((base) => {
+      const classType = getClassType(types, base)
+      return (
+        classType && types.getProperties(classType).some((p) => p.escapedName.startsWith('__#'))
+      )
+    })
+
+    if (privateBase) {
+      return getClassType(types, privateBase)
+    }
+  }
+
   if (type.flags & TypeFlags.TypeParameter) {
     const constraint = types.checker.getBaseConstraintOfType(type)
     return constraint && constraint.id !== type.id ? getClassType(types, constraint) : undefined
@@ -186,9 +192,9 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
     return undefined
   }
 
-  if ((type as any).objectFlags & ObjectFlags.Mapped) {
-    const [source] = types.getTypeArguments(type)
-    return source && source.flags & TypeFlags.Object ? getClassType(types, source) : undefined
+  const source = types.getMappedSource(type)
+  if (source) {
+    return getClassType(types, source)
   }
 
   return undefined
@@ -382,17 +388,11 @@ export class ModeSensitivity {
       return types.getReferenceArguments(type).some(isSensitive)
     }
 
-    const symbol = type.getSymbol()
-
-    // named built-ins, not the anonymous types of library aliases like `Partial<T>` or `Record<K, V>`
-    if (
-      symbol &&
-      symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class) &&
-      isBuiltinSymbol(types, symbol)
-    ) {
-      return MODE_SENSITIVE_BUILTINS.has(symbol.name)
+    if (getDeclaredBuiltinName(types, type) !== undefined) {
+      return isModeSensitiveBuiltin(types, type)
     }
 
+    const symbol = type.getSymbol()
     const classType = getClassType(types, type)
     // the class, or an interface extending a built-in (`interface Tags extends Set<string>`)
     const declared =
@@ -400,7 +400,7 @@ export class ModeSensitivity {
     const extended = declared && getBuiltinBaseName(types, declared)
 
     if (extended !== undefined) {
-      if (MODE_SENSITIVE_BUILTINS.has(extended) || hasOwnToJSON(types, declared!)) {
+      if (isModeSensitiveBuiltin(types, declared!)) {
         return true
       }
 
@@ -418,9 +418,8 @@ export class ModeSensitivity {
       return false
     }
 
-    const mapped = getMappedBuiltinName(types, type)
-    if (mapped !== undefined) {
-      return MODE_SENSITIVE_BUILTINS.has(mapped)
+    if (getMappedBuiltinName(types, type) !== undefined) {
+      return isModeSensitiveBuiltin(types, type)
     }
 
     const properties = types.getProperties(type)

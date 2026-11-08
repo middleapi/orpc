@@ -10,15 +10,7 @@ import type {
 } from 'typescript/unstable/sync'
 import { ElementFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import type { Builtin } from './builtins.ts'
-import {
-  getBuiltin,
-  getMappedBuiltin,
-  getMappedBinary,
-  isBuiltinSymbol,
-  TYPED_ARRAY_SCHEMA,
-  TYPED_ARRAYS,
-} from './builtins.ts'
+import { getBuiltin, getBuiltinFields, isBuiltinSymbol, isTypedArray } from './builtins.ts'
 import { getDefName, getFallbackDefName } from './def-names.ts'
 import { DefRegistry } from './defs.ts'
 import { ExpansionGuard } from './expansion.ts'
@@ -633,10 +625,7 @@ export class TypeToJsonSchemaConverter {
       return this.convertTuple(type as TypeReference)
     }
 
-    const builtin = this.convertBuiltin(
-      getBuiltin(this.types, type, this.stringify) ??
-        getMappedBuiltin(this.types, type, this.stringify),
-    )
+    const builtin = this.convertBuiltinObject(type)
     if (builtin !== undefined) {
       return builtin
     }
@@ -659,19 +648,28 @@ export class TypeToJsonSchemaConverter {
     if (toJSONResult) {
       const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
 
-      // without `toJSON`, a value is its own fields: of a class instance written by
-      // `JSON.stringify`, but of `Partial<Money>` (whose class has `toJSON`) or an interface
-      // possibly a plain object
-      const plainFields =
-        !this.stringify && (classType === undefined || !hasOptionalToJSON(this.types, classType))
+      if (!hasOptionalToJSON(this.types, type)) {
+        return converted
+      }
 
-      return hasOptionalToJSON(this.types, type)
-        ? { anyOf: dedupe([converted, this.convertObject(type, true, plainFields)]) }
-        : converted
+      // without `toJSON`, a value is its own fields: of a class instance written by
+      // `JSON.stringify`, but a view of a class (`Partial<Money>`, `Readonly<C>`) or an interface
+      // may also hold a plain object, which the serializer walks
+      const instanceFields = this.convertObject(type, true)
+      // an interface only resolves to a class through a base with `#private` members
+      const onlyInstances =
+        classType === type ||
+        (classType !== undefined && Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.Interface))
+      const fields =
+        this.stringify || onlyInstances
+          ? [instanceFields]
+          : [instanceFields, this.convertObject(type, true, true)]
+
+      return { anyOf: dedupe([converted, ...fields]) }
     }
 
     const isClassInstance = classType !== undefined
-    const dataProperties = getDataProperties(this.types, properties, classType)
+    let dataProperties = getDataProperties(this.types, properties, classType)
 
     if (
       dataProperties.length === 0 &&
@@ -692,14 +690,17 @@ export class TypeToJsonSchemaConverter {
       return {}
     }
 
-    // the fields of `Partial<Buffer>` without `toJSON` are a typed array's index keys
-    if (getMappedBinary(this.types, type, true)) {
-      return TYPED_ARRAY_SCHEMA
-    }
+    // a typed array (`class Bytes extends Uint8Array`, `Partial<Buffer>` without `toJSON`)
+    // is written by its index keys, and by the fields it adds
+    const typedArray = isTypedArray(this.types, type)
 
-    const arrayLike = this.convertArrayLikeObject(properties)
-    if (arrayLike !== undefined) {
-      return arrayLike
+    if (typedArray) {
+      dataProperties = dataProperties.filter((p) => !isBuiltinSymbol(this.types, p))
+    } else {
+      const arrayLike = this.convertArrayLikeObject(properties)
+      if (arrayLike !== undefined) {
+        return arrayLike
+      }
     }
 
     const convertValue = (value: Type) =>
@@ -766,6 +767,10 @@ export class TypeToJsonSchemaConverter {
     }
 
     this.convertIndexSignatures(type, schema, convertValue)
+
+    if (typedArray) {
+      schema.additionalProperties ??= { type: 'number' }
+    }
 
     if (!Object.keys(schema.properties).length) {
       delete (schema as ObjectJsonSchema).properties
@@ -873,10 +878,8 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertBuiltinObject(type: Type): JsonSchema | undefined {
-    return this.convertBuiltin(getBuiltin(this.types, type, this.stringify))
-  }
+    const builtin = getBuiltin(this.types, type, this.stringify)
 
-  private convertBuiltin(builtin: Builtin | undefined): JsonSchema | undefined {
     switch (builtin?.kind) {
       case 'schema':
         return builtin.schema
@@ -1043,7 +1046,9 @@ export class TypeToJsonSchemaConverter {
       }
 
       const base = members.find(
-        (m) => this.types.getReferenceKind(m) !== undefined || this.isBuiltinObject(m),
+        (m) =>
+          this.types.getReferenceKind(m) !== undefined ||
+          getBuiltinFields(this.types, m) !== undefined,
       )
 
       if (base) {
@@ -1051,21 +1056,8 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    // typed arrays are written by their index keys, also through `Readonly<Uint8Array>`
-    const binary = getMappedBinary(this.types, resolved)
-    if (binary) {
-      return this.visit(binary)
-    }
-
-    // built-ins have no own enumerable data, also through `Readonly<Date>`
-    if (
-      this.isBuiltinObject(resolved) ||
-      getMappedBuiltin(this.types, resolved, true) !== undefined
-    ) {
-      return { type: 'object' }
-    }
-
-    return this.convertObject(resolved, true)
+    // a returned built-in is written by its own fields, also through `Readonly<Date>`
+    return getBuiltinFields(this.types, resolved) ?? this.convertObject(resolved, true)
   }
 
   /**
@@ -1075,20 +1067,6 @@ export class TypeToJsonSchemaConverter {
   private getBigIntToJSONResultType(): Type | undefined {
     const bigint = this.types.getGlobalType('BigInt')
     return bigint && getToJSONResultType(this.types, bigint, true)
-  }
-
-  /**
-   * A built-in object other than a typed array, like `Date` or `Set`.
-   */
-  private isBuiltinObject(type: Type): boolean {
-    const symbol = type.getSymbol()
-    // not the anonymous types of library aliases like `Omit<User, 'password'>`
-    return Boolean(
-      symbol &&
-      symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class) &&
-      !TYPED_ARRAYS.has(symbol.name) &&
-      isBuiltinSymbol(this.types, symbol),
-    )
   }
 
   /**

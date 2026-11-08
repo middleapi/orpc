@@ -527,6 +527,29 @@ export class ReadonlyBytesJSON {
   }
 }
 
+/** Not mapped over `T`: its values are objects holding `T` */
+export type Box<T> = { [K in 'data']: T }
+
+/** Bytes without fields of their own */
+export class PlainBytes extends Uint8Array {}
+
+export class LabeledBytes extends Uint8Array {
+  label = 'x'
+}
+
+export class PrivateOptionalToJSON {
+  #secret = 1
+  tags = new Set(['p'])
+  declare toJSON?: () => string
+
+  get secret(): number {
+    return this.#secret
+  }
+}
+
+/** Only instances of the class are assignable, because of its `#private` member */
+export interface ExtendsPrivate extends PrivateOptionalToJSON {}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -693,4 +716,30 @@ export const router = {
     buffer: new ArrayBuffer(2),
     view: new DataView(new ArrayBuffer(2)),
   })),
+  bytesAndBoxes: os.handler(
+    (): {
+      box: Box<Uint8Array>
+      plain: PlainBytes
+      labeled: LabeledBytes
+      frozen: Readonly<LabeledBytes>
+      partial: Partial<LabeledBytes>
+    } => ({
+      box: { data: new Uint8Array([1]) },
+      plain: new PlainBytes([2]),
+      labeled: new LabeledBytes([3]),
+      frozen: new LabeledBytes([4]),
+      partial: new LabeledBytes([5]),
+    }),
+  ),
+  optionalToJSONViews: os.handler(
+    (): {
+      plain: Partial<OptionalToJSONClass>
+      instance: Partial<OptionalToJSONClass>
+      private: ExtendsPrivate
+    } => ({
+      plain: { tags: new Set(['z']) },
+      instance: new OptionalToJSONClass(),
+      private: new PrivateOptionalToJSON(),
+    }),
+  ),
 }
