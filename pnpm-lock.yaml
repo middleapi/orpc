@@ -1195,6 +1195,9 @@ importers:
       '@orpc/zod':
         specifier: workspace:*
         version: link:../zod
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       type-fest:
         specifier: ^5.10.0
         version: 5.10.0

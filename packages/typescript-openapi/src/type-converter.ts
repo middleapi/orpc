@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import { stringifyJSON } from '@orpc/shared'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
@@ -112,6 +113,9 @@ const TYPED_ARRAYS = new Set([
   'BigUint64Array',
 ])
 
+/** Markers of values the serializer handles but `JSON.stringify` does not */
+const SERIALIZER_DEPENDENT = /"x-native-type":"(?:set|map|bigint)"|"contentMediaType"/u
+
 /** Members that identify a built-in through a mapped type over it, most specific first */
 const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]])[] = [
   ['Date', ['getTime', 'toISOString', 'getTimezoneOffset']],
@@ -177,7 +181,7 @@ export class TypeToJsonSchemaConverter {
 
   /** Anonymous types being converted, with the named depth they were entered at */
   private readonly visiting = new Map<number, number>()
-  private readonly visitingStack: Type[] = []
+  private readonly visitingStack: { type: Type; key: number }[] = []
   /** Types that close a cycle, preferred over wrappers around them for the def */
   private readonly cycleClosers = new Set<number>()
   /** Non-null cores of named nullable unions, back to the union (`Json` without `null` -> `Json`) */
@@ -192,6 +196,12 @@ export class TypeToJsonSchemaConverter {
   /** Finished conversions of anonymous types, shared between their uses */
   private readonly anonymous = new Map<number, JsonSchema>()
   private createdAnonymous: number[] = []
+
+  /**
+   * Inside class instances, which the OpenAPI JSON serializer leaves to `JSON.stringify`:
+   * `Set`, `Map`, and `Blob` become `{}`, and `bigint` can not be serialized.
+   */
+  private stringify = false
 
   private readonly membersCache = new Map<number, readonly Type[]>()
   private readonly propertiesCache = new Map<number, readonly TSSymbol[]>()
@@ -288,13 +298,13 @@ export class TypeToJsonSchemaConverter {
   }
 
   private visit(type: Type): JsonSchema {
-    const inlined = this.inlined.get(type.id)
+    const inlined = this.inlined.get(this.key(type))
 
     if (inlined !== undefined) {
       return structuredClone(inlined)
     }
 
-    const existing = this.defs.get(type.id)
+    const existing = this.defs.get(this.key(type))
 
     if (existing) {
       return { $ref: toRef(existing.name) }
@@ -454,8 +464,8 @@ export class TypeToJsonSchemaConverter {
       // It has no refs, so nothing references the def yet.
       if (isTrivialSchema(schema)) {
         this.removeDef(def)
-        this.inlined.set(type.id, schema)
-        this.createdInlined.push(type.id)
+        this.inlined.set(this.key(type), schema)
+        this.createdInlined.push(this.key(type))
         return structuredClone(schema)
       }
 
@@ -463,13 +473,13 @@ export class TypeToJsonSchemaConverter {
       return { $ref: toRef(def.name) }
     }
 
-    const memoized = this.anonymous.get(type.id)
+    const memoized = this.anonymous.get(this.key(type))
 
     if (memoized !== undefined) {
       return memoized
     }
 
-    const enteredAt = this.visiting.get(type.id)
+    const enteredAt = this.visiting.get(this.key(type))
 
     // the same anonymous type again, without a named def in between to stop at: a cycle.
     // Through a named def (`Tree[]` in `Tree`), converting it again ends at that def.
@@ -481,11 +491,11 @@ export class TypeToJsonSchemaConverter {
       }
 
       // convert this wrapper (`TreeNode[]`) once more, so the cycle closes at `TreeNode` instead
-      this.cycleClosers.add(closer.id)
+      this.cycleClosers.add(closer.key)
     }
 
-    this.visiting.set(type.id, this.namedDepth)
-    this.visitingStack.push(type)
+    this.visiting.set(this.key(type), this.namedDepth)
+    this.visitingStack.push({ type, key: this.key(type) })
     const truncations = this.truncations
 
     let schema: JsonSchema
@@ -494,9 +504,9 @@ export class TypeToJsonSchemaConverter {
     } finally {
       this.visitingStack.pop()
       if (enteredAt === undefined) {
-        this.visiting.delete(type.id)
+        this.visiting.delete(this.key(type))
       } else {
-        this.visiting.set(type.id, enteredAt)
+        this.visiting.set(this.key(type), enteredAt)
       }
     }
 
@@ -505,7 +515,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     // a self reference was found while converting, so the type became a def
-    const def = this.defs.get(type.id)
+    const def = this.defs.get(this.key(type))
 
     if (def) {
       def.schema ??= schema
@@ -514,8 +524,8 @@ export class TypeToJsonSchemaConverter {
 
     // reuse it for siblings, `{ a: C<N>; b: C<N> }` would otherwise grow exponentially in time
     if (enteredAt === undefined && truncations === this.truncations) {
-      this.anonymous.set(type.id, schema)
-      this.createdAnonymous.push(type.id)
+      this.anonymous.set(this.key(type), schema)
+      this.createdAnonymous.push(this.key(type))
     }
 
     return schema
@@ -525,19 +535,21 @@ export class TypeToJsonSchemaConverter {
    * When a cycle comes back to a type without a good name, like `TreeNode[]` or
    * `Record<string, Dict>`, returns the named type in the cycle (`TreeNode`) to make the def for.
    */
-  private getCycleCloser(type: Type): Type | undefined {
-    if (this.cycleClosers.has(type.id) || this.hasCycleName(type)) {
+  private getCycleCloser(type: Type): { type: Type; key: number } | undefined {
+    const key = this.key(type)
+
+    if (this.cycleClosers.has(key) || this.hasCycleName(type)) {
       return undefined
     }
 
-    const start = this.visitingStack.findIndex((entry) => entry.id === type.id)
+    const start = this.visitingStack.findIndex((entry) => entry.key === key)
 
     // converted once more already, the closer did not come back
-    if (this.visitingStack.lastIndexOf(type) !== start) {
+    if (this.visitingStack.filter((entry) => entry.key === key).length > 1) {
       return undefined
     }
 
-    return this.visitingStack.slice(start + 1).find((entry) => this.hasCycleName(entry))
+    return this.visitingStack.slice(start + 1).find((entry) => this.hasCycleName(entry.type))
   }
 
   private hasCycleName(type: Type): boolean {
@@ -577,6 +589,11 @@ export class TypeToJsonSchemaConverter {
 
     if (flags & TypeFlags.NumberLiteral) {
       return { type: 'number', const: (type as any).value }
+    }
+
+    if (flags & (TypeFlags.BigIntLiteral | TypeFlags.BigInt) && this.stringify) {
+      // `JSON.stringify` throws on a bigint
+      return { not: {} }
     }
 
     if (flags & TypeFlags.BigIntLiteral) {
@@ -767,13 +784,15 @@ export class TypeToJsonSchemaConverter {
     const properties = this.getProperties(type)
 
     // the serializer walks plain objects key by key, only other objects go through `toJSON`
-    const toJSON = this.isObjectLiteral(type)
-      ? undefined
-      : properties.find((p) => p.name === 'toJSON')
+    const toJSON =
+      this.isObjectLiteral(type) && !this.stringify
+        ? undefined
+        : properties.find((p) => p.name === 'toJSON')
     if (toJSON) {
       const returnType = getCallReturnType(this.checker, this.checker.getTypeOfSymbol(toJSON))
       if (returnType) {
-        return this.visit(returnType)
+        // `JSON.stringify` serializes what `toJSON` returns
+        return this.visitInClassInstance(returnType)
       }
     }
 
@@ -824,9 +843,10 @@ export class TypeToJsonSchemaConverter {
         continue
       }
 
-      let propertySchema = this.visit(
-        this.getNullableAliasType(property, propertyType) ?? propertyType,
-      )
+      const valueType = this.getNullableAliasType(property, propertyType) ?? propertyType
+      let propertySchema = isClassInstance
+        ? this.visitInClassInstance(valueType)
+        : this.visit(valueType)
 
       // an alias of a primitive or literal (`type Count = number`) leaves no trace in the type,
       // so its JSDoc is read through the property's type annotation
@@ -944,7 +964,7 @@ export class TypeToJsonSchemaConverter {
       const runtimeGlobal =
         symbol.declarations.length > 0 &&
         symbol.declarations.every((d) => RUNTIME_TYPINGS.test(d.path))
-          ? getLeafBuiltinSchema(symbol.name)
+          ? this.getLeafBuiltinSchema(symbol.name)
           : undefined
 
       return (
@@ -953,7 +973,7 @@ export class TypeToJsonSchemaConverter {
       )
     }
 
-    const leaf = getLeafBuiltinSchema(symbol.name)
+    const leaf = this.getLeafBuiltinSchema(symbol.name)
     if (leaf) {
       return leaf
     }
@@ -968,15 +988,15 @@ export class TypeToJsonSchemaConverter {
     switch (symbol.name) {
       case 'Set':
       case 'ReadonlySet':
-        return setSchema(this.visitElement(first))
+        return this.toSetSchema(() => this.visitElement(first))
       case 'Map':
       case 'ReadonlyMap':
-        return mapSchema({
+        return this.toMapSchema(() => ({
           type: 'array',
           prefixItems: [this.visitElement(first), this.visitElement(second)],
           maxItems: 2,
           minItems: 2,
-        })
+        }))
       case 'Promise':
       case 'PromiseLike':
         return first ? this.visit(first) : {}
@@ -1040,14 +1060,14 @@ export class TypeToJsonSchemaConverter {
     }
 
     if (builtin === 'Set' || builtin === 'ReadonlySet') {
-      return setSchema({})
+      return this.toSetSchema(() => ({}))
     }
 
     if (builtin === 'Map' || builtin === 'ReadonlyMap') {
-      return mapSchema({})
+      return this.toMapSchema(() => ({}))
     }
 
-    return getLeafBuiltinSchema(builtin)
+    return this.getLeafBuiltinSchema(builtin)
   }
 
   private getGlobalType(name: string): Type | undefined {
@@ -1080,11 +1100,11 @@ export class TypeToJsonSchemaConverter {
     if (base === 'Set' || base === 'Map') {
       const item = getIteratorTypes(this.checker, type, this.getProperties(type), false)?.yieldType
       return base === 'Set'
-        ? setSchema(this.visitElement(item))
-        : mapSchema(item ? this.visit(item) : {})
+        ? this.toSetSchema(() => this.visitElement(item))
+        : this.toMapSchema(() => (item ? this.visit(item) : {}))
     }
 
-    return getLeafBuiltinSchema(base)
+    return this.getLeafBuiltinSchema(base)
   }
 
   private getBuiltinBaseName(type: Type, depth = 0): string | undefined {
@@ -1402,8 +1422,8 @@ export class TypeToJsonSchemaConverter {
       name = `${preferredName}${separator}${i}`
     }
 
-    const def: Def = { name, typeId: type.id }
-    this.defs.set(type.id, def)
+    const def: Def = { name, typeId: this.key(type) }
+    this.defs.set(def.typeId, def)
     this.defsByName.set(name, def)
     this.createdDefs.push(def)
     return def
@@ -1514,7 +1534,7 @@ export class TypeToJsonSchemaConverter {
   }
 
   private isConverting(type: Type): boolean {
-    const def = this.defs.get(type.id)
+    const def = this.defs.get(this.key(type))
     return def !== undefined && def.schema === undefined
   }
 
@@ -1523,6 +1543,67 @@ export class TypeToJsonSchemaConverter {
    */
   private isObjectLiteral(type: Type): boolean {
     return Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.ObjectLiteral)
+  }
+
+  private getLeafBuiltinSchema(name: string): JsonSchema | undefined {
+    // `JSON.stringify` has no handling for binary values, they become `{}`
+    return this.stringify && (name === 'Blob' || name === 'File')
+      ? { type: 'object' }
+      : getLeafBuiltinSchema(name)
+  }
+
+  private toSetSchema(items: () => JsonSchema): JsonSchema {
+    return this.stringify ? { type: 'object' } : setSchema(items())
+  }
+
+  private toMapSchema(entries: () => JsonSchema): JsonSchema {
+    return this.stringify ? { type: 'object' } : mapSchema(entries())
+  }
+
+  /**
+   * Converts a value of a class instance, which `JSON.stringify` serializes. Converted again
+   * under its rules only when they make a difference, so shared models keep one def.
+   */
+  private visitInClassInstance(type: Type): JsonSchema {
+    const schema = this.visit(type)
+
+    return !this.stringify && this.dependsOnSerializer(schema)
+      ? this.withStringify(() => this.visit(type))
+      : schema
+  }
+
+  /**
+   * Keys of conversion results, which differ between the serializer and `JSON.stringify`.
+   */
+  private key(type: Type): number {
+    return this.stringify ? -type.id : type.id
+  }
+
+  private withStringify<T>(fn: () => T): T {
+    const previous = this.stringify
+    this.stringify = true
+    try {
+      return fn()
+    } finally {
+      this.stringify = previous
+    }
+  }
+
+  /**
+   * Whether `JSON.stringify` serializes values of a schema differently than the serializer:
+   * when it reaches a `Set`, `Map`, `bigint`, or binary value.
+   */
+  private dependsOnSerializer(schema: JsonSchema): boolean {
+    const schemas = [schema]
+
+    for (const name of this.collectDeps(collectDefRefs(schema))) {
+      const def = this.defsByName.get(name)!.schema
+      if (def !== undefined) {
+        schemas.push(def)
+      }
+    }
+
+    return schemas.some((s) => SERIALIZER_DEPENDENT.test(stringifyJSON(s) ?? ''))
   }
 
   private hasMember(type: Type, flags: number): boolean {

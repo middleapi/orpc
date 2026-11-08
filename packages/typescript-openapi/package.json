@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@orpc/zod": "workspace:*",
+    "ajv": "^8.20.0",
     "type-fest": "^5.10.0",
     "zod": "^4.6.7"
   }
