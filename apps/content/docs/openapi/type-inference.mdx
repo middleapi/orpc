@@ -1,0 +1,156 @@
+---
+title: 'OpenAPI Type Inference'
+description: 'Generate OpenAPI documents from the TypeScript types of your oRPC router, so procedures without output schemas, or with type-only schemas, are fully documented.'
+sidebar:
+  label: 'Type Inference'
+---
+
+`TypeScriptOpenAPIGenerator` works like [`OpenAPIGenerator`](/docs/openapi/specification#openapi-generator), but infers every schema a converter can not produce from your router's TypeScript types. Procedures without `.output`, inputs defined with [`type`](/docs/procedure#type-utility), and schemas of libraries without a converter are all documented.
+
+:::warning
+This package is experimental. It runs the TypeScript 7 compiler on your source files, so generation needs them, and takes a moment. Generate the document once, at build time or on first request, and reuse it.
+:::
+
+## Installation
+
+```package-install
+npm install @orpc/experimental-typescript-openapi@beta
+```
+
+## Basic Usage
+
+Pass the router and the file that exports it. `export` is the export name of the router, `router` by default:
+
+```ts
+// src/router.ts
+import { os, type } from '@orpc/server'
+import type { Planet } from '@/models/planet'
+
+export const router = {
+  planet: {
+    /**
+     * Find a planet
+     * Looks a planet up by its id.
+     */
+    find: os
+      .route({ method: 'GET', path: '/planets/{id}' })
+      .input(type<{ id: number }>())
+      .handler(async ({ input }): Promise<Planet | null> => findPlanet(input.id)),
+  },
+}
+```
+
+```ts
+// scripts/generate-openapi.ts
+import { TypeScriptOpenAPIGenerator } from '@orpc/experimental-typescript-openapi'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+import { router } from '../src/router'
+
+const generator = new TypeScriptOpenAPIGenerator({
+  converters: [new ZodToJsonSchemaConverter()],
+})
+
+const spec = await generator.generate(router, {
+  source: { file: './src/router.ts', export: 'router' },
+  version: '3.1.1',
+  base: { info: { title: 'Planet API', version: '1.0.0' } },
+})
+```
+
+Every option of `OpenAPIGenerator`, such as `version`, `base`, `filter`, and the error options, works the same way.
+
+### Source
+
+`source` points to the type of the router passed to `generate`:
+
+- `file`: the file exporting the router, a path relative to the current working directory or a `file:` URL.
+- `export`: the export name, `default` for a default export. It can be a value (`export const router`) or a type (`export type AppRouter = typeof router`), and a [contract](/docs/contract/router) works too.
+- `tsconfig`: the `tsconfig.json` of the project, the nearest one that includes `file` by default. Its `paths` resolve aliased imports like `@/`.
+
+## Schema Resolution
+
+For each input, output, and error `data` schema:
+
+1. When a converter in `converters` (or the built-in [Standard JSON Schema](https://standardschema.dev/) converter) supports the schema, it converts the schema as usual.
+2. Otherwise the JSON schema is inferred from the type: the input type of the input schema, the output type of output and error schemas, or the return type of the handler when there is no `.output`.
+
+Handlers returning an async iterator are documented as [event streams](/docs/async-iterator-object), from the yield and return types.
+
+## Type Mapping
+
+Types are converted as they look after [OpenAPI JSON serialization](/docs/openapi/serializer):
+
+| TypeScript                              | JSON Schema                                                    |
+| --------------------------------------- | -------------------------------------------------------------- |
+| `string`, `number`, `boolean`, `null`   | `type` of the same name                                        |
+| Literals, enums, unions of literals     | `const` or `enum`                                              |
+| Unions, discriminated unions            | `anyOf`                                                        |
+| Intersections, mapped and utility types | the resolved object                                            |
+| Branded primitives (`string & { … }`)   | the primitive                                                  |
+| Template literals                       | `string` with a `pattern`                                      |
+| Arrays, tuples (optional and rest)      | `items`, `prefixItems`                                         |
+| Index signatures, `Record`              | `additionalProperties`, `patternProperties`                    |
+| Optional or `undefined` properties      | not `required`                                                 |
+| `Date`, `bigint`, `URL`, `Set`, `Map`   | their serialized form, matching the Zod and Valibot converters |
+| `Blob`, `File`                          | binary `string`, sent as `multipart/form-data`                 |
+| Classes with `toJSON`                   | the return type of `toJSON`                                    |
+| Functions, symbols, methods             | omitted                                                        |
+| `any`, `unknown`                        | `{}`                                                           |
+
+Interfaces, classes, enums, and type aliases declared in your project (not in `node_modules`) become components, named after the type, like `Planet` or `Page_User` for `Page<User>`. Aliases of primitives stay inline. Set `defs: 'recursive'` to only extract recursive types, which can not be inlined:
+
+```ts
+const generator = new TypeScriptOpenAPIGenerator({ defs: 'recursive' })
+```
+
+## JSDoc
+
+JSDoc comments document the generated operations and schemas.
+
+On procedures, the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, `@deprecated`, and `@tags a, b` are supported too.
+
+On properties and named types, the comment becomes the schema `description`, `@deprecated` sets `deprecated`, `@example` adds to `examples`, `@type integer` sets the type, and tags named like JSON Schema keywords set that keyword:
+
+```ts
+interface User {
+  /**
+   * The age in years
+   * @type integer
+   * @minimum 0
+   * @default 18
+   */
+  age: number
+
+  /**
+   * @format email
+   * @example "john@example.com"
+   */
+  email: string
+}
+```
+
+Supported keyword tags: `title`, `default`, `format`, `pattern`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`, `minLength`, `maxLength`, `minItems`, `maxItems`, `uniqueItems`, `minProperties`, `maxProperties`, `contentMediaType`, `contentEncoding`, `readOnly`, and `writeOnly`. Values are parsed as JSON when possible.
+
+## Converting Types Directly
+
+`openTypeScriptProject` and `TypeToJsonSchemaConverter` convert any exported type into a JSON Schema:
+
+```ts
+import {
+  openTypeScriptProject,
+  TypeToJsonSchemaConverter,
+} from '@orpc/experimental-typescript-openapi'
+
+const project = openTypeScriptProject({ file: './src/models.ts' })
+
+try {
+  const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+  const [jsonSchema, optional] = converter.convert(project.getExportType('User').type)
+} finally {
+  project.close()
+}
+```
+
+:::info
+Types the compiler can not resolve, like an import whose path alias is missing from the `tsconfig.json`, throw instead of silently becoming `{}`.
+:::
