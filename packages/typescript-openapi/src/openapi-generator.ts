@@ -36,6 +36,7 @@ import type { ResolvedRouterType } from './router-type.ts'
 import { RouterTypeResolver } from './router-type.ts'
 import type { TypeToJsonSchemaConverterOptions } from './type-converter.ts'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter.ts'
+import { createLibraryPathChecker, getJSDoc } from './utils.ts'
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
@@ -64,6 +65,13 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
   convert(schema: AnySchema | undefined): [jsonSchema: JsonSchema, optional: boolean] {
     return (schema!['~standard'] as any)[INFERRED_JSON_SCHEMA_SYMBOL]
   }
+}
+
+interface InferenceContext {
+  checker: Checker
+  resolver: RouterTypeResolver
+  converter: TypeToJsonSchemaConverter
+  isLibraryPath: (path: string) => boolean
 }
 
 export interface TypeScriptOpenAPIGeneratorOptions
@@ -123,17 +131,17 @@ export class TypeScriptOpenAPIGenerator {
     let inferred: RouterContract
 
     try {
-      const resolver = new RouterTypeResolver(
-        project.checker,
-        project.getExportType(source.export ?? 'router'),
-      )
-      const converter = new TypeToJsonSchemaConverter(
-        project.checker,
-        project.program,
-        this.options,
-      )
+      const ctx: InferenceContext = {
+        checker: project.checker,
+        resolver: new RouterTypeResolver(
+          project.checker,
+          project.getExportType(source.export ?? 'router'),
+        ),
+        converter: new TypeToJsonSchemaConverter(project.checker, project.program, this.options),
+        isLibraryPath: createLibraryPathChecker(project.program),
+      }
 
-      inferred = await this.inferRouter(router, resolver, converter, project.checker, filter)
+      inferred = await this.inferRouter(ctx, router, filter)
     } finally {
       project.close()
     }
@@ -142,10 +150,8 @@ export class TypeScriptOpenAPIGenerator {
   }
 
   private async inferRouter(
+    ctx: InferenceContext,
     router: RouterContract | AnyRouter,
-    resolver: RouterTypeResolver,
-    converter: TypeToJsonSchemaConverter,
-    checker: Checker,
     filter: OpenAPIGeneratorGenerateOptions<OpenAPIVersion>['filter'],
   ): Promise<RouterContract> {
     let inferred: RouterContract = {}
@@ -157,7 +163,7 @@ export class TypeScriptOpenAPIGenerator {
       }
 
       try {
-        const resolved = resolver.resolve(path)
+        const resolved = ctx.resolver.resolve(path)
 
         if (!resolved) {
           throw new OpenAPIGeneratorError(
@@ -165,7 +171,7 @@ export class TypeScriptOpenAPIGenerator {
           )
         }
 
-        const procedure = this.inferProcedure(contract, resolved, resolver, converter, checker)
+        const procedure = this.inferProcedure(ctx, contract, resolved)
 
         if (path.length === 0) {
           inferred = procedure
@@ -190,11 +196,9 @@ export class TypeScriptOpenAPIGenerator {
   }
 
   private inferProcedure(
+    ctx: InferenceContext,
     contract: AnyProcedureContract,
     resolved: ResolvedRouterType,
-    resolver: RouterTypeResolver,
-    converter: TypeToJsonSchemaConverter,
-    checker: Checker,
   ): AnyProcedureContract {
     const def = contract['~orpc']
 
@@ -206,8 +210,8 @@ export class TypeScriptOpenAPIGenerator {
         return schemas
       }
 
-      const type = resolver.getSchemaType(resolved.type, direction)
-      return type ? [this.toSchema(type, converter)] : schemas
+      const type = ctx.resolver.getSchemaType(resolved.type, direction)
+      return type ? [toInferredSchema(ctx.converter, type)] : schemas
     }
 
     const errorMap: ErrorMap = {}
@@ -216,13 +220,13 @@ export class TypeScriptOpenAPIGenerator {
       const config = def.errorMap[code]
       const dataType =
         config?.data && !this.isConvertible([config.data], 'output')
-          ? resolver.getErrorDataType(resolved.type, code)
+          ? ctx.resolver.getErrorDataType(resolved.type, code)
           : undefined
 
       setOwn(
         errorMap,
         code,
-        dataType ? { ...config, data: this.toSchema(dataType, converter) } : config,
+        dataType ? { ...config, data: toInferredSchema(ctx.converter, dataType) } : config,
       )
     }
 
@@ -231,26 +235,8 @@ export class TypeScriptOpenAPIGenerator {
       inputSchemas: inferSchemas(def.inputSchemas, 'input'),
       outputSchemas: inferSchemas(def.outputSchemas, 'output'),
       errorMap,
-      meta: withJSDocMeta(def.meta, resolved.symbol, checker),
+      meta: withJSDocMeta(ctx, def.meta, resolved.symbol),
     })
-  }
-
-  private toSchema(type: Type, converter: TypeToJsonSchemaConverter): AnySchema {
-    const iterator = converter.getAsyncIteratorTypes(type)
-
-    if (iterator) {
-      const hasReturn = !(
-        iterator.returnType.flags &
-        (TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Any | TypeFlags.Unknown)
-      )
-
-      return asyncIteratorObject(
-        inferredSchema(converter.convert(iterator.yieldType)),
-        hasReturn ? inferredSchema(converter.convert(iterator.returnType)) : undefined,
-      )
-    }
-
-    return inferredSchema(converter.convert(type))
   }
 
   private isConvertible(
@@ -269,21 +255,43 @@ export class TypeScriptOpenAPIGenerator {
 }
 
 /**
+ * Infers a schema from a type, an async iterator becomes an `asyncIteratorObject` schema.
+ */
+function toInferredSchema(converter: TypeToJsonSchemaConverter, type: Type): AnySchema {
+  const iterator = converter.getAsyncIteratorTypes(type)
+
+  if (iterator) {
+    const hasReturn = !(
+      iterator.returnType.flags &
+      (TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Any | TypeFlags.Unknown)
+    )
+
+    return asyncIteratorObject(
+      inferredSchema(converter.convert(iterator.yieldType)),
+      hasReturn ? inferredSchema(converter.convert(iterator.returnType)) : undefined,
+    )
+  }
+
+  return inferredSchema(converter.convert(type))
+}
+
+/**
  * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by `.route`:
  * the first line is the `summary`, the rest the `description`,
  * and `@summary`, `@description`, `@deprecated`, `@tags` override them.
  */
-function withJSDocMeta(meta: Meta, symbol: TSSymbol | undefined, checker: Checker): Meta {
+function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | undefined): Meta {
   if (!symbol) {
     return meta
   }
 
-  const comment = checker.getDocumentationCommentOfSymbol(symbol).trim()
-  const tags = checker.getJsDocTagsOfSymbol(symbol)
+  const jsdoc = getJSDoc(ctx.checker, symbol, ctx.isLibraryPath)
 
-  if (!comment && !tags.length) {
+  if (!jsdoc) {
     return meta
   }
+
+  const { comment, tags } = jsdoc
 
   const [firstLine = '', ...rest] = comment.split('\n')
   const fromJSDoc: OpenAPIMeta = {

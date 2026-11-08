@@ -1,5 +1,5 @@
 import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { SignatureKind } from 'typescript/unstable/sync'
+import { SignatureKind, TypeFlags } from 'typescript/unstable/sync'
 
 export interface ResolvedRouterType {
   type: Type
@@ -12,6 +12,8 @@ export interface ResolvedRouterType {
  * and lazy routers without resolving oRPC's own types by name.
  */
 export class RouterTypeResolver {
+  private readonly properties = new Map<string, Type | undefined>()
+
   constructor(
     private readonly checker: Checker,
     private readonly root: ResolvedRouterType,
@@ -82,10 +84,27 @@ export class RouterTypeResolver {
       return undefined
     }
 
+    const key = `${type.id}:${name}`
+
+    if (!this.properties.has(key)) {
+      this.properties.set(key, this.getPropertyUncached(type, name))
+    }
+
+    return this.properties.get(key)
+  }
+
+  private getPropertyUncached(type: Type, name: string): Type | undefined {
     const symbol = this.checker.getPropertyOfType(type, name)
     const propertyType = symbol && this.checker.getTypeOfSymbol(symbol)
 
-    return propertyType && this.checker.getNonNullableType(propertyType)
+    if (
+      propertyType?.isUnionType() &&
+      propertyType.getTypes().some((t) => t.flags & (TypeFlags.Undefined | TypeFlags.Null))
+    ) {
+      return this.checker.getNonNullableType(propertyType)
+    }
+
+    return propertyType
   }
 
   private unlazy(type: Type): Type {

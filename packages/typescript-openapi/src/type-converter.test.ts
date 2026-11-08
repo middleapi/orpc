@@ -755,6 +755,210 @@ describe('typeToJsonSchemaConverter', () => {
     ])
   })
 
+  describe('complex types', () => {
+    let complex: TypeScriptProject
+    let c: TypeToJsonSchemaConverter
+
+    beforeAll(() => {
+      complex = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/complex.ts', import.meta.url),
+      })
+      c = new TypeToJsonSchemaConverter(complex.checker, complex.program)
+    })
+
+    afterAll(() => {
+      complex.close()
+    })
+
+    const convertComplex = (name: string) => c.convert(complex.getExportType(name).type)
+
+    const USER = {
+      type: 'object',
+      properties: { id: { type: 'string' }, name: { type: 'string' } },
+      required: ['id', 'name'],
+      description: 'A registered user',
+    }
+
+    it('generic discriminated unions', () => {
+      expect(convertComplex('UserResult')).toEqual([
+        {
+          $ref: '#/$defs/UserResult',
+          $defs: {
+            UserResult: {
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    ok: { type: 'boolean', const: true },
+                    value: { $ref: '#/$defs/User' },
+                  },
+                  required: ['ok', 'value'],
+                },
+                {
+                  type: 'object',
+                  properties: { ok: { type: 'boolean', const: false }, error: { type: 'string' } },
+                  required: ['ok', 'error'],
+                },
+              ],
+            },
+            User: USER,
+          },
+        },
+        false,
+      ])
+    })
+
+    it('records keyed by enums', () => {
+      expect(convertComplex('RoleRecord')).toEqual([
+        {
+          $ref: '#/$defs/RoleRecord',
+          $defs: {
+            RoleRecord: {
+              type: 'object',
+              properties: { admin: { type: 'boolean' }, member: { type: 'boolean' } },
+              required: ['admin', 'member'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertComplex('PartialRoleRecord')).toEqual([
+        { type: 'object', properties: { admin: { type: 'number' }, member: { type: 'number' } } },
+        false,
+      ])
+      expect(convertComplex('Keys')).toEqual([
+        { type: 'string', enum: ['admin-key', 'member-key'] },
+        false,
+      ])
+    })
+
+    it('type-fest deep utilities', () => {
+      expect(convertComplex('Camel')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            nestedObj: {
+              type: 'object',
+              properties: { firstValue: { type: 'number' } },
+              required: ['firstValue'],
+            },
+            userName: { type: 'string' },
+          },
+          required: ['nestedObj', 'userName'],
+        },
+        false,
+      ])
+      expect(convertComplex('Jsonified')).toEqual([
+        {
+          type: 'object',
+          properties: { date: { type: 'string' }, n: { type: 'number' } },
+          required: ['date', 'n'],
+        },
+        false,
+      ])
+      expect(convertComplex('DeepRO')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            a: {
+              type: 'object',
+              properties: { b: { type: 'array', items: { type: 'string' } } },
+              required: ['b'],
+            },
+          },
+          required: ['a'],
+        },
+        false,
+      ])
+      expect(convertComplex('ExactlyOne')).toEqual([
+        {
+          anyOf: [
+            { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+            { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+          ],
+        },
+        false,
+      ])
+      expect(convertComplex('Writ')).toEqual([
+        { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+        false,
+      ])
+    })
+
+    it('callable types', () => {
+      expect(convertComplex('Overloaded')).toEqual([{}, false])
+      expect(convertComplex('WithOverload')).toEqual([
+        {
+          $ref: '#/$defs/WithOverload',
+          $defs: {
+            WithOverload: {
+              type: 'object',
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('nullable and mixed unions', () => {
+      expect(convertComplex('NestedNull')).toEqual([
+        {
+          $ref: '#/$defs/NestedNull',
+          $defs: {
+            NestedNull: {
+              type: 'object',
+              properties: {
+                a: {
+                  anyOf: [
+                    {
+                      type: 'object',
+                      properties: { b: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+                      required: ['b'],
+                    },
+                    { type: 'null' },
+                  ],
+                },
+              },
+              required: ['a'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertComplex('InterfaceInUnion')).toEqual([
+        {
+          $ref: '#/$defs/InterfaceInUnion',
+          $defs: {
+            InterfaceInUnion: {
+              anyOf: [
+                { type: 'string', const: 'anonymous' },
+                { $ref: '#/$defs/User' },
+                { type: 'null' },
+              ],
+            },
+            User: USER,
+          },
+        },
+        false,
+      ])
+      expect(convertComplex('OptionalTuple')).toEqual([
+        {
+          $ref: '#/$defs/OptionalTuple',
+          $defs: {
+            OptionalTuple: {
+              type: 'array',
+              prefixItems: [{ type: 'string' }, { type: 'number' }],
+              maxItems: 2,
+            },
+          },
+        },
+        false,
+      ])
+    })
+  })
+
   describe('edge cases', () => {
     let edge: TypeScriptProject
 

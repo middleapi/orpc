@@ -9,7 +9,15 @@ import type {
   Type,
   TypeReference,
 } from 'typescript/unstable/sync'
-import { ElementFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import {
+  ElementFlags,
+  ObjectFlags,
+  SignatureKind,
+  SymbolFlags,
+  TypeFlags,
+} from 'typescript/unstable/sync'
+
+import { createLibraryPathChecker, getJSDoc } from './utils.ts'
 
 type ObjectJsonSchema = Exclude<JsonSchema, boolean>
 
@@ -119,14 +127,15 @@ export class TypeToJsonSchemaConverter {
   private readonly defsByName = new Map<string, Def>()
   private readonly visiting = new Set<number>()
   private readonly frames: Frame[] = []
-  private readonly libraryPaths = new Map<string, boolean>()
+  private readonly isLibraryPath: (path: string) => boolean
 
   constructor(
     private readonly checker: Checker,
-    private readonly program: Program,
+    program: Program,
     options: TypeToJsonSchemaConverterOptions = {},
   ) {
     this.defsMode = options.defs ?? 'named'
+    this.isLibraryPath = createLibraryPathChecker(program)
   }
 
   /**
@@ -473,9 +482,7 @@ export class TypeToJsonSchemaConverter {
       return this.visit(primitive)
     }
 
-    const arrayLike = members.find(
-      (m) => this.checker.isArrayType(m) || this.checker.isTupleType(m),
-    )
+    const arrayLike = members.find((m) => this.isArrayOrTuple(m))
     if (arrayLike) {
       return this.visit(arrayLike)
     }
@@ -484,12 +491,12 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertObject(type: Type): JsonSchema {
-    if (this.checker.isArrayType(type)) {
+    if (isTypeReference(type) && this.checker.isArrayType(type)) {
       const [item] = this.checker.getTypeArguments(type as TypeReference)
       return { type: 'array', items: item ? this.visitElement(item) : {} }
     }
 
-    if (this.checker.isTupleType(type)) {
+    if (isTypeReference(type) && this.checker.isTupleType(type)) {
       return this.convertTuple(type as TypeReference)
     }
 
@@ -773,13 +780,13 @@ export class TypeToJsonSchemaConverter {
       return schema
     }
 
-    const description = this.checker.getDocumentationCommentOfSymbol(symbol).trim()
-    const tags = this.checker.getJsDocTagsOfSymbol(symbol)
+    const jsdoc = getJSDoc(this.checker, symbol, this.isLibraryPath)
 
-    if (!description && !tags.length) {
+    if (!jsdoc) {
       return schema
     }
 
+    const { comment: description, tags } = jsdoc
     const annotated: ObjectJsonSchema = { ...schema }
 
     if (description) {
@@ -900,20 +907,13 @@ export class TypeToJsonSchemaConverter {
 
   private isLibrarySymbol(symbol: TSSymbol): boolean {
     const path = symbol.declarations[0]?.path
+    return path !== undefined && this.isLibraryPath(path)
+  }
 
-    if (path === undefined) {
-      return false
-    }
-
-    let isLibrary = this.libraryPaths.get(path)
-
-    if (isLibrary === undefined) {
-      const metadata = this.program.getSourceFileMetadataByPath(path)
-      isLibrary = Boolean(metadata?.isDefaultLibrary || metadata?.isFromExternalLibrary)
-      this.libraryPaths.set(path, isLibrary)
-    }
-
-    return isLibrary
+  private isArrayOrTuple(type: Type): boolean {
+    return (
+      isTypeReference(type) && (this.checker.isArrayType(type) || this.checker.isTupleType(type))
+    )
   }
 
   private isNonSerializable(type: Type): boolean {
@@ -921,7 +921,7 @@ export class TypeToJsonSchemaConverter {
       return true
     }
 
-    if (!(type.flags & TypeFlags.Object) || this.checker.isArrayType(type)) {
+    if (!(type.flags & TypeFlags.Object) || this.isArrayOrTuple(type)) {
       return false
     }
 
@@ -948,6 +948,13 @@ export class TypeToJsonSchemaConverter {
 
     return this.checker.getTypeArguments(type)[0]
   }
+}
+
+/**
+ * Arrays and tuples are type references, checking it locally saves compiler requests.
+ */
+function isTypeReference(type: Type): boolean {
+  return Boolean(type.flags & TypeFlags.Object && (type as any).objectFlags & ObjectFlags.Reference)
 }
 
 function toRef(name: string): string {
@@ -982,10 +989,10 @@ const TRIVIAL_KEYWORDS = new Set([
 ])
 
 /**
- * A primitive schema without enums or structure, or a union of them, such as `string | null`.
+ * An empty schema, a primitive schema without enums or structure, or a union of them, such as `string | null`.
  */
 function isTrivialSchema(schema: JsonSchema): boolean {
-  if (typeof schema !== 'object') {
+  if (typeof schema !== 'object' || Object.keys(schema).length === 0) {
     return true
   }
 
