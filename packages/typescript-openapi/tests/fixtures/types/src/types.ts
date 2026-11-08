@@ -117,7 +117,23 @@ export class Point {
   move(): number {
     return this.#secret
   }
+
+  get length(): number {
+    return Math.hypot(this.x, this.y)
+  }
 }
+
+export interface WithAccessors {
+  get computed(): string
+  set writable(value: number)
+}
+
+export const literalWithGetter = {
+  get value() {
+    return 1
+  },
+}
+export type LiteralWithGetter = typeof literalWithGetter
 export class Money {
   constructor(private readonly cents: number) {}
   toJSON(): string {

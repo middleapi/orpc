@@ -443,6 +443,23 @@ describe('typeToJsonSchemaConverter', () => {
       },
       false,
     ])
+    expect(convert('WithAccessors')).toEqual([
+      {
+        $ref: '#/$defs/WithAccessors',
+        $defs: {
+          WithAccessors: {
+            type: 'object',
+            properties: { computed: { type: 'string' }, writable: { type: 'number' } },
+            required: ['computed', 'writable'],
+          },
+        },
+      },
+      false,
+    ])
+    expect(convert('LiteralWithGetter')).toEqual([
+      { type: 'object', properties: { value: { type: 'number' } }, required: ['value'] },
+      false,
+    ])
     expect(convert('Money')).toEqual([{ type: 'string' }, false])
   })
 

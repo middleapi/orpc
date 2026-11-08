@@ -1,6 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { stringifyJSON } from '@orpc/shared'
+import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
   Program,
@@ -520,7 +521,8 @@ export class TypeToJsonSchemaConverter {
         !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)) &&
         !p.name.startsWith('__@') &&
         !p.name.startsWith('#') &&
-        !p.name.startsWith('__#'),
+        !p.name.startsWith('__#') &&
+        !isClassAccessor(p),
     )
 
     if (
@@ -948,6 +950,21 @@ export class TypeToJsonSchemaConverter {
 
     return this.checker.getTypeArguments(type)[0]
   }
+}
+
+/**
+ * Class accessors live on the prototype, so JSON serialization skips them.
+ * Accessors of object literals and interfaces describe own data and are kept.
+ */
+function isClassAccessor(symbol: TSSymbol): boolean {
+  if (!(symbol.flags & SymbolFlags.Accessor) || symbol.flags & SymbolFlags.Property) {
+    return false
+  }
+
+  return symbol.declarations.every((declaration) => {
+    const kind = declaration.resolve()?.parent?.kind
+    return kind === SyntaxKind.ClassDeclaration || kind === SyntaxKind.ClassExpression
+  })
 }
 
 /**
