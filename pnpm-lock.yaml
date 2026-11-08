@@ -1189,7 +1189,7 @@ importers:
         specifier: workspace:*
         version: link:../shared
       typescript:
-        specifier: ^7.0.2
+        specifier: ~7.0.2
         version: 7.0.2
     devDependencies:
       '@orpc/zod':

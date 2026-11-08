@@ -50,7 +50,7 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "typescript": "^7.0.2"
+    "typescript": "~7.0.2"
   },
   "devDependencies": {
     "@orpc/zod": "workspace:*",
