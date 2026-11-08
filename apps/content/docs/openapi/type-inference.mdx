@@ -85,7 +85,7 @@ Types are converted as they look after [OpenAPI JSON serialization](/docs/openap
 
 | TypeScript                               | JSON Schema                                                       |
 | ---------------------------------------- | ----------------------------------------------------------------- |
-| `string`, `number`, `boolean`, `null`    | `type` of the same name                                           |
+| `string`, `number`, `boolean`, `null`    | `type` of the same name, also for `String`, `Number`, `Boolean`   |
 | Literals, enums, unions of literals      | `const` or `enum`                                                 |
 | Unions, discriminated unions             | `anyOf`                                                           |
 | Intersections, mapped and utility types  | the resolved object                                               |
@@ -99,7 +99,7 @@ Types are converted as they look after [OpenAPI JSON serialization](/docs/openap
 | `Blob`, `File`                           | binary `string`, sent as `multipart/form-data`                    |
 | Classes with `toJSON`                    | what `toJSON` returns, serialized by its own fields               |
 | Class instances                          | their own fields, as `JSON.stringify` serializes them             |
-| Functions, symbols, methods              | omitted                                                           |
+| Functions, symbols, methods              | omitted, and in unions with data the key becomes optional         |
 | `any`, `unknown`, `{}`                   | `{}`                                                              |
 | `number`                                 | `number`, though `NaN` and `Infinity` are sent as `null`          |
 

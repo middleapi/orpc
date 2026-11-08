@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import { setOwn } from '@orpc/shared'
 import type {
   Checker,
   Program,
@@ -26,6 +27,7 @@ import {
   getDataProperties,
   getToJSONResultType,
   isDropped,
+  isNonSerializable,
   ModeSensitivity,
 } from './json-rules.ts'
 import type { ObjectJsonSchema } from './schema-utils.ts'
@@ -666,9 +668,12 @@ export class TypeToJsonSchemaConverter {
         continue
       }
 
-      let propertySchema = convertValue(
-        this.getNullableAliasType(property, propertyType) ?? propertyType,
-      )
+      // `string | (() => void)`: JSON serialization drops the key when it holds a function
+      const serializable = this.getSerializableMembers(propertyType)
+
+      let propertySchema = serializable
+        ? this.convertMembers(serializable)
+        : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
 
       // an alias of a primitive or literal (`type Count = number`) leaves no trace in the type,
       // so its JSDoc is read through the property's type annotation
@@ -679,9 +684,11 @@ export class TypeToJsonSchemaConverter {
         )
       }
 
-      schema.properties[property.name] = this.annotate(propertySchema, property)
+      // a `__proto__` key must be an own property, not the object's prototype
+      setOwn(schema.properties, property.name, this.annotate(propertySchema, property))
 
       if (
+        !serializable &&
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
         !(serialized && this.isOptional(serialized))
@@ -735,7 +742,11 @@ export class TypeToJsonSchemaConverter {
     } else {
       for (const { info, key } of patternKeys) {
         schema.patternProperties ??= {}
-        schema.patternProperties[`^${toPattern(this.types, key!)}$`] = convertValue(info.valueType)
+        setOwn(
+          schema.patternProperties,
+          `^${toPattern(this.types, key!)}$`,
+          convertValue(info.valueType),
+        )
       }
     }
   }
@@ -855,6 +866,39 @@ export class TypeToJsonSchemaConverter {
   /**
    * Array items and tuple elements serialize `undefined` as `null`.
    */
+  /**
+   * The members of a union JSON serialization keeps, when it also has functions or symbols.
+   */
+  private getSerializableMembers(type: Type): readonly Type[] | undefined {
+    if (!type.isUnionType()) {
+      return undefined
+    }
+
+    const members = this.types.getMembers(type)
+    const serializable = members.filter((m) => !isNonSerializable(this.types, m))
+
+    return serializable.length < members.length ? serializable : undefined
+  }
+
+  /**
+   * Converts some members of a union, `null` adds a `null` branch and `undefined` is left out.
+   */
+  private convertMembers(members: readonly Type[]): JsonSchema {
+    const concrete = members.filter((m) => !(m.flags & NULLISH_FLAGS))
+    const schema =
+      concrete.length === 0
+        ? undefined
+        : concrete.length === 1
+          ? this.visit(concrete[0]!)
+          : this.convertUnion(concrete)
+
+    if (!members.some((m) => m.flags & TypeFlags.Null)) {
+      return schema ?? {}
+    }
+
+    return schema === undefined ? { type: 'null' } : withNull(schema)
+  }
+
   private visitElement(type: Type | undefined): JsonSchema {
     if (!type) {
       return {}
@@ -862,6 +906,12 @@ export class TypeToJsonSchemaConverter {
 
     if (type.flags & UNDEFINED_FLAGS) {
       return { type: 'null' }
+    }
+
+    // functions and symbols in arrays are serialized as `null`
+    const serializable = this.getSerializableMembers(type)
+    if (serializable) {
+      return withNull(this.convertMembers(serializable))
     }
 
     const schema = this.visit(type)

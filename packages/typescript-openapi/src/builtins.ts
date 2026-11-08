@@ -2,7 +2,7 @@ import type { JsonSchema } from '@orpc/json-schema'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import { getLeafBuiltinSchema } from './schema-utils.ts'
+import { bigintSchema, getLeafBuiltinSchema } from './schema-utils.ts'
 import type { TypeQueries } from './type-queries.ts'
 import { getIteratorTypes } from './utils.ts'
 
@@ -291,9 +291,21 @@ function getLeaf(name: string, stringify: boolean): Builtin | undefined {
   const schema: JsonSchema | undefined =
     stringify && (name === 'Blob' || name === 'File')
       ? { type: 'object' }
-      : getLeafBuiltinSchema(name)
+      : (BOXED_PRIMITIVES[name]?.(stringify) ?? getLeafBuiltinSchema(name))
 
   return schema === undefined ? undefined : { kind: 'schema', schema }
+}
+
+/**
+ * `String` and the other boxed types also describe primitives (`const s: String = 'a'`),
+ * and boxed values serialize like them.
+ */
+const BOXED_PRIMITIVES: Record<string, ((stringify: boolean) => JsonSchema) | undefined> = {
+  String: () => ({ type: 'string' }),
+  Number: () => ({ type: 'number' }),
+  Boolean: () => ({ type: 'boolean' }),
+  // `JSON.stringify` throws on a bigint
+  BigInt: (stringify) => (stringify ? { not: {} } : bigintSchema()),
 }
 
 function emptyObject(): Builtin {

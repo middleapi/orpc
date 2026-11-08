@@ -84,12 +84,40 @@ describe('generated schemas match serialized outputs', async () => {
     ['extendsBuiltins', undefined],
     ['mutual', undefined],
     ['holdsMutual', undefined],
+    ['protoKey', undefined],
+    ['boxed', undefined],
+    ['mixedFunctions', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
     const validate = ajv.compile(responseSchema(`/${name}`))
 
     expect(validate(json) ? [] : validate.errors).toEqual([])
+  })
+
+  it('keeps `__proto__` as an own key, describes boxed primitives, and drops functions in unions', () => {
+    const schemas = spec.components?.schemas as any
+
+    expect(Object.keys(schemas.ProtoKey.properties)).toEqual(['__proto__', 'name'])
+    expect(schemas.ProtoKey.required).toEqual(['__proto__', 'name'])
+    expect(schemas.Boxed).toEqual({
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        count: { type: 'number' },
+        ok: { type: 'boolean' },
+      },
+      required: ['name', 'count'],
+    })
+    expect(schemas.MixedFunctions).toEqual({
+      type: 'object',
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'number' },
+        list: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+      },
+      required: ['list'],
+    })
   })
 
   it('describes class instances with JSON.stringify semantics', () => {

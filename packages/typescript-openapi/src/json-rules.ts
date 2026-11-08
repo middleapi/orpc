@@ -85,7 +85,7 @@ export function isDropped(types: TypeQueries, type: Type): boolean {
   return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m))
 }
 
-function isNonSerializable(types: TypeQueries, type: Type): boolean {
+export function isNonSerializable(types: TypeQueries, type: Type): boolean {
   if (type.flags & TypeFlags.ESSymbolLike) {
     return true
   }

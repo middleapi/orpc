@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import { setOwn } from '@orpc/shared'
 
 import { collectDefRefs, fromRef } from './schema-utils.ts'
 
@@ -115,7 +116,7 @@ export class DefRegistry {
     const $defs: Record<string, JsonSchema> = {}
 
     for (const name of this.collectDeps(collectDefRefs(schema))) {
-      $defs[name] = this.defsByName.get(name)!.schema!
+      setOwn($defs, name, this.defsByName.get(name)!.schema!)
     }
 
     return $defs

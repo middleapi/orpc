@@ -394,6 +394,26 @@ export interface Plain {
   author: Author
 }
 
+export interface ProtoKey {
+  __proto__: number
+  name: string
+}
+
+export interface Boxed {
+  // oxlint-disable-next-line typescript/no-wrapper-object-types
+  name: String
+  // oxlint-disable-next-line typescript/no-wrapper-object-types
+  count: Number
+  // oxlint-disable-next-line typescript/no-wrapper-object-types
+  ok?: Boolean
+}
+
+export interface MixedFunctions {
+  a: string | (() => void)
+  b: number | symbol
+  list: (string | (() => void))[]
+}
+
 export const router = {
   post: os.handler(() => new Post()),
   posts: os.handler(() => [new Post(), new Post()]),
@@ -477,5 +497,12 @@ export const router = {
   nestedPromise: os.handler(async () => ({
     user: Promise.resolve({ id: 'u' }),
     list: [Promise.resolve(1)],
+  })),
+  protoKey: os.handler((): ProtoKey => JSON.parse('{"__proto__":1,"name":"n"}')),
+  boxed: os.handler((): Boxed => ({ name: 'n', count: 1, ok: true })),
+  mixedFunctions: os.handler((): MixedFunctions => ({
+    a: () => {},
+    b: Symbol('b'),
+    list: ['x', () => {}],
   })),
 }
