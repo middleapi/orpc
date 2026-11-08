@@ -364,17 +364,23 @@ describe('serializableStreamedQuery', () => {
 
     it('starts a new array when the cache is set to null mid-stream', async () => {
       const key = ['null-mid-stream']
+      const release = promiseWithResolvers<void>()
 
-      await expect(
-        queryClient.fetchQuery({
-          queryKey: key,
-          queryFn: serializableStreamedQuery(async function* () {
-            yield 1
-            queryClient.setQueryData(key, null)
-            yield 2
-          }),
+      const fetching = queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: serializableStreamedQuery(async function* () {
+          yield 1
+          queryClient.setQueryData(key, null)
+          yield 2
+          await release.promise
         }),
-      ).resolves.toEqual([2])
+      })
+
+      // checked while the stream is still open, so the final write cannot be what makes it pass
+      await vi.waitFor(() => expect(queryClient.getQueryData(key)).toEqual([2]), { interval: 1 })
+
+      release.resolve()
+      await expect(fetching).resolves.toEqual([2])
       expect(queryClient.getQueryData(key)).toEqual([2])
     })
 
