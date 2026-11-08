@@ -94,6 +94,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['setOrFunction', undefined],
     ['walkedIntersections', undefined],
     ['toBranded', undefined],
+    ['arrayToJSON', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -163,6 +164,8 @@ describe('generated schemas match serialized outputs', async () => {
       description: 'A date with a brand, serialized as an empty object',
     })
     expect(schemas.ToBrandedItems).toEqual({ type: 'array', items: { type: 'number' } })
+    // `JSON.stringify` calls `toJSON` of arrays in class instances
+    expect(schemas.ArrayToJSONHolder.properties.list).toEqual({ type: 'number' })
   })
 
   it('describes class instances with JSON.stringify semantics', () => {

@@ -26,7 +26,7 @@ import type {
 import { getOpenAPIMeta, OpenAPIGenerator, OpenAPIGeneratorError } from '@orpc/openapi'
 import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
-import { setOwn, toArray, value } from '@orpc/shared'
+import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { TypeFlags } from 'typescript/unstable/sync'
 
@@ -34,7 +34,7 @@ import type { TypeScriptProjectOptions } from './project.ts'
 import { openTypeScriptProject } from './project.ts'
 import type { ResolvedRouterType } from './router-type.ts'
 import { RouterTypeResolver } from './router-type.ts'
-import { isPlain } from './schema-utils.ts'
+import { collectDefRefs, isPlain, isTrivialSchema } from './schema-utils.ts'
 import type {
   AsyncIteratorTypes,
   TypeToJsonSchemaConverterOptions,
@@ -113,7 +113,7 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  * so procedures without `.output` (or with type-only schemas) are fully documented.
  *
  * Schemas supported by `converters` are converted as usual, everything else falls back to type inference.
- * JSDoc comments of procedures fill `summary`, `description`, `deprecated`, and `tags` when not set by `.route`.
+ * JSDoc comments of procedures fill `summary`, `description`, and `deprecated` when not set by `.route`, and `@tags` adds tags.
  *
  * @remarks
  * Generation runs the TypeScript 7 compiler on the source files, so it needs them at runtime.
@@ -263,29 +263,31 @@ export class TypeScriptOpenAPIGenerator {
       }
 
       /**
-       * Schemas inferred from the types, without the keys the kept schemas describe
+       * Schemas inferred from the types, without what the kept schemas already describe
        * (which keeps query parameters primitive), and only when something is left.
        */
       const inferRest = (
         kept: AnySchema[],
-        types: Type[],
+        types: (Type | readonly Type[])[],
         options?: TypeToJsonSchemaConvertOptions,
       ): AnySchema[] => {
-        const described = kept.flatMap((schema) => {
-          const [converted] = this.converters
-            .find((c) => c.condition(schema, direction))!
-            .convert(schema, direction)
-          return typeof converted === 'object' && converted.properties
-            ? Object.keys(converted.properties)
-            : []
-        })
+        const described = kept.map(
+          (schema) =>
+            this.converters
+              .find((c) => c.condition(schema, direction))!
+              .convert(schema, direction)[0],
+        )
 
         return types.flatMap((t) => {
           const [jsonSchema, optional] = ctx.converter.convert(t, options)
-          const rest = withoutProperties(jsonSchema, described)
-          return rest !== jsonSchema && isPlain(rest, 'object')
-            ? []
-            : [inferredSchema([rest, optional])]
+          const rest = described.reduce(withoutDescribed, jsonSchema)
+
+          if (rest === jsonSchema) {
+            return [inferredSchema([jsonSchema, optional])]
+          }
+
+          const pruned = withoutUnusedDefs(rest)
+          return isPlain(pruned, 'object') ? [] : [inferredSchema([pruned, optional])]
         })
       }
 
@@ -293,7 +295,7 @@ export class TypeScriptOpenAPIGenerator {
 
       // event streams, completing the yield and return parts separately
       if (iteratorTypes.length) {
-        const complete = (parts: AnySchema[], partTypes: (Type | undefined)[]) => {
+        const complete = (parts: AnySchema[], partTypes: (readonly Type[] | undefined)[]) => {
           if (parts.length && parts.every(supported)) {
             return parts
           }
@@ -310,11 +312,11 @@ export class TypeScriptOpenAPIGenerator {
 
         const yields = complete(
           iterator?.yieldSchemas ?? [],
-          iteratorTypes.map((t) => t.yieldType),
+          iteratorTypes.map((t) => t.yieldTypes),
         )
         const returns = complete(
           iterator?.returnSchemas ?? [],
-          iteratorTypes.map((t) => (hasReturn(t.returnType) ? t.returnType : undefined)),
+          iteratorTypes.map((t) => (hasReturn(t.returnTypes) ? t.returnTypes : undefined)),
         )
 
         return Array.from({ length: Math.max(yields.length, returns.length) }, (_, i) =>
@@ -394,23 +396,53 @@ function getAllAsyncIteratorTypes(
   return members.every((m) => m !== undefined) ? (members as AsyncIteratorTypes[]) : []
 }
 
-function hasReturn(type: Type): boolean {
-  return !(type.flags & (TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Any | TypeFlags.Unknown))
+/**
+ * Whether an iterator returns a value worth documenting, not `void` or `any`.
+ */
+function hasReturn(types: readonly Type[]): boolean {
+  return types.length > 0 && !types.some((t) => t.flags & (TypeFlags.Any | TypeFlags.Unknown))
 }
 
 /**
- * Removes properties from an object schema, when other schemas describe them.
+ * Removes the properties of an object schema that another schema describes as well,
+ * keeping what only it adds (`b` of `{ query: { a, b } }` when the other has `{ query: { a } }`).
  */
-function withoutProperties(schema: JsonSchema, names: readonly string[]): JsonSchema {
-  if (typeof schema !== 'object' || !schema.properties || !names.length) {
+function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema {
+  if (
+    typeof schema !== 'object' ||
+    typeof described !== 'object' ||
+    !schema.properties ||
+    !described.properties
+  ) {
     return schema
   }
 
-  const properties = Object.fromEntries(
-    Object.entries(schema.properties).filter(([name]) => !names.includes(name)),
-  )
-  const required = schema.required?.filter((name) => !names.includes(name))
-  const rest = { ...schema }
+  const properties: Record<string, JsonSchema> = {}
+  const removed = new Set<string>()
+
+  for (const [name, property] of Object.entries(schema.properties)) {
+    const other = described.properties[name]
+
+    if (other === undefined) {
+      setOwn(properties, name, property)
+      continue
+    }
+
+    const rest = isCovered(property, other) ? undefined : withoutDescribed(property, other)
+
+    if (rest === undefined || (rest !== property && isPlain(rest, 'object'))) {
+      removed.add(name)
+    } else {
+      setOwn(properties, name, rest)
+    }
+  }
+
+  if (!removed.size && Object.entries(properties).every(([n, p]) => p === schema.properties![n])) {
+    return schema
+  }
+
+  const required = schema.required?.filter((name) => !removed.has(name))
+  const rest: Exclude<JsonSchema, boolean> = { ...schema }
   delete rest.properties
   delete rest.required
 
@@ -419,6 +451,55 @@ function withoutProperties(schema: JsonSchema, names: readonly string[]): JsonSc
     ...(Object.keys(properties).length ? { properties } : {}),
     ...(required?.length ? { required } : {}),
   }
+}
+
+/**
+ * Whether a schema adds nothing to another: it is `{}`, the same schema, or the same primitive
+ * type without constraints (`{ type: 'string' }` next to `{ type: 'string', minLength: 3 }`).
+ */
+function isCovered(schema: JsonSchema, other: JsonSchema): boolean {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  if (!Object.keys(schema).length || stringifyJSON(schema) === stringifyJSON(other)) {
+    return true
+  }
+
+  return (
+    typeof other === 'object' &&
+    typeof schema.type === 'string' &&
+    isTrivialSchema(schema) &&
+    (other.type === schema.type || (schema.type === 'number' && other.type === 'integer'))
+  )
+}
+
+/**
+ * Removes the `$defs` nothing references anymore.
+ */
+function withoutUnusedDefs(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object' || !schema.$defs) {
+    return schema
+  }
+
+  const $defs = schema.$defs
+  const root: Exclude<JsonSchema, boolean> = { ...schema }
+  delete root.$defs
+
+  const used = new Set<string>()
+  const queue = [...collectDefRefs(root)]
+
+  while (queue.length) {
+    const name = queue.pop()!
+
+    if (!used.has(name) && Object.hasOwn($defs, name)) {
+      used.add(name)
+      queue.push(...collectDefRefs($defs[name]!))
+    }
+  }
+
+  const kept = Object.fromEntries(Object.entries($defs).filter(([name]) => used.has(name)))
+  return Object.keys(kept).length ? { ...root, $defs: kept } : root
 }
 
 /**

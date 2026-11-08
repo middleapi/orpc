@@ -116,21 +116,18 @@ export function getToJSONResultType(
   type: Type,
   stringify: boolean,
 ): Type | undefined {
-  if (
-    !(type.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
-    types.getReferenceKind(type) !== undefined ||
-    (isObjectLiteral(type) && !stringify)
-  ) {
+  if (!(type.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
     return undefined
   }
 
-  // an array or plain object with a brand (`string[] & { toJSON(): undefined }`) is still walked
-  if (type.isIntersectionType()) {
-    const members = types.getMembers(type)
+  // the serializer walks arrays and plain objects, also with a brand
+  // (`string[] & { toJSON(): undefined }`), `JSON.stringify` calls their `toJSON`
+  if (!stringify) {
+    const members = type.isIntersectionType() ? types.getMembers(type) : [type]
 
     if (
       members.some((m) => types.getReferenceKind(m) !== undefined) ||
-      (!stringify && members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m)))
+      members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m))
     ) {
       return undefined
     }
@@ -253,8 +250,19 @@ export class ModeSensitivity {
     }
 
     if (flags & TypeFlags.UnionOrIntersection) {
+      const members = types.getMembers(type)
+
+      // `JSON.stringify` calls `toJSON` of an array (`string[] & { toJSON(): number }`)
+      if (
+        flags & TypeFlags.Intersection &&
+        members.some((m) => types.getReferenceKind(m) !== undefined) &&
+        getToJSON(types, type)
+      ) {
+        return true
+      }
+
       // a class instance through `C & { ... }` is converted the same way either way
-      return getClassType(types, type) === undefined && types.getMembers(type).some(isSensitive)
+      return getClassType(types, type) === undefined && members.some(isSensitive)
     }
 
     if (flags & INSTANTIABLE_FLAGS) {

@@ -9,7 +9,7 @@ import { router as headersRouter } from '../tests/fixtures/app/src/headers.ts'
 import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
-import { jsdoc, mixed } from '../tests/fixtures/app/src/round11.ts'
+import { jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -526,6 +526,7 @@ describe('typeScriptOpenAPIGenerator', () => {
 
       // comments of builders and helpers are not the procedure's
       expect(operation('/getMe').summary).toBeUndefined()
+      expect(operation('/getGeneric').summary).toBeUndefined()
       expect(operation('/secret').summary).toBeUndefined()
 
       for (const path of ['/ns', '/star', '/healthPing']) {
@@ -591,6 +592,51 @@ describe('typeScriptOpenAPIGenerator', () => {
           { type: 'object', properties: { n: { type: 'number' } }, required: ['n'] },
         ],
       })
+    })
+
+    it('keeps what type-only schemas add inside keys converted schemas describe', async () => {
+      const spec = await generator.generate(mixed, {
+        source: { file: fixture('round11.ts'), export: 'mixed' },
+      })
+      const paths = spec.paths as any
+      const body = (path: string) =>
+        paths[path].post.requestBody.content['application/json'].schema.allOf[1]
+
+      expect(
+        paths['/detailed/{id}'].post.parameters.map((p: any) => [p.in, p.name, p.schema]),
+      ).toEqual([
+        ['path', 'id', { type: 'string' }],
+        ['query', 'a', { type: 'string' }],
+        ['query', 'b', { type: 'number' }],
+      ])
+      expect(body('/nested')).toEqual({
+        type: 'object',
+        properties: {
+          user: { type: 'object', properties: { age: { type: 'number' } }, required: ['age'] },
+        },
+        required: ['user'],
+      })
+      // `z.unknown()` says less than `Tag`
+      expect(body('/weaker').properties).toEqual({
+        tag: { $ref: '#/components/schemas/Tag' },
+        b: { type: 'number' },
+      })
+    })
+
+    it('documents unions of event iterators as event streams', async () => {
+      const spec = await generator.generate(streams, {
+        source: { file: fixture('round11.ts'), export: 'streams' },
+      })
+
+      for (const path of ['/union', '/nullable']) {
+        const content = (spec.paths as any)[path].post.responses['200'].content
+        expect(Object.keys(content)).toEqual(['text/event-stream'])
+      }
+
+      const [message] = (spec.paths as any)['/union'].post.responses['200'].content[
+        'text/event-stream'
+      ].schema.oneOf
+      expect(message.properties.data.anyOf).toHaveLength(2)
     })
 
     it('reports unresolved types when only error data needs inference', async () => {

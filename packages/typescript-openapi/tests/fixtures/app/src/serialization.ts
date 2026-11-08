@@ -465,6 +465,10 @@ export interface WalkedIntersections {
   list: string[] & HiddenJSON
 }
 
+export class ArrayToJSONHolder {
+  list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
+}
+
 /** A date with a brand, serialized as an empty object */
 export class ToBrandedDate {
   toJSON(): Date & { __n: 1 } {
@@ -588,4 +592,5 @@ export const router = {
     list: Object.assign(['a'], { toJSON: () => undefined }),
   })),
   toBranded: os.handler(() => ({ date: new ToBrandedDate(), items: new ToBrandedItems() })),
+  arrayToJSON: os.handler(() => new ArrayToJSONHolder()),
 }

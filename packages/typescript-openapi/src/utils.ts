@@ -131,19 +131,18 @@ export function getImplementedSymbol(checker: Checker, symbol: TSSymbol): TSSymb
     } else if (expression.kind === SyntaxKind.PropertyAccessExpression) {
       if (!callee) {
         const property = checker.getSymbolAtLocation(expression.name)
-        const declaration = property?.declarations[0]?.resolve() as any
-        const declared = declaration?.name && checker.getSymbolAtLocation(declaration.name)
 
-        // implementer properties are mapped from the contract: the contract declares them with
-        // another type. A property of a plain object (`procedures.authed`) has its declared type.
         if (!property || !(property.flags & SymbolFlags.Property) || property.id === symbol.id) {
           return undefined
         }
 
-        const mappedType = checker.getTypeOfSymbol(property)
+        // implementer properties are mapped from contract procedures, declared without `.handler`.
+        // A builder (`procedures.authed`, also of a generic factory) is declared with it.
+        const declaration = property.declarations[0]?.resolve() as any
+        const declared = declaration?.name && checker.getSymbolAtLocation(declaration.name)
         const declaredType = declared && checker.getTypeOfSymbol(declared)
 
-        return mappedType && declaredType && mappedType.id !== declaredType.id
+        return declaredType && !checker.getPropertyOfType(declaredType, 'handler')
           ? property
           : undefined
       }
@@ -202,8 +201,10 @@ export function getPromisedType(checker: Checker, type: Type): Type | undefined 
 }
 
 export interface IteratorTypes {
-  yieldType: Type
-  returnType: Type | undefined
+  /** The types of the yielded values, one per `{ done: false }` result of `next()` */
+  yieldTypes: Type[]
+  /** The types of the returned values, one per `{ done: true }` result of `next()` */
+  returnTypes: Type[]
 }
 
 /**
@@ -228,8 +229,8 @@ export function getIteratorTypes(
   const returned = next && getCallReturnType(checker, checker.getTypeOfSymbol(next))
   const result = isAsync && returned ? getPromisedType(checker, returned) : returned
 
-  let yieldType: Type | undefined
-  let returnType: Type | undefined
+  const yieldTypes: Type[] = []
+  const returnTypes: Type[] = []
 
   for (const member of result?.isUnionType() ? result.getTypes() : result ? [result] : []) {
     const done = getPropertyType(checker, member, 'done')
@@ -240,11 +241,11 @@ export function getIteratorTypes(
     }
 
     if (done.flags & TypeFlags.BooleanLiteral && (done as any).value === true) {
-      returnType = value
+      returnTypes.push(value)
     } else {
-      yieldType = value
+      yieldTypes.push(value)
     }
   }
 
-  return yieldType ? { yieldType, returnType } : undefined
+  return yieldTypes.length ? { yieldTypes, returnTypes } : undefined
 }

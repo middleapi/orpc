@@ -1,6 +1,9 @@
+// oxlint-disable-next-line import/no-unassigned-import
+import '@orpc/openapi/extensions/route'
 import { eventIterator, os, type } from '@orpc/server'
 import * as z from 'zod'
 
+import type { Tag } from './round11/contract'
 import { impl } from './round11/contract'
 import * as all from './round11/index'
 import { healthPing, pings } from './round11/index'
@@ -18,7 +21,15 @@ const helpers = {
   withAuth: <T>(procedure: T) => procedure,
 }
 
+function makeProcedures<TContext extends object>() {
+  return {
+    /** Requires a signed-in user, from a generic factory */
+    authed: os.$context<TContext>().use(({ next }) => next()),
+  }
+}
+
 const getMe = procedures.authed.handler(() => 'me')
+const getGeneric = makeProcedures<{ user?: string }>().authed.handler(() => 'me')
 const secret = helpers.withAuth(os.handler(() => 'secret'))
 
 /**
@@ -30,6 +41,7 @@ export const jsdoc = {
   star: all.healthPing,
   healthPing,
   getMe,
+  getGeneric,
   secret,
 }
 
@@ -62,4 +74,33 @@ export const mixed = {
     .handler(async function* () {
       yield { id: 'ab', n: 1 }
     }),
+  detailed: os
+    .route({ method: 'POST', path: '/detailed/{id}', inputStructure: 'detailed' })
+    .input(z.object({ params: z.object({ id: z.string() }), query: z.object({ a: z.string() }) }))
+    .input(type<{ query: { b: number } }>())
+    .handler(() => 'ok'),
+  nested: os
+    .input(z.object({ user: z.object({ name: z.string() }) }))
+    .input(type<{ user: { age: number } }>())
+    .handler(() => 'ok'),
+  weaker: os
+    .input(z.object({ tag: z.unknown() }))
+    .input(type<{ tag: Tag; b: number }>())
+    .handler(() => 'ok'),
+}
+
+async function* genA() {
+  yield { a: 1 }
+}
+
+async function* genB() {
+  yield { b: 'x' }
+}
+
+/**
+ * Unions of event iterators
+ */
+export const streams = {
+  union: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : genB())),
+  nullable: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : undefined)),
 }

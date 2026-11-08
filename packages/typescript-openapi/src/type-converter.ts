@@ -83,8 +83,10 @@ export interface TypeToJsonSchemaConvertOptions {
 }
 
 export interface AsyncIteratorTypes {
-  yieldType: Type
-  returnType: Type
+  /** The yielded values, a union of these types */
+  yieldTypes: readonly Type[]
+  /** The returned values, a union of these types, empty when it returns nothing */
+  returnTypes: readonly Type[]
 }
 
 const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
@@ -134,11 +136,12 @@ export class TypeToJsonSchemaConverter {
    * Converts a type, returning its schema, with the `$defs` it references, and whether it accepts `undefined`.
    */
   convert(
-    type: Type,
+    type: Type | readonly Type[],
     options: TypeToJsonSchemaConvertOptions = {},
   ): [jsonSchema: JsonSchema, optional: boolean] {
-    type = this.getAwaitedType(type)
-    const optional = this.isOptional(type)
+    // a list of types is their union, like the yield types of a union of async iterators
+    const members = (Array.isArray(type) ? type : [type]).map((t) => this.getAwaitedType(t))
+    const optional = members.some((t) => this.isOptional(t))
 
     const cuts = this.expansion.cuts
     this.expansion.reset()
@@ -147,7 +150,12 @@ export class TypeToJsonSchemaConverter {
     let $defs: Record<string, JsonSchema>
 
     try {
-      schema = this.visit(type)
+      schema =
+        members.length === 1
+          ? this.visit(members[0]!)
+          : this.convertMembers(
+              members.flatMap((t) => (t.isUnionType() ? this.types.getMembers(t) : [t])),
+            )
 
       if (options.inlineRoot) {
         schema = this.defs.inlineRoot(schema, options.inlineProperties ?? [])
@@ -175,9 +183,24 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * Returns the yield and return types when the type is an async iterable, such as an `AsyncGenerator`.
+   * Returns the yield and return types when the type is an async iterable, such as an `AsyncGenerator`,
+   * also of a union of async iterables (`AsyncGenerator<A> | AsyncGenerator<B> | undefined`).
    */
   getAsyncIteratorTypes(type: Type): AsyncIteratorTypes | undefined {
+    if (type.isUnionType()) {
+      const members = this.types.getMembers(type).filter((m) => !(m.flags & NULLISH_FLAGS))
+      const all = members.map((m) => this.getAsyncIteratorTypes(m))
+
+      if (!all.length || !all.every((t) => t !== undefined)) {
+        return undefined
+      }
+
+      return {
+        yieldTypes: all.flatMap((t) => t!.yieldTypes),
+        returnTypes: all.flatMap((t) => t!.returnTypes),
+      }
+    }
+
     if (!(type.flags & TypeFlags.Object)) {
       return undefined
     }
@@ -186,8 +209,9 @@ export class TypeToJsonSchemaConverter {
 
     return (
       types && {
-        yieldType: types.yieldType,
-        returnType: types.returnType ?? this.checker.getVoidType(),
+        yieldTypes: types.yieldTypes,
+        // `void` and `undefined` returns send no value
+        returnTypes: types.returnTypes.filter((t) => !(t.flags & UNDEFINED_FLAGS)),
       }
     )
   }
@@ -537,7 +561,11 @@ export class TypeToJsonSchemaConverter {
 
     const arrayLike = members.find((m) => this.types.getReferenceKind(m) !== undefined)
     if (arrayLike) {
-      return this.visit(arrayLike)
+      // `JSON.stringify` calls `toJSON` of arrays, the serializer walks them
+      const toJSONResult = this.stringify && getToJSONResultType(this.types, type, true)
+      return toJSONResult
+        ? this.withStringify(() => this.convertToJSONResult(toJSONResult))
+        : this.visit(arrayLike)
     }
 
     // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`

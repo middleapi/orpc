@@ -2670,12 +2670,23 @@ describe('typeToJsonSchemaConverter', () => {
       const c = create()
       const toString = (name: string) => {
         const types = c.getAsyncIteratorTypes(edge.getExportType(name).type)
-        return types && [types.yieldType, types.returnType].map((t) => edge.checker.typeToString(t))
+        return (
+          types &&
+          [types.yieldTypes, types.returnTypes].map((list) =>
+            list.map((t) => edge.checker.typeToString(t)),
+          )
+        )
       }
 
-      expect(toString('Gen')).toEqual(['{ n: number; }', '"done"'])
-      expect(toString('Iter')).toEqual(['string', 'any'])
-      expect(toString('IterObject')).toEqual(['number', 'void'])
+      expect(toString('Gen')).toEqual([['{ n: number; }'], ['"done"']])
+      expect(toString('Iter')).toEqual([['string'], ['any']])
+      expect(toString('IterObject')).toEqual([['number'], []])
+      // members in the checker's order, `any` is the default return of `AsyncGenerator<string>`
+      expect(toString('GenOrNull')).toEqual([
+        ['string', '{ n: number; }'],
+        ['any', '"done"'],
+      ])
+      expect(toString('ManyResults')).toEqual([['{ a: number; }', '{ b: string; }'], []])
       expect(toString('NotIter')).toBeUndefined()
       expect(toString('BothUsers')).toBeUndefined()
     })

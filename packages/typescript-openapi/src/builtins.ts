@@ -210,7 +210,8 @@ function getBuiltinSubclass(
   }
 
   if (base === 'Set' || base === 'Map') {
-    const item = getIteratorTypes(types.checker, type, types.getProperties(type), false)?.yieldType
+    const item = getIteratorTypes(types.checker, type, types.getProperties(type), false)
+      ?.yieldTypes[0]
 
     if (stringify) {
       return emptyObject()

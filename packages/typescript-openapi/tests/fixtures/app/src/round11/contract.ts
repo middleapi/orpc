@@ -6,6 +6,12 @@ export interface User {
   name: string
 }
 
+/** A tag */
+export interface Tag {
+  label: string
+  color: 'red' | 'blue'
+}
+
 export const contract = {
   users: {
     /**
