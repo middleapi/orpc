@@ -989,7 +989,11 @@ describe('typeToJsonSchemaConverter', () => {
           properties: { code: { type: 'string' } },
           required: ['code'],
         })
-        expect(schema.$defs.Errors.properties.type).toEqual({ type: 'object' })
+        // the fixture augments `TypeError` with `code`
+        expect(schema.$defs.Errors.properties.type).toEqual({
+          type: 'object',
+          properties: { code: { type: 'string' } },
+        })
         expect(schema.$defs.Errors.properties.plain).toEqual({ type: 'object' })
       } finally {
         project.close()
@@ -1024,6 +1028,45 @@ describe('typeToJsonSchemaConverter', () => {
         expect(polyfills.$defs.WithPolyfills.properties).toEqual({
           big: { type: 'string' },
           counts: { type: 'array', items: expect.objectContaining({ type: 'array' }) },
+        })
+      } finally {
+        project.close()
+      }
+    })
+
+    it('recognizes library classes augmented by the project or created through other types', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const [classes] = converter.convert(project.getExportType('LibraryClasses').type) as [
+          any,
+          boolean,
+        ]
+        const { typeError, ...created } = classes.$defs.LibraryClasses.properties
+
+        // `name` and `message` are not own enumerable data, `code` is the project's
+        expect(typeError).toEqual({ type: 'object', properties: { code: { type: 'string' } } })
+        for (const value of Object.values(created)) {
+          expect((value as any).properties.tags).toEqual({ type: 'object' })
+        }
+
+        const [cases] = converter.convert(project.getExportType('ToJSONCases').type) as [
+          any,
+          boolean,
+        ]
+        expect(cases.$defs.MaybeJSON).toEqual({
+          anyOf: [
+            { type: 'string' },
+            { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+          ],
+        })
+        expect(cases.$defs.Account).toEqual({
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
         })
       } finally {
         project.close()
@@ -2776,6 +2819,15 @@ describe('typeToJsonSchemaConverter', () => {
         ['any', '"done"'],
       ])
       expect(toString('ManyResults')).toEqual([['{ a: number; }', '{ b: string; }'], []])
+      // asked once per type
+      const c2 = create()
+      const gen = edge.getExportType('GenOrNull').type
+      c2.getAsyncIteratorTypes(gen)
+      const spy = vi.spyOn(edge.checker, 'getTypeOfSymbol')
+      c2.getAsyncIteratorTypes(gen)
+      expect(spy).not.toHaveBeenCalled()
+      spy.mockRestore()
+
       expect(toString('NotIter')).toBeUndefined()
       expect(toString('BothUsers')).toBeUndefined()
     })

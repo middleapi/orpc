@@ -147,6 +147,20 @@ export function getToJSONResultType(
 }
 
 /**
+ * Whether the `toJSON` of a type may be missing (`toJSON?(): string`, or `Partial<Money>`),
+ * so a value is either what `toJSON` returns or its own fields.
+ */
+export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
+  const toJSON = getToJSON(types, type)
+  const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
+  return Boolean(
+    toJSON &&
+    (toJSON.flags & SymbolFlags.Optional ||
+      (method?.isUnionType() && types.getMembers(method).some((m) => m.flags & UNDEFINED_FLAGS))),
+  )
+}
+
+/**
  * The class instance type of a type, also through `Readonly<C>`, `Pick<C, K>`, `C & { ... }`,
  * and `this`.
  */
@@ -186,7 +200,7 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
  * unless the serializer handles it as a built-in, like `Date`, `Set`, or arrays.
  * Only declaration files of the default library and packages declare classes this way:
  * a project interface with a factory (`const User = model<User>()`) describes plain objects,
- * and the constructor must create the interface (or a class of its name) itself.
+ * and the constructor must create the interface itself.
  */
 function isConstructedInterface(types: TypeQueries, type: Type, symbol: TSSymbol): boolean {
   if (
@@ -198,9 +212,12 @@ function isConstructedInterface(types: TypeQueries, type: Type, symbol: TSSymbol
   }
 
   const constructed = types.memo('constructed', symbol.id, () => {
+    // the constructor comes from a declaration file, the interface may be augmented anywhere
     if (
-      !symbol.declarations.length ||
-      !symbol.declarations.every((d) => types.getSourceKind(d.path) !== 'project')
+      !symbol.declarations.some(
+        (d) =>
+          d.kind === SyntaxKind.VariableDeclaration && types.getSourceKind(d.path) !== 'project',
+      )
     ) {
       return false
     }
@@ -210,17 +227,50 @@ function isConstructedInterface(types: TypeQueries, type: Type, symbol: TSSymbol
       ? types.checker.getSignaturesOfType(value, SignatureKind.Construct)
       : []
 
-    // by name, the global `Response` of the Node typings is constructed by undici's `Response`
-    return signatures.some(
-      (signature) =>
-        types.checker.getReturnTypeOfSignature(signature)?.getSymbol()?.name === symbol.name,
-    )
+    return signatures.some((signature) => {
+      const created = types.checker.getReturnTypeOfSignature(signature)
+      return created !== undefined && createsInterface(types, created, symbol.name)
+    })
   })
 
   return (
     constructed &&
     types.memo('builtin', type.id, () => getBuiltin(types, type, false) === undefined)
   )
+}
+
+/**
+ * Whether a constructor's result is the interface of this name: by name, since the global
+ * `Response` of the Node typings is constructed by undici's `Response`, also through
+ * `Readonly<T>`, `T & { ... }`, a subclass, or a type parameter constrained to it.
+ * effect's opaque schema types (`new (_: never): {}`) are not.
+ */
+function createsInterface(types: TypeQueries, type: Type, name: string, depth = 0): boolean {
+  if (type.getSymbol()?.name === name) {
+    return true
+  }
+
+  if (depth > 4) {
+    return false
+  }
+
+  const next = (t: Type | undefined) =>
+    t !== undefined && createsInterface(types, t, name, depth + 1)
+
+  if (type.isIntersectionType()) {
+    return types.getMembers(type).some(next)
+  }
+
+  if (type.flags & TypeFlags.TypeParameter) {
+    return next(types.checker.getBaseConstraintOfType(type))
+  }
+
+  if ((type as any).objectFlags & ObjectFlags.Mapped) {
+    return next(types.getTypeArguments(type)[0])
+  }
+
+  const target = type.isTypeReference() ? type.getTarget() : type
+  return (target.getBaseTypes() ?? []).some(next)
 }
 
 /**

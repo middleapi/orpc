@@ -192,7 +192,11 @@ describe('generated schemas match serialized outputs', async () => {
     const money = (spec.paths as any)['/partialMoney'].post.responses['200'].content[
       'application/json'
     ].schema.properties.m
-    expect(money.required).toEqual(['amount', 'currency'])
+    // `{}` is a `Partial<Money>` too
+    expect(money.anyOf).toEqual([
+      expect.objectContaining({ required: ['amount', 'currency'] }),
+      expect.objectContaining({ type: 'object' }),
+    ])
     expect(schemas.MixedSet.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'number' }] })
   })
 

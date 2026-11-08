@@ -11,6 +11,14 @@ import { getUser } from './round11/users'
 
 const list = impl.users.list.handler(() => [])
 
+/* oxlint-disable typescript/no-duplicate-enum-values -- duplicate values, which zod's enum keeps */
+enum Status {
+  Active = 'a',
+  Alias = 'a',
+  Closed = 'c',
+}
+/* oxlint-enable typescript/no-duplicate-enum-values */
+
 const procedures = {
   /** Requires a signed-in user */
   authed: os.use(({ next }) => next()),
@@ -104,6 +112,26 @@ export const mixed = {
     .route({ method: 'GET' })
     .input(z.object({ s: z.enum(['archived', 'active']) }))
     .input(type<{ s: 'active' | 'archived'; extra: string }>())
+    .handler(() => 'ok'),
+  queryRequired: os
+    .route({ method: 'GET' })
+    .input(z.object({ a: z.string().optional() }))
+    .input(type<{ a: string; b: string }>())
+    .handler(() => 'ok'),
+  queryNullableEnum: os
+    .route({ method: 'GET' })
+    .input(z.object({ s: z.enum(['b', 'a']).nullable() }))
+    .input(type<{ s: 'a' | 'b' | null; extra: string }>())
+    .handler(() => 'ok'),
+  queryDuplicateEnum: os
+    .route({ method: 'GET' })
+    .input(z.object({ s: z.enum(Status) }))
+    .input(type<{ s: Status; extra: string }>())
+    .handler(() => 'ok'),
+  queryConst: os
+    .route({ method: 'GET' })
+    .input(z.object({ s: z.enum(['a']) }))
+    .input(type<{ s: 'a'; extra: string }>())
     .handler(() => 'ok'),
   weaker: os
     .input(z.object({ tag: z.unknown() }))

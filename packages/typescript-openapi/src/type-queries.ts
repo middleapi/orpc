@@ -46,14 +46,7 @@ export interface PropertyAnnotation {
 export class TypeQueries {
   readonly getSourceKind: (path: string) => SourceKind
 
-  private readonly membersCache = new Map<number, readonly Type[]>()
-  private readonly propertiesCache = new Map<number, readonly TSSymbol[]>()
-  private readonly typeArgumentsCache = new Map<number, readonly Type[]>()
-  private readonly jsdocCache = new Map<number, JSDoc | undefined>()
-  private readonly singleMemberEnumCache = new Map<number, TSSymbol | undefined>()
-  private readonly annotationCache = new Map<number, PropertyAnnotation | undefined>()
   private readonly globalTypes = new Map<string, Type | undefined>()
-  private readonly callableCache = new Map<number, boolean>()
   private readonly memos = new Map<string, Map<number, unknown>>()
 
   constructor(
@@ -90,27 +83,17 @@ export class TypeQueries {
    * Whether a type has call or construct signatures, like functions and classes.
    */
   isCallable(type: Type): boolean {
-    let callable = this.callableCache.get(type.id)
-
-    if (callable === undefined) {
-      callable =
+    return this.memo(
+      'callable',
+      type.id,
+      () =>
         this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
-        this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0
-      this.callableCache.set(type.id, callable)
-    }
-
-    return callable
+        this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0,
+    )
   }
 
   getMembers(type: Type): readonly Type[] {
-    let members = this.membersCache.get(type.id)
-
-    if (members === undefined) {
-      members = (type as any).getTypes() ?? []
-      this.membersCache.set(type.id, members!)
-    }
-
-    return members!
+    return this.memo('members', type.id, (): readonly Type[] => (type as any).getTypes() ?? [])
   }
 
   /**
@@ -121,14 +104,7 @@ export class TypeQueries {
   }
 
   getProperties(type: Type): readonly TSSymbol[] {
-    let properties = this.propertiesCache.get(type.id)
-
-    if (properties === undefined) {
-      properties = this.checker.getPropertiesOfType(type)
-      this.propertiesCache.set(type.id, properties)
-    }
-
-    return properties
+    return this.memo('properties', type.id, () => this.checker.getPropertiesOfType(type))
   }
 
   /**
@@ -142,14 +118,9 @@ export class TypeQueries {
    * The type arguments of a reference, like the `string` of `string[]`, even when it is aliased.
    */
   getReferenceArguments(type: Type): readonly Type[] {
-    let args = this.typeArgumentsCache.get(type.id)
-
-    if (args === undefined) {
-      args = isTypeReference(type) ? this.checker.getTypeArguments(type as TypeReference) : []
-      this.typeArgumentsCache.set(type.id, args)
-    }
-
-    return args
+    return this.memo('referenceArguments', type.id, () =>
+      isTypeReference(type) ? this.checker.getTypeArguments(type as TypeReference) : [],
+    )
   }
 
   getReferenceKind(type: Type): 'array' | 'tuple' | undefined {
@@ -181,24 +152,18 @@ export class TypeQueries {
       return undefined
     }
 
-    if (!this.singleMemberEnumCache.has(type.id)) {
+    return this.memo('singleMemberEnum', type.id, () => {
       const parent = type.getSymbol()?.getParent()
       const isSingle =
         parent &&
         parent.flags & SymbolFlags.Enum &&
         this.checker.getDeclaredTypeOfSymbol(parent).id === type.id
-      this.singleMemberEnumCache.set(type.id, isSingle ? parent : undefined)
-    }
-
-    return this.singleMemberEnumCache.get(type.id)
+      return isSingle ? parent : undefined
+    })
   }
 
   getJSDoc(symbol: TSSymbol): JSDoc | undefined {
-    if (!this.jsdocCache.has(symbol.id)) {
-      this.jsdocCache.set(symbol.id, getJSDoc(this.checker, symbol, this.getSourceKind))
-    }
-
-    return this.jsdocCache.get(symbol.id)
+    return this.memo('jsdoc', symbol.id, () => getJSDoc(this.checker, symbol, this.getSourceKind))
   }
 
   /**
@@ -206,14 +171,13 @@ export class TypeQueries {
    * with its instantiated type (`Maybe<string>` rather than `T | null`).
    */
   getAnnotation(property: TSSymbol): PropertyAnnotation | undefined {
-    if (this.annotationCache.has(property.id)) {
-      return this.annotationCache.get(property.id)
-    }
+    return this.memo('annotation', property.id, (): PropertyAnnotation | undefined => {
+      const declaration = property.declarations[0]
 
-    let annotation: PropertyAnnotation | undefined
-    const declaration = property.declarations[0]
+      if (!declaration || this.getSourceKind(declaration.path) !== 'project') {
+        return undefined
+      }
 
-    if (declaration && this.getSourceKind(declaration.path) === 'project') {
       let typeNode = (declaration.resolve() as any)?.type
 
       // `count?: Count | null`
@@ -222,23 +186,24 @@ export class TypeQueries {
         typeNode = references.length === 1 ? references[0] : undefined
       }
 
-      if (typeNode?.kind === SyntaxKind.TypeReference) {
-        const symbol = this.checker.getSymbolAtLocation(typeNode.typeName)
-        const alias = symbol && resolveAlias(this.checker, symbol)
-
-        if (
-          alias &&
-          alias.flags & SymbolFlags.TypeAlias &&
-          this.getSymbolSourceKind(alias) === 'project'
-        ) {
-          const type = this.checker.getTypeAtLocation(typeNode)
-          annotation = type ? { alias, type } : undefined
-        }
+      if (typeNode?.kind !== SyntaxKind.TypeReference) {
+        return undefined
       }
-    }
 
-    this.annotationCache.set(property.id, annotation)
-    return annotation
+      const symbol = this.checker.getSymbolAtLocation(typeNode.typeName)
+      const alias = symbol && resolveAlias(this.checker, symbol)
+
+      if (
+        !alias ||
+        !(alias.flags & SymbolFlags.TypeAlias) ||
+        this.getSymbolSourceKind(alias) !== 'project'
+      ) {
+        return undefined
+      }
+
+      const type = this.checker.getTypeAtLocation(typeNode)
+      return type ? { alias, type } : undefined
+    })
   }
 }
 

@@ -624,10 +624,17 @@ describe('typeScriptOpenAPIGenerator', () => {
         required: ['label', 'color'],
       })
       // the type requires `a`, which zod makes optional
-      expect(body('/optionalInZod')).toEqual({
+      // (on the converted schema, which query parameters read)
+      const optionalInZod =
+        paths['/optionalInZod'].post.requestBody.content['application/json'].schema.allOf
+      expect(optionalInZod[0]).toMatchObject({
+        properties: { a: { type: 'string' } },
+        required: ['a'],
+      })
+      expect(optionalInZod[1]).toEqual({
         type: 'object',
         properties: { b: { type: 'number' } },
-        required: ['a', 'b'],
+        required: ['b'],
       })
       // query parameters stay primitive, also with equal enums in another order
       const parameters = (path: string) =>
@@ -636,6 +643,18 @@ describe('typeScriptOpenAPIGenerator', () => {
         ['lim', { type: 'number', default: 10 }, undefined],
         ['extra', { type: 'string' }, undefined],
       ])
+      expect(
+        paths['/queryRequired'].get.parameters.map((p: any) => [p.name, p.required, p.style]),
+      ).toEqual([
+        ['a', true, undefined],
+        ['b', true, undefined],
+      ])
+      for (const path of ['/queryNullableEnum', '/queryDuplicateEnum', '/queryConst']) {
+        expect(parameters(path).map(([name, , style]: any) => [name, style])).toEqual([
+          ['s', undefined],
+          ['extra', undefined],
+        ])
+      }
       expect(parameters('/queryEnum')).toEqual([
         ['s', { type: 'string', enum: ['archived', 'active'] }, undefined],
         ['extra', { type: 'string' }, undefined],

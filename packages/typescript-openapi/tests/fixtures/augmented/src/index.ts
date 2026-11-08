@@ -1,4 +1,4 @@
-import type { Opaque, Reporter, Session } from 'augments-error'
+import type { Animal, Branded, Frozen, Generic, Opaque, Reporter, Session } from 'augments-error'
 
 export class AppError extends Error {
   code = 'APP'
@@ -29,6 +29,10 @@ declare global {
   interface Map<K, V> {
     toJSON(): [K, V][]
   }
+
+  interface TypeError {
+    code?: string
+  }
 }
 
 export class WithPolyfills {
@@ -41,4 +45,33 @@ export interface Constructed {
   opaque: Opaque
   session: Session
   user: User
+}
+
+/** Library classes, also augmented by the project or created through other types */
+export interface LibraryClasses {
+  typeError: TypeError
+  branded: Branded
+  frozen: Frozen
+  generic: Generic
+  animal: Animal
+}
+
+export interface MaybeJSON {
+  a: number
+  toJSON?(): string
+}
+
+export class Account {
+  id = '1'
+  password = 'secret'
+
+  toJSON(): Omit<Account, 'password' | 'toJSON'> {
+    return { id: this.id }
+  }
+}
+
+/** `toJSON` that may be missing, and `toJSON` returning a library alias */
+export interface ToJSONCases {
+  maybe: MaybeJSON
+  account: Account
 }

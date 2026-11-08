@@ -19,6 +19,7 @@ import {
   getClassType,
   getDataProperties,
   getToJSONResultType,
+  hasOptionalToJSON,
   isDropped,
   isNonSerializable,
   ModeSensitivity,
@@ -114,6 +115,7 @@ export class TypeToJsonSchemaConverter {
   /** Non-null cores of named nullable unions, back to the union (`Json` without `null` -> `Json`) */
   private readonly nullableCores = new Map<number, Type>()
   private namedDepth = 0
+  private voidType: Type | undefined
 
   /**
    * Inside class instances, which the OpenAPI JSON serializer leaves to `JSON.stringify`:
@@ -187,6 +189,10 @@ export class TypeToJsonSchemaConverter {
    * also of a union of async iterables (`AsyncGenerator<A> | AsyncGenerator<B> | undefined`).
    */
   getAsyncIteratorTypes(type: Type): AsyncIteratorTypes | undefined {
+    return this.types.memo('asyncIterator', type.id, () => this.computeAsyncIteratorTypes(type))
+  }
+
+  private computeAsyncIteratorTypes(type: Type): AsyncIteratorTypes | undefined {
     if (type.isUnionType()) {
       const members = this.types.getMembers(type).filter((m) => !(m.flags & NULLISH_FLAGS))
       const all = members.map((m) => this.getAsyncIteratorTypes(m))
@@ -202,7 +208,7 @@ export class TypeToJsonSchemaConverter {
         // members that return nothing make the returned value optional
         returnTypes:
           returnTypes.length && all.some((t) => !t!.returnTypes.length)
-            ? [...returnTypes, this.checker.getVoidType()]
+            ? [...returnTypes, (this.voidType ??= this.checker.getVoidType())]
             : returnTypes,
       }
     }
@@ -233,9 +239,6 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * The value of a `Promise`, like a handler's result.
-   */
-  /**
    * The values of a handler's result: `Promise<A> | B` (returned by a handler without `async`)
    * is `A | B` once awaited.
    */
@@ -252,6 +255,9 @@ export class TypeToJsonSchemaConverter {
     return awaited === type ? [type] : this.getAwaitedTypes(awaited)
   }
 
+  /**
+   * The value of a `Promise`, like a handler's result.
+   */
   private getAwaitedType(type: Type): Type {
     const symbol = type.flags & TypeFlags.Object ? type.getSymbol() : undefined
 
@@ -639,7 +645,11 @@ export class TypeToJsonSchemaConverter {
       ? undefined
       : getToJSONResultType(this.types, type, this.stringify)
     if (toJSONResult) {
-      return this.withStringify(() => this.convertToJSONResult(toJSONResult))
+      const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
+
+      return hasOptionalToJSON(this.types, type)
+        ? { anyOf: dedupe([converted, this.convertObject(type, true)]) }
+        : converted
     }
 
     const isClassInstance = classType !== undefined
@@ -692,7 +702,9 @@ export class TypeToJsonSchemaConverter {
       if (
         !propertyType ||
         isDropped(this.types, propertyType) ||
-        (serialized && isDropped(this.types, serialized))
+        (serialized &&
+          isDropped(this.types, serialized) &&
+          !hasOptionalToJSON(this.types, propertyType))
       ) {
         continue
       }
@@ -894,8 +906,7 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    const items = dedupe(elementTypes.map((t) => this.visitElement(t)))
-    return { type: 'array', items: items.length > 1 ? { anyOf: items } : (items[0] ?? {}) }
+    return { type: 'array', items: this.visitElements(elementTypes) }
   }
 
   /**
@@ -928,7 +939,7 @@ export class TypeToJsonSchemaConverter {
   /**
    * Items of several types, like a `Set` subclass iterating strings and numbers.
    */
-  private visitElements(items: readonly Type[]): JsonSchema {
+  private visitElements(items: readonly (Type | undefined)[]): JsonSchema {
     const schemas = dedupe(items.map((item) => this.visitElement(item)))
     return schemas.length > 1 ? { anyOf: schemas } : (schemas[0] ?? {})
   }
@@ -1039,7 +1050,13 @@ export class TypeToJsonSchemaConverter {
    */
   private isBuiltinObject(type: Type): boolean {
     const symbol = type.getSymbol()
-    return Boolean(symbol && !TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(this.types, symbol))
+    // not the anonymous types of library aliases like `Omit<User, 'password'>`
+    return Boolean(
+      symbol &&
+      symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class) &&
+      !TYPED_ARRAYS.has(symbol.name) &&
+      isBuiltinSymbol(this.types, symbol),
+    )
   }
 
   /**
@@ -1174,12 +1191,8 @@ function getIndexKeyType(types: TypeQueries, key: Type): Type | undefined {
 function toPattern(types: TypeQueries, type: Type): string {
   const flags = type.flags
 
-  if (flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BigIntLiteral)) {
+  if (flags & (LITERAL_FLAGS | TypeFlags.BigIntLiteral)) {
     return escapeRegExp(String((type as any).value))
-  }
-
-  if (flags & TypeFlags.BooleanLiteral) {
-    return String((type as any).value)
   }
 
   if (flags & TypeFlags.Number) {
