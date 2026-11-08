@@ -125,19 +125,41 @@ export class TypeQueries {
   }
 
   /**
-   * The class or interface declaring the properties of a mapped type, which keeps them.
+   * The source of a mapped type named by an alias without arguments: the first argument
+   * of the utility it is declared with (`type View = Omit<Box<string>, 'x'>`), or else
+   * the class or interface declaring all its properties.
    */
   private getDeclaringType(type: Type): Type | undefined {
-    const declaration = this.getProperties(type)[0]?.declarations[0]?.resolve() as any
-    const owner = declaration?.parent
-    const symbol =
-      owner &&
-      (owner.kind === SyntaxKind.ClassDeclaration ||
-        owner.kind === SyntaxKind.InterfaceDeclaration) &&
-      owner.name &&
-      this.checker.getSymbolAtLocation(owner.name)
+    const declaration = type.getAliasSymbol()?.declarations[0]?.resolve() as any
+    const argument = declaration?.type?.typeArguments?.[0]
 
-    return symbol ? this.checker.getDeclaredTypeOfSymbol(symbol) : undefined
+    if (argument) {
+      return this.checker.getTypeFromTypeNode(argument)
+    }
+
+    const properties = this.getProperties(type)
+    const owners = properties.flatMap((p) => {
+      const owner = (p.declarations[0]?.resolve() as any)?.parent
+      return owner &&
+        (owner.kind === SyntaxKind.ClassDeclaration ||
+          owner.kind === SyntaxKind.InterfaceDeclaration) &&
+        owner.name
+        ? [owner.name]
+        : []
+    })
+
+    // the most derived owner, which has every property
+    for (const name of owners) {
+      const symbol = this.checker.getSymbolAtLocation(name)
+      const candidate = symbol && this.checker.getDeclaredTypeOfSymbol(symbol)
+      const keys = candidate && new Set(this.getProperties(candidate).map((p) => p.name))
+
+      if (keys && properties.every((p) => keys.has(p.name))) {
+        return candidate
+      }
+    }
+
+    return undefined
   }
 
   /**

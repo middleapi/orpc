@@ -644,6 +644,69 @@ export class ReturnsAssignedDate {
 /** An alias of a view of a class */
 export type OmittedKind = Omit<KindJSON, 'name'>
 
+export class Point {
+  x = 1
+}
+
+export class BaseJSON {
+  a = 'a'
+
+  toJSON(): string {
+    return 'json'
+  }
+}
+
+export class DerivedJSON extends BaseJSON {
+  b = 'b'
+}
+
+/** An alias of a view of a derived class */
+export type PickedDerived = Pick<DerivedJSON, 'a' | 'b'>
+
+export class GenericBox<T> {
+  value!: T
+  history: T[] = []
+  x = 0
+  tags = new Set(['b'])
+}
+
+/** An alias of a view of a generic class */
+export type OmittedBox = Omit<GenericBox<string>, 'x'>
+
+export class Counted extends Array<number> {
+  label = 'a'
+}
+
+export class PlainFields {
+  s = 's'
+  tags = new Set(['p'])
+}
+
+/** An interface extending a class without private members */
+export interface ExtendsPlain extends PlainFields {}
+
+export class MaybeJSONClass {
+  toJSON(): string | undefined {
+    return undefined
+  }
+}
+
+/** A chain of views, each a component */
+export class ChainA {
+  tags = new Set(['c'])
+  next: Readonly<ChainB> | null = null
+}
+
+export class ChainB {
+  tags = new Set(['c'])
+  next: Readonly<ChainC> | null = null
+}
+
+export class ChainC {
+  tags = new Set(['c'])
+  next: Readonly<ChainA> | null = null
+}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -899,6 +962,31 @@ export const router = {
       maps: new HoldsMapIntersection(),
       frozenDate: new ReturnsFrozenDate(),
       assignedDate: new ReturnsAssignedDate(),
+    }),
+  ),
+  roundTwentyThree: os.handler(
+    (): {
+      assignedJSON: Point & { toJSON: () => number }
+      pickedDerived: PickedDerived
+      omittedBox: OmittedBox
+      readonlySet: Readonly<Set<string> & { x: string }>
+      bytes: Uint8Array & { x: string }
+      partialCounted: Partial<Counted>
+      partialDate: Partial<Date>
+      extendsPlain: ExtendsPlain
+      omittedJSON: { v: Omit<MaybeJSONClass, 'toJSON'> }
+      chain: Readonly<ChainA>
+    } => ({
+      assignedJSON: Object.assign(new Point(), { toJSON: () => 5 }),
+      pickedDerived: new DerivedJSON(),
+      omittedBox: { value: 'v', history: [], tags: new Set(['o']) },
+      readonlySet: Object.assign(new Set(['a']), { x: 'x' }),
+      bytes: Object.assign(new Uint8Array([1]), { x: 'x' }),
+      partialCounted: { label: 'x' },
+      partialDate: {},
+      extendsPlain: new PlainFields(),
+      omittedJSON: { v: new MaybeJSONClass() },
+      chain: new ChainA(),
     }),
   ),
 }

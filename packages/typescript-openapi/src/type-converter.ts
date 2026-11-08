@@ -1,5 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import { setOwn } from '@orpc/shared'
+import { setOwn, stringifyJSON } from '@orpc/shared'
 import type {
   Checker,
   Program,
@@ -17,8 +17,9 @@ import {
   isBuiltinSymbol,
   isTypedArray,
 } from './builtins.ts'
-import { getDefName, getFallbackDefName } from './def-names.ts'
-import { DefRegistry } from './defs.ts'
+import { getDefName, getFallbackDefName, getViewDefName } from './def-names.ts'
+import type { Def } from './defs.ts'
+import { DefNames, DefRegistry } from './defs.ts'
 import { ExpansionGuard } from './expansion.ts'
 import {
   getClassType,
@@ -34,6 +35,7 @@ import type { ObjectJsonSchema } from './schema-utils.ts'
 import {
   applyJSDoc,
   bigintSchema,
+  collectDefRefs,
   dedupe,
   escapeRegExp,
   isLiteralSchema,
@@ -107,7 +109,7 @@ export interface AsyncIteratorTypes {
   returnTypes: readonly Type[]
 }
 
-const TYPE_QUERIES = new WeakMap<Checker, TypeQueries>()
+const SHARED = new WeakMap<Checker, { types: TypeQueries; names: DefNames }>()
 
 const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
 
@@ -124,7 +126,7 @@ export class TypeToJsonSchemaConverter {
   /** Values a client sends, decoded from JSON: classes are plain objects, `toJSON` is not called */
   private readonly input: boolean
   private readonly types: TypeQueries
-  private readonly defs = new DefRegistry()
+  private readonly defs: DefRegistry
   private readonly expansion: ExpansionGuard
   private readonly sensitivity: ModeSensitivity
 
@@ -136,6 +138,8 @@ export class TypeToJsonSchemaConverter {
   /** Non-null cores of named nullable unions, back to the union (`Json` without `null` -> `Json`) */
   private readonly nullableCores = new Map<number, Type>()
   private namedDepth = 0
+  /** Defs of views by their schema, to share one def between views of the same schema */
+  private readonly viewDefs = new Map<string, Def>()
   private voidType: Type | undefined
 
   /**
@@ -151,13 +155,14 @@ export class TypeToJsonSchemaConverter {
   ) {
     this.defsMode = options.defs ?? 'named'
     this.input = options.direction === 'input'
-    // converters of one program (for inputs and outputs) share the compiler queries
-    let types = TYPE_QUERIES.get(checker)
-    if (!types) {
-      types = new TypeQueries(checker, program)
-      TYPE_QUERIES.set(checker, types)
+    // converters of one program (for inputs and outputs) share the compiler queries and def names
+    let shared = SHARED.get(checker)
+    if (!shared) {
+      shared = { types: new TypeQueries(checker, program), names: new DefNames() }
+      SHARED.set(checker, shared)
     }
-    this.types = types
+    this.types = shared.types
+    this.defs = new DefRegistry(shared.names)
     this.expansion = new ExpansionGuard(this.types)
     this.sensitivity = new ModeSensitivity(this.types)
   }
@@ -338,13 +343,23 @@ export class TypeToJsonSchemaConverter {
         ? namedSymbol
         : undefined
 
-    if (this.defsMode === 'named' && projectSymbol && !(type.flags & TypeFlags.Boolean)) {
-      const def = this.defs.create(key, getDefName(this.types, type, projectSymbol))
+    // a view of a project class (`Readonly<User>`) holds an instance or a plain object: a def
+    // writes both forms once, instead of at every use along a chain of views
+    const viewName =
+      this.defsMode === 'named' && !projectSymbol ? this.getViewDefName(type) : undefined
+
+    if (
+      this.defsMode === 'named' &&
+      (projectSymbol || viewName) &&
+      !(type.flags & TypeFlags.Boolean)
+    ) {
+      const def = this.defs.create(key, viewName ?? getDefName(this.types, type, projectSymbol!))
 
       this.namedDepth++
       let schema: JsonSchema
       try {
-        schema = this.annotate(this.convertType(type), projectSymbol)
+        const converted = this.convertType(type)
+        schema = projectSymbol ? this.annotate(converted, projectSymbol) : converted
       } finally {
         this.namedDepth--
       }
@@ -354,6 +369,24 @@ export class TypeToJsonSchemaConverter {
       if (isTrivialSchema(schema)) {
         this.defs.inline(def, schema)
         return schema
+      }
+
+      // views with the same schema (`Readonly<C>` and `Pick<C, keyof C>`) share one def
+      if (viewName) {
+        const signature = stringifyJSON(schema)!
+        const existing = this.viewDefs.get(signature)
+
+        if (
+          existing &&
+          this.defs.get(existing.key)?.name === existing.name &&
+          !collectDefRefs(schema).has(def.name)
+        ) {
+          const ref = { $ref: toRef(existing.name) }
+          this.defs.replace(def, ref)
+          return ref
+        }
+
+        this.viewDefs.set(signature, def)
       }
 
       def.schema = schema
@@ -626,6 +659,11 @@ export class TypeToJsonSchemaConverter {
         : this.visit(arrayLike)
     }
 
+    // `Uint8Array & { label: string }` is written by its index keys and the added fields
+    if (isTypedArray(this.types, type)) {
+      return this.convertObject(type)
+    }
+
     // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`
     for (const member of members) {
       const builtin =
@@ -669,6 +707,12 @@ export class TypeToJsonSchemaConverter {
 
     const builtin = ownFields ? undefined : this.convertBuiltinObject(type)
     if (builtin !== undefined) {
+      // `Partial<Date>` or `Pick<URL, 'href'>` may also hold a plain object, a request only that
+      if (this.mayHoldPlainObject(type)) {
+        const fields = this.convertObject(type, true, 'plain', true)
+        return this.input ? fields : anyOfDeduped([builtin, fields])
+      }
+
       return builtin
     }
 
@@ -699,11 +743,17 @@ export class TypeToJsonSchemaConverter {
 
     const properties = this.types.getProperties(type)
 
-    // an instance has the `toJSON` of its class, also when a view leaves it out (`Pick<Money, 'cents'>`)
-    const jsonSource = classType ?? type
-    const toJSONResult = ignoreToJSON
+    // an instance has its own `toJSON` (also one an intersection adds), or the one of its class,
+    // also when a view leaves it out (`Pick<Money, 'cents'>`)
+    const ownToJSON = ignoreToJSON
       ? undefined
-      : getToJSONResultType(this.types, jsonSource, this.stringify)
+      : getToJSONResultType(this.types, type, this.stringify)
+    const jsonSource = ownToJSON || !classType ? type : classType
+    const toJSONResult =
+      ownToJSON ??
+      (ignoreToJSON || !classType
+        ? undefined
+        : getToJSONResultType(this.types, classType, this.stringify))
     if (toJSONResult) {
       const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
 
@@ -752,7 +802,8 @@ export class TypeToJsonSchemaConverter {
 
     if (typedArray) {
       dataProperties = dataProperties.filter((p) => !isBuiltinSymbol(this.types, p))
-    } else {
+    } else if (!(form === 'plain' && this.isViewOfArraySubclass(type))) {
+      // (the plain form of `Partial<class Rows extends Array>` holds the fields, not items)
       const arrayLike = this.convertArrayLikeObject(properties)
       if (arrayLike !== undefined) {
         return arrayLike
@@ -777,8 +828,9 @@ export class TypeToJsonSchemaConverter {
       // functions, symbols, and always `undefined` values are dropped by JSON serialization,
       // also when `toJSON` returns them
       const serialized =
-        propertyType &&
-        getToJSONResultType(this.types, propertyType, this.stringify || isClassInstance)
+        !this.input && propertyType
+          ? getToJSONResultType(this.types, propertyType, this.stringify || isClassInstance)
+          : undefined
       if (
         !propertyType ||
         isDropped(this.types, propertyType) ||
@@ -810,6 +862,8 @@ export class TypeToJsonSchemaConverter {
 
       if (
         !serializable &&
+        // fields added to a typed array by an intersection may be phantom brands
+        !(typedArray && type.isIntersectionType()) &&
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
         !this.mayDropThroughToJSON(propertyType, this.stringify || isClassInstance)
@@ -1147,14 +1201,81 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
+   * The def name of a view of a project class, when its two forms differ
+   * (outside class instances, for outputs).
+   */
+  private getViewDefName(type: Type): string | undefined {
+    if (
+      this.input ||
+      this.stringify ||
+      !(type.flags & (TypeFlags.Object | TypeFlags.Intersection))
+    ) {
+      return undefined
+    }
+
+    const classType = getClassType(this.types, type)
+    const classSymbol = classType?.getSymbol()
+
+    // only when the forms differ, which is when the view is mode sensitive
+    return classType &&
+      classSymbol &&
+      this.types.getSymbolSourceKind(classSymbol) === 'project' &&
+      isClassView(this.types, type, classType) &&
+      this.sensitivity.isSensitive(type)
+      ? getViewDefName(this.types, type, classSymbol)
+      : undefined
+  }
+
+  /**
+   * Whether a mapped view of a built-in or class may hold a plain object: it makes members
+   * optional (`Partial<Date>`) or leaves some out (`Pick<URL, 'href'>`).
+   */
+  private mayHoldPlainObject(type: Type): boolean {
+    const source = this.types.getMappedSource(type)
+
+    if (!source) {
+      return false
+    }
+
+    const sourceProperties = new Map(this.types.getProperties(source).map((p) => [p.name, p]))
+    const properties = this.types.getProperties(type)
+
+    return (
+      properties.length < sourceProperties.size ||
+      properties.some(
+        (p) =>
+          p.flags & SymbolFlags.Optional &&
+          !(sourceProperties.get(p.name)!.flags & SymbolFlags.Optional),
+      )
+    )
+  }
+
+  private isViewOfArraySubclass(type: Type): boolean {
+    const source = this.types.getMappedSource(type)
+    const base = source && getBuiltinBaseName(this.types, source)
+    return base === 'Array' || base === 'ReadonlyArray'
+  }
+
+  /**
    * Whether `toJSON` of a value of this type, or of a union member, may return what JSON
    * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
    */
   private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
+    // a request carries plain JSON, `toJSON` is not called
+    if (this.input) {
+      return false
+    }
+
     const members = type.isUnionType() ? this.types.getMembers(type) : [type]
 
     return members.some((member) => {
-      const serialized = getToJSONResultType(this.types, member, stringify)
+      // also of the class behind a view leaving `toJSON` out (`Omit<C, 'toJSON'>`)
+      const classType = getClassType(this.types, member)
+      const serialized =
+        getToJSONResultType(this.types, member, stringify) ??
+        (classType && classType.id !== member.id
+          ? getToJSONResultType(this.types, classType, stringify)
+          : undefined)
       return (
         serialized !== undefined &&
         (this.isOptional(serialized) ||

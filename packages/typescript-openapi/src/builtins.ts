@@ -219,9 +219,13 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
   // a view keeping the source's values (`Readonly<Error>`, `Partial<RegExp>`) is still the built-in
   // (not a view of a project class extending one, `Pick<MyDate, 'label'>` may be a plain object)
   const viewed = types.getMappedSource(type)
+  // also over an intersection with a built-in (`Readonly<Set<string> & { x: string }>`)
+  const viewedMember = viewed?.isIntersectionType()
+    ? types.getMembers(viewed).find((m) => getDeclaredBuiltinName(types, m) !== undefined)
+    : viewed
   const viewedBuiltin =
-    viewed && getDeclaredBuiltinName(types, viewed) !== undefined
-      ? getBuiltin(types, viewed, stringify)
+    viewedMember && getDeclaredBuiltinName(types, viewedMember) !== undefined
+      ? getBuiltin(types, viewedMember, stringify)
       : undefined
   if (viewedBuiltin !== undefined) {
     return viewedBuiltin

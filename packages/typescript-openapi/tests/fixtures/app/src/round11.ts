@@ -8,6 +8,8 @@ import { impl } from './round11/contract'
 import * as all from './round11/index'
 import { healthPing, pings } from './round11/index'
 import { getUser } from './round11/users'
+import type { Item as One } from './round23/one'
+import type { Item as Two } from './round23/two'
 
 const list = impl.users.list.handler(() => [])
 
@@ -198,6 +200,28 @@ export const classes = {
   create: os
     .input(type<CreatePost>())
     .handler(({ input }) => new CreatePost(input.title, new Set(input.tags), 0n)),
+}
+
+class SecretJSON {
+  value = 'v'
+
+  toJSON(): undefined {
+    return undefined
+  }
+}
+
+interface HoldsSecret {
+  secret: SecretJSON
+  list: SecretJSON[]
+}
+
+/**
+ * Models in both directions, and `toJSON`, which requests never call
+ */
+export const directions = {
+  one: os.handler((): One => ({ id: '1' })),
+  two: os.input(type<Two>()).handler(({ input }): Two => input),
+  secret: os.input(type<HoldsSecret>()).handler(() => 'ok'),
 }
 
 export const streams = {

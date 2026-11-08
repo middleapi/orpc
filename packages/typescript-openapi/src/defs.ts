@@ -13,6 +13,15 @@ export interface Def {
 }
 
 /**
+ * Def names shared by the registries of one program (the converters for inputs and outputs),
+ * so a type gets the same name in both.
+ */
+export class DefNames {
+  readonly byKey = new Map<number, string>()
+  readonly used = new Set<string>()
+}
+
+/**
  * The defs and shared results of the conversions, by the conversion key of their type.
  * What a conversion adds can be discarded, when it failed or depends on where it started.
  */
@@ -46,15 +55,25 @@ export class DefRegistry {
     return def !== undefined && def.schema === undefined
   }
 
+  constructor(private readonly names = new DefNames()) {}
+
   create(key: number, preferredName: string): Def {
-    // the `JSON.stringify` form of a type (negative keys) has its own name, so names do not
-    // depend on which form was converted first
-    const base = key < 0 ? `${preferredName}Json` : preferredName
-    // `Page_1` and `Page_12` must not collide as `Page_12`
-    const separator = /\d$/u.test(base) ? '_' : ''
-    let name = base
-    for (let i = 2; this.defsByName.has(name) || this.reservedNames.has(name); i++) {
-      name = `${base}${separator}${i}`
+    const taken = (name: string) => this.defsByName.has(name) || this.reservedNames.has(name)
+    let name = this.names.byKey.get(key)
+
+    if (name === undefined || taken(name)) {
+      // the `JSON.stringify` form of a type (negative keys) has its own name, so names do not
+      // depend on which form was converted first
+      const base = key < 0 ? `${preferredName}Json` : preferredName
+      // `Page_1` and `Page_12` must not collide as `Page_12`
+      const separator = /\d$/u.test(base) ? '_' : ''
+      name = base
+      for (let i = 2; taken(name) || this.names.used.has(name); i++) {
+        name = `${base}${separator}${i}`
+      }
+
+      this.names.byKey.set(key, name)
+      this.names.used.add(name)
     }
 
     const def: Def = { name, key }
@@ -70,6 +89,15 @@ export class DefRegistry {
   inline(def: Def, schema: JsonSchema): void {
     this.remove(def)
     this.setAnonymous(def.key, schema)
+  }
+
+  /**
+   * Replaces a def nothing references by another one, freeing its name.
+   */
+  replace(def: Def, schema: JsonSchema): void {
+    this.inline(def, schema)
+    this.names.byKey.delete(def.key)
+    this.names.used.delete(def.name)
   }
 
   setAnonymous(key: number, schema: JsonSchema): void {

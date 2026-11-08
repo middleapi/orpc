@@ -167,16 +167,16 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
     return type
   }
 
-  // only instances of a class with `#private` or `private` members are assignable to an
-  // interface extending it directly, not through `Pick<C, K>` or `Partial<C>`
+  // an interface extending a class describes its instances (and, unless the class has private
+  // members, plain objects), not through `Pick<C, K>` or `Partial<C>`
   if (symbol && symbol.flags & SymbolFlags.Interface) {
     const target = type.isTypeReference() ? type.getTarget() : type
-    const nominalBase = (target.getBaseTypes() ?? []).find(
-      (base) => (base.getSymbol()?.flags ?? 0) & SymbolFlags.Class && types.isNominalClass(base),
+    const classBase = (target.getBaseTypes() ?? []).find(
+      (base) => (base.getSymbol()?.flags ?? 0) & SymbolFlags.Class,
     )
 
-    if (nominalBase) {
-      return nominalBase
+    if (classBase) {
+      return classBase
     }
   }
 

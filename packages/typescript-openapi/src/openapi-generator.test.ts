@@ -9,7 +9,7 @@ import { router as headersRouter } from '../tests/fixtures/app/src/headers.ts'
 import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
-import { classes, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
+import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -743,6 +743,26 @@ describe('typeScriptOpenAPIGenerator', () => {
       // the server sends an instance, which `JSON.stringify` writes
       const output = component(operation.responses['200'].content['application/json'].schema)
       expect(output.properties.tags).toEqual({ type: 'object' })
+    })
+
+    it('names a model the same in both directions, and ignores toJSON in inputs', async () => {
+      const spec = await generator.generate(directions, {
+        source: { file: fixture('round11.ts'), export: 'directions' },
+      })
+      const paths = spec.paths as any
+      const two = paths['/two'].post
+
+      // one component for the second `Item`, used by the request and the response
+      const names = Object.keys(spec.components?.schemas ?? {})
+      expect(names).toEqual(expect.arrayContaining(['Item', 'Item2']))
+      expect(names).not.toContain('ItemInput')
+      expect(two.requestBody.content['application/json'].schema).toEqual(
+        two.responses['200'].content['application/json'].schema,
+      )
+
+      const secret = (spec.components?.schemas as any).HoldsSecret
+      expect(secret.required).toEqual(['secret', 'list'])
+      expect(secret.properties.list.items).toEqual({ $ref: '#/components/schemas/SecretJSON' })
     })
 
     it('reports unresolved types when only error data needs inference', async () => {

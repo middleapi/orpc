@@ -37,6 +37,12 @@ describe('generated schemas match serialized outputs', async () => {
       ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
     )
 
+  // a view of a class whose two forms differ is a component
+  const deref = (schema: any): any =>
+    schema?.$ref
+      ? deref((spec.components?.schemas as any)[schema.$ref.replace('#/components/schemas/', '')])
+      : schema
+
   const serialize = (value: unknown) =>
     JSON.parse(JSON.stringify(serializer.serializeJson(value).json) ?? 'null')
 
@@ -113,6 +119,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['builtinViews', undefined],
     ['moreViews', undefined],
     ['moreToJSON', undefined],
+    ['roundTwentyThree', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -206,7 +213,7 @@ describe('generated schemas match serialized outputs', async () => {
       'application/json'
     ].schema.properties.m
     // `{}` is a `Partial<Money>` too
-    expect(money.anyOf).toEqual([
+    expect(deref(money).anyOf).toEqual([
       expect.objectContaining({ required: ['amount', 'currency'] }),
       expect.objectContaining({ type: 'object' }),
     ])
@@ -215,8 +222,8 @@ describe('generated schemas match serialized outputs', async () => {
       'application/json'
     ].schema.properties
     for (const key of ['frozen', 'picked', 'assigned']) {
-      expect(wrapped[key].anyOf[0]).toEqual({ type: 'string' })
-      expect(wrapped[key].anyOf[1].properties.tags).toEqual({ type: 'object' })
+      expect(deref(wrapped[key]).anyOf[0]).toEqual({ type: 'string' })
+      expect(deref(wrapped[key]).anyOf[1].properties.tags).toEqual({ type: 'object' })
     }
     const binary = (spec.paths as any)['/readonlyBinary'].post.responses['200'].content[
       'application/json'
@@ -239,7 +246,7 @@ describe('generated schemas match serialized outputs', async () => {
     const views = (spec.paths as any)['/optionalToJSONViews'].post.responses['200'].content[
       'application/json'
     ].schema.properties
-    expect(views.plain.anyOf).toHaveLength(3)
+    expect(deref(views.plain).anyOf).toHaveLength(3)
     expect(schemas.ExtendsPrivate.anyOf).toEqual([
       { type: 'string' },
       { type: 'object', properties: { tags: { type: 'object' } }, required: ['tags'] },
@@ -276,12 +283,14 @@ describe('generated schemas match serialized outputs', async () => {
 
     // a view holds an instance (`JSON.stringify` writes a `Set` as `{}`) or a plain object
     const views = response('/views')
-    expect(views.picked.anyOf.map((s: any) => s.properties.tags)).toEqual([
+    expect(deref(views.picked).anyOf.map((s: any) => s.properties.tags)).toEqual([
       { type: 'object' },
       setArray,
     ])
     // a getter is no data of an instance, but of a plain object
-    expect(views.frozenIntersection.anyOf.map((s: any) => Object.keys(s.properties))).toEqual([
+    expect(
+      deref(views.frozenIntersection).anyOf.map((s: any) => Object.keys(s.properties)),
+    ).toEqual([
       ['tags', 'name', 'extra'],
       ['tags', 'name', 'label', 'extra'],
     ])
@@ -323,11 +332,11 @@ describe('generated schemas match serialized outputs', async () => {
 
     const views = response('/moreViews').properties
     // `Readonly<C>` drops the private members, so a plain object is assignable too
-    expect(views.privateView.anyOf).toHaveLength(2)
+    expect(deref(views.privateView).anyOf).toHaveLength(2)
     // an instance has the `toJSON` of its class, which a `Pick` leaves out
-    expect(views.pickedJSON.anyOf[0]).toEqual(kind)
-    expect(views.pickedJSONList.items.anyOf[0]).toEqual(kind)
-    expect(views.pickedDate.anyOf[1]).toEqual({
+    expect(deref(views.pickedJSON).anyOf[0]).toEqual(kind)
+    expect(deref(views.pickedJSONList.items).anyOf[0]).toEqual(kind)
+    expect(deref(views.pickedDate).anyOf[1]).toEqual({
       type: 'object',
       properties: { label: { type: 'string' } },
       required: ['label'],
@@ -343,6 +352,42 @@ describe('generated schemas match serialized outputs', async () => {
     expect(schemas.ReturnsAssignedDate).toMatchObject({
       properties: { label: { type: 'string' }, x: { type: 'string' } },
     })
+  })
+
+  it('reads views through aliases, intersections, and built-ins', () => {
+    const schemas = spec.components?.schemas as any
+    const response = (spec.paths as any)['/roundTwentyThree'].post.responses['200'].content[
+      'application/json'
+    ].schema
+    const { properties } = response
+
+    // the `toJSON` an intersection adds
+    expect(deref(properties.assignedJSON).anyOf[0]).toEqual({ type: 'number' })
+    // aliases of views of derived and generic classes
+    expect(schemas.PickedDerived.anyOf[0]).toEqual({ type: 'string' })
+    expect(schemas.OmittedBox.anyOf).toHaveLength(2)
+    expect(schemas.ExtendsPlain.anyOf).toHaveLength(2)
+    // a built-in behind a view, and fields added to a typed array
+    expect(properties.readonlySet).toMatchObject({ 'x-native-type': 'set' })
+    expect(properties.bytes).toEqual({
+      type: 'object',
+      properties: { x: { type: 'string' } },
+      additionalProperties: { type: 'number' },
+    })
+    // views that may hold plain objects
+    expect(properties.partialDate.anyOf[1]).toEqual({ type: 'object' })
+    expect(properties.partialCounted.anyOf[1].properties.label).toEqual({ type: 'string' })
+    // `toJSON` of the class behind `Omit` may return `undefined`
+    expect(properties.omittedJSON.required).toBeUndefined()
+  })
+
+  it('writes each view of a chain of views once', () => {
+    const schemas = spec.components?.schemas as any
+    // one component per view of the chain, referenced by the next
+    expect(Object.keys(schemas).filter((name) => /^Readonly_Chain[ABC]$/u.test(name))).toHaveLength(
+      3,
+    )
+    expect(JSON.stringify(schemas.Readonly_ChainA).length).toBeLessThan(1000)
   })
 
   it('describes class instances with JSON.stringify semantics', () => {
