@@ -38,11 +38,13 @@ const MAPPED_ACCESSOR_KINDS: ReadonlySet<SyntaxKind> = new Set([
 /**
  * The properties JSON serialization writes: no methods, symbol keys, #private fields,
  * or class accessors, and of a class instance, no members inherited from a built-in.
+ * `getters` keeps the getters of a class, which a plain object of a view holds as data.
  */
 export function getDataProperties(
   types: TypeQueries,
   properties: readonly TSSymbol[],
   classType: Type | undefined,
+  getters = false,
 ): TSSymbol[] {
   const isClassInstance = classType !== undefined
   // members of `Error` subclasses from packages are not data either (`ZodError#issues` is a getter)
@@ -55,7 +57,7 @@ export function getDataProperties(
       // quoted keys starting with `__` are escaped with another `_`
       !p.escapedName.startsWith('__@') &&
       !p.escapedName.startsWith('__#') &&
-      !isClassAccessor(p) &&
+      (!isClassAccessor(p) || (getters && Boolean(p.flags & SymbolFlags.GetAccessor))) &&
       // mapped types keep methods (`DeepPartial<Account>`) and class accessors (`Readonly<C>`)
       // as properties, still functions or on the prototype
       !(
@@ -302,10 +304,16 @@ export function isClassView(types: TypeQueries, type: Type, classType: Type): bo
 }
 
 /**
- * Whether types convert differently under `JSON.stringify` than under the serializer:
- * when they reach a `Set`, `Map`, `Blob`, `File`, or `bigint`, a built-in subclass serialized
- * through its own `toJSON`, or an object literal with `toJSON`. Class instances are always
- * converted under `JSON.stringify` rules, so they convert the same way either way.
+ * Whether types convert differently in another mode than under the serializer: when they reach
+ * a `Set`, `Map`, `Blob`, `File`, or `bigint`, a built-in subclass serialized through its own
+ * `toJSON`, or an object literal with `toJSON`. Class instances are always converted under
+ * `JSON.stringify` rules, so they convert the same way in every mode.
+ *
+ * - `stringify`: under `JSON.stringify`. A view of a class (`Readonly<C>`) is converted in the
+ *   `either` mode under the serializer, so it differs when its fields do, or when an instance
+ *   differs from a plain object: `toJSON` (also of the class), getters, or a built-in base.
+ * - `either`: when the value may be written by either one. A view is converted in the `either`
+ *   mode under the serializer too, so it never differs.
  */
 export class ModeSensitivity {
   private readonly cache = new Map<number, boolean>()
@@ -314,7 +322,10 @@ export class ModeSensitivity {
   private readonly path: number[] = []
   private order = 0
 
-  constructor(private readonly types: TypeQueries) {}
+  constructor(
+    private readonly types: TypeQueries,
+    private readonly mode: 'stringify' | 'either',
+  ) {}
 
   isSensitive(type: Type): boolean {
     return this.visit(type).sensitive
@@ -401,7 +412,7 @@ export class ModeSensitivity {
         // `MyMap & { x: string }` is written as a map or by `JSON.stringify`
         return (
           isModeSensitiveBuiltin(types, classType) ||
-          (isClassView(types, type, classType) && this.computeFields(type, isSensitive))
+          (isClassView(types, type, classType) && this.computeView(type, classType, isSensitive))
         )
       }
 
@@ -437,6 +448,18 @@ export class ModeSensitivity {
       classType ?? (symbol && symbol.flags & SymbolFlags.Interface ? type : undefined)
     const extended = declared && getBuiltinBaseName(types, declared)
 
+    // the serializer converts a view in the `either` mode, unless it is a built-in
+    // (`Readonly<class Tags extends Set<string>>`)
+    if (
+      this.mode === 'either' &&
+      classType !== undefined &&
+      isClassView(types, type, classType) &&
+      getBuiltin(types, type, false) === undefined &&
+      getBuiltin(types, type, true) === undefined
+    ) {
+      return false
+    }
+
     if (extended !== undefined) {
       if (isModeSensitiveBuiltin(types, declared!)) {
         return true
@@ -454,7 +477,7 @@ export class ModeSensitivity {
     // class instances are converted under `JSON.stringify` rules either way, views may also
     // hold plain objects
     if (classType !== undefined) {
-      return isClassView(types, type, classType) && this.computeFields(type, isSensitive)
+      return isClassView(types, type, classType) && this.computeView(type, classType, isSensitive)
     }
 
     if (getMappedBuiltinName(types, type) !== undefined) {
@@ -474,8 +497,38 @@ export class ModeSensitivity {
   }
 
   /**
-   * Whether the fields of a type convert differently: of a plain object, or of a view of a class
-   * (whose instance form differs from its plain form when it has `toJSON`).
+   * Whether a view of a class converts differently: never between the serializer and the
+   * `either` mode (the serializer converts it in that mode), and under `JSON.stringify`, which
+   * converts it as an instance, when a plain object differs from an instance (`toJSON` of the
+   * view or of its class, getters, members inherited from a built-in, a built-in base), or its
+   * fields do.
+   */
+  private computeView(type: Type, classType: Type, isSensitive: (type: Type) => boolean): boolean {
+    const types = this.types
+
+    if (this.mode === 'either') {
+      return false
+    }
+
+    if (
+      getToJSON(types, classType) ||
+      getBuiltin(types, classType, false) !== undefined ||
+      getBuiltin(types, classType, true) !== undefined
+    ) {
+      return true
+    }
+
+    const properties = types.getProperties(type)
+
+    return (
+      getDataProperties(types, properties, undefined, true).length !==
+        getDataProperties(types, properties, classType).length ||
+      this.computeFields(type, isSensitive)
+    )
+  }
+
+  /**
+   * Whether the fields of a type convert differently, or it has `toJSON`.
    */
   private computeFields(type: Type, isSensitive: (type: Type) => boolean): boolean {
     const types = this.types

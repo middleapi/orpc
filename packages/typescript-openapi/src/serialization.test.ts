@@ -3,6 +3,7 @@ import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
 import { router } from '../tests/fixtures/app/src/serialization.ts'
+import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
 
 /**
@@ -37,7 +38,6 @@ describe('generated schemas match serialized outputs', async () => {
       ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
     )
 
-  // a view of a class whose two forms differ is a component
   const deref = (schema: any): any =>
     schema?.$ref
       ? deref((spec.components?.schemas as any)[schema.$ref.replace('#/components/schemas/', '')])
@@ -45,6 +45,10 @@ describe('generated schemas match serialized outputs', async () => {
 
   const serialize = (value: unknown) =>
     JSON.parse(JSON.stringify(serializer.serializeJson(value).json) ?? 'null')
+
+  const setArray = expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' })
+  // a `Set` in a view: of a plain object the serializer walks, or of an instance `JSON.stringify` writes
+  const eitherSet = { anyOf: [setArray, { type: 'object' }] }
 
   it.each([
     ['post', undefined],
@@ -120,6 +124,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['moreViews', undefined],
     ['moreToJSON', undefined],
     ['roundTwentyThree', undefined],
+    ['eitherForms', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -217,13 +222,13 @@ describe('generated schemas match serialized outputs', async () => {
       expect.objectContaining({ required: ['amount', 'currency'] }),
       expect.objectContaining({ type: 'object' }),
     ])
-    // also behind `Readonly`, `Pick`, and intersections
+    // also behind `Readonly`, `Pick`, and intersections, whose fields are of an instance or a plain object
     const wrapped = (spec.paths as any)['/wrappedOptionalToJSON'].post.responses['200'].content[
       'application/json'
     ].schema.properties
     for (const key of ['frozen', 'picked', 'assigned']) {
       expect(deref(wrapped[key]).anyOf[0]).toEqual({ type: 'string' })
-      expect(deref(wrapped[key]).anyOf[1].properties.tags).toEqual({ type: 'object' })
+      expect(deref(wrapped[key]).anyOf[1].properties.tags).toEqual(eitherSet)
     }
     const binary = (spec.paths as any)['/readonlyBinary'].post.responses['200'].content[
       'application/json'
@@ -246,7 +251,10 @@ describe('generated schemas match serialized outputs', async () => {
     const views = (spec.paths as any)['/optionalToJSONViews'].post.responses['200'].content[
       'application/json'
     ].schema.properties
-    expect(deref(views.plain).anyOf).toHaveLength(3)
+    expect(deref(views.plain).anyOf).toEqual([
+      { type: 'string' },
+      { type: 'object', properties: { tags: eitherSet } },
+    ])
     expect(schemas.ExtendsPrivate.anyOf).toEqual([
       { type: 'string' },
       { type: 'object', properties: { tags: { type: 'object' } }, required: ['tags'] },
@@ -275,25 +283,29 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  it('describes views of classes in both forms, and toJSON results by their own fields', () => {
+  it('describes the fields of views of classes in both forms, and toJSON results by their own fields', () => {
     const schemas = spec.components?.schemas as any
     const response = (path: string) =>
       (spec.paths as any)[path].post.responses['200'].content['application/json'].schema.properties
-    const setArray = expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' })
 
     // a view holds an instance (`JSON.stringify` writes a `Set` as `{}`) or a plain object
     const views = response('/views')
-    expect(deref(views.picked).anyOf.map((s: any) => s.properties.tags)).toEqual([
-      { type: 'object' },
-      setArray,
-    ])
+    expect(views.picked).toEqual({
+      type: 'object',
+      properties: { tags: eitherSet },
+      required: ['tags'],
+    })
     // a getter is no data of an instance, but of a plain object
-    expect(
-      deref(views.frozenIntersection).anyOf.map((s: any) => Object.keys(s.properties)),
-    ).toEqual([
-      ['tags', 'name', 'extra'],
-      ['tags', 'name', 'label', 'extra'],
-    ])
+    expect(views.frozenIntersection).toEqual({
+      type: 'object',
+      properties: {
+        tags: eitherSet,
+        name: { type: 'string' },
+        label: { type: 'string' },
+        extra: { type: 'string' },
+      },
+      required: ['tags', 'name', 'extra'],
+    })
     // `private` allows only instances, and a mapped base drops `#private`
     expect(schemas.ExtendsTsPrivate.properties.tags).toEqual({ type: 'object' })
     expect(schemas.ExtendsPickedPrivate.properties.tags).toEqual(setArray)
@@ -332,7 +344,7 @@ describe('generated schemas match serialized outputs', async () => {
 
     const views = response('/moreViews').properties
     // `Readonly<C>` drops the private members, so a plain object is assignable too
-    expect(deref(views.privateView).anyOf).toHaveLength(2)
+    expect(views.privateView.properties.tags).toEqual(eitherSet)
     // an instance has the `toJSON` of its class, which a `Pick` leaves out
     expect(deref(views.pickedJSON).anyOf[0]).toEqual(kind)
     expect(deref(views.pickedJSONList.items).anyOf[0]).toEqual(kind)
@@ -365,8 +377,8 @@ describe('generated schemas match serialized outputs', async () => {
     expect(deref(properties.assignedJSON).anyOf[0]).toEqual({ type: 'number' })
     // aliases of views of derived and generic classes
     expect(schemas.PickedDerived.anyOf[0]).toEqual({ type: 'string' })
-    expect(schemas.OmittedBox.anyOf).toHaveLength(2)
-    expect(schemas.ExtendsPlain.anyOf).toHaveLength(2)
+    expect(schemas.OmittedBox.properties.tags).toEqual(eitherSet)
+    expect(schemas.ExtendsPlain.properties.tags).toEqual(eitherSet)
     // a built-in behind a view, and fields added to a typed array
     expect(properties.readonlySet).toMatchObject({ 'x-native-type': 'set' })
     expect(properties.bytes).toEqual({
@@ -381,12 +393,34 @@ describe('generated schemas match serialized outputs', async () => {
     expect(properties.omittedJSON.required).toBeUndefined()
   })
 
+  it('names the form of a model written by either one apart', () => {
+    const schemas = spec.components?.schemas as any
+    const { properties } = (spec.paths as any)['/eitherForms'].post.responses['200'].content[
+      'application/json'
+    ].schema
+
+    expect(properties.holder).toEqual({ $ref: '#/components/schemas/TagsHolder' })
+    expect(schemas.TagsHolder.properties.tags).toEqual(setArray)
+    // inside a view, a plain object may be walked by the serializer or written by `JSON.stringify`
+    const plain = deref(properties.plain)
+    expect(plain.properties.holder).toEqual({
+      $ref: '#/components/schemas/TagsHolderAny',
+    })
+    expect(schemas.TagsHolderAny.properties.tags).toEqual(eitherSet)
+    expect(plain.properties.list).toEqual({ type: 'array', items: eitherSet })
+    // only the serializer writes a bigint
+    expect(plain.properties.big).toMatchObject({ 'x-native-type': 'bigint' })
+  })
+
   it('writes each view of a chain of views once', () => {
     const schemas = spec.components?.schemas as any
-    // one component per view of the chain, referenced by the next
-    expect(Object.keys(schemas).filter((name) => /^Readonly_Chain[ABC]$/u.test(name))).toHaveLength(
-      3,
-    )
+    // a view reaching other views is written once, as a component
+    expect(
+      Object.keys(schemas)
+        .filter((name) => name.includes('Chain'))
+        .toSorted(),
+    ).toEqual(['Readonly_ChainA', 'Readonly_ChainB', 'Readonly_ChainC'])
+    expect(schemas.Readonly_ChainA.properties.tags).toEqual(eitherSet)
     expect(JSON.stringify(schemas.Readonly_ChainA).length).toBeLessThan(1000)
   })
 
@@ -453,6 +487,15 @@ describe('generated schemas match serialized outputs', async () => {
     expect(schemas.Instant).toEqual({ type: 'object' })
   })
 
+  it('refers only to components it has', () => {
+    const names = new Set(Object.keys(spec.components?.schemas ?? {}))
+    const refs = [
+      ...JSON.stringify(spec).matchAll(/"\$ref":"#\/components\/schemas\/([^"]+)"/gu),
+    ].map((match) => match[1]!)
+
+    expect(refs.filter((name) => !names.has(name))).toEqual([])
+  })
+
   it('has one component per model, named after it', () => {
     const schemas = spec.components?.schemas ?? {}
     const names = Object.keys(schemas)
@@ -491,5 +534,61 @@ describe('generated schemas match serialized outputs', async () => {
     expect(names).toContain('CycleBJson')
     expect((spec.components?.schemas as any).CycleBJson.properties.tags).toEqual({ type: 'object' })
     expect((spec.components?.schemas as any).CycleB.properties.tags['x-native-type']).toBe('set')
+  })
+})
+
+describe('chains of views of classes', async () => {
+  const file = new URL('../tests/fixtures/app/src/view-chains.ts', import.meta.url)
+  const generator = new TypeScriptOpenAPIGenerator()
+  const specs = {
+    8: await generator.generate(chain8, { source: { file, export: 'chain8' } }),
+    16: await generator.generate(chain16, { source: { file, export: 'chain16' } }),
+  }
+  const routers = { 8: chain8, 16: chain16 }
+  const serializer = new OpenAPIJsonSerializer()
+
+  it.each([
+    [8, 'chain'],
+    [8, 'ring'],
+    [16, 'chain'],
+    [16, 'ring'],
+  ] as const)('match serialized outputs (%s, %s)', async (k, name) => {
+    const spec = specs[k]
+    const ajv = new Ajv2020({ strict: false, allErrors: true })
+    const json = JSON.stringify({
+      $id: 'spec',
+      $defs: spec.components?.schemas ?? {},
+      ...(spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema,
+    }).replaceAll('#/components/schemas/', '#/$defs/')
+    const validate = ajv.compile(JSON.parse(json))
+    const output = await call(routers[k][name], undefined)
+    const serialized = JSON.parse(JSON.stringify(serializer.serializeJson(output).json))
+
+    expect(validate(serialized) ? [] : validate.errors).toEqual([])
+  })
+
+  it('grow linearly with the length of the chain', () => {
+    const size = (k: 8 | 16) => JSON.stringify(specs[k]).length
+    expect(size(16) / size(8)).toBeLessThan(2.5)
+  })
+
+  it('write each view once, as fields of an instance or a plain object', () => {
+    const view = (specs[16].paths as any)['/chain'].post.responses['200'].content[
+      'application/json'
+    ].schema.properties.view
+
+    expect(view.properties.tags).toEqual({
+      anyOf: [
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+        { type: 'object' },
+      ],
+    })
+    // a getter is written for a plain object, not an instance
+    expect(view.properties.label).toEqual({ type: 'string' })
+    expect(view.required).toEqual(['tags', 'next'])
+    expect(view.properties.next.anyOf[0].properties.next.anyOf[0].required).toEqual([
+      'tags',
+      'next',
+    ])
   })
 })

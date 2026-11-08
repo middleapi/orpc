@@ -724,6 +724,18 @@ export class ToBrandedItems {
   }
 }
 
+/** A plain object, written by either one inside a view */
+export interface TagsHolder {
+  tags: Set<string>
+  at: Date
+}
+
+export class HoldsTags {
+  holder: TagsHolder = { tags: new Set(['h']), at: new Date(0) }
+  big = 1n
+  list: Set<string>[] = []
+}
+
 export const router = {
   post: os.handler(() => new Post()),
   posts: os.handler(() => [new Post(), new Post()]),
@@ -987,6 +999,17 @@ export const router = {
       extendsPlain: new PlainFields(),
       omittedJSON: { v: new MaybeJSONClass() },
       chain: new ChainA(),
+    }),
+  ),
+  eitherForms: os.handler(
+    (): {
+      plain: Pick<HoldsTags, 'holder' | 'big' | 'list'>
+      instance: Omit<HoldsTags, 'big'>
+      holder: TagsHolder
+    } => ({
+      plain: { holder: { tags: new Set(['p']), at: new Date(0) }, big: 2n, list: [new Set(['l'])] },
+      instance: Object.assign(new HoldsTags(), { big: undefined }),
+      holder: { tags: new Set(['t']), at: new Date(0) },
     }),
   ),
 }

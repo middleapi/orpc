@@ -3,6 +3,32 @@ import { setOwn } from '@orpc/shared'
 
 import { collectDefRefs, fromRef } from './schema-utils.ts'
 
+/**
+ * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class
+ * instances, which the serializer leaves to it), or by either one (a view of a class, like
+ * `Readonly<C>`, holds an instance or a plain object the serializer walks).
+ */
+export type ConversionMode = 'serializer' | 'stringify' | 'either'
+
+/** Keys of the `either` mode come after all type ids */
+const EITHER_KEY_OFFSET = 2 ** 40
+
+/**
+ * The conversion key of a type in a mode, for a type that converts differently in it than under
+ * the serializer: `JSON.stringify` keys are negative, `either` keys come after the type ids.
+ */
+export function toModeKey(id: number, mode: Exclude<ConversionMode, 'serializer'>): number {
+  return mode === 'stringify' ? -id : id + EITHER_KEY_OFFSET
+}
+
+/**
+ * The suffix of the def name of a type in the mode of a key, so names do not depend on which
+ * mode was converted first: `Json` under `JSON.stringify`, `Any` for either one.
+ */
+function getModeSuffix(key: number): string {
+  return key < 0 ? 'Json' : key >= EITHER_KEY_OFFSET ? 'Any' : ''
+}
+
 export interface Def {
   name: string
   /** The conversion key of the type */
@@ -62,9 +88,7 @@ export class DefRegistry {
     let name = this.names.byKey.get(key)
 
     if (name === undefined || taken(name)) {
-      // the `JSON.stringify` form of a type (negative keys) has its own name, so names do not
-      // depend on which form was converted first
-      const base = key < 0 ? `${preferredName}Json` : preferredName
+      const base = `${preferredName}${getModeSuffix(key)}`
       // `Page_1` and `Page_12` must not collide as `Page_12`
       const separator = /\d$/u.test(base) ? '_' : ''
       name = base
@@ -92,12 +116,25 @@ export class DefRegistry {
   }
 
   /**
-   * Replaces a def nothing references by another one, freeing its name.
+   * Replaces a def by another one (`{ $ref }`), freeing its name, when nothing refers to it:
+   * neither its schema nor the defs created while it was converted.
    */
-  replace(def: Def, schema: JsonSchema): void {
+  replaceIfUnreferenced(def: Def, schema: JsonSchema): boolean {
+    const later = this.createdDefs.slice(this.createdDefs.indexOf(def) + 1)
+
+    if (
+      collectDefRefs(def.schema ?? {}).has(def.name) ||
+      later.some(
+        (other) => other.schema === undefined || collectDefRefs(other.schema).has(def.name),
+      )
+    ) {
+      return false
+    }
+
     this.inline(def, schema)
     this.names.byKey.delete(def.key)
     this.names.used.delete(def.name)
+    return true
   }
 
   setAnonymous(key: number, schema: JsonSchema): void {

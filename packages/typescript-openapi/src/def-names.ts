@@ -44,11 +44,11 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
 }
 
 /**
- * The def name of a view of a class, like `Readonly_User` for `Readonly<User>`, or `UserView`
+ * The def name of a view of a class, like `Readonly_User` for `Readonly<User>`, or `User_View`
  * when the printed type is not usable (`Pick<User, 'id' | 'name'>`).
  */
 export function getViewDefName(types: TypeQueries, type: Type, classSymbol: TSSymbol): string {
-  return toDefName(types.checker.typeToString(type)) ?? `${getSymbolName(classSymbol)}View`
+  return toDefName(types.checker.typeToString(type)) ?? `${getSymbolName(classSymbol)}_View`
 }
 
 /**
