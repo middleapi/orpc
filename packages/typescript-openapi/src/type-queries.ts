@@ -89,7 +89,9 @@ export class TypeQueries {
         return undefined
       }
 
-      const [source] = this.getTypeArguments(type)
+      // `Readonly<C>` by its argument, an alias without arguments (`type View = Omit<C, 'x'>`)
+      // by the declarations its properties keep
+      const source = this.getTypeArguments(type)[0] ?? this.getDeclaringType(type)
 
       if (!source || !(source.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
         return undefined
@@ -120,6 +122,22 @@ export class TypeQueries {
         ? source
         : undefined
     })
+  }
+
+  /**
+   * The class or interface declaring the properties of a mapped type, which keeps them.
+   */
+  private getDeclaringType(type: Type): Type | undefined {
+    const declaration = this.getProperties(type)[0]?.declarations[0]?.resolve() as any
+    const owner = declaration?.parent
+    const symbol =
+      owner &&
+      (owner.kind === SyntaxKind.ClassDeclaration ||
+        owner.kind === SyntaxKind.InterfaceDeclaration) &&
+      owner.name &&
+      this.checker.getSymbolAtLocation(owner.name)
+
+    return symbol ? this.checker.getDeclaredTypeOfSymbol(symbol) : undefined
   }
 
   /**

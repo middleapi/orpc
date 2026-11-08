@@ -183,6 +183,23 @@ async function* genC() {
   return { total: 1 }
 }
 
+export class CreatePost {
+  constructor(
+    public title: string,
+    public tags: Set<string>,
+    public views: bigint,
+  ) {}
+}
+
+/**
+ * Class types sent by clients are plain JSON, sent by the server instances
+ */
+export const classes = {
+  create: os
+    .input(type<CreatePost>())
+    .handler(({ input }) => new CreatePost(input.title, new Set(input.tags), 0n)),
+}
+
 export const streams = {
   partialReturn: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : genC())),
   union: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : genB())),

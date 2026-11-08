@@ -366,10 +366,23 @@ describe('typeToJsonSchemaConverter', () => {
   })
 
   it('template literals', () => {
-    expect(convert('Template')).toEqual([
-      { type: 'string', pattern: '^user-[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?$' },
-      false,
-    ])
+    const [template] = convert('Template') as [any, boolean]
+    const pattern = new RegExp(template.pattern, 'u')
+
+    // the strings TypeScript accepts for `user-${number}`: `+s` is finite
+    for (const valid of [
+      'user-1',
+      'user--1.5e3',
+      'user-.5',
+      'user-0x1F',
+      'user-0b101',
+      'user- 1 ',
+    ]) {
+      expect(pattern.test(valid)).toBe(true)
+    }
+    for (const invalid of ['user-', 'user-abc', 'user-1_0', 'user--0x1']) {
+      expect(pattern.test(invalid)).toBe(false)
+    }
     expect(convert('TemplateMulti')).toEqual([
       {
         anyOf: [

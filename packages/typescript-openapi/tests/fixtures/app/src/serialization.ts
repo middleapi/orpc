@@ -607,6 +607,43 @@ export class HoldsSettled {
   settled: PromiseFulfilledResult<Set<string>> = { status: 'fulfilled', value: new Set(['v']) }
 }
 
+export class KindJSON {
+  tags = new Set(['k'])
+  name = 'n'
+
+  toJSON(): { kind: 'json' } {
+    return { kind: 'json' }
+  }
+}
+
+/** Values may also be `null` */
+export type Nullable<T> = { [K in keyof T]: T[K] | null }
+
+export class LabeledMap extends Map<string, number> {
+  label = 'l'
+}
+
+export class HoldsMapIntersection {
+  m: LabeledMap & { x: string } = Object.assign(new LabeledMap(), { x: 'x' })
+}
+
+/** Returns a readonly date subclass from `toJSON` */
+export class ReturnsFrozenDate {
+  toJSON(): Readonly<LabeledDate> {
+    return new LabeledDate(0)
+  }
+}
+
+/** Returns a date subclass with an extra field from `toJSON` */
+export class ReturnsAssignedDate {
+  toJSON(): LabeledDate & { x: string } {
+    return Object.assign(new LabeledDate(0), { x: 'x' })
+  }
+}
+
+/** An alias of a view of a class */
+export type OmittedKind = Omit<KindJSON, 'name'>
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -827,6 +864,41 @@ export const router = {
       error: new Error('x'),
       regexp: /a/,
       settled: new HoldsSettled(),
+    }),
+  ),
+  moreViews: os.handler(
+    (): {
+      privateView: Readonly<TsPrivate> & { extra: string }
+      pickedJSON: Pick<KindJSON, 'tags'>
+      pickedJSONList: Pick<KindJSON, 'name'>[]
+      pickedDate: Pick<LabeledDate, 'label'>
+      nullable: Nullable<KindJSON>
+      aliased: OmittedKind
+      aliasedPlain: OmittedKind
+    } => ({
+      privateView: { tags: new Set(['a']), extra: 'e' },
+      pickedJSON: new KindJSON(),
+      pickedJSONList: [new KindJSON(), { name: 'plain' }],
+      pickedDate: { label: 'p' },
+      nullable: new KindJSON(),
+      aliased: new KindJSON(),
+      // the serializer walks a plain object key by key, skipping its `toJSON`
+      aliasedPlain: { tags: new Set(['o']), toJSON: () => ({ kind: 'json' as const }) },
+    }),
+  ),
+  moreToJSON: os.handler(
+    (): {
+      mixed: (MaybeUndefinedJSON | number)[]
+      maybe: MaybeUndefinedJSON | number
+      maps: HoldsMapIntersection
+      frozenDate: ReturnsFrozenDate
+      assignedDate: ReturnsAssignedDate
+    } => ({
+      mixed: [new MaybeUndefinedJSON(), 1],
+      maybe: new MaybeUndefinedJSON(),
+      maps: new HoldsMapIntersection(),
+      frozenDate: new ReturnsFrozenDate(),
+      assignedDate: new ReturnsAssignedDate(),
     }),
   ),
 }

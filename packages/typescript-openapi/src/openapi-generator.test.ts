@@ -9,7 +9,7 @@ import { router as headersRouter } from '../tests/fixtures/app/src/headers.ts'
 import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
-import { jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
+import { classes, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -724,6 +724,25 @@ describe('typeScriptOpenAPIGenerator', () => {
         'text/event-stream'
       ].schema.oneOf
       expect(close.required).toEqual(['event'])
+    })
+
+    it('documents class inputs as the plain JSON a client sends', async () => {
+      const spec = await generator.generate(classes, {
+        source: { file: fixture('round11.ts'), export: 'classes' },
+      })
+      const operation = (spec.paths as any)['/create'].post
+      const component = (schema: any) =>
+        schema.$ref
+          ? (spec.components?.schemas as any)[schema.$ref.replace('#/components/schemas/', '')]
+          : schema
+
+      const input = component(operation.requestBody.content['application/json'].schema)
+      expect(input.properties.tags).toMatchObject({ 'type': 'array', 'x-native-type': 'set' })
+      expect(input.properties.views).toMatchObject({ 'type': 'string', 'x-native-type': 'bigint' })
+
+      // the server sends an instance, which `JSON.stringify` writes
+      const output = component(operation.responses['200'].content['application/json'].schema)
+      expect(output.properties.tags).toEqual({ type: 'object' })
     })
 
     it('reports unresolved types when only error data needs inference', async () => {

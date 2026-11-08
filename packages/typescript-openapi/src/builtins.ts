@@ -217,8 +217,12 @@ export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | u
  */
 function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): Builtin | undefined {
   // a view keeping the source's values (`Readonly<Error>`, `Partial<RegExp>`) is still the built-in
+  // (not a view of a project class extending one, `Pick<MyDate, 'label'>` may be a plain object)
   const viewed = types.getMappedSource(type)
-  const viewedBuiltin = viewed && getBuiltin(types, viewed, stringify)
+  const viewedBuiltin =
+    viewed && getDeclaredBuiltinName(types, viewed) !== undefined
+      ? getBuiltin(types, viewed, stringify)
+      : undefined
   if (viewedBuiltin !== undefined) {
     return viewedBuiltin
   }

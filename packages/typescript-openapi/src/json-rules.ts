@@ -12,7 +12,12 @@ import {
   isModeSensitiveBuiltin,
 } from './builtins.ts'
 import type { TypeQueries } from './type-queries.ts'
-import { INSTANTIABLE_FLAGS, isObjectLiteral, UNDEFINED_FLAGS } from './type-queries.ts'
+import {
+  INSTANTIABLE_FLAGS,
+  isObjectLiteral,
+  NULLISH_FLAGS,
+  UNDEFINED_FLAGS,
+} from './type-queries.ts'
 import { getCallReturnType, isClassAccessor } from './utils.ts'
 
 /*
@@ -131,7 +136,7 @@ export function getToJSONResultType(
   // `Partial<Money>` maps the method to an optional property, the instance still has it
   const callable =
     method && method.isUnionType()
-      ? types.getMembers(method).find((m) => !(m.flags & UNDEFINED_FLAGS))
+      ? types.getMembers(method).find((m) => !(m.flags & NULLISH_FLAGS))
       : method
 
   return getCallReturnType(types.checker, callable)
@@ -147,7 +152,7 @@ export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
   return Boolean(
     toJSON &&
     (toJSON.flags & SymbolFlags.Optional ||
-      (method?.isUnionType() && types.getMembers(method).some((m) => m.flags & UNDEFINED_FLAGS))),
+      (method?.isUnionType() && types.getMembers(method).some((m) => m.flags & NULLISH_FLAGS))),
   )
 }
 
@@ -287,9 +292,11 @@ export function isClassView(types: TypeQueries, type: Type, classType: Type): bo
     return false
   }
 
+  // an intersection only when it holds the class itself, `Readonly<C>` drops private members
   const nominalOnly =
-    ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Interface || type.isIntersectionType()) &&
-    types.isNominalClass(classType)
+    types.isNominalClass(classType) &&
+    ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Interface ||
+      (type.isIntersectionType() && types.getMembers(type).some((m) => m.id === classType.id)))
 
   return !nominalOnly
 }
@@ -391,7 +398,11 @@ export class ModeSensitivity {
       // a class instance is converted the same way either way, a view (`C & { ... }`)
       // may also hold a plain object
       if (classType !== undefined) {
-        return isClassView(types, type, classType) && this.computeFields(type, isSensitive)
+        // `MyMap & { x: string }` is written as a map or by `JSON.stringify`
+        return (
+          isModeSensitiveBuiltin(types, classType) ||
+          (isClassView(types, type, classType) && this.computeFields(type, isSensitive))
+        )
       }
 
       return members.some(isSensitive)

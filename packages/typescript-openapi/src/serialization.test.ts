@@ -111,6 +111,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['views', undefined],
     ['toJSONResults', undefined],
     ['builtinViews', undefined],
+    ['moreViews', undefined],
+    ['moreToJSON', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -307,6 +309,40 @@ describe('generated schemas match serialized outputs', async () => {
     expect(builtins.error).toEqual({ type: 'object' })
     expect(builtins.regexp).toEqual({})
     expect(schemas.HoldsSettled.properties.settled.properties.value).toEqual({ type: 'object' })
+  })
+
+  it('reads toJSON of classes behind views, and of union members', () => {
+    const schemas = spec.components?.schemas as any
+    const response = (path: string) =>
+      (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
+    const kind = {
+      type: 'object',
+      properties: { kind: { type: 'string', const: 'json' } },
+      required: ['kind'],
+    }
+
+    const views = response('/moreViews').properties
+    // `Readonly<C>` drops the private members, so a plain object is assignable too
+    expect(views.privateView.anyOf).toHaveLength(2)
+    // an instance has the `toJSON` of its class, which a `Pick` leaves out
+    expect(views.pickedJSON.anyOf[0]).toEqual(kind)
+    expect(views.pickedJSONList.items.anyOf[0]).toEqual(kind)
+    expect(views.pickedDate.anyOf[1]).toEqual({
+      type: 'object',
+      properties: { label: { type: 'string' } },
+      required: ['label'],
+    })
+    expect(schemas.Nullable_KindJSON.anyOf[0]).toEqual(kind)
+    expect(schemas.OmittedKind.anyOf[0]).toEqual(kind)
+
+    const results = response('/moreToJSON')
+    expect(results.properties.mixed.items.anyOf).toContainEqual({ type: 'null' })
+    expect(results.required).not.toContain('maybe')
+    // a returned date subclass is written by its own fields, also through a view
+    expect(schemas.ReturnsFrozenDate).toMatchObject({ properties: { label: { type: 'string' } } })
+    expect(schemas.ReturnsAssignedDate).toMatchObject({
+      properties: { label: { type: 'string' }, x: { type: 'string' } },
+    })
   })
 
   it('describes class instances with JSON.stringify semantics', () => {

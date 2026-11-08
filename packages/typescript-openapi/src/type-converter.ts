@@ -70,6 +70,17 @@ export interface TypeToJsonSchemaConverterOptions {
    * @default 'named'
    */
   defs?: 'named' | 'recursive' | undefined
+
+  /**
+   * Which values the schemas describe:
+   *
+   * - `output`: values the server sends, serialized by oRPC's OpenAPI JSON serializer, which
+   *   leaves class instances to `JSON.stringify`.
+   * - `input`: values a client sends, decoded from JSON, so class types are plain objects.
+   *
+   * @default 'output'
+   */
+  direction?: 'input' | 'output' | undefined
 }
 
 export interface TypeToJsonSchemaConvertOptions {
@@ -96,6 +107,8 @@ export interface AsyncIteratorTypes {
   returnTypes: readonly Type[]
 }
 
+const TYPE_QUERIES = new WeakMap<Checker, TypeQueries>()
+
 const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
 
 /**
@@ -108,6 +121,8 @@ const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFl
  */
 export class TypeToJsonSchemaConverter {
   private readonly defsMode: 'named' | 'recursive'
+  /** Values a client sends, decoded from JSON: classes are plain objects, `toJSON` is not called */
+  private readonly input: boolean
   private readonly types: TypeQueries
   private readonly defs = new DefRegistry()
   private readonly expansion: ExpansionGuard
@@ -135,7 +150,14 @@ export class TypeToJsonSchemaConverter {
     options: TypeToJsonSchemaConverterOptions = {},
   ) {
     this.defsMode = options.defs ?? 'named'
-    this.types = new TypeQueries(checker, program)
+    this.input = options.direction === 'input'
+    // converters of one program (for inputs and outputs) share the compiler queries
+    let types = TYPE_QUERIES.get(checker)
+    if (!types) {
+      types = new TypeQueries(checker, program)
+      TYPE_QUERIES.set(checker, types)
+    }
+    this.types = types
     this.expansion = new ExpansionGuard(this.types)
     this.sensitivity = new ModeSensitivity(this.types)
   }
@@ -629,6 +651,12 @@ export class TypeToJsonSchemaConverter {
     form: 'auto' | 'instance' | 'plain' = 'auto',
     ownFields = false,
   ): JsonSchema {
+    // a request carries plain JSON, also for a class type
+    if (this.input) {
+      form = 'plain'
+      ignoreToJSON = true
+    }
+
     const referenceKind = this.types.getReferenceKind(type)
 
     if (referenceKind === 'array') {
@@ -671,13 +699,20 @@ export class TypeToJsonSchemaConverter {
 
     const properties = this.types.getProperties(type)
 
+    // an instance has the `toJSON` of its class, also when a view leaves it out (`Pick<Money, 'cents'>`)
+    const jsonSource = classType ?? type
     const toJSONResult = ignoreToJSON
       ? undefined
-      : getToJSONResultType(this.types, type, this.stringify)
+      : getToJSONResultType(this.types, jsonSource, this.stringify)
     if (toJSONResult) {
       const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
 
-      if (!hasOptionalToJSON(this.types, type)) {
+      // under `JSON.stringify` rules, a view may also hold a plain object without `toJSON`
+      const mayLackToJSON =
+        hasOptionalToJSON(this.types, jsonSource) ||
+        (this.stringify && classType !== undefined && classType.id !== type.id)
+
+      if (!mayLackToJSON) {
         return converted
       }
 
@@ -777,10 +812,7 @@ export class TypeToJsonSchemaConverter {
         !serializable &&
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
-        !(
-          serialized &&
-          (this.isOptional(serialized) || this.getSerializableMembers(serialized) !== undefined)
-        )
+        !this.mayDropThroughToJSON(propertyType, this.stringify || isClassInstance)
       ) {
         required.push(property.name)
       }
@@ -1015,11 +1047,7 @@ export class TypeToJsonSchemaConverter {
     const schema = this.visit(type)
 
     // `JSON.stringify` writes an item whose `toJSON` returns `undefined` (or a function) as `null`
-    const serialized = getToJSONResultType(this.types, type, this.stringify)
-    if (
-      serialized &&
-      (this.isOptional(serialized) || this.getSerializableMembers(serialized) !== undefined)
-    ) {
+    if (this.mayDropThroughToJSON(type, this.stringify)) {
       return withNull(schema)
     }
 
@@ -1072,6 +1100,14 @@ export class TypeToJsonSchemaConverter {
       return this.visit(resolved)
     }
 
+    // a typed array by its index keys and the fields it adds, a subclass of another built-in
+    // (`class MyDate extends Date`, also `Readonly<MyDate>` or `MyDate & { x }`) by its own fields
+    const typedArray = isTypedArray(this.types, resolved)
+    const classType = getClassType(this.types, resolved)
+    if (typedArray || (classType && getBuiltinBaseName(this.types, classType) !== undefined)) {
+      return this.convertObject(resolved, true, 'instance', !typedArray)
+    }
+
     // a branded value is serialized as its base: the primitive of `string & { __brand: 'Id' }`,
     // the items of `number[] & { ... }`, or the own fields of `Date & { ... }`
     if (resolved.isIntersectionType()) {
@@ -1097,15 +1133,6 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    // a typed array by its index keys and the fields it adds, a subclass of another built-in
-    // (`class MyDate extends Date`) by its own fields
-    if (
-      isTypedArray(this.types, resolved) ||
-      getBuiltinBaseName(this.types, resolved) !== undefined
-    ) {
-      return this.convertObject(resolved, true, 'instance', !isTypedArray(this.types, resolved))
-    }
-
     // a returned built-in is written by its own fields, also through `Readonly<Date>`
     return getBuiltinFields(this.types, resolved) ?? this.convertObject(resolved, true)
   }
@@ -1117,6 +1144,24 @@ export class TypeToJsonSchemaConverter {
   private getBigIntToJSONResultType(): Type | undefined {
     const bigint = this.types.getGlobalType('BigInt')
     return bigint && getToJSONResultType(this.types, bigint, true)
+  }
+
+  /**
+   * Whether `toJSON` of a value of this type, or of a union member, may return what JSON
+   * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
+   */
+  private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
+    const members = type.isUnionType() ? this.types.getMembers(type) : [type]
+
+    return members.some((member) => {
+      const serialized = getToJSONResultType(this.types, member, stringify)
+      return (
+        serialized !== undefined &&
+        (this.isOptional(serialized) ||
+          isNonSerializable(this.types, serialized) ||
+          this.getSerializableMembers(serialized) !== undefined)
+      )
+    })
   }
 
   /**
@@ -1267,12 +1312,15 @@ function toPattern(types: TypeQueries, type: Type): string {
     return escapeRegExp(String((type as any).value))
   }
 
+  // what TypeScript accepts: strings whose `+s` is finite, so also hexadecimal, octal,
+  // and binary literals, with whitespace around
   if (flags & TypeFlags.Number) {
-    return '[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?'
+    return '\\s*(?:[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?|0[xX][\\da-fA-F]+|0[oO][0-7]+|0[bB][01]+)\\s*'
   }
 
+  // integer literals, also hexadecimal, octal, and binary ones, without whitespace or `+`
   if (flags & TypeFlags.BigInt) {
-    return '-?\\d+'
+    return '-?(?:\\d+|0[xX][\\da-fA-F]+|0[oO][0-7]+|0[bB][01]+)'
   }
 
   if (flags & TypeFlags.TemplateLiteral) {

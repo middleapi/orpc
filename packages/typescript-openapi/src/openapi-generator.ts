@@ -81,12 +81,12 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
 interface InferenceContext {
   checker: Checker
   resolver: RouterTypeResolver
-  converter: TypeToJsonSchemaConverter
+  converters: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverter>
   getSourceKind: (path: string) => SourceKind
 }
 
 export interface TypeScriptOpenAPIGeneratorOptions
-  extends OpenAPIGeneratorOptions, TypeToJsonSchemaConverterOptions {}
+  extends OpenAPIGeneratorOptions, Omit<TypeToJsonSchemaConverterOptions, 'direction'> {}
 
 export interface TypeScriptOpenAPIGeneratorGenerateOptions<
   TVersion extends OpenAPIVersion,
@@ -148,7 +148,16 @@ export class TypeScriptOpenAPIGenerator {
           project.checker,
           project.getExportType(source.export ?? 'router'),
         ),
-        converter: new TypeToJsonSchemaConverter(project.checker, project.program, this.options),
+        converters: {
+          input: new TypeToJsonSchemaConverter(project.checker, project.program, {
+            ...this.options,
+            direction: 'input',
+          }),
+          output: new TypeToJsonSchemaConverter(project.checker, project.program, {
+            ...this.options,
+            direction: 'output',
+          }),
+        },
         getSourceKind: createSourceKindChecker(project.program),
       }
 
@@ -277,7 +286,7 @@ export class TypeScriptOpenAPIGenerator {
         }
 
         const inferred = partTypes.flatMap((t) =>
-          t === undefined ? [] : [ctx.converter.convert(t, options)],
+          t === undefined ? [] : [ctx.converters[direction].convert(t, options)],
         )
 
         // the kept schemas, also requiring the keys the type requires
@@ -310,7 +319,7 @@ export class TypeScriptOpenAPIGenerator {
         ]
       }
 
-      const iteratorTypes = getAllAsyncIteratorTypes(ctx.converter, type)
+      const iteratorTypes = getAllAsyncIteratorTypes(ctx.converters[direction], type)
 
       // event streams, completing the yield and return parts separately
       if (iteratorTypes.length) {
@@ -345,7 +354,9 @@ export class TypeScriptOpenAPIGenerator {
       setOwn(
         errorMap,
         code,
-        dataType ? { ...config, data: inferredSchema(ctx.converter.convert(dataType)) } : config,
+        dataType
+          ? { ...config, data: inferredSchema(ctx.converters.output.convert(dataType)) }
+          : config,
       )
     }
 
