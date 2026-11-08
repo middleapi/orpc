@@ -34,9 +34,13 @@ import type { TypeScriptProjectOptions } from './project.ts'
 import { openTypeScriptProject } from './project.ts'
 import type { ResolvedRouterType } from './router-type.ts'
 import { RouterTypeResolver } from './router-type.ts'
-import type { TypeToJsonSchemaConverterOptions } from './type-converter.ts'
+import type {
+  TypeToJsonSchemaConverterOptions,
+  TypeToJsonSchemaConvertOptions,
+} from './type-converter.ts'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter.ts'
-import { createLibraryPathChecker, getAssignedSymbol, getJSDoc } from './utils.ts'
+import type { SourceKind } from './utils.ts'
+import { createSourceKindChecker, getAssignedSymbol, getJSDoc } from './utils.ts'
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
@@ -71,7 +75,7 @@ interface InferenceContext {
   checker: Checker
   resolver: RouterTypeResolver
   converter: TypeToJsonSchemaConverter
-  isLibraryPath: (path: string) => boolean
+  getSourceKind: (path: string) => SourceKind
 }
 
 export interface TypeScriptOpenAPIGeneratorOptions
@@ -138,7 +142,7 @@ export class TypeScriptOpenAPIGenerator {
           project.getExportType(source.export ?? 'router'),
         ),
         converter: new TypeToJsonSchemaConverter(project.checker, project.program, this.options),
-        isLibraryPath: createLibraryPathChecker(project.program),
+        getSourceKind: createSourceKindChecker(project.program),
       }
 
       inferred = await this.inferRouter(ctx, router, filter)
@@ -205,13 +209,21 @@ export class TypeScriptOpenAPIGenerator {
     const meta = getOpenAPIMeta(contract)
 
     // the stock generator splits these into parts, where a def of the whole would be unused
-    const inlineRoot = {
-      input:
-        meta?.inputStructure === 'detailed' ||
-        meta?.method === 'GET' ||
-        meta?.method === 'HEAD' ||
-        `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
-      output: meta?.outputStructure === 'detailed',
+    const inputDetailed = meta?.inputStructure === 'detailed'
+    const outputDetailed = meta?.outputStructure === 'detailed'
+    const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
+      input: {
+        inlineRoot:
+          inputDetailed ||
+          meta?.method === 'GET' ||
+          meta?.method === 'HEAD' ||
+          `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
+        inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
+      },
+      output: {
+        inlineRoot: outputDetailed,
+        inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
+      },
     }
 
     const inferSchemas = (
@@ -222,6 +234,12 @@ export class TypeScriptOpenAPIGenerator {
         return schemas
       }
 
+      if (resolved.type.isErrorType()) {
+        throw new TypeScriptTypeResolutionError(
+          `Could not resolve its type "${ctx.checker.typeToString(resolved.type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+        )
+      }
+
       if (!ctx.resolver.isProcedure(resolved.type)) {
         throw new OpenAPIGeneratorError(
           `its type "${ctx.checker.typeToString(resolved.type)}" is not a procedure or contract, make sure "source" points to the type of this router.`,
@@ -229,7 +247,7 @@ export class TypeScriptOpenAPIGenerator {
       }
 
       const type = ctx.resolver.getSchemaType(resolved.type, direction)
-      return type ? [toInferredSchema(ctx.converter, type, inlineRoot[direction])] : schemas
+      return type ? [toInferredSchema(ctx.converter, type, inline[direction])] : schemas
     }
 
     const errorMap: ErrorMap = {}
@@ -244,7 +262,7 @@ export class TypeScriptOpenAPIGenerator {
       setOwn(
         errorMap,
         code,
-        dataType ? { ...config, data: toInferredSchema(ctx.converter, dataType, false) } : config,
+        dataType ? { ...config, data: toInferredSchema(ctx.converter, dataType, {}) } : config,
       )
     }
 
@@ -278,7 +296,7 @@ export class TypeScriptOpenAPIGenerator {
 function toInferredSchema(
   converter: TypeToJsonSchemaConverter,
   type: Type,
-  inlineRoot: boolean,
+  options: TypeToJsonSchemaConvertOptions,
 ): AnySchema {
   const iterator = converter.getAsyncIteratorTypes(type)
 
@@ -294,7 +312,7 @@ function toInferredSchema(
     )
   }
 
-  return inferredSchema(converter.convert(type, { inlineRoot }))
+  return inferredSchema(converter.convert(type, options))
 }
 
 /**
@@ -308,11 +326,11 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
     return meta
   }
 
-  let jsdoc = getJSDoc(ctx.checker, symbol, ctx.isLibraryPath)
+  let jsdoc = getJSDoc(ctx.checker, symbol, ctx.getSourceKind)
 
   if (!jsdoc) {
     const assigned = getAssignedSymbol(ctx.checker, symbol)
-    jsdoc = assigned && getJSDoc(ctx.checker, assigned, ctx.isLibraryPath)
+    jsdoc = assigned && getJSDoc(ctx.checker, assigned, ctx.getSourceKind)
   }
 
   if (!jsdoc) {

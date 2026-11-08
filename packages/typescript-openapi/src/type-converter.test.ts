@@ -705,13 +705,12 @@ describe('typeToJsonSchemaConverter', () => {
         $defs: {
           NumberList: {
             type: 'object',
-            properties: { value: { type: 'number' }, next: { $ref: '#/$defs/Recursive' } },
+            properties: { value: { type: 'number' }, next: { $ref: '#/$defs/LinkedList_number' } },
             required: ['value'],
           },
-          Recursive: { $ref: '#/$defs/LinkedList_number' },
           LinkedList_number: {
             type: 'object',
-            properties: { value: { type: 'number' }, next: { $ref: '#/$defs/Recursive' } },
+            properties: { value: { type: 'number' }, next: { $ref: '#/$defs/LinkedList_number' } },
             required: ['value'],
           },
         },
@@ -976,6 +975,253 @@ describe('typeToJsonSchemaConverter', () => {
               maxItems: 2,
             },
           },
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('round three', () => {
+    let r3: TypeScriptProject
+
+    beforeAll(() => {
+      r3 = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round3.ts', import.meta.url),
+      })
+    })
+
+    afterAll(() => {
+      r3.close()
+    })
+
+    const convertR3 = (
+      name: string,
+      c = new TypeToJsonSchemaConverter(r3.checker, r3.program),
+      options?: Parameters<TypeToJsonSchemaConverter['convert']>[1],
+    ) => c.convert(r3.getExportType(name).type, options)
+
+    it('fixture has no type errors', () => {
+      expect(r3.program.getSemanticDiagnostics(r3.sourceFile.fileName)).toEqual([])
+    })
+
+    it('does not mistake similar names or finite re-instantiations for growth', () => {
+      expect(convertR3('HolderTag')).toEqual([
+        {
+          $ref: '#/$defs/HolderTag',
+          $defs: {
+            HolderTag: {
+              type: 'object',
+              properties: { t: { $ref: '#/$defs/Tag_User' } },
+              required: ['t'],
+            },
+            Tag_User: {
+              type: 'object',
+              properties: {
+                owner: { $ref: '#/$defs/User' },
+                sub: { $ref: '#/$defs/Tag_UserProfile' },
+              },
+              required: ['owner'],
+            },
+            Tag_UserProfile: {
+              type: 'object',
+              properties: {
+                owner: { $ref: '#/$defs/UserProfile' },
+                sub: { $ref: '#/$defs/Tag_UserProfile' },
+              },
+              required: ['owner'],
+            },
+            UserProfile: {
+              type: 'object',
+              properties: { bio: { type: 'string' } },
+              required: ['bio'],
+            },
+            User: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+          },
+        },
+        false,
+      ])
+      expect(convertR3('GQuery')).toEqual([
+        {
+          $ref: '#/$defs/GQuery',
+          $defs: {
+            GQuery: {
+              type: 'object',
+              properties: { me: { $ref: '#/$defs/Maybe_GUser' } },
+              required: ['me'],
+            },
+            Maybe_GUser: { anyOf: [{ $ref: '#/$defs/GUser' }, { type: 'null' }] },
+            GUser: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                friends: { $ref: '#/$defs/Maybe_GUserArray' },
+                best: { $ref: '#/$defs/Maybe_GUser' },
+              },
+              required: ['id', 'friends', 'best'],
+            },
+            Maybe_GUserArray: {
+              anyOf: [{ type: 'array', items: { $ref: '#/$defs/GUser' } }, { type: 'null' }],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR3('HolderWiden')).toEqual([
+        {
+          $ref: '#/$defs/HolderWiden',
+          $defs: {
+            HolderWiden: {
+              type: 'object',
+              properties: { w: { $ref: '#/$defs/Widen_string' } },
+              required: ['w'],
+            },
+            Widen_string: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+                next: { anyOf: [{ $ref: '#/$defs/Widen' }, { type: 'null' }] },
+              },
+              required: ['value', 'next'],
+            },
+            Widen: {
+              type: 'object',
+              properties: {
+                value: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+                next: { anyOf: [{ $ref: '#/$defs/Widen' }, { type: 'null' }] },
+              },
+              required: ['value', 'next'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('stops branching expansions quickly', () => {
+      const start = performance.now()
+      const [schema] = convertR3('HolderGrow') as [any, boolean]
+      expect(performance.now() - start).toBeLessThan(5000)
+      expect(Object.keys(schema.$defs).length).toBeLessThan(64)
+    })
+
+    it('applies alias JSDoc once, also to literal aliases', () => {
+      expect(convertR3('AliasDocs')).toEqual([
+        {
+          $ref: '#/$defs/AliasDocs',
+          $defs: {
+            AliasDocs: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'A name', examples: ['bob'] },
+                answer: { type: 'number', const: 42, description: 'Always 42' },
+                legacy: {
+                  type: 'string',
+                  const: 'old',
+                  description: 'A legacy status',
+                  deprecated: true,
+                },
+              },
+              required: ['name', 'answer', 'legacy'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('does not create defs for wrappers of recursive named types', () => {
+      expect(convertR3('Person')).toEqual([
+        {
+          $ref: '#/$defs/Person',
+          $defs: {
+            Person: {
+              type: 'object',
+              properties: { name: { type: 'string' }, team: { $ref: '#/$defs/Team' } },
+              required: ['name'],
+            },
+            Team: {
+              type: 'object',
+              properties: { lead: { $ref: '#/$defs/Person' }, parent: { $ref: '#/$defs/Team' } },
+            },
+          },
+        },
+        false,
+      ])
+
+      const c = new TypeToJsonSchemaConverter(r3.checker, r3.program)
+      expect(convertR3('Forest', c)).toEqual([
+        {
+          $ref: '#/$defs/Forest',
+          $defs: {
+            Forest: {
+              type: 'object',
+              properties: { trees: { type: 'array', items: { $ref: '#/$defs/Tree' } } },
+              required: ['trees'],
+            },
+            Tree: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                children: { type: 'array', items: { $ref: '#/$defs/Tree' } },
+              },
+              required: ['id', 'children'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR3('Tree', c)).toEqual([
+        {
+          $ref: '#/$defs/Tree',
+          $defs: {
+            Tree: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                children: { type: 'array', items: { $ref: '#/$defs/Tree' } },
+              },
+              required: ['id', 'children'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('subclasses of Date and URL', () => {
+      expect(convertR3('Subclasses')).toEqual([
+        {
+          $ref: '#/$defs/Subclasses',
+          $defs: {
+            Subclasses: {
+              type: 'object',
+              properties: {
+                date: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+                url: { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' },
+              },
+              required: ['date', 'url'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('inlineRoot inlines the members of a named root union', () => {
+      expect(convertR3('QU', undefined, { inlineRoot: true })).toEqual([
+        {
+          anyOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'a' }, a: { type: 'string' } },
+              required: ['kind', 'a'],
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'b' }, b: { type: 'string' } },
+              required: ['kind', 'b'],
+            },
+          ],
         },
         false,
       ])
@@ -1283,7 +1529,29 @@ describe('typeToJsonSchemaConverter', () => {
             },
             Expand_stringArray: {
               type: 'object',
-              properties: { value: { type: 'array', items: { type: 'string' } }, next: {} },
+              properties: {
+                value: { type: 'array', items: { type: 'string' } },
+                next: { $ref: '#/$defs/Expand_stringArrayArray' },
+              },
+              required: ['value'],
+            },
+            Expand_stringArrayArray: {
+              type: 'object',
+              properties: {
+                value: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+                next: { $ref: '#/$defs/Expand_stringArrayArrayArray' },
+              },
+              required: ['value'],
+            },
+            Expand_stringArrayArrayArray: {
+              type: 'object',
+              properties: {
+                value: {
+                  type: 'array',
+                  items: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+                },
+                next: {},
+              },
               required: ['value'],
             },
           },

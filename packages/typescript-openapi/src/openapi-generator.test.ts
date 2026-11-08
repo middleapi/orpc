@@ -6,6 +6,7 @@ import { router as brokenRouter } from '../tests/fixtures/app/src/broken.ts'
 import { contract, implemented } from '../tests/fixtures/app/src/contract.ts'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed.ts'
 import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
+import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -450,6 +451,44 @@ describe('typeScriptOpenAPIGenerator', () => {
         properties: { id: { type: 'string' } },
         required: ['id'],
       })
+    })
+  })
+
+  describe('detailed structures', async () => {
+    const spec = await generator.generate(round3Router, {
+      source: { file: fixture('round3.ts') },
+    })
+
+    it('reads statuses of named aliases and enums', () => {
+      expect(Object.keys(spec.paths?.['/alias']?.post?.responses ?? {})).toEqual(['200', '201'])
+      expect(Object.keys(spec.paths?.['/enum']?.post?.responses ?? {})).toEqual(['200', '201'])
+      expect((spec.paths?.['/alias']?.post?.responses?.['201'] as any).headers).toEqual({
+        location: { required: true, schema: { type: 'string' } },
+      })
+    })
+
+    it('does not leave components for split sections', () => {
+      expect(Object.keys(spec.components?.schemas ?? {})).toEqual(['Item'])
+      expect(spec.paths?.['/sections/{id}']?.patch?.parameters).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+        {
+          in: 'query',
+          name: 'limit',
+          schema: { type: 'number' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        { in: 'header', name: 'location', required: true, schema: { type: 'string' } },
+      ])
+    })
+
+    it('reports procedures whose type can not be resolved', async () => {
+      await expect(
+        generator.generate(
+          { missing: round3Router.sections, ok: round3Router.sections },
+          { source: { file: fixture('round3-unresolved.ts'), export: 'unresolved' } },
+        ),
+      ).rejects.toThrow('Procedure at missing: Could not resolve its type')
     })
   })
 })

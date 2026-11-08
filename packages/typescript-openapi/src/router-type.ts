@@ -115,14 +115,19 @@ export class RouterTypeResolver {
   }
 
   private stripNullish(type: Type): Type {
-    if (
-      type.isUnionType() &&
-      type.getTypes().some((t) => t.flags & (TypeFlags.Undefined | TypeFlags.Null))
-    ) {
-      return this.checker.getNonNullableType(type) ?? type
+    if (!type.isUnionType()) {
+      return type
     }
 
-    return type
+    const members = type.getTypes()
+    const concrete = members.filter((t) => !(t.flags & (TypeFlags.Undefined | TypeFlags.Null)))
+
+    if (concrete.length === members.length) {
+      return type
+    }
+
+    // `Procedure | undefined` needs no compiler request
+    return concrete.length === 1 ? concrete[0]! : (this.checker.getNonNullableType(type) ?? type)
   }
 
   private unlazy(type: Type): Type {

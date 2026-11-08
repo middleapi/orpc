@@ -95,8 +95,13 @@ Types are converted as they look after [OpenAPI JSON serialization](/docs/openap
 | `Date`, `bigint`, `URL`, `Set`, `Map`   | their serialized form, matching the Zod and Valibot converters |
 | `Blob`, `File`                          | binary `string`, sent as `multipart/form-data`                 |
 | Classes with `toJSON`                   | the return type of `toJSON`                                    |
+| Class instances                         | their fields, without members inherited from built-ins         |
 | Functions, symbols, methods             | omitted                                                        |
 | `any`, `unknown`                        | `{}`                                                           |
+
+:::warning
+The OpenAPI JSON serializer leaves class instances to `JSON.stringify`, so their `Set`, `Map`, and `bigint` fields do not match the documented schemas. Prefer plain objects for those values.
+:::
 
 Interfaces, classes, enums, and type aliases declared in your project (not in `node_modules`) become components, named after the type, like `Planet` or `Page_User` for `Page<User>`. Aliases of primitives stay inline, and so do aliases of library types, like `type PartialUser = Partial<User>`, since the compiler names that type after `Partial`. Set `defs: 'recursive'` to only extract recursive types, which can not be inlined:
 
