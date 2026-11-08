@@ -61,7 +61,37 @@ function combineJsonSchemas(jsonSchemas: Record<string, unknown>[]): Record<stri
   return { $schema, ...combined }
 }
 
-function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | FlexibleSchema {
+type CombinedValidate = (
+  schemas: AnySchema[],
+  value: unknown,
+) => ReturnType<AnySchema['~standard']['validate']>
+
+// Mirrors the server's stacked input validation.
+const validateStackedInput: CombinedValidate = async (schemas, value) => {
+  const result = await validateInputSchemas(schemas, value)
+  return result.issues ? { issues: result.issues } : { value: result.value }
+}
+
+const validatePiped: CombinedValidate = async (schemas, value) => {
+  let current = value
+
+  for (const schema of schemas) {
+    const result = await schema['~standard'].validate(current)
+
+    if (result.issues) {
+      return result
+    }
+
+    current = result.value
+  }
+
+  return { value: current }
+}
+
+function combineSchemas(
+  schemas: AnySchema[],
+  validate: CombinedValidate,
+): undefined | FlexibleSchema {
   if (schemas.length === 0) {
     return undefined
   }
@@ -94,28 +124,7 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
     '~standard': {
       vendor: ORPC_NAME,
       version: 1,
-      async validate(value: unknown) {
-        if (merge) {
-          // Mirrors the server's stacked input validation.
-          const result = await validateInputSchemas(schemas, value)
-          return result.issues ? { issues: result.issues } : { value: result.value }
-        }
-
-        // Output schemas stay piped.
-        let current = value
-
-        for (const schema of schemas) {
-          const result = await schema['~standard'].validate(current)
-
-          if (result.issues) {
-            return result
-          }
-
-          current = result.value
-        }
-
-        return { value: current }
-      },
+      validate: (value: unknown) => validate(schemas, value),
       jsonSchema,
     },
   }
@@ -124,7 +133,7 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
 function combineOutputSchemas(outputSchemas: AnySchema[]): FlexibleSchema | undefined {
   const yieldSchemas = getAsyncIteratorObjectSchemasDetails(outputSchemas)?.yieldSchemas
   // oxlint-disable-next-line unicorn/no-array-reverse
-  return combineSchemas([...(yieldSchemas ?? outputSchemas)].reverse(), false)
+  return combineSchemas([...(yieldSchemas ?? outputSchemas)].reverse(), validatePiped)
 }
 
 /**
@@ -260,7 +269,7 @@ export function implementToolFactory(options: ImplementToolFactoryOptions = {}):
       ...defaults,
       ...toolOptions,
       toModelOutput: toolOptions.toModelOutput ?? defaults?.toModelOutput ?? defaultToModelOutput,
-      inputSchema: combineSchemas(inputSchemas, true) ?? ANY_SCHEMA,
+      inputSchema: combineSchemas(inputSchemas, validateStackedInput) ?? ANY_SCHEMA,
       outputSchema: combineOutputSchemas(outputSchemas),
     })
   }

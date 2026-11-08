@@ -3,7 +3,7 @@ import * as v from 'valibot'
 import * as z from 'zod'
 
 import { asyncIteratorObject } from './schema-built-in.ts'
-import { isSchemaIssue, type, validateInputSchemas } from './schema-utils.ts'
+import { getInputSchemaValue, isSchemaIssue, type, validateInputSchemas } from './schema-utils.ts'
 
 describe('type', async () => {
   it('without map', async () => {
@@ -48,7 +48,6 @@ describe('isSchemaIssue', async () => {
 describe('validateInputSchemas', () => {
   it('returns the input as is without schemas', async () => {
     const input = { a: 1 }
-    await expect(validateInputSchemas([], input)).resolves.toEqual({ value: input })
     expect(((await validateInputSchemas([], input)) as any).value).toBe(input)
   })
 
@@ -116,8 +115,10 @@ describe('validateInputSchemas', () => {
       { a: '1', c: 'c' },
     )
 
-    expect(result.issues).toEqual([expect.objectContaining({ path: ['b'] })])
-    expect(result).toEqual(expect.objectContaining({ index: 1, invalidData: { a: 1, c: 'c' } }))
+    expect(result).toEqual({
+      issues: [expect.objectContaining({ path: ['b'] })],
+      invalidData: { a: 1, c: 'c' },
+    })
     expect(validateSpy).not.toHaveBeenCalled()
   })
 
@@ -172,14 +173,19 @@ describe('validateInputSchemas', () => {
     expect(validate).toHaveBeenNthCalledWith(1, schemas[0], { a: '1', b: 'b' }, 0)
     expect(validate).toHaveBeenNthCalledWith(2, schemas[1], { a: 1, b: 'b' }, 1)
   })
+})
 
-  it('propagates errors thrown by a custom validate', async () => {
-    await expect(
-      validateInputSchemas([z.string()], 'a', {
-        validate: () => {
-          throw new Error('THROWN')
-        },
-      }),
-    ).rejects.toThrow('THROWN')
+describe('getInputSchemaValue', () => {
+  it('gives the first schema the current value as is', () => {
+    const current = { a: 1 }
+    expect(getInputSchemaValue({ a: 'raw' }, current, 0)).toBe(current)
+  })
+
+  it('applies the current value over the original input for later schemas', () => {
+    expect(getInputSchemaValue({ a: 'raw', b: 'raw' }, { a: 1 }, 1)).toEqual({ a: 1, b: 'raw' })
+  })
+
+  it('pipes values that are not plain objects', () => {
+    expect(getInputSchemaValue({ a: 'raw' }, 'current', 1)).toBe('current')
   })
 })

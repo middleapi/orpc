@@ -103,11 +103,19 @@ export type ValidateInputSchemasResult =
        * The value the failing schema validated.
        */
       invalidData: unknown
-      /**
-       * Index of the failing schema.
-       */
-      index: number
     }
+
+/**
+ * Returns the value the stacked `.input` schema at `index` validates: the original input with what
+ * the earlier schemas returned (`current`) applied. Only plain objects are merged, two levels deep;
+ * anything else is piped.
+ */
+export function getInputSchemaValue(input: unknown, current: unknown, index: number): unknown {
+  return index !== 0 ? mergeTwoLevels(input, current) : current
+}
+
+const validateSchema: NonNullable<ValidateInputSchemasOptions['validate']> = (schema, value) =>
+  schema['~standard'].validate(value)
 
 /**
  * Validates an input against stacked `.input` schemas.
@@ -128,17 +136,16 @@ export async function validateInputSchemas(
 ): Promise<ValidateInputSchemasResult> {
   const from = options.from ?? 0
   const to = options.to ?? schemas.length
-  const validate =
-    options.validate ?? ((schema: AnySchema, value: unknown) => schema['~standard'].validate(value))
+  const validate = options.validate ?? validateSchema
 
   let current = from === 0 ? input : options.current
 
   for (let index = from; index < to; index++) {
-    const value = index !== 0 ? mergeTwoLevels(input, current) : current
+    const value = getInputSchemaValue(input, current, index)
     const result = await validate(schemas[index]!, value, index)
 
     if (result.issues) {
-      return { issues: result.issues, invalidData: value, index }
+      return { issues: result.issues, invalidData: value }
     }
 
     current = index !== 0 ? mergeTwoLevels(current, result.value) : result.value

@@ -10,6 +10,7 @@ import type {
 } from '@orpc/contract'
 import {
   createORPCErrorConstructorMap,
+  getInputSchemaValue,
   reconcileORPCError,
   validateInputSchemas,
   ValidationError,
@@ -26,7 +27,6 @@ import {
   getTracer,
   intercept,
   isAsyncIteratorObject,
-  mergeTwoLevels,
   override,
   resolveMaybeOptionalOptions,
   runWithSpan,
@@ -178,7 +178,14 @@ export function createProcedureClient<
   }
 }
 
-async function validateInput(i: number, schema: AnySchema, input: unknown): Promise<any> {
+/**
+ * Throws instead of returning issues, so the error is recorded on the schema's span.
+ */
+async function validateInput(
+  schema: AnySchema,
+  input: unknown,
+  i: number,
+): Promise<{ value: unknown }> {
   return runWithSpan(`validate_input.${i}`, async (span) => {
     span?.setAttribute('input_schema.index', i)
 
@@ -198,7 +205,7 @@ async function validateInput(i: number, schema: AnySchema, input: unknown): Prom
       })
     }
 
-    return result.value
+    return { value: result.value }
   })
 }
 
@@ -257,23 +264,24 @@ async function executeProcedureInternal(
         ? inputSchemas.length
         : (orderedMiddlewares[midIndex]!.inputSchemasLengthAtUse ?? 0)
 
-    // Only the schemas between the previous middleware and this one run here, see validateInputSchemas.
     if (!procedure['~orpc'].disableInputValidation) {
-      const result = await validateInputSchemas(inputSchemas, options.input, {
-        from: startInputIndex,
-        to: endInputIndex,
-        current: currentInput,
-        // Throws instead of returning issues, so the error is recorded on the schema's span.
-        validate: async (schema, value, index) => ({
-          value: await validateInput(index, schema, value),
-        }),
-      })
+      // Only the schemas between the previous middleware and this one run here.
+      if (startInputIndex < endInputIndex) {
+        const result = await validateInputSchemas(inputSchemas, options.input, {
+          from: startInputIndex,
+          to: endInputIndex,
+          current: currentInput,
+          validate: validateInput,
+        })
 
-      currentInput = (result as { value: unknown }).value
+        // validateInput throws instead of returning issues.
+        currentInput = (result as { value: unknown }).value
+      }
 
+      // A middleware between schemas sees what the next schema will validate.
       middlewareInput =
-        endInputIndex > 0 && endInputIndex < inputSchemas.length
-          ? mergeTwoLevels(options.input, currentInput)
+        endInputIndex < inputSchemas.length
+          ? getInputSchemaValue(options.input, currentInput, endInputIndex)
           : currentInput
     }
 
