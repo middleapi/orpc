@@ -97,7 +97,7 @@ Types are converted as they look after [OpenAPI JSON serialization](/docs/openap
 | Functions, symbols, methods             | omitted                                                        |
 | `any`, `unknown`                        | `{}`                                                           |
 
-Interfaces, classes, enums, and type aliases declared in your project (not in `node_modules`) become components, named after the type, like `Planet` or `Page_User` for `Page<User>`. Aliases of primitives stay inline. Set `defs: 'recursive'` to only extract recursive types, which can not be inlined:
+Interfaces, classes, enums, and type aliases declared in your project (not in `node_modules`) become components, named after the type, like `Planet` or `Page_User` for `Page<User>`. Aliases of primitives stay inline, and so do aliases of library types, like `type PartialUser = Partial<User>`, since the compiler names that type after `Partial`. Set `defs: 'recursive'` to only extract recursive types, which can not be inlined:
 
 ```ts
 const generator = new TypeScriptOpenAPIGenerator({ defs: 'recursive' })
@@ -107,7 +107,14 @@ const generator = new TypeScriptOpenAPIGenerator({ defs: 'recursive' })
 
 JSDoc comments document the generated operations and schemas.
 
-On procedures, the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, `@deprecated`, and `@tags a, b` are supported too.
+On procedures, the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, `@deprecated`, and `@tags a, b` are supported too. The comment can be on the router property, or on the variable assigned to it:
+
+```ts
+/** Ping the server */
+export const ping = os.handler(() => 'pong')
+
+export const router = { ping } // summary: 'Ping the server'
+```
 
 On properties and named types, the comment becomes the schema `description`, `@deprecated` sets `deprecated`, `@example` adds to `examples`, `@type integer` sets the type, and tags named like JSON Schema keywords set that keyword:
 

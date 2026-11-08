@@ -6,6 +6,7 @@ import { router as brokenRouter } from '../tests/fixtures/app/src/broken.ts'
 import { contract, implemented } from '../tests/fixtures/app/src/contract.ts'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
+import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
 
 const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, import.meta.url)
@@ -343,5 +344,21 @@ describe('typeScriptOpenAPIGenerator', () => {
         },
       },
     })
+  })
+
+  it('reads JSDoc of procedures assigned from variables', async () => {
+    const spec = await generator.generate(shorthandRouter, {
+      source: { file: fixture('shorthand.ts') },
+    })
+
+    const meta = (path: `/${string}`) => {
+      const { summary, description } = spec.paths?.[path]?.post ?? {}
+      return { summary, description }
+    }
+
+    expect(meta('/ping')).toEqual({ summary: 'Ping it', description: undefined })
+    expect(meta('/pong')).toEqual({ summary: 'Pong', description: 'Answers with pong.' })
+    expect(meta('/renamed')).toEqual({ summary: 'Ping it', description: undefined })
+    expect(meta('/overridden')).toEqual({ summary: 'Own JSDoc wins', description: undefined })
   })
 })

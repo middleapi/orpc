@@ -265,7 +265,7 @@ describe('typeToJsonSchemaConverter', () => {
         $defs: {
           NamedTuple: {
             type: 'array',
-            prefixItems: [{ type: 'string' }, { type: 'number' }],
+            prefixItems: [{ type: 'string' }, { anyOf: [{ type: 'number' }, { type: 'null' }] }],
             maxItems: 2,
             minItems: 1,
           },
@@ -966,8 +966,205 @@ describe('typeToJsonSchemaConverter', () => {
           $defs: {
             OptionalTuple: {
               type: 'array',
-              prefixItems: [{ type: 'string' }, { type: 'number' }],
+              prefixItems: [
+                { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                { anyOf: [{ type: 'number' }, { type: 'null' }] },
+              ],
               maxItems: 2,
+            },
+          },
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('regressions', () => {
+    let reg: TypeScriptProject
+    let loose: TypeScriptProject
+
+    beforeAll(() => {
+      reg = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/regressions.ts', import.meta.url),
+      })
+      loose = openTypeScriptProject({
+        file: new URL('../tests/fixtures/loose/src/types.ts', import.meta.url),
+      })
+    })
+
+    afterAll(() => {
+      reg.close()
+      loose.close()
+    })
+
+    const convertIn = (p: TypeScriptProject, name: string, c?: TypeToJsonSchemaConverter) =>
+      (c ?? new TypeToJsonSchemaConverter(p.checker, p.program)).convert(p.getExportType(name).type)
+
+    it('tuples with rest elements in the middle, first, or optional undefined elements', () => {
+      expect(convertIn(reg, 'RestInMiddle')).toEqual([
+        {
+          $ref: '#/$defs/RestInMiddle',
+          $defs: {
+            RestInMiddle: {
+              type: 'array',
+              prefixItems: [{ type: 'string' }],
+              items: { anyOf: [{ type: 'number' }, { type: 'boolean' }] },
+              minItems: 2,
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertIn(reg, 'RestFirst')).toEqual([
+        {
+          $ref: '#/$defs/RestFirst',
+          $defs: {
+            RestFirst: {
+              type: 'array',
+              items: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+              minItems: 1,
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertIn(reg, 'OptionalUndefinedElement')).toEqual([
+        {
+          $ref: '#/$defs/OptionalUndefinedElement',
+          $defs: {
+            OptionalUndefinedElement: {
+              type: 'array',
+              prefixItems: [{ type: 'string' }, { anyOf: [{ type: 'number' }, { type: 'null' }] }],
+              maxItems: 2,
+              minItems: 1,
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('drops optional functions, symbols, and methods', () => {
+      expect(convertIn(reg, 'OptionalNonSerializable')).toEqual([
+        {
+          $ref: '#/$defs/OptionalNonSerializable',
+          $defs: {
+            OptionalNonSerializable: {
+              type: 'object',
+              properties: { n: { type: 'number' } },
+              required: ['n'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertIn(reg, 'WithMethod')).toEqual([
+        {
+          $ref: '#/$defs/WithMethod',
+          $defs: {
+            WithMethod: { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+          },
+        },
+        false,
+      ])
+      expect(convertIn(reg, 'PartialWithMethod')).toEqual([
+        { type: 'object', properties: { a: { type: 'number' } } },
+        false,
+      ])
+    })
+
+    it('@type keeps null branches and refs', () => {
+      expect(convertIn(reg, 'NullableInteger')).toEqual([
+        {
+          $ref: '#/$defs/NullableInteger',
+          $defs: {
+            NullableInteger: {
+              type: 'object',
+              properties: {
+                age: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+                user: { $ref: '#/$defs/User' },
+              },
+              required: ['age', 'user'],
+            },
+            User: {
+              type: 'object',
+              properties: { id: { type: 'string' }, name: { type: 'string' } },
+              required: ['id', 'name'],
+              description: 'A registered user',
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('keeps quoted keys starting with __@ or #', () => {
+      expect(convertIn(reg, 'SpecialKeys')).toEqual([
+        {
+          $ref: '#/$defs/SpecialKeys',
+          $defs: {
+            SpecialKeys: {
+              type: 'object',
+              properties: {
+                '__typename': { type: 'string', const: 'User' },
+                '__@odd': { type: 'number' },
+                '#hash': { type: 'string' },
+              },
+              required: ['__typename', '__@odd', '#hash'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('does not convert ignored index signatures', () => {
+      expect(convertIn(reg, 'SymbolIndex')).toEqual([
+        {
+          $ref: '#/$defs/SymbolIndex',
+          $defs: {
+            SymbolIndex: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('branded built-ins and computed enums', () => {
+      expect(convertIn(reg, 'BrandedDate')).toEqual([
+        { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+        false,
+      ])
+      expect(convertIn(reg, 'Computed')).toEqual([{ type: 'number' }, false])
+    })
+
+    it('rolls back defs of a failed conversion', () => {
+      const c = new TypeToJsonSchemaConverter(reg.checker, reg.program)
+      expect(() => convertIn(reg, 'WithMissing', c)).toThrow('Could not resolve the type "Missing"')
+      expect(() => convertIn(reg, 'WithMissing', c)).toThrow('Could not resolve the type "Missing"')
+      expect(() => convertIn(reg, 'HoldsMissing', c)).toThrow(
+        'Could not resolve the type "Missing"',
+      )
+      expect(convertIn(reg, 'Computed', c)).toEqual([{ type: 'number' }, false])
+    })
+
+    it('stops infinitely expanding generics', () => {
+      const [schema] = convertIn(reg, 'Expanded') as [any, boolean]
+      const defs = Object.values(schema.$defs) as any[]
+      expect(defs.length).toBeLessThanOrEqual(6)
+      expect(defs.some((def) => JSON.stringify(def.properties.next) === '{}')).toBe(true)
+    })
+
+    it('void unions without strictNullChecks', () => {
+      expect(convertIn(loose, 'StringOrVoid')).toEqual([{ type: 'string' }, true])
+      expect(convertIn(loose, 'Loose')).toEqual([
+        {
+          $ref: '#/$defs/Loose',
+          $defs: {
+            Loose: {
+              type: 'object',
+              properties: { p: { type: 'string' }, n: { type: 'number' } },
+              required: ['n'],
             },
           },
         },

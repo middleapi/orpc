@@ -50,10 +50,13 @@ interface Frame {
 
 interface Def extends Frame {
   name: string
+  typeId: number
   schema?: JsonSchema
 }
 
 const DEFS_REF_PREFIX = '#/$defs/'
+
+const MAX_EXPANSION_DEPTH = 5
 
 const NON_NULLISH_LITERAL_FLAGS =
   TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
@@ -128,6 +131,8 @@ export class TypeToJsonSchemaConverter {
   private readonly defsByName = new Map<string, Def>()
   private readonly visiting = new Set<number>()
   private readonly frames: Frame[] = []
+  private readonly expansions = new Map<number, number>()
+  private createdDefs: Def[] = []
   private readonly isLibraryPath: (path: string) => boolean
 
   constructor(
@@ -147,12 +152,21 @@ export class TypeToJsonSchemaConverter {
 
     const frame: Frame = { deps: new Set() }
     this.frames.push(frame)
+    this.createdDefs = []
 
     let schema: JsonSchema
     try {
       schema = type.flags & (TypeFlags.Undefined | TypeFlags.Void) ? {} : this.visit(type)
+    } catch (error) {
+      // defs of a failed conversion may be unfinished or reference unfinished ones
+      for (const def of this.createdDefs) {
+        this.defs.delete(def.typeId)
+        this.defsByName.delete(def.name)
+      }
+      throw error
     } finally {
       this.frames.pop()
+      this.createdDefs = []
     }
 
     const names = this.collectDeps(frame.deps)
@@ -257,6 +271,29 @@ export class TypeToJsonSchemaConverter {
       return this.convertType(type)
     }
 
+    // every instantiation of `type Expand<T> = { next: Expand<T[]> }` is a new type,
+    // so stop once a declaration nests deeper than any real value would
+    const declaration = (type as any).aliasSymbol || (type as any).symbol
+    const depth = this.expansions.get(declaration) ?? 0
+
+    if (declaration && depth >= MAX_EXPANSION_DEPTH) {
+      // library types (`Array`, `Map`) only nest as deep as the type that uses them
+      const symbol = type.getAliasSymbol() ?? type.getSymbol()
+      if (!symbol || !this.isLibrarySymbol(symbol)) {
+        return {}
+      }
+    }
+
+    this.expansions.set(declaration, depth + 1)
+
+    try {
+      return this.visitStructured(type)
+    } finally {
+      this.expansions.set(declaration, depth)
+    }
+  }
+
+  private visitStructured(type: Type): JsonSchema {
     const name = this.defsMode === 'named' ? this.getDefName(type) : undefined
 
     if (name !== undefined) {
@@ -352,7 +389,8 @@ export class TypeToJsonSchemaConverter {
       return { type: 'string' }
     }
 
-    if (flags & TypeFlags.Number) {
+    // includes computed enum members, e.g. `enum E { A = key.length }`
+    if (flags & (TypeFlags.NumberLike | TypeFlags.Enum)) {
       return { type: 'number' }
     }
 
@@ -381,7 +419,13 @@ export class TypeToJsonSchemaConverter {
       // strip nullish members through the checker, so a named union keeps its name (`Status | null`)
       if (members.some((m) => m.flags & NULLISH_FLAGS)) {
         const core = this.checker.getNonNullableType(type)
-        const schema = !core || core.flags & TypeFlags.Never ? undefined : this.visit(core)
+        const schema =
+          !core || core.flags & TypeFlags.Never
+            ? undefined
+            : // without `strictNullChecks` the checker returns the union itself
+              core.id === type.id
+              ? this.convertUnion(members, true)
+              : this.visit(core)
 
         if (!members.some((m) => m.flags & TypeFlags.Null)) {
           return schema ?? {}
@@ -390,7 +434,7 @@ export class TypeToJsonSchemaConverter {
         return schema === undefined ? { type: 'null' } : withNull(schema)
       }
 
-      return this.convertUnion(members)
+      return this.convertUnion(members)!
     }
 
     if (type.isIntersectionType()) {
@@ -412,7 +456,7 @@ export class TypeToJsonSchemaConverter {
     return {}
   }
 
-  private convertUnion(members: readonly Type[]): JsonSchema {
+  private convertUnion(members: readonly Type[], allowEmpty = false): JsonSchema | undefined {
     const strings: string[] = []
     const numbers: number[] = []
     const booleans = new Set<boolean>()
@@ -470,7 +514,7 @@ export class TypeToJsonSchemaConverter {
     const anyOf = dedupe([...literalSchemas, ...schemas])
 
     if (anyOf.length === 0) {
-      return { not: {} }
+      return allowEmpty ? undefined : { not: {} }
     }
 
     return anyOf.length === 1 ? anyOf[0]! : { anyOf }
@@ -486,6 +530,15 @@ export class TypeToJsonSchemaConverter {
     const arrayLike = members.find((m) => this.isArrayOrTuple(m))
     if (arrayLike) {
       return this.visit(arrayLike)
+    }
+
+    // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`
+    for (const member of members) {
+      const builtin =
+        member.flags & TypeFlags.Object ? this.convertBuiltinObject(member) : undefined
+      if (builtin !== undefined) {
+        return builtin
+      }
     }
 
     return this.convertObject(type)
@@ -519,9 +572,10 @@ export class TypeToJsonSchemaConverter {
     const dataProperties = properties.filter(
       (p) =>
         !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)) &&
-        !p.name.startsWith('__@') &&
-        !p.name.startsWith('#') &&
-        !p.name.startsWith('__#') &&
+        // symbol keys (`__@iterator@12`) and #private fields (`__#12@#secret`);
+        // quoted keys starting with `__` are escaped with another `_`
+        !p.escapedName.startsWith('__@') &&
+        !p.escapedName.startsWith('__#') &&
         !isClassAccessor(p),
     )
 
@@ -545,12 +599,8 @@ export class TypeToJsonSchemaConverter {
       const property = dataProperties[i]!
       const propertyType = propertyTypes[i]
 
-      if (!propertyType || this.isNonSerializable(propertyType)) {
-        continue
-      }
-
-      // a property that is always `undefined` is dropped by JSON serialization
-      if (propertyType.flags & (TypeFlags.Undefined | TypeFlags.Void)) {
+      // functions, symbols, and always `undefined` values are dropped by JSON serialization
+      if (!propertyType || this.isDropped(propertyType)) {
         continue
       }
 
@@ -567,13 +617,12 @@ export class TypeToJsonSchemaConverter {
 
     for (const info of this.checker.getIndexInfosOfType(type)) {
       const keyFlags = info.keyType.flags
-      const valueSchema = this.visit(info.valueType)
 
       if (keyFlags & (TypeFlags.String | TypeFlags.Number)) {
-        schema.additionalProperties ??= valueSchema
+        schema.additionalProperties ??= this.visit(info.valueType)
       } else if (keyFlags & (TypeFlags.TemplateLiteral | TypeFlags.StringMapping)) {
         schema.patternProperties ??= {}
-        schema.patternProperties[`^${this.toPattern(info.keyType)}$`] = valueSchema
+        schema.patternProperties[`^${this.toPattern(info.keyType)}$`] = this.visit(info.valueType)
       }
     }
 
@@ -590,25 +639,32 @@ export class TypeToJsonSchemaConverter {
     const elements = this.checker.getTypeArguments(type).slice(0, elementFlags.length)
 
     const prefixItems: JsonSchema[] = []
-    let items: JsonSchema | undefined
+    // the rest element and everything after it, like `number` and `boolean` in `[string, ...number[], boolean]`
+    const variableItems: JsonSchema[] = []
     let minItems = 0
 
     for (let i = 0; i < elements.length; i++) {
       const element = elements[i]!
       const flags = elementFlags[i]!
 
-      if (flags & ElementFlags.Variable) {
-        items = flags & ElementFlags.Rest ? this.visitElement(element) : {}
-        break
+      if (variableItems.length || flags & ElementFlags.Variable) {
+        // a variadic element is an unresolved generic spread (`...T`)
+        variableItems.push(flags & ElementFlags.Variadic ? {} : this.visitElement(element))
+        if (flags & ElementFlags.Required) {
+          minItems++
+        }
+        continue
       }
 
       if (flags & ElementFlags.Required) {
         minItems = i + 1
-        prefixItems.push(this.visitElement(element))
-      } else {
-        prefixItems.push(this.visit(element))
       }
+
+      // an `undefined` element, even an optional one, is serialized as `null`
+      prefixItems.push(this.visitElement(element))
     }
+
+    const items = dedupe(variableItems)
 
     const schema: ObjectJsonSchema = { type: 'array' }
 
@@ -616,8 +672,8 @@ export class TypeToJsonSchemaConverter {
       schema.prefixItems = prefixItems
     }
 
-    if (items !== undefined) {
-      schema.items = items
+    if (items.length) {
+      schema.items = items.length === 1 ? items[0]! : { anyOf: items }
     } else {
       schema.maxItems = prefixItems.length
     }
@@ -805,7 +861,7 @@ export class TypeToJsonSchemaConverter {
           annotated.examples = [...((annotated.examples as unknown[]) ?? []), parseTagValue(text)]
         }
       } else if (tag.name === 'type' && JSON_SCHEMA_TYPES.has(text)) {
-        annotated.type = text as any
+        Object.assign(annotated, overrideType(annotated, text))
       } else if (JSDOC_KEYWORD_TAGS.has(tag.name)) {
         ;(annotated as Record<string, unknown>)[tag.name] = text === '' ? true : parseTagValue(text)
       }
@@ -866,9 +922,10 @@ export class TypeToJsonSchemaConverter {
       name = `${preferredName}${i}`
     }
 
-    const def: Def = { name, deps: new Set() }
+    const def: Def = { name, typeId: type.id, deps: new Set() }
     this.defs.set(type.id, def)
     this.defsByName.set(name, def)
+    this.createdDefs.push(def)
     return def
   }
 
@@ -915,6 +972,18 @@ export class TypeToJsonSchemaConverter {
   private isArrayOrTuple(type: Type): boolean {
     return (
       isTypeReference(type) && (this.checker.isArrayType(type) || this.checker.isTupleType(type))
+    )
+  }
+
+  /**
+   * Whether JSON serialization drops a property of this type: `undefined`, functions,
+   * and symbols, optionally mixed with `undefined` (`cb?: () => void`).
+   */
+  private isDropped(type: Type): boolean {
+    const members = type.isUnionType() ? type.getTypes() : [type]
+
+    return members.every(
+      (m) => m.flags & (TypeFlags.Undefined | TypeFlags.Void) || this.isNonSerializable(m),
     )
   }
 
@@ -1023,6 +1092,27 @@ function isTrivialSchema(schema: JsonSchema): boolean {
     schema.type !== 'array' &&
     Object.keys(schema).every((key) => TRIVIAL_KEYWORDS.has(key))
   )
+}
+
+/**
+ * Sets the `type` of a schema from `@type`, keeping `null` branches (`number | null`)
+ * and leaving refs untouched.
+ */
+function overrideType(schema: ObjectJsonSchema, type: string): ObjectJsonSchema {
+  if (schema.$ref !== undefined) {
+    return schema
+  }
+
+  if (schema.anyOf && schema.type === undefined) {
+    return {
+      ...schema,
+      anyOf: schema.anyOf.map((member) =>
+        typeof member === 'object' && member.type !== 'null' ? overrideType(member, type) : member,
+      ),
+    }
+  }
+
+  return { ...schema, type: type as any }
 }
 
 function isPlain(schema: ObjectJsonSchema, type: string): boolean {

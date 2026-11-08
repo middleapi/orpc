@@ -36,7 +36,7 @@ import type { ResolvedRouterType } from './router-type.ts'
 import { RouterTypeResolver } from './router-type.ts'
 import type { TypeToJsonSchemaConverterOptions } from './type-converter.ts'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter.ts'
-import { createLibraryPathChecker, getJSDoc } from './utils.ts'
+import { createLibraryPathChecker, getAssignedSymbol, getJSDoc } from './utils.ts'
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
@@ -276,7 +276,8 @@ function toInferredSchema(converter: TypeToJsonSchemaConverter, type: Type): Any
 }
 
 /**
- * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by `.route`:
+ * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by `.route`.
+ * The JSDoc is read from the router property, or the variable assigned to it (`{ ping }`):
  * the first line is the `summary`, the rest the `description`,
  * and `@summary`, `@description`, `@deprecated`, `@tags` override them.
  */
@@ -285,7 +286,12 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
     return meta
   }
 
-  const jsdoc = getJSDoc(ctx.checker, symbol, ctx.isLibraryPath)
+  let jsdoc = getJSDoc(ctx.checker, symbol, ctx.isLibraryPath)
+
+  if (!jsdoc) {
+    const assigned = getAssignedSymbol(ctx.checker, symbol)
+    jsdoc = assigned && getJSDoc(ctx.checker, assigned, ctx.isLibraryPath)
+  }
 
   if (!jsdoc) {
     return meta

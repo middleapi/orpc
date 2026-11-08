@@ -5,7 +5,12 @@ export default defineConfig({
     typeAware: true,
     typeCheck: true,
   },
-  ignorePatterns: ['.agents/skills/**', '.claude/skills/**'],
+  ignorePatterns: [
+    '.agents/skills/**',
+    '.claude/skills/**',
+    // type-aware rules require strictNullChecks, which this fixture turns off on purpose
+    'packages/typescript-openapi/tests/fixtures/loose/**',
+  ],
   categories: {
     correctness: 'error',
     suspicious: 'error',

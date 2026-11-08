@@ -1,4 +1,6 @@
+import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Checker, JSDocTagInfo, Program, Symbol as TSSymbol } from 'typescript/unstable/sync'
+import { SymbolFlags } from 'typescript/unstable/sync'
 
 export interface JSDoc {
   comment: string
@@ -58,4 +60,31 @@ export function getJSDoc(
   const tags = checker.getJsDocTagsOfSymbol(symbol)
 
   return comment || tags.length ? { comment, tags } : undefined
+}
+
+/**
+ * For a property assigned from a variable, like `{ ping }` or `{ ping: pingProcedure }`,
+ * returns the variable's symbol (following imports), which carries its JSDoc.
+ */
+export function getAssignedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol | undefined {
+  for (const declaration of symbol.declarations) {
+    const node = declaration.resolve() as any
+
+    let assigned: TSSymbol | undefined
+
+    if (node?.kind === SyntaxKind.ShorthandPropertyAssignment) {
+      assigned = checker.getShorthandAssignmentValueSymbol(node)
+    } else if (
+      node?.kind === SyntaxKind.PropertyAssignment &&
+      node.initializer?.kind === SyntaxKind.Identifier
+    ) {
+      assigned = checker.getSymbolAtLocation(node.initializer)
+    }
+
+    if (assigned) {
+      return assigned.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(assigned) : assigned
+    }
+  }
+
+  return undefined
 }
