@@ -160,6 +160,11 @@ export const TYPED_ARRAY_SCHEMA: JsonSchema = {
  * Unless `toJSON` is called, they are written by their index keys.
  */
 export function isTypedArray(types: TypeQueries, type: Type): boolean {
+  // `Uint8Array & { label: string }`
+  if (type.isIntersectionType()) {
+    return types.getMembers(type).some((member) => isTypedArray(types, member))
+  }
+
   const source = (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(type) : type
   const symbol = source?.getSymbol()
 
@@ -211,6 +216,13 @@ export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | u
  * but the value is still the built-in and serialized like it.
  */
 function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): Builtin | undefined {
+  // a view keeping the source's values (`Readonly<Error>`, `Partial<RegExp>`) is still the built-in
+  const viewed = types.getMappedSource(type)
+  const viewedBuiltin = viewed && getBuiltin(types, viewed, stringify)
+  if (viewedBuiltin !== undefined) {
+    return viewedBuiltin
+  }
+
   const builtin = getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {
@@ -218,8 +230,9 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
   }
 
   // `DeepReadonly<Set<string>>` still knows its item type, `Readonly<Uint8Array>` is still a typed array
-  const source = types.getMappedSource(type)
-  if (source && source.getSymbol()?.name === builtin) {
+  // (by its argument: the members already showed it maps over the built-in)
+  const [source] = types.getTypeArguments(type)
+  if (source && source.flags & TypeFlags.Object && source.getSymbol()?.name === builtin) {
     const precise = getBuiltin(types, source, stringify)
     if (precise !== undefined) {
       return precise

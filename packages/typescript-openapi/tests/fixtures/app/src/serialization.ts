@@ -550,6 +550,63 @@ export class PrivateOptionalToJSON {
 /** Only instances of the class are assignable, because of its `#private` member */
 export interface ExtendsPrivate extends PrivateOptionalToJSON {}
 
+export class TaggedView {
+  tags = new Set(['t'])
+  name = 'n'
+
+  get label(): string {
+    return this.name
+  }
+}
+
+/** Only an instance is assignable, because of `private` */
+export class TsPrivate {
+  private secret = 1
+  tags = new Set(['s'])
+}
+
+export interface ExtendsTsPrivate extends TsPrivate {}
+
+/** Mapped views drop `#private` members, so plain objects are assignable */
+export interface ExtendsPickedPrivate extends Pick<PrivateOptionalToJSON, 'tags'> {}
+
+/** Keys of `T` with values of their own, not a view of `T` */
+export type Flags<T> = { [K in keyof T]: Set<string> }
+
+/** Returns labeled bytes from `toJSON` */
+export class ReturnsLabeledBytes {
+  toJSON(): LabeledBytes {
+    return new LabeledBytes([1])
+  }
+}
+
+/** A date subclass, which `JSON.stringify` writes by its own fields when `toJSON` returns it */
+export class LabeledDate extends Date {
+  label = 'l'
+}
+
+export class ReturnsLabeledDate {
+  toJSON(): LabeledDate {
+    return new LabeledDate(0)
+  }
+}
+
+export class MaybeUndefinedJSON {
+  toJSON(): string | undefined {
+    return undefined
+  }
+}
+
+export class FunctionOrStringJSON {
+  toJSON(): string | (() => void) {
+    return () => {}
+  }
+}
+
+export class HoldsSettled {
+  settled: PromiseFulfilledResult<Set<string>> = { status: 'fulfilled', value: new Set(['v']) }
+}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -740,6 +797,36 @@ export const router = {
       plain: { tags: new Set(['z']) },
       instance: new OptionalToJSONClass(),
       private: new PrivateOptionalToJSON(),
+    }),
+  ),
+  views: os.handler(
+    (): {
+      picked: Pick<TaggedView, 'tags'>
+      pickedInstance: Pick<TaggedView, 'tags'>
+      frozenIntersection: Readonly<TaggedView & { extra: string }>
+      tsPrivate: ExtendsTsPrivate
+      pickedPrivate: ExtendsPickedPrivate
+      flags: Flags<TaggedView>
+    } => ({
+      picked: { tags: new Set(['p']) },
+      pickedInstance: new TaggedView(),
+      frozenIntersection: Object.freeze(Object.assign(new TaggedView(), { extra: 'e' })),
+      tsPrivate: new TsPrivate(),
+      pickedPrivate: { tags: new Set(['q']) },
+      flags: { tags: new Set(['f']), name: new Set(['g']), label: new Set(['h']) },
+    }),
+  ),
+  toJSONResults: os.handler(() => ({
+    bytes: new ReturnsLabeledBytes(),
+    date: new ReturnsLabeledDate(),
+    maybe: [new MaybeUndefinedJSON()],
+    fn: new FunctionOrStringJSON(),
+  })),
+  builtinViews: os.handler(
+    (): { error: Readonly<Error>; regexp: Readonly<RegExp>; settled: HoldsSettled } => ({
+      error: new Error('x'),
+      regexp: /a/,
+      settled: new HoldsSettled(),
     }),
   ),
 }

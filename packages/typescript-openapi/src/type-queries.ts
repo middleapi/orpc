@@ -91,13 +91,54 @@ export class TypeQueries {
 
       const [source] = this.getTypeArguments(type)
 
-      if (!source || !(source.flags & TypeFlags.Object)) {
+      if (!source || !(source.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
         return undefined
       }
 
-      const keys = new Set(this.getProperties(source).map((p) => p.name))
-      return this.getProperties(type).every((p) => keys.has(p.name)) ? source : undefined
+      // the keys are the source's, and each value is the source's (`T[K]`, maybe optional)
+      const sourceProperties = new Map(this.getProperties(source).map((p) => [p.name, p]))
+      const properties = this.getProperties(type)
+      const pairs = properties.map((p) => sourceProperties.get(p.name))
+
+      if (pairs.some((p) => p === undefined)) {
+        return undefined
+      }
+
+      const mappedTypes = properties.length ? this.checker.getTypeOfSymbol([...properties]) : []
+      const sourceTypes = pairs.length ? this.checker.getTypeOfSymbol(pairs as TSSymbol[]) : []
+
+      return mappedTypes.every((t, i) => {
+        const original = sourceTypes[i]
+        return (
+          t !== undefined &&
+          original !== undefined &&
+          (t.id === original.id ||
+            this.checker.getNonNullableType(t)?.id ===
+              this.checker.getNonNullableType(original)?.id)
+        )
+      })
+        ? source
+        : undefined
     })
+  }
+
+  /**
+   * Whether only instances of a class are assignable to it: it has `#private`, `private`,
+   * or `protected` members.
+   */
+  isNominalClass(type: Type): boolean {
+    return this.memo('nominal', type.id, () =>
+      this.getProperties(type).some(
+        (p) =>
+          p.escapedName.startsWith('__#') ||
+          p.declarations.some((d) =>
+            ((d.resolve() as any)?.modifiers ?? []).some(
+              (m: any) =>
+                m.kind === SyntaxKind.PrivateKeyword || m.kind === SyntaxKind.ProtectedKeyword,
+            ),
+          ),
+      ),
+    )
   }
 
   /**

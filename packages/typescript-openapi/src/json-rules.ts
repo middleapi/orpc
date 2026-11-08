@@ -162,18 +162,16 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
     return type
   }
 
-  // only instances of a class with `#private` members are assignable to an interface extending it
+  // only instances of a class with `#private` or `private` members are assignable to an
+  // interface extending it directly, not through `Pick<C, K>` or `Partial<C>`
   if (symbol && symbol.flags & SymbolFlags.Interface) {
     const target = type.isTypeReference() ? type.getTarget() : type
-    const privateBase = (target.getBaseTypes() ?? []).find((base) => {
-      const classType = getClassType(types, base)
-      return (
-        classType && types.getProperties(classType).some((p) => p.escapedName.startsWith('__#'))
-      )
-    })
+    const nominalBase = (target.getBaseTypes() ?? []).find(
+      (base) => (base.getSymbol()?.flags ?? 0) & SymbolFlags.Class && types.isNominalClass(base),
+    )
 
-    if (privateBase) {
-      return getClassType(types, privateBase)
+    if (nominalBase) {
+      return nominalBase
     }
   }
 
@@ -280,6 +278,23 @@ function createsInterface(types: TypeQueries, type: Type, name: string, depth = 
 }
 
 /**
+ * Whether a type is a view of a class (`Readonly<C>`, `Pick<C, K>`, `C & { ... }`), which may
+ * hold an instance or a plain object: not the class itself, and not an interface or intersection
+ * over a class with private members, which only instances are assignable to.
+ */
+export function isClassView(types: TypeQueries, type: Type, classType: Type): boolean {
+  if (classType.id === type.id) {
+    return false
+  }
+
+  const nominalOnly =
+    ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Interface || type.isIntersectionType()) &&
+    types.isNominalClass(classType)
+
+  return !nominalOnly
+}
+
+/**
  * Whether types convert differently under `JSON.stringify` than under the serializer:
  * when they reach a `Set`, `Map`, `Blob`, `File`, or `bigint`, a built-in subclass serialized
  * through its own `toJSON`, or an object literal with `toJSON`. Class instances are always
@@ -371,8 +386,15 @@ export class ModeSensitivity {
         return true
       }
 
-      // a class instance through `C & { ... }` is converted the same way either way
-      return getClassType(types, type) === undefined && members.some(isSensitive)
+      const classType = getClassType(types, type)
+
+      // a class instance is converted the same way either way, a view (`C & { ... }`)
+      // may also hold a plain object
+      if (classType !== undefined) {
+        return isClassView(types, type, classType) && this.computeFields(type, isSensitive)
+      }
+
+      return members.some(isSensitive)
     }
 
     if (flags & INSTANTIABLE_FLAGS) {
@@ -388,7 +410,12 @@ export class ModeSensitivity {
       return types.getReferenceArguments(type).some(isSensitive)
     }
 
-    if (getDeclaredBuiltinName(types, type) !== undefined) {
+    // a built-in the serializer or `JSON.stringify` handles, not a library interface
+    // holding data (`PromiseFulfilledResult<T>`)
+    if (
+      getDeclaredBuiltinName(types, type) !== undefined &&
+      (getBuiltin(types, type, false) ?? getBuiltin(types, type, true)) !== undefined
+    ) {
       return isModeSensitiveBuiltin(types, type)
     }
 
@@ -413,9 +440,10 @@ export class ModeSensitivity {
       }
     }
 
-    // class instances are converted under `JSON.stringify` rules either way
+    // class instances are converted under `JSON.stringify` rules either way, views may also
+    // hold plain objects
     if (classType !== undefined) {
-      return false
+      return isClassView(types, type, classType) && this.computeFields(type, isSensitive)
     }
 
     if (getMappedBuiltinName(types, type) !== undefined) {
@@ -429,6 +457,21 @@ export class ModeSensitivity {
     // Other objects with `toJSON` are serialized through it either way.
     if (hasToJSON) {
       return isObjectLiteral(type)
+    }
+
+    return this.computeFields(type, isSensitive)
+  }
+
+  /**
+   * Whether the fields of a type convert differently: of a plain object, or of a view of a class
+   * (whose instance form differs from its plain form when it has `toJSON`).
+   */
+  private computeFields(type: Type, isSensitive: (type: Type) => boolean): boolean {
+    const types = this.types
+    const properties = types.getProperties(type)
+
+    if (properties.some((p) => p.name === 'toJSON')) {
+      return true
     }
 
     const data = properties.filter((p) => !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)))

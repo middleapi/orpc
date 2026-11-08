@@ -108,6 +108,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['readonlyBinary', undefined],
     ['bytesAndBoxes', undefined],
     ['optionalToJSONViews', undefined],
+    ['views', undefined],
+    ['toJSONResults', undefined],
+    ['builtinViews', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -261,6 +264,49 @@ describe('generated schemas match serialized outputs', async () => {
       response: { type: 'object' },
       zodError: { type: 'object' },
     })
+  })
+
+  it('describes views of classes in both forms, and toJSON results by their own fields', () => {
+    const schemas = spec.components?.schemas as any
+    const response = (path: string) =>
+      (spec.paths as any)[path].post.responses['200'].content['application/json'].schema.properties
+    const setArray = expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' })
+
+    // a view holds an instance (`JSON.stringify` writes a `Set` as `{}`) or a plain object
+    const views = response('/views')
+    expect(views.picked.anyOf.map((s: any) => s.properties.tags)).toEqual([
+      { type: 'object' },
+      setArray,
+    ])
+    // a getter is no data of an instance, but of a plain object
+    expect(views.frozenIntersection.anyOf.map((s: any) => Object.keys(s.properties))).toEqual([
+      ['tags', 'name', 'extra'],
+      ['tags', 'name', 'label', 'extra'],
+    ])
+    // `private` allows only instances, and a mapped base drops `#private`
+    expect(schemas.ExtendsTsPrivate.properties.tags).toEqual({ type: 'object' })
+    expect(schemas.ExtendsPickedPrivate.properties.tags).toEqual(setArray)
+    // keys of a class with values of their own are a plain object
+    expect(schemas.Flags_TaggedView.properties.tags).toEqual(setArray)
+
+    const results = response('/toJSONResults')
+    expect(schemas.ReturnsLabeledBytes).toMatchObject({
+      properties: { label: { type: 'string' } },
+      additionalProperties: { type: 'number' },
+    })
+    expect(schemas.ReturnsLabeledDate).toMatchObject({ properties: { label: { type: 'string' } } })
+    expect(results.maybe.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] })
+    expect(results.fn).toEqual({ type: 'string' })
+    // the key is dropped when `toJSON` returns the function
+    expect(
+      (spec.paths as any)['/toJSONResults'].post.responses['200'].content['application/json'].schema
+        .required,
+    ).not.toContain('fn')
+
+    const builtins = response('/builtinViews')
+    expect(builtins.error).toEqual({ type: 'object' })
+    expect(builtins.regexp).toEqual({})
+    expect(schemas.HoldsSettled.properties.settled.properties.value).toEqual({ type: 'object' })
   })
 
   it('describes class instances with JSON.stringify semantics', () => {

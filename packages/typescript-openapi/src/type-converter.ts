@@ -10,7 +10,13 @@ import type {
 } from 'typescript/unstable/sync'
 import { ElementFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import { getBuiltin, getBuiltinFields, isBuiltinSymbol, isTypedArray } from './builtins.ts'
+import {
+  getBuiltin,
+  getBuiltinBaseName,
+  getBuiltinFields,
+  isBuiltinSymbol,
+  isTypedArray,
+} from './builtins.ts'
 import { getDefName, getFallbackDefName } from './def-names.ts'
 import { DefRegistry } from './defs.ts'
 import { ExpansionGuard } from './expansion.ts'
@@ -19,6 +25,7 @@ import {
   getDataProperties,
   getToJSONResultType,
   hasOptionalToJSON,
+  isClassView,
   isDropped,
   isNonSerializable,
   ModeSensitivity,
@@ -610,11 +617,18 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * `ignoreToJSON` converts the own fields of a type with `toJSON`, and `asPlainObject` converts
-   * them like a plain object the serializer walks, also when the type is a class instance
-   * (`Partial<Money>`, whose values may be plain objects).
+   * `ignoreToJSON` converts the own fields of a type with `toJSON`. `form` decides whether a
+   * view of a class (`Readonly<C>`, `Pick<C, K>`, `C & { ... }`) is converted as an instance,
+   * which `JSON.stringify` writes, as a plain object the serializer walks, or as either one.
+   * `ownFields` converts a built-in subclass by its own fields, as `JSON.stringify` writes
+   * what `toJSON` returned.
    */
-  private convertObject(type: Type, ignoreToJSON = false, asPlainObject = false): JsonSchema {
+  private convertObject(
+    type: Type,
+    ignoreToJSON = false,
+    form: 'auto' | 'instance' | 'plain' = 'auto',
+    ownFields = false,
+  ): JsonSchema {
     const referenceKind = this.types.getReferenceKind(type)
 
     if (referenceKind === 'array') {
@@ -625,15 +639,30 @@ export class TypeToJsonSchemaConverter {
       return this.convertTuple(type as TypeReference)
     }
 
-    const builtin = this.convertBuiltinObject(type)
+    const builtin = ownFields ? undefined : this.convertBuiltinObject(type)
     if (builtin !== undefined) {
       return builtin
     }
 
     // the class behind `Readonly<C>`, `Pick<C, K>`, or `C & { extra }` (`Object.freeze`, `Object.assign`)
-    const classType = asPlainObject ? undefined : getClassType(this.types, type)
+    const classType = form === 'plain' ? undefined : getClassType(this.types, type)
 
-    if (classType && classType.id !== type.id) {
+    // a view of a class may hold an instance or a plain object, unless only instances
+    // are assignable to it (an interface or intersection over a class with private members)
+    if (
+      form === 'auto' &&
+      !this.stringify &&
+      classType !== undefined &&
+      isClassView(this.types, type, classType)
+    ) {
+      return anyOfDeduped([
+        this.convertObject(type, ignoreToJSON, 'instance'),
+        // the serializer walks plain objects key by key, without `toJSON`
+        this.convertObject(type, true, 'plain'),
+      ])
+    }
+
+    if (classType && classType.id !== type.id && !ownFields) {
       const subclass = this.convertBuiltinObject(classType)
       if (subclass !== undefined) {
         return subclass
@@ -652,20 +681,12 @@ export class TypeToJsonSchemaConverter {
         return converted
       }
 
-      // without `toJSON`, a value is its own fields: of a class instance written by
-      // `JSON.stringify`, but a view of a class (`Partial<Money>`, `Readonly<C>`) or an interface
-      // may also hold a plain object, which the serializer walks
-      const instanceFields = this.convertObject(type, true)
-      // an interface only resolves to a class through a base with `#private` members
-      const onlyInstances =
-        classType === type ||
-        (classType !== undefined && Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.Interface))
-      const fields =
-        this.stringify || onlyInstances
-          ? [instanceFields]
-          : [instanceFields, this.convertObject(type, true, true)]
-
-      return { anyOf: dedupe([converted, ...fields]) }
+      // without `toJSON`, a value is its own fields, of an instance or (for a view or an interface)
+      // of a plain object
+      return anyOfDeduped([
+        converted,
+        this.convertObject(type, true, classType === type ? 'instance' : form),
+      ])
     }
 
     const isClassInstance = classType !== undefined
@@ -756,7 +777,10 @@ export class TypeToJsonSchemaConverter {
         !serializable &&
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
-        !(serialized && this.isOptional(serialized))
+        !(
+          serialized &&
+          (this.isOptional(serialized) || this.getSerializableMembers(serialized) !== undefined)
+        )
       ) {
         required.push(property.name)
       }
@@ -990,6 +1014,15 @@ export class TypeToJsonSchemaConverter {
 
     const schema = this.visit(type)
 
+    // `JSON.stringify` writes an item whose `toJSON` returns `undefined` (or a function) as `null`
+    const serialized = getToJSONResultType(this.types, type, this.stringify)
+    if (
+      serialized &&
+      (this.isOptional(serialized) || this.getSerializableMembers(serialized) !== undefined)
+    ) {
+      return withNull(schema)
+    }
+
     return this.types.hasMember(type, UNDEFINED_FLAGS) &&
       !this.types.hasMember(type, TypeFlags.Null)
       ? withNull(schema)
@@ -1019,8 +1052,11 @@ export class TypeToJsonSchemaConverter {
         return this.visit(resolved)
       }
 
+      // functions and symbols are dropped like `undefined`
       const schemas = dedupe(
-        members.filter((m) => !(m.flags & NULLISH_FLAGS)).map((m) => this.convertToJSONResult(m)),
+        members
+          .filter((m) => !(m.flags & NULLISH_FLAGS) && !isNonSerializable(this.types, m))
+          .map((m) => this.convertToJSONResult(m)),
       )
 
       return withNullBranch(
@@ -1045,6 +1081,11 @@ export class TypeToJsonSchemaConverter {
         return this.visit(resolved)
       }
 
+      // `Uint8Array & { label }` keeps its added fields
+      if (isTypedArray(this.types, resolved)) {
+        return this.convertObject(resolved, true, 'instance')
+      }
+
       const base = members.find(
         (m) =>
           this.types.getReferenceKind(m) !== undefined ||
@@ -1054,6 +1095,15 @@ export class TypeToJsonSchemaConverter {
       if (base) {
         return this.convertToJSONResult(base)
       }
+    }
+
+    // a typed array by its index keys and the fields it adds, a subclass of another built-in
+    // (`class MyDate extends Date`) by its own fields
+    if (
+      isTypedArray(this.types, resolved) ||
+      getBuiltinBaseName(this.types, resolved) !== undefined
+    ) {
+      return this.convertObject(resolved, true, 'instance', !isTypedArray(this.types, resolved))
     }
 
     // a returned built-in is written by its own fields, also through `Readonly<Date>`
@@ -1169,6 +1219,18 @@ export class TypeToJsonSchemaConverter {
 /**
  * A schema with a `null` branch when the type has a `null` member, `{}` when nothing is left.
  */
+/**
+ * One schema, or `anyOf` of the different ones, flattening nested `anyOf`.
+ */
+function anyOfDeduped(schemas: readonly JsonSchema[]): JsonSchema {
+  const flat = dedupe(
+    schemas.flatMap((s) =>
+      typeof s === 'object' && s.anyOf && Object.keys(s).length === 1 ? s.anyOf : [s],
+    ),
+  )
+  return flat.length === 1 ? flat[0]! : { anyOf: flat }
+}
+
 function withNullBranch(schema: JsonSchema | undefined, hasNull: boolean): JsonSchema {
   if (!hasNull) {
     return schema ?? {}
