@@ -112,13 +112,24 @@ const TYPED_ARRAYS = new Set([
   'BigUint64Array',
 ])
 
+/** Members that identify a built-in through a mapped type over it, most specific first */
+const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]])[] = [
+  ['Date', ['getTime', 'toISOString', 'getTimezoneOffset']],
+  ['URL', ['href', 'origin', 'searchParams']],
+  ['File', ['name', 'lastModified', 'arrayBuffer', 'slice']],
+  ['Blob', ['size', 'arrayBuffer', 'slice', 'stream']],
+  ['Map', ['get', 'set', 'has', 'delete', 'size']],
+  ['Set', ['add', 'has', 'delete', 'size']],
+]
+
 /** Typings of runtime built-in modules, whose classes are not data holders */
 const RUNTIME_TYPINGS = /\/node_modules\/(?:@types\/(?:node|bun|deno)|bun-types)\//u
 
 /** Nested instantiations of one declaration, like `Maybe<A>` inside `Maybe<B>` */
 const MAX_NESTING = 16
-/** Distinct instantiations of one declaration in one conversion */
-const MAX_INSTANTIATIONS = 64
+/** Distinct instantiations nested in one outermost instantiation, once nested this deep */
+const MAX_INSTANTIATIONS = 256
+const MIN_BUDGET_NESTING = 4
 /** Nested instantiations in a row whose type arguments contain the previous ones */
 const MAX_GROWTH = 3
 
@@ -175,12 +186,17 @@ export class TypeToJsonSchemaConverter {
   private createdDefs: Def[] = []
   private createdInlined: number[] = []
   private truncated = false
+  private truncations = 0
+  /** Finished conversions of anonymous types, shared between their uses */
+  private readonly anonymous = new Map<number, JsonSchema>()
+  private createdAnonymous: number[] = []
 
   private readonly membersCache = new Map<number, readonly Type[]>()
   private readonly propertiesCache = new Map<number, readonly TSSymbol[]>()
   private readonly typeArgumentsCache = new Map<number, readonly Type[]>()
   private readonly jsdocCache = new Map<number, JSDoc | undefined>()
   private readonly singleMemberEnumCache = new Map<number, TSSymbol | undefined>()
+  private readonly annotationCache = new Map<number, { alias: TSSymbol; type: Type } | undefined>()
 
   constructor(
     private readonly checker: Checker,
@@ -202,6 +218,7 @@ export class TypeToJsonSchemaConverter {
 
     this.createdDefs = []
     this.createdInlined = []
+    this.createdAnonymous = []
     this.truncated = false
     this.instantiations.clear()
 
@@ -230,6 +247,7 @@ export class TypeToJsonSchemaConverter {
     }
     this.createdDefs = []
     this.createdInlined = []
+    this.createdAnonymous = []
 
     if (!Object.keys($defs).length) {
       return [schema, optional]
@@ -309,6 +327,7 @@ export class TypeToJsonSchemaConverter {
 
     if (growth === undefined) {
       this.truncated = true
+      this.truncations++
       return {}
     }
 
@@ -360,7 +379,11 @@ export class TypeToJsonSchemaConverter {
 
     seen.add(type.id)
 
-    if (stack.length >= MAX_NESTING || seen.size > MAX_INSTANTIATIONS) {
+    if (
+      stack.length >= MAX_NESTING ||
+      // wide but shallow (`DeepPartial` over a model with many relations) is fine
+      (stack.length >= MIN_BUDGET_NESTING && seen.size > MAX_INSTANTIATIONS)
+    ) {
       return undefined
     }
 
@@ -437,6 +460,12 @@ export class TypeToJsonSchemaConverter {
       return { $ref: toRef(def.name) }
     }
 
+    const memoized = this.anonymous.get(type.id)
+
+    if (memoized !== undefined) {
+      return memoized
+    }
+
     const enteredAt = this.visiting.get(type.id)
 
     // the same anonymous type again, without a named def in between to stop at: a cycle.
@@ -454,6 +483,7 @@ export class TypeToJsonSchemaConverter {
 
     this.visiting.set(type.id, this.namedDepth)
     this.visitingStack.push(type)
+    const truncations = this.truncations
 
     let schema: JsonSchema
     try {
@@ -477,6 +507,12 @@ export class TypeToJsonSchemaConverter {
     if (def) {
       def.schema ??= schema
       return { $ref: toRef(def.name) }
+    }
+
+    // reuse it for siblings, `{ a: C<N>; b: C<N> }` would otherwise grow exponentially in time
+    if (enteredAt === undefined && truncations === this.truncations) {
+      this.anonymous.set(type.id, schema)
+      this.createdAnonymous.push(type.id)
     }
 
     return schema
@@ -614,8 +650,9 @@ export class TypeToJsonSchemaConverter {
       // without `strictNullChecks` the checker returns the union itself
       if (core && core.id !== type.id && !(core.flags & TypeFlags.Never)) {
         // `Json | undefined` inside `type Json = ... | null` is `Json` again
+        // only while that union is being converted, an unrelated `boolean | null` is not `Flag`
         const named = this.nullableCores.get(core.id)
-        if (named && named.id !== type.id && hasNull) {
+        if (named && named.id !== type.id && hasNull && this.isConverting(named)) {
           return this.visit(named)
         }
 
@@ -719,7 +756,7 @@ export class TypeToJsonSchemaConverter {
       return this.convertTuple(type as TypeReference)
     }
 
-    const builtin = this.convertBuiltinObject(type)
+    const builtin = this.convertBuiltinObject(type) ?? this.convertMappedBuiltin(type)
     if (builtin !== undefined) {
       return builtin
     }
@@ -785,7 +822,10 @@ export class TypeToJsonSchemaConverter {
       // an alias of a primitive or literal (`type Count = number`) leaves no trace in the type,
       // so its JSDoc is read through the property's type annotation
       if (isTrivialSchema(propertySchema) || isLiteralSchema(propertySchema)) {
-        propertySchema = this.annotate(propertySchema, this.getAnnotationAlias(property))
+        propertySchema = this.annotate(
+          propertySchema,
+          this.getAnnotationAlias(property, propertyType),
+        )
       }
 
       schema.properties[property.name] = this.annotate(propertySchema, property)
@@ -883,7 +923,17 @@ export class TypeToJsonSchemaConverter {
 
     // only globals of the default library, a `File` or `Map` class of a package is its own type
     if (this.getSymbolSourceKind(symbol) !== 'default') {
-      return symbol.flags & SymbolFlags.Class ? this.convertBuiltinSubclass(type) : undefined
+      // `Blob`, `File`, and `URL` without the DOM library come from the runtime's typings
+      const runtimeGlobal =
+        symbol.declarations.length > 0 &&
+        symbol.declarations.every((d) => RUNTIME_TYPINGS.test(d.path))
+          ? getLeafBuiltinSchema(symbol.name)
+          : undefined
+
+      return (
+        runtimeGlobal ??
+        (symbol.flags & SymbolFlags.Class ? this.convertBuiltinSubclass(type) : undefined)
+      )
     }
 
     const leaf = getLeafBuiltinSchema(symbol.name)
@@ -926,6 +976,45 @@ export class TypeToJsonSchemaConverter {
     }
 
     return undefined
+  }
+
+  /**
+   * `DeepReadonly<Date>` or `DeepPartial<Set<string>>` maps over the built-in's methods,
+   * but the value is still the built-in and serialized like it.
+   */
+  private convertMappedBuiltin(type: Type): JsonSchema | undefined {
+    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+      return undefined
+    }
+
+    const [source] = this.getTypeArguments(type)
+
+    if (source && source.flags & TypeFlags.Object) {
+      return this.convertBuiltinObject(source)
+    }
+
+    // a resolved conditional (`T extends object ? { [K in keyof T]?: ... } : T`) has no alias
+    // arguments, so recognize the built-in by its members, which keep their library declarations
+    const properties = this.getProperties(type)
+
+    if (!properties.length || !properties.every((p) => this.isBuiltinMember(p, false))) {
+      return undefined
+    }
+
+    const names = new Set(properties.map((p) => p.name))
+    const builtin = MAPPED_BUILTIN_FINGERPRINTS.find(([, members]) =>
+      members.every((member) => names.has(member)),
+    )?.[0]
+
+    if (builtin === 'Set') {
+      return setSchema({})
+    }
+
+    if (builtin === 'Map') {
+      return mapSchema({})
+    }
+
+    return builtin ? getLeafBuiltinSchema(builtin) : undefined
   }
 
   /**
@@ -1116,25 +1205,20 @@ export class TypeToJsonSchemaConverter {
       return symbol.name
     }
 
-    const text = this.checker.typeToString(type)
-
-    // `Page<User>` -> `Page_User`, `Page<User[]>` -> `Page_UserArray`, `Pair<[A, B]>` -> `Pair_A_B`
-    return /^[\w$.]+(?:<[\w$.<>, [\]]+>)?$/u.test(text) && text.length <= 80
-      ? text
-          .replace(/\[\]/gu, 'Array')
-          .replace(/[\s<,[]+/gu, '_')
-          .replace(/[>\]]/gu, '')
-          .replace(/_+/gu, '_')
-          .replace(/_$/u, '')
-      : internal
-        ? this.getFallbackDefName(type)
-        : symbol.name
+    return (
+      toDefName(this.checker.typeToString(type)) ??
+      (internal ? this.getFallbackDefName(type) : symbol.name)
+    )
   }
 
   private getFallbackDefName(type: Type): string {
     const name = (type.getAliasSymbol() ?? type.getSymbol())?.name
 
-    return name && /^[\w$]+$/u.test(name) && !name.startsWith('__') ? name : 'Recursive'
+    if (name && /^[\w$]+$/u.test(name) && !name.startsWith('__')) {
+      return name
+    }
+
+    return toDefName(this.checker.typeToString(type)) ?? 'Recursive'
   }
 
   private getNamedSymbol(type: Type): TSSymbol | undefined {
@@ -1180,51 +1264,92 @@ export class TypeToJsonSchemaConverter {
   /**
    * `status?: Status` with `type Status = 'open' | null` has the type `'open' | null | undefined`,
    * which no longer carries the alias, and stripping `undefined` through the checker also strips
-   * `null`. The declared alias type keeps the def and its JSDoc.
+   * `null`. The alias type of the annotation keeps the def and its JSDoc, when it is the same type.
    */
   private getNullableAliasType(property: TSSymbol, type: Type): Type | undefined {
     if (!this.hasMember(type, UNDEFINED_FLAGS) || !this.hasMember(type, TypeFlags.Null)) {
       return undefined
     }
 
-    const alias = this.getAnnotationAlias(property)
-    const declared = alias && this.checker.getDeclaredTypeOfSymbol(alias)
+    const annotated = this.getAnnotation(property)?.type
 
-    return declared && this.hasMember(declared, TypeFlags.Null) && !this.isOptional(declared)
-      ? declared
+    if (
+      !annotated?.isUnionType() ||
+      !this.hasMember(annotated, TypeFlags.Null) ||
+      this.hasMember(annotated, UNDEFINED_FLAGS)
+    ) {
+      return undefined
+    }
+
+    const ids = (t: Type) =>
+      new Set(
+        this.getMembers(t)
+          .filter((m) => !(m.flags & UNDEFINED_FLAGS))
+          .map((m) => m.id),
+      )
+    const annotatedIds = ids(annotated)
+    const typeIds = ids(type)
+
+    // `status?: Status | 'archived'`, or a mapped type changing the value, is another type
+    return annotatedIds.size === typeIds.size && [...typeIds].every((id) => annotatedIds.has(id))
+      ? annotated
       : undefined
   }
 
   /**
-   * The project type alias a property's type annotation names, like `Count` in `count?: Count | null`.
+   * The project type alias a property's type annotation names (`count?: Count | null`),
+   * when the property still has that type: a mapped type like `{ [K in keyof T]: boolean }`
+   * keeps the source declaration but not its type.
    */
-  private getAnnotationAlias(property: TSSymbol): TSSymbol | undefined {
+  private getAnnotationAlias(property: TSSymbol, type: Type): TSSymbol | undefined {
+    const annotation = this.getAnnotation(property)
+
+    if (!annotation) {
+      return undefined
+    }
+
+    const members = type.isUnionType() ? this.getMembers(type) : [type]
+
+    return annotation.type.id === type.id || members.some((m) => m.id === annotation.type.id)
+      ? annotation.alias
+      : undefined
+  }
+
+  private getAnnotation(property: TSSymbol): { alias: TSSymbol; type: Type } | undefined {
+    if (this.annotationCache.has(property.id)) {
+      return this.annotationCache.get(property.id)
+    }
+
+    let annotation: { alias: TSSymbol; type: Type } | undefined
     const declaration = property.declarations[0]
 
-    if (!declaration || this.getSourceKind(declaration.path) !== 'project') {
-      return undefined
+    if (declaration && this.getSourceKind(declaration.path) === 'project') {
+      let typeNode = (declaration.resolve() as any)?.type
+
+      // `count?: Count | null`
+      if (typeNode?.kind === SyntaxKind.UnionType) {
+        const references = typeNode.types.filter((t: any) => t.kind === SyntaxKind.TypeReference)
+        typeNode = references.length === 1 ? references[0] : undefined
+      }
+
+      if (typeNode?.kind === SyntaxKind.TypeReference) {
+        const symbol = this.checker.getSymbolAtLocation(typeNode.typeName)
+        const alias = symbol && resolveAlias(this.checker, symbol)
+
+        if (
+          alias &&
+          alias.flags & SymbolFlags.TypeAlias &&
+          this.getSymbolSourceKind(alias) === 'project'
+        ) {
+          // the instantiated alias type, `Maybe<string>` rather than `T | null`
+          const type = this.checker.getTypeAtLocation(typeNode)
+          annotation = type ? { alias, type } : undefined
+        }
+      }
     }
 
-    let typeNode = (declaration.resolve() as any)?.type
-
-    // `count?: Count | null`
-    if (typeNode?.kind === SyntaxKind.UnionType) {
-      const references = typeNode.types.filter((t: any) => t.kind === SyntaxKind.TypeReference)
-      typeNode = references.length === 1 ? references[0] : undefined
-    }
-
-    if (typeNode?.kind !== SyntaxKind.TypeReference) {
-      return undefined
-    }
-
-    const symbol = this.checker.getSymbolAtLocation(typeNode.typeName)
-    const target = symbol && resolveAlias(this.checker, symbol)
-
-    return target &&
-      target.flags & SymbolFlags.TypeAlias &&
-      this.getSymbolSourceKind(target) === 'project'
-      ? target
-      : undefined
+    this.annotationCache.set(property.id, annotation)
+    return annotation
   }
 
   private createDef(type: Type, preferredName: string): Def {
@@ -1252,8 +1377,12 @@ export class TypeToJsonSchemaConverter {
     for (const id of this.createdInlined) {
       this.inlined.delete(id)
     }
+    for (const id of this.createdAnonymous) {
+      this.anonymous.delete(id)
+    }
     this.createdDefs = []
     this.createdInlined = []
+    this.createdAnonymous = []
   }
 
   private getDefDeps(def: Def): Set<string> {
@@ -1340,6 +1469,11 @@ export class TypeToJsonSchemaConverter {
     )
   }
 
+  private isConverting(type: Type): boolean {
+    const def = this.defs.get(type.id)
+    return def !== undefined && def.schema === undefined
+  }
+
   /**
    * A type of an object literal expression (`{ a: 1 }`), whose values are plain objects.
    */
@@ -1405,4 +1539,22 @@ export class TypeToJsonSchemaConverter {
         ? 'tuple'
         : undefined
   }
+}
+
+/**
+ * A def name from a printed type: `Page<User>` -> `Page_User`, `Page<User[]>` -> `Page_UserArray`,
+ * `Event<"message", Message>` -> `Event_message_Message`, `Pair<[A, B]>` -> `Pair_A_B`.
+ * Types with object literals, functions, unions, or intersections in their arguments are not named this way.
+ */
+function toDefName(text: string): string | undefined {
+  if (text.length > 80 || /[{}()|&]|=>|\.\.\./u.test(text) || !/^[\w$.]+(?:<.*>)?$/u.test(text)) {
+    return undefined
+  }
+
+  return (
+    text
+      .replace(/\[\]/gu, 'Array')
+      .replace(/[^\w$.]+/gu, '_')
+      .replace(/^_+|_+$/gu, '') || undefined
+  )
 }

@@ -981,6 +981,278 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('round five', () => {
+    let r5: TypeScriptProject
+
+    beforeAll(() => {
+      r5 = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round5.ts', import.meta.url),
+      })
+    })
+
+    afterAll(() => {
+      r5.close()
+    })
+
+    const converter = () => new TypeToJsonSchemaConverter(r5.checker, r5.program)
+    const convertR5 = (name: string, c = converter()) => c.convert(r5.getExportType(name).type)
+
+    it('fixture has no type errors', () => {
+      expect(r5.program.getSemanticDiagnostics(r5.sourceFile.fileName)).toEqual([])
+    })
+
+    it('uses an annotated nullable alias only when it is the whole property type', () => {
+      expect(convertR5('Extended')).toEqual([
+        {
+          $ref: '#/$defs/Extended',
+          $defs: {
+            Extended: {
+              type: 'object',
+              properties: {
+                status: {
+                  anyOf: [
+                    { type: 'string', enum: ['archived', 'closed', 'open'] },
+                    { type: 'null' },
+                  ],
+                },
+                count: {
+                  anyOf: [
+                    { type: 'string', enum: ['closed', 'open'] },
+                    { type: 'number' },
+                    { type: 'null' },
+                  ],
+                },
+                plain: { $ref: '#/$defs/Status' },
+              },
+            },
+            Status: {
+              anyOf: [{ type: 'string', enum: ['closed', 'open'] }, { type: 'null' }],
+              description: 'status doc',
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR5('WithMaybe')).toEqual([
+        {
+          $ref: '#/$defs/WithMaybe',
+          $defs: {
+            WithMaybe: {
+              type: 'object',
+              properties: {
+                name: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                count: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+              },
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR5('GenericUser')).toEqual([
+        {
+          $ref: '#/$defs/GenericUser',
+          $defs: {
+            GenericUser: {
+              type: 'object',
+              properties: {
+                item: {
+                  anyOf: [
+                    { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+                    { type: 'null' },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR5('SourceFlags')).toEqual([
+        {
+          $ref: '#/$defs/Flags_FlagSource',
+          $defs: {
+            Flags_FlagSource: {
+              type: 'object',
+              properties: {
+                status: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+                title: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+              },
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('does not send unrelated nullable unions to a named one', () => {
+      const c = converter()
+      expect(convertR5('UsesFlag', c)).toEqual([
+        {
+          $ref: '#/$defs/UsesFlag',
+          $defs: {
+            UsesFlag: {
+              type: 'object',
+              properties: { f: { $ref: '#/$defs/Flag' } },
+              required: ['f'],
+            },
+            Flag: {
+              anyOf: [{ type: 'boolean' }, { type: 'null' }],
+              description: 'A nullable flag',
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR5('Unrelated', c)).toEqual([
+        {
+          $ref: '#/$defs/Unrelated',
+          $defs: {
+            Unrelated: {
+              type: 'object',
+              properties: {
+                enabled: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+                other: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+              },
+              required: ['enabled'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('converts types repeated as siblings once', () => {
+      const start = performance.now()
+      convertR5('Counted')
+      expect(performance.now() - start).toBeLessThan(2000)
+    })
+
+    it('never cuts wide models under a recursive mapped type', () => {
+      const [schema] = convertR5('WidePartial') as [any, boolean]
+      expect(Object.keys(schema.$defs)).toHaveLength(71)
+      expect(JSON.stringify(schema)).not.toContain(':{}')
+    })
+
+    it('deep mapped types over built-ins keep the built-in form', () => {
+      expect(convertR5('ReadonlyPost')).toEqual([
+        {
+          $ref: '#/$defs/DeepReadonly_Post',
+          $defs: {
+            DeepReadonly_Post: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                createdAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+                tags: { $ref: '#/$defs/DeepReadonly_Set_string' },
+                link: { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' },
+                counts: { $ref: '#/$defs/DeepReadonly_Map_string_number' },
+              },
+              required: ['id', 'createdAt', 'tags', 'link', 'counts'],
+            },
+            DeepReadonly_Map_string_number: {
+              'type': 'array',
+              'items': {
+                type: 'array',
+                prefixItems: [{ type: 'string' }, { type: 'number' }],
+                maxItems: 2,
+                minItems: 2,
+              },
+              'x-native-type': 'map',
+            },
+            DeepReadonly_Set_string: {
+              'type': 'array',
+              'uniqueItems': true,
+              'items': { type: 'string' },
+              'x-native-type': 'set',
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR5('PartialPost')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            createdAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+            tags: { 'type': 'array', 'uniqueItems': true, 'items': {}, 'x-native-type': 'set' },
+            link: { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' },
+            counts: { 'type': 'array', 'items': {}, 'x-native-type': 'map' },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('names generics with literal arguments', () => {
+      expect(convertR5('AnyChatEvent')).toEqual([
+        {
+          $ref: '#/$defs/AnyChatEvent',
+          $defs: {
+            AnyChatEvent: {
+              anyOf: [
+                { $ref: '#/$defs/ChatEvent_message_Message' },
+                { $ref: '#/$defs/ChatEvent_ping_null' },
+              ],
+            },
+            ChatEvent_ping_null: {
+              type: 'object',
+              properties: { type: { type: 'string', const: 'ping' }, data: { type: 'null' } },
+              required: ['type', 'data'],
+            },
+            ChatEvent_message_Message: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', const: 'message' },
+                data: { $ref: '#/$defs/Message' },
+              },
+              required: ['type', 'data'],
+            },
+            Message: {
+              type: 'object',
+              properties: { text: { type: 'string' } },
+              required: ['text'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('Blob, File, and URL from the runtime typings without the DOM library', () => {
+      const node = openTypeScriptProject({
+        file: new URL('../tests/fixtures/node-only/src/upload.ts', import.meta.url),
+      })
+
+      try {
+        expect(node.program.getSemanticDiagnostics(node.sourceFile.fileName)).toEqual([])
+        expect(
+          new TypeToJsonSchemaConverter(node.checker, node.program).convert(
+            node.getExportType('Upload').type,
+          ),
+        ).toEqual([
+          {
+            $ref: '#/$defs/Upload',
+            $defs: {
+              Upload: {
+                type: 'object',
+                properties: {
+                  file: { type: 'string', contentMediaType: '*/*' },
+                  blob: { type: 'string', contentMediaType: '*/*' },
+                  url: { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' },
+                },
+                required: ['file', 'blob', 'url'],
+              },
+            },
+          },
+          false,
+        ])
+      } finally {
+        node.close()
+      }
+    })
+  })
+
   describe('round four', () => {
     let r4: TypeScriptProject
 
@@ -1341,7 +1613,7 @@ describe('typeToJsonSchemaConverter', () => {
       const start = performance.now()
       const [schema] = convertR3('HolderGrow') as [any, boolean]
       expect(performance.now() - start).toBeLessThan(5000)
-      expect(Object.keys(schema.$defs).length).toBeLessThan(64)
+      expect(Object.keys(schema.$defs).length).toBeLessThan(300)
     })
 
     it('applies alias JSDoc once, also to literal aliases', () => {
