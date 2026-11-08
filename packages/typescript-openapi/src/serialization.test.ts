@@ -43,6 +43,19 @@ describe('generated schemas match serialized outputs', async () => {
     ['plain', undefined],
     ['literal', undefined],
     ['echo', { at: new Date(0), tags: ['a'] }],
+    ['instant', undefined],
+    ['receipt', undefined],
+    ['frozen', undefined],
+    ['assigned', undefined],
+    ['readonlySession', undefined],
+    ['pickedSession', undefined],
+    ['omittedChannel', undefined],
+    ['readonlyCounter', undefined],
+    ['readonlyBag', undefined],
+    ['spreadRoom', undefined],
+    ['spreadSizeRoom', undefined],
+    ['selfRoom', undefined],
+    ['nestedPromise', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -79,5 +92,38 @@ describe('generated schemas match serialized outputs', async () => {
     expect(
       Object.keys(spec.components?.schemas ?? {}).filter((n) => n.startsWith('Author')),
     ).toEqual(['Author'])
+  })
+
+  it('never emits a component that only refers to itself', () => {
+    for (const [name, schema] of Object.entries(spec.components?.schemas ?? {})) {
+      expect((schema as any).$ref).not.toBe(`#/components/schemas/${name}`)
+    }
+  })
+
+  it('documents what toJSON returns, read by its own fields', () => {
+    const schemas = spec.components?.schemas as any
+    // `{ ...this, size: this.size }`
+    expect(schemas.SpreadSizeRoom).toEqual({
+      type: 'object',
+      properties: {
+        members: { type: 'object' },
+        id: { type: 'string' },
+        size: { type: 'number' },
+      },
+      required: ['members', 'id', 'size'],
+    })
+    // `toJSON(): this`
+    expect(schemas.SelfRoom).toEqual({
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    })
+    // `toJSON(): Money` is serialized by Money's fields, `toJSON(): Date` as `{}`
+    expect(schemas.Receipt).toEqual({
+      type: 'object',
+      properties: { cents: { type: 'number' } },
+      required: ['cents'],
+    })
+    expect(schemas.Instant).toEqual({ type: 'object' })
   })
 })

@@ -1,5 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import { stringifyJSON } from '@orpc/shared'
+import { getJsonSchemaKeywordKind } from '@orpc/json-schema'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
@@ -113,8 +113,47 @@ const TYPED_ARRAYS = new Set([
   'BigUint64Array',
 ])
 
-/** Markers of values the serializer handles but `JSON.stringify` does not */
-const SERIALIZER_DEPENDENT = /"x-native-type":"(?:set|map|bigint)"|"contentMediaType"/u
+const MAPPED_METHOD_KINDS: ReadonlySet<SyntaxKind> = new Set([
+  SyntaxKind.MethodDeclaration,
+  SyntaxKind.MethodSignature,
+])
+
+const MAPPED_ACCESSOR_KINDS: ReadonlySet<SyntaxKind> = new Set([
+  SyntaxKind.GetAccessor,
+  SyntaxKind.SetAccessor,
+])
+
+const SERIALIZER_ONLY_NATIVE_TYPES = new Set(['set', 'map', 'bigint'])
+
+/**
+ * Whether a schema (without following refs) reaches a value the serializer handles
+ * but `JSON.stringify` does not: a `Set`, `Map`, `bigint`, or binary value.
+ */
+function reachesSerializerOnlyValue(schema: JsonSchema, schemaLevel = true): boolean {
+  if (typeof schema !== 'object' || schema === null) {
+    return false
+  }
+
+  if (Array.isArray(schema)) {
+    return schema.some((item) => reachesSerializerOnlyValue(item, schemaLevel))
+  }
+
+  if (
+    schemaLevel &&
+    (SERIALIZER_ONLY_NATIVE_TYPES.has((schema as any)['x-native-type']) ||
+      typeof schema.contentMediaType === 'string')
+  ) {
+    return true
+  }
+
+  return Object.entries(schema).some(([key, value]) => {
+    const kind = getJsonSchemaKeywordKind(key, value, schemaLevel)
+    return (
+      (kind === 'schema' && reachesSerializerOnlyValue(value as JsonSchema, true)) ||
+      (kind === 'schema-record' && reachesSerializerOnlyValue(value as JsonSchema, false))
+    )
+  })
+}
 
 /** Members that identify a built-in through a mapped type over it, most specific first */
 const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]])[] = [
@@ -227,6 +266,7 @@ export class TypeToJsonSchemaConverter {
     type: Type,
     options: TypeToJsonSchemaConvertOptions = {},
   ): [jsonSchema: JsonSchema, optional: boolean] {
+    type = this.getAwaitedType(type)
     const optional = this.isOptional(type)
 
     this.createdDefs = []
@@ -267,6 +307,24 @@ export class TypeToJsonSchemaConverter {
     }
 
     return [{ ...(typeof schema === 'object' ? schema : { not: {} }), $defs }, optional]
+  }
+
+  /**
+   * The value of a `Promise`, like a handler's result.
+   */
+  private getAwaitedType(type: Type): Type {
+    const symbol = type.flags & TypeFlags.Object ? type.getSymbol() : undefined
+
+    if (
+      symbol &&
+      (symbol.name === 'Promise' || symbol.name === 'PromiseLike') &&
+      this.getSymbolSourceKind(symbol) === 'default'
+    ) {
+      const [value] = this.getReferenceArguments(type)
+      return value ? this.getAwaitedType(value) : type
+    }
+
+    return type
   }
 
   /**
@@ -591,13 +649,15 @@ export class TypeToJsonSchemaConverter {
       return { type: 'number', const: (type as any).value }
     }
 
-    if (flags & (TypeFlags.BigIntLiteral | TypeFlags.BigInt) && this.stringify) {
-      // `JSON.stringify` throws on a bigint
-      return { not: {} }
-    }
+    if (flags & TypeFlags.BigIntLike) {
+      if (this.stringify) {
+        // `JSON.stringify` throws on a bigint
+        return { not: {} }
+      }
 
-    if (flags & TypeFlags.BigIntLiteral) {
-      return { ...bigintSchema(), const: String((type as any).value) }
+      return flags & TypeFlags.BigIntLiteral
+        ? { ...bigintSchema(), const: String((type as any).value) }
+        : bigintSchema()
     }
 
     if (flags & TypeFlags.String) {
@@ -607,10 +667,6 @@ export class TypeToJsonSchemaConverter {
     // includes computed enum members, e.g. `enum E { A = key.length }`
     if (flags & (TypeFlags.NumberLike | TypeFlags.Enum)) {
       return { type: 'number' }
-    }
-
-    if (flags & TypeFlags.BigInt) {
-      return bigintSchema()
     }
 
     if (flags & TypeFlags.TemplateLiteral) {
@@ -765,7 +821,7 @@ export class TypeToJsonSchemaConverter {
     return this.convertObject(type)
   }
 
-  private convertObject(type: Type): JsonSchema {
+  private convertObject(type: Type, ignoreToJSON = false): JsonSchema {
     const referenceKind = this.getReferenceKind(type)
 
     if (referenceKind === 'array') {
@@ -781,24 +837,33 @@ export class TypeToJsonSchemaConverter {
       return builtin
     }
 
+    // the class behind `Readonly<C>`, `Pick<C, K>`, or `C & { extra }` (`Object.freeze`, `Object.assign`)
+    const classType = this.getClassType(type)
+
+    if (classType && classType.id !== type.id) {
+      const subclass = this.convertBuiltinObject(classType)
+      if (subclass !== undefined) {
+        return subclass
+      }
+    }
+
     const properties = this.getProperties(type)
 
     // the serializer walks plain objects key by key, only other objects go through `toJSON`
     const toJSON =
-      this.isObjectLiteral(type) && !this.stringify
+      ignoreToJSON || (this.isObjectLiteral(type) && !this.stringify)
         ? undefined
         : properties.find((p) => p.name === 'toJSON')
     if (toJSON) {
       const returnType = getCallReturnType(this.checker, this.checker.getTypeOfSymbol(toJSON))
       if (returnType) {
-        // `JSON.stringify` serializes what `toJSON` returns
-        return this.visitInClassInstance(returnType)
+        return this.withStringify(() => this.convertToJSONResult(returnType))
       }
     }
 
-    const isClassInstance = Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.Class)
+    const isClassInstance = classType !== undefined
     // members of `Error` subclasses from packages are not data either (`ZodError#issues` is a getter)
-    const isError = isClassInstance && this.getBuiltinBaseName(type) === 'Error'
+    const isError = isClassInstance && this.getBuiltinBaseName(classType) === 'Error'
 
     const dataProperties = properties.filter(
       (p) =>
@@ -808,11 +873,16 @@ export class TypeToJsonSchemaConverter {
         !p.escapedName.startsWith('__@') &&
         !p.escapedName.startsWith('__#') &&
         !isClassAccessor(p) &&
-        // mapped types keep methods as properties (`DeepPartial<Account>`), still functions
+        // mapped types keep methods (`DeepPartial<Account>`) and class accessors (`Readonly<C>`)
+        // as properties, still functions or on the prototype
         !(
           p.flags & SymbolFlags.Transient &&
-          (p.declarations[0]?.kind === SyntaxKind.MethodDeclaration ||
-            p.declarations[0]?.kind === SyntaxKind.MethodSignature)
+          p.declarations.length > 0 &&
+          p.declarations.every(
+            (d) =>
+              MAPPED_METHOD_KINDS.has(d.kind) ||
+              (isClassInstance && MAPPED_ACCESSOR_KINDS.has(d.kind)),
+          )
         ) &&
         // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
         !(isClassInstance && this.isBuiltinMember(p, isError)),
@@ -999,7 +1069,8 @@ export class TypeToJsonSchemaConverter {
         }))
       case 'Promise':
       case 'PromiseLike':
-        return first ? this.visit(first) : {}
+        // only the converted value itself is awaited, a nested promise is serialized as `{}`
+        return { type: 'object' }
       case 'RegExp':
       case 'Function':
       case 'Object':
@@ -1260,21 +1331,35 @@ export class TypeToJsonSchemaConverter {
   }
 
   private getDefName(type: Type, symbol: TSSymbol): string {
+    const symbolName = this.getSymbolName(symbol)
     // internal names like `__class` (class expressions) are not used
-    const internal = symbol.name.startsWith('__')
+    const internal = symbolName.startsWith('__')
 
     if (!internal && (symbol.flags & SymbolFlags.Enum || !this.getTypeArguments(type).length)) {
-      return symbol.name
+      return symbolName
     }
 
     return (
       toDefName(this.checker.typeToString(type)) ??
-      (internal ? this.getFallbackDefName(type) : symbol.name)
+      (internal ? this.getFallbackDefName(type) : symbolName)
     )
   }
 
+  /**
+   * The declared name of a symbol, also for default exports (`export default class Account`).
+   */
+  private getSymbolName(symbol: TSSymbol): string {
+    if (symbol.name !== 'default') {
+      return symbol.name
+    }
+
+    const node = symbol.declarations[0]?.resolve() as any
+    return typeof node?.name?.text === 'string' ? node.name.text : symbol.name
+  }
+
   private getFallbackDefName(type: Type): string {
-    const name = (type.getAliasSymbol() ?? type.getSymbol())?.name
+    const symbol = type.getAliasSymbol() ?? type.getSymbol()
+    const name = symbol && this.getSymbolName(symbol)
 
     if (name && /^[\w$]+$/u.test(name) && !name.startsWith('__')) {
       return name
@@ -1320,9 +1405,6 @@ export class TypeToJsonSchemaConverter {
     return this.singleMemberEnumCache.get(type.id)
   }
 
-  /**
-   * The alias of a property's type annotation (`count: Count`), when it names a project type alias.
-   */
   /**
    * `status?: Status` with `type Status = 'open' | null` has the type `'open' | null | undefined`,
    * which no longer carries the alias, and stripping `undefined` through the checker also strips
@@ -1450,7 +1532,12 @@ export class TypeToJsonSchemaConverter {
   }
 
   private getDefDeps(def: Def): Set<string> {
-    def.deps ??= collectDefRefs(def.schema!)
+    // an unfinished def has no deps yet, and must not cache that
+    if (def.schema === undefined) {
+      return new Set()
+    }
+
+    def.deps ??= collectDefRefs(def.schema)
     return def.deps
   }
 
@@ -1561,6 +1648,78 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
+   * `JSON.stringify` calls `toJSON` once: the returned value is serialized by its own fields,
+   * so a returned `Date` is `{}`, and `this` (or `{ ...this }`) are the instance's fields.
+   * Its properties and items go through `toJSON` again, so they are converted as usual.
+   */
+  private convertToJSONResult(type: Type): JsonSchema {
+    const resolved =
+      type.flags & TypeFlags.TypeParameter
+        ? (this.checker.getBaseConstraintOfType(type) ?? type)
+        : type
+
+    if (
+      !(resolved.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
+      this.getReferenceKind(resolved) !== undefined
+    ) {
+      return this.visit(resolved)
+    }
+
+    const symbol = resolved.getSymbol()
+
+    // built-ins have no own enumerable data, except typed arrays
+    if (symbol && !TYPED_ARRAYS.has(symbol.name) && this.isBuiltinSymbol(symbol)) {
+      return { type: 'object' }
+    }
+
+    return this.convertObject(resolved, true)
+  }
+
+  /**
+   * The class instance type of a type, also through `Readonly<C>`, `Pick<C, K>`, `C & { ... }`,
+   * and `this`.
+   */
+  private getClassType(type: Type): Type | undefined {
+    if ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Class) {
+      return type
+    }
+
+    if (type.flags & TypeFlags.TypeParameter) {
+      const constraint = this.checker.getBaseConstraintOfType(type)
+      return constraint && constraint.id !== type.id ? this.getClassType(constraint) : undefined
+    }
+
+    if (type.isIntersectionType()) {
+      for (const member of this.getMembers(type)) {
+        const classType = this.getClassType(member)
+        if (classType) {
+          return classType
+        }
+      }
+      return undefined
+    }
+
+    if ((type as any).objectFlags & ObjectFlags.Mapped) {
+      const [source] = this.getTypeArguments(type)
+      return source && source.flags & TypeFlags.Object ? this.getClassType(source) : undefined
+    }
+
+    return undefined
+  }
+
+  /**
+   * Declared by the default library or the runtime's typings.
+   */
+  private isBuiltinSymbol(symbol: TSSymbol): boolean {
+    return (
+      symbol.declarations.length > 0 &&
+      symbol.declarations.every(
+        (d) => this.getSourceKind(d.path) === 'default' || RUNTIME_TYPINGS.test(d.path),
+      )
+    )
+  }
+
+  /**
    * Converts a value of a class instance, which `JSON.stringify` serializes. Converted again
    * under its rules only when they make a difference, so shared models keep one def.
    */
@@ -1594,16 +1753,20 @@ export class TypeToJsonSchemaConverter {
    * when it reaches a `Set`, `Map`, `bigint`, or binary value.
    */
   private dependsOnSerializer(schema: JsonSchema): boolean {
-    const schemas = [schema]
+    if (reachesSerializerOnlyValue(schema)) {
+      return true
+    }
 
     for (const name of this.collectDeps(collectDefRefs(schema))) {
       const def = this.defsByName.get(name)!.schema
-      if (def !== undefined) {
-        schemas.push(def)
+
+      // still being converted, so undecided: convert under `JSON.stringify` rules to be safe
+      if (def === undefined || reachesSerializerOnlyValue(def)) {
+        return true
       }
     }
 
-    return schemas.some((s) => SERIALIZER_DEPENDENT.test(stringifyJSON(s) ?? ''))
+    return false
   }
 
   private hasMember(type: Type, flags: number): boolean {

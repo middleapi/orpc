@@ -418,7 +418,7 @@ describe('typeToJsonSchemaConverter', () => {
               },
               blob: { type: 'string', contentMediaType: '*/*' },
               file: { type: 'string', contentMediaType: '*/*' },
-              promise: { type: 'string' },
+              promise: { type: 'object' },
               regexp: {},
             },
             required: ['date', 'url', 'big', 'set', 'map', 'blob', 'file', 'promise', 'regexp'],
@@ -979,6 +979,29 @@ describe('typeToJsonSchemaConverter', () => {
         },
         false,
       ])
+    })
+  })
+
+  describe('round seven', () => {
+    it('names default exports after their declaration', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round7.ts', import.meta.url),
+      })
+
+      try {
+        const [schema] = new TypeToJsonSchemaConverter(project.checker, project.program).convert(
+          project.getExportType('DefaultExports').type,
+        ) as [any, boolean]
+
+        expect(Object.keys(schema.$defs).toSorted()).toEqual([
+          'Account',
+          'DefaultExports',
+          'Profile',
+        ])
+        expect(schema.$defs.Profile.description).toBe('A profile')
+      } finally {
+        project.close()
+      }
     })
   })
 

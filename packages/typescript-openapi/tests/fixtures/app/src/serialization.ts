@@ -29,6 +29,94 @@ export class Money {
   }
 }
 
+export class Instant {
+  constructor(private readonly date: Date) {}
+
+  toJSON(): Date {
+    return this.date
+  }
+}
+
+export class Receipt {
+  toJSON(): Money {
+    return new Money(5)
+  }
+}
+
+export class Customer {
+  id = 'c1'
+  favorites = new Set(['sku-1'])
+  since = new Date(0)
+}
+
+export class Session {
+  #token = 's'
+  private internal = 1
+  startedAt = new Date(0)
+  handlers = new Set(['a'])
+
+  constructor(
+    public user: string,
+    public score = 1,
+  ) {}
+
+  get token(): string {
+    return this.#token
+  }
+
+  get clicks(): number {
+    return this.internal
+  }
+}
+
+export class Channel {
+  name = 'general'
+
+  get topic(): string {
+    return 't'
+  }
+}
+
+export class Counter extends Map<string, number> {
+  label = 'c'
+}
+
+export class Bag extends Array<number> {}
+
+export class SpreadRoom {
+  members = new Set(['a'])
+
+  constructor(public id: string) {}
+
+  toJSON() {
+    // oxlint-disable-next-line typescript/no-misused-spread -- the pattern under test
+    return { ...this }
+  }
+}
+
+export class SpreadSizeRoom {
+  members = new Set(['a'])
+
+  constructor(public id: string) {}
+
+  get size(): number {
+    return this.members.size
+  }
+
+  toJSON() {
+    // oxlint-disable-next-line typescript/no-misused-spread -- the pattern under test
+    return { ...this, size: this.size }
+  }
+}
+
+export class SelfRoom {
+  constructor(public id: string) {}
+
+  toJSON(): this {
+    return this
+  }
+}
+
 export type Status = 'draft' | 'published' | null
 
 export interface Plain {
@@ -76,4 +164,22 @@ export const router = {
     },
   })),
   echo: os.input(type<{ at: Date; tags: string[] }>()).handler(({ input }) => input),
+  instant: os.handler(() => ({ at: new Instant(new Date(0)) })),
+  receipt: os.handler(() => new Receipt()),
+  frozen: os.handler((): Readonly<Customer> => Object.freeze(new Customer())),
+  assigned: os.handler((): Customer & { extra: string } =>
+    Object.assign(new Customer(), { extra: 'x' }),
+  ),
+  readonlySession: os.handler((): Readonly<Session> => new Session('x')),
+  pickedSession: os.handler((): Pick<Session, 'user' | 'token' | 'handlers'> => new Session('p')),
+  omittedChannel: os.handler((): Omit<Channel, 'name'> => new Channel()),
+  readonlyCounter: os.handler((): Readonly<Counter> => new Counter([['a', 1]])),
+  readonlyBag: os.handler((): Readonly<Bag> => Bag.from([1, 2]) as Bag),
+  spreadRoom: os.handler(() => new SpreadRoom('r')),
+  spreadSizeRoom: os.handler(() => new SpreadSizeRoom('r')),
+  selfRoom: os.handler(() => new SelfRoom('r')),
+  nestedPromise: os.handler(async () => ({
+    user: Promise.resolve({ id: 'u' }),
+    list: [Promise.resolve(1)],
+  })),
 }
