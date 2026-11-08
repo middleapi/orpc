@@ -34,7 +34,7 @@ const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]
 ]
 
 /** Typings of runtime built-in modules, whose classes are not data holders */
-const RUNTIME_TYPINGS = /\/node_modules\/(?:@types\/(?:node|bun|deno)|bun-types)\//u
+const RUNTIME_TYPINGS = /\/node_modules\/(?:@types\/(?:node|bun|deno)|bun-types|undici-types)\//u
 
 /**
  * How a built-in value is serialized: as a final schema, or as an array, `Set`, or `Map`
@@ -82,6 +82,11 @@ export function getBuiltin(
         ? getBuiltinSubclass(types, type, stringify)
         : undefined)
     )
+  }
+
+  // `JSON.stringify` calls a `toJSON` a project adds to a built-in (`interface Map<K, V> { toJSON(): ... }`)
+  if (stringify && hasOwnToJSON(types, type)) {
+    return undefined
   }
 
   const leaf = getLeaf(symbol.name, stringify)

@@ -626,9 +626,21 @@ describe('typeScriptOpenAPIGenerator', () => {
       // the type requires `a`, which zod makes optional
       expect(body('/optionalInZod')).toEqual({
         type: 'object',
-        properties: { a: {}, b: { type: 'number' } },
+        properties: { b: { type: 'number' } },
         required: ['a', 'b'],
       })
+      // query parameters stay primitive, also with equal enums in another order
+      const parameters = (path: string) =>
+        paths[path].get.parameters.map((p: any) => [p.name, p.schema, p.style])
+      expect(parameters('/queryDefault')).toEqual([
+        ['lim', { type: 'number', default: 10 }, undefined],
+        ['extra', { type: 'string' }, undefined],
+      ])
+      expect(parameters('/queryEnum')).toEqual([
+        ['s', { type: 'string', enum: ['archived', 'active'] }, undefined],
+        ['extra', { type: 'string' }, undefined],
+      ])
+
       // constraints only the type has
       expect(body('/constraints').properties.id).toEqual({
         type: 'string',

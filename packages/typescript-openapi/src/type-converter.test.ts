@@ -995,6 +995,59 @@ describe('typeToJsonSchemaConverter', () => {
         project.close()
       }
     })
+
+    it('treats interfaces as classes only when a library constructor creates them', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const [constructed] = converter.convert(project.getExportType('Constructed').type) as [
+          any,
+          boolean,
+        ]
+        const set = expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' })
+
+        // package types are inlined
+        const { opaque, session } = constructed.$defs.Constructed.properties
+
+        expect(opaque.properties.tags).toEqual(set)
+        expect(constructed.$defs.User.properties.roles).toEqual(set)
+        // a library class is written by `JSON.stringify`, which writes a `Set` as `{}`
+        expect(session.properties.tags).toEqual({ type: 'object' })
+
+        const [polyfills] = converter.convert(project.getExportType('WithPolyfills').type) as [
+          any,
+          boolean,
+        ]
+        expect(polyfills.$defs.WithPolyfills.properties).toEqual({
+          big: { type: 'string' },
+          counts: { type: 'array', items: expect.objectContaining({ type: 'array' }) },
+        })
+      } finally {
+        project.close()
+      }
+    })
+
+    it('describes web classes of the Node typings as class instances', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/node-only/src/upload.ts', import.meta.url),
+      })
+
+      try {
+        const [schema] = new TypeToJsonSchemaConverter(project.checker, project.program).convert(
+          project.getExportType('WebClasses').type,
+        ) as [any, boolean]
+
+        expect(schema.$defs.WebClasses.properties).toEqual({
+          response: { type: 'object' },
+          request: { type: 'object' },
+        })
+      } finally {
+        project.close()
+      }
+    })
   })
 
   describe('round eleven', () => {

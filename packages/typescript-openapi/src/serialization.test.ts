@@ -98,6 +98,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['libraryClasses', undefined],
     ['droppedArrays', undefined],
     ['mixedSet', undefined],
+    ['brandedSets', undefined],
+    ['partialMoney', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -177,6 +179,20 @@ describe('generated schemas match serialized outputs', async () => {
       type: 'object',
       properties: { maybe: { type: 'number' } },
     })
+    // arrays are not class instances, `JSON.stringify` writes the `Set` items of a class field as `{}`
+    expect(schemas.HoldsBrandedSets.properties.sets).toEqual({
+      $ref: '#/components/schemas/BrandedSetsJson',
+    })
+    expect(schemas.BrandedSetsJson).toEqual({
+      type: 'array',
+      items: { type: 'object' },
+      description: 'Sets with a brand',
+    })
+    // `Partial<Money>` maps `toJSON` to an optional property, the instance still has it
+    const money = (spec.paths as any)['/partialMoney'].post.responses['200'].content[
+      'application/json'
+    ].schema.properties.m
+    expect(money.required).toEqual(['amount', 'currency'])
     expect(schemas.MixedSet.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'number' }] })
   })
 

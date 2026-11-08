@@ -95,6 +95,16 @@ export const mixed = {
     .input(z.object({ id: z.string() }))
     .input(type<{ id: `user_${string}`; b: number }>())
     .handler(() => 'ok'),
+  queryDefault: os
+    .route({ method: 'GET' })
+    .input(z.object({ lim: z.coerce.number().default(10) }))
+    .input(type<{ lim: number; extra: string }>())
+    .handler(() => 'ok'),
+  queryEnum: os
+    .route({ method: 'GET' })
+    .input(z.object({ s: z.enum(['archived', 'active']) }))
+    .input(type<{ s: 'active' | 'archived'; extra: string }>())
+    .handler(() => 'ok'),
   weaker: os
     .input(z.object({ tag: z.unknown() }))
     .input(type<{ tag: Tag; b: number }>())

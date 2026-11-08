@@ -486,6 +486,13 @@ export class MixedSet extends Set<string | number> {
   }
 }
 
+/** Sets with a brand */
+type BrandedSets = Set<string>[] & { readonly __brand?: 'sets' }
+
+export class HoldsBrandedSets {
+  sets: BrandedSets = [new Set(['a'])]
+}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -622,4 +629,9 @@ export const router = {
   })),
   droppedArrays: os.handler(() => new DroppedArrays()),
   mixedSet: os.handler(() => ({ set: new MixedSet(['a', 1]) })),
+  brandedSets: os.handler(() => new HoldsBrandedSets()),
+  partialMoney: os.handler((): { m: Partial<Money>; list: Partial<Money>[] } => ({
+    m: new Money(150),
+    list: [new Money(1)],
+  })),
 }

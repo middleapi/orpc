@@ -431,12 +431,7 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
     const rest = isCovered(property, other) ? undefined : withoutDescribed(property, other)
 
     if (rest === undefined || (rest !== property && isPlain(rest, 'object'))) {
-      // a key the type requires stays required, also when the other schema makes it optional
-      if (schema.required?.includes(name) && !described.required?.includes(name)) {
-        setOwn(properties, name, {})
-      } else {
-        removed.add(name)
-      }
+      removed.add(name)
     } else {
       setOwn(properties, name, rest)
     }
@@ -446,7 +441,10 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
     return schema
   }
 
-  const required = schema.required?.filter((name) => !removed.has(name))
+  // a key the type requires stays required, also when the other schema makes it optional
+  const required = schema.required?.filter(
+    (name) => !removed.has(name) || !described.required?.includes(name),
+  )
   const rest: Exclude<JsonSchema, boolean> = { ...schema }
   delete rest.properties
   delete rest.required
@@ -478,11 +476,22 @@ function isCovered(schema: JsonSchema, other: JsonSchema): boolean {
     return false
   }
 
-  return keys.every((key) =>
-    key === 'type' && schema.type === 'number'
-      ? other.type === 'number' || other.type === 'integer'
-      : stringifyJSON((schema as any)[key]) === stringifyJSON((other as any)[key]),
-  )
+  return keys.every((key) => {
+    const value = (schema as any)[key]
+    const otherValue = (other as any)[key]
+
+    if (key === 'type' && value === 'number') {
+      return otherValue === 'number' || otherValue === 'integer'
+    }
+
+    // the same values in another order (`'active' | 'archived'` and `z.enum(['archived', 'active'])`)
+    if (key === 'enum' && Array.isArray(value) && Array.isArray(otherValue)) {
+      const others = new Set(otherValue.map((v) => stringifyJSON(v)))
+      return value.length === otherValue.length && value.every((v) => others.has(stringifyJSON(v)))
+    }
+
+    return stringifyJSON(value) === stringifyJSON(otherValue)
+  })
 }
 
 /**

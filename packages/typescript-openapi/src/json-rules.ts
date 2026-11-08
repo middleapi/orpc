@@ -135,7 +135,15 @@ export function getToJSONResultType(
   }
 
   const toJSON = getToJSON(types, type)
-  return toJSON && getCallReturnType(types.checker, types.checker.getTypeOfSymbol(toJSON))
+  const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
+
+  // `Partial<Money>` maps the method to an optional property, the instance still has it
+  const callable =
+    method && method.isUnionType()
+      ? types.getMembers(method).find((m) => !(m.flags & UNDEFINED_FLAGS))
+      : method
+
+  return getCallReturnType(types.checker, callable)
 }
 
 /**
@@ -175,18 +183,37 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
 /**
  * An interface with a constructor of the same name, the way libraries declare classes
  * (`interface TypeError` with `var TypeError: TypeErrorConstructor`, zod's `ZodError`),
- * unless the serializer handles it as a built-in, like `Date` or `Set`.
+ * unless the serializer handles it as a built-in, like `Date`, `Set`, or arrays.
+ * Only declaration files of the default library and packages declare classes this way:
+ * a project interface with a factory (`const User = model<User>()`) describes plain objects,
+ * and the constructor must create the interface (or a class of its name) itself.
  */
 function isConstructedInterface(types: TypeQueries, type: Type, symbol: TSSymbol): boolean {
-  if (!(symbol.flags & SymbolFlags.Interface) || !(symbol.flags & SymbolFlags.Variable)) {
+  if (
+    !(symbol.flags & SymbolFlags.Interface) ||
+    !(symbol.flags & SymbolFlags.Variable) ||
+    types.getReferenceKind(type) !== undefined
+  ) {
     return false
   }
 
   const constructed = types.memo('constructed', symbol.id, () => {
+    if (
+      !symbol.declarations.length ||
+      !symbol.declarations.every((d) => types.getSourceKind(d.path) !== 'project')
+    ) {
+      return false
+    }
+
     const value = types.checker.getTypeOfSymbol(symbol)
-    return (
-      value !== undefined &&
-      types.checker.getSignaturesOfType(value, SignatureKind.Construct).length > 0
+    const signatures = value
+      ? types.checker.getSignaturesOfType(value, SignatureKind.Construct)
+      : []
+
+    // by name, the global `Response` of the Node typings is constructed by undici's `Response`
+    return signatures.some(
+      (signature) =>
+        types.checker.getReturnTypeOfSignature(signature)?.getSymbol()?.name === symbol.name,
     )
   })
 

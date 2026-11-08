@@ -439,8 +439,9 @@ export class TypeToJsonSchemaConverter {
 
     if (flags & TypeFlags.BigIntLike) {
       if (this.stringify) {
-        // `JSON.stringify` throws on a bigint
-        return { not: {} }
+        // `JSON.stringify` throws on a bigint, unless `BigInt.prototype.toJSON` is polyfilled
+        const toJSONResult = this.getBigIntToJSONResultType()
+        return toJSONResult ? this.convertToJSONResult(toJSONResult) : { not: {} }
       }
 
       return flags & TypeFlags.BigIntLiteral
@@ -1022,6 +1023,15 @@ export class TypeToJsonSchemaConverter {
     }
 
     return this.convertObject(resolved, true)
+  }
+
+  /**
+   * What a polyfilled `BigInt.prototype.toJSON` returns, declared with
+   * `declare global { interface BigInt { toJSON(): string } }`.
+   */
+  private getBigIntToJSONResultType(): Type | undefined {
+    const bigint = this.types.getGlobalType('BigInt')
+    return bigint && getToJSONResultType(this.types, bigint, true)
   }
 
   /**
