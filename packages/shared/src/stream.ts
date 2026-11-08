@@ -1,11 +1,13 @@
-import { AsyncIteratorClass } from '@standard-server/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject } from '@standard-server/shared'
 import type { Promisable } from 'type-fest'
 
 import { once } from './function.ts'
+import { traceAsyncIterator } from './iterator.ts'
 import { isPlainObject } from './object.ts'
 import { promiseWithResolvers } from './promise.ts'
+import { override } from './proxy.ts'
 import type { StartSpanOptions } from './tracing.ts'
-import { recordSpanError, runInSpanContext, startSpan } from './tracing.ts'
+import { getTracer, recordSpanError, runInSpanContext, startSpan } from './tracing.ts'
 import type { ThrowableError } from './types.ts'
 
 export function replicateReadableStream<T>(
@@ -126,6 +128,30 @@ export function traceReadableStream<T>(
       getSpan()?.end()
     },
   })
+}
+
+/**
+ * When a tracer is set, traces the consumption of an async iterator object or a
+ * {@link ReadableStream} with a `consume_async_iterator_object_${direction}` or
+ * `consume_octet_stream_${direction}` span. Other values are returned as is.
+ *
+ * Uses `override` so other special properties of the value remain.
+ */
+export function traceConsumption<T>(value: T, direction: 'input' | 'output'): T {
+  if (getTracer()) {
+    if (isAsyncIteratorObject(value)) {
+      return override(
+        value,
+        traceAsyncIterator(`consume_async_iterator_object_${direction}`, value),
+      ) as T
+    }
+
+    if (value instanceof ReadableStream) {
+      return override(value, traceReadableStream(`consume_octet_stream_${direction}`, value)) as T
+    }
+  }
+
+  return value
 }
 
 /**

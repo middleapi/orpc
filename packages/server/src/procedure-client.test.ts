@@ -12,6 +12,7 @@ const ValidationError = ContractModule.ValidationError
 const createORPCErrorConstructorMapSpy = vi.spyOn(ContractModule, 'createORPCErrorConstructorMap')
 const reconcileErrorSpy = vi.spyOn(ContractModule, 'reconcileORPCError')
 const overrideSpy = vi.spyOn(SharedV2Module, 'override')
+const traceConsumptionSpy = vi.spyOn(SharedV2Module, 'traceConsumption')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -1100,7 +1101,7 @@ describe('createProcedureClient', () => {
     await expect(iterator.next()).resolves.toEqual({ value: 'result', done: true })
   })
 
-  it('trace output readable stream and use override for proxy', async () => {
+  it('trace output readable stream', async () => {
     const handlerStream = new ReadableStream({
       start(controller) {
         controller.enqueue('event')
@@ -1113,10 +1114,11 @@ describe('createProcedureClient', () => {
 
     const stream = (await client()) as any
     expect(stream).toBeInstanceOf(ReadableStream)
+    expect(stream).not.toBe(handlerStream)
 
-    expect(overrideSpy).toHaveBeenCalledTimes(1)
-    expect(overrideSpy).toHaveBeenCalledWith(handlerStream, expect.any(Object))
-    expect(stream).toBe(overrideSpy.mock.results[0]!.value)
+    expect(traceConsumptionSpy).toHaveBeenCalledTimes(1)
+    expect(traceConsumptionSpy).toHaveBeenCalledWith(handlerStream, 'output')
+    expect(stream).toBe(traceConsumptionSpy.mock.results[0]!.value)
 
     const reader = stream.getReader()
     await expect(reader.read()).resolves.toEqual({ value: 'event', done: false })

@@ -23,53 +23,30 @@ export async function reconcileORPCError(
   error: AnyORPCError,
 ): Promise<AnyORPCError> {
   const config = getOwn(map, error.code)
+  let defined = false
+  let data = error.data
 
-  if (!config) {
-    if (!error.defined) {
-      return error
+  if (config) {
+    if (!config.data) {
+      defined = true
+    } else {
+      const validated = await config.data['~standard'].validate(error.data)
+
+      if (!validated.issues) {
+        defined = true
+        data = validated.value
+      }
     }
-
-    const cloned = cloneORPCError(error)
-
-    ;(cloned.defined as Writable<typeof cloned.defined>) = false
-
-    return cloned
   }
 
-  if (!config.data) {
-    if (error.defined) {
-      return error
-    }
-
-    const cloned = cloneORPCError(error)
-
-    ;(cloned.defined as Writable<typeof cloned.defined>) = true
-
-    return cloned
-  }
-
-  const validated = await config.data['~standard'].validate(error.data)
-
-  if (validated.issues) {
-    if (!error.defined) {
-      return error
-    }
-
-    const cloned = cloneORPCError(error)
-
-    ;(cloned.defined as Writable<typeof cloned.defined>) = false
-
-    return cloned
-  }
-
-  if (error.data === validated.value && error.defined) {
+  if (error.defined === defined && error.data === data) {
     return error
   }
 
   const cloned = cloneORPCError(error)
 
-  cloned.data = validated.value
-  ;(cloned.defined as Writable<typeof cloned.defined>) = true
+  cloned.data = data
+  ;(cloned.defined as Writable<typeof cloned.defined>) = defined
 
   return cloned
 }

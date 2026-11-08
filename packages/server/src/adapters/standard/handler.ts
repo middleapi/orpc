@@ -12,8 +12,7 @@ import {
   runWithSpan,
   toArray,
   toTracingException,
-  traceAsyncIterator,
-  traceReadableStream,
+  traceConsumption,
   value,
   wrapAsyncIterator,
   wrapReadableStream,
@@ -172,25 +171,11 @@ export class StandardHandler<T extends Context> {
 
             async ({ context, prefix, request, path, procedure, decodeInput }) => {
               step = 'decode_input'
-              let input = await runWithSpan('decode_input', decodeInput)
+              const input = traceConsumption(
+                await runWithSpan('decode_input', decodeInput),
+                'input',
+              )
               step = undefined
-
-              if (getTracer() && isAsyncIteratorObject(input)) {
-                /**
-                 * @warning
-                 * Remember use `override` for AsyncIteratorObject to remain other special properties
-                 */
-                input = override(
-                  input,
-                  traceAsyncIterator('consume_async_iterator_object_input', input),
-                )
-              } else if (getTracer() && input instanceof ReadableStream) {
-                /**
-                 * @warning
-                 * Remember use `override` for ReadableStream to remain other special properties
-                 */
-                input = override(input, traceReadableStream('consume_octet_stream_input', input))
-              }
 
               const client = createProcedureClient(procedure, {
                 context,
@@ -277,69 +262,46 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
               }
 
               const body = result.response.body
-              if (isAsyncIteratorObject(body)) {
-                return {
-                  ...result,
-                  response: {
-                    ...result.response,
-                    /**
-                     * @remarks
-                     * **Warning**: Remember use `override` for remaining special properties
-                     */
-                    body: override(
-                      body,
-                      wrapAsyncIterator(body, {
-                        runWith: (fn) => tracer.withActiveSpan(span, fn),
-                        onError(error) {
-                          /**
-                           * Errors here are internal (interceptor/framework) failures,
-                           * except `EventStreamErrorEvent`: a business error the protocol delivers
-                           * inside the event stream, already logged by the client interceptor.
-                           */
-                          if (!(error instanceof EventStreamErrorEvent)) {
-                            span.recordException('error', toTracingException(error))
-                          }
-                        },
-                        onFinish() {
-                          span.end()
-                        },
-                      }),
-                    ),
-                  },
-                }
+              const isIterator = isAsyncIteratorObject(body)
+
+              if (!isIterator && !(body instanceof ReadableStream)) {
+                span.end()
+                return result
               }
 
-              if (body instanceof ReadableStream) {
-                return {
-                  ...result,
-                  response: {
-                    ...result.response,
-                    /**
-                     * @remarks
-                     * **Warning**: Remember use `override` for remaining special properties
-                     */
-                    body: override(
-                      body,
-                      wrapReadableStream(body, {
-                        runWith: (fn) => tracer.withActiveSpan(span, fn),
-                        onError(error) {
-                          /**
-                           * Any error here is internal (interceptor/framework), not business logic.
-                           * Indicates unexpected handler failure.
-                           */
-                          span.recordException('error', toTracingException(error))
-                        },
-                        onFinish() {
-                          span.end()
-                        },
-                      }),
-                    ),
-                  },
-                }
+              const wrapOptions = {
+                runWith: <T>(fn: () => Promise<T>) => tracer.withActiveSpan(span, fn),
+                onError(error: unknown) {
+                  /**
+                   * Errors here are internal (interceptor/framework) failures, not business logic,
+                   * except an iterator's `EventStreamErrorEvent`: a business error the protocol
+                   * delivers inside the event stream, already logged by the client interceptor.
+                   */
+                  if (!isIterator || !(error instanceof EventStreamErrorEvent)) {
+                    span.recordException('error', toTracingException(error))
+                  }
+                },
+                onFinish() {
+                  span.end()
+                },
               }
 
-              span.end()
-              return result
+              return {
+                ...result,
+                response: {
+                  ...result.response,
+                  /**
+                   * @remarks
+                   * **Warning**: Remember use `override` for remaining special properties
+                   */
+                  body: override(
+                    body,
+                    isIterator
+                      ? wrapAsyncIterator(body, wrapOptions)
+                      : wrapReadableStream(body as ReadableStream, wrapOptions),
+                  ),
+                },
+              }
             } catch (e) {
               /**
                * Any error here is internal (interceptor/framework), not business logic.

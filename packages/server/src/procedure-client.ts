@@ -27,7 +27,7 @@ import {
   runWithSpan,
   toArray,
   traceAsyncIterator,
-  traceReadableStream,
+  traceConsumption,
   value,
 } from '@orpc/shared'
 
@@ -155,63 +155,33 @@ export function createProcedureClient<
             { mapError: reconcileError },
           ),
         ) as typeof output
-      } else if (getTracer() && (output as unknown) instanceof ReadableStream) {
-        /**
-         * @warning
-         * Remember use `override` for ReadableStream to remain other special properties
-         */
-        return override(
-          output,
-          traceReadableStream('consume_octet_stream_output', output),
-        ) as typeof output
       }
 
-      return output
+      return traceConsumption(output, 'output')
     } catch (e) {
       throw await reconcileError(e as ThrowableError)
     }
   }
 }
 
-async function validateInput(i: number, schema: AnySchema, input: unknown): Promise<any> {
-  return runWithSpan(`validate_input.${i}`, async (span) => {
-    span?.setAttribute('input_schema.index', i)
+async function validateSchema(
+  kind: 'input' | 'output',
+  i: number,
+  schema: AnySchema,
+  data: unknown,
+): Promise<any> {
+  return runWithSpan(`validate_${kind}.${i}`, async (span) => {
+    span?.setAttribute(`${kind}_schema.index`, i)
 
-    const result = await schema['~standard'].validate(input)
-
-    if (result.issues) {
-      throw new ORPCError('BAD_REQUEST', {
-        message: 'Input validation failed',
-        data: {
-          issues: result.issues,
-        },
-        cause: new ValidationError({
-          message: 'Input validation failed',
-          issues: result.issues,
-          invalidData: input,
-        }),
-      })
-    }
-
-    return result.value
-  })
-}
-
-async function validateOutput(i: number, schema: AnySchema, output: unknown): Promise<any> {
-  return runWithSpan(`validate_output.${i}`, async (span) => {
-    span?.setAttribute('output_schema.index', i)
-
-    const result = await schema['~standard'].validate(output)
+    const result = await schema['~standard'].validate(data)
 
     if (result.issues) {
-      throw new ORPCError('INTERNAL_SERVER_ERROR', {
-        message: 'Output validation failed',
-        cause: new ValidationError({
-          message: 'Output validation failed',
-          issues: result.issues,
-          invalidData: output,
-        }),
-      })
+      const message = kind === 'input' ? 'Input validation failed' : 'Output validation failed'
+      const cause = new ValidationError({ message, issues: result.issues, invalidData: data })
+
+      throw kind === 'input'
+        ? new ORPCError('BAD_REQUEST', { message, data: { issues: result.issues }, cause })
+        : new ORPCError('INTERNAL_SERVER_ERROR', { message, cause })
     }
 
     return result.value
@@ -259,7 +229,8 @@ async function executeProcedureInternal(
      */
     if (!procedure['~orpc'].disableInputValidation) {
       for (let i = startInputIndex; i < endInputIndex; i++) {
-        const validated = await validateInput(
+        const validated = await validateSchema(
+          'input',
           i,
           inputSchemas[i]!,
           i !== 0 ? mergeTwoLevels(options.input, currentInput) : currentInput,
@@ -327,7 +298,7 @@ async function executeProcedureInternal(
 
     if (!procedure['~orpc'].disableOutputValidation) {
       for (let i = endOutputIndex - 1; i >= startOutputIndex; i--) {
-        currentOutput = await validateOutput(i, outputSchemas[i]!, currentOutput)
+        currentOutput = await validateSchema('output', i, outputSchemas[i]!, currentOutput)
       }
     }
 

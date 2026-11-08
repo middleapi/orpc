@@ -8,6 +8,7 @@ import {
   asyncIteratorToUnproxiedDataStream,
   replicateReadableStream,
   streamToAsyncIteratorObject,
+  traceConsumption,
   traceReadableStream,
   wrapReadableStream,
 } from './stream.ts'
@@ -168,6 +169,84 @@ describe('traceReadableStream', () => {
     expect(recordSpanErrorSpy).toHaveBeenCalledTimes(1)
     expect(recordSpanErrorSpy).toHaveBeenCalledWith(span, error)
     expect(span.end).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('traceConsumption', () => {
+  it('traces async iterator objects and keeps their other properties', async () => {
+    const span = createSpan()
+    startSpanSpy.mockReturnValue(span)
+
+    const iterator = Object.assign(
+      (async function* () {
+        yield 1
+        yield 2
+      })(),
+      { extra: 'extra' },
+    )
+
+    const traced = traceConsumption(iterator, 'input')
+
+    expect(traced).not.toBe(iterator)
+    expect(traced.extra).toBe('extra')
+    await expect(traced.next()).resolves.toEqual({ done: false, value: 1 })
+    await expect(traced.next()).resolves.toEqual({ done: false, value: 2 })
+    await expect(traced.next()).resolves.toEqual({ done: true, value: undefined })
+
+    expect(startSpanSpy).toHaveBeenCalledTimes(1)
+    expect(startSpanSpy).toHaveBeenCalledWith('consume_async_iterator_object_input')
+    expect(span.end).toHaveBeenCalledTimes(1)
+  })
+
+  it('traces readable streams and keeps their other properties', async () => {
+    const span = createSpan()
+    startSpanSpy.mockReturnValue(span)
+
+    const stream = Object.assign(
+      new ReadableStream<number>({
+        start(controller) {
+          controller.enqueue(1)
+          controller.close()
+        },
+      }),
+      { extra: 'extra' },
+    )
+
+    const traced = traceConsumption(stream, 'output')
+
+    expect(traced).not.toBe(stream)
+    expect(traced).toBeInstanceOf(ReadableStream)
+    expect(traced.extra).toBe('extra')
+    await expect(readAll(traced)).resolves.toEqual([1])
+
+    expect(startSpanSpy).toHaveBeenCalledTimes(1)
+    expect(startSpanSpy).toHaveBeenCalledWith('consume_octet_stream_output')
+    expect(span.end).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns other values as is', () => {
+    const value = { a: 1 }
+
+    expect(traceConsumption(value, 'input')).toBe(value)
+    expect(traceConsumption('string', 'output')).toBe('string')
+    expect(startSpanSpy).not.toHaveBeenCalled()
+  })
+
+  describe('without a tracer', () => {
+    beforeEach(() => {
+      const tracer = Tracing.getTracer()
+      Tracing.setTracer(undefined)
+      return () => Tracing.setTracer(tracer)
+    })
+
+    it('returns async iterator objects and readable streams as is', () => {
+      const iterator = (async function* () {})()
+      const stream = new ReadableStream()
+
+      expect(traceConsumption(iterator, 'input')).toBe(iterator)
+      expect(traceConsumption(stream, 'output')).toBe(stream)
+      expect(startSpanSpy).not.toHaveBeenCalled()
+    })
   })
 })
 

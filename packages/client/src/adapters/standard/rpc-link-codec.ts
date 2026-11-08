@@ -152,6 +152,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     const isOk = response.status < 400
 
     const body = await response.resolveBody()
+    const details = { status: response.status, headers: response.headers, body }
 
     const deserialized = await (async () => {
       try {
@@ -159,7 +160,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
       } catch (cause) {
         throw new MalformedResponseError({
           message: isOk ? 'Invalid RPC response format.' : undefined,
-          response: { status: response.status, headers: response.headers, body },
+          response: details,
           cause,
         })
       }
@@ -170,16 +171,12 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
         return {
           kind: 'error',
           error: createORPCErrorFromJson(deserialized, {
-            cause: new ResponseError({
-              response: { status: response.status, headers: response.headers, body },
-            }),
+            cause: new ResponseError({ response: details }),
           }),
         }
       }
 
-      throw new MalformedResponseError({
-        response: { headers: response.headers, status: response.status, body },
-      })
+      throw new MalformedResponseError({ response: details })
     }
 
     return { kind: 'output', output: deserialized }
