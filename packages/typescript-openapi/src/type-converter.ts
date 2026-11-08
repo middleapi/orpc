@@ -340,7 +340,7 @@ export class TypeToJsonSchemaConverter {
       const closer = this.getCycleCloser(type, key)
 
       if (closer === undefined) {
-        return { $ref: toRef(this.defs.create(key, getFallbackDefName(this.checker, type)).name) }
+        return { $ref: toRef(this.defs.create(key, getFallbackDefName(this.types, type)).name) }
       }
 
       // convert this wrapper (`TreeNode[]`) once more, so the cycle closes at `TreeNode` instead

@@ -1,4 +1,4 @@
-import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
+import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { SymbolFlags } from 'typescript/unstable/sync'
 
 import type { TypeQueries } from './type-queries.ts'
@@ -18,22 +18,29 @@ export function getDefName(types: TypeQueries, type: Type, symbol: TSSymbol): st
 
   return (
     toDefName(types.checker.typeToString(type)) ??
-    (internal ? getFallbackDefName(types.checker, type) : symbolName)
+    (internal ? getFallbackDefName(types, type) : symbolName)
   )
 }
 
 /**
  * The def name of a type without a usable name, like a recursive anonymous type.
  */
-export function getFallbackDefName(checker: Checker, type: Type): string {
+export function getFallbackDefName(types: TypeQueries, type: Type): string {
   const symbol = type.getAliasSymbol() ?? type.getSymbol()
   const name = symbol && getSymbolName(symbol)
 
-  if (name && /^[\w$]+$/u.test(name) && !name.startsWith('__')) {
+  // not the name of a library wrapper, like `Array` of an anonymous recursive item
+  if (
+    name &&
+    /^[\w$]+$/u.test(name) &&
+    !name.startsWith('__') &&
+    types.getSymbolSourceKind(symbol) !== 'default'
+  ) {
     return name
   }
 
-  return toDefName(checker.typeToString(type)) ?? 'Recursive'
+  const printed = toDefName(types.checker.typeToString(type))
+  return printed && printed !== name ? printed : 'Recursive'
 }
 
 /**

@@ -668,6 +668,8 @@ describe('typeScriptOpenAPIGenerator', () => {
       ]
       expect(category.required).toEqual(['children'])
       expect(recursive[1].properties.extra).toEqual({ type: 'number' })
+      // not named after the `Array` around the anonymous recursive item
+      expect(Object.keys(spec.components?.schemas ?? {})).not.toContain('Array')
       expect(recursive[1].required).toEqual(expect.arrayContaining(['name', 'extra']))
 
       // constraints only the type has
