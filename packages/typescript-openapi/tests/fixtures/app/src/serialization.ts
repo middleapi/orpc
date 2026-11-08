@@ -414,6 +414,40 @@ export interface MixedFunctions {
   list: (string | (() => void))[]
 }
 
+export interface FunctionValues {
+  m: Record<string, string | (() => void)>
+  nulls: (null | (() => void))[]
+  undefineds: (undefined | (() => void))[]
+}
+
+export class DropJSON {
+  a = 'x'
+
+  toJSON(): undefined {
+    return undefined
+  }
+}
+
+export interface HoldsDropJSON {
+  x: DropJSON & { b: number }
+  y: (DropJSON & { b: number })[]
+}
+
+export type BrandedId = string & { __brand: 'BrandedId' }
+
+export class BrandedJSON {
+  id = 'u1'
+
+  toJSON(): BrandedId {
+    return this.id as BrandedId
+  }
+}
+
+export interface HoldsBrandedJSON {
+  k: BrandedJSON
+  ks: BrandedJSON[]
+}
+
 export const router = {
   post: os.handler(() => new Post()),
   posts: os.handler(() => [new Post(), new Post()]),
@@ -504,5 +538,18 @@ export const router = {
     a: () => {},
     b: Symbol('b'),
     list: ['x', () => {}],
+  })),
+  functionValues: os.handler((): FunctionValues => ({
+    m: { a: 'x', f: () => {} },
+    nulls: [null, () => {}],
+    undefineds: [undefined, () => {}],
+  })),
+  holdsDropJSON: os.handler((): HoldsDropJSON => {
+    const value = Object.assign(new DropJSON(), { b: 1 })
+    return { x: value, y: [value] }
+  }),
+  holdsBrandedJSON: os.handler((): HoldsBrandedJSON => ({
+    k: new BrandedJSON(),
+    ks: [new BrandedJSON()],
   })),
 }

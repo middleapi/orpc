@@ -11,14 +11,7 @@ import type {
 import { ElementFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import type { Builtin } from './builtins.ts'
-import {
-  getBuiltin,
-  getMappedBuiltin,
-  getToJSON,
-  isBuiltinMember,
-  isBuiltinSymbol,
-  TYPED_ARRAYS,
-} from './builtins.ts'
+import { getBuiltin, getMappedBuiltin, isBuiltinSymbol, TYPED_ARRAYS } from './builtins.ts'
 import { getDefName, getFallbackDefName } from './def-names.ts'
 import { DefRegistry } from './defs.ts'
 import { ExpansionGuard } from './expansion.ts'
@@ -53,7 +46,7 @@ import {
   TypeQueries,
   UNDEFINED_FLAGS,
 } from './type-queries.ts'
-import { getCallReturnType, getIteratorTypes } from './utils.ts'
+import { getIteratorTypes } from './utils.ts'
 
 /**
  * A type the converter cannot resolve, such as an unresolved import.
@@ -229,12 +222,6 @@ export class TypeToJsonSchemaConverter {
 
   private visit(type: Type): JsonSchema {
     const key = this.key(type)
-    const inlined = this.defs.getInlined(key)
-
-    if (inlined !== undefined) {
-      return structuredClone(inlined)
-    }
-
     const existing = this.defs.get(key)
 
     if (existing) {
@@ -258,6 +245,12 @@ export class TypeToJsonSchemaConverter {
 
   private visitStructured(type: Type, singleMemberEnum: TSSymbol | undefined): JsonSchema {
     const key = this.key(type)
+    const memoized = this.defs.getAnonymous(key)
+
+    if (memoized !== undefined) {
+      return memoized
+    }
+
     const namedSymbol = singleMemberEnum ?? getNamedSymbol(type)
     const projectSymbol =
       namedSymbol && this.types.getSymbolSourceKind(namedSymbol) === 'project'
@@ -279,17 +272,11 @@ export class TypeToJsonSchemaConverter {
       // It has no refs, so nothing references the def yet.
       if (isTrivialSchema(schema)) {
         this.defs.inline(def, schema)
-        return structuredClone(schema)
+        return schema
       }
 
       def.schema = schema
       return { $ref: toRef(def.name) }
-    }
-
-    const memoized = this.defs.getAnonymous(key)
-
-    if (memoized !== undefined) {
-      return memoized
     }
 
     const enteredAt = this.visiting.get(key)
@@ -464,39 +451,30 @@ export class TypeToJsonSchemaConverter {
    */
   private convertNullableUnion(type: Type, members: readonly Type[]): JsonSchema {
     const concrete = members.filter((m) => !(m.flags & NULLISH_FLAGS))
+    const core =
+      concrete.length > 1 && concrete.length < members.length
+        ? this.checker.getNonNullableType(type)
+        : undefined
 
-    if (concrete.length === members.length) {
-      return this.convertUnion(members) ?? { not: {} }
-    }
+    // without `strictNullChecks` the checker returns the union itself
+    if (core && core.id !== type.id && !(core.flags & TypeFlags.Never)) {
+      const hasNull = members.some((m) => m.flags & TypeFlags.Null)
 
-    const hasNull = members.some((m) => m.flags & TypeFlags.Null)
-    let schema: JsonSchema | undefined
-
-    if (concrete.length === 1) {
-      schema = this.visit(concrete[0]!)
-    } else if (concrete.length > 1) {
-      const core = this.checker.getNonNullableType(type)
-
-      // without `strictNullChecks` the checker returns the union itself
-      if (core && core.id !== type.id && !(core.flags & TypeFlags.Never)) {
-        // `Json | undefined` inside `type Json = ... | null` is `Json` again
-        // only while that union is being converted, an unrelated `boolean | null` is not `Flag`
-        const named = this.nullableCores.get(core.id)
-        if (named && named.id !== type.id && hasNull && this.defs.isConverting(this.key(named))) {
-          return this.visit(named)
-        }
-
-        if (hasNull && type.getAliasSymbol() && !this.types.hasMember(type, UNDEFINED_FLAGS)) {
-          this.nullableCores.set(core.id, type)
-        }
-
-        schema = this.visit(core)
-      } else {
-        schema = this.convertUnion(concrete)
+      // `Json | undefined` inside `type Json = ... | null` is `Json` again
+      // only while that union is being converted, an unrelated `boolean | null` is not `Flag`
+      const named = this.nullableCores.get(core.id)
+      if (named && named.id !== type.id && hasNull && this.defs.isConverting(this.key(named))) {
+        return this.visit(named)
       }
+
+      if (hasNull && type.getAliasSymbol() && !this.types.hasMember(type, UNDEFINED_FLAGS)) {
+        this.nullableCores.set(core.id, type)
+      }
+
+      return withNullBranch(this.visit(core), hasNull)
     }
 
-    return withNullBranch(schema, hasNull)
+    return this.convertMembers(members)
   }
 
   private convertUnion(members: readonly Type[]): JsonSchema | undefined {
@@ -602,16 +580,11 @@ export class TypeToJsonSchemaConverter {
 
     const properties = this.types.getProperties(type)
 
-    // the serializer walks plain objects key by key, only other objects go through `toJSON`
-    const toJSON =
-      ignoreToJSON || (isObjectLiteral(type) && !this.stringify)
-        ? undefined
-        : getToJSON(this.types, type)
-    if (toJSON) {
-      const returnType = getCallReturnType(this.checker, this.checker.getTypeOfSymbol(toJSON))
-      if (returnType) {
-        return this.withStringify(() => this.convertToJSONResult(returnType))
-      }
+    const toJSONResult = ignoreToJSON
+      ? undefined
+      : getToJSONResultType(this.types, type, this.stringify)
+    if (toJSONResult) {
+      return this.withStringify(() => this.convertToJSONResult(toJSONResult))
     }
 
     const isClassInstance = classType !== undefined
@@ -719,6 +692,12 @@ export class TypeToJsonSchemaConverter {
     schema: ObjectJsonSchema & { properties: Record<string, JsonSchema> },
     convertValue: (value: Type) => JsonSchema,
   ): void {
+    // like properties, functions and symbols are dropped (`Record<string, string | (() => void)>`)
+    const convertEntry = (value: Type) => {
+      const serializable = this.getSerializableMembers(value)
+      return serializable ? this.convertMembers(serializable) : convertValue(value)
+    }
+
     const keys = this.checker.getIndexInfosOfType(type).map((info) => ({
       info,
       key: getIndexKeyType(this.types, info.keyType),
@@ -731,21 +710,21 @@ export class TypeToJsonSchemaConverter {
     )
 
     if (anyKey) {
-      schema.additionalProperties = convertValue(anyKey.info.valueType)
+      schema.additionalProperties = convertEntry(anyKey.info.valueType)
     } else if (patternKeys.length === 1 && !Object.keys(schema.properties).length) {
       // like zod records with template literal keys, which keeps the value type in OpenAPI 3.0
       schema.propertyNames = {
         type: 'string',
         pattern: `^${toPattern(this.types, patternKeys[0]!.key!)}$`,
       }
-      schema.additionalProperties = convertValue(patternKeys[0]!.info.valueType)
+      schema.additionalProperties = convertEntry(patternKeys[0]!.info.valueType)
     } else {
       for (const { info, key } of patternKeys) {
         schema.patternProperties ??= {}
         setOwn(
           schema.patternProperties,
           `^${toPattern(this.types, key!)}$`,
-          convertValue(info.valueType),
+          convertEntry(info.valueType),
         )
       }
     }
@@ -836,7 +815,7 @@ export class TypeToJsonSchemaConverter {
     const length = properties.find((p) => p.name === 'length')
     const slice = properties.find((p) => p.name === 'slice')
 
-    if (!length || !slice || !isBuiltinMember(this.types, slice, false)) {
+    if (!length || !slice || !isBuiltinSymbol(this.types, slice)) {
       return undefined
     }
 
@@ -864,9 +843,6 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * Array items and tuple elements serialize `undefined` as `null`.
-   */
-  /**
    * The members of a union JSON serialization keeps, when it also has functions or symbols.
    */
   private getSerializableMembers(type: Type): readonly Type[] | undefined {
@@ -884,21 +860,15 @@ export class TypeToJsonSchemaConverter {
    * Converts some members of a union, `null` adds a `null` branch and `undefined` is left out.
    */
   private convertMembers(members: readonly Type[]): JsonSchema {
-    const concrete = members.filter((m) => !(m.flags & NULLISH_FLAGS))
-    const schema =
-      concrete.length === 0
-        ? undefined
-        : concrete.length === 1
-          ? this.visit(concrete[0]!)
-          : this.convertUnion(concrete)
-
-    if (!members.some((m) => m.flags & TypeFlags.Null)) {
-      return schema ?? {}
-    }
-
-    return schema === undefined ? { type: 'null' } : withNull(schema)
+    return withNullBranch(
+      this.convertUnion(members),
+      members.some((m) => m.flags & TypeFlags.Null),
+    )
   }
 
+  /**
+   * Array items and tuple elements serialize `undefined` as `null`.
+   */
   private visitElement(type: Type | undefined): JsonSchema {
     if (!type) {
       return {}
@@ -911,7 +881,7 @@ export class TypeToJsonSchemaConverter {
     // functions and symbols in arrays are serialized as `null`
     const serializable = this.getSerializableMembers(type)
     if (serializable) {
-      return withNull(this.convertMembers(serializable))
+      return withNullBranch(this.convertUnion(serializable), true)
     }
 
     const schema = this.visit(type)
@@ -955,9 +925,12 @@ export class TypeToJsonSchemaConverter {
       )
     }
 
+    // a branded primitive (`string & { __brand: 'UserId' }`) is serialized as the primitive
     if (
       !(resolved.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
-      this.types.getReferenceKind(resolved) !== undefined
+      this.types.getReferenceKind(resolved) !== undefined ||
+      (resolved.isIntersectionType() &&
+        this.types.getMembers(resolved).some((m) => m.flags & PRIMITIVE_FLAGS))
     ) {
       return this.visit(resolved)
     }
@@ -1098,6 +1071,8 @@ function getIndexKeyType(types: TypeQueries, key: Type): Type | undefined {
 
 /**
  * The regular expression of the strings a template literal (or its parts) accepts.
+ * The checker folds literal parts (`${null}`, `${true}`) into the texts and distributes
+ * unions (`${boolean}`, `${'a' | 'b'}`) over the template, branded literals remain.
  */
 function toPattern(types: TypeQueries, type: Type): string {
   const flags = type.flags
@@ -1110,24 +1085,12 @@ function toPattern(types: TypeQueries, type: Type): string {
     return String((type as any).value)
   }
 
-  if (flags & TypeFlags.Boolean) {
-    return '(?:true|false)'
-  }
-
   if (flags & TypeFlags.Number) {
     return '[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?'
   }
 
   if (flags & TypeFlags.BigInt) {
     return '-?\\d+'
-  }
-
-  if (flags & TypeFlags.Null) {
-    return 'null'
-  }
-
-  if (flags & TypeFlags.Undefined) {
-    return 'undefined'
   }
 
   if (flags & TypeFlags.TemplateLiteral) {
@@ -1138,13 +1101,6 @@ function toPattern(types: TypeQueries, type: Type): string {
       pattern += toPattern(types, parts[i]!) + escapeRegExp(template.texts[i + 1] ?? '')
     }
     return pattern
-  }
-
-  if (type.isUnionType()) {
-    return `(?:${types
-      .getMembers(type)
-      .map((t) => toPattern(types, t))
-      .join('|')})`
   }
 
   if (type.isIntersectionType()) {

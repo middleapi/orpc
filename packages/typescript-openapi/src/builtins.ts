@@ -67,11 +67,9 @@ export function getBuiltin(
   // only globals of the default library, a `File` or `Map` class of a package is its own type
   if (types.getSymbolSourceKind(symbol) !== 'default') {
     // `Blob`, `File`, and `URL` without the DOM library come from the runtime's typings
-    const runtimeGlobal =
-      symbol.declarations.length > 0 &&
-      symbol.declarations.every((d) => RUNTIME_TYPINGS.test(d.path))
-        ? getLeaf(symbol.name, stringify)
-        : undefined
+    const runtimeGlobal = isBuiltinSymbol(types, symbol)
+      ? getLeaf(symbol.name, stringify)
+      : undefined
 
     // `JSON.stringify` calls the own `toJSON` of a built-in subclass, the serializer does not
     return (
@@ -169,7 +167,7 @@ export function getMappedBuiltinName(types: TypeQueries, type: Type): string | u
 
   const properties = types.getProperties(type)
 
-  if (!properties.length || !properties.every((p) => isBuiltinMember(types, p, false))) {
+  if (!properties.length || !properties.every((p) => isBuiltinSymbol(types, p))) {
     return undefined
   }
 
@@ -250,9 +248,9 @@ export function getBuiltinBaseName(types: TypeQueries, type: Type, depth = 0): s
 
 /**
  * Declared by the runtime: the default library, or typings of runtime modules like `node:stream`.
- * For `Error` subclasses, everything declared outside the project.
+ * With `isError`, for members of `Error` subclasses, everything declared outside the project.
  */
-export function isBuiltinMember(types: TypeQueries, symbol: TSSymbol, isError: boolean): boolean {
+export function isBuiltinSymbol(types: TypeQueries, symbol: TSSymbol, isError = false): boolean {
   return (
     symbol.declarations.length > 0 &&
     symbol.declarations.every((declaration) => {
@@ -265,25 +263,13 @@ export function isBuiltinMember(types: TypeQueries, symbol: TSSymbol, isError: b
   )
 }
 
-/**
- * Declared by the default library or the runtime's typings.
- */
-export function isBuiltinSymbol(types: TypeQueries, symbol: TSSymbol): boolean {
-  return (
-    symbol.declarations.length > 0 &&
-    symbol.declarations.every(
-      (d) => types.getSourceKind(d.path) === 'default' || RUNTIME_TYPINGS.test(d.path),
-    )
-  )
-}
-
 export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
   return types.getProperties(type).find((p) => p.name === 'toJSON')
 }
 
 export function hasOwnToJSON(types: TypeQueries, type: Type): boolean {
   const toJSON = getToJSON(types, type)
-  return toJSON !== undefined && !isBuiltinMember(types, toJSON, false)
+  return toJSON !== undefined && !isBuiltinSymbol(types, toJSON)
 }
 
 function getLeaf(name: string, stringify: boolean): Builtin | undefined {

@@ -231,38 +231,71 @@ export class TypeScriptOpenAPIGenerator {
       },
     }
 
+    const isSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
+      this.converters.some((c) => c.condition(schema, direction))
+
+    /**
+     * Keeps the schemas a converter supports, and adds one inferred from the type for the rest:
+     * several schemas of a slot are combined with `allOf`, and the type is their intersection.
+     */
     const inferSchemas = (
       schemas: AnySchema[] | undefined,
       direction: JsonSchemaConverterDirection,
     ): AnySchema[] | undefined => {
-      if (this.isConvertible(schemas, direction)) {
+      const supported = (s: AnySchema) => isSupported(s, direction)
+      const iterator = getAsyncIteratorObjectSchemasDetails(schemas)
+      const leaves = iterator
+        ? [...iterator.yieldSchemas, ...iterator.returnSchemas]
+        : (schemas ?? [])
+
+      if (leaves.length && leaves.every(supported)) {
         return schemas
       }
 
-      if (resolved.type.isErrorType()) {
-        throw new TypeScriptTypeResolutionError(
-          `Could not resolve its type "${ctx.checker.typeToString(resolved.type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
-        )
-      }
-
-      if (!ctx.resolver.isProcedure(resolved.type)) {
-        throw new OpenAPIGeneratorError(
-          `its type "${ctx.checker.typeToString(resolved.type)}" is not a procedure or contract, make sure "source" points to the type of this router.`,
-        )
-      }
+      assertProcedureType(ctx, resolved)
 
       const type = ctx.resolver.getSchemaType(resolved.type, direction)
-      return type ? [toInferredSchema(ctx.converter, type, inline[direction])] : schemas
+
+      if (!type) {
+        return schemas
+      }
+
+      if (!leaves.some(supported)) {
+        return [toInferredSchema(ctx.converter, type, inline[direction])]
+      }
+
+      const iteratorTypes = iterator && ctx.converter.getAsyncIteratorTypes(type)
+
+      if (iteratorTypes) {
+        const complete = (parts: AnySchema[], partType: Type) =>
+          parts.every(supported)
+            ? parts
+            : [...parts.filter(supported), inferredSchema(ctx.converter.convert(partType))]
+
+        const yields = complete(iterator!.yieldSchemas, iteratorTypes.yieldType)
+        const returns = complete(iterator!.returnSchemas, iteratorTypes.returnType)
+
+        return Array.from({ length: Math.max(yields.length, returns.length) }, (_, i) =>
+          asyncIteratorObject(yields[i] ?? yields[0]!, returns[i]),
+        )
+      }
+
+      return [
+        ...schemas!.filter(supported),
+        toInferredSchema(ctx.converter, type, inline[direction]),
+      ]
     }
 
     const errorMap: ErrorMap = {}
 
     for (const code of Object.keys(def.errorMap)) {
       const config = def.errorMap[code]
-      const dataType =
-        config?.data && !this.isConvertible([config.data], 'output')
-          ? ctx.resolver.getErrorDataType(resolved.type, code)
-          : undefined
+      let dataType: Type | undefined
+
+      if (config?.data && !isSupported(config.data, 'output')) {
+        assertProcedureType(ctx, resolved)
+        dataType = ctx.resolver.getErrorDataType(resolved.type, code)
+      }
 
       setOwn(
         errorMap,
@@ -279,19 +312,23 @@ export class TypeScriptOpenAPIGenerator {
       meta: withJSDocMeta(ctx, def.meta, resolved.symbol),
     })
   }
+}
 
-  private isConvertible(
-    schemas: AnySchema[] | undefined,
-    direction: JsonSchemaConverterDirection,
-  ): boolean {
-    if (!schemas?.length) {
-      return false
-    }
+/**
+ * Inference needs the type of a procedure: it fails when the type is not resolved,
+ * instead of documenting `{}`.
+ */
+function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType): void {
+  if (resolved.type.isErrorType()) {
+    throw new TypeScriptTypeResolutionError(
+      `Could not resolve its type "${ctx.checker.typeToString(resolved.type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+    )
+  }
 
-    const iterator = getAsyncIteratorObjectSchemasDetails(schemas)
-    const leaves = iterator ? [...iterator.yieldSchemas, ...iterator.returnSchemas] : schemas
-
-    return leaves.every((schema) => this.converters.some((c) => c.condition(schema, direction)))
+  if (!ctx.resolver.isProcedure(resolved.type)) {
+    throw new OpenAPIGeneratorError(
+      `its type "${ctx.checker.typeToString(resolved.type)}" is not a procedure or contract, make sure "source" points to the type of this router.`,
+    )
   }
 }
 
@@ -323,7 +360,7 @@ function toInferredSchema(
 /**
  * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by `.route`.
  * The JSDoc is read from the router property, the variable assigned to it (`{ ping }`),
- * or the contract property it implements:
+ * or the contract property either of them implements:
  * the first line is the `summary`, the rest the `description`,
  * `@summary`, `@description`, `@deprecated` override them, and `@tags` adds tags.
  */
@@ -332,16 +369,18 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
     return meta
   }
 
-  let jsdoc = getJSDoc(ctx.checker, symbol, ctx.getSourceKind)
+  const read = (other: TSSymbol | undefined) =>
+    other && getJSDoc(ctx.checker, other, ctx.getSourceKind)
 
-  // the variable assigned to the property (`{ ping }`), or the contract it implements
-  for (const fallback of [getAssignedSymbol, getImplementedSymbol]) {
-    if (jsdoc) {
-      break
-    }
+  let jsdoc = read(symbol)
 
-    const other = fallback(ctx.checker, symbol)
-    jsdoc = other && getJSDoc(ctx.checker, other, ctx.getSourceKind)
+  // the variable assigned to the property (`{ ping }`), or the contract either implements
+  if (!jsdoc) {
+    const assigned = getAssignedSymbol(ctx.checker, symbol)
+    jsdoc =
+      read(assigned) ??
+      read(getImplementedSymbol(ctx.checker, symbol)) ??
+      read(assigned && getImplementedSymbol(ctx.checker, assigned))
   }
 
   if (!jsdoc) {

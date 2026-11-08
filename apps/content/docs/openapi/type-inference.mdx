@@ -75,6 +75,8 @@ For each input, output, and error `data` schema:
 1. When a converter in `converters` (or the built-in [Standard JSON Schema](https://standardschema.dev/) converter) supports the schema, it converts the schema as usual.
 2. Otherwise the JSON schema is inferred from the type: the input type of the input schema, the output type of output and error schemas, or the return type of the handler when there is no `.output`.
 
+A procedure with several `.input` (or `.output`) schemas keeps the converted ones and adds one inferred from the combined type, all joined with `allOf`, like `OpenAPIGenerator` does with several schemas.
+
 Handlers returning an async iterator are documented as [event streams](/docs/async-iterator-object), from the yield and return types.
 
 Types carry no validation constraints, so an inferred schema has no `format: uuid`, `minLength`, or integer ranges unless you add them with [JSDoc tags](#jsdoc), like `@format uuid`, or keep the schema and its converter for that procedure.
@@ -117,7 +119,7 @@ const generator = new TypeScriptOpenAPIGenerator({ defs: 'recursive' })
 
 JSDoc comments document the generated operations and schemas.
 
-On procedures (or the contract procedures they implement), the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, and `@deprecated` are supported too, and `@tags a, b` adds tags. The comment can be on the router property, or on the variable assigned to it:
+On procedures (or the contract procedures they implement), the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, and `@deprecated` are supported too, and `@tags a, b` adds tags. The comment can be on the router property, on the variable assigned to it (also through a namespace import, like `routers.ping`), or on the contract procedure either of them implements:
 
 ```ts
 /** Ping the server */

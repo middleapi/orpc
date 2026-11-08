@@ -87,6 +87,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['protoKey', undefined],
     ['boxed', undefined],
     ['mixedFunctions', undefined],
+    ['functionValues', undefined],
+    ['holdsDropJSON', undefined],
+    ['holdsBrandedJSON', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -117,6 +120,21 @@ describe('generated schemas match serialized outputs', async () => {
         list: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
       },
       required: ['list'],
+    })
+  })
+
+  it('drops functions in record values and array items, and reads toJSON of intersections', () => {
+    const schemas = spec.components?.schemas as any
+
+    expect(schemas.FunctionValues.properties).toEqual({
+      m: { type: 'object', additionalProperties: { type: 'string' } },
+      nulls: { type: 'array', items: { type: 'null' } },
+      undefineds: { type: 'array', items: { type: 'null' } },
+    })
+    expect(schemas.HoldsDropJSON.required).toEqual(['y'])
+    expect(schemas.HoldsBrandedJSON.properties).toEqual({
+      k: { type: 'string' },
+      ks: { type: 'array', items: { type: 'string' } },
     })
   })
 

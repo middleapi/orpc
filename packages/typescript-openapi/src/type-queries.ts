@@ -6,7 +6,7 @@ import type {
   Type,
   TypeReference,
 } from 'typescript/unstable/sync'
-import { SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import type { JSDoc, SourceKind } from './utils.ts'
 import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils.ts'
@@ -53,6 +53,7 @@ export class TypeQueries {
   private readonly singleMemberEnumCache = new Map<number, TSSymbol | undefined>()
   private readonly annotationCache = new Map<number, PropertyAnnotation | undefined>()
   private readonly globalTypes = new Map<string, Type | undefined>()
+  private readonly callableCache = new Map<number, boolean>()
 
   constructor(
     readonly checker: Checker,
@@ -64,6 +65,22 @@ export class TypeQueries {
   getSymbolSourceKind(symbol: TSSymbol): SourceKind {
     const path = symbol.declarations[0]?.path
     return path === undefined ? 'project' : this.getSourceKind(path)
+  }
+
+  /**
+   * Whether a type has call or construct signatures, like functions and classes.
+   */
+  isCallable(type: Type): boolean {
+    let callable = this.callableCache.get(type.id)
+
+    if (callable === undefined) {
+      callable =
+        this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
+        this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0
+      this.callableCache.set(type.id, callable)
+    }
+
+    return callable
   }
 
   getMembers(type: Type): readonly Type[] {

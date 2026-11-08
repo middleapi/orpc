@@ -8,6 +8,8 @@ import { router as detailedRouter } from '../tests/fixtures/app/src/detailed.ts'
 import { router as headersRouter } from '../tests/fixtures/app/src/headers.ts'
 import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
+import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
+import { jsdoc, mixed } from '../tests/fixtures/app/src/round11.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -506,5 +508,73 @@ describe('typeScriptOpenAPIGenerator', () => {
       (spec.paths?.['/headers']?.post?.responses?.['200'] as any).content['application/json'].schema
         .properties.headers.additionalProperties,
     ).toEqual({ type: 'string' })
+  })
+
+  describe('round eleven', () => {
+    it('reads JSDoc through variables of implemented procedures and namespace members', async () => {
+      const spec = await generator.generate(jsdoc, {
+        source: { file: fixture('round11.ts'), export: 'jsdoc' },
+      })
+      const operation = (path: string) => (spec.paths as any)[path].post
+
+      expect(operation('/users/get')).toMatchObject({
+        summary: 'Get a user',
+        description: 'Looks a user up by id.',
+        tags: ['users'],
+      })
+      expect(operation('/users/list').summary).toBe('List users')
+
+      for (const path of ['/ns', '/star', '/healthPing']) {
+        expect(operation(path)).toMatchObject({
+          summary: 'Ping the server',
+          description: 'Returns pong.',
+          tags: ['health'],
+        })
+      }
+    })
+
+    it('keeps converted schemas of slots that also have type-only schemas', async () => {
+      const spec = await generator.generate(mixed, {
+        source: { file: fixture('round11.ts'), export: 'mixed' },
+      })
+      const paths = spec.paths as any
+      const inferred = {
+        type: 'object',
+        properties: { b: { type: 'number' }, a: { type: 'string' } },
+        required: ['b', 'a'],
+      }
+
+      expect(paths['/input'].post.requestBody.content['application/json'].schema).toEqual({
+        allOf: [
+          {
+            type: 'object',
+            properties: { a: { type: 'string', minLength: 3 } },
+            required: ['a'],
+          },
+          inferred,
+        ],
+      })
+      expect(
+        paths['/output'].post.responses['200'].content['application/json'].schema.allOf,
+      ).toEqual([
+        expect.objectContaining({ properties: { a: { type: 'string', minLength: 3 } } }),
+        inferred,
+      ])
+
+      const [message, close] =
+        paths['/iterator'].post.responses['200'].content['text/event-stream'].schema.oneOf
+      expect(message.properties.data.properties).toEqual({ id: { type: 'string', minLength: 2 } })
+      expect(close.properties.data).toEqual({
+        type: 'object',
+        properties: { total: { type: 'number' } },
+        required: ['total'],
+      })
+    })
+
+    it('reports unresolved types when only error data needs inference', async () => {
+      await expect(
+        generator.generate({ proc: errorData }, { source: { file: fixture('round11-broken.ts') } }),
+      ).rejects.toThrow('Procedure at proc: Could not resolve its type "Missing"')
+    })
   })
 })

@@ -1,13 +1,12 @@
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import {
   getBuiltinBaseName,
   getMappedBuiltinName,
   getToJSON,
   hasOwnToJSON,
-  isBuiltinMember,
   isBuiltinSymbol,
 } from './builtins.ts'
 import type { TypeQueries } from './type-queries.ts'
@@ -72,7 +71,7 @@ export function getDataProperties(
         )
       ) &&
       // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
-      !(isClassInstance && isBuiltinMember(types, p, isError)),
+      !(isClassInstance && isBuiltinSymbol(types, p, isError)),
   )
 }
 
@@ -105,10 +104,7 @@ export function isNonSerializable(types: TypeQueries, type: Type): boolean {
     return true
   }
 
-  return (
-    types.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
-    types.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0
-  )
+  return types.isCallable(type)
 }
 
 /**
@@ -121,7 +117,7 @@ export function getToJSONResultType(
   stringify: boolean,
 ): Type | undefined {
   if (
-    !(type.flags & TypeFlags.Object) ||
+    !(type.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
     types.getReferenceKind(type) !== undefined ||
     (isObjectLiteral(type) && !stringify)
   ) {
@@ -274,13 +270,13 @@ export class ModeSensitivity {
     }
 
     const classType = getClassType(types, type)
-    const extended =
-      symbol && symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class)
-        ? getBuiltinBaseName(types, classType ?? type)
-        : classType && getBuiltinBaseName(types, classType)
+    // the class, or an interface extending a built-in (`interface Tags extends Set<string>`)
+    const declared =
+      classType ?? (symbol && symbol.flags & SymbolFlags.Interface ? type : undefined)
+    const extended = declared && getBuiltinBaseName(types, declared)
 
     if (extended !== undefined) {
-      if (MODE_SENSITIVE_BUILTINS.has(extended) || hasOwnToJSON(types, classType ?? type)) {
+      if (MODE_SENSITIVE_BUILTINS.has(extended) || hasOwnToJSON(types, declared!)) {
         return true
       }
 

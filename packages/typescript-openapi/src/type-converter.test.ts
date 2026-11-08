@@ -973,6 +973,27 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('round eleven', () => {
+    it('asks for the signatures of each type once', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round11.ts', import.meta.url),
+      })
+
+      try {
+        const spy = vi.spyOn(project.checker, 'getSignaturesOfType')
+        const [schema] = new TypeToJsonSchemaConverter(project.checker, project.program).convert(
+          project.getExportType('Wide').type,
+        ) as [any, boolean]
+
+        expect(Object.keys(schema.$defs)).toHaveLength(41)
+        // 40 members of `Wide | undefined`, asked by each of the 40 `next` properties before
+        expect(spy.mock.calls.length).toBeLessThan(200)
+      } finally {
+        project.close()
+      }
+    })
+  })
+
   describe('round seven', () => {
     it('names default exports after their declaration', () => {
       const project = openTypeScriptProject({

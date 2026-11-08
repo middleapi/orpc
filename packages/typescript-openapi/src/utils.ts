@@ -76,8 +76,9 @@ export function getJSDoc(
 }
 
 /**
- * For a property assigned from a variable, like `{ ping }` or `{ ping: pingProcedure }`,
- * returns the variable's symbol (following imports), which carries its JSDoc.
+ * For a property assigned from a variable, like `{ ping }`, `{ ping: pingProcedure }`,
+ * or `{ ping: routers.ping }` with `import * as routers`, returns the variable's symbol
+ * (following imports), which carries its JSDoc.
  */
 export function getAssignedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol | undefined {
   for (const declaration of symbol.declarations) {
@@ -87,11 +88,14 @@ export function getAssignedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol 
 
     if (node?.kind === SyntaxKind.ShorthandPropertyAssignment) {
       assigned = checker.getShorthandAssignmentValueSymbol(node)
-    } else if (
-      node?.kind === SyntaxKind.PropertyAssignment &&
-      node.initializer?.kind === SyntaxKind.Identifier
-    ) {
-      assigned = checker.getSymbolAtLocation(node.initializer)
+    } else if (node?.kind === SyntaxKind.PropertyAssignment) {
+      const initializer = node.initializer
+
+      if (initializer?.kind === SyntaxKind.Identifier) {
+        assigned = checker.getSymbolAtLocation(initializer)
+      } else if (initializer?.kind === SyntaxKind.PropertyAccessExpression) {
+        assigned = checker.getSymbolAtLocation(initializer.name)
+      }
     }
 
     if (assigned) {
@@ -105,11 +109,15 @@ export function getAssignedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol 
 /**
  * For a procedure built from an implementer, like `os.todo.get.handler(...)` with
  * `const os = implement(contract)`, returns the implemented property (`get`),
- * which keeps the contract's declaration and JSDoc.
+ * which keeps the contract's declaration and JSDoc. The procedure can be a router property
+ * or a variable (`const get = os.todo.get.handler(...)`).
  */
 export function getImplementedSymbol(checker: Checker, symbol: TSSymbol): TSSymbol | undefined {
   const node = symbol.declarations[0]?.resolve() as any
-  let expression = node?.kind === SyntaxKind.PropertyAssignment ? node.initializer : undefined
+  let expression =
+    node?.kind === SyntaxKind.PropertyAssignment || node?.kind === SyntaxKind.VariableDeclaration
+      ? node.initializer
+      : undefined
 
   // walk down `.handler(...)`, `.use(...)`, and other builder calls to the implementer property
   for (let depth = 0; expression && depth < 32; depth++) {

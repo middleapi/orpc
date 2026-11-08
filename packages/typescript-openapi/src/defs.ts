@@ -21,21 +21,17 @@ export class DefRegistry {
   private readonly defsByName = new Map<string, Def>()
   /** Names emitted by discarded conversions */
   private readonly reservedNames = new Set<string>()
-  /** Named types whose schema is clearer inline, like `type UserId = string & { ... }` */
-  private readonly inlined = new Map<number, JsonSchema>()
-  /** Finished conversions of anonymous types, shared between their uses */
+  /**
+   * Finished conversions of anonymous types, shared between their uses,
+   * and of named types whose schema is clearer inline, like `type UserId = string & { ... }`
+   */
   private readonly anonymous = new Map<number, JsonSchema>()
 
   private createdDefs: Def[] = []
-  private createdInlined: number[] = []
   private createdAnonymous: number[] = []
 
   get(key: number): Def | undefined {
     return this.defs.get(key)
-  }
-
-  getInlined(key: number): JsonSchema | undefined {
-    return this.inlined.get(key)
   }
 
   getAnonymous(key: number): JsonSchema | undefined {
@@ -73,8 +69,7 @@ export class DefRegistry {
    */
   inline(def: Def, schema: JsonSchema): void {
     this.remove(def)
-    this.inlined.set(def.key, schema)
-    this.createdInlined.push(def.key)
+    this.setAnonymous(def.key, schema)
   }
 
   setAnonymous(key: number, schema: JsonSchema): void {
@@ -87,7 +82,6 @@ export class DefRegistry {
    */
   keepCreated(): void {
     this.createdDefs = []
-    this.createdInlined = []
     this.createdAnonymous = []
   }
 
@@ -99,9 +93,6 @@ export class DefRegistry {
       this.remove(def)
       // it was emitted by the discarded conversion, a different schema must not take its name
       this.reservedNames.add(def.name)
-    }
-    for (const key of this.createdInlined) {
-      this.inlined.delete(key)
     }
     for (const key of this.createdAnonymous) {
       this.anonymous.delete(key)
