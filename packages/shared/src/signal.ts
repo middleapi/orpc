@@ -120,3 +120,28 @@ export async function runWithSignal<T>(
     }
   }
 }
+
+const noop = () => {}
+
+/**
+ * Calls `onAbort` with the abort reason once the signal aborts, or synchronously, before returning,
+ * if it is already aborted. Does nothing without a signal. Returns a function that removes the listener.
+ */
+export function listenAbort(
+  signal: AbortSignal | undefined,
+  onAbort: (reason: unknown) => void,
+): () => void {
+  if (!signal) {
+    return noop
+  }
+
+  const listener = () => onAbort(signal.reason)
+
+  if (signal.aborted) {
+    listener()
+  } else {
+    signal.addEventListener('abort', listener, { once: true })
+  }
+
+  return () => signal.removeEventListener('abort', listener)
+}

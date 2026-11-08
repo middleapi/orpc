@@ -12,6 +12,7 @@ import type {
   StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
 } from '@orpc/server/standard'
+import type { CompressionEncoding } from '@orpc/shared'
 import { toArray } from '@orpc/shared'
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { flattenStandardHeader } from '@standard-server/core'
@@ -25,7 +26,7 @@ export interface BatchResponseCompressionHandlerPluginOptions {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
+  encodings?: readonly CompressionEncoding[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.
@@ -188,9 +189,7 @@ interface CompressionStreamPair {
  * as soon as the batch produces it instead of waiting in the compressor for the batch to end.
  * The few bytes each flush costs are what keep a streaming batch streaming.
  */
-function createFlushingCompressionStream(
-  encoding: Exclude<BatchResponseCompressionHandlerPluginOptions['encodings'], undefined>[number],
-): CompressionStreamPair {
+function createFlushingCompressionStream(encoding: CompressionEncoding): CompressionStreamPair {
   const zlibOptions = { flush: constants.Z_SYNC_FLUSH }
 
   const compressor =

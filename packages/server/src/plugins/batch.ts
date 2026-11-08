@@ -1,7 +1,13 @@
 import { ORPCError } from '@orpc/client'
 import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 import type { Promisable, Value } from '@orpc/shared'
-import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
+import {
+  isAsyncIteratorObject,
+  listenAbort,
+  promiseWithResolvers,
+  toArray,
+  value,
+} from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
@@ -521,19 +527,15 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
               .finally(() => resolve(undefined))
           }),
         )
-        const signal = interceptorOptions.request.signal
-        const closePeer = () => peer.close(signal?.reason)
-
-        if (signal?.aborted) {
-          void closePeer()
-        }
-
-        signal?.addEventListener('abort', closePeer)
+        const unlisten = listenAbort(
+          interceptorOptions.request.signal,
+          (reason) => void peer.close(reason),
+        )
 
         try {
           await promise
         } finally {
-          signal?.removeEventListener('abort', closePeer)
+          unlisten()
         }
       }
 

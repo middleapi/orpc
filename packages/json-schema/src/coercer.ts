@@ -1,8 +1,10 @@
 import {
   DEFAULT_MAX_BIGINT_DIGITS,
   getOwn,
-  isPlainObject,
+  INTEGER_REGEX,
   isNonPrimitive,
+  isPlainObject,
+  isPlainObjectOrArray,
   parseBigIntString,
   toArray,
   tryOrUndefined,
@@ -553,7 +555,7 @@ function countValues(input: unknown, limit: number): number {
   while (stack.length) {
     const value = stack.pop()
 
-    if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
+    if (isPlainObjectOrArray(value) && !walked.has(value)) {
       walked.add(value)
 
       const items = Array.isArray(value) ? value : Object.values(value)
@@ -591,9 +593,8 @@ function stringToNumber(value: string): number | string {
   return num
 }
 
-const INTEGER_PATTERN = /^-?(?:0|[1-9]\d*)$/
 function stringToInteger(value: string): number | string {
-  if (!INTEGER_PATTERN.test(value)) {
+  if (!INTEGER_REGEX.test(value)) {
     return value
   }
 

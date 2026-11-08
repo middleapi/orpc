@@ -52,7 +52,7 @@ import {
   encodeBase64,
   getOwn,
   isAsyncIteratorObject,
-  isPlainObject,
+  isPlainObjectOrArray,
   loadBytes,
   pathToHttpPath,
   resolveMaybeOptionalOptions,
@@ -538,7 +538,7 @@ function collectNestedBlobs(
 ): void {
   if (json instanceof Blob) {
     blobs.push([toResourceUri(segments, json), json])
-  } else if (Array.isArray(json) || isPlainObject(json)) {
+  } else if (isPlainObjectOrArray(json)) {
     for (const key of Object.keys(json)) {
       segments.push(key)
       collectNestedBlobs((json as Record<string, unknown>)[key], segments, blobs)

@@ -240,8 +240,36 @@ describe('procedureUtils', () => {
       expect(next).toHaveBeenCalledWith(new Error('__error__'))
     })
 
+    it('does not start the stream when unsubscribed before the call resolves', async () => {
+      const started = vi.fn()
+      const connected = promiseWithResolvers<void>()
+      client.mockImplementationOnce(async () => {
+        await connected.promise
+        return (async function* () {
+          started()
+          yield '__event__1'
+        })()
+      })
+      const subscriber = utils.subscriber({ refetchMode: 'reset' })
+
+      const next = vi.fn()
+      const unsubscribe = subscriber(key, { next })
+
+      unsubscribe()
+      connected.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      // no reset either, so a late resolution cannot clear the cache
+      expect(next).not.toHaveBeenCalled()
+      expect(started).not.toHaveBeenCalled()
+    })
+
     it('on error after unsubscribe', async () => {
+      const started = promiseWithResolvers<void>()
       client.mockImplementationOnce(async function* () {
+        yield 'started'
+        // resumed for the next value, so the first one has been handled
+        started.resolve()
         await new Promise((resolve) => setTimeout(resolve, 10))
         throw new Error('__error__')
       })
@@ -249,9 +277,12 @@ describe('procedureUtils', () => {
 
       const next = vi.fn()
       const unsubscribe = subscriber(key, { next })
+      // unsubscribe mid-stream, so the error reaches the subscriber after it was aborted
+      await started.promise
+      const callsBeforeUnsubscribe = next.mock.calls.length
       unsubscribe()
       await new Promise((resolve) => setTimeout(resolve, 20))
-      expect(next).toHaveBeenCalledTimes(0)
+      expect(next).toHaveBeenCalledTimes(callsBeforeUnsubscribe)
     })
 
     it('on non-AsyncIteratorObject output', async () => {
@@ -388,7 +419,11 @@ describe('procedureUtils', () => {
     })
 
     it('on error after unsubscribe', async () => {
+      const started = promiseWithResolvers<void>()
       client.mockImplementationOnce(async function* () {
+        yield 'started'
+        // resumed for the next value, so the first one has been handled
+        started.resolve()
         await new Promise((resolve) => setTimeout(resolve, 10))
         throw new Error('__error__')
       })
@@ -396,9 +431,12 @@ describe('procedureUtils', () => {
 
       const next = vi.fn()
       const unsubscribe = subscriber(key, { next })
+      // unsubscribe mid-stream, so the error reaches the subscriber after it was aborted
+      await started.promise
+      const callsBeforeUnsubscribe = next.mock.calls.length
       unsubscribe()
       await new Promise((resolve) => setTimeout(resolve, 20))
-      expect(next).toHaveBeenCalledTimes(0)
+      expect(next).toHaveBeenCalledTimes(callsBeforeUnsubscribe)
     })
 
     it('on non-AsyncIteratorObject output', async () => {

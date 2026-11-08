@@ -9,6 +9,7 @@ import {
   defer,
   disposableAllAbortSignal,
   isAsyncIteratorObject,
+  listenAbort,
   replicateAsyncIterator,
   replicateReadableStream,
   runWithSignal,
@@ -318,13 +319,7 @@ function closeAsyncIteratorOnAbort<T, TReturn, TNext>(
     return replica
   }
 
-  const abort = () => replica.return().catch(() => {})
-
-  if (signal.aborted) {
-    void abort()
-  } else {
-    signal.addEventListener('abort', abort, { once: true })
-  }
+  const removeAbortListener = listenAbort(signal, () => void replica.return().catch(() => {}))
 
   return wrapAsyncIterator(replica, {
     mapResult(result) {
@@ -332,7 +327,7 @@ function closeAsyncIteratorOnAbort<T, TReturn, TNext>(
       throwIfAborted(signal)
       return result
     },
-    onFinish: () => signal.removeEventListener('abort', abort),
+    onFinish: removeAbortListener,
   })
 }
 
@@ -349,13 +344,9 @@ function closeReadableStreamOnAbort<T>(
   }
 
   const reader = replica.getReader()
-  const abort = () => reader.cancel(signal.reason).catch(() => {})
-
-  if (signal.aborted) {
-    void abort()
-  } else {
-    signal.addEventListener('abort', abort, { once: true })
-  }
+  const removeAbortListener = listenAbort(signal, (reason) => {
+    reader.cancel(reason).catch(() => {})
+  })
 
   return new ReadableStream<T>(
     {
@@ -366,18 +357,18 @@ function closeReadableStreamOnAbort<T>(
           throwIfAborted(signal)
 
           if (result.done) {
-            signal.removeEventListener('abort', abort)
+            removeAbortListener()
             controller.close()
           } else {
             controller.enqueue(result.value)
           }
         } catch (error) {
-          signal.removeEventListener('abort', abort)
+          removeAbortListener()
           throw error
         }
       },
       async cancel(reason) {
-        signal.removeEventListener('abort', abort)
+        removeAbortListener()
         await reader.cancel(reason)
       },
     },

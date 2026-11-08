@@ -276,4 +276,68 @@ describe('signalSyncHandlerPlugin', () => {
     expect((await promise).status).toBe(500)
     expect(signal?.reason).toBe(reason)
   })
+
+  describe('interceptor', () => {
+    function intercept(output: unknown, signal: AbortSignal): Promise<any> {
+      const interceptor = new SignalSyncHandlerPlugin().init({}).clientInterceptors![0]!
+      return interceptor({ signal, next: async () => output } as any)
+    }
+
+    it('ignores a rejecting iterator return when the signal aborts', async () => {
+      const iterator = {
+        next: () => new Promise<never>(() => {}),
+        return: vi.fn(async () => {
+          throw new Error('return failed')
+        }),
+        [Symbol.asyncIterator]() {
+          return this
+        },
+      }
+
+      const controller = new AbortController()
+      await intercept(iterator, controller.signal)
+      controller.abort()
+
+      expect(iterator.return).toHaveBeenCalledTimes(1)
+      await new Promise((resolve) => setTimeout(resolve, 0)) // any unhandled rejection would fail the test
+    })
+
+    it('ignores a rejecting stream cancel when the signal aborts', async () => {
+      const cancel = vi.fn(() => {
+        throw new Error('cancel failed')
+      })
+
+      const controller = new AbortController()
+      const synced: ReadableStream = await intercept(
+        new ReadableStream({ cancel }),
+        controller.signal,
+      )
+      const reason = new Error('aborted')
+      controller.abort(reason)
+
+      await expect(synced.getReader().read()).rejects.toBe(reason)
+      expect(cancel).toHaveBeenCalledExactlyOnceWith(reason)
+      await new Promise((resolve) => setTimeout(resolve, 0)) // any unhandled rejection would fail the test
+    })
+
+    it('rejects a pending read with the abort reason when the signal aborts', async () => {
+      const pulled = promiseWithResolvers<void>()
+
+      const controller = new AbortController()
+      const synced: ReadableStream = await intercept(
+        new ReadableStream({ pull: () => pulled.resolve() }, { highWaterMark: 0 }),
+        controller.signal,
+      )
+
+      const reader = synced.getReader()
+      const read = reader.read()
+      await pulled.promise
+
+      const reason = new Error('aborted')
+      controller.abort(reason)
+
+      await expect(read).rejects.toBe(reason)
+      await new Promise((resolve) => setTimeout(resolve, 0)) // let the pending inner read settle
+    })
+  })
 })

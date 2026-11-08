@@ -36,6 +36,7 @@ import { StandardHandler } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
 import {
   isAsyncIteratorObject,
+  listenAbort,
   mergeHttpPath,
   NullProtoObj,
   stringifyJSON,
@@ -431,11 +432,7 @@ function toStreamableFile(
   const type = flattenStandardHeader(headers['content-type'])
   headers['content-type'] = undefined
 
-  if (signal?.aborted) {
-    stream.destroy()
-  } else {
-    signal?.addEventListener('abort', () => stream.destroy(), { once: true })
-  }
+  listenAbort(signal, () => stream.destroy())
 
   return new StreamableFile(stream, { type })
 }

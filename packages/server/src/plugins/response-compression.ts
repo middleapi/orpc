@@ -1,4 +1,7 @@
+import type { CompressionEncoding } from '@orpc/shared'
 import {
+  estimateUtf8ByteLength,
+  estimateCompressibleFormDataSize,
   isAcceptableEncoding,
   isAsyncIteratorObject,
   isCompressibleContentType,
@@ -19,10 +22,6 @@ import type {
 } from '../adapters/standard/index.ts'
 import type { Context } from '../context.ts'
 
-// Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
-// occasional multi-byte characters increase the average.
-const AVG_BYTES_PER_CHAR = 1.2
-
 export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
   /**
    * The compression schemes to use for response compression.
@@ -31,7 +30,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
+  encodings?: readonly CompressionEncoding[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.
@@ -165,32 +164,9 @@ export class ResponseCompressionHandlerPlugin<
           }
         }
       } else if (body instanceof FormData) {
-        const PART_OVERHEAD = 64 // approx bytes for boundary + Content-Disposition/Content-Type headers per part
-
-        let contentLength = 0
-        for (const [key, value] of body) {
-          contentLength += PART_OVERHEAD + key.length
-
-          if (value instanceof Blob) {
-            if (!Number.isFinite(value.size)) {
-              // Bun-s3 can use NaN for size
-              if (!this.isCompressibleContentType(value.type, interceptorOptions)) {
-                // Unknown non-compressible part size makes the estimate unreliable
-                contentLength = -Infinity
-                break
-              }
-
-              // Unknown size for compressible content - still apply compression
-              contentLength = Infinity
-            } else {
-              contentLength += this.isCompressibleContentType(value.type, interceptorOptions)
-                ? value.size
-                : -value.size
-            }
-          } else {
-            contentLength += value.length * AVG_BYTES_PER_CHAR
-          }
-        }
+        const contentLength = estimateCompressibleFormDataSize(body, (contentType) =>
+          this.isCompressibleContentType(contentType, interceptorOptions),
+        )
 
         if (contentLength >= this.threshold) {
           const res = new Response(body)
@@ -211,7 +187,7 @@ export class ResponseCompressionHandlerPlugin<
         }
       } else if (body instanceof URLSearchParams) {
         const string = body.toString()
-        if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           const [, bodyHeaders] = toFetchBody(body, headers)
 
           return {
@@ -229,7 +205,7 @@ export class ResponseCompressionHandlerPlugin<
         }
       } else if (body !== undefined && !isAsyncIteratorObject(body)) {
         const [string, bodyHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
-        if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           return {
             ...result,
             response: {

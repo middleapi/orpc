@@ -11,7 +11,7 @@ import type { Context, ProcedureConfig, ProcedureHandler, Router } from '@orpc/s
 import { implement } from '@orpc/server'
 import type { FetchHandler, FetchHandlerHandleResult } from '@orpc/server/fetch'
 import type { Promisable, Value } from '@orpc/shared'
-import { value } from '@orpc/shared'
+import { listenAbort, value } from '@orpc/shared'
 import type { HttpHandler, HttpRequestResolverExtras, PathParams, ResponseResolverInfo } from 'msw'
 import { http, passthrough } from 'msw'
 
@@ -163,12 +163,7 @@ export class HTTPProcedureUtils<
     return this.handler(
       ({ signal }) =>
         new Promise<never>((_, reject) => {
-          if (signal?.aborted) {
-            reject(signal.reason)
-            return
-          }
-
-          signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+          listenAbort(signal, reject)
         }),
     )
   }

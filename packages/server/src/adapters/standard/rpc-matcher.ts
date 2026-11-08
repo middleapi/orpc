@@ -1,6 +1,6 @@
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { Value } from '@orpc/shared'
-import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
+import { normalizeHttpPath, pathToHttpPath, stripHttpPathPrefix, value } from '@orpc/shared'
 import type { StandardMethod } from '@standard-server/core'
 
 import { unlazy } from '../../lazy.ts'
@@ -126,21 +126,13 @@ export class RPCMatcher {
     }
 
     if (prefix) {
-      if (!pathname.startsWith(prefix)) {
+      const stripped = stripHttpPathPrefix(pathname, prefix)
+
+      if (stripped === undefined) {
         return undefined
       }
 
-      const charAfterPrefix = pathname[prefix.length]
-
-      if (charAfterPrefix === '/') {
-        pathname = pathname.slice(prefix.length) as `/${string}`
-      } else if (charAfterPrefix === undefined) {
-        pathname = '/'
-      } else if (prefix[prefix.length - 1] === '/') {
-        pathname = pathname.slice(prefix.length - 1) as `/${string}`
-      } else {
-        return undefined
-      }
+      pathname = stripped
     }
 
     if (pathname.length > 1 && pathname.endsWith('/')) {

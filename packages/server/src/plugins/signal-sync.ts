@@ -4,6 +4,7 @@ import {
   anyAbortSignal,
   AsyncIteratorClass,
   isAsyncIteratorObject,
+  listenAbort,
   override,
   runWithSignal,
   toArray,
@@ -52,16 +53,6 @@ export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandl
   }
 }
 
-function listenAbort(signal: AbortSignal, onAbort: () => void): () => void {
-  if (signal.aborted) {
-    onAbort()
-  } else {
-    signal.addEventListener('abort', onAbort, { once: true })
-  }
-
-  return () => signal.removeEventListener('abort', onAbort)
-}
-
 function syncAsyncIterator(
   iterator: AsyncIterator<unknown, unknown>,
   signal: AbortSignal,
@@ -99,9 +90,9 @@ function syncReadableStream(
   return new ReadableStream(
     {
       start(controller) {
-        unlisten = listenAbort(signal, () => {
-          controller.error(signal.reason)
-          cancelling = reader.cancel(signal.reason)
+        unlisten = listenAbort(signal, (reason) => {
+          controller.error(reason)
+          cancelling = reader.cancel(reason)
           cancelling.catch(() => {}) // only awaited when the consumer cancels
         })
       },
