@@ -156,6 +156,11 @@ export const mixed = {
     .input(z.object({ a: z.string().optional(), s: StatusWithId }))
     .input(type<{ a: string; s: 'x' | 'y'; b: string }>())
     .handler(() => 'ok'),
+  queryDescribedRef: os
+    .route({ method: 'GET' })
+    .input(z.object({ s: StatusWithId.describe('The status') }))
+    .input(type<{ s: 'x' | 'y'; b: string }>())
+    .handler(() => 'ok'),
   weaker: os
     .input(z.object({ tag: z.unknown() }))
     .input(type<{ tag: Tag; b: number }>())

@@ -14,8 +14,9 @@ import type { Builtin } from './builtins.ts'
 import {
   getBuiltin,
   getMappedBuiltin,
-  getMappedTypedArray,
+  getMappedBinary,
   isBuiltinSymbol,
+  TYPED_ARRAY_SCHEMA,
   TYPED_ARRAYS,
 } from './builtins.ts'
 import { getDefName, getFallbackDefName } from './def-names.ts'
@@ -659,14 +660,13 @@ export class TypeToJsonSchemaConverter {
       const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
 
       // without `toJSON`, a value is its own fields: of a class instance written by
-      // `JSON.stringify`, of a `Partial<Money>` or an interface possibly a plain object
+      // `JSON.stringify`, but of `Partial<Money>` (whose class has `toJSON`) or an interface
+      // possibly a plain object
+      const plainFields =
+        !this.stringify && (classType === undefined || !hasOptionalToJSON(this.types, classType))
+
       return hasOptionalToJSON(this.types, type)
-        ? {
-            anyOf: dedupe([
-              converted,
-              this.convertObject(type, true, !this.stringify && classType !== type),
-            ]),
-          }
+        ? { anyOf: dedupe([converted, this.convertObject(type, true, plainFields)]) }
         : converted
     }
 
@@ -690,6 +690,11 @@ export class TypeToJsonSchemaConverter {
       !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length
     ) {
       return {}
+    }
+
+    // the fields of `Partial<Buffer>` without `toJSON` are a typed array's index keys
+    if (getMappedBinary(this.types, type, true)) {
+      return TYPED_ARRAY_SCHEMA
     }
 
     const arrayLike = this.convertArrayLikeObject(properties)
@@ -1047,9 +1052,9 @@ export class TypeToJsonSchemaConverter {
     }
 
     // typed arrays are written by their index keys, also through `Readonly<Uint8Array>`
-    const typedArray = getMappedTypedArray(this.types, resolved)
-    if (typedArray) {
-      return this.visit(typedArray)
+    const binary = getMappedBinary(this.types, resolved)
+    if (binary) {
+      return this.visit(binary)
     }
 
     // built-ins have no own enumerable data, also through `Readonly<Date>`

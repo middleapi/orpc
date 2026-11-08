@@ -9,3 +9,8 @@ export interface WebClasses {
   response: Response
   request: Request
 }
+
+/** A partial buffer, which may be a plain object without `toJSON` */
+export interface PartialBuffer {
+  v: Partial<Buffer>
+}

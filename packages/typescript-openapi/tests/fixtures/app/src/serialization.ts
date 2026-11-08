@@ -678,4 +678,19 @@ export const router = {
     json: new ReadonlyBytesJSON(),
     field: new Uint8Array([3]),
   })),
+  wrappedOptionalToJSON: os.handler(
+    (): {
+      frozen: Readonly<OptionalToJSONClass>
+      picked: Pick<OptionalToJSONClass, 'tags' | 'toJSON'>
+      assigned: OptionalToJSONClass & { extra: Set<string> }
+    } => ({
+      frozen: Object.freeze(new OptionalToJSONClass()),
+      picked: new OptionalToJSONClass(),
+      assigned: Object.assign(new OptionalToJSONClass(), { extra: new Set(['e']) }),
+    }),
+  ),
+  readonlyBinary: os.handler((): { buffer: Readonly<ArrayBuffer>; view: Readonly<DataView> } => ({
+    buffer: new ArrayBuffer(2),
+    view: new DataView(new ArrayBuffer(2)),
+  })),
 }

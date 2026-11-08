@@ -684,6 +684,13 @@ describe('typeScriptOpenAPIGenerator', () => {
         ['b', true, undefined],
       ])
 
+      expect(paths['/queryDescribedRef'].get.parameters.map((p: any) => [p.name, p.style])).toEqual(
+        [
+          ['s', undefined],
+          ['b', undefined],
+        ],
+      )
+
       // constraints only the type has
       expect(body('/constraints').properties.id).toEqual({
         type: 'string',

@@ -1108,6 +1108,15 @@ describe('typeToJsonSchemaConverter', () => {
           response: { type: 'object' },
           request: { type: 'object' },
         })
+
+        // a `Buffer` writes `toJSON`, a plain partial value its index keys
+        const [partial] = new TypeToJsonSchemaConverter(project.checker, project.program).convert(
+          project.getExportType('PartialBuffer').type,
+        ) as [any, boolean]
+        expect(partial.$defs.PartialBuffer.properties.v.anyOf).toEqual([
+          expect.objectContaining({ required: ['type', 'data'] }),
+          { type: 'object', additionalProperties: { type: 'number' } },
+        ])
       } finally {
         project.close()
       }

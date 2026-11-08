@@ -102,7 +102,8 @@ function getDefsResolver(root: JsonSchema): (schema: JsonSchema) => JsonSchema {
   return (schema) => {
     // a ref to a ref, at most a few times
     for (let depth = 0; depth < 8; depth++) {
-      const name = fromRef(schema)
+      // also a ref with annotations beside it (`{ $ref, description }`)
+      const name = fromRef(withoutAnnotations(schema))
 
       if (name === undefined || !Object.hasOwn($defs, name)) {
         break
@@ -113,6 +114,28 @@ function getDefsResolver(root: JsonSchema): (schema: JsonSchema) => JsonSchema {
 
     return schema
   }
+}
+
+const ANNOTATIONS = [
+  'description',
+  'title',
+  'examples',
+  'deprecated',
+  'readOnly',
+  'writeOnly',
+  'default',
+]
+
+function withoutAnnotations(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object' || !ANNOTATIONS.some((key) => key in schema)) {
+    return schema
+  }
+
+  const rest: Record<string, unknown> = { ...schema }
+  for (const key of ANNOTATIONS) {
+    delete rest[key]
+  }
+  return rest as JsonSchema
 }
 
 /**

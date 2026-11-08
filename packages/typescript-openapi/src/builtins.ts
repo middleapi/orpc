@@ -96,7 +96,7 @@ export function getBuiltin(
 
   if (TYPED_ARRAYS.has(symbol.name)) {
     // serialized like an object with index keys, `{ "0": 1, "1": 2 }`
-    return { kind: 'schema', schema: { type: 'object', additionalProperties: { type: 'number' } } }
+    return { kind: 'schema', schema: TYPED_ARRAY_SCHEMA }
   }
 
   const [first, second] = types.getReferenceArguments(type)
@@ -127,17 +127,39 @@ export function getBuiltin(
   return undefined
 }
 
+/** Binary values, written by their own keys: typed arrays by index, the others as `{}` */
+const BINARY = new Set([...TYPED_ARRAYS, 'ArrayBuffer', 'SharedArrayBuffer', 'DataView'])
+
+/** How the serializer and `JSON.stringify` write a typed array: by its index keys */
+export const TYPED_ARRAY_SCHEMA: JsonSchema = {
+  type: 'object',
+  additionalProperties: { type: 'number' },
+}
+
 /**
- * The typed array a mapped type maps over, like `Uint8Array` of `Readonly<Uint8Array>`.
+ * The binary built-in a mapped type maps over, like `Uint8Array` of `Readonly<Uint8Array>`
+ * or `ArrayBuffer` of `Readonly<ArrayBuffer>`. With `subclasses`, also a class extending
+ * a typed array, like Node's `Buffer`.
  */
-export function getMappedTypedArray(types: TypeQueries, type: Type): Type | undefined {
+export function getMappedBinary(
+  types: TypeQueries,
+  type: Type,
+  subclasses = false,
+): Type | undefined {
   const [source] =
     (type as any).objectFlags & ObjectFlags.Mapped ? types.getTypeArguments(type) : []
   const symbol = source?.getSymbol()
 
-  return symbol && TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(types, symbol)
-    ? source
-    : undefined
+  if (!symbol) {
+    return undefined
+  }
+
+  if (BINARY.has(symbol.name) && isBuiltinSymbol(types, symbol)) {
+    return source
+  }
+
+  const base = subclasses ? getBuiltinBaseName(types, source!) : undefined
+  return base !== undefined && TYPED_ARRAYS.has(base) ? source : undefined
 }
 
 /**
@@ -150,9 +172,9 @@ export function getMappedBuiltin(
   stringify: boolean,
 ): Builtin | undefined {
   // `Readonly<Uint8Array>` is still a typed array
-  const typedArray = getMappedTypedArray(types, type)
-  if (typedArray) {
-    return getBuiltin(types, typedArray, stringify)
+  const binary = getMappedBinary(types, type)
+  if (binary) {
+    return getBuiltin(types, binary, stringify)
   }
 
   const builtin = getMappedBuiltinName(types, type)

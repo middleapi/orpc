@@ -104,6 +104,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['partialPlain', undefined],
     ['optionalToJSONClass', undefined],
     ['readonlyBytes', undefined],
+    ['wrappedOptionalToJSON', undefined],
+    ['readonlyBinary', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -201,6 +203,19 @@ describe('generated schemas match serialized outputs', async () => {
       expect.objectContaining({ required: ['amount', 'currency'] }),
       expect.objectContaining({ type: 'object' }),
     ])
+    // also behind `Readonly`, `Pick`, and intersections
+    const wrapped = (spec.paths as any)['/wrappedOptionalToJSON'].post.responses['200'].content[
+      'application/json'
+    ].schema.properties
+    for (const key of ['frozen', 'picked', 'assigned']) {
+      expect(wrapped[key].anyOf[0]).toEqual({ type: 'string' })
+      expect(wrapped[key].anyOf[1].properties.tags).toEqual({ type: 'object' })
+    }
+    const binary = (spec.paths as any)['/readonlyBinary'].post.responses['200'].content[
+      'application/json'
+    ].schema.properties
+    expect(binary).toEqual({ buffer: { type: 'object' }, view: { type: 'object' } })
+
     // the fields of a class instance are written by `JSON.stringify`
     expect(schemas.OptionalToJSONClass.anyOf[1].properties.tags).toEqual({ type: 'object' })
     const bytes = { type: 'object', additionalProperties: { type: 'number' } }
