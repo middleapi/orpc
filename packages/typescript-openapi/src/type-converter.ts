@@ -140,7 +140,7 @@ export class TypeToJsonSchemaConverter {
     options: TypeToJsonSchemaConvertOptions = {},
   ): [jsonSchema: JsonSchema, optional: boolean] {
     // a list of types is their union, like the yield types of a union of async iterators
-    const members = (Array.isArray(type) ? type : [type]).map((t) => this.getAwaitedType(t))
+    const members = (Array.isArray(type) ? type : [type]).flatMap((t) => this.getAwaitedTypes(t))
     const optional = members.some((t) => this.isOptional(t))
 
     const cuts = this.expansion.cuts
@@ -195,9 +195,15 @@ export class TypeToJsonSchemaConverter {
         return undefined
       }
 
+      const returnTypes = all.flatMap((t) => t!.returnTypes)
+
       return {
         yieldTypes: all.flatMap((t) => t!.yieldTypes),
-        returnTypes: all.flatMap((t) => t!.returnTypes),
+        // members that return nothing make the returned value optional
+        returnTypes:
+          returnTypes.length && all.some((t) => !t!.returnTypes.length)
+            ? [...returnTypes, this.checker.getVoidType()]
+            : returnTypes,
       }
     }
 
@@ -229,6 +235,23 @@ export class TypeToJsonSchemaConverter {
   /**
    * The value of a `Promise`, like a handler's result.
    */
+  /**
+   * The values of a handler's result: `Promise<A> | B` (returned by a handler without `async`)
+   * is `A | B` once awaited.
+   */
+  private getAwaitedTypes(type: Type): Type[] {
+    if (type.isUnionType()) {
+      const members = this.types.getMembers(type)
+
+      if (members.some((m) => this.getAwaitedType(m) !== m)) {
+        return members.flatMap((m) => this.getAwaitedTypes(m))
+      }
+    }
+
+    const awaited = this.getAwaitedType(type)
+    return awaited === type ? [type] : this.getAwaitedTypes(awaited)
+  }
+
   private getAwaitedType(type: Type): Type {
     const symbol = type.flags & TypeFlags.Object ? type.getSymbol() : undefined
 
@@ -663,7 +686,8 @@ export class TypeToJsonSchemaConverter {
       // functions, symbols, and always `undefined` values are dropped by JSON serialization,
       // also when `toJSON` returns them
       const serialized =
-        propertyType && getToJSONResultType(this.types, propertyType, this.stringify)
+        propertyType &&
+        getToJSONResultType(this.types, propertyType, this.stringify || isClassInstance)
       if (
         !propertyType ||
         isDropped(this.types, propertyType) ||
@@ -823,7 +847,7 @@ export class TypeToJsonSchemaConverter {
       case 'array':
         return { type: 'array', items: this.visitElement(builtin.items) }
       case 'set':
-        return setSchema(this.visitElement(builtin.items))
+        return setSchema(this.visitElements(builtin.items))
       case 'map':
         return mapSchema({
           type: 'array',
@@ -832,7 +856,7 @@ export class TypeToJsonSchemaConverter {
           minItems: 2,
         })
       case 'map-entries':
-        return mapSchema(builtin.entry ? this.visit(builtin.entry) : {})
+        return mapSchema(this.visitElements(builtin.entries))
     }
 
     return undefined
@@ -898,6 +922,14 @@ export class TypeToJsonSchemaConverter {
       this.convertUnion(members, convertValue),
       members.some((m) => m.flags & TypeFlags.Null),
     )
+  }
+
+  /**
+   * Items of several types, like a `Set` subclass iterating strings and numbers.
+   */
+  private visitElements(items: readonly Type[]): JsonSchema {
+    const schemas = dedupe(items.map((item) => this.visitElement(item)))
+    return schemas.length > 1 ? { anyOf: schemas } : (schemas[0] ?? {})
   }
 
   /**

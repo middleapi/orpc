@@ -34,7 +34,7 @@ import type { TypeScriptProjectOptions } from './project.ts'
 import { openTypeScriptProject } from './project.ts'
 import type { ResolvedRouterType } from './router-type.ts'
 import { RouterTypeResolver } from './router-type.ts'
-import { collectDefRefs, isPlain, isTrivialSchema } from './schema-utils.ts'
+import { collectDefRefs, isPlain } from './schema-utils.ts'
 import type {
   AsyncIteratorTypes,
   TypeToJsonSchemaConverterOptions,
@@ -431,7 +431,12 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
     const rest = isCovered(property, other) ? undefined : withoutDescribed(property, other)
 
     if (rest === undefined || (rest !== property && isPlain(rest, 'object'))) {
-      removed.add(name)
+      // a key the type requires stays required, also when the other schema makes it optional
+      if (schema.required?.includes(name) && !described.required?.includes(name)) {
+        setOwn(properties, name, {})
+      } else {
+        removed.add(name)
+      }
     } else {
       setOwn(properties, name, rest)
     }
@@ -454,23 +459,29 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
 }
 
 /**
- * Whether a schema adds nothing to another: it is `{}`, the same schema, or the same primitive
- * type without constraints (`{ type: 'string' }` next to `{ type: 'string', minLength: 3 }`).
+ * Whether a schema adds nothing to another: it is `{}`, or says nothing the other does not,
+ * like `{ type: 'string' }` next to `{ type: 'string', minLength: 3 }`. Refs point into
+ * different `$defs`, so a schema with a ref is never covered.
  */
 function isCovered(schema: JsonSchema, other: JsonSchema): boolean {
   if (typeof schema !== 'object') {
     return schema
   }
 
-  if (!Object.keys(schema).length || stringifyJSON(schema) === stringifyJSON(other)) {
+  const keys = Object.keys(schema)
+
+  if (!keys.length) {
     return true
   }
 
-  return (
-    typeof other === 'object' &&
-    typeof schema.type === 'string' &&
-    isTrivialSchema(schema) &&
-    (other.type === schema.type || (schema.type === 'number' && other.type === 'integer'))
+  if (typeof other !== 'object' || stringifyJSON(schema)!.includes('"$ref"')) {
+    return false
+  }
+
+  return keys.every((key) =>
+    key === 'type' && schema.type === 'number'
+      ? other.type === 'number' || other.type === 'integer'
+      : stringifyJSON((schema as any)[key]) === stringifyJSON((other as any)[key]),
   )
 }
 

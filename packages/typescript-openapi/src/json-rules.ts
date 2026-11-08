@@ -1,8 +1,9 @@
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import {
+  getBuiltin,
   getBuiltinBaseName,
   getMappedBuiltinName,
   getToJSON,
@@ -142,7 +143,9 @@ export function getToJSONResultType(
  * and `this`.
  */
 export function getClassType(types: TypeQueries, type: Type): Type | undefined {
-  if ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Class) {
+  const symbol = type.getSymbol()
+
+  if (symbol && (symbol.flags & SymbolFlags.Class || isConstructedInterface(types, type, symbol))) {
     return type
   }
 
@@ -167,6 +170,30 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
   }
 
   return undefined
+}
+
+/**
+ * An interface with a constructor of the same name, the way libraries declare classes
+ * (`interface TypeError` with `var TypeError: TypeErrorConstructor`, zod's `ZodError`),
+ * unless the serializer handles it as a built-in, like `Date` or `Set`.
+ */
+function isConstructedInterface(types: TypeQueries, type: Type, symbol: TSSymbol): boolean {
+  if (!(symbol.flags & SymbolFlags.Interface) || !(symbol.flags & SymbolFlags.Variable)) {
+    return false
+  }
+
+  const constructed = types.memo('constructed', symbol.id, () => {
+    const value = types.checker.getTypeOfSymbol(symbol)
+    return (
+      value !== undefined &&
+      types.checker.getSignaturesOfType(value, SignatureKind.Construct).length > 0
+    )
+  })
+
+  return (
+    constructed &&
+    types.memo('builtin', type.id, () => getBuiltin(types, type, false) === undefined)
+  )
 }
 
 /**

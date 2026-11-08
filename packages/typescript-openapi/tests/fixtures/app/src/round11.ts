@@ -83,6 +83,18 @@ export const mixed = {
     .input(z.object({ user: z.object({ name: z.string() }) }))
     .input(type<{ user: { age: number } }>())
     .handler(() => 'ok'),
+  sameRef: os
+    .input(z.object({ tag: z.unknown().meta({ id: 'Tag' }) }))
+    .input(type<{ tag: Tag; b: number }>())
+    .handler(() => 'ok'),
+  optionalInZod: os
+    .input(z.object({ a: z.string().optional() }))
+    .input(type<{ a: string; b: number }>())
+    .handler(() => 'ok'),
+  constraints: os
+    .input(z.object({ id: z.string() }))
+    .input(type<{ id: `user_${string}`; b: number }>())
+    .handler(() => 'ok'),
   weaker: os
     .input(z.object({ tag: z.unknown() }))
     .input(type<{ tag: Tag; b: number }>())
@@ -100,7 +112,13 @@ async function* genB() {
 /**
  * Unions of event iterators
  */
+async function* genC() {
+  yield { c: true }
+  return { total: 1 }
+}
+
 export const streams = {
+  partialReturn: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : genC())),
   union: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : genB())),
   nullable: os.input(type<boolean>()).handler(({ input }) => (input ? genA() : undefined)),
 }

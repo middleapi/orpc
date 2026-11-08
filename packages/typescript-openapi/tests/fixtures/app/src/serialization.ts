@@ -1,5 +1,6 @@
 import { os, type } from '@orpc/server'
 import type { FixedLengthArray, Jsonifiable, Tagged } from 'type-fest'
+import * as z from 'zod'
 
 export interface Author {
   id: string
@@ -465,6 +466,26 @@ export interface WalkedIntersections {
   list: string[] & HiddenJSON
 }
 
+export class DroppedArrays {
+  gone: string[] & { toJSON(): undefined } = Object.assign(['a'], { toJSON: () => undefined })
+  maybe: string[] & { toJSON(): number | undefined } = Object.assign(['a'], {
+    toJSON: () => undefined,
+  })
+}
+
+interface MixedIterator {
+  next():
+    | { done: false; value: string }
+    | { done: false; value: number }
+    | { done: true; value: undefined }
+}
+
+export class MixedSet extends Set<string | number> {
+  override [Symbol.iterator](): MixedIterator & SetIterator<string | number> {
+    return super[Symbol.iterator]() as any
+  }
+}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -593,4 +614,12 @@ export const router = {
   })),
   toBranded: os.handler(() => ({ date: new ToBrandedDate(), items: new ToBrandedItems() })),
   arrayToJSON: os.handler(() => new ArrayToJSONHolder()),
+  libraryClasses: os.handler(() => ({
+    typeError: new TypeError('bad'),
+    params: new URLSearchParams('a=1'),
+    response: new Response('x'),
+    zodError: z.string().safeParse(1).error!,
+  })),
+  droppedArrays: os.handler(() => new DroppedArrays()),
+  mixedSet: os.handler(() => ({ set: new MixedSet(['a', 1]) })),
 }

@@ -973,6 +973,30 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('round fourteen', () => {
+    it('keeps recognizing Error subclasses when a package augments the global Error', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
+      })
+
+      try {
+        const [schema] = new TypeToJsonSchemaConverter(project.checker, project.program).convert(
+          project.getExportType('Errors').type,
+        ) as [any, boolean]
+
+        expect(schema.$defs.AppError).toEqual({
+          type: 'object',
+          properties: { code: { type: 'string' } },
+          required: ['code'],
+        })
+        expect(schema.$defs.Errors.properties.type).toEqual({ type: 'object' })
+        expect(schema.$defs.Errors.properties.plain).toEqual({ type: 'object' })
+      } finally {
+        project.close()
+      }
+    })
+  })
+
   describe('round eleven', () => {
     it('asks for the signatures of each type once', () => {
       const project = openTypeScriptProject({
@@ -2661,6 +2685,18 @@ describe('typeToJsonSchemaConverter', () => {
               required: ['value', 'children'],
             },
           },
+        },
+        false,
+      ])
+    })
+
+    it('awaits promises in unions', () => {
+      expect(create().convert(edge.getExportType('PromiseOrValue').type)).toEqual([
+        {
+          anyOf: [
+            { type: 'string', const: 'x' },
+            { type: 'object', properties: { n: { type: 'number' } }, required: ['n'] },
+          ],
         },
         false,
       ])

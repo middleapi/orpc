@@ -616,10 +616,29 @@ describe('typeScriptOpenAPIGenerator', () => {
         },
         required: ['user'],
       })
+      // refs point into different `$defs`, so the same ref text is not the same schema
+      // (zod's `Tag` takes the name, so the inferred one is renamed)
+      const tagSchema = (ref: string) =>
+        (spec.components?.schemas as any)[ref.replace('#/components/schemas/', '')]
+      expect(tagSchema(body('/sameRef').properties.tag.$ref)).toMatchObject({
+        required: ['label', 'color'],
+      })
+      // the type requires `a`, which zod makes optional
+      expect(body('/optionalInZod')).toEqual({
+        type: 'object',
+        properties: { a: {}, b: { type: 'number' } },
+        required: ['a', 'b'],
+      })
+      // constraints only the type has
+      expect(body('/constraints').properties.id).toEqual({
+        type: 'string',
+        pattern: '^user_[\\s\\S]*$',
+      })
+
       // `z.unknown()` says less than `Tag`
-      expect(body('/weaker').properties).toEqual({
-        tag: { $ref: '#/components/schemas/Tag' },
-        b: { type: 'number' },
+      expect(Object.keys(body('/weaker').properties)).toEqual(['tag', 'b'])
+      expect(tagSchema(body('/weaker').properties.tag.$ref)).toMatchObject({
+        required: ['label', 'color'],
       })
     })
 
@@ -637,6 +656,12 @@ describe('typeScriptOpenAPIGenerator', () => {
         'text/event-stream'
       ].schema.oneOf
       expect(message.properties.data.anyOf).toHaveLength(2)
+
+      // `genA` returns nothing, so the close event may have no data
+      const [, close] = (spec.paths as any)['/partialReturn'].post.responses['200'].content[
+        'text/event-stream'
+      ].schema.oneOf
+      expect(close.required).toEqual(['event'])
     })
 
     it('reports unresolved types when only error data needs inference', async () => {

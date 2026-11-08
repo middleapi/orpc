@@ -30,3 +30,6 @@ export interface ManyResults {
     >
   }
 }
+
+/** A result returned by a handler without `async` */
+export type PromiseOrValue = Promise<{ n: number }> | 'x'

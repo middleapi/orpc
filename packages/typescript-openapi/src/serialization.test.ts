@@ -95,6 +95,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['walkedIntersections', undefined],
     ['toBranded', undefined],
     ['arrayToJSON', undefined],
+    ['libraryClasses', undefined],
+    ['droppedArrays', undefined],
+    ['mixedSet', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -166,6 +169,28 @@ describe('generated schemas match serialized outputs', async () => {
     expect(schemas.ToBrandedItems).toEqual({ type: 'array', items: { type: 'number' } })
     // `JSON.stringify` calls `toJSON` of arrays in class instances
     expect(schemas.ArrayToJSONHolder.properties.list).toEqual({ type: 'number' })
+  })
+
+  it('reads toJSON of arrays in class instances, and iterated Set items', () => {
+    const schemas = spec.components?.schemas as any
+    expect(schemas.DroppedArrays).toEqual({
+      type: 'object',
+      properties: { maybe: { type: 'number' } },
+    })
+    expect(schemas.MixedSet.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'number' }] })
+  })
+
+  it('describes classes libraries declare as interfaces with constructors as class instances', () => {
+    const schema = (spec.paths as any)['/libraryClasses'].post.responses['200'].content[
+      'application/json'
+    ].schema
+
+    expect(schema.properties).toEqual({
+      typeError: { type: 'object' },
+      params: { type: 'object' },
+      response: { type: 'object' },
+      zodError: { type: 'object' },
+    })
   })
 
   it('describes class instances with JSON.stringify semantics', () => {

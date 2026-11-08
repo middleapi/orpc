@@ -54,6 +54,7 @@ export class TypeQueries {
   private readonly annotationCache = new Map<number, PropertyAnnotation | undefined>()
   private readonly globalTypes = new Map<string, Type | undefined>()
   private readonly callableCache = new Map<number, boolean>()
+  private readonly memos = new Map<string, Map<number, unknown>>()
 
   constructor(
     readonly checker: Checker,
@@ -65,6 +66,24 @@ export class TypeQueries {
   getSymbolSourceKind(symbol: TSSymbol): SourceKind {
     const path = symbol.declarations[0]?.path
     return path === undefined ? 'project' : this.getSourceKind(path)
+  }
+
+  /**
+   * Caches a result by the id of a type or symbol, under a kind of question.
+   */
+  memo<T>(kind: string, id: number, compute: () => T): T {
+    let cache = this.memos.get(kind)
+
+    if (cache === undefined) {
+      cache = new Map()
+      this.memos.set(kind, cache)
+    }
+
+    if (!cache.has(id)) {
+      cache.set(id, compute())
+    }
+
+    return cache.get(id) as T
   }
 
   /**

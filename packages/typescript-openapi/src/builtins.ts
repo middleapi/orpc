@@ -42,11 +42,13 @@ const RUNTIME_TYPINGS = /\/node_modules\/(?:@types\/(?:node|bun|deno)|bun-types)
  */
 export type Builtin =
   | { kind: 'schema'; schema: JsonSchema }
-  | { kind: 'array' | 'set'; items: Type | undefined }
+  | { kind: 'array'; items: Type | undefined }
+  /** Items of these types */
+  | { kind: 'set'; items: readonly Type[] }
   /** Entries as `[key, value]` tuples */
   | { kind: 'map'; key: Type | undefined; value: Type | undefined }
-  /** Entries of one type, like the iterated `[string, number]` of a `Map` subclass */
-  | { kind: 'map-entries'; entry: Type | undefined }
+  /** Entries of these types, like the iterated `[string, number]` of a `Map` subclass */
+  | { kind: 'map-entries'; entries: readonly Type[] }
 
 /**
  * The built-in a value of this type is, like `Date`, `Set<T>`, a typed array, or a subclass
@@ -97,7 +99,7 @@ export function getBuiltin(
   switch (symbol.name) {
     case 'Set':
     case 'ReadonlySet':
-      return stringify ? emptyObject() : { kind: 'set', items: first }
+      return stringify ? emptyObject() : { kind: 'set', items: first ? [first] : [] }
     case 'Map':
     case 'ReadonlyMap':
       return stringify ? emptyObject() : { kind: 'map', key: first, value: second }
@@ -145,11 +147,11 @@ export function getMappedBuiltin(
   }
 
   if (builtin === 'Set' || builtin === 'ReadonlySet') {
-    return stringify ? emptyObject() : { kind: 'set', items: undefined }
+    return stringify ? emptyObject() : { kind: 'set', items: [] }
   }
 
   if (builtin === 'Map' || builtin === 'ReadonlyMap') {
-    return stringify ? emptyObject() : { kind: 'map-entries', entry: undefined }
+    return stringify ? emptyObject() : { kind: 'map-entries', entries: [] }
   }
 
   return getLeaf(builtin, stringify)
@@ -210,14 +212,14 @@ function getBuiltinSubclass(
   }
 
   if (base === 'Set' || base === 'Map') {
-    const item = getIteratorTypes(types.checker, type, types.getProperties(type), false)
-      ?.yieldTypes[0]
-
     if (stringify) {
       return emptyObject()
     }
 
-    return base === 'Set' ? { kind: 'set', items: item } : { kind: 'map-entries', entry: item }
+    const items =
+      getIteratorTypes(types.checker, type, types.getProperties(type), false)?.yieldTypes ?? []
+
+    return base === 'Set' ? { kind: 'set', items } : { kind: 'map-entries', entries: items }
   }
 
   return getLeaf(base, stringify)
@@ -252,16 +254,19 @@ export function getBuiltinBaseName(types: TypeQueries, type: Type, depth = 0): s
  * With `isError`, for members of `Error` subclasses, everything declared outside the project.
  */
 export function isBuiltinSymbol(types: TypeQueries, symbol: TSSymbol, isError = false): boolean {
-  return (
-    symbol.declarations.length > 0 &&
-    symbol.declarations.every((declaration) => {
-      const kind = types.getSourceKind(declaration.path)
-      return (
-        kind === 'default' ||
-        (kind === 'external' && (isError || RUNTIME_TYPINGS.test(declaration.path)))
-      )
-    })
-  )
+  const isRuntime = (declaration: TSSymbol['declarations'][number]) => {
+    const kind = types.getSourceKind(declaration.path)
+    return (
+      kind === 'default' ||
+      (kind === 'external' && (isError || RUNTIME_TYPINGS.test(declaration.path)))
+    )
+  }
+
+  // a global stays built-in when a package augments it (`declare global { interface Error }`),
+  // members of `Error` subclasses are built-in when declared outside the project
+  return isError
+    ? symbol.declarations.length > 0 && symbol.declarations.every(isRuntime)
+    : symbol.declarations.some(isRuntime)
 }
 
 export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
