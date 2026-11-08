@@ -128,6 +128,19 @@ export function getBuiltin(
 }
 
 /**
+ * The typed array a mapped type maps over, like `Uint8Array` of `Readonly<Uint8Array>`.
+ */
+export function getMappedTypedArray(types: TypeQueries, type: Type): Type | undefined {
+  const [source] =
+    (type as any).objectFlags & ObjectFlags.Mapped ? types.getTypeArguments(type) : []
+  const symbol = source?.getSymbol()
+
+  return symbol && TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(types, symbol)
+    ? source
+    : undefined
+}
+
+/**
  * `DeepReadonly<Date>` or `DeepPartial<Set<string>>` maps over the built-in's methods,
  * but the value is still the built-in and serialized like it.
  */
@@ -136,6 +149,12 @@ export function getMappedBuiltin(
   type: Type,
   stringify: boolean,
 ): Builtin | undefined {
+  // `Readonly<Uint8Array>` is still a typed array
+  const typedArray = getMappedTypedArray(types, type)
+  if (typedArray) {
+    return getBuiltin(types, typedArray, stringify)
+  }
+
   const builtin = getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {

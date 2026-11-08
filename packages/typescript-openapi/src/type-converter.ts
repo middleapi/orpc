@@ -11,7 +11,13 @@ import type {
 import { ElementFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import type { Builtin } from './builtins.ts'
-import { getBuiltin, getMappedBuiltin, isBuiltinSymbol, TYPED_ARRAYS } from './builtins.ts'
+import {
+  getBuiltin,
+  getMappedBuiltin,
+  getMappedTypedArray,
+  isBuiltinSymbol,
+  TYPED_ARRAYS,
+} from './builtins.ts'
 import { getDefName, getFallbackDefName } from './def-names.ts'
 import { DefRegistry } from './defs.ts'
 import { ExpansionGuard } from './expansion.ts'
@@ -652,9 +658,15 @@ export class TypeToJsonSchemaConverter {
     if (toJSONResult) {
       const converted = this.withStringify(() => this.convertToJSONResult(toJSONResult))
 
-      // without `toJSON`, a value is its own fields, walked by the serializer outside class instances
+      // without `toJSON`, a value is its own fields: of a class instance written by
+      // `JSON.stringify`, of a `Partial<Money>` or an interface possibly a plain object
       return hasOptionalToJSON(this.types, type)
-        ? { anyOf: dedupe([converted, this.convertObject(type, true, !this.stringify)]) }
+        ? {
+            anyOf: dedupe([
+              converted,
+              this.convertObject(type, true, !this.stringify && classType !== type),
+            ]),
+          }
         : converted
     }
 
@@ -1034,7 +1046,13 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    // built-ins have no own enumerable data, except typed arrays, also through `Readonly<Date>`
+    // typed arrays are written by their index keys, also through `Readonly<Uint8Array>`
+    const typedArray = getMappedTypedArray(this.types, resolved)
+    if (typedArray) {
+      return this.visit(typedArray)
+    }
+
+    // built-ins have no own enumerable data, also through `Readonly<Date>`
     if (
       this.isBuiltinObject(resolved) ||
       getMappedBuiltin(this.types, resolved, true) !== undefined

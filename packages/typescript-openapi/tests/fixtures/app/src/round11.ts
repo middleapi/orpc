@@ -11,6 +11,8 @@ import { getUser } from './round11/users'
 
 const list = impl.users.list.handler(() => [])
 
+const StatusWithId = z.enum(['x', 'y']).meta({ id: 'StatusWithId' })
+
 const Category = z.object({
   name: z.string().optional(),
   get children(): z.ZodArray<typeof Category> {
@@ -143,6 +145,16 @@ export const mixed = {
   recursive: os
     .input(Category)
     .input(type<{ name: string; extra: number }>())
+    .handler(() => 'ok'),
+  pathWithRef: os
+    .route({ method: 'POST', path: '/path-with-ref/{id}' })
+    .input(z.object({ id: z.string().optional(), s: StatusWithId }))
+    .input(type<{ id: string; s: 'x' | 'y'; b: number }>())
+    .handler(() => 'ok'),
+  queryWithRef: os
+    .route({ method: 'GET' })
+    .input(z.object({ a: z.string().optional(), s: StatusWithId }))
+    .input(type<{ a: string; s: 'x' | 'y'; b: string }>())
     .handler(() => 'ok'),
   weaker: os
     .input(z.object({ tag: z.unknown() }))

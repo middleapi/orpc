@@ -2,7 +2,7 @@ import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
 import type { ObjectJsonSchema } from './schema-utils.ts'
-import { collectDefRefs, isPlain } from './schema-utils.ts'
+import { collectDefRefs, fromRef, isPlain } from './schema-utils.ts'
 
 /**
  * What an inferred schema adds to the schemas a converter produced for the same value,
@@ -12,7 +12,10 @@ export function withoutDescribedSchemas(
   schema: JsonSchema,
   described: readonly JsonSchema[],
 ): JsonSchema | undefined {
-  const rest = described.reduce(withoutDescribed, schema)
+  const rest = described.reduce(
+    (current, other) => withoutDescribed(current, other, getDefsResolver(other)),
+    schema,
+  )
 
   if (rest === schema) {
     return schema
@@ -26,7 +29,13 @@ export function withoutDescribedSchemas(
  * Removes the properties of an object schema that another schema describes as well,
  * keeping what only it adds (`b` of `{ query: { a, b } }` when the other has `{ query: { a } }`).
  */
-function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema {
+function withoutDescribed(
+  schema: JsonSchema,
+  described: JsonSchema,
+  resolve: (schema: JsonSchema) => JsonSchema,
+): JsonSchema {
+  described = resolve(described)
+
   if (
     typeof schema !== 'object' ||
     typeof described !== 'object' ||
@@ -48,7 +57,9 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
       continue
     }
 
-    const rest = isCovered(property, other) ? undefined : withoutDescribed(property, other)
+    const rest = isCovered(property, resolve(other))
+      ? undefined
+      : withoutDescribed(property, other, resolve)
 
     if (rest === undefined || (rest !== property && isPlain(rest, 'object'))) {
       removed.add(name)
@@ -74,6 +85,33 @@ function withoutDescribed(schema: JsonSchema, described: JsonSchema): JsonSchema
     ...rest,
     ...(Object.keys(properties).length ? { properties } : {}),
     ...(required?.length ? { required } : {}),
+  }
+}
+
+/**
+ * Resolves refs of a converted schema into its own `$defs` (zod's `.meta({ id })`),
+ * to compare what they describe.
+ */
+function getDefsResolver(root: JsonSchema): (schema: JsonSchema) => JsonSchema {
+  const $defs = typeof root === 'object' ? root.$defs : undefined
+
+  if (!$defs) {
+    return (schema) => schema
+  }
+
+  return (schema) => {
+    // a ref to a ref, at most a few times
+    for (let depth = 0; depth < 8; depth++) {
+      const name = fromRef(schema)
+
+      if (name === undefined || !Object.hasOwn($defs, name)) {
+        break
+      }
+
+      schema = $defs[name]!
+    }
+
+    return schema
   }
 }
 

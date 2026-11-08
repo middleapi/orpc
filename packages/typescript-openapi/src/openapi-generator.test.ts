@@ -672,6 +672,18 @@ describe('typeScriptOpenAPIGenerator', () => {
       expect(Object.keys(spec.components?.schemas ?? {})).not.toContain('Array')
       expect(recursive[1].required).toEqual(expect.arrayContaining(['name', 'extra']))
 
+      // refs into the converted schema's own defs are not recursion, and describe their keys
+      expect(
+        paths['/path-with-ref/{id}'].post.parameters.map((p: any) => [p.in, p.name, p.required]),
+      ).toEqual([['path', 'id', true]])
+      expect(
+        paths['/queryWithRef'].get.parameters.map((p: any) => [p.name, p.required, p.style]),
+      ).toEqual([
+        ['a', true, undefined],
+        ['s', true, undefined],
+        ['b', true, undefined],
+      ])
+
       // constraints only the type has
       expect(body('/constraints').properties.id).toEqual({
         type: 'string',

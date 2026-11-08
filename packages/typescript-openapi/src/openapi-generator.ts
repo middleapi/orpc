@@ -286,7 +286,7 @@ export class TypeScriptOpenAPIGenerator {
             .find((c) => c.condition(schema, direction))!
             .convert(schema, direction)
           // a recursive schema (`$ref: '#'`) shares its levels, so the inferred part keeps them
-          const required = stringifyJSON(jsonSchema)!.includes('"$ref":"#')
+          const required = /"\$ref":"#(?:\/properties\/[^"]*)?"/u.test(stringifyJSON(jsonSchema)!)
             ? jsonSchema
             : withRequiredFrom(
                 jsonSchema,

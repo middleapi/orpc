@@ -102,6 +102,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['partialMoney', undefined],
     ['mappedDates', undefined],
     ['partialPlain', undefined],
+    ['optionalToJSONClass', undefined],
+    ['readonlyBytes', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -199,6 +201,11 @@ describe('generated schemas match serialized outputs', async () => {
       expect.objectContaining({ required: ['amount', 'currency'] }),
       expect.objectContaining({ type: 'object' }),
     ])
+    // the fields of a class instance are written by `JSON.stringify`
+    expect(schemas.OptionalToJSONClass.anyOf[1].properties.tags).toEqual({ type: 'object' })
+    const bytes = { type: 'object', additionalProperties: { type: 'number' } }
+    expect(schemas.ReadonlyBytesJSON).toEqual(bytes)
+
     // `JSON.stringify` does not call `toJSON` of the returned date again
     expect(schemas.ReadonlyDateJSON).toMatchObject({ type: 'object' })
     expect(schemas.PartialDateJSON).toMatchObject({ type: 'object' })

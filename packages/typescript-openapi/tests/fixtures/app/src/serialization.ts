@@ -516,6 +516,17 @@ export class TaggedJSON {
   }
 }
 
+export class OptionalToJSONClass {
+  tags = new Set(['x'])
+  declare toJSON?: () => string
+}
+
+export class ReadonlyBytesJSON {
+  toJSON(): Readonly<Uint8Array> {
+    return new Uint8Array([1, 2])
+  }
+}
+
 export class ArrayToJSONHolder {
   list: string[] & { toJSON(): number } = Object.assign(['a'], { toJSON: () => 5 })
 }
@@ -661,5 +672,10 @@ export const router = {
   partialPlain: os.handler((): { p: Partial<TaggedJSON>; list: Partial<TaggedJSON>[] } => ({
     p: { tags: new Set(['a']) },
     list: [{ tags: new Set(['b']), big: 2n }, new TaggedJSON()],
+  })),
+  optionalToJSONClass: os.handler(() => ({ value: new OptionalToJSONClass() })),
+  readonlyBytes: os.handler((): { json: ReadonlyBytesJSON; field: Readonly<Uint8Array> } => ({
+    json: new ReadonlyBytesJSON(),
+    field: new Uint8Array([3]),
   })),
 }
