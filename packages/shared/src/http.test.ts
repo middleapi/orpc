@@ -1,6 +1,6 @@
 import {
-  AVG_UTF8_BYTES_PER_CHAR,
   estimateCompressibleFormDataSize,
+  estimateUtf8ByteLength,
   isAcceptableEncoding,
   isCompressibleContentType,
   isCompressionEncoding,
@@ -280,6 +280,20 @@ describe('parseContentEncodings', () => {
   it('keeps the order codings were applied in, trimmed and lowercased', () => {
     expect(parseContentEncodings(' GZIP , deflate')).toEqual(['gzip', 'deflate'])
   })
+
+  it('ignores empty list elements', () => {
+    expect(parseContentEncodings('gzip,')).toEqual(['gzip'])
+    expect(parseContentEncodings(', gzip, , deflate')).toEqual(['gzip', 'deflate'])
+    expect(parseContentEncodings('')).toEqual([])
+  })
+})
+
+describe('estimateUtf8ByteLength', () => {
+  it('scales with the string length', () => {
+    expect(estimateUtf8ByteLength('')).toBe(0)
+    expect(estimateUtf8ByteLength('a'.repeat(10))).toBeGreaterThanOrEqual(10)
+    expect(estimateUtf8ByteLength('a'.repeat(20))).toBe(2 * estimateUtf8ByteLength('a'.repeat(10)))
+  })
 })
 
 describe('isAcceptableEncoding', () => {
@@ -341,7 +355,7 @@ describe('estimateCompressibleFormDataSize', () => {
     form.append('b', new Blob(['y'.repeat(100)], { type: 'text/plain' }))
 
     expect(estimateCompressibleFormDataSize(form, isCompressible)).toBe(
-      64 + 1 + 10 * AVG_UTF8_BYTES_PER_CHAR + 64 + 1 + 100,
+      64 + 1 + estimateUtf8ByteLength('x'.repeat(10)) + 64 + 1 + 100,
     )
   })
 
@@ -353,9 +367,10 @@ describe('estimateCompressibleFormDataSize', () => {
   })
 
   it('handles blobs with an unknown size', () => {
-    const compressible = new Blob(['a'], { type: 'text/plain' })
+    // a File appended without a filename is stored as is, so the patched size is what gets read
+    const compressible = new File(['a'], 'a.txt', { type: 'text/plain' })
     Object.defineProperty(compressible, 'size', { value: Number.NaN })
-    const nonCompressible = new Blob(['a'], { type: 'image/png' })
+    const nonCompressible = new File(['a'], 'a.png', { type: 'image/png' })
     Object.defineProperty(nonCompressible, 'size', { value: Number.NaN })
 
     const form = new FormData()

@@ -1,6 +1,6 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { isAsyncIteratorObject, resolveMaybeOptionalOptions, takeLast } from '@orpc/shared'
 
 import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key.ts'
 import { generateOperationKey } from './key.ts'
@@ -131,11 +131,9 @@ export class ProcedureUtils<
             next(undefined, (old) => {
               const newData = Array.isArray(old) ? [...old, event] : [event]
 
-              if (typeof maxChunks === 'number' && newData.length > maxChunks) {
-                return newData.slice(newData.length - maxChunks) as InferSubscriberOutput<TOutput>
-              }
-
-              return newData as InferSubscriberOutput<TOutput>
+              return (
+                typeof maxChunks === 'number' ? takeLast(newData, maxChunks) : newData
+              ) as InferSubscriberOutput<TOutput>
             })
           }
         } catch (error) {

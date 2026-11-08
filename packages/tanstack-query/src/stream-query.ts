@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { takeLast, throwIfAborted } from '@orpc/shared'
+import { listenAbort, takeLast, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
 export interface SerializableStreamedQueryOptions {
@@ -56,11 +56,9 @@ export function serializableStreamedQuery<
 
     // a stream cut short (cancelled, or its last observer left) reopens when observed again;
     // marked at abort, so the writes of a fetch that replaces this one clear it
-    const markStale = () => client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
-    if (signal.aborted) {
-      markStale()
-    }
-    signal.addEventListener('abort', markStale, { once: true })
+    const unlisten = listenAbort(signal, () =>
+      client.getQueryCache().find({ queryKey, exact: true })?.invalidate(),
+    )
 
     try {
       const stream = await queryFn(context)
@@ -83,9 +81,9 @@ export function serializableStreamedQuery<
       for await (const chunk of stream) {
         throwIfAborted(signal)
 
-        // read the cache, so writes made during the stream are kept
-        data = client.setQueryData<TQueryFnData[]>(queryKey, (current = []) =>
-          takeLast([...current, chunk], maxChunks),
+        // read the cache, so writes made during the stream are kept; a cleared entry (`null`) starts over
+        data = client.setQueryData<TQueryFnData[]>(queryKey, (current) =>
+          takeLast([...(current ?? []), chunk], maxChunks),
         )!
       }
 
@@ -98,7 +96,7 @@ export function serializableStreamedQuery<
       // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
       return Array.isArray(cached) ? takeLast(cached, maxChunks) : cached
     } finally {
-      signal.removeEventListener('abort', markStale)
+      unlisten()
     }
   }
 }

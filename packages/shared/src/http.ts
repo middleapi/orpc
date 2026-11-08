@@ -84,7 +84,7 @@ export function matchesHttpPath(url: `/${string}`, path: `/${string}`): boolean 
 /**
  * Content codings that oRPC compression plugins can encode and decode.
  */
-export const COMPRESSION_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
+const COMPRESSION_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
 
 export type CompressionEncoding = (typeof COMPRESSION_ENCODINGS)[number]
 
@@ -93,23 +93,35 @@ export function isCompressionEncoding(encoding: string): encoding is Compression
 }
 
 /**
- * Parse Content-Encoding into ordered codings (order applied).
+ * Parse Content-Encoding into ordered codings (order applied), ignoring empty list elements.
  *
  * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
+ * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-lists-rule-abnf-extension
  */
 export function parseContentEncodings(header: string | undefined): string[] {
-  if (header === undefined) {
-    return []
+  const codings: string[] = []
+
+  for (const part of header?.split(',') ?? []) {
+    const coding = part.trim().toLowerCase()
+
+    if (coding !== '') {
+      codings.push(coding)
+    }
   }
 
-  return header.split(',').map((part) => part.trim().toLowerCase())
+  return codings
 }
 
+// Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
+// occasional multi-byte characters increase the average.
+const AVG_UTF8_BYTES_PER_CHAR = 1.2
+
 /**
- * Rough UTF-8 bytes per string character. Mostly ASCII text stays close to 1 byte/char;
- * occasional multi-byte characters increase the average.
+ * Roughly estimates the UTF-8 byte length of a string without encoding it.
  */
-export const AVG_UTF8_BYTES_PER_CHAR = 1.2
+export function estimateUtf8ByteLength(value: string): number {
+  return value.length * AVG_UTF8_BYTES_PER_CHAR
+}
 
 // approx bytes for boundary + Content-Disposition/Content-Type headers per part
 const FORM_DATA_PART_OVERHEAD = 64
@@ -141,7 +153,7 @@ export function estimateCompressibleFormDataSize(
         size += isCompressible(value.type) ? value.size : -value.size
       }
     } else {
-      size += value.length * AVG_UTF8_BYTES_PER_CHAR
+      size += estimateUtf8ByteLength(value)
     }
   }
 

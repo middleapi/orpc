@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { stringifyJSON, throwIfAborted } from '@orpc/shared'
+import { listenAbort, stringifyJSON, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
 import type { SettleOnFirstDataOptions } from './stream-query.ts'
@@ -13,11 +13,9 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
 
     // a stream cut short (cancelled, or its last observer left) reopens when observed again;
     // marked at abort, so the writes of a fetch that replaces this one clear it
-    const markStale = () => client.getQueryCache().find({ queryKey, exact: true })?.invalidate()
-    if (signal.aborted) {
-      markStale()
-    }
-    signal.addEventListener('abort', markStale, { once: true })
+    const unlisten = listenAbort(signal, () =>
+      client.getQueryCache().find({ queryKey, exact: true })?.invalidate(),
+    )
 
     try {
       const stream = await queryFn(context)
@@ -48,7 +46,7 @@ export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = Q
 
       return last.chunk
     } finally {
-      signal.removeEventListener('abort', markStale)
+      unlisten()
     }
   }
 }

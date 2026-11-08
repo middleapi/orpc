@@ -362,6 +362,22 @@ describe('serializableStreamedQuery', () => {
       await promise1
     })
 
+    it('starts a new array when the cache is set to null mid-stream', async () => {
+      const key = ['null-mid-stream']
+
+      await expect(
+        queryClient.fetchQuery({
+          queryKey: key,
+          queryFn: serializableStreamedQuery(async function* () {
+            yield 1
+            queryClient.setQueryData(key, null)
+            yield 2
+          }),
+        }),
+      ).resolves.toEqual([2])
+      expect(queryClient.getQueryData(key)).toEqual([2])
+    })
+
     it('keeps a null written after the last chunk', async () => {
       const key = ['null-after-stream']
 

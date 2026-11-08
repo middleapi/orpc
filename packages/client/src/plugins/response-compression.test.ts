@@ -115,6 +115,22 @@ describe('responseCompressionLinkPlugin', () => {
     await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
   })
 
+  it('ignores empty content-encoding list elements', async () => {
+    const compressed = await compressAsync(JSON.stringify({ json: 'OK' }), 'gzip')
+
+    const { link } = createLink({
+      fetchImpl: async () =>
+        new Response(compressed, {
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'gzip, ',
+          },
+        }),
+    })
+
+    await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
+  })
+
   it('decompresses response body when 5 content-encodings are applied', async () => {
     let body: Uint8Array<ArrayBuffer> = await compressAsync(JSON.stringify({ json: 'OK' }), 'gzip')
     for (let i = 1; i < 5; i++) {

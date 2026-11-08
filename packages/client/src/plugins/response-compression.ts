@@ -1,3 +1,4 @@
+import type { CompressionEncoding } from '@orpc/shared'
 import { isCompressionEncoding, parseContentEncodings, toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
@@ -22,7 +23,7 @@ export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> 
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
+  encodings?: readonly CompressionEncoding[] | undefined
 }
 
 /**

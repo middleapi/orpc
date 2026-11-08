@@ -241,7 +241,11 @@ describe('procedureUtils', () => {
     })
 
     it('on error after unsubscribe', async () => {
+      const started = promiseWithResolvers<void>()
       client.mockImplementationOnce(async function* () {
+        yield 'started'
+        // resumed for the next value, so the first one has been handled
+        started.resolve()
         await new Promise((resolve) => setTimeout(resolve, 10))
         throw new Error('__error__')
       })
@@ -249,9 +253,11 @@ describe('procedureUtils', () => {
 
       const next = vi.fn()
       const unsubscribe = subscriber(key, { next })
+      // unsubscribe mid-stream, so the error reaches the subscriber after it was aborted
+      await started.promise
       unsubscribe()
       await new Promise((resolve) => setTimeout(resolve, 20))
-      expect(next).toHaveBeenCalledTimes(0)
+      expect(next).not.toHaveBeenCalledWith(new Error('__error__'))
     })
 
     it('on non-AsyncIteratorObject output', async () => {
@@ -388,7 +394,11 @@ describe('procedureUtils', () => {
     })
 
     it('on error after unsubscribe', async () => {
+      const started = promiseWithResolvers<void>()
       client.mockImplementationOnce(async function* () {
+        yield 'started'
+        // resumed for the next value, so the first one has been handled
+        started.resolve()
         await new Promise((resolve) => setTimeout(resolve, 10))
         throw new Error('__error__')
       })
@@ -396,9 +406,11 @@ describe('procedureUtils', () => {
 
       const next = vi.fn()
       const unsubscribe = subscriber(key, { next })
+      // unsubscribe mid-stream, so the error reaches the subscriber after it was aborted
+      await started.promise
       unsubscribe()
       await new Promise((resolve) => setTimeout(resolve, 20))
-      expect(next).toHaveBeenCalledTimes(0)
+      expect(next).not.toHaveBeenCalledWith(new Error('__error__'))
     })
 
     it('on non-AsyncIteratorObject output', async () => {

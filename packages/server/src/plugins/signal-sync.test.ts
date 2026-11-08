@@ -320,7 +320,7 @@ describe('signalSyncHandlerPlugin', () => {
       await new Promise((resolve) => setTimeout(resolve, 0)) // any unhandled rejection would fail the test
     })
 
-    it('drops a pending read that settles after the signal aborts', async () => {
+    it('rejects a pending read with the abort reason when the signal aborts', async () => {
       const pulled = promiseWithResolvers<void>()
 
       const controller = new AbortController()

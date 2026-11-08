@@ -1,6 +1,6 @@
 import type { CompressionEncoding } from '@orpc/shared'
 import {
-  AVG_UTF8_BYTES_PER_CHAR,
+  estimateUtf8ByteLength,
   estimateCompressibleFormDataSize,
   isAcceptableEncoding,
   isAsyncIteratorObject,
@@ -187,7 +187,7 @@ export class ResponseCompressionHandlerPlugin<
         }
       } else if (body instanceof URLSearchParams) {
         const string = body.toString()
-        if (string.length * AVG_UTF8_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           const [, bodyHeaders] = toFetchBody(body, headers)
 
           return {
@@ -205,7 +205,7 @@ export class ResponseCompressionHandlerPlugin<
         }
       } else if (body !== undefined && !isAsyncIteratorObject(body)) {
         const [string, bodyHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
-        if (string.length * AVG_UTF8_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           return {
             ...result,
             response: {

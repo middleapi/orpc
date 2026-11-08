@@ -1,6 +1,6 @@
 import type { CompressionEncoding } from '@orpc/shared'
 import {
-  AVG_UTF8_BYTES_PER_CHAR,
+  estimateUtf8ByteLength,
   estimateCompressibleFormDataSize,
   isAsyncIteratorObject,
   isCompressibleContentType,
@@ -179,7 +179,7 @@ export class RequestCompressionLinkPlugin<
         }
       } else if (request.body instanceof URLSearchParams) {
         const string = request.body.toString()
-        if (string.length * AVG_UTF8_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           const compressedStream = new Blob([string])
             .stream()
             .pipeThrough(new CompressionStream(this.encoding))
@@ -205,7 +205,7 @@ export class RequestCompressionLinkPlugin<
           string,
           StandardHeaders,
         ]
-        if (string.length * AVG_UTF8_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           const compressedStream = new Blob([string])
             .stream()
             .pipeThrough(new CompressionStream(this.encoding))

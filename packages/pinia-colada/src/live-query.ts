@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { stringifyJSON, throwIfAborted } from '@orpc/shared'
+import { listenAbort, stringifyJSON, throwIfAborted } from '@orpc/shared'
 
 import type { SettleOnFirstDataOptions } from './stream-query.ts'
 import type { UseQueryFnContext } from './types.ts'
@@ -16,13 +16,9 @@ export function liveQuery<T>(
     const { entry, signal } = context
 
     // a fetch cut short (cancelled, superseded, or its last component left) reopens when used again
-    const markStale = () => {
+    listenAbort(signal, () => {
       entry.when = 0
-    }
-    if (signal.aborted) {
-      markStale()
-    }
-    signal.addEventListener('abort', markStale, { once: true })
+    })
 
     const stream = await queryFn(context)
 

@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { takeLast, throwIfAborted } from '@orpc/shared'
+import { listenAbort, takeLast, throwIfAborted } from '@orpc/shared'
 
 import type { UseQueryFnContext } from './types.ts'
 
@@ -61,13 +61,9 @@ export function serializableStreamedQuery<T>(
     }
 
     // a fetch cut short (cancelled, superseded, or its last component left) reopens when used again
-    const markStale = () => {
+    listenAbort(signal, () => {
       entry.when = 0
-    }
-    if (signal.aborted) {
-      markStale()
-    }
-    signal.addEventListener('abort', markStale, { once: true })
+    })
 
     const stream = await queryFn(context)
 

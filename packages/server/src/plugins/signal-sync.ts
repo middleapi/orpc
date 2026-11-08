@@ -90,9 +90,9 @@ function syncReadableStream(
   return new ReadableStream(
     {
       start(controller) {
-        unlisten = listenAbort(signal, () => {
-          controller.error(signal.reason)
-          cancelling = reader.cancel(signal.reason)
+        unlisten = listenAbort(signal, (reason) => {
+          controller.error(reason)
+          cancelling = reader.cancel(reason)
           cancelling.catch(() => {}) // only awaited when the consumer cancels
         })
       },
