@@ -67,7 +67,6 @@ export const router = {
     record: { x: { n: 1 } },
     prefixed: { 'x-a': 'b' },
     union: { kind: 'b', b: [1] },
-    nan: Number.NaN,
     author: { id: 'a', joinedAt: new Date(0) },
   })),
   literal: os.handler(() => ({

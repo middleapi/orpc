@@ -1,6 +1,6 @@
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { call } from '@orpc/server'
-import Ajv2020 from 'ajv/dist/2020'
+import { Ajv2020 } from 'ajv/dist/2020.js'
 
 import { router } from '../tests/fixtures/app/src/serialization.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
