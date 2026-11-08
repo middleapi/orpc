@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "strict": true, "noEmit": true, "skipLibCheck": true },
+  "include": ["src"]
+}

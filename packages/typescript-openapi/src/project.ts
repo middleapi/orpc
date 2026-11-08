@@ -66,13 +66,25 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
   const api = new API({ cwd: path.dirname(tsconfig ?? file) })
 
   try {
-    const snapshot = api.updateSnapshot(
+    let snapshot = api.updateSnapshot(
       tsconfig ? { openProjects: [tsconfig] } : { openFiles: [file] },
     )
 
-    const project = tsconfig
-      ? snapshot.getProject(tsconfig)
-      : snapshot.getDefaultProjectForFile(file)
+    let project = tsconfig ? snapshot.getProject(tsconfig) : snapshot.getDefaultProjectForFile(file)
+
+    // the nearest tsconfig.json may not include the file (e.g. `include: ["src"]` for a script),
+    // look further up for one that does before settling for default compiler options
+    if (!tsconfig && project?.configFileName.startsWith('/dev/null/')) {
+      for (const candidate of findAncestorTsconfigs(path.dirname(file))) {
+        snapshot = api.updateSnapshot({ openProjects: [candidate] })
+        const candidateProject = snapshot.getProject(candidate)
+
+        if (candidateProject?.program.getSourceFile(file)) {
+          project = candidateProject
+          break
+        }
+      }
+    }
 
     if (!project) {
       throw new Error(`[TypeScript] Could not load the project for "${tsconfig ?? file}".`)
@@ -121,6 +133,20 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
   } catch (error) {
     api.close()
     throw error
+  }
+}
+
+function* findAncestorTsconfigs(directory: string): Generator<string> {
+  for (let current = directory; ; current = path.dirname(current)) {
+    const candidate = path.join(current, 'tsconfig.json')
+
+    if (existsSync(candidate)) {
+      yield candidate
+    }
+
+    if (path.dirname(current) === current) {
+      return
+    }
   }
 }
 

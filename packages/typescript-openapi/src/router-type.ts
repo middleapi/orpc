@@ -27,16 +27,30 @@ export class RouterTypeResolver {
 
     for (const segment of path) {
       const symbol = this.checker.getPropertyOfType(current.type, segment)
-      const type = symbol && this.checker.getTypeOfSymbol(symbol)
+
+      // routers typed with an index signature, like `Record<string, typeof procedure>`
+      const type = symbol
+        ? this.checker.getTypeOfSymbol(symbol)
+        : this.checker
+            .getIndexInfosOfType(current.type)
+            .find((info) => info.keyType.flags & TypeFlags.String)?.valueType
 
       if (!type) {
         return undefined
       }
 
-      current = { type: this.unlazy(type), symbol }
+      // optional sub-routers and procedures, like `...(dev ? { debug } : {})`
+      current = { type: this.unlazy(this.stripNullish(type)), symbol }
     }
 
     return current
+  }
+
+  /**
+   * Whether the type is a procedure or contract, which carries a `~orpc` definition.
+   */
+  isProcedure(type: Type): boolean {
+    return this.getProperty(type, '~orpc') !== undefined
   }
 
   /**
@@ -97,14 +111,18 @@ export class RouterTypeResolver {
     const symbol = this.checker.getPropertyOfType(type, name)
     const propertyType = symbol && this.checker.getTypeOfSymbol(symbol)
 
+    return propertyType && this.stripNullish(propertyType)
+  }
+
+  private stripNullish(type: Type): Type {
     if (
-      propertyType?.isUnionType() &&
-      propertyType.getTypes().some((t) => t.flags & (TypeFlags.Undefined | TypeFlags.Null))
+      type.isUnionType() &&
+      type.getTypes().some((t) => t.flags & (TypeFlags.Undefined | TypeFlags.Null))
     ) {
-      return this.checker.getNonNullableType(propertyType)
+      return this.checker.getNonNullableType(type) ?? type
     }
 
-    return propertyType
+    return type
   }
 
   private unlazy(type: Type): Type {

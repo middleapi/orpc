@@ -5,8 +5,10 @@ import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken.ts'
 import { contract, implemented } from '../tests/fixtures/app/src/contract.ts'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed.ts'
+import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
+import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
 
 const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, import.meta.url)
@@ -360,5 +362,94 @@ describe('typeScriptOpenAPIGenerator', () => {
     expect(meta('/pong')).toEqual({ summary: 'Pong', description: 'Answers with pong.' })
     expect(meta('/renamed')).toEqual({ summary: 'Ping it', description: undefined })
     expect(meta('/overridden')).toEqual({ summary: 'Own JSDoc wins', description: undefined })
+  })
+
+  describe('router types', () => {
+    const OK = {
+      'application/json': {
+        schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      },
+    }
+
+    const outputOf = (spec: any, path: string) => spec.paths[path].post.responses['200'].content
+
+    it('resolves routers typed with index signatures', async () => {
+      const spec = await generator.generate(records, {
+        source: { file: fixture('round2.ts'), export: 'records' },
+      })
+      expect(outputOf(spec, '/planets/a')).toEqual(OK)
+    })
+
+    it('resolves optional procedures and sub-routers', async () => {
+      const spec = await generator.generate(optional, {
+        source: { file: fixture('round2.ts'), export: 'optional' },
+      })
+      expect(outputOf(spec, '/ping')).toEqual(OK)
+      expect(outputOf(spec, '/nested/a')).toEqual(OK)
+
+      const spreadSpec = await generator.generate(
+        { ...spread, debug: spread.ping },
+        { source: { file: fixture('round2.ts'), export: 'spread' } },
+      )
+      expect(outputOf(spreadSpec, '/debug')).toEqual(OK)
+    })
+
+    it('reports types that are not procedures', async () => {
+      await expect(
+        generator.generate(
+          { ping: optional.ping, nested: { pong: optional.ping } },
+          { source: { file: fixture('round2.ts'), export: 'notProcedures' } },
+        ),
+      ).rejects.toThrow(
+        'Failed to infer types for the OpenAPI document (2 errors):\n\nProcedure at ping: its type "string" is not a procedure or contract',
+      )
+    })
+
+    it('does not leave components for split inputs and detailed outputs', async () => {
+      const spec = await generator.generate(decomposed, {
+        source: { file: fixture('round2.ts'), export: 'decomposed' },
+      })
+
+      expect(spec.components?.schemas).toBeUndefined()
+      expect(spec.paths?.['/things']?.get?.parameters).toEqual([
+        {
+          in: 'query',
+          name: 'limit',
+          schema: { type: 'number' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        {
+          in: 'query',
+          name: 'search',
+          required: true,
+          schema: { type: 'string' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+      ])
+      expect(Object.keys(spec.paths?.['/things']?.post?.responses ?? {})).toEqual(['201', '202'])
+    })
+
+    it('adds JSDoc tags to router-level tags', async () => {
+      const spec = await generator.generate(decomposed, {
+        source: { file: fixture('round2.ts'), export: 'decomposed' },
+      })
+      expect(spec.paths?.['/things']?.get?.tags).toEqual(['grp', 'fromdoc'])
+      expect(spec.paths?.['/things']?.get?.summary).toBe('Find things')
+    })
+
+    it('finds an ancestor tsconfig.json when the nearest one does not include the file', async () => {
+      const spec = await generator.generate(nestedRouter, {
+        source: {
+          file: new URL('../tests/fixtures/nested/proj/scripts/router.ts', import.meta.url),
+        },
+      })
+      expect(spec.components?.schemas?.Account).toEqual({
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      })
+    })
   })
 })

@@ -23,7 +23,7 @@ import type {
   OpenAPIMeta,
   OpenAPIVersion,
 } from '@orpc/openapi'
-import { OpenAPIGenerator, OpenAPIGeneratorError } from '@orpc/openapi'
+import { getOpenAPIMeta, OpenAPIGenerator, OpenAPIGeneratorError } from '@orpc/openapi'
 import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { setOwn, toArray, value } from '@orpc/shared'
@@ -202,6 +202,18 @@ export class TypeScriptOpenAPIGenerator {
   ): AnyProcedureContract {
     const def = contract['~orpc']
 
+    const meta = getOpenAPIMeta(contract)
+
+    // the stock generator splits these into parts, where a def of the whole would be unused
+    const inlineRoot = {
+      input:
+        meta?.inputStructure === 'detailed' ||
+        meta?.method === 'GET' ||
+        meta?.method === 'HEAD' ||
+        `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
+      output: meta?.outputStructure === 'detailed',
+    }
+
     const inferSchemas = (
       schemas: AnySchema[] | undefined,
       direction: JsonSchemaConverterDirection,
@@ -210,8 +222,14 @@ export class TypeScriptOpenAPIGenerator {
         return schemas
       }
 
+      if (!ctx.resolver.isProcedure(resolved.type)) {
+        throw new OpenAPIGeneratorError(
+          `its type "${ctx.checker.typeToString(resolved.type)}" is not a procedure or contract, make sure "source" points to the type of this router.`,
+        )
+      }
+
       const type = ctx.resolver.getSchemaType(resolved.type, direction)
-      return type ? [toInferredSchema(ctx.converter, type)] : schemas
+      return type ? [toInferredSchema(ctx.converter, type, inlineRoot[direction])] : schemas
     }
 
     const errorMap: ErrorMap = {}
@@ -226,7 +244,7 @@ export class TypeScriptOpenAPIGenerator {
       setOwn(
         errorMap,
         code,
-        dataType ? { ...config, data: toInferredSchema(ctx.converter, dataType) } : config,
+        dataType ? { ...config, data: toInferredSchema(ctx.converter, dataType, false) } : config,
       )
     }
 
@@ -257,7 +275,11 @@ export class TypeScriptOpenAPIGenerator {
 /**
  * Infers a schema from a type, an async iterator becomes an `asyncIteratorObject` schema.
  */
-function toInferredSchema(converter: TypeToJsonSchemaConverter, type: Type): AnySchema {
+function toInferredSchema(
+  converter: TypeToJsonSchemaConverter,
+  type: Type,
+  inlineRoot: boolean,
+): AnySchema {
   const iterator = converter.getAsyncIteratorTypes(type)
 
   if (iterator) {
@@ -272,14 +294,14 @@ function toInferredSchema(converter: TypeToJsonSchemaConverter, type: Type): Any
     )
   }
 
-  return inferredSchema(converter.convert(type))
+  return inferredSchema(converter.convert(type, { inlineRoot }))
 }
 
 /**
  * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by `.route`.
  * The JSDoc is read from the router property, or the variable assigned to it (`{ ping }`):
  * the first line is the `summary`, the rest the `description`,
- * and `@summary`, `@description`, `@deprecated`, `@tags` override them.
+ * `@summary`, `@description`, `@deprecated` override them, and `@tags` adds tags.
  */
 function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | undefined): Meta {
   if (!symbol) {
@@ -328,10 +350,15 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
   const openapi = (meta['~openapi'] ?? {}) as OpenAPIMeta
   const merged: OpenAPIMeta = { ...openapi }
 
-  for (const key of ['summary', 'description', 'deprecated', 'tags'] as const) {
+  for (const key of ['summary', 'description', 'deprecated'] as const) {
     if (merged[key] === undefined && fromJSDoc[key] !== undefined) {
       ;(merged as Record<string, unknown>)[key] = fromJSDoc[key]
     }
+  }
+
+  // tags concatenate, like `openapi({ tags })` does, so router-level tags keep JSDoc tags
+  if (fromJSDoc.tags?.length) {
+    merged.tags = [...new Set([...(merged.tags ?? []), ...fromJSDoc.tags])]
   }
 
   return { ...meta, '~openapi': merged }

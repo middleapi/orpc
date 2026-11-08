@@ -23,6 +23,7 @@ Pass the router and the file that exports it. `export` is the export name of the
 
 ```ts
 // src/router.ts
+import '@orpc/openapi/extensions/route'
 import { os, type } from '@orpc/server'
 import type { Planet } from '@/models/planet'
 
@@ -107,7 +108,7 @@ const generator = new TypeScriptOpenAPIGenerator({ defs: 'recursive' })
 
 JSDoc comments document the generated operations and schemas.
 
-On procedures, the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, `@deprecated`, and `@tags a, b` are supported too. The comment can be on the router property, or on the variable assigned to it:
+On procedures, the first line becomes the operation `summary` and the rest its `description`, unless `.route` sets them. `@summary`, `@description`, and `@deprecated` are supported too, and `@tags a, b` adds tags. The comment can be on the router property, or on the variable assigned to it:
 
 ```ts
 /** Ping the server */

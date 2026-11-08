@@ -39,6 +39,16 @@ export interface TypeToJsonSchemaConverterOptions {
   defs?: 'named' | 'recursive' | undefined
 }
 
+export interface TypeToJsonSchemaConvertOptions {
+  /**
+   * Inline the root def (and the defs of a root union) when nothing else references them,
+   * for schemas that are split into parts like path params, query, headers, and body.
+   *
+   * @default false
+   */
+  inlineRoot?: boolean | undefined
+}
+
 export interface AsyncIteratorTypes {
   yieldType: Type
   returnType: Type
@@ -56,7 +66,23 @@ interface Def extends Frame {
 
 const DEFS_REF_PREFIX = '#/$defs/'
 
-const MAX_EXPANSION_DEPTH = 5
+const TYPED_ARRAYS = new Set([
+  'Int8Array',
+  'Uint8Array',
+  'Uint8ClampedArray',
+  'Int16Array',
+  'Uint16Array',
+  'Int32Array',
+  'Uint32Array',
+  'Float16Array',
+  'Float32Array',
+  'Float64Array',
+  'BigInt64Array',
+  'BigUint64Array',
+  'Buffer',
+])
+
+const MAX_EXPANSION_DEPTH = 32
 
 const NON_NULLISH_LITERAL_FLAGS =
   TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
@@ -131,8 +157,10 @@ export class TypeToJsonSchemaConverter {
   private readonly defsByName = new Map<string, Def>()
   private readonly visiting = new Set<number>()
   private readonly frames: Frame[] = []
-  private readonly expansions = new Map<number, number>()
+  private readonly expansions = new Map<number, Type[]>()
+  private readonly typeArgumentsTexts = new Map<number, string>()
   private createdDefs: Def[] = []
+  private truncated = false
   private readonly isLibraryPath: (path: string) => boolean
 
   constructor(
@@ -147,32 +175,28 @@ export class TypeToJsonSchemaConverter {
   /**
    * Converts a type, returning its schema, with the `$defs` it references, and whether it accepts `undefined`.
    */
-  convert(type: Type): [jsonSchema: JsonSchema, optional: boolean] {
+  convert(
+    type: Type,
+    options: TypeToJsonSchemaConvertOptions = {},
+  ): [jsonSchema: JsonSchema, optional: boolean] {
     const optional = this.isOptional(type)
 
     const frame: Frame = { deps: new Set() }
     this.frames.push(frame)
     this.createdDefs = []
+    this.truncated = false
 
     let schema: JsonSchema
+    let names: Set<string>
     try {
       schema = type.flags & (TypeFlags.Undefined | TypeFlags.Void) ? {} : this.visit(type)
+      names = this.collectDeps(frame.deps)
     } catch (error) {
       // defs of a failed conversion may be unfinished or reference unfinished ones
-      for (const def of this.createdDefs) {
-        this.defs.delete(def.typeId)
-        this.defsByName.delete(def.name)
-      }
+      this.discardCreatedDefs()
       throw error
     } finally {
       this.frames.pop()
-      this.createdDefs = []
-    }
-
-    const names = this.collectDeps(frame.deps)
-
-    if (!names.size) {
-      return [schema, optional]
     }
 
     const $defs: Record<string, JsonSchema> = {}
@@ -180,7 +204,80 @@ export class TypeToJsonSchemaConverter {
       $defs[name] = this.defsByName.get(name)!.schema!
     }
 
-    return [{ ...(typeof schema === 'object' ? schema : { not: {} }), $defs }, optional]
+    // a cut expansion depends on where the conversion started, so it is not reused
+    if (this.truncated) {
+      this.discardCreatedDefs()
+    }
+    this.createdDefs = []
+
+    if (options.inlineRoot) {
+      ;[schema, names] = this.inlineRootDefs(schema, names, $defs)
+    }
+
+    if (!names.size) {
+      return [schema, optional]
+    }
+
+    const usedDefs: Record<string, JsonSchema> = {}
+    for (const name of names) {
+      usedDefs[name] = $defs[name]!
+    }
+
+    return [{ ...(typeof schema === 'object' ? schema : { not: {} }), $defs: usedDefs }, optional]
+  }
+
+  private discardCreatedDefs(): void {
+    for (const def of this.createdDefs) {
+      this.defs.delete(def.typeId)
+      this.defsByName.delete(def.name)
+    }
+    this.createdDefs = []
+  }
+
+  /**
+   * Inlines the root def, and the defs of a root union, when nothing else references them.
+   * Used for schemas that get split into parts, like path params, query, and headers,
+   * where the def of the whole would become an unused component.
+   */
+  private inlineRootDefs(
+    schema: JsonSchema,
+    names: Set<string>,
+    $defs: Record<string, JsonSchema>,
+  ): [JsonSchema, Set<string>] {
+    const referencedByDefs = new Set<string>()
+    for (const name of names) {
+      for (const dep of this.defsByName.get(name)!.deps) {
+        referencedByDefs.add(dep)
+      }
+    }
+
+    const inline = (member: JsonSchema): JsonSchema => {
+      const name = typeof member === 'object' ? fromRef(member) : undefined
+
+      if (name === undefined || referencedByDefs.has(name)) {
+        return member
+      }
+
+      names.delete(name)
+      return $defs[name]!
+    }
+
+    let inlined = inline(schema)
+
+    if (typeof inlined === 'object' && inlined.anyOf) {
+      const refs = inlined.anyOf.map((m) => (typeof m === 'object' ? fromRef(m) : undefined))
+      const unique = refs.every((r, i) => r === undefined || refs.indexOf(r) === i)
+      if (unique) {
+        inlined = { ...inlined, anyOf: inlined.anyOf.map(inline) }
+      }
+    }
+
+    // inlined defs may be the only users of other defs
+    const remaining = this.collectDeps(
+      new Set([...names].filter((n) => referencedByDefs.has(n) || refersTo(inlined, n))),
+    )
+
+    return [inlined, remaining]
   }
 
   /**
@@ -267,30 +364,74 @@ export class TypeToJsonSchemaConverter {
       )
     }
 
-    if (!(type.flags & (TypeFlags.Object | TypeFlags.UnionOrIntersection))) {
+    if (
+      !(type.flags & (TypeFlags.Object | TypeFlags.UnionOrIntersection)) &&
+      !this.getSingleMemberEnum(type)
+    ) {
       return this.convertType(type)
     }
 
-    // every instantiation of `type Expand<T> = { next: Expand<T[]> }` is a new type,
-    // so stop once a declaration nests deeper than any real value would
-    const declaration = (type as any).aliasSymbol || (type as any).symbol
-    const depth = this.expansions.get(declaration) ?? 0
+    // every instantiation of `type Expand<T> = { next: Expand<T[]> }` is a new type
+    const declaration: number = (type as any).aliasSymbol || (type as any).symbol
+    const active = declaration ? this.expansions.get(declaration) : undefined
 
-    if (declaration && depth >= MAX_EXPANSION_DEPTH) {
-      // library types (`Array`, `Map`) only nest as deep as the type that uses them
-      const symbol = type.getAliasSymbol() ?? type.getSymbol()
-      if (!symbol || !this.isLibrarySymbol(symbol)) {
-        return {}
-      }
+    if (active?.length && this.isExpanding(active, type)) {
+      this.truncated = true
+      return {}
     }
 
-    this.expansions.set(declaration, depth + 1)
+    if (!declaration) {
+      return this.visitStructured(type)
+    }
+
+    const stack = active ?? []
+    this.expansions.set(declaration, stack)
+    stack.push(type)
 
     try {
       return this.visitStructured(type)
     } finally {
-      this.expansions.set(declaration, depth)
+      stack.pop()
     }
+  }
+
+  /**
+   * Whether a declaration comes back with type arguments that contain the ones it is already
+   * being converted with (`Expand<string>` -> `Expand<string[]>`), which never ends.
+   * Distinct instantiations (`Maybe<A>` -> `Maybe<B>`) are fine.
+   */
+  private isExpanding(active: Type[], type: Type): boolean {
+    const symbol = type.getAliasSymbol() ?? type.getSymbol()
+
+    // library types (`Array`, `Map`) only nest as deep as the type that uses them
+    if (symbol && this.isLibrarySymbol(symbol)) {
+      return false
+    }
+
+    if (active.length >= MAX_EXPANSION_DEPTH) {
+      return true
+    }
+
+    const outer = this.getTypeArgumentsText(active.at(-1)!)
+    const inner = this.getTypeArgumentsText(type)
+
+    return outer !== '' && inner.length > outer.length && inner.includes(outer)
+  }
+
+  private getTypeArgumentsText(type: Type): string {
+    let text = this.typeArgumentsTexts.get(type.id)
+
+    if (text === undefined) {
+      const args = type.getAliasSymbol()
+        ? type.getAliasTypeArguments()
+        : type.isTypeReference()
+          ? this.checker.getTypeArguments(type)
+          : []
+      text = args.map((arg) => this.checker.typeToString(arg)).join(', ')
+      this.typeArgumentsTexts.set(type.id, text)
+    }
+
+    return text
   }
 
   private visitStructured(type: Type): JsonSchema {
@@ -329,6 +470,11 @@ export class TypeToJsonSchemaConverter {
       schema = this.withFrame(frame, () => this.convertType(type))
     } finally {
       this.visiting.delete(type.id)
+    }
+
+    const namedSymbol = this.getNamedSymbol(type)
+    if (namedSymbol && !this.isLibrarySymbol(namedSymbol)) {
+      schema = this.annotate(schema, namedSymbol)
     }
 
     // a self reference was found while converting, so the type became a def
@@ -457,8 +603,8 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertUnion(members: readonly Type[], allowEmpty = false): JsonSchema | undefined {
-    const strings: string[] = []
-    const numbers: number[] = []
+    const strings = new Set<string>()
+    const numbers = new Set<number>()
     const booleans = new Set<boolean>()
     const schemas: JsonSchema[] = []
 
@@ -472,9 +618,9 @@ export class TypeToJsonSchemaConverter {
       if (flags & NON_NULLISH_LITERAL_FLAGS && !this.defs.has(member.id)) {
         const value = (member as any).value
         if (flags & TypeFlags.StringLiteral) {
-          strings.push(value)
+          strings.add(value)
         } else if (flags & TypeFlags.NumberLiteral) {
-          numbers.push(value)
+          numbers.add(value)
         } else {
           booleans.add(value)
         }
@@ -489,20 +635,15 @@ export class TypeToJsonSchemaConverter {
 
     const literalSchemas: JsonSchema[] = []
 
-    if (strings.length && !hasPlainString) {
-      literalSchemas.push(
-        strings.length === 1
-          ? { type: 'string', const: strings[0] }
-          : { type: 'string', enum: strings },
-      )
-    }
-
-    if (numbers.length && !hasPlainNumber) {
-      literalSchemas.push(
-        numbers.length === 1
-          ? { type: 'number', const: numbers[0] }
-          : { type: 'number', enum: numbers },
-      )
+    for (const [values, type, hasPlain] of [
+      [[...strings], 'string', hasPlainString],
+      [[...numbers], 'number', hasPlainNumber],
+    ] as const) {
+      if (values.length && !hasPlain) {
+        literalSchemas.push(
+          values.length === 1 ? { type, const: values[0] } : { type, enum: [...values] },
+        )
+      }
     }
 
     if (booleans.size === 2) {
@@ -560,6 +701,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     const properties = this.checker.getPropertiesOfType(type)
+    const isClassInstance = Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.Class)
 
     const toJSON = properties.find((p) => p.name === 'toJSON')
     if (toJSON) {
@@ -576,7 +718,9 @@ export class TypeToJsonSchemaConverter {
         // quoted keys starting with `__` are escaped with another `_`
         !p.escapedName.startsWith('__@') &&
         !p.escapedName.startsWith('__#') &&
-        !isClassAccessor(p),
+        !isClassAccessor(p) &&
+        // members a class inherits from a library class (`Error#message`) are not own enumerable data
+        !(isClassInstance && this.isLibraryMember(p)),
     )
 
     if (
@@ -604,7 +748,15 @@ export class TypeToJsonSchemaConverter {
         continue
       }
 
-      schema.properties[property.name] = this.annotate(this.visit(propertyType), property)
+      let propertySchema = this.visit(propertyType)
+
+      // an alias of a primitive (`type Count = number`) has no trace in the type,
+      // so its JSDoc is read through the property's type annotation
+      if (isTrivialSchema(propertySchema)) {
+        propertySchema = this.annotate(propertySchema, this.getPrimitiveAliasSymbol(property))
+      }
+
+      schema.properties[property.name] = this.annotate(propertySchema, property)
 
       if (!(property.flags & SymbolFlags.Optional) && !this.isOptional(propertyType)) {
         required.push(property.name)
@@ -615,7 +767,14 @@ export class TypeToJsonSchemaConverter {
       schema.required = required
     }
 
-    for (const info of this.checker.getIndexInfosOfType(type)) {
+    // a string index covers every key, so it describes additionalProperties over a number index
+    const allIndexInfos = this.checker.getIndexInfosOfType(type)
+    const indexInfos = [
+      ...allIndexInfos.filter((info) => info.keyType.flags & TypeFlags.String),
+      ...allIndexInfos.filter((info) => !(info.keyType.flags & TypeFlags.String)),
+    ]
+
+    for (const info of indexInfos) {
       const keyFlags = info.keyType.flags
 
       if (keyFlags & (TypeFlags.String | TypeFlags.Number)) {
@@ -688,8 +847,17 @@ export class TypeToJsonSchemaConverter {
   private convertBuiltinObject(type: Type): JsonSchema | undefined {
     const symbol = type.getSymbol()
 
-    if (!symbol || !this.isLibrarySymbol(symbol)) {
+    if (!symbol) {
       return undefined
+    }
+
+    if (!this.isLibrarySymbol(symbol)) {
+      return symbol.flags & SymbolFlags.Class ? this.convertLibrarySubclass(type) : undefined
+    }
+
+    if (TYPED_ARRAYS.has(symbol.name)) {
+      // serialized like an object with index keys, `{ "0": 1, "1": 2 }`
+      return { type: 'object', additionalProperties: { type: 'number' } }
     }
 
     switch (symbol.name) {
@@ -739,7 +907,85 @@ export class TypeToJsonSchemaConverter {
       }
       case 'RegExp':
       case 'Function':
+      case 'Object':
         return {}
+      case 'Error':
+      case 'ArrayBuffer':
+      case 'SharedArrayBuffer':
+      case 'DataView':
+        // no own enumerable data
+        return { type: 'object' }
+    }
+
+    return undefined
+  }
+
+  /**
+   * A class extending `Map`, `Set`, or `Array` is serialized like its base,
+   * the serializer checks with `instanceof` and `Array.isArray`.
+   */
+  private convertLibrarySubclass(type: Type): JsonSchema | undefined {
+    const base = this.getLibraryBaseName(type)
+
+    if (base === 'Array' || base === 'ReadonlyArray') {
+      const item = this.checker
+        .getIndexInfosOfType(type)
+        .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+      return { type: 'array', items: item ? this.visitElement(item) : {} }
+    }
+
+    if (base === 'Set' || base === 'Map') {
+      const item = this.getIteratorYieldType(type)
+      return base === 'Set'
+        ? {
+            'type': 'array',
+            'uniqueItems': true,
+            'items': item ? this.visitElement(item) : {},
+            'x-native-type': JsonSchemaXNativeType.Set,
+          }
+        : {
+            'type': 'array',
+            'items': item ? this.visit(item) : {},
+            'x-native-type': JsonSchemaXNativeType.Map,
+          }
+    }
+
+    return undefined
+  }
+
+  private getLibraryBaseName(type: Type, depth = 0): string | undefined {
+    const target = type.isTypeReference() ? type.getTarget() : type
+
+    for (const base of target.getBaseTypes() ?? []) {
+      const symbol = base.getSymbol()
+
+      if (symbol && this.isLibrarySymbol(symbol)) {
+        return symbol.name
+      }
+
+      const name = depth < 16 ? this.getLibraryBaseName(base, depth + 1) : undefined
+      if (name) {
+        return name
+      }
+    }
+
+    return undefined
+  }
+
+  private getIteratorYieldType(type: Type): Type | undefined {
+    const iteratorProperty = this.checker
+      .getPropertiesOfType(type)
+      .find((p) => p.escapedName.startsWith('__@iterator@'))
+    const iterator =
+      iteratorProperty && this.getCallReturnType(this.checker.getTypeOfSymbol(iteratorProperty))
+    const next = iterator && this.checker.getPropertyOfType(iterator, 'next')
+    const result = next && this.getCallReturnType(this.checker.getTypeOfSymbol(next))
+
+    for (const member of result?.isUnionType() ? result.getTypes() : result ? [result] : []) {
+      const done = this.getPropertyType(member, 'done')
+      if (done && !(done.flags & TypeFlags.BooleanLiteral && (done as any).value === true)) {
+        return this.getPropertyType(member, 'value')
+      }
     }
 
     return undefined
@@ -825,7 +1071,8 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    return '.*'
+    // `.` does not match line terminators
+    return '[\\s\\S]*'
   }
 
   /**
@@ -882,13 +1129,20 @@ export class TypeToJsonSchemaConverter {
       return undefined
     }
 
+    if (symbol.flags & SymbolFlags.Enum) {
+      return symbol.name
+    }
+
     const text = this.checker.typeToString(type)
 
-    return /^[\w$.]+(?:<[\w$.<>, []+>)?$/u.test(text) && text.length <= 80
+    // `Page<User>` -> `Page_User`, `Page<User[]>` -> `Page_UserArray`, `Pair<[A, B]>` -> `Pair_A_B`
+    return /^[\w$.]+(?:<[\w$.<>, [\]]+>)?$/u.test(text) && text.length <= 80
       ? text
           .replace(/\[\]/gu, 'Array')
-          .replace(/\s*[<,]\s*/gu, '_')
-          .replace(/>/gu, '')
+          .replace(/[\s<,[]+/gu, '_')
+          .replace(/[>\]]/gu, '')
+          .replace(/_+/gu, '_')
+          .replace(/_$/u, '')
       : symbol.name
   }
 
@@ -913,7 +1167,24 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    return undefined
+    return this.getSingleMemberEnum(type)
+  }
+
+  /**
+   * The type of an enum with one member is that member's literal type.
+   */
+  private getSingleMemberEnum(type: Type): TSSymbol | undefined {
+    if (!(type.flags & TypeFlags.EnumLiteral) || type.flags & TypeFlags.Union) {
+      return undefined
+    }
+
+    const parent = type.getSymbol()?.getParent()
+
+    if (!parent || !(parent.flags & SymbolFlags.Enum)) {
+      return undefined
+    }
+
+    return this.checker.getDeclaredTypeOfSymbol(parent).id === type.id ? parent : undefined
   }
 
   private createDef(type: Type, preferredName: string): Def {
@@ -964,6 +1235,43 @@ export class TypeToJsonSchemaConverter {
     return collected
   }
 
+  private getPrimitiveAliasSymbol(property: TSSymbol): TSSymbol | undefined {
+    const declaration = property.declarations[0]
+
+    if (!declaration || this.isLibraryPath(declaration.path)) {
+      return undefined
+    }
+
+    let typeNode = (declaration.resolve() as any)?.type
+
+    // `count?: Count | null`
+    if (typeNode?.kind === SyntaxKind.UnionType) {
+      const references = typeNode.types.filter((t: any) => t.kind === SyntaxKind.TypeReference)
+      typeNode = references.length === 1 ? references[0] : undefined
+    }
+
+    if (typeNode?.kind !== SyntaxKind.TypeReference) {
+      return undefined
+    }
+
+    let symbol = this.checker.getSymbolAtLocation(typeNode.typeName)
+
+    if (symbol && symbol.flags & SymbolFlags.Alias) {
+      symbol = this.checker.getAliasedSymbol(symbol)
+    }
+
+    return symbol && symbol.flags & SymbolFlags.TypeAlias && !this.isLibrarySymbol(symbol)
+      ? symbol
+      : undefined
+  }
+
+  private isLibraryMember(symbol: TSSymbol): boolean {
+    return (
+      symbol.declarations.length > 0 &&
+      symbol.declarations.every((declaration) => this.isLibraryPath(declaration.path))
+    )
+  }
+
   private isLibrarySymbol(symbol: TSSymbol): boolean {
     const path = symbol.declarations[0]?.path
     return path !== undefined && this.isLibraryPath(path)
@@ -996,9 +1304,15 @@ export class TypeToJsonSchemaConverter {
       return false
     }
 
+    // functions, also with properties (`{ (): void; displayName: string }`) or as constructors
+    const symbol = type.getSymbol()
+    if (symbol?.name === 'Function' && this.isLibrarySymbol(symbol)) {
+      return true
+    }
+
     return (
-      this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 &&
-      this.checker.getPropertiesOfType(type).length === 0
+      this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
+      this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0
     )
   }
 
@@ -1041,6 +1355,20 @@ function isClassAccessor(symbol: TSSymbol): boolean {
  */
 function isTypeReference(type: Type): boolean {
   return Boolean(type.flags & TypeFlags.Object && (type as any).objectFlags & ObjectFlags.Reference)
+}
+
+function fromRef(schema: ObjectJsonSchema): string | undefined {
+  if (typeof schema.$ref !== 'string' || Object.keys(schema).length !== 1) {
+    return undefined
+  }
+
+  return schema.$ref.startsWith(DEFS_REF_PREFIX)
+    ? schema.$ref.slice(DEFS_REF_PREFIX.length).replace(/~1/gu, '/').replace(/~0/gu, '~')
+    : undefined
+}
+
+function refersTo(schema: JsonSchema, name: string): boolean {
+  return (stringifyJSON(schema) ?? '').includes(stringifyJSON(toRef(name))!)
 }
 
 function toRef(name: string): string {

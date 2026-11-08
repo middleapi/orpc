@@ -178,7 +178,10 @@ describe('typeToJsonSchemaConverter', () => {
       {
         $ref: '#/$defs/PrefixedDict',
         $defs: {
-          PrefixedDict: { type: 'object', patternProperties: { '^x-.*$': { type: 'string' } } },
+          PrefixedDict: {
+            type: 'object',
+            patternProperties: { '^x-[\\s\\S]*$': { type: 'string' } },
+          },
         },
       },
       false,
@@ -372,8 +375,8 @@ describe('typeToJsonSchemaConverter', () => {
     expect(convert('TemplateMulti')).toEqual([
       {
         anyOf: [
-          { type: 'string', pattern: '^GET \\/.*$' },
-          { type: 'string', pattern: '^POST \\/.*$' },
+          { type: 'string', pattern: '^GET \\/[\\s\\S]*$' },
+          { type: 'string', pattern: '^POST \\/[\\s\\S]*$' },
         ],
       },
       false,
@@ -979,6 +982,391 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('round two', () => {
+    let r2: TypeScriptProject
+
+    beforeAll(() => {
+      r2 = openTypeScriptProject({
+        file: new URL('../tests/fixtures/types/src/round2.ts', import.meta.url),
+      })
+    })
+
+    afterAll(() => {
+      r2.close()
+    })
+
+    const convertR2 = (name: string, c = new TypeToJsonSchemaConverter(r2.checker, r2.program)) =>
+      c.convert(r2.getExportType(name).type)
+
+    it('fixture has no type errors', () => {
+      expect(r2.program.getSemanticDiagnostics(r2.sourceFile.fileName)).toEqual([])
+    })
+
+    it('distinct generic instantiations convert fully, in any order', () => {
+      const c = new TypeToJsonSchemaConverter(r2.checker, r2.program)
+      expect(convertR2('L1', c)).toEqual([
+        {
+          $ref: '#/$defs/L1',
+          $defs: {
+            L1: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L2' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L2: { anyOf: [{ $ref: '#/$defs/L2' }, { type: 'null' }] },
+            L2: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L3' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L3: { anyOf: [{ $ref: '#/$defs/L3' }, { type: 'null' }] },
+            L3: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L4' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L4: { anyOf: [{ $ref: '#/$defs/L4' }, { type: 'null' }] },
+            L4: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L5' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L5: { anyOf: [{ $ref: '#/$defs/L5' }, { type: 'null' }] },
+            L5: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L6' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L6: { anyOf: [{ $ref: '#/$defs/L6' }, { type: 'null' }] },
+            L6: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L7' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L7: { anyOf: [{ $ref: '#/$defs/L7' }, { type: 'null' }] },
+            L7: {
+              type: 'object',
+              properties: { id: { type: 'string' }, leaf: { type: 'number' } },
+              required: ['id', 'leaf'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR2('L6', c)).toEqual([
+        {
+          $ref: '#/$defs/L6',
+          $defs: {
+            L6: {
+              type: 'object',
+              properties: { id: { type: 'string' }, next: { $ref: '#/$defs/Maybe_L7' } },
+              required: ['id', 'next'],
+            },
+            Maybe_L7: { anyOf: [{ $ref: '#/$defs/L7' }, { type: 'null' }] },
+            L7: {
+              type: 'object',
+              properties: { id: { type: 'string' }, leaf: { type: 'number' } },
+              required: ['id', 'leaf'],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR2('PartialConfig')).toEqual([
+        {
+          $ref: '#/$defs/DeepPartial',
+          $defs: {
+            DeepPartial: { type: 'object', properties: { a: { $ref: '#/$defs/DeepPartial2' } } },
+            DeepPartial2: { type: 'object', properties: { b: { $ref: '#/$defs/DeepPartial3' } } },
+            DeepPartial3: { type: 'object', properties: { c: { $ref: '#/$defs/DeepPartial4' } } },
+            DeepPartial4: { type: 'object', properties: { d: { $ref: '#/$defs/DeepPartial5' } } },
+            DeepPartial5: { type: 'object', properties: { e: { $ref: '#/$defs/DeepPartial6' } } },
+            DeepPartial6: { type: 'object', properties: { f: { $ref: '#/$defs/DeepPartial7' } } },
+            DeepPartial7: { type: 'object', properties: { g: { type: 'string' } } },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('functions, constructors, hybrids, and Object', () => {
+      expect(convertR2('FnProp')).toEqual([
+        {
+          $ref: '#/$defs/FnProp',
+          $defs: {
+            FnProp: {
+              type: 'object',
+              properties: { name: { type: 'string' }, data: {} },
+              required: ['name', 'data'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('subclasses of Map, Set, Array, Error, and typed arrays', () => {
+      expect(convertR2('LibraryClasses')).toEqual([
+        {
+          $ref: '#/$defs/LibraryClasses',
+          $defs: {
+            LibraryClasses: {
+              type: 'object',
+              properties: {
+                map: { $ref: '#/$defs/DefaultMap_string_number' },
+                tags: { $ref: '#/$defs/Tags' },
+                stack: { $ref: '#/$defs/Stack' },
+                error: { $ref: '#/$defs/MyError' },
+                plainError: { type: 'object' },
+                bytes: { type: 'object', additionalProperties: { type: 'number' } },
+              },
+              required: ['map', 'tags', 'stack', 'error', 'plainError', 'bytes'],
+            },
+            MyError: {
+              type: 'object',
+              properties: { code: { type: 'number' } },
+              required: ['code'],
+            },
+            Stack: { type: 'array', items: { type: 'number' } },
+            Tags: {
+              'type': 'array',
+              'uniqueItems': true,
+              'items': { type: 'string' },
+              'x-native-type': 'set',
+            },
+            DefaultMap_string_number: {
+              'type': 'array',
+              'items': {
+                type: 'array',
+                prefixItems: [{ type: 'string' }, { type: 'number' }],
+                maxItems: 2,
+                minItems: 2,
+              },
+              'x-native-type': 'map',
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('string index signatures win over number ones', () => {
+      expect(convertR2('NumberIndexFirst')).toEqual([
+        {
+          $ref: '#/$defs/NumberIndexFirst',
+          $defs: {
+            NumberIndexFirst: {
+              type: 'object',
+              additionalProperties: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('template literal patterns match newlines', () => {
+      expect(convertR2('Message')).toEqual([
+        { type: 'string', pattern: '^Error: [\\s\\S]*$' },
+        false,
+      ])
+    })
+
+    it('deduplicates literals', () => {
+      expect(convertR2('DuplicateLiterals')).toEqual([
+        {
+          $ref: '#/$defs/DuplicateLiterals',
+          $defs: { DuplicateLiterals: { type: 'string', enum: ['a', 'c'] } },
+        },
+        false,
+      ])
+    })
+
+    it('names generics with array and tuple arguments', () => {
+      expect(convertR2('GenericNames')).toEqual([
+        {
+          $ref: '#/$defs/GenericNames',
+          $defs: {
+            GenericNames: {
+              type: 'object',
+              properties: {
+                a: { $ref: '#/$defs/Page_AArray' },
+                b: { $ref: '#/$defs/Page_BArray' },
+                pair: { $ref: '#/$defs/Pair_A_B' },
+              },
+              required: ['a', 'b', 'pair'],
+            },
+            Pair_A_B: {
+              type: 'object',
+              properties: {
+                pair: {
+                  type: 'array',
+                  prefixItems: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }],
+                  maxItems: 2,
+                  minItems: 2,
+                },
+              },
+              required: ['pair'],
+            },
+            B: { type: 'object', properties: { b: { type: 'string' } }, required: ['b'] },
+            A: { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+            Page_BArray: {
+              type: 'object',
+              properties: {
+                items: { type: 'array', items: { type: 'array', items: { $ref: '#/$defs/B' } } },
+              },
+              required: ['items'],
+            },
+            Page_AArray: {
+              type: 'object',
+              properties: {
+                items: { type: 'array', items: { type: 'array', items: { $ref: '#/$defs/A' } } },
+              },
+              required: ['items'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('applies JSDoc of primitive aliases', () => {
+      expect(convertR2('PrimitiveAliases')).toEqual([
+        {
+          $ref: '#/$defs/PrimitiveAliases',
+          $defs: {
+            PrimitiveAliases: {
+              type: 'object',
+              properties: {
+                count: { type: 'integer', description: 'An integer count', minimum: 0 },
+                email: { anyOf: [{ type: 'string' }, { type: 'null' }], format: 'email' },
+                described: { type: 'integer', description: 'Own description wins', minimum: 0 },
+              },
+              required: ['count', 'described'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('single-member enums are components', () => {
+      expect(convertR2('UsesKind')).toEqual([
+        {
+          $ref: '#/$defs/UsesKind',
+          $defs: {
+            UsesKind: {
+              type: 'object',
+              properties: { kind: { $ref: '#/$defs/Kind' } },
+              required: ['kind'],
+            },
+            Kind: { type: 'string', const: 'only', description: 'The only kind' },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('cuts growing instantiations without caching the cut', () => {
+      const c = new TypeToJsonSchemaConverter(r2.checker, r2.program)
+      const expected = [
+        {
+          $ref: '#/$defs/Expanded',
+          $defs: {
+            Expanded: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+                next: { $ref: '#/$defs/Expand_stringArray' },
+              },
+              required: ['value'],
+            },
+            Expand_stringArray: {
+              type: 'object',
+              properties: { value: { type: 'array', items: { type: 'string' } }, next: {} },
+              required: ['value'],
+            },
+          },
+        },
+        false,
+      ]
+      expect(convertR2('Expanded', c)).toEqual(expected)
+      expect(convertR2('Expanded', c)).toEqual(expected)
+    })
+
+    it('applies JSDoc of named types with defs: recursive', () => {
+      const c = new TypeToJsonSchemaConverter(r2.checker, r2.program, { defs: 'recursive' })
+      expect(convertR2('RecursiveHolder', c)).toEqual([
+        {
+          type: 'object',
+          properties: {
+            tree: { $ref: '#/$defs/DocTree' },
+            plain: {
+              type: 'object',
+              properties: { id: { type: 'string' } },
+              required: ['id'],
+              description: 'A plain item',
+            },
+          },
+          required: ['tree', 'plain'],
+          $defs: {
+            DocTree: {
+              type: 'object',
+              properties: { children: { type: 'array', items: { $ref: '#/$defs/DocTree' } } },
+              required: ['children'],
+              description: 'A documented tree',
+              deprecated: true,
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertR2('RecursiveHolder')).toEqual([
+        {
+          $ref: '#/$defs/RecursiveHolder',
+          $defs: {
+            RecursiveHolder: {
+              type: 'object',
+              properties: { tree: { $ref: '#/$defs/DocTree' }, plain: { $ref: '#/$defs/Plain' } },
+              required: ['tree', 'plain'],
+            },
+            Plain: {
+              type: 'object',
+              properties: { id: { type: 'string' } },
+              required: ['id'],
+              description: 'A plain item',
+            },
+            DocTree: {
+              type: 'object',
+              properties: { children: { type: 'array', items: { $ref: '#/$defs/DocTree' } } },
+              required: ['children'],
+              description: 'A documented tree',
+              deprecated: true,
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('inlineRoot inlines a root def nothing else references', () => {
+      const c = new TypeToJsonSchemaConverter(r2.checker, r2.program)
+      const [schema] = c.convert(r2.getExportType('RecursiveHolder').type, {
+        inlineRoot: true,
+      }) as [any, boolean]
+      expect(schema.type).toBe('object')
+      expect(Object.keys(schema.$defs)).toEqual(expect.arrayContaining(['DocTree', 'Plain']))
+      expect(schema.$defs.RecursiveHolder).toBeUndefined()
+
+      // a recursive root stays a ref
+      const [tree] = c.convert(r2.getExportType('DocTree').type, { inlineRoot: true }) as [
+        any,
+        boolean,
+      ]
+      expect(tree.$ref).toBe('#/$defs/DocTree')
+    })
+  })
+
   describe('regressions', () => {
     let reg: TypeScriptProject
     let loose: TypeScriptProject
@@ -1242,11 +1630,13 @@ describe('typeToJsonSchemaConverter', () => {
               type: 'object',
               properties: { id: { type: 'string' }, name: { type: 'string' } },
               required: ['id', 'name'],
+              description: 'A registered user',
             },
             other: {
               type: 'object',
               properties: { email: { type: 'string' } },
               required: ['email'],
+              description: 'Another user, with the same name',
             },
           },
           required: ['user', 'other'],
