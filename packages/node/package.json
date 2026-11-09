@@ -1,6 +1,6 @@
 {
   "name": "@orpc/node",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Node.js plugins for oRPC: static file serving, temporary file uploads, and batch response compression",
   "keywords": [
     "compression",

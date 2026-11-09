@@ -1,6 +1,6 @@
 {
   "name": "@orpc/experimental-lock",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Locking for oRPC procedures, with memory, Redis, and Upstash adapters",
   "keywords": [
     "api",

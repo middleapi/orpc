@@ -1,6 +1,6 @@
 {
   "name": "@orpc/openapi",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Generate OpenAPI specs from oRPC routers and serve OpenAPI-compliant APIs with end-to-end type safety",
   "keywords": [
     "api",

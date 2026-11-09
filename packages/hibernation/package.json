@@ -1,6 +1,6 @@
 {
   "name": "@orpc/hibernation",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Hibernation API support for oRPC, including Cloudflare Durable Objects' WebSocket Hibernation",
   "keywords": [
     "cloudflare",

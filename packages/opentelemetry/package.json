@@ -1,6 +1,6 @@
 {
   "name": "@orpc/opentelemetry",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "OpenTelemetry integration for oRPC: distributed tracing for typesafe APIs",
   "keywords": [
     "observability",

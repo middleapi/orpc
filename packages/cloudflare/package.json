@@ -1,6 +1,6 @@
 {
   "name": "@orpc/cloudflare",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Cloudflare integration for oRPC: Durable Object pub/sub and locking, Workers rate limiting, and Workers Traces adapters",
   "keywords": [
     "cloudflare",

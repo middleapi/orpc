@@ -1,6 +1,6 @@
 {
   "name": "@orpc/bun",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Bun integration for oRPC: Redis-backed pub/sub, rate limiting, and locking using Bun's built-in Redis client",
   "keywords": [
     "bun",
