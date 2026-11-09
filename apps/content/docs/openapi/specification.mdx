@@ -372,7 +372,6 @@ try {
 - Types carry no validation rules. Add them with [JSDoc tags](#jsdoc) or keep a converter schema.
 - Class types in inputs are documented as the plain objects a client sends.
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
-- Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, or a conditional deep mapped type over a model holding that view of itself, are cut to `{}` after a few levels.
-- `NaN`, `Infinity`, and invalid dates are serialized as `null`, which the schemas of `number` and `Date` leave out.
-- Types a built-in satisfies only through its prototype, like `ArrayBufferView` holding a `Uint8Array` or `Partial<Date>` an array, are documented without that built-in.
-- Generation throws on types the compiler cannot resolve, like an import with a missing path alias, also in a file under `// @ts-nocheck`, and on types nested too deep for the compiler to instantiate.
+- Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
+- `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out.
+- Generation throws on types the compiler cannot resolve, like an import with a missing path alias.

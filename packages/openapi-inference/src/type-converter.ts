@@ -84,7 +84,7 @@ import { getIteratorTypes } from './utils'
  */
 export class TypeScriptTypeResolutionError extends TypeError {
   /** The files declaring the types and properties the conversion went through to reach it */
-  readonly files = new Set<string>()
+  readonly files: Set<string> = new Set()
 
   addDeclarations(symbol: TSSymbol | undefined): void {
     for (const declaration of symbol?.declarations ?? []) {
