@@ -216,6 +216,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['maybeToJSON', undefined],
     ['restTupleViews', undefined],
     ['narrowedClass', undefined],
+    ['frozenToJSON', undefined],
+    ['frozenFieldRoot', undefined],
+    ['pickedTuples', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1408,15 +1411,16 @@ describe('generated schemas match serialized outputs', async () => {
       expect(schemas().SetOrItems_TaggedError.required).toEqual(['mtags'])
     })
 
-    it('calls toJSON of a view widening it with a view of it', () => {
+    it('writes a view widening toJSON with a view of it by toJSON or by its fields', () => {
       const word = { type: 'object', properties: { w: { type: 'string' } }, required: ['w'] }
+      const fields = { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] }
 
       expect(schemas().OrFrozen_WithWordJson).toEqual({
-        ...word,
+        anyOf: [word, fields],
         description: 'Values or read-only views of them',
       })
       expect(schemas().OrPartial_WithWordJson).toEqual({
-        ...word,
+        anyOf: [word, fields],
         description: 'Values, or partial views of them',
       })
     })
@@ -1497,8 +1501,51 @@ describe('generated schemas match serialized outputs', async () => {
         },
       ])
       expect(schemas().NumberOrToJSONJson.anyOf[1].properties.toJSON).toEqual({ type: 'number' })
-      // a view of the method may still hold it, which is called
-      expect(schemas().OrFrozen_WithWordJson.anyOf).toBeUndefined()
+    })
+
+    it('writes an object whose toJSON may be a view of the method by toJSON or by its fields', () => {
+      const fields = {
+        type: 'object',
+        properties: { a: { type: 'number' }, toJSON: {} },
+        required: ['a'],
+      }
+
+      // `Readonly<() => R>` is `{}`, which holds any value
+      expect(schemas().FrozenJJson.anyOf).toEqual([word, fields])
+      expect(schemas().FrozenField.anyOf).toEqual([word, fields])
+      expect(schemas().DeepFrozenJJson.anyOf).toEqual([
+        word,
+        {
+          ...fields,
+          properties: {
+            ...fields.properties,
+            toJSON: { description: 'Read-only all the way down' },
+          },
+        },
+      ])
+      expect(schemas().OrFrozen_PlainJJson.anyOf).toEqual([
+        { type: 'object', properties: { j: { type: 'string' } }, required: ['j'] },
+        { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+      ])
+    })
+
+    it('writes array-like views of tuples leaving out an element as arrays of any value there', () => {
+      expect(schemaOf('pickedTuples').properties).toEqual({
+        inner: {
+          type: 'array',
+          prefixItems: [{ type: 'number' }, {}, { type: 'boolean' }],
+          minItems: 3,
+          maxItems: 3,
+        },
+        first: {
+          type: 'array',
+          prefixItems: [{ type: 'number' }, {}, {}],
+          minItems: 3,
+          maxItems: 3,
+        },
+        // the items after the elements are unknown
+        rest: { type: 'array', prefixItems: [{ type: 'number' }] },
+      })
     })
 
     it('writes views of rest tuples intersected with an object by their leading elements and items', () => {

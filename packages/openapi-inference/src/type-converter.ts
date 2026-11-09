@@ -1321,10 +1321,21 @@ export class TypeToJsonSchemaConverter {
       ? lengths.map((t) => (t as any).value as number)
       : undefined
 
-    if (fixed !== undefined && ordered === elements && numeric.length === Math.max(...fixed)) {
+    // an element a view leaves out (`Pick<[number, string], 0 | 'length' | 'slice'>`) is still
+    // there, of any type
+    const byIndex = new Map(ordered.map((p, i) => [Number(p.name), elementTypes[i]!]))
+    const prefixItems = (count: number) =>
+      Array.from({ length: count }, (_, i): JsonSchema => {
+        const element = byIndex.get(i)
+        return element ? this.visitElement(element) : {}
+      })
+
+    const count = byIndex.size ? Math.max(...byIndex.keys()) + 1 : 0
+
+    if (fixed !== undefined && count <= Math.max(...fixed)) {
       return {
         type: 'array',
-        prefixItems: elementTypes.map((t) => this.visitElement(t)),
+        prefixItems: prefixItems(Math.max(...fixed)),
         minItems: Math.min(...fixed),
         maxItems: Math.max(...fixed),
       }
@@ -1350,7 +1361,8 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    return { type: 'array', items: this.visitElements(elementTypes) }
+    // without a number index, the items after the elements are unknown
+    return count ? { type: 'array', prefixItems: prefixItems(count) } : { type: 'array' }
   }
 
   /**

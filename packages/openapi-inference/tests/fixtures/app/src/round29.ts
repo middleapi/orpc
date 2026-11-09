@@ -119,6 +119,29 @@ export class DateWithJSON extends Date {
   }
 }
 
+/** An object whose `toJSON` is the method or a read-only view of it, which may hold any value */
+export interface FrozenJ {
+  a: number
+  toJSON: (() => { w: string }) | Readonly<() => { w: string }>
+}
+
+/** The same, with a deep read-only view of the method */
+export interface DeepFrozenJ {
+  a: number
+  toJSON: (() => { w: string }) | DeepRO<() => { w: string }>
+}
+
+export interface PlainJ {
+  a: number
+  toJSON(): { j: string }
+}
+
+/** A class whose `toJSON` field is the method or a read-only view of it */
+export class FrozenField {
+  a = 1
+  toJSON: (() => { w: string }) | Readonly<() => { w: string }> = 'x'
+}
+
 export const roundTwentyNine = {
   // brands redeclaring a member of the primitive's interface are still the primitive
   narrowedBrands: os.handler(
@@ -168,6 +191,33 @@ export const roundTwentyNine = {
       frozen: new ValueBox<OrFrozen<WithWord>>(withWord()),
       partial: new ValueBox<OrPartial<WithWord>>(withWord()),
     }),
+  ),
+  // a view of the method in `toJSON` may hold a value `JSON.stringify` does not call
+  frozenToJSON: os.handler(
+    (): {
+      str: ValueBox<FrozenJ>
+      obj: ValueBox<FrozenJ>
+      called: ValueBox<FrozenJ>
+      deep: ValueBox<DeepFrozenJ>
+      plain: ValueBox<OrFrozen<PlainJ>>
+      field: FrozenField
+    } => ({
+      str: new ValueBox<FrozenJ>({ a: 1, toJSON: 'x' }),
+      obj: new ValueBox<FrozenJ>({ a: 1, toJSON: {} }),
+      called: new ValueBox<FrozenJ>({ a: 1, toJSON: () => ({ w: 'x' }) }),
+      deep: new ValueBox<DeepFrozenJ>({ a: 1, toJSON: 'x' }),
+      plain: new ValueBox<OrFrozen<PlainJ>>({ a: 1, toJSON: 'x' }),
+      field: new FrozenField(),
+    }),
+  ),
+  frozenFieldRoot: os.handler((): FrozenField => new FrozenField()),
+  // array-like views of tuples leaving out an element still hold it
+  pickedTuples: os.handler(
+    (): {
+      inner: Pick<[number, string, boolean], 0 | 2 | 'length' | 'slice'>
+      first: Pick<[number, string, boolean], 0 | 'length' | 'slice'>
+      rest: Pick<[number, ...string[]], 0 | 'length' | 'slice'>
+    } => ({ inner: [1, 'a', true], first: [1, 'a', true], rest: [1, 'a'] }),
   ),
   // classes extending a mixin applied to a built-in are built-in subclasses
   mixinBuiltins: os.handler(
