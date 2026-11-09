@@ -225,6 +225,19 @@ export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | u
 }
 
 /**
+ * How `JSON.stringify` writes a boxed primitive, also of a subclass (`class Tag extends String`)
+ * or through a mapped type: as its primitive (`new String('x')` as `"x"`).
+ */
+export function getBoxedPrimitiveSchema(types: TypeQueries, type: Type): JsonSchema | undefined {
+  const name =
+    getDeclaredBuiltinName(types, type) ??
+    getMappedBuiltinName(types, type) ??
+    getBuiltinBaseName(types, type)
+
+  return name === undefined ? undefined : BOXED_PRIMITIVES[name]?.(true)
+}
+
+/**
  * `DeepReadonly<Date>` or `DeepPartial<Set<string>>` maps over the built-in's methods,
  * but the value is still the built-in and serialized like it.
  */
@@ -323,6 +336,15 @@ function getBuiltinSubclass(
   const base = getBuiltinBaseName(types, type)
 
   if (base === undefined) {
+    // an interface extending a view of a built-in (`interface Link extends Pick<URL, 'href'>`)
+    // holds the built-in or a plain object
+    for (const view of getViewBases(type)) {
+      const builtin = getMappedBuiltin(types, view, stringify)
+      if (builtin !== undefined) {
+        return builtin
+      }
+    }
+
     return undefined
   }
 
@@ -350,25 +372,66 @@ function getBuiltinSubclass(
 /**
  * The name of the default library class a class extends, also through other classes.
  */
-export function getBuiltinBaseName(types: TypeQueries, type: Type, depth = 0): string | undefined {
+export function getBuiltinBaseName(types: TypeQueries, type: Type): string | undefined {
+  return getBuiltinBase(types, type)?.name
+}
+
+/**
+ * The default library class a class extends, also through other classes.
+ */
+function getBuiltinBase(types: TypeQueries, type: Type, depth = 0): TSSymbol | undefined {
   const target = type.isTypeReference() ? type.getTarget() : type
 
   for (const base of target.getBaseTypes() ?? []) {
     const symbol = base.getSymbol()
 
     // also the runtime's globals, like `File` from `@types/node` without the DOM library,
-    // which zod's own `File` interface extends
-    if (symbol && isBuiltinSymbol(types, symbol)) {
-      return symbol.name
+    // which zod's own `File` interface extends (not a library mapped type, `Pick<URL, 'href'>`)
+    if (
+      symbol &&
+      isBuiltinSymbol(types, symbol) &&
+      !((base as any).objectFlags & ObjectFlags.Mapped)
+    ) {
+      return symbol
     }
 
-    const name = depth < 16 ? getBuiltinBaseName(types, base, depth + 1) : undefined
-    if (name) {
-      return name
+    const found = depth < 16 ? getBuiltinBase(types, base, depth + 1) : undefined
+    if (found) {
+      return found
     }
   }
 
   return undefined
+}
+
+/**
+ * The mapped types an interface extends, also through other interfaces
+ * (`interface Link extends Pick<URL, 'href'>`).
+ */
+export function getViewBases(type: Type, depth = 0): Type[] {
+  const symbol = type.getSymbol()
+
+  if (!symbol || !(symbol.flags & SymbolFlags.Interface) || depth > 16) {
+    return []
+  }
+
+  const target = type.isTypeReference() ? type.getTarget() : type
+
+  return (target.getBaseTypes() ?? []).flatMap((base) =>
+    (base as any).objectFlags & ObjectFlags.Mapped ? [base] : getViewBases(base, depth + 1),
+  )
+}
+
+/**
+ * Whether a declared interface extends a built-in class (`interface AppError extends Error`),
+ * so a value may be an instance, which does not write the members it inherits from the built-in.
+ * Not a library interface of plain data, like `PromiseFulfilledResult<T>`.
+ */
+export function extendsBuiltinClass(types: TypeQueries, type: Type): boolean {
+  const symbol = type.getSymbol()
+  const base =
+    symbol && symbol.flags & SymbolFlags.Interface ? getBuiltinBase(types, type) : undefined
+  return base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))
 }
 
 /**

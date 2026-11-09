@@ -3,6 +3,7 @@ import type { FixedLengthArray, Jsonifiable, Tagged } from 'type-fest'
 import * as z from 'zod'
 
 import { roundTwentyFive } from './round25'
+import { roundTwentySix } from './round26'
 
 export interface Author {
   id: string
@@ -1015,4 +1016,5 @@ export const router = {
     }),
   ),
   ...roundTwentyFive,
+  ...roundTwentySix,
 }

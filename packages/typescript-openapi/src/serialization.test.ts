@@ -135,6 +135,17 @@ describe('generated schemas match serialized outputs', async () => {
     ['typedArrayFields', undefined],
     ['alphaViews', undefined],
     ['alphaDeclared', undefined],
+    ['holdsUnfolding', undefined],
+    ['deepViews', undefined],
+    ['genericAliasViews', undefined],
+    ['boxedSubclassJSON', undefined],
+    ['errorInterfaces', undefined],
+    ['linkInterface', undefined],
+    ['twoClassViews', undefined],
+    ['brandedMapped', undefined],
+    ['typedArrayViews', undefined],
+    ['prioritizedView', undefined],
+    ['priorities', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -652,6 +663,165 @@ describe('generated schemas match serialized outputs', async () => {
     ).toEqual({
       frozen: { $ref: '#/components/schemas/Readonly-AlphaModel' },
       assigned: { $ref: '#/components/schemas/AlphaModel-View' },
+    })
+  })
+
+  describe('round twenty-six', () => {
+    const schemas = () => spec.components?.schemas as any
+    const properties = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+        .properties
+    const setOf = (items: object) => ({
+      'type': 'array',
+      'uniqueItems': true,
+      items,
+      'x-native-type': 'set',
+    })
+    const stringifiedSet = { type: 'object' }
+
+    it('converts a type an expansion was cut at again when it is used directly in a class', () => {
+      expect(schemas().HoldsUnfolding.properties).toEqual({
+        a: { $ref: '#/components/schemas/Unfolding_Set_stringJson' },
+        b: { $ref: '#/components/schemas/Unfolding_Set_string_ArrayArrayArrayJson' },
+      })
+      expect(schemas().Unfolding_Set_string_ArrayArrayArrayJson.properties.value).toEqual({
+        type: 'array',
+        items: { type: 'array', items: { type: 'array', items: stringifiedSet } },
+      })
+    })
+
+    it('reads views through generic aliases of the class', () => {
+      expect(schemas().PickLabel_string).toEqual({
+        anyOf: [
+          { type: 'string' },
+          { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+        ],
+      })
+      expect(schemas().PickBagTags_number.properties.tags).toEqual({
+        anyOf: [setOf({ type: 'number' }), stringifiedSet],
+      })
+      expect(schemas().OmitBagNothing_string.properties.tags).toEqual({
+        anyOf: [setOf({ type: 'string' }), stringifiedSet],
+      })
+    })
+
+    it('writes subclasses of boxed primitives toJSON returns as the primitive', () => {
+      expect(properties('boxedSubclassJSON')).toEqual({
+        s: {
+          type: 'object',
+          properties: { v: { type: 'string' } },
+          required: ['v'],
+        },
+        n: {
+          type: 'object',
+          properties: { v: { type: 'number' } },
+          required: ['v'],
+        },
+      })
+    })
+
+    it('does not require the members an interface inherits from a built-in class', () => {
+      expect(schemas().CodedError.required).toEqual(['code'])
+      expect(Object.keys(schemas().CodedError.properties)).toEqual([
+        'code',
+        'name',
+        'message',
+        'stack',
+        'cause',
+      ])
+      expect(schemas().MaybeCodedError.required).toBeUndefined()
+    })
+
+    it('documents an interface extending a view of a built-in as the built-in or a plain object', () => {
+      expect(schemas().LabeledLink).toEqual({
+        anyOf: [
+          { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' },
+          {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              href: expect.objectContaining({ type: 'string' }),
+            },
+            required: ['href'],
+          },
+        ],
+      })
+    })
+
+    it('adds what toJSON of every class behind an interface returns, in any order', () => {
+      const json = { type: 'object', properties: { j: { type: 'string' } }, required: ['j'] }
+
+      expect(schemas().IdThenJSON).toEqual({
+        anyOf: [
+          json,
+          {
+            type: 'object',
+            properties: { id: { type: 'number' }, v: { type: 'string' } },
+            required: ['id', 'v'],
+          },
+        ],
+      })
+      expect(schemas().JSONThenId.anyOf[0]).toEqual(json)
+    })
+
+    it('converts mapped types over branded primitives as the primitive', () => {
+      expect(properties('brandedMapped')).toEqual({
+        id: { type: 'string' },
+        partial: { type: 'string' },
+        amount: { type: 'number' },
+        flag: {
+          anyOf: [
+            { type: 'boolean', const: false },
+            { type: 'boolean', const: true },
+          ],
+        },
+        account: { $ref: '#/components/schemas/DeepFrozen_Account' },
+      })
+      expect(schemas().DeepFrozen_Account.properties).toEqual({
+        id: { type: 'string' },
+        balance: { type: 'number' },
+        name: { type: 'string' },
+      })
+    })
+
+    it('converts views of typed array subclasses as an instance or a plain object', () => {
+      expect(properties('typedArrayViews')).toEqual({
+        set: { type: 'object', properties: { s: eitherSet }, required: ['s'] },
+        map: {
+          type: 'object',
+          properties: {
+            d: {
+              anyOf: [expect.objectContaining({ 'x-native-type': 'map' }), stringifiedSet],
+            },
+          },
+          required: ['d'],
+        },
+        bigint: {
+          type: 'object',
+          properties: {
+            v: {
+              type: 'object',
+              properties: { n: expect.objectContaining({ 'x-native-type': 'bigint' }) },
+              required: ['n'],
+            },
+          },
+          required: ['v'],
+        },
+        // an instance also writes the private field the view leaves out
+        frozen: { type: 'object' },
+        partial: { type: 'object' },
+      })
+    })
+
+    it('keeps the def of a type next to a cut expansion', () => {
+      expect(schemas().Priority).toEqual({ type: 'number', enum: [0, 1] })
+      expect(schemas().Priority2).toBeUndefined()
+      expect(schemas()['Readonly-Prioritized'].properties.priority).toEqual({
+        $ref: '#/components/schemas/Priority',
+      })
+      expect(
+        (spec.paths as any)['/priorities'].post.responses['200'].content['application/json'].schema,
+      ).toEqual({ type: 'array', items: { $ref: '#/components/schemas/Priority' } })
     })
   })
 

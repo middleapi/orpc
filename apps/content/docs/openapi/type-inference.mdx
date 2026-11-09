@@ -87,29 +87,29 @@ Types carry no validation constraints, so an inferred schema has no `format: uui
 
 Types are converted as they look after [OpenAPI JSON serialization](/docs/openapi/serializer):
 
-| TypeScript                                | JSON Schema                                                       |
-| ----------------------------------------- | ----------------------------------------------------------------- |
-| `string`, `number`, `boolean`, `null`     | `type` of the same name, also for `String`, `Number`, `Boolean`   |
-| Literals, enums, unions of literals       | `const` or `enum`                                                 |
-| Unions, discriminated unions              | `anyOf`                                                           |
-| Intersections, mapped and utility types   | the resolved object                                               |
-| Branded primitives (`string & { … }`)     | the primitive                                                     |
-| Template literals                         | `string` with a `pattern`                                         |
-| Arrays, tuples (optional and rest)        | `items`, `prefixItems`                                            |
-| Array-derived types (`FixedLengthArray`)  | `items`, `prefixItems`                                            |
-| Index signatures, `Record`, typed arrays  | `additionalProperties`, `propertyNames` for template literal keys |
-| Optional or `undefined` properties        | not `required`                                                    |
-| `Date`, `bigint`, `URL`, `Set`, `Map`     | their serialized form, matching the Zod and Valibot converters    |
-| `Blob`, `File`                            | binary `string`, sent as `multipart/form-data`                    |
-| Classes with `toJSON`                     | what `toJSON` returns, serialized by its own fields               |
-| Interfaces and object types with `toJSON` | what `toJSON` returns, or the fields of a plain object            |
-| Class instances                           | their own fields, as `JSON.stringify` serializes them             |
-| Functions, symbols, methods               | omitted, and in unions with data the key becomes optional         |
-| `any`, `unknown`, `{}`, `object`          | `{}`                                                              |
-| `number`                                  | `number`, though `NaN` and `Infinity` are sent as `null`          |
+| TypeScript                                | JSON Schema                                                                   |
+| ----------------------------------------- | ----------------------------------------------------------------------------- |
+| `string`, `number`, `boolean`, `null`     | `type` of the same name, also for `String`, `Number`, `Boolean`               |
+| Literals, enums, unions of literals       | `const` or `enum`                                                             |
+| Unions, discriminated unions              | `anyOf`                                                                       |
+| Intersections, mapped and utility types   | the resolved object                                                           |
+| Branded primitives (`string & { … }`)     | the primitive, also through `Readonly` and other mapped types                 |
+| Template literals                         | `string` with a `pattern`                                                     |
+| Arrays, tuples (optional and rest)        | `items`, `prefixItems`                                                        |
+| Array-derived types (`FixedLengthArray`)  | `items`, `prefixItems`                                                        |
+| Index signatures, `Record`, typed arrays  | `additionalProperties`, `propertyNames` for template literal keys             |
+| Optional or `undefined` properties        | not `required`                                                                |
+| `Date`, `bigint`, `URL`, `Set`, `Map`     | their serialized form, matching the Zod and Valibot converters                |
+| `Blob`, `File`                            | binary `string`, sent as `multipart/form-data`                                |
+| Classes with `toJSON`                     | what `toJSON` returns, serialized by its own fields                           |
+| Interfaces and object types with `toJSON` | what `toJSON` returns, or the fields of a plain object                        |
+| Class instances                           | their own fields, as `JSON.stringify` serializes them                         |
+| Functions, symbols, methods               | omitted (also a whole response), in unions with data the key becomes optional |
+| `any`, `unknown`, `{}`, `object`          | `{}`                                                                          |
+| `number`                                  | `number`, though `NaN` and `Infinity` are sent as `null`                      |
 
 :::info
-Class instances are serialized by `JSON.stringify` rather than the OpenAPI JSON serializer, and documented that way: their `Set`, `Map`, `Blob`, and `File` fields become `{}`, `bigint` fields can not be serialized, and getters and methods on the prototype are left out. A model reached both inside and outside class instances, whose `JSON.stringify` form differs, gets a second component with a `Json` suffix, like `TagsJson`. Views of a class, like `Readonly<User>`, `Pick<User, 'tags'>`, or `User & { extra: string }`, may hold an instance or a plain object, unless the class has `private` or `#private` members, which only instances have. So may interfaces extending a class or a view of one. Their fields are documented in both forms, field by field: a `Set` field is an array or `{}`, getters (also `accessor` fields) are optional fields, and a class with `toJSON` adds what it returns. Likewise, an interface or object type with `toJSON` may be a plain object, which the serializer walks without calling `toJSON`, so it is documented as what `toJSON` returns or its fields. A view referring to other components becomes one too, named after it, like `Readonly-User`, and a model reached inside a view, whose form differs, gets a component with an `Any` suffix, like `TagsAny`. Inputs are decoded from JSON, so class types in inputs are documented as the plain objects a client sends.
+Class instances are serialized by `JSON.stringify` rather than the OpenAPI JSON serializer, and documented that way: their `Set`, `Map`, `Blob`, and `File` fields become `{}`, `bigint` fields can not be serialized, and getters and methods on the prototype are left out. A model reached both inside and outside class instances, whose `JSON.stringify` form differs, gets a second component with a `Json` suffix, like `TagsJson`. Views of a class, like `Readonly<User>`, `Pick<User, 'tags'>`, or `User & { extra: string }`, may hold an instance or a plain object, unless the class has `private` or `#private` members, which only instances have. So may interfaces extending a class or a view of one, and interfaces extending a view of a built-in, like `interface Link extends Pick<URL, 'href'>`, are the built-in or a plain object. Their fields are documented in both forms, field by field: a `Set` field is an array or `{}`, getters (also `accessor` fields) are optional fields, and each class with `toJSON` adds what it returns. Members an interface inherits from a built-in class, like the `message` of `interface AppError extends Error`, are optional, since an instance does not write them. Likewise, an interface or object type with `toJSON` may be a plain object, which the serializer walks without calling `toJSON`, so it is documented as what `toJSON` returns or its fields. A view referring to other components becomes one too, named after it, like `Readonly-User`, and a model reached inside a view, whose form differs, gets a component with an `Any` suffix, like `TagsAny`. Inputs are decoded from JSON, so class types in inputs are documented as the plain objects a client sends, and since a client may send an instance, views of a class leave its getters optional and also accept the built-in the class extends, like the string of a `Date` subclass.
 :::
 
 Interfaces, classes, enums, and type aliases declared in your project (not in `node_modules`, though workspace packages linked into it count as your project) become components, named after the type, like `Planet` or `Page_User` for `Page<User>`. Aliases of primitives stay inline, and so do aliases of library types, like `type PartialUser = Partial<User>`, since the compiler names that type after `Partial`. Views are named with `-`, like `Readonly-User`, which no declared type name has, so they never take the name of one. Set `defs: 'recursive'` to only extract recursive types, which can not be inlined:
@@ -177,10 +177,12 @@ try {
 
 :::info
 Generic types that expand forever, like `type Expand<T> = { next: Expand<T[]> }` (also through `Readonly<Expand<T[]>>`), are cut to `{}` after a few levels, since no value can be infinitely nested. So is a generic nested in itself more than 64 levels deep.
+
+The class behind a generic alias or interface of a view, like `type PickBox<T> = Pick<Box<T>, 'a'>` or `interface Picked<T> extends Pick<Box<T>, 'a'> {}`, is read as declared, without the type arguments, so its type parameters in what its `toJSON` returns are documented as `{}`. Its fields keep their types.
 :::
 
 :::info
-Index signatures and typed arrays constrain every other key with `additionalProperties`, so the extra string keys of a subtype, like the `label` of a `Uint8Array` subclass held by a `Uint8Array` field, do not match the schema.
+Index signatures and typed arrays constrain every other key with `additionalProperties`, so the extra string keys of a subtype, like the `label` of a `Uint8Array` subclass held by a `Uint8Array` field, do not match the schema. A view of a class that leaves out some of its fields, like the `private` ones `Readonly<C>` drops, does not constrain them, since an instance still writes them.
 :::
 
 :::info

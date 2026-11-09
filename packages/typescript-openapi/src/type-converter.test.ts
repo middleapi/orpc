@@ -38,7 +38,8 @@ describe('typeToJsonSchemaConverter', () => {
     expect(convert('Never')).toEqual([{ not: {} }, false])
     // `object` is also an array, a `Date` (a string), or a function
     expect(convert('Obj')).toEqual([{}, false])
-    expect(convert('Sym')).toEqual([{}, false])
+    // a symbol (like a function) is written as nothing, like `undefined`
+    expect(convert('Sym')).toEqual([{}, true])
   })
 
   it('literals', () => {
@@ -914,7 +915,8 @@ describe('typeToJsonSchemaConverter', () => {
     })
 
     it('callable types', () => {
-      expect(convertComplex('Overloaded')).toEqual([{}, false])
+      // written as nothing, like `undefined`
+      expect(convertComplex('Overloaded')).toEqual([{}, true])
       expect(convertComplex('WithOverload')).toEqual([
         {
           $ref: '#/$defs/WithOverload',

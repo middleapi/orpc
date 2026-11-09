@@ -36,6 +36,8 @@ export interface Def {
   schema?: JsonSchema
   /** The defs the schema refers to, computed once the schema is final */
   deps?: Set<string>
+  /** Whether no expansion was cut while converting it, so it does not depend on where it started */
+  stable?: boolean
 }
 
 /**
@@ -63,7 +65,8 @@ export class DefRegistry {
   private readonly anonymous = new Map<number, JsonSchema>()
 
   private createdDefs: Def[] = []
-  private createdAnonymous: number[] = []
+  /** Anonymous results the conversion added, with whether they are stable (see `Def.stable`) */
+  private createdAnonymous: { key: number; stable: boolean }[] = []
 
   get(key: number): Def | undefined {
     return this.defs.get(key)
@@ -113,7 +116,7 @@ export class DefRegistry {
    */
   inline(def: Def, schema: JsonSchema): void {
     this.remove(def)
-    this.setAnonymous(def.key, schema)
+    this.setAnonymous(def.key, schema, def.stable)
   }
 
   /**
@@ -138,9 +141,9 @@ export class DefRegistry {
     return true
   }
 
-  setAnonymous(key: number, schema: JsonSchema): void {
+  setAnonymous(key: number, schema: JsonSchema, stable = true): void {
     this.anonymous.set(key, schema)
-    this.createdAnonymous.push(key)
+    this.createdAnonymous.push({ key, stable })
   }
 
   /**
@@ -152,16 +155,45 @@ export class DefRegistry {
   }
 
   /**
-   * Removes what the conversion added.
+   * Removes what the conversion added, or with `keepStable`, only what depends on where it started:
+   * a stable def or result (see `Def.stable`) that refers only to kept defs is kept, so a type
+   * next to a cut expansion keeps its def and name (an enum `E` next to `Expand<T>`).
    */
-  discardCreated(): void {
-    for (const def of this.createdDefs) {
-      this.remove(def)
-      // it was emitted by the discarded conversion, a different schema must not take its name
-      this.reservedNames.add(def.name)
+  discardCreated(keepStable = false): void {
+    const created = new Set(this.createdDefs.map((def) => def.name))
+    const kept = new Set(
+      keepStable
+        ? this.createdDefs
+            .filter((def) => def.stable && this.defs.get(def.key) === def)
+            .map((def) => def.name)
+        : [],
+    )
+    const refersToDiscarded = (schema: JsonSchema) =>
+      [...collectDefRefs(schema)].some((name) => created.has(name) && !kept.has(name))
+
+    // until no kept def refers to a discarded one
+    for (let changed = true; changed;) {
+      changed = false
+      for (const name of kept) {
+        if (refersToDiscarded(this.defsByName.get(name)!.schema!)) {
+          kept.delete(name)
+          changed = true
+        }
+      }
     }
-    for (const key of this.createdAnonymous) {
-      this.anonymous.delete(key)
+
+    for (const def of this.createdDefs) {
+      if (!kept.has(def.name)) {
+        this.remove(def)
+        // it was emitted by the discarded conversion, a different schema must not take its name
+        this.reservedNames.add(def.name)
+      }
+    }
+    for (const { key, stable } of this.createdAnonymous) {
+      const schema = this.anonymous.get(key)
+      if (!keepStable || !stable || schema === undefined || refersToDiscarded(schema)) {
+        this.anonymous.delete(key)
+      }
     }
     this.keepCreated()
   }

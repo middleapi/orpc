@@ -11,7 +11,13 @@ import { decomposed, optional, records, spread } from '../tests/fixtures/app/src
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
 import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
-import { viewInputs } from '../tests/fixtures/app/src/round25.ts'
+import { StringRows, viewInputs } from '../tests/fixtures/app/src/round25.ts'
+import {
+  callables,
+  FullName,
+  instanceInputs,
+  LabeledStamp,
+} from '../tests/fixtures/app/src/round26.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -799,11 +805,19 @@ describe('typeScriptOpenAPIGenerator', () => {
           { type: 'object', properties: { href, x: { type: 'number' } }, required: ['href', 'x'] },
         ],
       })
-      // a request is plain JSON, the fields of a view of an array subclass
-      expect(body('/partialRowsWithX')).toMatchObject({
-        type: 'object',
-        properties: { label: { type: 'string' }, x: { type: 'string' } },
-        required: ['x'],
+      // a client sends an instance of the array subclass as an array, a plain object by its fields
+      expect(body('/partialRowsWithX')).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          expect.objectContaining({
+            type: 'object',
+            properties: expect.objectContaining({
+              label: { type: 'string' },
+              x: { type: 'string' },
+            }),
+            required: ['x'],
+          }),
+        ],
       })
 
       // what a client holding these values sends
@@ -817,6 +831,88 @@ describe('typeScriptOpenAPIGenerator', () => {
         ['/pickedURLWithX', Object.assign(new URL('http://x/'), { x: 1 })],
         ['/pickedURLWithX', { href: 'h', x: 1 }],
         ['/partialRowsWithX', { label: 'a', x: 'x' }],
+        ['/partialRowsWithX', Object.assign(new StringRows(), { x: 'x' })],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : validate.errors).toEqual([])
+      }
+    })
+  })
+
+  describe('round twenty-six', () => {
+    it('documents functions at the root as no body, also in a union', async () => {
+      const spec = await generator.generate(callables, {
+        source: { file: fixture('round26.ts'), export: 'callables' },
+      })
+      const response = (path: string) => (spec.paths as any)[path].post.responses['200']
+
+      // like a plain function or `undefined`
+      expect(response('/tagged')).toEqual({ description: 'OK', content: {} })
+      expect(response('/callable')).toEqual({ description: 'OK', content: {} })
+      expect(response('/taggedOrNumber').content['application/json'].schema).toEqual({
+        type: 'number',
+      })
+      expect(spec.components?.schemas ?? {}).toEqual({})
+    })
+
+    it('documents inputs a client may send as an instance or a plain object', async () => {
+      const spec = await generator.generate(instanceInputs, {
+        source: { file: fixture('round26.ts'), export: 'instanceInputs' },
+      })
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // the getter is optional, as in the class itself an instance does not write it
+      expect(body('/frozenFullName')).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, full: { type: 'string' } },
+        required: ['name'],
+      })
+      expect(body('/pickedStamp')).toEqual({
+        anyOf: [
+          { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+          { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+        ],
+      })
+      expect((spec.components?.schemas as any).LabeledLink.anyOf[0]).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect((spec.components?.schemas as any).MaybeCodedError.required).toBeUndefined()
+      expect(body('/branded')).toEqual({
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      })
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/frozenFullName', new FullName()],
+        ['/frozenFullName', { name: 'n', full: 'f' }],
+        ['/fullName', new FullName()],
+        ['/pickedStamp', new LabeledStamp(0)],
+        ['/pickedStamp', { label: 'l' }],
+        ['/link', new URL('http://x/')],
+        ['/link', { href: 'h', label: 'l' }],
+        ['/error', new Error('boom')],
+        ['/error', { code: 1, message: 'm' }],
+        ['/branded', { id: 'abc' }],
       ] as const) {
         const validate = ajv.compile(body(path))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

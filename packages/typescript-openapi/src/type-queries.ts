@@ -104,15 +104,18 @@ export class TypeQueries {
         return argument
       }
 
+      // the declared type is not instantiated with the alias's arguments
+      // (`Box<T>` of `type PickBox<T> = Pick<Box<T>, 'a'>`), so its type parameters match any type
       const declaring = type.getAliasSymbol() ? this.getDeclaringType(type) : undefined
-      return declaring && this.isMappedSourceOf(type, declaring) ? declaring : undefined
+      return declaring && this.isMappedSourceOf(type, declaring, true) ? declaring : undefined
     })
   }
 
   /**
-   * Whether a mapped type keeps the keys and values of a type (`T[K]`, maybe optional).
+   * Whether a mapped type keeps the keys and values of a type (`T[K]`, maybe optional),
+   * with `generic`, also values of the source with type parameters, which match any type.
    */
-  private isMappedSourceOf(type: Type, source: Type): boolean {
+  private isMappedSourceOf(type: Type, source: Type, generic = false): boolean {
     if (!(source.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
       return false
     }
@@ -134,9 +137,24 @@ export class TypeQueries {
         t !== undefined &&
         original !== undefined &&
         (t.id === original.id ||
-          this.checker.getNonNullableType(t)?.id === this.checker.getNonNullableType(original)?.id)
+          this.checker.getNonNullableType(t)?.id ===
+            this.checker.getNonNullableType(original)?.id ||
+          (generic && this.hasTypeParameter(original, 3)))
       )
     })
+  }
+
+  private hasTypeParameter(type: Type, depth: number): boolean {
+    if (type.flags & TypeFlags.TypeParameter) {
+      return true
+    }
+
+    const children =
+      type.flags & TypeFlags.UnionOrIntersection
+        ? this.getMembers(type)
+        : this.getReferenceArguments(type)
+
+    return depth > 0 && children.some((child) => this.hasTypeParameter(child, depth - 1))
   }
 
   /**

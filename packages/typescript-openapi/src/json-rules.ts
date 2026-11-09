@@ -199,13 +199,42 @@ export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
 
 /**
  * The class instance type of a type, also through `Readonly<C>`, `Pick<C, K>`, `C & { ... }`,
- * and `this`.
+ * and `this`: the first of `getClassTypes`.
  */
 export function getClassType(types: TypeQueries, type: Type): Type | undefined {
+  return getClassTypes(types, type)[0]
+}
+
+/**
+ * The class instance types behind a type, also through `Readonly<C>`, `Pick<C, K>`, `C & { ... }`,
+ * and `this`, and every class an interface or intersection is over
+ * (`interface L extends Pick<A, 'id'>, Pick<B, 'v'>`), whose instances a value may be.
+ */
+export function getClassTypes(types: TypeQueries, type: Type): readonly Type[] {
+  return types.memo('classTypes', type.id, () => {
+    const found = new Map<number, Type>()
+    collectClassTypes(types, type, found, new Set())
+    return [...found.values()]
+  })
+}
+
+function collectClassTypes(
+  types: TypeQueries,
+  type: Type,
+  found: Map<number, Type>,
+  visited: Set<number>,
+): void {
   const symbol = type.getSymbol()
 
+  // each type once, which also ends cycles through heritage clauses, at any nesting depth
+  if (visited.has(type.id)) {
+    return
+  }
+  visited.add(type.id)
+
   if (symbol && (symbol.flags & SymbolFlags.Class || isConstructedInterface(types, type, symbol))) {
-    return type
+    found.set(type.id, type)
+    return
   }
 
   // an interface extending a class describes its instances (and, unless the class has private
@@ -215,34 +244,30 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
     const target = type.isTypeReference() ? type.getTarget() : type
 
     for (const base of target.getBaseTypes() ?? []) {
-      const classType = getClassType(types, base)
-      if (classType) {
-        return classType
-      }
+      collectClassTypes(types, base, found, visited)
     }
+    return
   }
 
   if (type.flags & TypeFlags.TypeParameter) {
     const constraint = types.checker.getBaseConstraintOfType(type)
-    return constraint && constraint.id !== type.id ? getClassType(types, constraint) : undefined
+    if (constraint && constraint.id !== type.id) {
+      collectClassTypes(types, constraint, found, visited)
+    }
+    return
   }
 
   if (type.isIntersectionType()) {
     for (const member of types.getMembers(type)) {
-      const classType = getClassType(types, member)
-      if (classType) {
-        return classType
-      }
+      collectClassTypes(types, member, found, visited)
     }
-    return undefined
+    return
   }
 
   const source = types.getMappedSource(type)
   if (source) {
-    return getClassType(types, source)
+    collectClassTypes(types, source, found, visited)
   }
-
-  return undefined
 }
 
 /**
@@ -389,6 +414,7 @@ export class ModeSensitivity {
     this.path.push(type.id)
 
     let low = entry.order
+    const cuts = this.expansion.cuts
     entry.sensitive =
       this.expansion.expand(type, () =>
         this.compute(type, (child) => {
@@ -414,9 +440,15 @@ export class ModeSensitivity {
       }
     }
 
+    // a cut hides what the expansion reaches further down, so only a sensitive part found is
+    // final: the same type reached from elsewhere (or directly) is walked deeper
+    const final = sensitive || cuts === this.expansion.cuts
+
     for (const id of members) {
       this.onPath.delete(id)
-      this.cache.set(id, sensitive)
+      if (final) {
+        this.cache.set(id, sensitive)
+      }
     }
 
     return { sensitive, low: Infinity }
@@ -432,9 +464,13 @@ export class ModeSensitivity {
       return this.mode === 'stringify' || hasBigIntToJSON(types)
     }
 
-    // the serializer leaves typed arrays, also with added fields, to `JSON.stringify`
+    // the serializer leaves typed arrays, also with added fields, to `JSON.stringify`, but not
+    // the plain object a view of a typed array class may hold (`Pick<class B extends Uint8Array, 's'>`)
     if (flags & (TypeFlags.Object | TypeFlags.Intersection) && isTypedArray(types, type)) {
-      return false
+      const classType = getClassType(types, type)
+      if (classType === undefined || !isClassView(types, type, classType)) {
+        return false
+      }
     }
 
     if (flags & TypeFlags.UnionOrIntersection) {
@@ -509,11 +545,12 @@ export class ModeSensitivity {
       return false
     }
 
-    if (extended !== undefined) {
-      if (isModeSensitiveBuiltin(types, declared!)) {
-        return true
-      }
+    // also an interface extending a view of a built-in (`interface Sized extends Pick<Set<T>, 'size'>`)
+    if (declared !== undefined && isModeSensitiveBuiltin(types, declared)) {
+      return true
+    }
 
+    if (extended !== undefined) {
       // `class Rows extends Array<Set<string>>` is an array of its items
       if (extended === 'Array' || extended === 'ReadonlyArray') {
         const item = types.checker
@@ -570,9 +607,12 @@ export class ModeSensitivity {
     }
 
     if (
-      getToJSON(types, classType) ||
-      getBuiltin(types, classType, false) !== undefined ||
-      getBuiltin(types, classType, true) !== undefined
+      getClassTypes(types, type).some(
+        (c) =>
+          getToJSON(types, c) ||
+          getBuiltin(types, c, false) !== undefined ||
+          getBuiltin(types, c, true) !== undefined,
+      )
     ) {
       return true
     }
