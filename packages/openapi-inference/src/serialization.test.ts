@@ -2243,6 +2243,8 @@ describe('chains of deep views of classes', async () => {
     return { spec, time: performance.now() - start }
   }
 
+  // the first generation also starts the compiler
+  await generate('shortDeepChain')
   const results = {
     shortDeepChain: await generate('shortDeepChain'),
     longDeepChain: await generate('longDeepChain'),
@@ -2294,6 +2296,8 @@ describe('rings of deep views of classes', async () => {
     return { spec, time: performance.now() - start }
   }
 
+  // the first generation also starts the compiler
+  await generate('nullRing')
   const results = {
     nullRing: await generate('nullRing'),
     conditionalRing: await generate('conditionalRing'),

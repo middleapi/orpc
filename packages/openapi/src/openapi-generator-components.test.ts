@@ -604,6 +604,40 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
+    it('checks a def again when its schema was changed in place', () => {
+      const { doc, registry } = createRegistry()
+      const user: any = { type: 'object', properties: { id: { type: 'string' } } }
+      const hoist = () => registry.hoistDefs({ $ref: '#/$defs/User', $defs: { User: user } })
+
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User' })
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User' })
+
+      user.properties = { id: { type: 'number' } }
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User2' })
+
+      user.properties.id.type = 'boolean'
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User3' })
+
+      expect(doc.components?.schemas).toEqual({
+        User: { type: 'object', properties: { id: { type: 'string' } } },
+        User2: { type: 'object', properties: { id: { type: 'number' } } },
+        User3: { type: 'object', properties: { id: { type: 'boolean' } } },
+      })
+    })
+
+    it('checks a def again when it holds values compared by identity', () => {
+      const { doc, registry } = createRegistry()
+      const hoist = (value: unknown) =>
+        registry.hoistDefs({ $ref: '#/$defs/Stamp', $defs: { Stamp: { default: value } } })
+
+      expect(hoist(new Date(0))).toEqual({ $ref: '#/components/schemas/Stamp' })
+      expect(hoist(new Date(0))).toEqual({ $ref: '#/components/schemas/Stamp2' })
+      expect(hoist([Number.NaN])).toEqual({ $ref: '#/components/schemas/Stamp3' })
+      expect(hoist([Number.NaN])).toEqual({ $ref: '#/components/schemas/Stamp3' })
+      expect(hoist([null])).toEqual({ $ref: '#/components/schemas/Stamp4' })
+      expect(Object.keys(doc.components?.schemas ?? {})).toHaveLength(4)
+    })
+
     it('checks a def again once a ref to a missing component resolves', () => {
       const { doc, registry } = createRegistry({
         schemas: { Box: { items: { $ref: '#/components/schemas/Left' } } },

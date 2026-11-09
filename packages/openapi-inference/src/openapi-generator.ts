@@ -209,6 +209,8 @@ export class OpenAPIGenerator {
   ): Promise<RouterContract> {
     let inferred: RouterContract = {}
     const errors: string[] = []
+    // printed once, many unresolved procedures share the errors of the router file
+    const diagnostics = new Set<string>()
     let walked = 0
     let found = 0
 
@@ -243,12 +245,13 @@ export class OpenAPIGenerator {
           throw e
         }
         // the compiler knows why a type is unresolved: a missing module, an undeclared name, ...
-        const diagnostics =
-          e instanceof TypeScriptTypeResolutionError ? getCompilerErrors(ctx, resolved) : []
+        if (e instanceof TypeScriptTypeResolutionError) {
+          for (const diagnostic of getCompilerErrors(ctx, resolved)) {
+            diagnostics.add(diagnostic)
+          }
+        }
 
-        errors.push(
-          `Procedure at ${path.length ? path.join('.') : '(root)'}: ${e.message}${diagnostics.map((d) => `\n  ${d}`).join('')}`,
-        )
+        errors.push(`Procedure at ${path.length ? path.join('.') : '(root)'}: ${e.message}`)
       }
     })
 
@@ -260,8 +263,12 @@ export class OpenAPIGenerator {
     }
 
     if (errors.length) {
+      const compilerErrors = diagnostics.size
+        ? `\n\nCompiler errors:${[...diagnostics].map((d) => `\n  ${d}`).join('')}`
+        : ''
+
       throw new OpenAPIGeneratorError(
-        `[OpenAPIGenerator] Failed to infer types for the OpenAPI document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n${errors.join('\n\n')}`,
+        `[OpenAPIGenerator] Failed to infer types for the OpenAPI document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n${errors.join('\n\n')}${compilerErrors}`,
       )
     }
 

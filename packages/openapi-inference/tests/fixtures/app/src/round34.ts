@@ -1,4 +1,6 @@
+import type { AnyProcedure } from '@orpc/server'
 import { os, type } from '@orpc/server'
+import * as z from 'zod'
 
 export const roundThirtyFourJSDoc = {
   /**
@@ -60,3 +62,42 @@ function wrapRouter<T>(router: T): { inner: T } {
 export const roundThirtyFourWrapped = wrapRouter(
   wrapRouter(wrapRouter({ list: os.handler(() => 1) })),
 )
+
+/** Routers whose types are no plain objects, for a `source` pointing at another router */
+const usersRouter = { users: { list: os.handler(() => [1]) } }
+const postsRouter = { posts: { list: os.handler(() => ['p']) } }
+
+export const assignedRouter = Object.assign({}, usersRouter, postsRouter)
+
+export const nestedAssigned = { api: Object.assign({}, usersRouter, postsRouter) }
+
+export declare const intersectedRouter: { a: AnyProcedure } & { b: AnyProcedure }
+
+class Holder {
+  list = os.handler(() => 1)
+  find = os.handler(() => 'x')
+}
+
+export const heldRouter = new Holder()
+
+export const heldService = { svc: new Holder() }
+
+export const callableRouter = Object.assign(() => 1, { q: os.handler(() => 1) })
+
+/** A library type with a large type graph, which holds no procedure */
+export const userSchema = z.object({ id: z.string(), tags: z.array(z.string()).optional() })
+
+/** A class that expands generically next to its procedure-free members */
+export class Cursor<T> {
+  constructor(readonly value: T) {}
+
+  next(): Cursor<T[]> {
+    return new Cursor([this.value])
+  }
+
+  get parent(): Cursor<{ child: T }> {
+    return new Cursor({ child: this.value })
+  }
+}
+
+export const cursor = new Cursor('x')

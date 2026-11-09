@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import type { SourceFile } from 'typescript/unstable/ast'
@@ -91,17 +91,28 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     let project = tsconfig ? snapshot.getProject(tsconfig) : snapshot.getDefaultProjectForFile(file)
 
     // a solution tsconfig (`"files": []` with `references`) has no files of its own,
-    // the file is in the referenced project the compiler picks for it, under the solution
+    // the file is in one of the projects it references: the one the compiler picks for it,
+    // else the first that includes it
     if (tsconfig && project && !project.rootFiles.length && !project.program.getSourceFile(file)) {
+      const references = getReferencedTsconfigs(tsconfig)
       snapshot = api.updateSnapshot({ openProjects: [tsconfig], openFiles: [file] })
-      const referenced = snapshot.getDefaultProjectForFile(file)
+      let referenced = snapshot.getDefaultProjectForFile(file)
 
-      if (
-        referenced &&
-        !referenced.configFileName.startsWith('/dev/null/') &&
-        !path.relative(path.dirname(tsconfig), referenced.configFileName).startsWith('..') &&
-        referenced.program.getSourceFile(file)
-      ) {
+      if (!referenced || !references.has(path.resolve(referenced.configFileName))) {
+        referenced = undefined
+
+        for (const candidate of references) {
+          snapshot = api.updateSnapshot({ openProjects: [candidate] })
+          const candidateProject = snapshot.getProject(candidate)
+
+          if (candidateProject?.program.getSourceFile(file)) {
+            referenced = candidateProject
+            break
+          }
+        }
+      }
+
+      if (referenced?.program.getSourceFile(file)) {
         project = referenced
       }
     }
@@ -153,4 +164,56 @@ function* findAncestorTsconfigs(directory: string): Generator<string> {
       return
     }
   }
+}
+
+/**
+ * The existing tsconfigs a solution tsconfig references, also through the solutions it references.
+ */
+function getReferencedTsconfigs(tsconfig: string): Set<string> {
+  const references = new Set<string>()
+  const queue = [tsconfig]
+
+  for (const config of queue) {
+    for (const reference of readReferencePaths(config)) {
+      let target = path.resolve(path.dirname(config), reference)
+
+      // a reference to a directory stands for its tsconfig.json
+      if (statSync(target, { throwIfNoEntry: false })?.isDirectory()) {
+        target = path.join(target, 'tsconfig.json')
+      }
+
+      if (target !== tsconfig && !references.has(target) && existsSync(target)) {
+        references.add(target)
+        queue.push(target)
+      }
+    }
+  }
+
+  return references
+}
+
+/**
+ * The `references[].path` values of a tsconfig, which is JSON with comments and trailing commas.
+ */
+function readReferencePaths(tsconfig: string): string[] {
+  try {
+    const config = JSON.parse(stripJsonComments(readFileSync(tsconfig, 'utf8')))
+    const references: unknown = config?.references
+
+    return Array.isArray(references)
+      ? references.map((reference) => reference?.path).filter((p) => typeof p === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Removes the comments and trailing commas of JSON with comments, keeping strings as they are.
+ */
+function stripJsonComments(text: string): string {
+  return text.replace(
+    /("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\/|,(?=\s*(?:\/\/[^\n]*\s*|\/\*[\s\S]*?\*\/\s*)*[\]}])/gu,
+    (_match, string: string | undefined) => string ?? '',
+  )
 }

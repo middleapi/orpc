@@ -1,4 +1,5 @@
 {
+  // the app, and a project outside the solution's directory
   "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }]
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "../solution-outside" }]
 }

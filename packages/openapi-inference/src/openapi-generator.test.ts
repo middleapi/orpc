@@ -48,6 +48,7 @@ import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
+import { router as outsideRouter } from '../tests/fixtures/solution-outside/router'
 import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
 import { OpenAPIGenerator } from './openapi-generator'
 
@@ -392,6 +393,29 @@ describe('openAPIGenerator', () => {
     await expect(
       generator.generate(router, { source: { file: fixture('router.ts'), tsconfig: solution } }),
     ).rejects.toThrow('Pass the tsconfig that includes it, or leave out "tsconfig"')
+
+    // nor is a file of a project under the solution's directory that it does not reference
+    await expect(
+      generator.generate(solutionRouter, {
+        source: {
+          file: new URL('../tests/fixtures/solution/unreferenced/router.ts', import.meta.url),
+          tsconfig: solution,
+        },
+      }),
+    ).rejects.toThrow(`is not part of the project "${fileURLToPath(solution)}"`)
+
+    // a referenced project outside the solution's directory is part of it
+    const outside = await generator.generate(outsideRouter, {
+      source: {
+        file: new URL('../tests/fixtures/solution-outside/router.ts', import.meta.url),
+        tsconfig: solution,
+      },
+    })
+    expect((outside.paths?.['/pong']?.post?.responses?.['200'] as any).content).toEqual({
+      'application/json': {
+        schema: { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+      },
+    })
   })
 
   it.each([
@@ -455,12 +479,43 @@ describe('openAPIGenerator', () => {
     await expect(wrapped).rejects.not.toThrow('which is not a router')
   })
 
+  it('reports the unmatched paths of routers that are no plain objects', async () => {
+    const file = fixture('round34.ts')
+    const other = { zzz: os.handler(() => 1) }
+
+    for (const exportName of [
+      'assignedRouter',
+      'nestedAssigned',
+      'intersectedRouter',
+      'heldRouter',
+      'heldService',
+      'callableRouter',
+    ]) {
+      const generated = generator.generate(other, { source: { file, export: exportName } })
+      await expect(generated).rejects.toThrow(
+        'Procedure at zzz: its type was not found in the router type',
+      )
+      await expect(generated).rejects.not.toThrow('which is not a router')
+    }
+
+    const assigned = await generator.generate(
+      Object.assign(
+        {},
+        { users: { list: os.handler(() => [1]) } },
+        { posts: { list: os.handler(() => ['p']) } },
+      ),
+      { source: { file, export: 'assignedRouter' } },
+    )
+    expect(Object.keys(assigned.paths ?? {})).toEqual(['/users/list', '/posts/list'])
+  })
+
   it('tells fast that an export whose type expands generically is no router', async () => {
     const file = fixture('round34.ts')
 
     for (const [exportName, typeName] of [
       ['grow', 'Grow<number>'],
       ['chain', 'Chain<number>'],
+      ['cursor', 'Cursor<string>'],
     ]) {
       const start = performance.now()
       await expect(
@@ -470,6 +525,13 @@ describe('openAPIGenerator', () => {
       )
       expect(performance.now() - start).toBeLessThan(1000)
     }
+
+    // a library class instance with a large type graph
+    const start = performance.now()
+    await expect(
+      generator.generate(roundThirtyFourInner, { source: { file, export: 'userSchema' } }),
+    ).rejects.toThrow(/The export "userSchema" .* has type "ZodObject<.*which is not a router/su)
+    expect(performance.now() - start).toBeLessThan(1000)
   })
 
   it('keeps the first line of the comment for an empty @summary or @description', async () => {
@@ -519,21 +581,19 @@ describe('openAPIGenerator', () => {
       const config = `error TS5083: Cannot read file '${file('missing-base.json')}'.`
       const undeclared = `${file('router.ts')}:2:31 - error TS2304: Cannot find name 'undefinedVariable'.`
 
-      // of the router file, and of the file a procedure assigned to it is declared in
-      expect((error as Error).message).toContain(
+      // of the router file, and of the file a procedure assigned to it is declared in, once
+      expect((error as Error).message).toBe(
         [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
           `Procedure at a: Could not resolve its type "User". ${resolution}`,
-          config,
-          undeclared,
-          `${file('sub.ts')}:1:27 - error TS2307: Cannot find module './nope-user' or its corresponding type declarations.`,
-        ].join('\n  '),
-      )
-      expect((error as Error).message).toContain(
-        [
           `Procedure at b: Could not resolve its type "any". ${resolution}`,
-          config,
-          undeclared,
-        ].join('\n  '),
+          [
+            'Compiler errors:',
+            config,
+            undeclared,
+            `${file('sub.ts')}:1:27 - error TS2307: Cannot find module './nope-user' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
       )
     } finally {
       rmSync(directory, { recursive: true, force: true })

@@ -1,5 +1,5 @@
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import { ExpansionGuard } from './expansion'
 import { TypeQueries } from './type-queries'
@@ -85,7 +85,8 @@ export class RouterTypeResolver {
       return true
     }
 
-    if (current.isUnionType()) {
+    // optional routers, and the `{ users } & { posts }` of `Object.assign`
+    if (current.flags & TypeFlags.UnionOrIntersection) {
       return types
         .getMembers(current)
         .some((member) => this.holdsProcedureIn(member, types, expansion, seen))
@@ -119,29 +120,22 @@ export class RouterTypeResolver {
   }
 
   /**
-   * Whether the type is a plain object, which a router of procedures, lazy routers and nested
-   * routers is: no primitive, function, array, class instance or default library type
-   * (`Record<K, T>` and the other mapped types aside).
+   * Whether the type can hold routers like an object of procedures, lazy routers and nested
+   * routers does: a plain object, a class instance or a function with properties, but no
+   * primitive, array or default library type (`Record<K, T>` and the other mapped types aside),
+   * whose members hold no procedure.
    */
   private canBeRouter(type: Type, types: TypeQueries): boolean {
-    if (
-      !(type.flags & TypeFlags.Object) ||
-      types.getReferenceKind(type) ||
-      types.isCallable(type)
-    ) {
+    if (!(type.flags & TypeFlags.Object) || types.getReferenceKind(type)) {
       return false
     }
 
     const symbol = type.getSymbol()
 
-    if (!symbol) {
-      return true
-    }
-
     return (
-      !(symbol.flags & SymbolFlags.Class) &&
-      (!!((type as any).objectFlags & ObjectFlags.Mapped) ||
-        types.getSymbolSourceKind(symbol) !== 'default')
+      !symbol ||
+      !!((type as any).objectFlags & ObjectFlags.Mapped) ||
+      types.getSymbolSourceKind(symbol) !== 'default'
     )
   }
 
