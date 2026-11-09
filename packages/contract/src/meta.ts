@@ -1,7 +1,7 @@
 import { isNonPrimitive } from '@orpc/shared'
 
-import type { ErrorMap } from './error.ts'
-import type { AnySchema } from './schema.ts'
+import type { ErrorMap } from './error'
+import type { AnySchema } from './schema'
 
 /**
  * Arbitrary metadata attached to a procedure.

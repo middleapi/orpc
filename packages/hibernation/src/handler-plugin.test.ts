@@ -9,8 +9,8 @@ import {
 } from '@standard-server/peer'
 import * as z from 'zod'
 
-import { encodeHibernationRPCEvent } from './encode-event.ts'
-import { HibernationHandlerPlugin } from './handler-plugin.ts'
+import { encodeHibernationRPCEvent } from './encode-event'
+import { HibernationHandlerPlugin } from './handler-plugin'
 
 beforeEach(() => {
   vi.resetAllMocks()

@@ -10,6 +10,8 @@ oRPC: typesafe APIs with RPC and OpenAPI support, in a pnpm monorepo.
 - `playgrounds/*`: example apps
 - `benches/`: benchmarks
 
+Relative imports omit the extension (`./foo`, not `./foo.ts`). Packages build per file with obuild (`build.config.ts`), so exported declarations need explicit types (`isolatedDeclarations`).
+
 ## Commands
 
 ```bash
@@ -22,6 +24,7 @@ pnpm format                  # format with oxfmt
 pnpm repo:fix                # fix monorepo issues with sherif
 pnpm docs:validate           # JSDoc backlinks + docs links
 pnpm bench
+pnpm build                   # build and verify every package (build.config.ts)
 pnpm --filter @orpc/server prepack  # build one package; tests don't need a build
 ```
 

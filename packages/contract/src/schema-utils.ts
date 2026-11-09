@@ -1,7 +1,7 @@
 import type { IsEqual, Promisable } from '@orpc/shared'
 import { isPropertyKey, isNonPrimitive, ORPC_NAME } from '@orpc/shared'
 
-import type { Schema, SchemaIssue } from './schema.ts'
+import type { Schema, SchemaIssue } from './schema'
 
 export type TypeRest<TInput, TOutput> =
   | [map: (input: TInput) => Promisable<TOutput>]

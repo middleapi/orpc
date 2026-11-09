@@ -1,4 +1,4 @@
-import { value } from './value.ts'
+import { value } from './value'
 
 it('value', async () => {
   expect(value(42)).toBe(42)

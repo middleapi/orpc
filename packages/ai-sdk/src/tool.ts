@@ -26,8 +26,8 @@ import {
 import type { FlexibleSchema, JSONValue, Tool, ToolResultPart } from 'ai'
 import { tool } from 'ai'
 
-import type { FunctionTool } from './tool-meta.ts'
-import { getAiSdkToolMeta } from './tool-meta.ts'
+import type { FunctionTool } from './tool-meta'
+import { getAiSdkToolMeta } from './tool-meta'
 
 const ANY_SCHEMA: FlexibleSchema = {
   '~standard': {

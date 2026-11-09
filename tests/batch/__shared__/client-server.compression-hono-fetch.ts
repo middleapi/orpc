@@ -8,8 +8,8 @@ import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
-import type { CreateBatchClientServerTest } from './client-server.ts'
-import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
+import type { CreateBatchClientServerTest } from './client-server'
+import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 /**
  * Compressed batches over the fetch adapter, which the plugin serves as readily as the node one

@@ -1,8 +1,8 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
-import { StandardLink } from '../adapters/standard/index.ts'
-import { RetryAfterLinkPlugin } from './retry-after.ts'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
+import { StandardLink } from '../adapters/standard/index'
+import { RetryAfterLinkPlugin } from './retry-after'
 
 function makeCodec(): StandardLinkCodec<any> {
   return {

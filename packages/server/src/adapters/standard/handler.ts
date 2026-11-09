@@ -25,12 +25,12 @@ import {
   parseStandardUrl,
 } from '@standard-server/core'
 
-import type { Context } from '../../context.ts'
-import type { ProcedureClientInterceptor } from '../../procedure-client.ts'
-import { createProcedureClient } from '../../procedure-client.ts'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec.ts'
-import type { StandardHandlerPlugin } from './plugin.ts'
-import { CompositeStandardHandlerPlugin } from './plugin.ts'
+import type { Context } from '../../context'
+import type { ProcedureClientInterceptor } from '../../procedure-client'
+import { createProcedureClient } from '../../procedure-client'
+import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
+import type { StandardHandlerPlugin } from './plugin'
+import { CompositeStandardHandlerPlugin } from './plugin'
 
 export interface StandardHandlerHandleOptions<T extends Context> {
   prefix?: `/${string}` | undefined

@@ -16,9 +16,9 @@ import type {
 import { Builder, ProcedureImplementer } from '@orpc/server'
 import type { Effect } from 'effect'
 
-import type { InferEffectServices } from '../context.ts'
-import type { HandlerGen } from '../handler.ts'
-import { handlerGen } from '../handler.ts'
+import type { InferEffectServices } from '../context'
+import type { HandlerGen } from '../handler'
+import { handlerGen } from '../handler'
 
 declare module '@orpc/server' {
   interface Builder<TInitialContext extends Context, TErrorMap extends ErrorMap> {

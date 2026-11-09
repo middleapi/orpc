@@ -4,9 +4,9 @@ import { os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
 
-import { Person } from '../rpc/__shared__/client-server.ts'
-import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch.ts'
-import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http.ts'
+import { Person } from '../rpc/__shared__/client-server'
+import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
+import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
 
 describe.each([
   ['hono-fetch', createHonoFetchClientServerTest],

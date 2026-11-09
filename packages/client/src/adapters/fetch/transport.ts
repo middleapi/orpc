@@ -4,8 +4,8 @@ import type { StandardLazyResponse, StandardRequest } from '@standard-server/cor
 import type { ToFetchBodyOptions } from '@standard-server/fetch'
 import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standard-server/fetch'
 
-import type { ClientContext, ClientOptions } from '../../types.ts'
-import type { StandardLinkTransport } from '../standard/index.ts'
+import type { ClientContext, ClientOptions } from '../../types'
+import type { StandardLinkTransport } from '../standard/index'
 
 const GET_SUPPORTED_DUPLEX_MODE = /* @__PURE__ */ once(() => {
   // TODO: Try `duplex: 'full'` when it is widely supported.

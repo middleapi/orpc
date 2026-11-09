@@ -1,8 +1,8 @@
 import { promiseWithResolvers } from '@orpc/shared'
 import { effectScope, watch } from 'vue'
 
-import { createChunkController, createQueryCache, mountQuery } from '../tests/__shared__/utils.ts'
-import { serializableStreamedQuery } from './stream-query.ts'
+import { createChunkController, createQueryCache, mountQuery } from '../tests/__shared__/utils'
+import { serializableStreamedQuery } from './stream-query'
 
 describe('serializableStreamedQuery', () => {
   it('publishes each chunk to the cache as it arrives on first fetch', async () => {

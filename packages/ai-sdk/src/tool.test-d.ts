@@ -4,7 +4,7 @@ import type { InferToolInput, InferToolOutput } from 'ai'
 import { generateText } from 'ai'
 import { z } from 'zod'
 
-import { createToolFactory, implementToolFactory } from './tool.ts'
+import { createToolFactory, implementToolFactory } from './tool'
 
 describe('implementToolFactory', () => {
   it('can use as a tool', () => {

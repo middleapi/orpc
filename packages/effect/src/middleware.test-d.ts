@@ -3,8 +3,8 @@ import { os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
 
-import type { WithEffectContext } from './context.ts'
-import { middlewareGen } from './middleware.ts'
+import type { WithEffectContext } from './context'
+import { middlewareGen } from './middleware'
 
 class Service1 extends Context.Service<
   Service1,

@@ -1,5 +1,5 @@
-import type { OpenAPIDocument, OpenAPIVersion } from '../types.ts'
-import { OpenAPIReferenceHandlerPlugin } from './openapi-reference.ts'
+import type { OpenAPIDocument, OpenAPIVersion } from '../types'
+import { OpenAPIReferenceHandlerPlugin } from './openapi-reference'
 
 describe('openAPIReferenceHandlerPlugin', () => {
   beforeEach(() => {

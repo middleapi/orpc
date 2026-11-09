@@ -6,8 +6,8 @@ import { getEventMeta, withEventMeta } from '@standard-server/core'
 import type { RedisClientType } from 'redis'
 import { createClient } from 'redis'
 
-import type { RedisPublisherOptions } from './redis.ts'
-import { RedisPublisher } from './redis.ts'
+import type { RedisPublisherOptions } from './redis'
+import { RedisPublisher } from './redis'
 
 const REDIS_URL = process.env.REDIS_URL
 

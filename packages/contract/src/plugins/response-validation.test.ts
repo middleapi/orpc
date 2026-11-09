@@ -2,13 +2,13 @@ import { getEventMeta, ORPCError, withEventMeta } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import * as z from 'zod'
 
-import { reconcileORPCError } from '../error-utils.ts'
-import { ValidationError } from '../error.ts'
-import { ProcedureContract } from '../procedure.ts'
-import { asyncIteratorObject } from '../schema-built-in.ts'
-import { ResponseValidationLinkPlugin } from './response-validation.ts'
+import { ValidationError } from '../error'
+import { reconcileORPCError } from '../error-utils'
+import { ProcedureContract } from '../procedure'
+import { asyncIteratorObject } from '../schema-built-in'
+import { ResponseValidationLinkPlugin } from './response-validation'
 
-vi.mock('../error-utils.ts', async (original) => ({
+vi.mock('../error-utils', async (original) => ({
   ...(await original()),
   reconcileORPCError: vi.fn(),
 }))
@@ -245,7 +245,7 @@ describe('responseValidationLinkPlugin', () => {
 
     it('marks mid-stream errors as defined and applies the error data schema', async () => {
       const { reconcileORPCError: actualReconcileORPCError } =
-        await vi.importActual<typeof import('../error-utils.ts')>('../error-utils.ts')
+        await vi.importActual<typeof import('../error-utils')>('../error-utils')
       vi.mocked(reconcileORPCError).mockImplementation(actualReconcileORPCError)
       onTestFinished(() => {
         vi.mocked(reconcileORPCError).mockReset()

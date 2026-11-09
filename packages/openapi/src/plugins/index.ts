@@ -1,1 +1,1 @@
-export * from './openapi-reference.ts'
+export * from './openapi-reference'

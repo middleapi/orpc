@@ -64,15 +64,15 @@ import {
 } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 
-import type { McpToolMeta } from './meta.ts'
-import { getMcpToolMeta } from './meta.ts'
-import type { ToolInputJsonSchema } from './utils.ts'
+import type { McpToolMeta } from './meta'
+import { getMcpToolMeta } from './meta'
+import type { ToolInputJsonSchema } from './utils'
 import {
   resolveToolInput,
   resolveToolInputJsonSchema,
   resolveToolOutputJsonSchema,
   toPassthroughStandardSchema,
-} from './utils.ts'
+} from './utils'
 
 /**
  * Options for {@link McpRegistrar}. Tool calls run through a standard handler,

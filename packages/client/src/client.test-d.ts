@@ -3,9 +3,9 @@ import type { RouterClient } from '@orpc/server'
 import { os, type } from '@orpc/server'
 import type { PromiseWithError } from '@orpc/shared'
 
-import { createORPCClient } from './client.ts'
-import type { ORPCError } from './error.ts'
-import type { ClientLink } from './types.ts'
+import { createORPCClient } from './client'
+import type { ORPCError } from './error'
+import type { ClientLink } from './types'
 
 const router = {
   ping: os.input(type<number>()).handler(() => 'pong'),

@@ -5,7 +5,7 @@ import { RedisRateLimiter } from '@orpc/ratelimit/redis'
 import { RedisClient } from 'bun'
 import { createClient } from 'redis'
 
-import { BunRedisRateLimiter } from '../src/index.ts'
+import { BunRedisRateLimiter } from '../src/index'
 
 const REDIS_URL = Bun.env.REDIS_URL
 

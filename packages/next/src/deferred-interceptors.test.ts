@@ -5,7 +5,7 @@ import {
   onFinishDeferred,
   onStartDeferred,
   onSuccessDeferred,
-} from './deferred-interceptors.ts'
+} from './deferred-interceptors'
 
 describe('onStartDeferred/onSuccessDeferred/onErrorDeferred/onFinishDeferred', async () => {
   it('on success', async () => {

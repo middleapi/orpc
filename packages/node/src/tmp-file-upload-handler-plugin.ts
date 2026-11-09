@@ -35,7 +35,7 @@ import {
 } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
-import { parseHeaderParameters, parseMultipart } from './multipart.ts'
+import { parseHeaderParameters, parseMultipart } from './multipart'
 
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**

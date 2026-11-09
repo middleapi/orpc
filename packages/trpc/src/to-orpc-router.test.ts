@@ -14,7 +14,7 @@ import { isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
 
-import { toORPCRouter } from './to-orpc-router.ts'
+import { toORPCRouter } from './to-orpc-router'
 
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 

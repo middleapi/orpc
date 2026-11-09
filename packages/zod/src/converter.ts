@@ -22,7 +22,7 @@ import {
   JSON_SCHEMA_INPUT_REGISTRY,
   JSON_SCHEMA_OUTPUT_REGISTRY,
   JSON_SCHEMA_REGISTRY,
-} from './registries.ts'
+} from './registries'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {
   /**

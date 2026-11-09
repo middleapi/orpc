@@ -9,8 +9,8 @@ import type {
   HttpResponseStream,
 } from '@standard-server/aws-lambda'
 
-import { openapi } from '../../meta.ts'
-import { OpenAPIHandler } from './openapi-handler.ts'
+import { openapi } from '../../meta'
+import { OpenAPIHandler } from './openapi-handler'
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []

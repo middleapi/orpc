@@ -2,10 +2,10 @@ import { ORPCError } from '@orpc/client'
 import * as sharedExperimental from '@orpc/shared'
 import { EventStreamErrorEvent } from '@standard-server/core'
 
-import { createProcedureClient } from '../../procedure-client.ts'
-import { StandardHandler } from './handler.ts'
+import { createProcedureClient } from '../../procedure-client'
+import { StandardHandler } from './handler'
 
-vi.mock('../../procedure-client.ts', () => ({
+vi.mock('../../procedure-client', () => ({
   createProcedureClient: vi.fn(),
 }))
 

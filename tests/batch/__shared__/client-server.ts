@@ -3,7 +3,7 @@ import type { BatchLinkPluginMode } from '@orpc/client/plugins'
 import type { AnyRouter, Context, RouterClient } from '@orpc/server'
 import type { Public } from '@orpc/shared'
 
-import { defaultSerializer } from '../../rpc/__shared__/client-server.ts'
+import { defaultSerializer } from '../../rpc/__shared__/client-server'
 
 export interface BatchClientServerTestOptions {
   context?: Context

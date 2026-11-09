@@ -4,7 +4,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import type { HttpHandler } from 'msw'
 import * as z from 'zod'
 
-import { createHTTPUtils } from './http-router-utils.ts'
+import { createHTTPUtils } from './http-router-utils'
 
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })

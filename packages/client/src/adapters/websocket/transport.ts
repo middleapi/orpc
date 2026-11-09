@@ -17,8 +17,8 @@ import {
   isServerPeerSendMessage,
 } from '@standard-server/peer'
 
-import type { ClientContext, ClientOptions } from '../../types.ts'
-import type { StandardLinkTransport } from '../standard/index.ts'
+import type { ClientContext, ClientOptions } from '../../types'
+import type { StandardLinkTransport } from '../standard/index'
 
 /**
  * Some env maybe not available WebSocket global, like node 20

@@ -12,8 +12,8 @@ import type { MaybeOptionalOptions } from '@orpc/shared'
 import { anyAbortSignal, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
 
-import type { InferEffectServices, WithEffectContext } from './context.ts'
-import { runPromise } from './runtime.ts'
+import type { InferEffectServices, WithEffectContext } from './context'
+import { runPromise } from './runtime'
 
 export interface MiddlewareGenNext<TOutput> {
   <U extends Context = object>(

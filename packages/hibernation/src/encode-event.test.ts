@@ -3,7 +3,7 @@ import { ORPCError, RPCSerializer } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { encodePeerMessage } from '@standard-server/peer'
 
-import { encodeHibernationRPCEvent } from './encode-event.ts'
+import { encodeHibernationRPCEvent } from './encode-event'
 
 class Planet {
   constructor(

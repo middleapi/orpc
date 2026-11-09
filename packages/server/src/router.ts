@@ -7,9 +7,9 @@ import type {
   ThrowableError,
 } from '@orpc/contract'
 
-import type { Context, MergedContext } from './context.ts'
-import type { Lazyable } from './lazy.ts'
-import type { Procedure } from './procedure.ts'
+import type { Context, MergedContext } from './context'
+import type { Lazyable } from './lazy'
+import type { Procedure } from './procedure'
 
 export type Router<TInitialContext extends Context> =
   | Procedure<TInitialContext, any, any, any, any>

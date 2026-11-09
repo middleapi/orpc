@@ -8,7 +8,7 @@ import {
 } from '@orpc/json-schema'
 import { getOwn, isDeepEqual, isPlainObject, isPlainObjectOrArray, setOwn } from '@orpc/shared'
 
-import type { OpenAPIV3_2 } from './types.ts'
+import type { OpenAPIV3_2 } from './types'
 
 const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'

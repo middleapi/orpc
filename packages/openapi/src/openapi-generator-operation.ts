@@ -27,12 +27,12 @@ import {
   DEFAULT_OPENAPI_METHOD,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
   DEFAULT_OPENAPI_SUCCESS_DESCRIPTION,
-} from './constants.ts'
-import type { OpenAPIMeta } from './meta.ts'
-import type { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
-import type { OpenAPIV3_2 } from './types.ts'
-import type { getDynamicPathParams } from './utils.ts'
-import { isBodylessMethod } from './utils.ts'
+} from './constants'
+import type { OpenAPIMeta } from './meta'
+import type { OpenAPIComponentRegistry } from './openapi-generator-components'
+import type { OpenAPIV3_2 } from './types'
+import type { getDynamicPathParams } from './utils'
+import { isBodylessMethod } from './utils'
 
 export type DynamicPathParam = NonNullable<ReturnType<typeof getDynamicPathParams>>[number]
 

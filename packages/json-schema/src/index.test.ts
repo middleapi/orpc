@@ -1,5 +1,5 @@
 it('exports utils, DelegatingJsonSchemaConverter, StandardJsonSchemaConverter, JsonSchemaCoercer, SmartCoercionHandlerPlugin, SmartCoercionLinkPlugin', async () => {
-  await expect(import('./index.ts')).resolves.toMatchObject({
+  await expect(import('./index')).resolves.toMatchObject({
     isJsonObjectSchema: expect.any(Function),
     combineJsonSchemasWithComposition: expect.any(Function),
     ensureJsonSchemaObject: expect.any(Function),

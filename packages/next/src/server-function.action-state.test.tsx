@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { startTransition, useActionState } from 'react'
 import { z } from 'zod'
 
-import { createServerFunction } from './server-function.ts'
+import { createServerFunction } from './server-function'
 
 describe('createServerFunction with useActionState', () => {
   const fn = createServerFunction(

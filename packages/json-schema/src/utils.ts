@@ -7,9 +7,9 @@ import {
   JSON_SCHEMA_LOGIC_KEYWORDS,
   JSON_SCHEMA_PRIMITIVE_TYPES,
   JSON_SCHEMA_RECORD_KEYWORDS,
-} from './constants.ts'
-import { resolveJsonSchemaLocalPointer } from './ref-utils.ts'
-import type { JsonSchema } from './types.ts'
+} from './constants'
+import { resolveJsonSchemaLocalPointer } from './ref-utils'
+import type { JsonSchema } from './types'
 
 /**
  * Returns true when the schema only describes primitive values, by a primitive `type`

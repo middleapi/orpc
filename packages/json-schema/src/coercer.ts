@@ -10,9 +10,9 @@ import {
   tryOrUndefined,
 } from '@orpc/shared'
 
-import { resolveJsonSchemaLocalPointer } from './ref-utils.ts'
-import type { JsonSchema } from './types.ts'
-import { JsonSchemaXNativeType } from './types.ts'
+import { resolveJsonSchemaLocalPointer } from './ref-utils'
+import type { JsonSchema } from './types'
+import { JsonSchemaXNativeType } from './types'
 
 /**
  * How well a value matches a schema, used to pick the best union branch.

@@ -5,7 +5,7 @@ import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
 
-import { orpc, streamHandler } from './__shared__/orpc.ts'
+import { orpc, streamHandler } from './__shared__/orpc'
 
 beforeEach(async () => {
   vi.clearAllMocks()

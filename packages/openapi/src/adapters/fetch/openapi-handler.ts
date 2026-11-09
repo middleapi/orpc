@@ -4,8 +4,8 @@ import { FetchHandler } from '@orpc/server/fetch'
 import type { StandardHandlerOptions } from '@orpc/server/standard'
 import { StandardHandler } from '@orpc/server/standard'
 
-import type { OpenAPIHandlerCodecOptions } from '../standard/index.ts'
-import { OpenAPIHandlerCodec } from '../standard/index.ts'
+import type { OpenAPIHandlerCodecOptions } from '../standard/index'
+import { OpenAPIHandlerCodec } from '../standard/index'
 
 export interface OpenAPIHandlerOptions<T extends Context>
   extends FetchHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}

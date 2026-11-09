@@ -1,6 +1,6 @@
 import { throwIfAborted } from '@standard-server/shared'
 
-import { promiseWithResolvers } from './promise.ts'
+import { promiseWithResolvers } from './promise'
 
 export interface DisposableAllAbortSignal {
   signal: AbortSignal | undefined

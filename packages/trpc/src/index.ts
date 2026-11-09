@@ -1,2 +1,2 @@
-export * from './to-orpc-router.ts'
-export * from './to-trpc-meta.ts'
+export * from './to-orpc-router'
+export * from './to-trpc-meta'

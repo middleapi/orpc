@@ -1,4 +1,4 @@
-import { isPlainObject } from './object.ts'
+import { isPlainObject } from './object'
 
 export function isDeepEqual(a: unknown, b: unknown): boolean {
   return isDeepEqualInternal(a, b, new WeakMap())

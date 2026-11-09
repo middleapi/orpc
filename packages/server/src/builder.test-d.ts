@@ -4,20 +4,20 @@ import { onError, onFinish, onStart, onSuccess } from '@orpc/shared'
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
 
+import type { Builder, DefaultInitialContext } from './builder'
+import { os } from './builder'
 import type {
   BuilderWithInput,
   BuilderWithMiddlewares,
   BuilderWithOutput,
-} from './builder-variants.ts'
-import type { Builder, DefaultInitialContext } from './builder.ts'
-import { os } from './builder.ts'
-import type { MergedContext, MergedInitialContext } from './context.ts'
-import type { Lazy } from './lazy.ts'
-import type { DecoratedMiddleware } from './middleware-decorated.ts'
-import type { Middleware, MiddlewareDone } from './middleware.ts'
-import type { DecoratedProcedure } from './procedure-decorated.ts'
-import type { Procedure } from './procedure.ts'
-import type { AugmentedRouter } from './router-utils.ts'
+} from './builder-variants'
+import type { MergedContext, MergedInitialContext } from './context'
+import type { Lazy } from './lazy'
+import type { Middleware, MiddlewareDone } from './middleware'
+import type { DecoratedMiddleware } from './middleware-decorated'
+import type { Procedure } from './procedure'
+import type { DecoratedProcedure } from './procedure-decorated'
+import type { AugmentedRouter } from './router-utils'
 
 const errorMap = {
   BASE: {

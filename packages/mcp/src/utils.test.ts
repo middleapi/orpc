@@ -7,7 +7,7 @@ import {
   resolveToolInputJsonSchema,
   resolveToolOutputJsonSchema,
   toPassthroughStandardSchema,
-} from './utils.ts'
+} from './utils'
 
 function createConverter(...results: [any, boolean][]): JsonSchemaConverter {
   let index = 0

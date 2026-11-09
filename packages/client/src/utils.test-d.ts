@@ -1,7 +1,7 @@
-import { isDefinedError } from './error-utils.ts'
-import type { ORPCError } from './error.ts'
-import type { Client, ClientContext } from './types.ts'
-import { safe } from './utils.ts'
+import type { ORPCError } from './error'
+import { isDefinedError } from './error-utils'
+import type { Client, ClientContext } from './types'
+import { safe } from './utils'
 
 describe('safe', async () => {
   const client = {} as Client<

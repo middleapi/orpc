@@ -4,13 +4,9 @@ import { visitJsonSchemaRefs } from '@orpc/json-schema'
 import * as arktype from 'arktype'
 import * as z from 'zod'
 
-import {
-  testSchema,
-  testSchemaConverter,
-  zodJsonSchemaConverter,
-} from '../tests/__shared__/schema.ts'
-import { openapi } from './meta.ts'
-import { OpenAPIGenerator, OpenAPIGeneratorError } from './openapi-generator.ts'
+import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../tests/__shared__/schema'
+import { openapi } from './meta'
+import { OpenAPIGenerator, OpenAPIGeneratorError } from './openapi-generator'
 
 describe('openAPIGenerator basic & options', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })

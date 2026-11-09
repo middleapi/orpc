@@ -2,8 +2,8 @@ import type { AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions } 
 import { DecoratedProcedure } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 
-import type { ProcedureServerFunction } from '../server-function.ts'
-import { createServerFunction } from '../server-function.ts'
+import type { ProcedureServerFunction } from '../server-function'
+import { createServerFunction } from '../server-function'
 
 declare module '@orpc/server' {
   interface DecoratedProcedure<

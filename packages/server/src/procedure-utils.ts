@@ -9,13 +9,13 @@ import type {
 } from '@orpc/contract'
 import type { PromiseWithError, ThrowableError } from '@orpc/shared'
 
-import type { Context } from './context.ts'
-import type { Lazyable } from './lazy.ts'
-import { Lazy, unlazy } from './lazy.ts'
-import type { ProcedureClientOptions } from './procedure-client.ts'
-import { createProcedureClient } from './procedure-client.ts'
-import type { AnyProcedure } from './procedure.ts'
-import { Procedure } from './procedure.ts'
+import type { Context } from './context'
+import type { Lazyable } from './lazy'
+import { Lazy, unlazy } from './lazy'
+import type { AnyProcedure } from './procedure'
+import { Procedure } from './procedure'
+import type { ProcedureClientOptions } from './procedure-client'
+import { createProcedureClient } from './procedure-client'
 
 export function createGuardedProcedureLazy(lazy: Lazy<unknown>): Lazy<AnyProcedure> {
   const guarded = new Lazy({

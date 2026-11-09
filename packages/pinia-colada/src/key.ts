@@ -3,8 +3,8 @@ import type { PartialDeep, Public } from '@orpc/shared'
 import { stringifyJSON } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
 
-import type { SerializableStreamedQueryOptions } from './stream-query.ts'
-import type { OperationType } from './types.ts'
+import type { SerializableStreamedQueryOptions } from './stream-query'
+import type { OperationType } from './types'
 
 export interface OperationKeyPrefixOptions {
   /**

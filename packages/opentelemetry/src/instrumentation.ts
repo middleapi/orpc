@@ -3,8 +3,8 @@ import { InstrumentationBase } from '@opentelemetry/instrumentation'
 import { getTracer, setTracer } from '@orpc/shared'
 
 import pkg from '../package.json' with { type: 'json' }
-import type { OpenTelemetryPropagationOptions } from './tracer.ts'
-import { OpenTelemetryTracer } from './tracer.ts'
+import type { OpenTelemetryPropagationOptions } from './tracer'
+import { OpenTelemetryTracer } from './tracer'
 
 export interface ORPCInstrumentationConfig extends InstrumentationConfig {
   /**

@@ -1,7 +1,7 @@
 import { os, type } from '@orpc/server'
 
-import { lock } from './middleware.ts'
-import type { Locker } from './types.ts'
+import { lock } from './middleware'
+import type { Locker } from './types'
 
 describe('lock', () => {
   it('can infer context & input & meta types', () => {

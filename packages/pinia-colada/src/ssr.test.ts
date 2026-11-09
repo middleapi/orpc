@@ -1,8 +1,8 @@
 import type { Client } from '@orpc/client'
 
-import { createQueryCache } from '../tests/__shared__/utils.ts'
-import { createRouterUtils } from './router-utils.ts'
-import { StreamQuerySSRUtilsPlugin } from './ssr.ts'
+import { createQueryCache } from '../tests/__shared__/utils'
+import { createRouterUtils } from './router-utils'
+import { StreamQuerySSRUtilsPlugin } from './ssr'
 
 describe('streamQuerySSRUtilsPlugin', () => {
   afterEach(() => {

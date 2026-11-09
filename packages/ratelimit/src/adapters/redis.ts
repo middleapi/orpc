@@ -1,7 +1,7 @@
 import type { RedisClientType } from 'redis'
 
-import type { BaseRedisRateLimiterOptions } from './base-redis.ts'
-import { BaseRedisRateLimiter } from './base-redis.ts'
+import type { BaseRedisRateLimiterOptions } from './base-redis'
+import { BaseRedisRateLimiter } from './base-redis'
 
 export interface RedisRateLimiterOptions extends BaseRedisRateLimiterOptions {}
 

@@ -1,8 +1,8 @@
 import { getConstructor, isNonPrimitive } from '@orpc/shared'
 
-import type { ErrorMap } from './error.ts'
-import type { AnyMetaPlugin, Meta } from './meta.ts'
-import type { AnySchema } from './schema.ts'
+import type { ErrorMap } from './error'
+import type { AnyMetaPlugin, Meta } from './meta'
+import type { AnySchema } from './schema'
 
 export interface ProcedureContractDefinition<
   TInputSchema extends AnySchema,

@@ -1,13 +1,13 @@
 import type { MergedErrorMap, Schema } from '@orpc/contract'
 
-import type { MergedInitialContext } from './context.ts'
-import type { Lazy } from './lazy.ts'
-import type { Procedure } from './procedure.ts'
+import type { MergedInitialContext } from './context'
+import type { Lazy } from './lazy'
+import type { Procedure } from './procedure'
 import type {
   AugmentedRouter,
   AugmentedRouterWithMiddlewares,
   UnlaziedRouter,
-} from './router-utils.ts'
+} from './router-utils'
 
 describe('AugmentedRouter', () => {
   const router = {

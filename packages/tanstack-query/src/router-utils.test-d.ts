@@ -5,10 +5,10 @@ import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
 import * as z from 'zod'
 
-import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
-import type { RouterUtils, RouterUtilsScoped } from './router-utils.ts'
-import { createRouterUtils } from './router-utils.ts'
-import type { SharedUtils } from './shared-utils.ts'
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
+import type { RouterUtils, RouterUtilsScoped } from './router-utils'
+import { createRouterUtils } from './router-utils'
+import type { SharedUtils } from './shared-utils'
 
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })

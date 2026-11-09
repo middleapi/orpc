@@ -2,7 +2,7 @@ import { createORPCErrorFromJson, ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { EventStreamErrorEvent } from '@standard-server/core'
 
-import { OpenAPISerializer } from './openapi-serializer.ts'
+import { OpenAPISerializer } from './openapi-serializer'
 
 describe('openAPISerializer', () => {
   const serializer = new OpenAPISerializer()

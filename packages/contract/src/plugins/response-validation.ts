@@ -4,10 +4,10 @@ import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/stand
 import type { ThrowableError } from '@orpc/shared'
 import { isAsyncIteratorObject, override, toArray } from '@orpc/shared'
 
-import { reconcileORPCError } from '../error-utils.ts'
-import { ValidationError } from '../error.ts'
-import { getProcedureContractOrThrow } from '../router-utils.ts'
-import type { RouterContract } from '../router.ts'
+import { ValidationError } from '../error'
+import { reconcileORPCError } from '../error-utils'
+import type { RouterContract } from '../router'
+import { getProcedureContractOrThrow } from '../router-utils'
 
 /**
  * Validates server responses against contract schemas before your application uses them.

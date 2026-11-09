@@ -2,7 +2,7 @@ import type { Public } from '@orpc/shared'
 import { isNonPrimitive, NullProtoObj } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
 
-import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer.ts'
+import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer'
 
 export function serializeHeaders(
   headers: object,

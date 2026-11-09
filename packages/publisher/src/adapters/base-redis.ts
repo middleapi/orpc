@@ -9,8 +9,8 @@ import type {
   PublisherOptions,
   PublisherResumeOptions,
   PublisherSubscribeListenerOptions,
-} from '../publisher.ts'
-import { Publisher } from '../publisher.ts'
+} from '../publisher'
+import { Publisher } from '../publisher'
 
 /**
  * Adds `ARGV[1]` to stream `KEYS[1]` and publishes it with its ID to the channel of the same name,

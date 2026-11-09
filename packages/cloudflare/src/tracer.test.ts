@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   experimental_CloudflareSpan as CloudflareSpan,
   experimental_CloudflareTracer as CloudflareTracer,
-} from './tracer.ts'
+} from './tracer'
 
 function createFakeSpan() {
   return {

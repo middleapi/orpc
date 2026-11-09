@@ -1,4 +1,4 @@
-import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer'
 
 class Person {
   constructor(

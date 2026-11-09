@@ -5,7 +5,7 @@ import * as z from 'zod'
 import {
   isStandardSchemaOptional,
   StandardJsonSchemaConverter,
-} from './standard-json-schema-converter.ts'
+} from './standard-json-schema-converter'
 
 function withStandardOverrides<TSchema extends AnySchema>(
   schema: TSchema,
