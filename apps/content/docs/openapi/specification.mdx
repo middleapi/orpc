@@ -317,7 +317,7 @@ const spec = await generator.generate(router, {
 
 - `file`: the file exporting the router, relative to the working directory, or a `file:` URL.
 - `export`: the export name, `router` by default (`default` for a default export). It can be a value, a type (`typeof router`), or a [contract](/docs/contract/router).
-- `tsconfig`: the `tsconfig.json` to use, or its directory, by default the nearest one that includes `file`. Its `paths` resolve aliases like `@/`. A solution tsconfig (`"files": []` with `references`) uses the referenced project that includes `file`.
+- `tsconfig`: the `tsconfig.json` to use, by default the nearest one that includes `file`. Its `paths` resolve aliases like `@/`.
 
 Every other option works as in `OpenAPIGenerator`.
 
@@ -373,4 +373,4 @@ try {
 - Class types in inputs are documented as the plain objects a client sends.
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
-- Generation throws on types the compiler cannot resolve, like an import with a missing path alias, and lists the compiler's errors.
+- Generation throws on types the compiler cannot resolve, like an import with a missing path alias.
