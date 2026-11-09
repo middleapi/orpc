@@ -47,8 +47,8 @@ import {
   isFunction,
   isNonSerializable,
   mayBeNonSerializable,
-  ModeSensitivity,
 } from './json-rules'
+import { ModeSensitivity } from './mode-sensitivity'
 import type { ObjectJsonSchema } from './schema-utils'
 import {
   applyJSDoc,
@@ -219,14 +219,13 @@ export class TypeToJsonSchemaConverter {
     const unions = members.flatMap((t) => (t.isUnionType() ? this.types.getMembers(t) : [t]))
     const serializable = unions.filter((t) => !isNonSerializable(this.types, t))
     const filtered = serializable.length < unions.length
-    let optional = filtered || members.some((t) => this.isOptional(t))
+    const optional =
+      filtered ||
+      members.some((t) => this.isOptional(t)) ||
+      // a function whose `toJSON` is optional may be written as nothing too
+      unions.some((t) => mayBeNonSerializable(this.types, t))
     // a single value is visited whole, so a union keeps its def
     const values = filtered ? serializable : members
-
-    // a function whose `toJSON` is optional may be written as nothing too
-    if (unions.some((t) => mayBeNonSerializable(this.types, t))) {
-      optional = true
-    }
 
     const cuts = this.expansion.cuts
     this.expansion.reset()
@@ -910,11 +909,9 @@ export class TypeToJsonSchemaConverter {
 
     const jsonSources = ownToJSON.length || !classType ? [type] : getClassTypes(this.types, type)
     // of each source, empty when it has no `toJSON`
-    const sourceResults = ownToJSON.length
-      ? [ownToJSON]
-      : ignoreToJSON || !classType
-        ? []
-        : jsonSources.map((c) => getToJSONResultTypes(this.types, c, stringifyRules))
+    const sourceResults = ignoreToJSON
+      ? []
+      : jsonSources.map((c) => getToJSONResultTypes(this.types, c, stringifyRules))
     const toJSONResults = sourceResults.flat()
     if (toJSONResults.length) {
       const converted = this.convertToJSONResults(toJSONResults)

@@ -198,7 +198,7 @@ export function getCallReturnType(checker: Checker, type: Type | undefined): Typ
 /**
  * The `T` of `Promise<T>`.
  */
-function getPromisedType(checker: Checker, type: Type): Type | undefined {
+export function getPromisedType(checker: Checker, type: Type): Type | undefined {
   return type.isTypeReference() ? checker.getTypeArguments(type)[0] : undefined
 }
 

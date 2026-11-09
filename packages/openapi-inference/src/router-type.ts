@@ -1,5 +1,7 @@
 import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { SignatureKind, TypeFlags } from 'typescript/unstable/sync'
+import { TypeFlags } from 'typescript/unstable/sync'
+
+import { getCallReturnType, getPromisedType } from './utils'
 
 export interface ResolvedRouterType {
   type: Type
@@ -137,9 +139,8 @@ export class RouterTypeResolver {
       return type
     }
 
-    const signature = this.checker.getSignaturesOfType(loader, SignatureKind.Call)[0]
-    const promise = signature && this.checker.getReturnTypeOfSignature(signature)
-    const resolved = promise?.isTypeReference() && this.checker.getTypeArguments(promise)[0]
+    const promise = getCallReturnType(this.checker, loader)
+    const resolved = promise && getPromisedType(this.checker, promise)
     const loaded = resolved ? this.getProperty(resolved, 'default') : undefined
 
     return loaded ? this.unlazy(loaded) : type
