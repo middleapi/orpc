@@ -302,13 +302,18 @@ export function getToJSONResultType(
   const toJSON = getOwnToJSON(types, type)
   const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
 
-  // `Partial<Money>` maps the method to an optional property, the instance still has it
-  const callable =
-    method && method.isUnionType()
-      ? types.getMembers(method).find((m) => !(m.flags & NULLISH_FLAGS))
-      : method
+  // `Partial<Money>` maps the method to an optional property, the instance still has it, and
+  // `OrFrozen<Money>` to the method or a view of it (`(() => R) | Readonly<() => R>`)
+  const members = method?.isUnionType() ? types.getMembers(method) : [method]
 
-  return getCallReturnType(types.checker, callable)
+  for (const member of members) {
+    const result = member && getCallReturnType(types.checker, member)
+    if (result) {
+      return result
+    }
+  }
+
+  return undefined
 }
 
 /**

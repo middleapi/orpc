@@ -30,6 +30,9 @@ export const INSTANTIABLE_FLAGS =
   TypeFlags.Substitution |
   TypeFlags.Index
 
+/** The interfaces of the members of primitives */
+const PRIMITIVE_INTERFACES = new Set(['String', 'Number', 'Boolean', 'BigInt', 'Symbol'])
+
 const NAMEABLE_SYMBOL_FLAGS =
   SymbolFlags.Interface | SymbolFlags.Class | SymbolFlags.Enum | SymbolFlags.TypeAlias
 
@@ -199,42 +202,45 @@ export class TypeQueries {
       return undefined
     }
 
-    const properties = this.getProperties(type)
-    const originals = properties.map((p) => {
-      const owner = owners.find((o) => this.getProperty(o, p.name) !== undefined)
-      return owner && this.getProperty(owner, p.name)
-    })
+    // of each owner declaring it, a brand may narrow a member (`length` of `string & { length: 8 }`)
+    const originals = this.getProperties(type).map((p) =>
+      this.getSymbolTypes(
+        owners.flatMap((o) => {
+          const original = this.getProperty(o, p.name)
+          return original ? [original] : []
+        }),
+      ),
+    )
 
-    if (originals.some((o) => o === undefined)) {
+    if (originals.some((o) => !o.length)) {
       return undefined
     }
 
-    return this.keepsValues(
-      this.getPropertyTypes(type),
-      this.getSymbolTypes(originals as TSSymbol[]),
-      true,
-    )
-      ? owners
-      : undefined
+    return this.keepsValues(this.getPropertyTypes(type), originals, true) ? owners : undefined
   }
 
   /**
-   * Whether each value keeps the original at its index (see `keepsValue`), with `generic`, also
-   * an original with type parameters, which match any type.
+   * Whether each value keeps one of the originals at its index (see `keepsValue`), or the
+   * intersection of several of them (`valueOf` of `number & { valueOf(): 1 }`), with `generic`,
+   * also an original with type parameters, which match any type.
    */
   private keepsValues(
     values: readonly (Type | undefined)[],
-    originals: readonly (Type | undefined)[],
+    originals: readonly (readonly (Type | undefined)[])[],
     generic: boolean,
   ): boolean {
-    const keeps = (value: Type | undefined, i: number) => {
-      const original = originals[i]
-      return (
-        value !== undefined &&
-        original !== undefined &&
-        (this.keepsValue(value, original) || (generic && this.hasTypeParameter(original, 3)))
+    const keepsOne = (value: Type, i: number) =>
+      originals[i]!.some(
+        (original) =>
+          original !== undefined &&
+          (this.keepsValue(value, original) || (generic && this.hasTypeParameter(original, 3))),
       )
-    }
+    const keeps = (value: Type | undefined, i: number) =>
+      value !== undefined &&
+      (keepsOne(value, i) ||
+        (originals[i]!.length > 1 &&
+          value.isIntersectionType() &&
+          this.getMembers(value).every((member) => keepsOne(member, i))))
 
     // values that are no mapped type first, which a mismatch shows without nesting deeper
     return (
@@ -253,24 +259,32 @@ export class TypeQueries {
       const owners = new Map<number, Type>()
 
       for (const p of this.getProperties(type)) {
-        const ownerType = this.getDeclarationOwner(p, true)
+        // also of the other declarations of a property of an intersection (the brand
+        // redeclaring the `length` of `string & { length: 8 }`)
+        const [first, ...others] = p.declarations.map((d) => this.getDeclarationOwner(p, true, d))
 
-        if (ownerType === undefined) {
+        if (first === undefined) {
           return undefined
         }
 
-        owners.set(ownerType.id, ownerType)
+        for (const ownerType of [first, ...others]) {
+          if (ownerType !== undefined) {
+            owners.set(ownerType.id, ownerType)
+          }
+        }
       }
 
       const keys = new Map(
         [...owners.values()].map((o) => [o, new Set(this.getProperties(o).map((p) => p.name))]),
       )
 
-      // the most derived of the owners holding the same properties
+      // the most derived of the owners holding the same properties, a brand narrowing members of a
+      // primitive (`string & { length: 8 }`) derives from none
       return [...keys].flatMap(([owner, names], i, all) =>
         all.some(
           ([other, otherNames], j) =>
             other !== owner &&
+            !this.isPrimitiveInterface(other) &&
             [...names].every((name) => otherNames.has(name)) &&
             (otherNames.size > names.size || j < i),
         )
@@ -281,12 +295,27 @@ export class TypeQueries {
   }
 
   /**
-   * The declared type of the class or interface declaring a property, also as a parameter
-   * property (`constructor(public a = 1)`) or in a class expression (`const C = class { ... }`),
-   * and with `literals`, of an object type literal declaring it.
+   * Whether a type is the interface of a primitive's members, like `String`.
    */
-  private getDeclarationOwner(property: TSSymbol, literals = false): Type | undefined {
-    const declaration = property.declarations[0]
+  private isPrimitiveInterface(type: Type): boolean {
+    const symbol = type.getSymbol()
+    return (
+      symbol !== undefined &&
+      PRIMITIVE_INTERFACES.has(symbol.name) &&
+      this.getSymbolSourceKind(symbol) === 'default'
+    )
+  }
+
+  /**
+   * The declared type of the class or interface declaring a property (by its first declaration),
+   * also as a parameter property (`constructor(public a = 1)`) or in a class expression
+   * (`const C = class { ... }`), and with `literals`, of an object type literal declaring it.
+   */
+  private getDeclarationOwner(
+    property: TSSymbol,
+    literals = false,
+    declaration: TSSymbol['declarations'][number] | undefined = property.declarations[0],
+  ): Type | undefined {
     const node = declaration?.resolve() as any
     // a parameter property is declared by the class of its constructor
     const owner =
@@ -364,7 +393,7 @@ export class TypeQueries {
     const sourceTypes = this.getPropertyTypes(source)
     return this.keepsValues(
       this.getPropertyTypes(type),
-      properties.map((p) => sourceTypes[sourceIndexes.get(p.name)!]),
+      properties.map((p) => [sourceTypes[sourceIndexes.get(p.name)!]]),
       generic,
     )
   }
@@ -689,8 +718,22 @@ export class TypeQueries {
       const values = value.isUnionType() ? this.getMembers(value) : [value]
       const sources = source.isUnionType() ? this.getMembers(source) : [source]
 
-      // each value is a source or a view of one (`T[K] | Readonly<T[K]>`)
-      return values.every((v) => sources.some((s) => this.keepsValue(v, s)))
+      // each value is a source or a view of one (`T[K] | Readonly<T[K]>`), or a union widening one
+      // with other values the source is assignable to (`T[K] | string`, `T[K] | T[K][]`)
+      return (
+        values.every((v) => sources.some((s) => this.keepsValue(v, s))) ||
+        (value.isUnionType() &&
+          values.some((v) => sources.some((s) => this.keepsValue(v, s))) &&
+          this.checker.isTypeAssignableTo(source, value))
+      )
+    }
+
+    // a literal widened to its primitive, `'a' | string` is `string`
+    if (
+      source.flags &
+      (TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BigIntLiteral)
+    ) {
+      return this.checker.getBaseTypeOfLiteralType(source)?.id === value.id
     }
 
     if (!(value.flags & TypeFlags.Object)) {

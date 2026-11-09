@@ -136,7 +136,12 @@ export class TypeScriptOpenAPIGenerator {
 
   async generate<TVersion extends OpenAPIVersion = '3.2.0'>(
     router: RouterContract | AnyRouter,
-    { source, filter, ...options }: TypeScriptOpenAPIGeneratorGenerateOptions<TVersion>,
+    {
+      source,
+      filter,
+      componentName,
+      ...options
+    }: TypeScriptOpenAPIGeneratorGenerateOptions<TVersion>,
   ): Promise<OpenAPIDocument<TVersion>> {
     const project = openTypeScriptProject(source)
 
@@ -168,8 +173,24 @@ export class TypeScriptOpenAPIGenerator {
       project.close()
     }
 
-    const document = await this.generator.generate(inferred, options)
-    mergeEquivalentComponents(document, ctx.converters.output.getDefNames())
+    // the components of `base`, and the names `componentName` chose, stay as they are
+    const reserved = new Set(Object.keys(options.base?.components?.schemas ?? {}))
+    const document = await this.generator.generate(inferred, {
+      ...options,
+      componentName:
+        componentName &&
+        ((defName, schema) => {
+          const name = componentName(defName, schema)
+          if (name !== defName) {
+            reserved.add(name)
+          }
+          return name
+        }),
+    })
+    mergeEquivalentComponents(document, ctx.converters.output.getDefNames(), {
+      reserved,
+      rename: !componentName,
+    })
     return document
   }
 

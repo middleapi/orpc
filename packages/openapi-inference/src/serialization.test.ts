@@ -201,6 +201,18 @@ describe('generated schemas match serialized outputs', async () => {
     ['conditionalParameterOnlyRoot', undefined],
     ['conditionalMoneyRoot', undefined],
     ['conditionalExpressionRoot', undefined],
+    ['narrowedBrands', undefined],
+    ['narrowedBrandRoot', undefined],
+    ['holderTimes', undefined],
+    ['holderTimeRoot', undefined],
+    ['widenedValues', undefined],
+    ['widenedToJSON', undefined],
+    ['mixinBuiltins', undefined],
+    ['mixinSetRoot', undefined],
+    ['arrayViews', undefined],
+    ['deepOrViews', undefined],
+    ['mutableDate', undefined],
+    ['bigintArrays', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1327,6 +1339,141 @@ describe('generated schemas match serialized outputs', async () => {
     it('makes a view of a view of a function optional', () => {
       expect(schemaOf('nestedFunctionViews').required).toEqual(['n'])
       expect(schemas().FnBox.required).toBeUndefined()
+    })
+  })
+
+  describe('round twenty-nine', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+    const stringSet = expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' })
+    const eitherStringSet = { anyOf: [stringSet, { type: 'object' }] }
+
+    it('reads mapped types over brands narrowing members of a primitive as the primitive', () => {
+      const deep = 'Read-only all the way down, through a conditional type'
+
+      expect(schemaOf('narrowedBrands')).toEqual({
+        type: 'object',
+        properties: {
+          deep: { type: 'string', description: deep },
+          simple: { type: 'string' },
+          one: { type: 'number' },
+          deepOne: { type: 'number', description: deep },
+        },
+        required: ['deep', 'simple', 'one', 'deepOne'],
+      })
+      expect(schemaOf('narrowedBrandRoot')).toEqual({ type: 'string' })
+    })
+
+    it('writes the fields of a class intersected with a view of a built-in in both forms', () => {
+      const holder = {
+        type: 'object',
+        properties: { tags: eitherStringSet, n: { type: 'number' } },
+        required: ['tags', 'n'],
+      }
+
+      expect(schemas().HolderTime).toEqual({
+        anyOf: [date, holder],
+        description: 'A holder with the time of a date',
+      })
+      expect(schemas().HolderTimeView).toEqual({
+        anyOf: [date, holder],
+        description: 'A holder declared with the time of a date',
+      })
+      expect(schemaOf('holderTimes').properties.deep.anyOf[1].properties.tags.anyOf).toEqual([
+        stringSet,
+        { type: 'object' },
+      ])
+    })
+
+    it('reads mapped types widening each value with other values as views', () => {
+      const { properties } = schemaOf('widenedValues')
+
+      expect(properties.str).toEqual({ type: 'string', description: 'Values, or strings' })
+      expect(properties.list).toEqual({ type: 'string', description: 'Values, or lists of them' })
+      expect(properties.date).toEqual({ ...date, description: 'Values, or lists of them' })
+      expect(schemas().OrWrapped_TagsOnly.properties.tags.anyOf[0]).toEqual(eitherStringSet)
+      expect(schemas().SetOrItems_TagsOnly.properties.tags.anyOf[1]).toEqual(eitherStringSet)
+      // an instance is written by `toJSON`
+      expect(schemas().OrList_WritesWord.anyOf[0]).toEqual({
+        type: 'object',
+        properties: { w: { type: 'string' } },
+        required: ['w'],
+      })
+      // an instance does not write the members inherited from `Error`
+      expect(schemas().SetOrItems_TaggedError.required).toEqual(['mtags'])
+    })
+
+    it('calls toJSON of a view widening it with a view of it', () => {
+      const word = { type: 'object', properties: { w: { type: 'string' } }, required: ['w'] }
+
+      expect(schemas().OrFrozen_WithWordJson).toEqual({
+        ...word,
+        description: 'Values or read-only views of them',
+      })
+      expect(schemas().OrPartial_WithWordJson).toEqual({
+        ...word,
+        description: 'Values, or partial views of them',
+      })
+    })
+
+    it('reads classes extending a mixin applied to a built-in as built-in subclasses', () => {
+      expect(schemas().TaggedSet).toEqual({
+        'type': 'array',
+        'uniqueItems': true,
+        'items': { type: 'number' },
+        'x-native-type': 'set',
+      })
+      expect(schemas().TaggedMap).toEqual({
+        'type': 'array',
+        'items': {
+          type: 'array',
+          prefixItems: [{ type: 'string' }, { type: 'boolean' }],
+          maxItems: 2,
+          minItems: 2,
+        },
+        'x-native-type': 'map',
+      })
+      expect(schemaOf('mixinSetRoot')).toEqual({ $ref: '#/components/schemas/TaggedSet' })
+      expect(schemaOf('mixinBuiltins').properties.frozen.anyOf[0]).toEqual(schemas().TaggedSet)
+    })
+
+    it('reads views of intersections of arrays and tuples with objects as arrays', () => {
+      expect(schemaOf('arrayViews').properties).toEqual({
+        tuple: {
+          type: 'array',
+          prefixItems: [{ type: 'number' }, { anyOf: [{ type: 'string' }, { type: 'null' }] }],
+          minItems: 1,
+          maxItems: 2,
+        },
+        partial: { type: 'array', items: {} },
+      })
+    })
+
+    it('reads conditional deep views over values widened with deep views as views', () => {
+      const { properties } = schemaOf('deepOrViews')
+
+      expect(properties.deep.properties.tags).toEqual({
+        anyOf: [stringSet, { type: 'object' }],
+      })
+      expect(properties.nulls.properties.tags).toEqual({
+        anyOf: [stringSet, { type: 'object' }, { type: 'null' }],
+      })
+      expect(properties.date).toEqual({
+        ...date,
+        description: 'Values or `null`, all the way down',
+      })
+      expect(schemaOf('mutableDate').properties.mutable).toEqual({
+        ...date,
+        description: 'Mutable all the way down, keeping functions',
+      })
+    })
+
+    it('writes bigint typed arrays as what JSON.stringify can write', () => {
+      const never = { type: 'object', additionalProperties: { not: {} } }
+
+      expect(schemaOf('bigintArrays').properties).toEqual({ signed: never, unsigned: never })
     })
   })
 

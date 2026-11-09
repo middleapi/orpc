@@ -82,3 +82,9 @@ export interface BoxedBigInts {
   // oxlint-disable-next-line typescript/no-wrapper-object-types
   boxed: BigInt
 }
+
+/** Typed arrays of bigints, written through the polyfilled `toJSON` */
+export interface BigIntArrays {
+  signed: BigInt64Array
+  unsigned: BigUint64Array
+}

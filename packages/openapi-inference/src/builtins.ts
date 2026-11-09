@@ -50,6 +50,8 @@ export type Builtin =
   | { kind: 'map'; key: Type | undefined; value: Type | undefined }
   /** Entries of these types, like the iterated `[string, number]` of a `Map` subclass */
   | { kind: 'map-entries'; entries: readonly Type[] }
+  /** Index keys of items of this type, which `JSON.stringify` writes (a `bigint` it can not) */
+  | { kind: 'typed-array'; items: Type | undefined }
 
 /**
  * The built-in a value of this type is, like `Date`, `Set<T>`, a typed array, a subclass
@@ -101,7 +103,7 @@ export function getBuiltin(
 
   if (TYPED_ARRAYS.has(symbol.name)) {
     // serialized like an object with index keys, `{ "0": 1, "1": 2 }`
-    return { kind: 'schema', schema: TYPED_ARRAY_SCHEMA }
+    return { kind: 'typed-array', items: getNumberIndexType(types, type) }
   }
 
   const [first, second] = types.getReferenceArguments(type)
@@ -154,12 +156,6 @@ export function isModeSensitiveBuiltin(types: TypeQueries, type: Type): boolean 
 
 /** Binary values, written by their own keys: typed arrays by index, the others as `{}` */
 const BINARY = new Set([...TYPED_ARRAYS, 'ArrayBuffer', 'SharedArrayBuffer', 'DataView'])
-
-/** How the serializer and `JSON.stringify` write a typed array: by its index keys */
-const TYPED_ARRAY_SCHEMA: JsonSchema = {
-  type: 'object',
-  additionalProperties: { type: 'number' },
-}
 
 /**
  * Whether values of this type are typed arrays, also a subclass (Node's `Buffer`,
@@ -416,10 +412,7 @@ function getBuiltinSubclass(
   }
 
   if (base === 'Array' || base === 'ReadonlyArray') {
-    const items = types.checker
-      .getIndexInfosOfType(type)
-      .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
-    return { kind: 'array', items }
+    return { kind: 'array', items: getNumberIndexType(types, type) }
   }
 
   if (base === 'Set' || base === 'Map') {
@@ -437,6 +430,15 @@ function getBuiltinSubclass(
 }
 
 /**
+ * The value type of the number index signature of a type, like the items of an array.
+ */
+export function getNumberIndexType(types: TypeQueries, type: Type): Type | undefined {
+  return types.checker
+    .getIndexInfosOfType(type)
+    .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+}
+
+/**
  * The name of the default library class a class extends, also through other classes.
  */
 export function getBuiltinBaseName(types: TypeQueries, type: Type): string | undefined {
@@ -444,12 +446,16 @@ export function getBuiltinBaseName(types: TypeQueries, type: Type): string | und
 }
 
 /**
- * The default library class a class extends, also through other classes.
+ * The default library class a class extends, also through other classes, and through a mixin
+ * applied to it (`class Tags extends Tagged(Set<string>)`, whose base is an intersection with it).
  */
 function getBuiltinBase(types: TypeQueries, type: Type, depth = 0): TSSymbol | undefined {
   const target = type.isTypeReference() ? type.getTarget() : type
+  const bases = (target.getBaseTypes() ?? []).flatMap((base) =>
+    base.isIntersectionType() ? types.getMembers(base) : [base],
+  )
 
-  for (const base of target.getBaseTypes() ?? []) {
+  for (const base of bases) {
     const symbol = base.getSymbol()
 
     // also the runtime's globals, like `File` from `@types/node` without the DOM library,

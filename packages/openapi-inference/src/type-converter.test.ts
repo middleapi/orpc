@@ -2977,5 +2977,24 @@ describe('typeToJsonSchemaConverter', () => {
         project.close()
       }
     })
+
+    it('writes the items of bigint typed arrays through a polyfilled toJSON', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const [schema] = converter.convert(project.getExportType('BigIntArrays').type) as [
+          any,
+          boolean,
+        ]
+        const items = { type: 'object', additionalProperties: { type: 'string' } }
+
+        expect(schema.$defs.BigIntArrays.properties).toEqual({ signed: items, unsigned: items })
+      } finally {
+        project.close()
+      }
+    })
   })
 })

@@ -20,6 +20,16 @@ import {
 } from '../tests/fixtures/app/src/round26.ts'
 import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/round27.ts'
 import { WithArrow, roundTwentyEightInputs } from '../tests/fixtures/app/src/round28.ts'
+import {
+  GetterOnly,
+  roundTwentyNineComponents,
+  roundTwentyNineInputs,
+  roundTwentyNineNamed,
+  StampDate,
+  TaggedDate,
+  TaggedSet,
+  TaggedURL,
+} from '../tests/fixtures/app/src/round29.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -1068,6 +1078,140 @@ describe('typeScriptOpenAPIGenerator', () => {
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
         expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
       }
+    })
+  })
+
+  describe('round twenty-nine', () => {
+    const second: any = {
+      type: 'object',
+      properties: { name: { type: 'string' } },
+      required: ['name'],
+    }
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+    const responseOf = (spec: any, path: string) =>
+      spec.paths[path].post.responses['200'].content['application/json'].schema
+    const legacy = (schema: unknown): any => ({
+      get: {
+        responses: { 200: { description: 'OK', content: { 'application/json': { schema } } } },
+      },
+    })
+
+    it('documents inputs of widened views, mixins applied to built-ins, and URLSearchParams', async () => {
+      const spec = await generator.generate(roundTwentyNineInputs, {
+        source: { file: fixture('round29.ts'), export: 'roundTwentyNineInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+
+      expect(body('/orString').properties.id).toEqual({
+        type: 'string',
+        description: 'Values, or strings',
+      })
+      expect(body('/mixinDate').properties.d).toEqual(date)
+      expect(body('/mixinURL').properties.u).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect(schemas.TaggedSet).toEqual({
+        'type': 'array',
+        'uniqueItems': true,
+        'items': { type: 'number' },
+        'x-native-type': 'set',
+      })
+      expect(body('/pickedMixinDate').properties.d.anyOf[0]).toEqual(date)
+      // an instance does not write the `size` a `URLSearchParams` has on its prototype
+      expect(body('/params').properties.p.type).toBe('object')
+      expect(body('/params').properties.p.required).toBeUndefined()
+      expect(schemas.OrList_GetterOnly.required).toEqual(['n'])
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/orString', { id: 'x' }],
+        ['/orListStamp', { at: new StampDate(0) }],
+        ['/orListGetter', new GetterOnly()],
+        ['/mixinDate', { d: new TaggedDate(0) }],
+        ['/mixinURL', { u: new TaggedURL('http://x/') }],
+        ['/mixinSet', { s: new TaggedSet([1]) }],
+        ['/pickedMixinDate', { d: new TaggedDate(0) }],
+        ['/params', { p: new URLSearchParams('a=1') }],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+
+    it('names the numbered component of a type after it, once its name is free', async () => {
+      const spec = await generator.generate(roundTwentyNineComponents, {
+        source: { file: fixture('round29.ts'), export: 'roundTwentyNineComponents' },
+      })
+
+      expect(spec.components?.schemas).toEqual({ Item: second })
+      expect(responseOf(spec, '/second').properties.i).toEqual(ref('Item'))
+    })
+
+    it('keeps the components of base and the references to them', async () => {
+      const user: any = { type: 'string', description: 'user-defined' }
+      const spec: any = await generator.generate(roundTwentyNineComponents, {
+        source: { file: fixture('round29.ts'), export: 'roundTwentyNineComponents' },
+        base: {
+          paths: { '/legacy': legacy(ref('Item2')) },
+          components: { schemas: { Item2: user } },
+        },
+      })
+
+      expect(spec.components.schemas.Item2).toEqual(user)
+      expect(spec.components.schemas.Item).toBeUndefined()
+      expect(spec.paths['/legacy'].get.responses['200'].content['application/json'].schema).toEqual(
+        ref('Item2'),
+      )
+      expect(
+        spec.components.schemas[responseOf(spec, '/second').properties.i.$ref.split('/').at(-1)],
+      ).toEqual(second)
+
+      // a component of base equal to a generated one is shared, under its own name
+      const shared: any = await generator.generate(roundTwentyNineComponents, {
+        source: { file: fixture('round29.ts'), export: 'roundTwentyNineComponents' },
+        base: {
+          paths: { '/legacy': legacy(ref('Item2')) },
+          components: { schemas: { Item2: second } },
+        },
+      })
+
+      expect(shared.components.schemas).toEqual({ Item2: second })
+      expect(responseOf(shared, '/second').properties.i).toEqual(ref('Item2'))
+      expect(
+        shared.paths['/legacy'].get.responses['200'].content['application/json'].schema,
+      ).toEqual(ref('Item2'))
+    })
+
+    it('keeps the names componentName chooses', async () => {
+      const componentName = vi.fn((name: string) => (name === 'Item' ? 'FirstItem' : name))
+      const spec = await generator.generate(roundTwentyNineNamed, {
+        source: { file: fixture('round29.ts'), export: 'roundTwentyNineNamed' },
+        componentName,
+      })
+
+      expect(componentName.mock.calls.map(([name]) => name).toSorted()).toEqual(['Item', 'Item2'])
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual(['FirstItem', 'Item2'])
+      expect(responseOf(spec, '/second').properties.i).toEqual(ref('Item2'))
     })
   })
 })

@@ -24,6 +24,7 @@ import {
   getBuiltinFields,
   getTypedArrayViewBases,
   getViewBases,
+  hasBuiltinForm,
   isBoxedBigInt,
   isTypedArray,
 } from './builtins.ts'
@@ -958,8 +959,11 @@ export class TypeToJsonSchemaConverter {
     let dataProperties = viewedClass
       ? getDataProperties(this.types, properties, undefined, true)
       : getDataProperties(this.types, properties, isClassInstance ? classType : undefined)
-    const instanceProperties = viewedClass
-      ? new Set(getDataProperties(this.types, properties, viewedClass))
+    // what an instance writes, which a client may also send for the class itself
+    // (not the `size` a `URLSearchParams` inherits)
+    const writingClass = viewedClass ?? sentClass
+    const instanceProperties = writingClass
+      ? new Set(getDataProperties(this.types, properties, writingClass))
       : undefined
 
     if (
@@ -1241,6 +1245,14 @@ export class TypeToJsonSchemaConverter {
         })
       case 'map-entries':
         return mapSchema(this.visitElements(builtin.entries))
+      case 'typed-array':
+        // `JSON.stringify` writes the items, also of a request, a `bigint` only by a polyfilled `toJSON`
+        return {
+          type: 'object',
+          additionalProperties: builtin.items
+            ? this.withMode('stringify', () => this.visit(builtin.items!))
+            : { type: 'number' },
+        }
     }
 
     return undefined
@@ -1289,22 +1301,29 @@ export class TypeToJsonSchemaConverter {
     const elements = numeric.map((_, i) => numeric.find((p) => p.name === String(i)))
     const ordered = elements.every((e) => e !== undefined) ? (elements as TSSymbol[]) : numeric
     const [lengthType, ...elementTypes] = this.checker.getTypeOfSymbol([length, ...ordered])
-    const fixed =
-      lengthType && lengthType.flags & TypeFlags.NumberLiteral
-        ? (lengthType as any).value
-        : undefined
+    // `Partial` makes the length optional, a tuple with optional elements has several
+    // (`1 | 2` of `Readonly<[number, string?] & { extra?: string }>`)
+    const lengths = lengthType
+      ? (lengthType.isUnionType() ? this.types.getMembers(lengthType) : [lengthType]).filter(
+          (t) => !(t.flags & UNDEFINED_FLAGS),
+        )
+      : []
 
     // a mapped type changing the values (`{ [K in keyof T]?: true }`) is no array
-    if (!lengthType || !(lengthType.flags & TypeFlags.NumberLike)) {
+    if (!lengths.length || !lengths.every((t) => t.flags & TypeFlags.NumberLike)) {
       return undefined
     }
 
-    if (fixed !== undefined && ordered === elements && numeric.length === fixed) {
+    const fixed = lengths.every((t) => t.flags & TypeFlags.NumberLiteral)
+      ? lengths.map((t) => (t as any).value as number)
+      : undefined
+
+    if (fixed !== undefined && ordered === elements && numeric.length === Math.max(...fixed)) {
       return {
         type: 'array',
         prefixItems: elementTypes.map((t) => this.visitElement(t)),
-        minItems: fixed,
-        maxItems: fixed,
+        minItems: Math.min(...fixed),
+        maxItems: Math.max(...fixed),
       }
     }
 
@@ -1493,7 +1512,10 @@ export class TypeToJsonSchemaConverter {
       return builtin
     }
 
-    const fields = this.convertObject(type, true, true, true)
+    // an instance of a class besides the built-in (`Holder & Pick<Date, 'getTime'>`) is written by its
+    // fields too, of a view of the class
+    const classView = getClassTypes(this.types, type).some((c) => !hasBuiltinForm(this.types, c))
+    const fields = this.convertObject(type, true, !classView, true)
 
     // `JSON.stringify` writes a `Set` as `{}`, which also covers its plain object
     return isPlain(builtin, 'object') && typeof fields === 'object' && fields.type === 'object'

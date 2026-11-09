@@ -12,6 +12,21 @@ export interface DefNameRecord {
   readonly numbered: ReadonlyMap<string, string>
 }
 
+export interface MergeEquivalentComponentsOptions {
+  /**
+   * Components the conversion did not name, like those of `base` or names `componentName` chose,
+   * which are neither merged nor renamed.
+   */
+  reserved?: ReadonlySet<string> | undefined
+  /**
+   * Whether a numbered name may take the name it was numbered after, not when `componentName`
+   * chose the names.
+   *
+   * @default true
+   */
+  rename?: boolean | undefined
+}
+
 /**
  * Merges the components of defs of one name (but its number) describing the same values, which
  * the conversion emits apart for instantiations of one type within a cycle (`DeepNull<A>`, reached
@@ -21,14 +36,21 @@ export interface DefNameRecord {
  * (a def holding `DeepReadonly_A` was replaced by a reference to `DeepReadonly_A2`).
  * Rewrites the references of the whole document, in place.
  */
-export function mergeEquivalentComponents(document: any, names: DefNameRecord): void {
+export function mergeEquivalentComponents(
+  document: any,
+  names: DefNameRecord,
+  { reserved = new Set(), rename = true }: MergeEquivalentComponentsOptions = {},
+): void {
   const schemas: Record<string, unknown> | undefined = document?.components?.schemas
 
   if (!schemas) {
     return
   }
 
-  const candidates = Object.keys(schemas).filter((name) => names.used.has(name))
+  // only the components of the conversion's own defs
+  const candidates = Object.keys(schemas).filter(
+    (name) => names.used.has(name) && !reserved.has(name),
+  )
   const isCandidate = new Set(candidates)
 
   // the JSON of each schema, without the names of the candidates it refers to, and those names
@@ -104,10 +126,11 @@ export function mergeEquivalentComponents(document: any, names: DefNameRecord): 
 
   const remaining = Object.keys(schemas).filter((name) => !merged.has(name))
   const renamed = new Map<string, string>()
-  const taken = new Set(remaining)
+  const taken = new Set([...remaining, ...reserved])
+  const renamable = rename ? candidates.filter((n) => !merged.has(n) && names.numbered.has(n)) : []
 
   // oxlint-disable-next-line unicorn/no-array-sort -- sorts a copy
-  for (const name of remaining.filter((n) => names.numbered.has(n)).sort(preference)) {
+  for (const name of renamable.sort(preference)) {
     const base = names.numbered.get(name)!
     if (!taken.has(base)) {
       taken.add(base)
