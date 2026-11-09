@@ -8,8 +8,8 @@ import type {
   StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
   StandardHandlerRoutingInterceptorOptions,
-} from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 export interface CORSHandlerPluginOptions<T extends Context> {
   /**

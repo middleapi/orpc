@@ -2,7 +2,7 @@ import { RPCJsonSerializer } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { hashKey, partialMatchKey, QueryClient, skipToken } from '@tanstack/query-core'
 
-import { generateOperationKey } from './key.ts'
+import { generateOperationKey } from './key'
 
 it('generateOperationKey', () => {
   expect(generateOperationKey(['path'])).toEqual([['path'], {}])

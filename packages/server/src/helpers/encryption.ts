@@ -1,4 +1,4 @@
-import { decodeBase64url, encodeBase64url } from './base64url.ts'
+import { decodeBase64url, encodeBase64url } from './base64url'
 
 const PBKDF2_CONFIG = {
   name: 'PBKDF2',

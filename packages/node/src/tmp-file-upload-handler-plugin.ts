@@ -35,7 +35,7 @@ import {
 } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
-import { parseHeaderParameters, parseMultipart } from './multipart.ts'
+import { parseHeaderParameters, parseMultipart } from './multipart'
 
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
@@ -122,19 +122,17 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
  * @see {@link https://orpc.dev/docs/plugins/tmp-file-upload | Tmp File Upload Plugin}
  */
 export class TmpFile extends File {
-  constructor(
-    blob: Blob,
-    /**
-     * Absolute path of the temporary file holding this file's content.
-     * The file is removed when the request finishes, so move or copy it
-     * to keep the content. The `File` reads from this path, so it must
-     * not be read after the file is moved or removed.
-     */
-    readonly path: string,
-    name: string,
-    options?: FilePropertyBag,
-  ) {
+  /**
+   * Absolute path of the temporary file holding this file's content.
+   * The file is removed when the request finishes, so move or copy it
+   * to keep the content. The `File` reads from this path, so it must
+   * not be read after the file is moved or removed.
+   */
+  readonly path: string
+
+  constructor(blob: Blob, path: string, name: string, options?: FilePropertyBag) {
     super([blob], name, options)
+    this.path = path
   }
 }
 

@@ -2,8 +2,8 @@ import { ORPCError } from '@orpc/client'
 import { DEFAULT_ERROR_STATUS, os } from '@orpc/server'
 import type { StandardLazyRequest } from '@standard-server/core'
 
-import { openapi } from '../../meta.ts'
-import { OpenAPIHandlerCodec } from './openapi-handler-codec.ts'
+import { openapi } from '../../meta'
+import { OpenAPIHandlerCodec } from './openapi-handler-codec'
 
 beforeEach(() => {
   vi.clearAllMocks()

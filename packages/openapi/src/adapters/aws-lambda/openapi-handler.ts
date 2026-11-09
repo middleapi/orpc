@@ -4,8 +4,8 @@ import { AwsLambdaHandler } from '@orpc/server/aws-lambda'
 import type { StandardHandlerOptions } from '@orpc/server/standard'
 import { StandardHandler } from '@orpc/server/standard'
 
-import type { OpenAPIHandlerCodecOptions } from '../standard/index.ts'
-import { OpenAPIHandlerCodec } from '../standard/index.ts'
+import type { OpenAPIHandlerCodecOptions } from '../standard/index'
+import { OpenAPIHandlerCodec } from '../standard/index'
 
 export interface OpenAPIHandlerOptions<T extends Context>
   extends AwsLambdaHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}

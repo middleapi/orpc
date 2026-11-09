@@ -10,7 +10,7 @@
  * the sponsor wall's data has no business in the browser bundle — slots.ts
  * carries only the handful of sponsors that bought a position.
  */
-import slots from './slots.ts'
+import slots from './slots'
 
 export interface AdSponsor {
   name: string

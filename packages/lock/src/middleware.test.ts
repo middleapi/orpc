@@ -1,8 +1,8 @@
 import { call, ORPCError, os, type } from '@orpc/server'
 
-import { LockTimeoutError } from './error.ts'
-import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware.ts'
-import type { Locker } from './types.ts'
+import { LockTimeoutError } from './error'
+import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
+import type { Locker } from './types'
 
 describe('lock', () => {
   const createLocker = (waited = false): Locker => ({

@@ -1,7 +1,7 @@
 import type { Promisable } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
-import type { ClientContext, ClientOptions } from '../../types.ts'
+import type { ClientContext, ClientOptions } from '../../types'
 
 export type StandardLinkCodecDecodedResponse =
   | { kind: 'output'; output: unknown }

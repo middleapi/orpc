@@ -1,4 +1,4 @@
-import { parseBigIntString } from './bigint.ts'
+import { parseBigIntString } from './bigint'
 
 it('parseBigIntString', () => {
   expect(parseBigIntString('0', 10)).toBe(0n)

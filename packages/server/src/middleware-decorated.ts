@@ -3,13 +3,13 @@ import { mergeErrorMap } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import { toArray } from '@orpc/shared'
 
-import type { Context, MergedContext, MergedInitialContext } from './context.ts'
+import type { Context, MergedContext, MergedInitialContext } from './context'
 import type {
   AnyMiddleware,
   Middleware,
   MiddlewareNextOptions,
   MiddlewareResult,
-} from './middleware.ts'
+} from './middleware'
 
 export interface DecoratedMiddleware<
   TInContext extends Context,

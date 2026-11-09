@@ -1,6 +1,6 @@
 import { AbortError } from '@standard-server/shared'
 
-import { isAbortError } from './error.ts'
+import { isAbortError } from './error'
 
 describe('isAbortError', () => {
   it('returns true for AbortError', () => {

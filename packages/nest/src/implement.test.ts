@@ -30,9 +30,9 @@ import supertest from 'supertest'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 
-import { Implement } from './implement.ts'
-import type { NestStandardLazyRequest } from './module.ts'
-import { ORPCModule } from './module.ts'
+import { Implement } from './implement'
+import type { NestStandardLazyRequest } from './module'
+import { ORPCModule } from './module'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -71,7 +71,7 @@ describe('requirements', () => {
     })
 
     try {
-      const { Implement: ImplementWithoutQueryMethod } = await import('./implement.ts')
+      const { Implement: ImplementWithoutQueryMethod } = await import('./implement')
 
       const contract = oc.meta(
         openapi({

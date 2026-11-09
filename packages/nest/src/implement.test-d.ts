@@ -3,7 +3,7 @@ import { implement, os } from '@orpc/server'
 import { describe, it } from 'vitest'
 import { z } from 'zod'
 
-import { Implement } from './implement.ts'
+import { Implement } from './implement'
 
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 

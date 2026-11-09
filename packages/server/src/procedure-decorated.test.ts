@@ -3,9 +3,9 @@ import { setHiddenMetaPlugins } from '@orpc/contract'
 import * as ContractModule from '@orpc/contract'
 import * as z from 'zod'
 
-import type { AnyMiddleware } from './middleware.ts'
-import { DecoratedProcedure } from './procedure-decorated.ts'
-import { Procedure } from './procedure.ts'
+import type { AnyMiddleware } from './middleware'
+import { Procedure } from './procedure'
+import { DecoratedProcedure } from './procedure-decorated'
 
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')

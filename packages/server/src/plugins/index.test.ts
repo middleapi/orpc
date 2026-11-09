@@ -1,5 +1,5 @@
 it('exports plugins', async () => {
-  await expect(import('./index.ts')).resolves.toMatchObject({
+  await expect(import('./index')).resolves.toMatchObject({
     BatchHandlerPlugin: expect.any(Function),
     BATCH_HEADER: expect.any(String),
     DEFAULT_BATCH_MAX_SIZE: expect.any(Number),

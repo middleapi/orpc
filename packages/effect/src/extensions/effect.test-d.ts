@@ -10,7 +10,7 @@ import type {
 } from '@orpc/server'
 import { z } from 'zod'
 
-import './effect.ts'
+import './effect'
 import '@orpc/server/extensions/callable' // not sure why, but we need import this to make type work
 
 const errorMap = {

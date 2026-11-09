@@ -7,8 +7,8 @@ import type {
   StandardHandlerOptions,
   StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
-} from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 /**
  * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny

@@ -8,7 +8,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import * as z from 'zod'
 
-import { createHTTPUtils } from './index.ts'
+import { createHTTPUtils } from './index'
 
 const contract = {
   planet: {

@@ -4,8 +4,8 @@ import { AbortError } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
-import { PinoHandlerPlugin } from './handler-plugin.ts'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+import { PinoHandlerPlugin } from './handler-plugin'
 
 const globalSpies = {
   child: vi.fn(),

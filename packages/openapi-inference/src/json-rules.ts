@@ -13,16 +13,11 @@ import {
   isBuiltinSymbol,
   isModeSensitiveBuiltin,
   isTypedArray,
-} from './builtins.ts'
-import { ExpansionGuard } from './expansion.ts'
-import type { TypeQueries } from './type-queries.ts'
-import {
-  INSTANTIABLE_FLAGS,
-  isObjectLiteral,
-  NULLISH_FLAGS,
-  UNDEFINED_FLAGS,
-} from './type-queries.ts'
-import { getCallReturnType, isClassAccessor } from './utils.ts'
+} from './builtins'
+import { ExpansionGuard } from './expansion'
+import type { TypeQueries } from './type-queries'
+import { INSTANTIABLE_FLAGS, isObjectLiteral, NULLISH_FLAGS, UNDEFINED_FLAGS } from './type-queries'
+import { getCallReturnType, isClassAccessor } from './utils'
 
 /*
  * How values are written as JSON: by the OpenAPI JSON serializer, or by `JSON.stringify`,

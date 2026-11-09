@@ -1,8 +1,8 @@
 import { AbortError, sleep } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 
-import { createORPCClient } from '../../client.ts'
-import { RPCLink } from './rpc-link.ts'
+import { createORPCClient } from '../../client'
+import { RPCLink } from './rpc-link'
 
 describe('rpcLink', () => {
   beforeEach(() => {

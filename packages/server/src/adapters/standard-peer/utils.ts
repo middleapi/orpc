@@ -1,8 +1,8 @@
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 
-import type { Context } from '../../context.ts'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index.ts'
+import type { Context } from '../../context'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index'
 
 export function createStandardPeerRequestHandler<T extends Context>(
   handler: StandardHandler<T>,

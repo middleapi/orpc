@@ -1,5 +1,5 @@
-import { createORPCClient } from './client.ts'
-import type { ClientContext, ClientLink } from './types.ts'
+import { createORPCClient } from './client'
+import type { ClientContext, ClientLink } from './types'
 
 beforeEach(() => {
   vi.clearAllMocks()

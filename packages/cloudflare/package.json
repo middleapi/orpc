@@ -46,7 +46,7 @@
   },
   "scripts": {
     "prepare": "wrangler types",
-    "prepack": "tsc -p tsconfig.build.json",
+    "prepack": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

@@ -10,9 +10,9 @@ import {
 } from '@orpc/shared'
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
-import { StandardLink } from '../adapters/standard/index.ts'
-import { DedupeLinkPlugin } from './dedupe.ts'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
+import { StandardLink } from '../adapters/standard/index'
+import { DedupeLinkPlugin } from './dedupe'
 
 interface TestContext {
   group?: boolean

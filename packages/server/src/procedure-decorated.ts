@@ -9,9 +9,9 @@ import type {
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 
-import type { Context, MergedContext, MergedInitialContext } from './context.ts'
-import type { Middleware } from './middleware.ts'
-import { Procedure } from './procedure.ts'
+import type { Context, MergedContext, MergedInitialContext } from './context'
+import type { Middleware } from './middleware'
+import { Procedure } from './procedure'
 
 export class DecoratedProcedure<
   TInitialContext extends Context,

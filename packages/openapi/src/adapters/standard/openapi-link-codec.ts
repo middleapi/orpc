@@ -35,12 +35,12 @@ import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
-} from '../../constants.ts'
-import type { OpenAPIMeta } from '../../meta.ts'
-import { getOpenAPIMeta } from '../../meta.ts'
-import { OpenAPISerializer } from '../../openapi-serializer.ts'
-import { getDynamicPathParams, isBodylessMethod } from '../../utils.ts'
-import { serializeHeaders } from './utils.ts'
+} from '../../constants'
+import type { OpenAPIMeta } from '../../meta'
+import { getOpenAPIMeta } from '../../meta'
+import { OpenAPISerializer } from '../../openapi-serializer'
+import { getDynamicPathParams, isBodylessMethod } from '../../utils'
+import { serializeHeaders } from './utils'
 
 export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   /**

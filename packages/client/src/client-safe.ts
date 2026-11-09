@@ -1,9 +1,9 @@
 import { isNonPrimitive } from '@orpc/shared'
 
-import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts.ts'
-import type { AnyNestedClient, Client, ClientRest } from './types.ts'
-import type { SafeResult } from './utils.ts'
-import { safe } from './utils.ts'
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts'
+import type { AnyNestedClient, Client, ClientRest } from './types'
+import type { SafeResult } from './utils'
+import { safe } from './utils'
 
 export type SafeClient<T extends AnyNestedClient> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>

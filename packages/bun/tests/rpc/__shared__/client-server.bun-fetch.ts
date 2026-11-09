@@ -4,8 +4,8 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RPCHandler } from '@orpc/server/fetch'
 
-import type { CreateClientServerTest } from './client-server.ts'
-import { defaultSerializer } from './client-server.ts'
+import type { CreateClientServerTest } from './client-server'
+import { defaultSerializer } from './client-server'
 
 export const createBunFetchClientServerTest: CreateClientServerTest = (
   router,

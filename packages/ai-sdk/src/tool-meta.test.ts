@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 
-import { aiSdkTool, getAiSdkToolMeta } from './tool-meta.ts'
+import { aiSdkTool, getAiSdkToolMeta } from './tool-meta'
 
 describe('aiSdkTool meta', () => {
   it('returns a plugin with name ~ai-sdk/tool', () => {

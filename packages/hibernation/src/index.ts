@@ -1,11 +1,11 @@
-export * from './encode-event.ts'
-export * from './handler-plugin.ts'
+export * from './encode-event'
+export * from './handler-plugin'
 export {
   /**
    * @deprecated Use `HibernationHandlerPlugin` instead.
    */
   HibernationHandlerPlugin as HibernationPlugin,
-} from './handler-plugin.ts'
+} from './handler-plugin'
 export {
   /**
    * An async iterator designed for the Hibernation APIs. Instead of streaming

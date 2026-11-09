@@ -5,17 +5,17 @@
 
 import { get, isDeepEqual, omit, toArray } from '@orpc/shared'
 
-import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants.ts'
+import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants'
 import {
   decodeJsonPointerSegment,
   encodeJsonPointerSegment,
   hoistRecursiveRefToDef,
   mapJsonSchemaRefs,
   resolveJsonSchemaRootLocalRef,
-} from './ref-utils.ts'
-import type { JsonSchema } from './types.ts'
-import type { JsonArraySchema, JsonObjectSchema } from './utils.ts'
-import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils.ts'
+} from './ref-utils'
+import type { JsonSchema } from './types'
+import type { JsonArraySchema, JsonObjectSchema } from './utils'
+import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils'
 
 /**
  * Moves a schema's `$defs` into the shared root map, renaming only the names whose bodies

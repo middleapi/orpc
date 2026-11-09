@@ -3,9 +3,9 @@ import { stringifyJSON } from '@orpc/shared'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import { bigintSchema, getLeafBuiltinSchema } from './schema-utils.ts'
-import type { TypeQueries } from './type-queries.ts'
-import { getIteratorTypes } from './utils.ts'
+import { bigintSchema, getLeafBuiltinSchema } from './schema-utils'
+import type { TypeQueries } from './type-queries'
+import { getIteratorTypes } from './utils'
 
 export const TYPED_ARRAYS = new Set([
   'Int8Array',

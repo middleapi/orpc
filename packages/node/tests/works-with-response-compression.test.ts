@@ -9,7 +9,7 @@ import { brotliCompressSync, brotliDecompressSync, gunzipSync } from 'node:zlib'
 import { RPCHandler } from '@orpc/server/node'
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 
-import { StaticFileHandlerPlugin } from '../src/index.ts'
+import { StaticFileHandlerPlugin } from '../src/index'
 
 /**
  * Driven over a raw socket rather than `fetch`, which negotiates its own encoding and

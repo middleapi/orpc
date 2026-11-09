@@ -7,9 +7,9 @@ import {
   flattenJsonUnionSchema,
   isJsonObjectLikeSchema,
   matchArrayableJsonSchema,
-} from './composition-utils.ts'
-import type { JsonSchema } from './types.ts'
-import type { JsonObjectSchema } from './utils.ts'
+} from './composition-utils'
+import type { JsonSchema } from './types'
+import type { JsonObjectSchema } from './utils'
 
 describe('extractJsonObjectSchemaEntries', () => {
   it('returns undefined for non object-able schemas', () => {

@@ -2,11 +2,11 @@ import type { RouterContract } from '@orpc/contract'
 import type { AnyFunction } from '@orpc/shared'
 import { isNonPrimitive } from '@orpc/shared'
 
-import type { DefaultInitialContext } from './builder.ts'
-import type { Context } from './context.ts'
-import type { RouterImplementer } from './implementer-router.ts'
-import { createRouterImplementer } from './implementer-router.ts'
-import type { ProcedureConfig } from './procedure.ts'
+import type { DefaultInitialContext } from './builder'
+import type { Context } from './context'
+import type { RouterImplementer } from './implementer-router'
+import { createRouterImplementer } from './implementer-router'
+import type { ProcedureConfig } from './procedure'
 
 export type Implementer<TContract extends RouterContract, TInitialContext extends Context> = {
   $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>

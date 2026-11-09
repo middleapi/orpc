@@ -8,8 +8,8 @@ import { ProcedureContract } from '@orpc/contract'
 import type { Promisable } from '@orpc/shared'
 import { getConstructor } from '@orpc/shared'
 
-import type { Context } from './context.ts'
-import type { AnyMiddleware } from './middleware.ts'
+import type { Context } from './context'
+import type { AnyMiddleware } from './middleware'
 
 export interface ProcedureHandlerOptions<
   TCurrentContext extends Context,

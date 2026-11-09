@@ -1,7 +1,7 @@
 import type { Type } from 'typescript/unstable/sync'
 import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import type { TypeQueries } from './type-queries.ts'
+import type { TypeQueries } from './type-queries'
 
 /** Nested instantiations of one declaration, like `Maybe<A>` inside `Maybe<B>` */
 export const MAX_NESTING = 64

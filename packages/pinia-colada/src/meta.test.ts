@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 
-import { ContractOptionsUtilsPlugin, getPiniaColadaMeta, piniaColada } from './meta.ts'
-import { createRouterUtils } from './router-utils.ts'
+import { ContractOptionsUtilsPlugin, getPiniaColadaMeta, piniaColada } from './meta'
+import { createRouterUtils } from './router-utils'
 
 describe('piniaColada', () => {
   it('stores options readable via getPiniaColadaMeta', () => {

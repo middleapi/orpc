@@ -2,10 +2,10 @@ import type { ClientContext, ClientLink, ORPCClientOptions } from '@orpc/client'
 import { createORPCClient } from '@orpc/client'
 import { get, isNonPrimitive, set } from '@orpc/shared'
 
-import { resolveBasePathMeta } from './meta-built-in.ts'
-import { ProcedureContract } from './procedure.ts'
-import type { RouterContractClient } from './router-client.ts'
-import type { RouterContract } from './router.ts'
+import { resolveBasePathMeta } from './meta-built-in'
+import { ProcedureContract } from './procedure'
+import type { RouterContract } from './router'
+import type { RouterContractClient } from './router-client'
 
 export interface ContractClientFactory<TClientContext extends ClientContext> {
   <T extends RouterContract>(contract: T): RouterContractClient<T, TClientContext>

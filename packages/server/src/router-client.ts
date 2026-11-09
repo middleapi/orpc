@@ -4,14 +4,14 @@ import type { ErrorMap, Schema } from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 
-import type { Lazyable } from './lazy.ts'
-import { Lazy } from './lazy.ts'
-import type { ProcedureClient, ProcedureClientOptions } from './procedure-client.ts'
-import { createProcedureClient } from './procedure-client.ts'
-import { createGuardedProcedureLazy } from './procedure-utils.ts'
-import { Procedure } from './procedure.ts'
-import { getRouter } from './router-utils.ts'
-import type { AnyRouter, InferRouterInitialContext } from './router.ts'
+import type { Lazyable } from './lazy'
+import { Lazy } from './lazy'
+import { Procedure } from './procedure'
+import type { ProcedureClient, ProcedureClientOptions } from './procedure-client'
+import { createProcedureClient } from './procedure-client'
+import { createGuardedProcedureLazy } from './procedure-utils'
+import type { AnyRouter, InferRouterInitialContext } from './router'
+import { getRouter } from './router-utils'
 
 /**
  * The client type derived from a router, exposing every procedure as a callable

@@ -1,3 +1,3 @@
-export * from './converter.ts'
+export * from './converter'
 
 export type { JsonSchema } from '@orpc/json-schema'

@@ -1,9 +1,9 @@
 import type { ClientLink, ORPCError } from '@orpc/client'
 import type { PromiseWithError } from '@orpc/shared'
 
-import { oc } from './builder.ts'
-import { createContractClientFactory } from './client-factory.ts'
-import { type } from './schema-utils.ts'
+import { oc } from './builder'
+import { createContractClientFactory } from './client-factory'
+import { type } from './schema-utils'
 
 const contract = {
   ping: oc,

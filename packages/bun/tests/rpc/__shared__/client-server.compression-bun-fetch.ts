@@ -9,8 +9,8 @@ import {
   ResponseCompressionHandlerPlugin,
 } from '@orpc/server/plugins'
 
-import type { CreateClientServerTest } from './client-server.ts'
-import { defaultSerializer } from './client-server.ts'
+import type { CreateClientServerTest } from './client-server'
+import { defaultSerializer } from './client-server'
 
 export const createCompressionBunFetchClientServerTest: CreateClientServerTest = (
   router,

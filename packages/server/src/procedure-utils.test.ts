@@ -2,11 +2,11 @@ import type { AnyMetaPlugin } from '@orpc/contract'
 import { oc } from '@orpc/contract'
 import * as z from 'zod'
 
-import { os } from './builder.ts'
-import { Lazy, unlazy } from './lazy.ts'
-import * as ProcedureClient from './procedure-client.ts'
-import { call, createContractProcedure, createGuardedProcedureLazy } from './procedure-utils.ts'
-import { Procedure } from './procedure.ts'
+import { os } from './builder'
+import { Lazy, unlazy } from './lazy'
+import { Procedure } from './procedure'
+import * as ProcedureClient from './procedure-client'
+import { call, createContractProcedure, createGuardedProcedureLazy } from './procedure-utils'
 
 const createProcedureClientSpy = vi.spyOn(ProcedureClient, 'createProcedureClient')
 

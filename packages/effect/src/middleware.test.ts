@@ -3,10 +3,10 @@ import { sleep } from '@orpc/shared'
 import { Cause, Context, Effect, Option, References } from 'effect'
 import { z } from 'zod'
 
-import type { EffectWrapOptions, WithEffectContext } from './context.ts'
-import { handlerGen } from './handler.ts'
-import { middlewareGen } from './middleware.ts'
-import * as EffectModule from './runtime.ts'
+import type { EffectWrapOptions, WithEffectContext } from './context'
+import { handlerGen } from './handler'
+import { middlewareGen } from './middleware'
+import * as EffectModule from './runtime'
 
 const runPromiseSpy = vi.spyOn(EffectModule, 'runPromise')
 

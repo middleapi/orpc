@@ -1,5 +1,5 @@
 it('exports StandardHandler, resolveFriendlyStandardHandlerHandleOptions, RPCMatcher, RPCHandlerCodec', async () => {
-  await expect(import('./index.ts')).resolves.toMatchObject({
+  await expect(import('./index')).resolves.toMatchObject({
     StandardHandler: expect.any(Function),
     resolveFriendlyStandardHandlerHandleOptions: expect.any(Function),
     RPCMatcher: expect.any(Function),

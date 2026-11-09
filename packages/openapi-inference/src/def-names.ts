@@ -1,7 +1,7 @@
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import type { TypeQueries } from './type-queries.ts'
+import type { TypeQueries } from './type-queries'
 
 /**
  * The def name of a named type: its symbol's name, or for an instantiated generic its printed

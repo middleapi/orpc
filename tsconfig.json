@@ -4,9 +4,9 @@
     "target": "ES2022",
     "jsx": "react-jsx",
     "lib": ["ES2023"],
-    "module": "nodenext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
 
-    "rewriteRelativeImportExtensions": true,
     "types": ["node", "vitest/globals"],
 
     "noImplicitOverride": true,

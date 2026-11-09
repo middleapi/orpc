@@ -15,8 +15,8 @@ import type {
   StandardLinkPlugin,
   StandardLinkTransportInterceptor,
   StandardLinkTransportInterceptorOptions,
-} from '../adapters/standard/index.ts'
-import type { ClientContext } from '../types.ts'
+} from '../adapters/standard/index'
+import type { ClientContext } from '../types'
 
 export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
   /**

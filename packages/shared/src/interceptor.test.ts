@@ -6,8 +6,8 @@ import {
   onReadableStreamError,
   onStart,
   onSuccess,
-} from './interceptor.ts'
-import { promiseWithResolvers } from './promise.ts'
+} from './interceptor'
+import { promiseWithResolvers } from './promise'
 
 describe('intercept', () => {
   const interceptor1 = vi.fn(({ next }) => next())

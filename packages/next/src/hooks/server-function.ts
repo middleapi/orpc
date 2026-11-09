@@ -4,7 +4,7 @@ import type { Interceptor, PromiseWithError } from '@orpc/shared'
 import { intercept, toArray } from '@orpc/shared'
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 
-import type { ServerFunction, ServerFunctionError } from '../server-function.ts'
+import type { ServerFunction, ServerFunctionError } from '../server-function'
 
 export interface UseServerFunctionOptions<TInput, TOutput, TError> {
   interceptors?: Interceptor<{ input: TInput }, PromiseWithError<TOutput, TError>>[] | undefined

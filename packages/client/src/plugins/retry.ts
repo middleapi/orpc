@@ -14,9 +14,9 @@ import type {
   StandardLinkInterceptorOptions,
   StandardLinkOptions,
   StandardLinkPlugin,
-} from '../adapters/standard/index.ts'
-import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error.ts'
-import type { ClientContext } from '../types.ts'
+} from '../adapters/standard/index'
+import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
+import type { ClientContext } from '../types'
 
 export interface RetryLinkPluginAttemptOptions<
   T extends RetryLinkPluginContext,

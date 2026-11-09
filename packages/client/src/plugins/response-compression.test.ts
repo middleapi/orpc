@@ -5,8 +5,8 @@ import type {
   StandardLinkOptions,
   StandardLinkPlugin,
   StandardLinkTransportInterceptor,
-} from '../adapters/standard/index.ts'
-import { ResponseCompressionLinkPlugin } from './response-compression.ts'
+} from '../adapters/standard/index'
+import { ResponseCompressionLinkPlugin } from './response-compression'
 
 async function compressAsync(
   data: string,

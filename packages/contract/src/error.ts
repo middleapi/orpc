@@ -1,6 +1,6 @@
 import type { ORPCError, ORPCErrorCode } from '@orpc/client'
 
-import type { AnySchema, InferSchemaOutput, SchemaIssue } from './schema.ts'
+import type { AnySchema, InferSchemaOutput, SchemaIssue } from './schema'
 
 export interface ErrorMapItem {
   /**

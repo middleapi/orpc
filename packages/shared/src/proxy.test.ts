@@ -1,4 +1,4 @@
-import { override } from './proxy.ts'
+import { override } from './proxy'
 
 describe('override', () => {
   it('should combine properties from both target and overlay (overlay takes precedence)', () => {

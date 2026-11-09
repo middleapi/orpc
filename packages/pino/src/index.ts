@@ -1,2 +1,2 @@
-export * from './context.ts'
-export * from './handler-plugin.ts'
+export * from './context'
+export * from './handler-plugin'

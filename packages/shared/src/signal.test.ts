@@ -1,6 +1,6 @@
 import { getEventListeners } from 'node:events'
 
-import { anyAbortSignal, disposableAllAbortSignal, listenAbort, runWithSignal } from './signal.ts'
+import { anyAbortSignal, disposableAllAbortSignal, listenAbort, runWithSignal } from './signal'
 
 describe('disposableAllAbortSignal', () => {
   it('returns an undefined signal and a no-op dispose if contains undefined or empty array', () => {

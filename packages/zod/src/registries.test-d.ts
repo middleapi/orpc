@@ -4,7 +4,7 @@ import {
   JSON_SCHEMA_INPUT_REGISTRY,
   JSON_SCHEMA_OUTPUT_REGISTRY,
   JSON_SCHEMA_REGISTRY,
-} from './registries.ts'
+} from './registries'
 
 const user = z.object({
   name: z.string(),

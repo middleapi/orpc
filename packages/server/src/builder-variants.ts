@@ -13,15 +13,15 @@ import type {
 } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 
-import type { BuilderDefinition } from './builder.ts'
-import type { Context, MergedContext, MergedInitialContext } from './context.ts'
-import type { Lazy } from './lazy.ts'
-import type { DecoratedMiddleware } from './middleware-decorated.ts'
-import type { Middleware } from './middleware.ts'
-import type { DecoratedProcedure } from './procedure-decorated.ts'
-import type { ProcedureHandler } from './procedure.ts'
-import type { AugmentedRouterWithMiddlewares } from './router-utils.ts'
-import type { Router } from './router.ts'
+import type { BuilderDefinition } from './builder'
+import type { Context, MergedContext, MergedInitialContext } from './context'
+import type { Lazy } from './lazy'
+import type { Middleware } from './middleware'
+import type { DecoratedMiddleware } from './middleware-decorated'
+import type { ProcedureHandler } from './procedure'
+import type { DecoratedProcedure } from './procedure-decorated'
+import type { Router } from './router'
+import type { AugmentedRouterWithMiddlewares } from './router-utils'
 
 /**
  * The builder variant returned after `.use` is called.

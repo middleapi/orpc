@@ -1,7 +1,7 @@
 import type { ClientContext, ClientLink } from '@orpc/client'
 
-import { createContractClientFactory } from './client-factory.ts'
-import { ProcedureContract } from './procedure.ts'
+import { createContractClientFactory } from './client-factory'
+import { ProcedureContract } from './procedure'
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -1,8 +1,8 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
-import type { ObjectJsonSchema } from './schema-utils.ts'
-import { collectDefRefs, fromRef, isPlain } from './schema-utils.ts'
+import type { ObjectJsonSchema } from './schema-utils'
+import { collectDefRefs, fromRef, isPlain } from './schema-utils'
 
 /**
  * What an inferred schema adds to the schemas a converter produced for the same value,

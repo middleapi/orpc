@@ -8,8 +8,8 @@ import {
 import { getTracer, setTracer } from '@orpc/shared'
 
 import pkg from '../package.json' with { type: 'json' }
-import { ORPCInstrumentation } from './instrumentation.ts'
-import { OpenTelemetryTracer } from './tracer.ts'
+import { ORPCInstrumentation } from './instrumentation'
+import { OpenTelemetryTracer } from './tracer'
 
 const getTracerSpy = vi.spyOn(trace, 'getTracer')
 

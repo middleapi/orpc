@@ -1,8 +1,8 @@
 import type { AnyNestedClient, InferClientContext, InferClientError } from '@orpc/client'
 
-import type { RouterUtilsPlugin } from './plugin.ts'
-import type { ProcedureUtilsOptions } from './procedure-utils.ts'
-import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
+import type { RouterUtilsPlugin } from './plugin'
+import type { ProcedureUtilsOptions } from './procedure-utils'
+import { mergeProcedureUtilsOptions } from './procedure-utils'
 
 export interface StreamQuerySSRUtilsPluginOptions {
   /**

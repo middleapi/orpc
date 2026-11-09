@@ -5,12 +5,12 @@ import type { AnySchema, ErrorMap, RouterContract } from '@orpc/contract'
 import { getProcedureContractOrThrow } from '@orpc/contract'
 import { getOwn, toArray } from '@orpc/shared'
 
-import type { JsonSchemaCoercerOptions } from './coercer.ts'
-import { JsonSchemaCoercer } from './coercer.ts'
-import type { JsonSchemaConverter } from './convert.ts'
-import { DelegatingJsonSchemaConverter } from './convert.ts'
-import { StandardJsonSchemaConverter } from './standard-json-schema-converter.ts'
-import type { JsonSchema } from './types.ts'
+import type { JsonSchemaCoercerOptions } from './coercer'
+import { JsonSchemaCoercer } from './coercer'
+import type { JsonSchemaConverter } from './convert'
+import { DelegatingJsonSchemaConverter } from './convert'
+import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import type { JsonSchema } from './types'
 
 export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions {
   converters?: JsonSchemaConverter[] | undefined

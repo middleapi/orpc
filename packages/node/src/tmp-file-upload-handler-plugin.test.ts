@@ -13,7 +13,7 @@ import type { StandardBodyHint, StandardLazyRequest } from '@standard-server/cor
 import { generateContentDisposition } from '@standard-server/core'
 import request from 'supertest'
 
-import { TmpFile, TmpFileUploadHandlerPlugin } from './tmp-file-upload-handler-plugin.ts'
+import { TmpFile, TmpFileUploadHandlerPlugin } from './tmp-file-upload-handler-plugin'
 
 describe('tmpFileUploadHandlerPlugin', () => {
   let tmpDir: string

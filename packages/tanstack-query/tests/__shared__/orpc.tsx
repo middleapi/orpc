@@ -6,7 +6,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { QueryClient } from '@tanstack/react-query'
 import * as z from 'zod'
 
-import { createTanstackQueryUtils } from '../../src/index.ts'
+import { createTanstackQueryUtils } from '../../src/index'
 
 export const router = {
   static: os

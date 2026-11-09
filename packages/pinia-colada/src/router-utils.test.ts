@@ -1,15 +1,15 @@
 import { RPCJsonSerializer } from '@orpc/client'
 
-import * as KeyModule from './key.ts'
-import type { RouterUtilsPlugin } from './plugin.ts'
-import { ProcedureUtils } from './procedure-utils.ts'
-import { createRouterUtils } from './router-utils.ts'
+import * as KeyModule from './key'
+import type { RouterUtilsPlugin } from './plugin'
+import { ProcedureUtils } from './procedure-utils'
+import { createRouterUtils } from './router-utils'
 
-vi.mock('./procedure-utils.ts', async (importOriginal) => {
-  const { SharedUtils } = await import('./shared-utils.ts')
+vi.mock('./procedure-utils', async (importOriginal) => {
+  const { SharedUtils } = await import('./shared-utils')
 
   return {
-    ...(await importOriginal<typeof import('./procedure-utils.ts')>()),
+    ...(await importOriginal<typeof import('./procedure-utils')>()),
     ProcedureUtils: vi.fn(
       class extends SharedUtils<unknown> {
         call = vi.fn()

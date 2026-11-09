@@ -47,7 +47,7 @@
     }
   },
   "scripts": {
-    "prepack": "tsc"
+    "prepack": "tsdown"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

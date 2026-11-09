@@ -6,8 +6,8 @@ import {
 } from '@opentelemetry/sdk-trace-node'
 import type { TracingHeaders } from '@orpc/shared'
 
-import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer.ts'
-import type { OpenTelemetryTracerOptions } from './tracer.ts'
+import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer'
+import type { OpenTelemetryTracerOptions } from './tracer'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({

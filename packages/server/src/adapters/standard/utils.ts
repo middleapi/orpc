@@ -1,8 +1,8 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 
-import type { Context } from '../../context.ts'
-import type { StandardHandlerHandleOptions } from './handler.ts'
+import type { Context } from '../../context'
+import type { StandardHandlerHandleOptions } from './handler'
 
 export type FriendlyStandardHandlerHandleOptions<T extends Context> = Omit<
   StandardHandlerHandleOptions<T>,

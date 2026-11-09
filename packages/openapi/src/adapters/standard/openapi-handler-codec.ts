@@ -19,17 +19,14 @@ import {
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import { parseStandardUrl } from '@standard-server/core'
 
-import {
-  DEFAULT_OPENAPI_INPUT_STRUCTURE,
-  DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
-} from '../../constants.ts'
-import type { OpenAPIMeta } from '../../meta.ts'
-import { getOpenAPIMeta } from '../../meta.ts'
-import { OpenAPISerializer } from '../../openapi-serializer.ts'
-import { isBodylessMethod } from '../../utils.ts'
-import type { OpenAPIMatcherOptions } from './openapi-matcher.ts'
-import { OpenAPIMatcher } from './openapi-matcher.ts'
-import { serializeHeaders } from './utils.ts'
+import { DEFAULT_OPENAPI_INPUT_STRUCTURE, DEFAULT_OPENAPI_OUTPUT_STRUCTURE } from '../../constants'
+import type { OpenAPIMeta } from '../../meta'
+import { getOpenAPIMeta } from '../../meta'
+import { OpenAPISerializer } from '../../openapi-serializer'
+import { isBodylessMethod } from '../../utils'
+import type { OpenAPIMatcherOptions } from './openapi-matcher'
+import { OpenAPIMatcher } from './openapi-matcher'
+import { serializeHeaders } from './utils'
 
 export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**

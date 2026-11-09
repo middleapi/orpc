@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract'
 
-import { os } from './builder.ts'
-import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden.ts'
+import { os } from './builder'
+import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden'
 
 const contract = {
   ping: oc.errors({ BAD_GATEWAY: {} }),

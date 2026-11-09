@@ -1,6 +1,6 @@
-import type { TypeScriptProject } from './project.ts'
-import { openTypeScriptProject } from './project.ts'
-import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter.ts'
+import type { TypeScriptProject } from './project'
+import { openTypeScriptProject } from './project'
+import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter'
 
 const FIXTURE = new URL('../tests/fixtures/types/src/types.ts', import.meta.url)
 

@@ -32,8 +32,8 @@ import type {
   StandardLinkPlugin,
   StandardLinkTransportInterceptor,
   StandardLinkTransportInterceptorOptions,
-} from '../adapters/standard/index.ts'
-import type { ClientContext } from '../types.ts'
+} from '../adapters/standard/index'
+import type { ClientContext } from '../types'
 
 /**
  * Header that marks a request as a batch, set by the Batch Link Plugin and detected by the Batch Handler Plugin.

@@ -7,8 +7,8 @@ import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/node'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
-import type { CreateBatchClientServerTest } from './client-server.ts'
-import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
+import type { CreateBatchClientServerTest } from './client-server'
+import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
   router,

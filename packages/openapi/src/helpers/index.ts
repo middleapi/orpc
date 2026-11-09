@@ -1,1 +1,1 @@
-export * from './form-data.ts'
+export * from './form-data'

@@ -4,13 +4,10 @@ import { meta, oc, type } from '@orpc/contract'
 import type { ContractJsonifiedClientFactory } from '@orpc/openapi'
 import type { PromiseWithError } from '@orpc/shared'
 
-import {
-  createContractJsonifiedUtilsFactory,
-  createContractUtilsFactory,
-} from './contract-utils.ts'
-import type { ProcedureUtils } from './procedure-utils.ts'
-import type { SharedUtils } from './shared-utils.ts'
-import type { OperationContext } from './types.ts'
+import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils'
+import type { ProcedureUtils } from './procedure-utils'
+import type { SharedUtils } from './shared-utils'
+import type { OperationContext } from './types'
 
 const contract = {
   ping: oc.meta(meta.path(['ping'])),

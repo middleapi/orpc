@@ -31,11 +31,11 @@ import {
   value,
 } from '@orpc/shared'
 
-import type { Context } from './context.ts'
-import type { Lazyable } from './lazy.ts'
-import { unlazy } from './lazy.ts'
-import type { MiddlewareDone } from './middleware.ts'
-import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure.ts'
+import type { Context } from './context'
+import type { Lazyable } from './lazy'
+import { unlazy } from './lazy'
+import type { MiddlewareDone } from './middleware'
+import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
 
 export type ProcedureClient<
   TClientContext extends ClientContext,

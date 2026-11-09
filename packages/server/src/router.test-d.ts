@@ -4,8 +4,8 @@ import { oc } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
 import * as z from 'zod'
 
-import type { Lazy, Lazyable } from './lazy.ts'
-import type { Procedure } from './procedure.ts'
+import type { Lazy, Lazyable } from './lazy'
+import type { Procedure } from './procedure'
 import type {
   ContractedRouter,
   InferRouterError,
@@ -16,7 +16,7 @@ import type {
   InferRouterInputs,
   InferRouterOutputs,
   Router,
-} from './router.ts'
+} from './router'
 
 describe('contractedRouter', () => {
   // Schemas should have distinct TInput and TOutput types to ensure correct inference.

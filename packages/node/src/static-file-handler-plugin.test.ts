@@ -23,8 +23,8 @@ import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
 
-import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin.ts'
-import { StaticFileHandlerPlugin } from './static-file-handler-plugin.ts'
+import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
+import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
 
 describe('staticFileHandlerPlugin', () => {
   let baseDir: string

@@ -1,10 +1,10 @@
 import { isNonPrimitive } from '@orpc/shared'
 
-import type { ErrorMap } from './error.ts'
-import type { Meta, MetaPlugin } from './meta.ts'
-import { ProcedureContract } from './procedure.ts'
-import type { RouterContract } from './router.ts'
-import type { AnySchema } from './schema.ts'
+import type { ErrorMap } from './error'
+import type { Meta, MetaPlugin } from './meta'
+import { ProcedureContract } from './procedure'
+import type { RouterContract } from './router'
+import type { AnySchema } from './schema'
 
 export interface PathMetaPlugin<
   TInputSchema extends AnySchema,

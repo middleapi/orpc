@@ -5,7 +5,7 @@ import { runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 
-import { experimental_DurableLocker as DurableLocker } from './lock.ts'
+import { experimental_DurableLocker as DurableLocker } from './lock'
 
 describe('durableLocker', () => {
   function createTestingLocker(

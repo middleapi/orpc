@@ -10,8 +10,8 @@ import {
 import type { Value } from '@orpc/shared'
 import { mergeHttpPath, pathToHttpPath, stripHttpPathPrefix, value } from '@orpc/shared'
 
-import { DEFAULT_OPENAPI_METHOD } from '../../constants.ts'
-import { getOpenAPIMeta } from '../../meta.ts'
+import { DEFAULT_OPENAPI_METHOD } from '../../constants'
+import { getOpenAPIMeta } from '../../meta'
 
 export interface OpenAPIMatcherOptions {
   /**

@@ -43,7 +43,7 @@
     }
   },
   "scripts": {
-    "prepack": "tsc -p tsconfig.build.json"
+    "prepack": "tsdown"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
@@ -51,7 +51,7 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@oxc-project/runtime": "^0.155.0",
+    "@oxc-project/runtime": "^0.157.0",
     "@standard-server/core": "~0.15.0",
     "@standard-server/node": "~0.15.0"
   },

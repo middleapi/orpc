@@ -19,8 +19,8 @@ import { flattenStandardHeader } from '@standard-server/core'
 import type { Logger } from 'pino'
 import pino from 'pino'
 
-import type { LoggerContext } from './context.ts'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
+import type { LoggerContext } from './context'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 
 export interface PinoHandlerPluginOptions<T extends Context> {
   /**
