@@ -241,6 +241,15 @@ describe('generated schemas match serialized outputs', async () => {
     ['overloadedToJSON', undefined],
     ['overloadedToJSONRoot', undefined],
     ['keylessViews', undefined],
+    ['objectToJSON', undefined],
+    ['objectToJSONRoot', undefined],
+    ['omittedBrands', undefined],
+    ['omittedBrandRoot', undefined],
+    ['partialBrands', undefined],
+    ['partialBrandRoot', undefined],
+    ['keylessClassViews', undefined],
+    ['symbolViews', undefined],
+    ['brandedSymbols', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -859,10 +868,23 @@ describe('generated schemas match serialized outputs', async () => {
       expect(schemas().JSONThenId.anyOf[0]).toEqual(json)
     })
 
-    it('converts mapped types over branded primitives as the primitive', () => {
+    it('converts mapped types over branded primitives as the primitive, or a plain object of a partial one', () => {
       expect(properties('brandedMapped')).toEqual({
         id: { type: 'string' },
-        partial: { type: 'string' },
+        // `{}` is a `Partial<AccountId>` too
+        partial: {
+          anyOf: [
+            { type: 'string' },
+            {
+              type: 'object',
+              properties: {
+                length: expect.objectContaining({ type: 'number' }),
+                __brand: { type: 'string', const: 'AccountId' },
+              },
+              additionalProperties: { type: 'string' },
+            },
+          ],
+        },
         amount: { type: 'number' },
         flag: {
           anyOf: [
@@ -1833,7 +1855,20 @@ describe('generated schemas match serialized outputs', async () => {
     it('writes views of branded primitives intersected with an object type as the primitive', () => {
       expect(schemaOf('brandedViews').properties).toEqual({
         tag: { type: 'string' },
-        eight: { type: 'string', description: 'A string of eight characters' },
+        // a plain object of a partial one, too
+        eight: {
+          anyOf: [
+            { type: 'string', description: 'A string of eight characters' },
+            {
+              type: 'object',
+              properties: {
+                length: expect.objectContaining({ type: 'number', const: 8 }),
+                extra: { type: 'string' },
+              },
+              additionalProperties: { type: 'string' },
+            },
+          ],
+        },
         one: { type: 'number', description: 'A number whose value is one' },
       })
     })
@@ -1886,6 +1921,127 @@ describe('generated schemas match serialized outputs', async () => {
 
     it('leaves out fields of mapped types without keys, which hold functions', () => {
       expect(schemaOf('keylessViews').required).toBeUndefined()
+    })
+  })
+
+  describe('round thirty-three', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const length = expect.objectContaining({ type: 'number' })
+
+    it('writes a toJSON typed object, {}, or Object as anything or the fields', () => {
+      const fields = {
+        type: 'object',
+        properties: { a: { type: 'number' }, toJSON: {} },
+        required: ['a'],
+      }
+
+      expect(schemas().ObjectJSON.anyOf).toEqual([{}, fields])
+      expect(schemas().EmptyTypeJSON.anyOf).toEqual([{}, fields])
+      expect(schemas().BoxedObjectJSON.anyOf).toEqual([{}, fields])
+      expect(schemas().ObjectOrFunctionJSON.anyOf).toEqual([
+        {},
+        { type: 'object', properties: { w: { type: 'string' } }, required: ['w'] },
+        fields,
+      ])
+    })
+
+    it('writes views of branded primitives leaving members out as the primitive or a plain object', () => {
+      const omitted = {
+        anyOf: [
+          { type: 'string' },
+          {
+            type: 'object',
+            properties: { length },
+            required: ['length'],
+            additionalProperties: { type: 'string' },
+          },
+        ],
+      }
+      const picked = {
+        anyOf: [
+          { type: 'string' },
+          { type: 'object', properties: { length }, required: ['length'] },
+        ],
+      }
+
+      expect(schemaOf('omittedBrands').properties).toEqual({
+        omit: omitted,
+        pick: picked,
+        picked,
+        num: { anyOf: [{ type: 'number' }, { type: 'object' }] },
+        list: { type: 'array', items: omitted },
+      })
+      expect(schemaOf('omittedBrandRoot')).toEqual(omitted)
+    })
+
+    it('writes partial views of branded primitives as the primitive or a plain object', () => {
+      const partial = {
+        anyOf: [
+          { type: 'string' },
+          {
+            type: 'object',
+            properties: { length, __brand: { type: 'string', const: 'BrandedId' } },
+            additionalProperties: { type: 'string' },
+          },
+        ],
+      }
+
+      expect(schemaOf('partialBrands').properties).toEqual({
+        v: partial,
+        x: {
+          anyOf: [
+            { type: 'string' },
+            {
+              ...partial.anyOf[1],
+              properties: { ...partial.anyOf[1]!.properties, extra: { type: 'string' } },
+            },
+          ],
+        },
+        id: partial,
+        list: { type: 'array', items: partial },
+      })
+      expect(schemaOf('partialBrandRoot')).toEqual(partial)
+    })
+
+    it('writes keyless views of classes as anything, which may be a function', () => {
+      expect(schemaOf('keylessClassViews')).toEqual({
+        type: 'object',
+        properties: {
+          picked: {},
+          omitted: {},
+          str: {},
+          list: { type: 'array', items: { anyOf: [{}, { type: 'null' }] } },
+        },
+        required: ['list'],
+      })
+    })
+
+    it('leaves out views of symbols and branded symbols, which may be symbols', () => {
+      const description = expect.objectContaining({ type: 'string' })
+      const symbolObject = { type: 'object', properties: { description } }
+
+      expect(schemaOf('symbolViews')).toEqual({
+        type: 'object',
+        properties: {
+          omit: symbolObject,
+          pick: { type: 'object' },
+          list: { type: 'array', items: { anyOf: [symbolObject, { type: 'null' }] } },
+        },
+        required: ['list'],
+      })
+      expect(schemaOf('brandedSymbols')).toEqual({
+        type: 'object',
+        properties: {
+          r: {},
+          x: {},
+          omit: { anyOf: [{}, symbolObject] },
+          list: { type: 'array', items: { type: 'null' } },
+          views: { type: 'array', items: { anyOf: [{}, { type: 'null' }] } },
+        },
+        required: ['list', 'views'],
+      })
     })
   })
 

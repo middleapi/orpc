@@ -32,6 +32,7 @@ import {
 } from '../tests/fixtures/app/src/round29'
 import { roundThirtyOneInputs } from '../tests/fixtures/app/src/round31'
 import { roundThirtyTwoInputs } from '../tests/fixtures/app/src/round32'
+import { roundThirtyThreeInputs } from '../tests/fixtures/app/src/round33'
 import { router } from '../tests/fixtures/app/src/router'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
@@ -1297,6 +1298,46 @@ describe('openAPIGenerator', () => {
         ['/plainBoolean', { v: true }],
         ['/plainBooleanRoot', {}],
         ['/plainBooleanRoot', false],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('round thirty-three', () => {
+    it('documents inputs of views of branded primitives a plain object satisfies', async () => {
+      const spec = await generator.generate(roundThirtyThreeInputs, {
+        source: { file: fixture('round33.ts'), export: 'roundThirtyThreeInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      expect(body('/omittedBrand').properties.v.anyOf[0]).toEqual({ type: 'string' })
+      expect(body('/partialBrand').properties.v.anyOf[0]).toEqual({ type: 'string' })
+      expect(body('/keylessClass')).toEqual({ type: 'object', properties: { v: {} } })
+
+      // what a client holding these values sends
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/omittedBrand', { v: 'abc' }],
+        ['/omittedBrand', { v: { length: 1 } }],
+        ['/partialBrand', { v: 'abc' }],
+        ['/partialBrand', { v: {} }],
+        ['/keylessClass', {}],
+        ['/keylessClass', { v: 'str' }],
       ] as const) {
         const validate = ajv.compile(body(path))
         expect(validate(value) ? [] : [path, validate.errors]).toEqual([])

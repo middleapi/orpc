@@ -746,13 +746,19 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertIntersection(type: Type, members: readonly Type[]): JsonSchema {
-    // branded primitives, e.g. `string & { __brand: 'UserId' }`, also through a view of one
-    // (`Readonly<UserId> & { extra?: string }`)
-    const primitive =
-      members.find((m) => m.flags & PRIMITIVE_FLAGS) ??
-      members.map((m) => this.getMappedBrandedPrimitive(m)).find((m) => m !== undefined)
+    // branded primitives, e.g. `string & { __brand: 'UserId' }`
+    const primitive = members.find((m) => m.flags & PRIMITIVE_FLAGS)
     if (primitive) {
       return this.visit(primitive)
+    }
+
+    // also through a view of one (`Readonly<UserId> & { extra?: string }`), which may also hold
+    // a plain object (`Partial<UserId> & { extra?: string }`)
+    const branded = members
+      .map((m) => this.getMappedBrandedPrimitive(m))
+      .find((m) => m !== undefined)
+    if (branded) {
+      return this.withPlainForm(type, this.visit(branded))
     }
 
     const arrayLike = members.find((m) => this.types.getReferenceKind(m) !== undefined)
@@ -810,16 +816,17 @@ export class TypeToJsonSchemaConverter {
     const sentClass =
       this.input && !plain && !ownFields ? getClassType(this.types, type) : undefined
 
+    // `Readonly<UserId>`, or `DeepReadonly<T>` over `UserId = string & { __brand: 'UserId' }`,
+    // maps over the members of the primitive, the value is still the primitive, or also a plain
+    // object of a view leaving members out or optional (`Omit<UserId, '__brand'>`, `Partial<UserId>`)
+    const branded = plain ? undefined : this.getMappedBrandedPrimitive(type)
+    if (branded) {
+      return this.withPlainForm(type, this.visit(branded))
+    }
+
     if (this.input) {
       plain = true
       ignoreToJSON = true
-    }
-
-    // `Readonly<UserId>`, or `DeepReadonly<T>` over `UserId = string & { __brand: 'UserId' }`,
-    // maps over the members of the primitive, the value is still the primitive
-    const branded = this.getMappedBrandedPrimitive(type)
-    if (branded) {
-      return this.visit(branded)
     }
 
     const referenceKind = this.types.getReferenceKind(type)
@@ -978,10 +985,11 @@ export class TypeToJsonSchemaConverter {
       return {}
     }
 
-    // the empty object type `{}` (also `NonNullable<unknown>`) accepts any value but `null` and `undefined`
+    // the empty object type `{}` (also `NonNullable<unknown>`, or `Pick<User, never>`) accepts any
+    // value but `null` and `undefined`
     if (
       !properties.length &&
-      !classType &&
+      (!classType || isView) &&
       !isObjectLiteral(type) &&
       !this.checker.getIndexInfosOfType(type).length &&
       !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length
@@ -1630,9 +1638,9 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * The branded primitive (`string & { __brand: 'UserId' }`) a mapped type maps over by its keys,
-   * which a homomorphic mapped type keeping its values (`Readonly<T>`, `DeepReadonly<T>`) does not
-   * change at runtime. One changing them (`{ [K in keyof T]?: true }`) is an object.
+   * The branded primitive (`string & { __brand: 'UserId' }`) a mapped type is a view of, keeping
+   * the values of the keys it keeps (`Readonly<T>`, `DeepReadonly<T>`, `Omit<T, '__brand'>`), which
+   * may hold the primitive. One changing them (`{ [K in keyof T]?: true }`) is an object.
    */
   private getMappedBrandedPrimitive(type: Type): Type | undefined {
     if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
@@ -1640,6 +1648,11 @@ export class TypeToJsonSchemaConverter {
     }
 
     const keys = new Set(this.types.getProperties(type).map((p) => p.name))
+    // a mapped type without keys keeps no member (`Record<UserId, User>` maps over its keys)
+    if (!keys.size) {
+      return undefined
+    }
+
     const source = this.types.getMappedSource(type)
 
     return [...(source ? [source] : []), ...this.types.getTypeArguments(type)].find((candidate) => {
@@ -1650,10 +1663,9 @@ export class TypeToJsonSchemaConverter {
         return false
       }
 
-      const candidateKeys = this.types.getProperties(candidate)
+      const candidateKeys = new Set(this.types.getProperties(candidate).map((p) => p.name))
       return (
-        candidateKeys.length === keys.size &&
-        candidateKeys.every((p) => keys.has(p.name)) &&
+        [...keys].every((key) => candidateKeys.has(key)) &&
         this.types.isMappedViewOf(type, candidate)
       )
     })

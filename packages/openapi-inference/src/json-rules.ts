@@ -127,15 +127,20 @@ export function isDropped(types: TypeQueries, type: Type): boolean {
 }
 
 /**
- * Whether JSON serialization drops a value of this type: symbols and functions, unless a function
- * has a `toJSON` (`JSON.stringify` calls it, also of a class constructor's static `toJSON`).
+ * Whether JSON serialization drops a value of this type: symbols (also branded,
+ * `symbol & { __brand: 'Id' }`) and functions, unless a function has a `toJSON` (`JSON.stringify`
+ * calls it, also of a class constructor's static `toJSON`).
  */
 export function isNonSerializable(
   types: TypeQueries,
   type: Type,
   seen: Set<number> = new Set(),
 ): boolean {
-  if (type.flags & TypeFlags.ESSymbolLike) {
+  if (
+    type.flags & TypeFlags.ESSymbolLike ||
+    (type.isIntersectionType() &&
+      types.getMembers(type).some((m) => m.flags & TypeFlags.ESSymbolLike))
+  ) {
     return true
   }
 
@@ -158,22 +163,51 @@ export function isNonSerializable(
 
 /**
  * Whether JSON serialization may drop a value of this type: a function whose `toJSON` is optional
- * (`(() => void) & { toJSON?: () => string }`) is written by `toJSON`, or else as nothing, and
- * a type a function is assignable to (`object`, `{}`, `Object`).
+ * (`(() => void) & { toJSON?: () => string }`) is written by `toJSON`, or else as nothing,
+ * a type a function is assignable to (`object`, `{}`, `Object`), and a view of a symbol.
  */
 export function mayBeNonSerializable(types: TypeQueries, type: Type): boolean {
   return (
     (isFunction(types, type) &&
       (isNonSerializable(types, type) || hasOptionalToJSON(types, type))) ||
     isFunctionView(types, type) ||
-    mayHoldFunction(types, type)
+    mayHoldFunction(types, type) ||
+    mayHoldSymbol(types, type)
   )
 }
 
 /**
+ * Whether a value of this type may be a symbol: a view of one, or of the `Symbol` interface
+ * (`Omit<symbol, 'k'>`, `Readonly<SymbolId>` of `SymbolId = symbol & { __brand: 'Id' }`), also in
+ * an intersection.
+ */
+function mayHoldSymbol(types: TypeQueries, type: Type, visited: Set<number> = new Set()): boolean {
+  if (visited.has(type.id)) {
+    return false
+  }
+  visited.add(type.id)
+
+  if (type.flags & TypeFlags.ESSymbolLike) {
+    return true
+  }
+
+  if (type.isIntersectionType()) {
+    return types.getMembers(type).some((m) => mayHoldSymbol(types, m, visited))
+  }
+
+  const source = types.getMappedSource(type)
+  if (source) {
+    return mayHoldSymbol(types, source, visited)
+  }
+
+  const symbol = type.getSymbol()
+  return symbol?.name === 'Symbol' && types.getSymbolSourceKind(symbol) === 'default'
+}
+
+/**
  * Whether a function is assignable to a type that is no function: `object`, `Object`, and the
- * empty object type `{}`, also as a mapped type without keys (`Omit<{ a: number }, 'a'>`), unless it
- * is a view of a function (see `isFunctionView`).
+ * empty object type `{}`, also as a mapped type without keys (`Omit<{ a: number }, 'a'>`, also of
+ * a class: `Pick<User, never>`), unless it is a view of a function (see `isFunctionView`).
  */
 function mayHoldFunction(types: TypeQueries, type: Type): boolean {
   if (type.flags & TypeFlags.NonPrimitive) {
@@ -199,7 +233,7 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
     !types.getProperties(type).length &&
     !types.checker.getIndexInfosOfType(type).length &&
     !types.isCallable(type) &&
-    getClassType(types, type) === undefined
+    (getClassType(types, type) === undefined || isClassView(types, type))
   )
 }
 
@@ -343,10 +377,11 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
 /**
  * What a function returns when `JSON.stringify` calls it: of each signature of a function type
  * (an overload taking the key may be the one that answers), of the function a view of it may hold
- * (`Readonly<() => R>`), or anything (`Function`, and `any` or `unknown`, which may hold one).
+ * (`Readonly<() => R>`), or anything (`Function`, and `any`, `unknown`, `object`, `{}`, or `Object`,
+ * which may hold one).
  */
 function getMethodResultTypes(types: TypeQueries, member: Type): readonly Type[] {
-  if (member.flags & (TypeFlags.Any | TypeFlags.Unknown)) {
+  if (member.flags & (TypeFlags.Any | TypeFlags.Unknown) || mayHoldFunction(types, member)) {
     return [types.checker.getAnyType()]
   }
 
