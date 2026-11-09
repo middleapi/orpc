@@ -19,6 +19,7 @@ import {
   LabeledStamp,
 } from '../tests/fixtures/app/src/round26.ts'
 import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/round27.ts'
+import { WithArrow, roundTwentyEightInputs } from '../tests/fixtures/app/src/round28.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -1005,6 +1006,63 @@ describe('typeScriptOpenAPIGenerator', () => {
         ['/partialStr', 'abc'],
         ['/bufView', { buffer: new ArrayBuffer(1), label: 'l' }],
         ['/bufView', Object.assign(new Uint8Array([1]), { label: 'l' })],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('round twenty-eight', () => {
+    it('documents inputs of intersections, conditional deep views, and views of functions', async () => {
+      const spec = await generator.generate(roundTwentyEightInputs, {
+        source: { file: fixture('round28.ts'), export: 'roundTwentyEightInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // members inherited from `Error` are not written by an instance
+      expect(schemas.CodedFailureExtra.required).toEqual(['code', 'extra'])
+      expect(body('/brandedConditional').properties.id).toEqual({ type: 'string' })
+      expect(body('/simplified').properties.n).toEqual({ type: 'number' })
+      expect(body('/conditionalDate').properties.at).toMatchObject({
+        type: 'string',
+        format: 'date-time',
+      })
+      // a client drops the function a view of it holds
+      for (const path of ['/frozenCallback', '/conditionalCallback', '/conditionalCallbackField']) {
+        expect(body(path).required).toEqual(['n'])
+      }
+      expect(schemas.DeepRO_WithCallback.required).toEqual(['n'])
+      expect(body('/conditionalArrow').required).toEqual(['n'])
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/errorIntersection', { e: Object.assign(new Error('m'), { code: 1, extra: 1 }) }],
+        ['/brandedConditional', { id: 'x' }],
+        ['/simplified', { n: 1 }],
+        ['/conditionalDate', { at: new Date(0) }],
+        ['/frozenCallback', { cb: () => {}, n: 1 }],
+        ['/deepCallback', { cb: () => {}, n: 1 }],
+        ['/conditionalCallback', { cb: () => {}, n: 1 }],
+        ['/conditionalCallbackField', { cb: () => {}, n: 1 }],
+        ['/conditionalArrow', new WithArrow()],
       ] as const) {
         const validate = ajv.compile(body(path))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

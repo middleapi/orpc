@@ -193,14 +193,18 @@ function isFunctionView(types: TypeQueries, type: Type): boolean {
   const viewed = getViewedFunction(types, type)
   return (
     viewed !== undefined &&
-    (viewed === type || isNonSerializable(types, viewed) || hasOptionalToJSON(types, viewed))
+    // a mapped type without keys stands in for a function without fields
+    (!isFunction(types, viewed) ||
+      isNonSerializable(types, viewed) ||
+      hasOptionalToJSON(types, viewed))
   )
 }
 
 /**
- * The function a mapped type is a view of (`Readonly<FnWithJSON>`), or the mapped type itself when
- * it has no keys, as a mapped type over a function has when its source is not found
- * (`T extends object ? { readonly [K in keyof T]: ... } : T`).
+ * The function a mapped type is a view of (`Readonly<FnWithJSON>`), or the mapped type without keys
+ * a mapped type over a function is when its source is not found
+ * (`T extends object ? { readonly [K in keyof T]: ... } : T`), also through views of it
+ * (`Readonly<DeepReadonly<() => void>>`).
  */
 export function getViewedFunction(types: TypeQueries, type: Type): Type | undefined {
   if (!(type.flags & TypeFlags.Object) || !((type as any).objectFlags & ObjectFlags.Mapped)) {
@@ -211,7 +215,7 @@ export function getViewedFunction(types: TypeQueries, type: Type): Type | undefi
     const source = types.getMappedSource(type)
 
     if (source) {
-      return isFunction(types, source) ? source : undefined
+      return isFunction(types, source) ? source : getViewedFunction(types, source)
     }
 
     return isKeyOfMapping(type) &&
@@ -404,8 +408,7 @@ function collectClassTypes(
     return
   }
 
-  const source = types.getMappedSource(type)
-  if (source) {
+  for (const source of types.getMappedSourceMembers(type)) {
     collectClassTypes(types, source, found, visited)
   }
 }

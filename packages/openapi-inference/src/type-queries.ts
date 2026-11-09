@@ -60,6 +60,16 @@ interface KeepingFrame {
   growth: number | undefined
   /** Where the growth began */
   root: number
+  /** Where it is on `keeping` */
+  depth: number
+  /** Once found kept assuming an enclosing pair, the frame of the outermost one */
+  assumes?: KeepingFrame
+}
+
+/** A pair found kept assuming the pair of a frame is kept */
+interface ProvisionalPair {
+  key: string
+  frame: KeepingFrame
 }
 
 /**
@@ -78,7 +88,9 @@ export class TypeQueries {
   /** Pairs being checked, innermost last */
   private readonly keeping: KeepingFrame[] = []
   /** Pairs found kept assuming an enclosing pair is kept, innermost last */
-  private readonly provisionallyKept: string[] = []
+  private readonly provisionallyKept: ProvisionalPair[] = []
+  /** The same pairs by their key, reused while the pair they assume is being checked */
+  private readonly provisionalPairs = new Map<string, ProvisionalPair>()
   /** The outermost pair assumed kept in the check of the current pair */
   private assumedDepth = Number.POSITIVE_INFINITY
 
@@ -144,6 +156,135 @@ export class TypeQueries {
       const declaring = this.getDeclaringType(type)
       return declaring && this.isMappedSourceOf(type, declaring, true) ? declaring : undefined
     })
+  }
+
+  /**
+   * The types a mapped type maps over: the members of its source when it is an intersection
+   * (`Date` and `{ x }` of `Readonly<Date & { x }>`), else the source. A conditional type
+   * resolving to a mapped type (`T extends object ? { [K in keyof T]: ... } : T`) keeps no trace of
+   * an intersection it maps over, whose members are found by the declarations of its properties
+   * instead (`Holder` and `Ext` of `DeepReadonly<Holder & Ext>`, or the `Number` members and the
+   * brand of `DeepReadonly<number & { __brand: 'Id' }>`), when it keeps their values.
+   */
+  getMappedSourceMembers(type: Type): readonly Type[] {
+    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+      return []
+    }
+
+    return this.memo('mappedSourceMembers', type.id, (): readonly Type[] => {
+      const source = this.getMappedSource(type)
+      const innermost = source ?? type
+
+      if ((innermost as any).objectFlags & ObjectFlags.Mapped) {
+        const owners = this.getKeptOwners(innermost)
+        if (owners) {
+          return owners
+        }
+      }
+
+      return source === undefined
+        ? []
+        : source.isIntersectionType()
+          ? this.getMembers(source)
+          : [source]
+    })
+  }
+
+  /**
+   * The types declaring the properties of a mapped type without a source, more than one,
+   * when it keeps the value of each of their properties.
+   */
+  private getKeptOwners(type: Type): readonly Type[] | undefined {
+    const owners = this.getPropertyOwners(type)
+
+    if (owners === undefined || owners.length < 2) {
+      return undefined
+    }
+
+    const properties = this.getProperties(type)
+    const originals = properties.map((p) => {
+      const owner = owners.find((o) => this.getProperty(o, p.name) !== undefined)
+      return owner && this.getProperty(owner, p.name)
+    })
+
+    if (originals.some((o) => o === undefined)) {
+      return undefined
+    }
+
+    const values = this.getPropertyTypes(type)
+    const originalTypes = this.getSymbolTypes(originals as TSSymbol[])
+    const keeps = (value: Type | undefined, i: number) => {
+      const original = originalTypes[i]
+      return (
+        value !== undefined &&
+        original !== undefined &&
+        (this.keepsValue(value, original) || this.hasTypeParameter(original, 3))
+      )
+    }
+
+    // values that are no mapped type first, which a mismatch shows without nesting deeper
+    return values.every((t, i) => nests(t) || keeps(t, i)) &&
+      values.every((t, i) => !nests(t) || keeps(t, i))
+      ? owners
+      : undefined
+  }
+
+  /**
+   * The classes, interfaces, and object type literals declaring the properties of a type, without
+   * the ones another of them derives from (`Base` of `class Holder extends Base`), or `undefined`
+   * when a property has none.
+   */
+  private getPropertyOwners(type: Type): readonly Type[] | undefined {
+    return this.memo('propertyOwners', type.id, (): readonly Type[] | undefined => {
+      const owners = new Map<number, Type>()
+
+      for (const p of this.getProperties(type)) {
+        const declaration = p.declarations[0]
+        const owner = (declaration?.resolve() as any)?.parent
+        const location = declaration && `${declaration.path}:${owner?.pos}`
+        const ownerType =
+          owner?.kind === SyntaxKind.TypeLiteral
+            ? this.getLiteralOwnerType(location!, owner)
+            : (owner?.kind === SyntaxKind.ClassDeclaration ||
+                  owner?.kind === SyntaxKind.InterfaceDeclaration) &&
+                owner.name
+              ? this.getOwnerType(location!, owner.name)
+              : undefined
+
+        if (ownerType === undefined) {
+          return undefined
+        }
+
+        owners.set(ownerType.id, ownerType)
+      }
+
+      const keys = new Map(
+        [...owners.values()].map((o) => [o, new Set(this.getProperties(o).map((p) => p.name))]),
+      )
+
+      // the most derived of the owners holding the same properties
+      return [...keys].flatMap(([owner, names], i, all) =>
+        all.some(
+          ([other, otherNames], j) =>
+            other !== owner &&
+            [...names].every((name) => otherNames.has(name)) &&
+            (otherNames.size > names.size || j < i),
+        )
+          ? []
+          : [owner],
+      )
+    })
+  }
+
+  /**
+   * The type of an object type literal declaring a property, by the location of its declaration.
+   */
+  private getLiteralOwnerType(location: string, node: any): Type | undefined {
+    if (!this.ownerTypes.has(location)) {
+      this.ownerTypes.set(location, this.checker.getTypeAtLocation(node))
+    }
+
+    return this.ownerTypes.get(location)
   }
 
   /**
@@ -269,6 +410,15 @@ export class TypeQueries {
       return cached
     }
 
+    // found kept assuming an enclosing pair that is still being checked, which this check
+    // assumes too, so it is not checked again on every path until that pair is done
+    const provisionalFrame = this.getAssumedFrame(this.provisionalPairs.get(key))
+
+    if (provisionalFrame) {
+      this.assumedDepth = Math.min(this.assumedDepth, provisionalFrame.depth)
+      return true
+    }
+
     const pending = this.keeping.findIndex((frame) => frame.key === key)
 
     if (pending !== -1) {
@@ -305,18 +455,39 @@ export class TypeQueries {
 
     if (!result) {
       // a pair is not kept whatever is assumed, but what was found assuming this one is not known
-      this.provisionallyKept.length = provisional
+      for (const pair of this.provisionallyKept.splice(provisional)) {
+        this.provisionalPairs.delete(pair.key)
+      }
       this.keptValues.set(key, false)
     } else if (assumedDepth < depth) {
-      this.provisionallyKept.push(key)
+      // what was found assuming this pair now assumes the enclosing one
+      frame.assumes = this.keeping[assumedDepth]!
+      const pair = { key, frame: frame.assumes }
+      this.provisionallyKept.push(pair)
+      this.provisionalPairs.set(key, pair)
     } else {
-      for (const provisionalKey of this.provisionallyKept.splice(provisional)) {
-        this.keptValues.set(provisionalKey, true)
+      for (const pair of this.provisionallyKept.splice(provisional)) {
+        this.provisionalPairs.delete(pair.key)
+        this.keptValues.set(pair.key, true)
       }
       this.keptValues.set(key, true)
     }
 
     return result
+  }
+
+  /**
+   * The frame a provisionally kept pair assumes kept, while it is still being checked: through
+   * the frames it assumed that were found kept assuming an enclosing one.
+   */
+  private getAssumedFrame(pair: ProvisionalPair | undefined): KeepingFrame | undefined {
+    let frame = pair?.frame
+
+    while (frame && this.keeping[frame.depth] !== frame) {
+      frame = frame.assumes
+    }
+
+    return frame
   }
 
   /**
@@ -433,7 +604,15 @@ export class TypeQueries {
   private createKeepingFrame(key: string, value: Type, source: Type): KeepingFrame {
     const declaration = getDeclarationId(source)
     const valueDeclaration = getDeclarationId(value)
-    const frame: KeepingFrame = { key, source, declaration, valueDeclaration, growth: 0, root: 0 }
+    const frame: KeepingFrame = {
+      key,
+      source,
+      declaration,
+      valueDeclaration,
+      growth: 0,
+      root: 0,
+      depth: this.keeping.length,
+    }
 
     if (declaration === undefined) {
       return frame
@@ -473,10 +652,8 @@ export class TypeQueries {
       const values = value.isUnionType() ? this.getMembers(value) : [value]
       const sources = source.isUnionType() ? this.getMembers(source) : [source]
 
-      return (
-        values.length === sources.length &&
-        values.every((v) => sources.some((s) => this.keepsValue(v, s)))
-      )
+      // each value is a source or a view of one (`T[K] | Readonly<T[K]>`)
+      return values.every((v) => sources.some((s) => this.keepsValue(v, s)))
     }
 
     if (!(value.flags & TypeFlags.Object)) {
@@ -501,7 +678,9 @@ export class TypeQueries {
       symbol.name.replace(/^Readonly/u, '') === sourceSymbol.name.replace(/^Readonly/u, '')
 
     if ((kind === undefined || kind !== this.getReferenceKind(source)) && !sameBuiltin) {
-      return false
+      // a value the source is still assignable to, like the `ReadonlyMap` type-fest's `PartialDeep`
+      // maps a `URLSearchParams` to, holds it too
+      return this.checker.isTypeAssignableTo(source, value)
     }
 
     const items = this.getReferenceArguments(value)

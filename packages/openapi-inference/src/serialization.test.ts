@@ -8,6 +8,7 @@ import {
   mixedDeepChain,
   shortDeepChain,
 } from '../tests/fixtures/app/src/deep-view-chains.ts'
+import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings.ts'
 import { router } from '../tests/fixtures/app/src/serialization.ts'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
@@ -181,6 +182,20 @@ describe('generated schemas match serialized outputs', async () => {
     ['plainFunctionViews', undefined],
     ['functionViewRoot', undefined],
     ['functionRoot', undefined],
+    ['errorIntersections', undefined],
+    ['errorIntersectionRoot', undefined],
+    ['widenedViews', undefined],
+    ['ringSideA', undefined],
+    ['ringSideB', undefined],
+    ['brandedConditional', undefined],
+    ['brandedConditionalRoot', undefined],
+    ['simplified', undefined],
+    ['simplifiedRoot', undefined],
+    ['conditionalIntersections', undefined],
+    ['conditionalIntersectionRoot', undefined],
+    ['typeFestURLs', undefined],
+    ['nestedFunctionViews', undefined],
+    ['boxedFunctionView', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1137,6 +1152,153 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
+  describe('round twenty-eight', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const mapArray = expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' })
+    const eitherMap = { anyOf: [mapArray, { type: 'object' }] }
+    const errorFields = {
+      name: { type: 'string' },
+      message: { type: 'string' },
+      stack: { type: 'string' },
+      cause: {},
+    }
+
+    it('leaves the members an interface inherits from Error optional in intersections', () => {
+      const { properties } = schemaOf('errorIntersections')
+      const coded = {
+        type: 'object',
+        properties: { ...errorFields, code: { type: 'string' }, extra: { type: 'string' } },
+        required: ['code'],
+      }
+
+      expect(schemas().CodedFailureExtra).toEqual({
+        type: 'object',
+        properties: {
+          code: { type: 'number' },
+          ...errorFields,
+          extra: { type: 'number', const: 1 },
+        },
+        required: ['code', 'extra'],
+        description: 'An error with a code and an extra field',
+      })
+      expect(properties.frozen.required).toEqual(['code', 'extra'])
+      expect(properties.code).toEqual(coded)
+      expect(properties.frozenCode).toEqual(coded)
+      expect(properties.list.items).toEqual(coded)
+      expect(properties.msg.required).toBeUndefined()
+      expect(schemaOf('errorIntersectionRoot')).toEqual(coded)
+    })
+
+    it('reads mapped types widening each value with views of it as views', () => {
+      expect(schemas().OrFrozen_Holder.properties).toEqual({
+        tags: eitherSet,
+        map: eitherMap,
+        n: { type: 'number' },
+      })
+      expect(schemas().DeepOrSame_WritesW.anyOf).toEqual([
+        { type: 'object', properties: { w: { type: 'string' } }, required: ['w'] },
+        { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] },
+      ])
+      expect(schemas().DeepOrSame_Set_stringAny).toEqual({
+        ...eitherSet,
+        description: 'Deep views of values, or the values',
+      })
+    })
+
+    it('names the deep views of classes referring to each other after them', () => {
+      expect(schemaOf('ringSideA')).toEqual({ $ref: '#/components/schemas/DeepSealed_RingSideA' })
+      expect(schemaOf('ringSideB')).toEqual({ $ref: '#/components/schemas/DeepSealed_RingSideB' })
+      expect(
+        Object.keys(schemas())
+          .filter((name) => name.startsWith('DeepSealed_Ring'))
+          .toSorted(),
+      ).toEqual(['DeepSealed_RingSideA', 'DeepSealed_RingSideB'])
+    })
+
+    it('reads conditional deep mapped types and Simplify over branded primitives as them', () => {
+      const brands = {
+        type: 'object',
+        properties: { id: { type: 'string' }, n: { type: 'number' } },
+        required: ['id', 'n'],
+      }
+      const { properties } = schemaOf('brandedConditional')
+
+      expect(properties.deep).toEqual(brands)
+      expect(properties.mutable).toEqual(brands)
+      // or a plain object of some of their members
+      expect(properties.partial.properties.id.anyOf[0]).toEqual({ type: 'string' })
+      expect(properties.partial.properties.n.anyOf[0]).toEqual({ type: 'number' })
+      expect(schemaOf('brandedConditionalRoot')).toEqual({ type: 'number' })
+      expect(schemaOf('simplified')).toEqual({
+        type: 'object',
+        properties: {
+          n: { type: 'number' },
+          s: { type: 'string' },
+          local: { type: 'number', description: "Each value, as type-fest's `Simplify`" },
+        },
+        required: ['n', 's', 'local'],
+      })
+      expect(schemaOf('simplifiedRoot')).toEqual({ type: 'number' })
+    })
+
+    it('reads conditional deep mapped types over intersections with a class or built-in as views', () => {
+      const { properties } = schemaOf('conditionalIntersections')
+      const description = 'Read-only all the way down, through a conditional type'
+      const holder = {
+        type: 'object',
+        properties: {
+          tags: {
+            anyOf: [expect.objectContaining({ 'x-native-type': 'set' }), { type: 'object' }],
+          },
+          map: eitherMap,
+          n: { type: 'number' },
+          extra: { type: 'string' },
+        },
+        required: ['tags', 'map', 'n'],
+      }
+
+      expect(properties.holder).toEqual(holder)
+      expect(schemaOf('conditionalIntersectionRoot')).toEqual(holder)
+      expect(properties.date).toEqual({
+        'type': 'string',
+        'format': 'date-time',
+        'x-native-type': 'date',
+        description,
+      })
+      expect(properties.partialDate.anyOf).toEqual([
+        { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+        { type: 'object', properties: { extra: { type: 'string' } } },
+      ])
+      expect(properties.url).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+        description,
+      })
+      expect(properties.set).toEqual(expect.objectContaining({ 'x-native-type': 'set' }))
+    })
+
+    it('reads a deep view whose values the source is assignable to as a view', () => {
+      const { properties } = schemaOf('typeFestURLs')
+
+      expect(properties.url.properties.s).toEqual(eitherSet)
+      expect(properties.url.properties.u.anyOf[0]).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect(properties.params.properties.s).toEqual(eitherSet)
+      expect(properties.params.properties.p).toEqual(eitherMap)
+    })
+
+    it('makes a view of a view of a function optional', () => {
+      expect(schemaOf('nestedFunctionViews').required).toEqual(['n'])
+      expect(schemas().FnBox.required).toBeUndefined()
+    })
+  })
+
   it('writes each view of a chain of views once', () => {
     const schemas = spec.components?.schemas as any
     // a view reaching other views is written once, as a component
@@ -1374,5 +1536,60 @@ describe('chains of deep views of classes', async () => {
     // the checks of a view reuse what the views of the next classes were found to keep
     expect(results.longDeepChain.time / results.shortDeepChain.time).toBeLessThan(3)
     expect(results.longerDeepChain.time / results.longDeepChain.time).toBeLessThan(3)
+  })
+})
+
+describe('rings of deep views of classes', async () => {
+  const file = new URL('../tests/fixtures/app/src/deep-view-rings.ts', import.meta.url)
+  const routers = { nullRing, conditionalRing }
+  const generate = async (name: keyof typeof routers) => {
+    const start = performance.now()
+    const spec = await new TypeScriptOpenAPIGenerator().generate(routers[name], {
+      source: { file, export: name },
+    })
+    return { spec, time: performance.now() - start }
+  }
+
+  // the first generation also starts the compiler
+  await generate('nullRing')
+  const results = {
+    nullRing: await generate('nullRing'),
+    conditionalRing: await generate('conditionalRing'),
+  }
+  const serializer = new OpenAPIJsonSerializer()
+
+  it.each([
+    ['nullRing', 'root'],
+    ['conditionalRing', 'ringA'],
+    ['conditionalRing', 'ringT'],
+  ] as const)('match serialized outputs (%s, %s)', async (name, procedure) => {
+    const { spec } = results[name]
+    const ajv = new Ajv2020({ strict: false, allErrors: true })
+    const json = JSON.stringify({
+      $id: 'spec',
+      $defs: spec.components?.schemas ?? {},
+      ...(spec.paths as any)[`/${procedure}`].post.responses['200'].content['application/json']
+        .schema,
+    }).replaceAll('#/components/schemas/', '#/$defs/')
+    const validate = ajv.compile(JSON.parse(json))
+    const output = await call((routers[name] as any)[procedure], undefined)
+    const serialized = JSON.parse(JSON.stringify(serializer.serializeJson(output).json))
+
+    expect(validate(serialized) ? [] : validate.errors).toEqual([])
+  })
+
+  it('generate in time growing linearly with the size of the ring', () => {
+    // each class added used to multiply the time by ten
+    expect(results.nullRing.time).toBeLessThan(3000)
+    expect(results.conditionalRing.time).toBeLessThan(5000)
+  })
+
+  it('write one component per deep view of a class of the ring', () => {
+    const names = Object.keys(results.nullRing.spec.components?.schemas ?? {})
+
+    // views of one class instantiated apart within the ring share their component and its name
+    expect(names.filter((name) => name.startsWith('DeepNull_')).toSorted()).toEqual(
+      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((letter) => `DeepNull_NullRing${letter}`),
+    )
   })
 })

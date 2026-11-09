@@ -184,12 +184,16 @@ function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | unde
     return kinds.includes(true) ? true : kinds.flatMap((kind) => (Array.isArray(kind) ? kind : []))
   }
 
-  const source = (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(type) : type
+  const members =
+    (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSourceMembers(type) : [type]
 
   // `Readonly<Uint8Array & { label: string }>`
-  if (source !== type && source?.isIntersectionType()) {
-    return getTypedArrayKind(types, source)
+  if (members.length !== 1) {
+    const kinds = members.map((member) => getTypedArrayKind(types, member))
+    return kinds.includes(true) ? true : kinds.flatMap((kind) => (Array.isArray(kind) ? kind : []))
   }
+
+  const source = members[0]
 
   const symbol = source?.getSymbol()
 
@@ -267,14 +271,12 @@ export function getBoxedPrimitiveSchema(types: TypeQueries, type: Type): JsonSch
 function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): Builtin | undefined {
   // a view keeping the source's values (`Readonly<Error>`, `Partial<RegExp>`) is still the built-in
   // (not a view of a project class extending one, `Pick<MyDate, 'label'>` may be a plain object)
-  const viewed = types.getMappedSource(type)
   // also over an intersection with a built-in (`Readonly<Set<string> & { x: string }>`)
-  const viewedMember = viewed?.isIntersectionType()
-    ? types.getMembers(viewed).find((m) => getDeclaredBuiltinName(types, m) !== undefined)
-    : viewed
+  const members = types.getMappedSourceMembers(type)
+  const viewed = members.length === 1 ? members[0] : undefined
+  const viewedMember = members.find((m) => getDeclaredBuiltinName(types, m) !== undefined)
   const viewedBuiltin =
     viewedMember &&
-    getDeclaredBuiltinName(types, viewedMember) !== undefined &&
     // a typed array is written by its own keys, also the ones an intersection adds
     !(viewedMember !== viewed && isTypedArray(types, viewedMember))
       ? getBuiltin(types, viewedMember, stringify)
@@ -498,10 +500,21 @@ export function getViewBases(type: Type, depth = 0): Type[] {
  * Not a library interface of plain data, like `PromiseFulfilledResult<T>`.
  */
 export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
-  const type = (view as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(view) : view
-  const symbol = type?.getSymbol()
+  // also of a member of an intersection (`AppError & { extra: string }`)
+  const members =
+    (view as any).objectFlags & ObjectFlags.Mapped
+      ? types.getMappedSourceMembers(view)
+      : view.isIntersectionType()
+        ? types.getMembers(view)
+        : undefined
+
+  if (members) {
+    return members.some((member) => extendsBuiltinClass(types, member))
+  }
+
+  const symbol = view.getSymbol()
   const base =
-    symbol && symbol.flags & SymbolFlags.Interface ? getBuiltinBase(types, type!) : undefined
+    symbol && symbol.flags & SymbolFlags.Interface ? getBuiltinBase(types, view) : undefined
   return base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))
 }
 

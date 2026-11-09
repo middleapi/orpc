@@ -30,6 +30,7 @@ import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { TypeFlags } from 'typescript/unstable/sync'
 
+import { mergeEquivalentComponents } from './components.ts'
 import type { TypeScriptProjectOptions } from './project.ts'
 import { openTypeScriptProject } from './project.ts'
 import type { ResolvedRouterType } from './router-type.ts'
@@ -140,9 +141,10 @@ export class TypeScriptOpenAPIGenerator {
     const project = openTypeScriptProject(source)
 
     let inferred: RouterContract
+    let ctx: InferenceContext
 
     try {
-      const ctx: InferenceContext = {
+      ctx = {
         checker: project.checker,
         resolver: new RouterTypeResolver(
           project.checker,
@@ -166,7 +168,9 @@ export class TypeScriptOpenAPIGenerator {
       project.close()
     }
 
-    return this.generator.generate(inferred, options)
+    const document = await this.generator.generate(inferred, options)
+    mergeEquivalentComponents(document, ctx.converters.output.getDefNames())
+    return document
   }
 
   private async inferRouter(

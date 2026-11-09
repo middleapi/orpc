@@ -27,6 +27,7 @@ import {
   isBoxedBigInt,
   isTypedArray,
 } from './builtins.ts'
+import type { DefNameRecord } from './components.ts'
 import { getDefName, getFallbackDefName, getViewDefName } from './def-names.ts'
 import type { ConversionMode, Def } from './defs.ts'
 import { DefNames, DefRegistry, toModeKey } from './defs.ts'
@@ -141,6 +142,7 @@ export class TypeToJsonSchemaConverter {
   /** Values a client sends, decoded from JSON: classes are plain objects, `toJSON` is not called */
   private readonly input: boolean
   private readonly types: TypeQueries
+  private readonly names: DefNames
   private readonly defs: DefRegistry
   private readonly expansion: ExpansionGuard
   /** Types whose `JSON.stringify` form differs from their serializer form */
@@ -193,6 +195,7 @@ export class TypeToJsonSchemaConverter {
       SHARED.set(checker, shared)
     }
     this.types = shared.types
+    this.names = shared.names
     this.defs = new DefRegistry(shared.names)
     this.expansion = new ExpansionGuard(this.types)
     this.stringifySensitivity = new ModeSensitivity(this.types, 'stringify')
@@ -219,7 +222,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     // a function whose `toJSON` is optional may be written as nothing too
-    if (!this.input && unions.some((t) => mayBeNonSerializable(this.types, t))) {
+    if (unions.some((t) => mayBeNonSerializable(this.types, t))) {
       optional = true
     }
 
@@ -260,6 +263,13 @@ export class TypeToJsonSchemaConverter {
     }
 
     return [{ ...(typeof schema === 'object' ? schema : { not: {} }), $defs }, optional]
+  }
+
+  /**
+   * The def names the conversions of this program gave (see `mergeEquivalentComponents`).
+   */
+  getDefNames(): DefNameRecord {
+    return this.names
   }
 
   /**
@@ -1065,7 +1075,7 @@ export class TypeToJsonSchemaConverter {
         // fields added to a typed array by an intersection may be phantom brands
         !(
           typedArray &&
-          (type.isIntersectionType() || this.types.getMappedSource(type)?.isIntersectionType())
+          (type.isIntersectionType() || this.types.getMappedSourceMembers(type).length > 1)
         ) &&
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
@@ -1516,23 +1526,27 @@ export class TypeToJsonSchemaConverter {
       return views.some((view) => this.mayHoldPlainObject(view))
     }
 
+    // the members of an intersection a conditional mapped type maps over, which it has no trace of
     const source = this.types.getMappedSource(type)
+    const sources = source ? [source] : this.types.getMappedSourceMembers(type)
 
-    if (!source) {
+    if (!sources.length) {
       return false
     }
 
-    const sourceProperties = new Map(this.types.getProperties(source).map((p) => [p.name, p]))
+    const sourceProperties = new Map(
+      sources.flatMap((s) => this.types.getProperties(s)).map((p) => [p.name, p]),
+    )
     const properties = this.types.getProperties(type)
 
     return (
       // the source may hold one (`Readonly<Link>` of `interface Link extends Pick<URL, 'href'>`)
-      getViewBases(source).some((view) => this.mayHoldPlainObject(view)) ||
+      sources.some((s) => getViewBases(s).some((view) => this.mayHoldPlainObject(view))) ||
       properties.length < sourceProperties.size ||
       properties.some(
         (p) =>
           p.flags & SymbolFlags.Optional &&
-          !(sourceProperties.get(p.name)!.flags & SymbolFlags.Optional),
+          !((sourceProperties.get(p.name)?.flags ?? 0) & SymbolFlags.Optional),
       )
     )
   }
@@ -1620,17 +1634,17 @@ export class TypeToJsonSchemaConverter {
    * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
    */
   private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
-    // a request carries plain JSON, `toJSON` is not called
-    if (this.input) {
-      return false
-    }
-
     const members = type.isUnionType() ? this.types.getMembers(type) : [type]
 
     return members.some((member) => {
-      // a function without its optional `toJSON` is dropped
+      // a function without its optional `toJSON` is dropped, also by a client sending it
       if (mayBeNonSerializable(this.types, member)) {
         return true
+      }
+
+      // the server decodes plain JSON, it calls no `toJSON`
+      if (this.input) {
+        return false
       }
 
       // also of the classes behind a view leaving `toJSON` out (`Omit<C, 'toJSON'>`)

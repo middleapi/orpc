@@ -47,6 +47,8 @@ export interface Def {
 export class DefNames {
   readonly byKey = new Map<number, string>()
   readonly used = new Set<string>()
+  /** Names numbered after a name another def held, with that name (`Page2` of `Page`) */
+  readonly numbered = new Map<string, string>()
 }
 
 /**
@@ -103,6 +105,9 @@ export class DefRegistry {
 
       this.names.byKey.set(key, name)
       this.names.used.add(name)
+      if (name !== base) {
+        this.names.numbered.set(name, base)
+      }
     }
 
     const def: Def = { name, key }
