@@ -196,6 +196,11 @@ describe('generated schemas match serialized outputs', async () => {
     ['typeFestURLs', undefined],
     ['nestedFunctionViews', undefined],
     ['boxedFunctionView', undefined],
+    ['conditionalParameterIntersections', undefined],
+    ['conditionalParameterRoot', undefined],
+    ['conditionalParameterOnlyRoot', undefined],
+    ['conditionalMoneyRoot', undefined],
+    ['conditionalExpressionRoot', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1291,6 +1296,32 @@ describe('generated schemas match serialized outputs', async () => {
       })
       expect(properties.params.properties.s).toEqual(eitherSet)
       expect(properties.params.properties.p).toEqual(eitherMap)
+    })
+
+    it('reads conditional deep views of classes with parameter properties or class expressions as views', () => {
+      const { properties } = schemaOf('conditionalParameterIntersections')
+      const tags = { tags: eitherSet }
+
+      expect(properties.params).toEqual({
+        type: 'object',
+        properties: { extra: { type: 'string' }, ...tags, a: { type: 'number' } },
+        required: ['tags', 'a'],
+      })
+      expect(properties.only).toEqual({ type: 'object', properties: tags, required: ['tags'] })
+      expect(schemaOf('conditionalParameterOnlyRoot')).toEqual(properties.only)
+      expect(properties.money.anyOf[0]).toEqual({
+        type: 'object',
+        properties: { amt: { type: 'number' }, cur: { type: 'string' } },
+        required: ['amt', 'cur'],
+      })
+      expect(schemaOf('conditionalMoneyRoot')).toEqual(properties.money)
+      expect(properties.box.properties.value).toEqual(eitherSet)
+      expect(properties.expression).toEqual({
+        type: 'object',
+        properties: { extra: { type: 'string' }, ...tags },
+        required: ['tags'],
+      })
+      expect(schemaOf('conditionalExpressionRoot')).toEqual(properties.expression)
     })
 
     it('makes a view of a view of a function optional', () => {

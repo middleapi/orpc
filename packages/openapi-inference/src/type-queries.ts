@@ -239,17 +239,7 @@ export class TypeQueries {
       const owners = new Map<number, Type>()
 
       for (const p of this.getProperties(type)) {
-        const declaration = p.declarations[0]
-        const owner = (declaration?.resolve() as any)?.parent
-        const location = declaration && `${declaration.path}:${owner?.pos}`
-        const ownerType =
-          owner?.kind === SyntaxKind.TypeLiteral
-            ? this.getLiteralOwnerType(location!, owner)
-            : (owner?.kind === SyntaxKind.ClassDeclaration ||
-                  owner?.kind === SyntaxKind.InterfaceDeclaration) &&
-                owner.name
-              ? this.getOwnerType(location!, owner.name)
-              : undefined
+        const ownerType = this.getDeclarationOwner(p, true)
 
         if (ownerType === undefined) {
           return undefined
@@ -277,11 +267,53 @@ export class TypeQueries {
   }
 
   /**
-   * The type of an object type literal declaring a property, by the location of its declaration.
+   * The declared type of the class or interface declaring a property, also as a parameter
+   * property (`constructor(public a = 1)`) or in a class expression (`const C = class { ... }`),
+   * and with `literals`, of an object type literal declaring it.
    */
-  private getLiteralOwnerType(location: string, node: any): Type | undefined {
+  private getDeclarationOwner(property: TSSymbol, literals = false): Type | undefined {
+    const declaration = property.declarations[0]
+    const node = declaration?.resolve() as any
+    // a parameter property is declared by the class of its constructor
+    const owner =
+      node?.kind === SyntaxKind.Parameter && node.parent?.kind === SyntaxKind.Constructor
+        ? node.parent.parent
+        : node?.parent
+
+    if (!declaration || !owner) {
+      return undefined
+    }
+
+    const location = `${declaration.path}:${owner.pos}`
+
+    switch (owner.kind) {
+      case SyntaxKind.TypeLiteral:
+        return literals
+          ? this.getOwnerTypeBy(location, () => this.checker.getTypeAtLocation(owner))
+          : undefined
+      case SyntaxKind.ClassDeclaration:
+      case SyntaxKind.InterfaceDeclaration:
+        return owner.name ? this.getOwnerType(location, owner.name) : undefined
+      case SyntaxKind.ClassExpression:
+        // the instance type its construct signatures return
+        return this.getOwnerTypeBy(location, () => {
+          const constructor = this.checker.getTypeAtLocation(owner)
+          const [signature] = constructor
+            ? this.checker.getSignaturesOfType(constructor, SignatureKind.Construct)
+            : []
+          return signature && this.checker.getReturnTypeOfSignature(signature)
+        })
+      default:
+        return undefined
+    }
+  }
+
+  /**
+   * The type declaring properties at a location, computed once.
+   */
+  private getOwnerTypeBy(location: string, compute: () => Type | undefined): Type | undefined {
     if (!this.ownerTypes.has(location)) {
-      this.ownerTypes.set(location, this.checker.getTypeAtLocation(node))
+      this.ownerTypes.set(location, compute())
     }
 
     return this.ownerTypes.get(location)
@@ -724,27 +756,20 @@ export class TypeQueries {
       return undefined
     }
 
-    const owners = new Map<string, any>()
+    const owners = new Map<number, Type>()
 
     for (const p of properties) {
-      const declaration = p.declarations[0]
-      const owner = (declaration?.resolve() as any)?.parent
-      if (
-        owner &&
-        (owner.kind === SyntaxKind.ClassDeclaration ||
-          owner.kind === SyntaxKind.InterfaceDeclaration) &&
-        owner.name
-      ) {
-        owners.set(`${declaration!.path}:${owner.pos}`, owner.name)
+      const owner = this.getDeclarationOwner(p)
+      if (owner) {
+        owners.set(owner.id, owner)
       }
     }
 
     // the most derived owner, which has every property
-    for (const [location, name] of owners) {
-      const candidate = this.getOwnerType(location, name)
-      const keys = candidate && new Set(this.getProperties(candidate).map((p) => p.name))
+    for (const candidate of owners.values()) {
+      const keys = new Set(this.getProperties(candidate).map((p) => p.name))
 
-      if (keys && properties.every((p) => keys.has(p.name))) {
+      if (properties.every((p) => keys.has(p.name))) {
         return candidate
       }
     }
@@ -756,12 +781,10 @@ export class TypeQueries {
    * The declared type of a class or interface, by the location of its declaration.
    */
   private getOwnerType(location: string, name: any): Type | undefined {
-    if (!this.ownerTypes.has(location)) {
+    return this.getOwnerTypeBy(location, () => {
       const symbol = this.checker.getSymbolAtLocation(name)
-      this.ownerTypes.set(location, symbol && this.checker.getDeclaredTypeOfSymbol(symbol))
-    }
-
-    return this.ownerTypes.get(location)
+      return symbol && this.checker.getDeclaredTypeOfSymbol(symbol)
+    })
   }
 
   /**

@@ -96,6 +96,30 @@ export class WithArrow {
   f = (): number => 1
 }
 
+export class ParamTags {
+  tags = new Set(['x'])
+
+  constructor(public a = 1) {}
+}
+
+export class OnlyParamTags {
+  constructor(public tags = new Set(['a'])) {}
+}
+
+export class ParamMoney {
+  constructor(public amount = 1) {}
+
+  toJSON(): { amt: number; cur: string } {
+    return { amt: this.amount, cur: 'USD' }
+  }
+}
+
+export const TagsExpression = class {
+  tags = new Set(['y'])
+}
+
+export type TagsExpressionInstance = InstanceType<typeof TagsExpression>
+
 const failure = <T extends object>(fields: T) => Object.assign(new Error('boom'), fields)
 
 export const roundTwentyEight = {
@@ -164,6 +188,36 @@ export const roundTwentyEight = {
     }),
   ),
   conditionalIntersectionRoot: os.handler((): DeepReadonlyIf<Holder & MaybeExtra> => new Holder()),
+  // classes declaring fields as constructor parameters, or by a class expression
+  conditionalParameterIntersections: os.handler(
+    (): {
+      params: DeepReadonlyIf<ParamTags & MaybeExtra>
+      only: DeepReadonlyIf<OnlyParamTags>
+      onlyExtra: DeepReadonlyIf<OnlyParamTags & MaybeExtra>
+      money: DeepReadonlyIf<ParamMoney & MaybeExtra>
+      box: DeepReadonlyIf<FnBox<Set<string>> & MaybeExtra>
+      expression: DeepReadonlyIf<TagsExpressionInstance & MaybeExtra>
+      n: 1
+    } => ({
+      params: new ParamTags(),
+      only: new OnlyParamTags(),
+      onlyExtra: new OnlyParamTags(),
+      money: new ParamMoney(),
+      box: new FnBox(new Set(['a'])),
+      expression: new TagsExpression(),
+      n: 1,
+    }),
+  ),
+  conditionalParameterRoot: os.handler(
+    (): DeepReadonlyIf<ParamTags & MaybeExtra> => new ParamTags(),
+  ),
+  conditionalParameterOnlyRoot: os.handler(
+    (): DeepReadonlyIf<OnlyParamTags> => new OnlyParamTags(),
+  ),
+  conditionalMoneyRoot: os.handler((): DeepReadonlyIf<ParamMoney & MaybeExtra> => new ParamMoney()),
+  conditionalExpressionRoot: os.handler(
+    (): DeepReadonlyIf<TagsExpressionInstance & MaybeExtra> => new TagsExpression(),
+  ),
   // type-fest maps the `URLSearchParams` of a `URL` to a `ReadonlyMap`, which still holds it
   typeFestURLs: os.handler(
     (): { url: PartialDeep<SetAndURL>; params: PartialDeep<SetAndParams> } => ({
