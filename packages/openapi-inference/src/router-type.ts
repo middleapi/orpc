@@ -1,6 +1,8 @@
-import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { TypeFlags } from 'typescript/unstable/sync'
+import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
+import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
+import { ExpansionGuard } from './expansion'
+import { TypeQueries } from './type-queries'
 import { getCallReturnType, getPromisedType } from './utils'
 
 export interface ResolvedRouterType {
@@ -18,6 +20,7 @@ export class RouterTypeResolver {
 
   constructor(
     private readonly checker: Checker,
+    private readonly program: Program,
     private readonly root: ResolvedRouterType,
   ) {}
 
@@ -59,7 +62,17 @@ export class RouterTypeResolver {
    * Whether a procedure or contract is anywhere in the type, so a router of other paths
    * is told apart from an export that is no router at all.
    */
-  holdsProcedure(type: Type = this.root.type, seen = new Set<number>()): boolean {
+  holdsProcedure(): boolean {
+    const types = new TypeQueries(this.checker, this.program)
+    return this.holdsProcedureIn(this.root.type, types, new ExpansionGuard(types), new Set())
+  }
+
+  private holdsProcedureIn(
+    type: Type,
+    types: TypeQueries,
+    expansion: ExpansionGuard,
+    seen: Set<number>,
+  ): boolean {
     const current = this.unlazy(this.stripNullish(type))
 
     if (seen.has(current.id)) {
@@ -73,21 +86,62 @@ export class RouterTypeResolver {
     }
 
     if (current.isUnionType()) {
-      return current.getTypes().some((member) => this.holdsProcedure(member, seen))
+      return types
+        .getMembers(current)
+        .some((member) => this.holdsProcedureIn(member, types, expansion, seen))
     }
 
-    // primitives have no sub-routers, only the members of their wrapper types
-    if (!(current.flags & TypeFlags.Object)) {
+    if (!this.canBeRouter(current, types)) {
       return false
     }
 
+    // every instantiation of `interface Grow<T> { next: Grow<T[]> }` is a new type
     return (
-      this.checker
-        .getPropertiesOfType(current)
-        .some((symbol) => this.holdsProcedure(this.checker.getTypeOfSymbol(symbol), seen)) ||
-      this.checker
-        .getIndexInfosOfType(current)
-        .some((info) => this.holdsProcedure(info.valueType, seen))
+      expansion.expand(
+        current,
+        () =>
+          this.getPropertyTypes(current, types).some((property) =>
+            this.holdsProcedureIn(property, types, expansion, seen),
+          ) ||
+          this.checker
+            .getIndexInfosOfType(current)
+            .some((info) => this.holdsProcedureIn(info.valueType, types, expansion, seen)),
+      ) ?? false
+    )
+  }
+
+  /** The types of all properties, in one compiler request */
+  private getPropertyTypes(type: Type, types: TypeQueries): Type[] {
+    const properties = types.getProperties(type)
+    return properties.length
+      ? this.checker.getTypeOfSymbol(properties).filter((t) => t !== undefined)
+      : []
+  }
+
+  /**
+   * Whether the type is a plain object, which a router of procedures, lazy routers and nested
+   * routers is: no primitive, function, array, class instance or default library type
+   * (`Record<K, T>` and the other mapped types aside).
+   */
+  private canBeRouter(type: Type, types: TypeQueries): boolean {
+    if (
+      !(type.flags & TypeFlags.Object) ||
+      types.getReferenceKind(type) ||
+      types.isCallable(type)
+    ) {
+      return false
+    }
+
+    const symbol = type.getSymbol()
+
+    if (!symbol) {
+      return true
+    }
+
+    return (
+      !(symbol.flags & SymbolFlags.Class) &&
+      (!!((type as any).objectFlags & ObjectFlags.Mapped) ||
+        types.getSymbolSourceKind(symbol) !== 'default')
     )
   }
 

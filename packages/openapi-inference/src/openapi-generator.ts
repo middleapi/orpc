@@ -162,7 +162,7 @@ export class OpenAPIGenerator {
         program: project.program,
         sourceFile: project.sourceFile,
         source: exported,
-        resolver: new RouterTypeResolver(project.checker, exported),
+        resolver: new RouterTypeResolver(project.checker, project.program, exported),
         converters: {
           input: new TypeToJsonSchemaConverter(project.checker, project.program, {
             ...this.options,

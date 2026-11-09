@@ -447,6 +447,29 @@ describe('openAPIGenerator', () => {
     await expect(inner).rejects.toThrow(`Procedure at list: ${hint}`)
     await expect(inner).rejects.toThrow(`Procedure at find: ${hint}`)
     await expect(inner).rejects.not.toThrow('which is not a router')
+
+    const wrapped = generator.generate(roundThirtyFourInner, {
+      source: { file, export: 'roundThirtyFourWrapped' },
+    })
+    await expect(wrapped).rejects.toThrow(`Procedure at list: ${hint}`)
+    await expect(wrapped).rejects.not.toThrow('which is not a router')
+  })
+
+  it('tells fast that an export whose type expands generically is no router', async () => {
+    const file = fixture('round34.ts')
+
+    for (const [exportName, typeName] of [
+      ['grow', 'Grow<number>'],
+      ['chain', 'Chain<number>'],
+    ]) {
+      const start = performance.now()
+      await expect(
+        generator.generate(roundThirtyFourInner, { source: { file, export: exportName } }),
+      ).rejects.toThrow(
+        `[OpenAPIGenerator] The export "${exportName}" of "${fileURLToPath(file)}" has type "${typeName}", which is not a router, procedure or contract.`,
+      )
+      expect(performance.now() - start).toBeLessThan(1000)
+    }
   })
 
   it('keeps the first line of the comment for an empty @summary or @description', async () => {
