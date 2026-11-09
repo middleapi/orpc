@@ -89,10 +89,11 @@ export class DefRegistry {
 
     if (name === undefined || taken(name)) {
       const base = `${preferredName}${getModeSuffix(key)}`
+      const unavailable = (candidate: string) => taken(candidate) || this.names.used.has(candidate)
       // `Page_1` and `Page_12` must not collide as `Page_12`
       const separator = /\d$/u.test(base) ? '_' : ''
       name = base
-      for (let i = 2; taken(name) || this.names.used.has(name); i++) {
+      for (let i = 2; unavailable(name); i++) {
         name = `${base}${separator}${i}`
       }
 

@@ -91,6 +91,8 @@ export type ObjectOrArray = { a: string } | string[]
 
 // template literals
 export type Template = `user-${number}`
+/** TypeScript accepts whitespace for `${number}`, since `+' '` is `0` */
+export const whitespaceTemplates: Template[] = ['user- ', 'user-\t']
 export type TemplateMulti = `${'GET' | 'POST'} /${string}`
 export type TemplateBool = `is-${boolean}`
 export type Upper = Uppercase<string>

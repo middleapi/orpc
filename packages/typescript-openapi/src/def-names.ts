@@ -48,7 +48,11 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
  * when the printed type is not usable (`Pick<User, 'id' | 'name'>`).
  */
 export function getViewDefName(types: TypeQueries, type: Type, classSymbol: TSSymbol): string {
-  return toDefName(types.checker.typeToString(type)) ?? `${getSymbolName(classSymbol)}_View`
+  // joined with `-`, which no declared type name has, so a view never takes one
+  return (
+    toDefName(types.checker.typeToString(type))?.replace(/_/gu, '-') ??
+    `${getSymbolName(classSymbol)}-View`
+  )
 }
 
 /**

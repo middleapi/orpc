@@ -75,3 +75,10 @@ export interface ToJSONCases {
   maybe: MaybeJSON
   account: Account
 }
+
+/** A bigint, and a boxed one, which the serializer leaves to `JSON.stringify` */
+export interface BoxedBigInts {
+  n: bigint
+  // oxlint-disable-next-line typescript/no-wrapper-object-types
+  boxed: BigInt
+}

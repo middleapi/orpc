@@ -38,7 +38,9 @@ export class ExpansionGuard {
    * Converts a type inside the instantiations of its declaration,
    * returning `undefined` when the expansion is cut instead.
    */
-  expand<T>(type: Type, convert: () => T): T | undefined {
+  expand<T>(wrapper: Type, convert: () => T): T | undefined {
+    // `Readonly<Expand<T[]>>` expands `Expand`, the library's mapped type only wraps it
+    const type = this.unwrap(wrapper)
     const declaration: number = (type as any).aliasSymbol || (type as any).symbol
 
     if (!declaration) {
@@ -72,6 +74,30 @@ export class ExpansionGuard {
         this.instantiations.delete(declaration)
       }
     }
+  }
+
+  /**
+   * The type a default library mapped type (`Readonly<T>`, `Partial<T>`, `Pick<T, K>`) wraps,
+   * also through several of them.
+   */
+  private unwrap(type: Type): Type {
+    for (let depth = 0; depth < 8; depth++) {
+      const symbol = type.getAliasSymbol() ?? type.getSymbol()
+      const [argument] = this.types.getTypeArguments(type)
+
+      if (
+        !argument ||
+        !((type as any).objectFlags & ObjectFlags.Mapped) ||
+        !symbol ||
+        this.types.getSymbolSourceKind(symbol) !== 'default'
+      ) {
+        return type
+      }
+
+      type = argument
+    }
+
+    return type
   }
 
   /**

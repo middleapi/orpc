@@ -6,11 +6,14 @@ import {
   getBuiltin,
   getBuiltinBaseName,
   getDeclaredBuiltinName,
-  getMappedBuiltinName,
   getToJSON,
+  hasBigIntToJSON,
+  isBoxedBigInt,
   isBuiltinSymbol,
   isModeSensitiveBuiltin,
+  isTypedArray,
 } from './builtins.ts'
+import { ExpansionGuard } from './expansion.ts'
 import type { TypeQueries } from './type-queries.ts'
 import {
   INSTANTIABLE_FLAGS,
@@ -34,6 +37,22 @@ const MAPPED_ACCESSOR_KINDS: ReadonlySet<SyntaxKind> = new Set([
   SyntaxKind.GetAccessor,
   SyntaxKind.SetAccessor,
 ])
+
+/**
+ * A getter, setter, or auto-accessor (`accessor x = 1`, a getter and setter pair on the prototype).
+ */
+function isAccessorDeclaration(declaration: TSSymbol['declarations'][number]): boolean {
+  if (MAPPED_ACCESSOR_KINDS.has(declaration.kind)) {
+    return true
+  }
+
+  return (
+    declaration.kind === SyntaxKind.PropertyDeclaration &&
+    ((declaration.resolve() as any)?.modifiers ?? []).some(
+      (m: any) => m.kind === SyntaxKind.AccessorKeyword,
+    )
+  )
+}
 
 /**
  * The properties JSON serialization writes: no methods, symbol keys, #private fields,
@@ -64,9 +83,7 @@ export function getDataProperties(
         p.flags & SymbolFlags.Transient &&
         p.declarations.length > 0 &&
         p.declarations.every(
-          (d) =>
-            MAPPED_METHOD_KINDS.has(d.kind) ||
-            (isClassInstance && MAPPED_ACCESSOR_KINDS.has(d.kind)),
+          (d) => MAPPED_METHOD_KINDS.has(d.kind) || (isClassInstance && isAccessorDeclaration(d)),
         )
       ) &&
       // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
@@ -86,6 +103,11 @@ export function isDropped(types: TypeQueries, type: Type): boolean {
 export function isNonSerializable(types: TypeQueries, type: Type): boolean {
   if (type.flags & TypeFlags.ESSymbolLike) {
     return true
+  }
+
+  // a function with properties (`(() => void) & { tag: string }`) is still a function
+  if (type.isIntersectionType()) {
+    return types.getMembers(type).some((m) => isNonSerializable(types, m))
   }
 
   if (
@@ -132,7 +154,7 @@ export function getToJSONResultType(
     }
   }
 
-  const toJSON = getToJSON(types, type)
+  const toJSON = getOwnToJSON(types, type)
   const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
 
   // `Partial<Money>` maps the method to an optional property, the instance still has it
@@ -145,11 +167,28 @@ export function getToJSONResultType(
 }
 
 /**
+ * The `toJSON` a value of this type calls: of `C & { toJSON: () => R }`
+ * (`Object.assign(new C(), { toJSON })`), the own one, which shadows the class's method.
+ */
+function getOwnToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
+  if (type.isIntersectionType()) {
+    const owners = types.getMembers(type).filter((m) => getToJSON(types, m) !== undefined)
+    const own = owners.filter((m) => getClassType(types, m) === undefined)
+
+    if (owners.length > 1 && own.length === 1) {
+      return getToJSON(types, own[0]!)
+    }
+  }
+
+  return getToJSON(types, type)
+}
+
+/**
  * Whether the `toJSON` of a type may be missing (`toJSON?(): string`, or `Partial<Money>`),
  * so a value is either what `toJSON` returns or its own fields.
  */
 export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
-  const toJSON = getToJSON(types, type)
+  const toJSON = getOwnToJSON(types, type)
   const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
   return Boolean(
     toJSON &&
@@ -170,15 +209,16 @@ export function getClassType(types: TypeQueries, type: Type): Type | undefined {
   }
 
   // an interface extending a class describes its instances (and, unless the class has private
-  // members, plain objects), not through `Pick<C, K>` or `Partial<C>`
+  // members, plain objects), also through another interface, a view (`Pick<C, K>`),
+  // or an intersection (`C & { x: string }`)
   if (symbol && symbol.flags & SymbolFlags.Interface) {
     const target = type.isTypeReference() ? type.getTarget() : type
-    const classBase = (target.getBaseTypes() ?? []).find(
-      (base) => (base.getSymbol()?.flags ?? 0) & SymbolFlags.Class,
-    )
 
-    if (classBase) {
-      return classBase
+    for (const base of target.getBaseTypes() ?? []) {
+      const classType = getClassType(types, base)
+      if (classType) {
+        return classType
+      }
     }
   }
 
@@ -287,20 +327,11 @@ function createsInterface(types: TypeQueries, type: Type, name: string, depth = 
 /**
  * Whether a type is a view of a class (`Readonly<C>`, `Pick<C, K>`, `C & { ... }`), which may
  * hold an instance or a plain object: not the class itself, and not an interface or intersection
- * over a class with private members, which only instances are assignable to.
+ * keeping the private members of a class, which only instances are assignable to
+ * (`Readonly<C>` and `Pick<C, K>` drop them).
  */
 export function isClassView(types: TypeQueries, type: Type, classType: Type): boolean {
-  if (classType.id === type.id) {
-    return false
-  }
-
-  // an intersection only when it holds the class itself, `Readonly<C>` drops private members
-  const nominalOnly =
-    types.isNominalClass(classType) &&
-    ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Interface ||
-      (type.isIntersectionType() && types.getMembers(type).some((m) => m.id === classType.id)))
-
-  return !nominalOnly
+  return classType.id !== type.id && !types.isNominalClass(type)
 }
 
 /**
@@ -321,11 +352,15 @@ export class ModeSensitivity {
   private readonly onPath = new Map<number, { order: number; sensitive: boolean }>()
   private readonly path: number[] = []
   private order = 0
+  /** Infinitely expanding generics are cut, the converter cuts them too */
+  private readonly expansion: ExpansionGuard
 
   constructor(
     private readonly types: TypeQueries,
     private readonly mode: 'stringify' | 'either',
-  ) {}
+  ) {
+    this.expansion = new ExpansionGuard(types)
+  }
 
   isSensitive(type: Type): boolean {
     return this.visit(type).sensitive
@@ -354,11 +389,14 @@ export class ModeSensitivity {
     this.path.push(type.id)
 
     let low = entry.order
-    entry.sensitive = this.compute(type, (child) => {
-      const result = this.visit(child)
-      low = Math.min(low, result.low)
-      return result.sensitive
-    })
+    entry.sensitive =
+      this.expansion.expand(type, () =>
+        this.compute(type, (child) => {
+          const result = this.visit(child)
+          low = Math.min(low, result.low)
+          return result.sensitive
+        }),
+      ) ?? false
 
     if (low < entry.order) {
       // part of a cycle that started earlier, its first type decides for all of them
@@ -388,8 +426,15 @@ export class ModeSensitivity {
     const types = this.types
     const flags = type.flags
 
+    // `JSON.stringify` throws on a bigint, unless `toJSON` is polyfilled, so the `either` mode
+    // differs only through it
     if (flags & TypeFlags.BigIntLike) {
-      return true
+      return this.mode === 'stringify' || hasBigIntToJSON(types)
+    }
+
+    // the serializer leaves typed arrays, also with added fields, to `JSON.stringify`
+    if (flags & (TypeFlags.Object | TypeFlags.Intersection) && isTypedArray(types, type)) {
+      return false
     }
 
     if (flags & TypeFlags.UnionOrIntersection) {
@@ -438,7 +483,11 @@ export class ModeSensitivity {
       getDeclaredBuiltinName(types, type) !== undefined &&
       (getBuiltin(types, type, false) ?? getBuiltin(types, type, true)) !== undefined
     ) {
-      return isModeSensitiveBuiltin(types, type)
+      // the serializer converts a boxed `BigInt` in the `either` mode already
+      return (
+        isModeSensitiveBuiltin(types, type) &&
+        !(this.mode === 'either' && isBoxedBigInt(types, type))
+      )
     }
 
     const symbol = type.getSymbol()
@@ -480,17 +529,27 @@ export class ModeSensitivity {
       return isClassView(types, type, classType) && this.computeView(type, classType, isSensitive)
     }
 
-    if (getMappedBuiltinName(types, type) !== undefined) {
+    // a view of a built-in (`Pick<Set<string>, 'size'>`), also when it keeps too few members
+    // to tell the built-in by them
+    if (
+      (type as any).objectFlags & ObjectFlags.Mapped &&
+      (getBuiltin(types, type, false) ?? getBuiltin(types, type, true)) !== undefined
+    ) {
       return isModeSensitiveBuiltin(types, type)
     }
 
     const properties = types.getProperties(type)
     const hasToJSON = properties.some((p) => p.name === 'toJSON')
 
-    // the serializer skips `toJSON` of object literals, `JSON.stringify` calls it.
-    // Other objects with `toJSON` are serialized through it either way.
+    // the serializer skips `toJSON` of plain objects, `JSON.stringify` calls it. An object literal
+    // is a plain object, a declared object type (`interface Point { toJSON(): string }`) may be
+    // one, so the serializer writes what `toJSON` returns or its fields, the `either` mode too.
     if (hasToJSON) {
-      return isObjectLiteral(type)
+      return (
+        this.mode === 'stringify' ||
+        isObjectLiteral(type) ||
+        this.computeFields(type, isSensitive, false)
+      )
     }
 
     return this.computeFields(type, isSensitive)
@@ -528,13 +587,13 @@ export class ModeSensitivity {
   }
 
   /**
-   * Whether the fields of a type convert differently, or it has `toJSON`.
+   * Whether the fields of a type convert differently, or (with `toJSON`) it has `toJSON`.
    */
-  private computeFields(type: Type, isSensitive: (type: Type) => boolean): boolean {
+  private computeFields(type: Type, isSensitive: (type: Type) => boolean, toJSON = true): boolean {
     const types = this.types
     const properties = types.getProperties(type)
 
-    if (properties.some((p) => p.name === 'toJSON')) {
+    if (toJSON && properties.some((p) => p.name === 'toJSON')) {
       return true
     }
 

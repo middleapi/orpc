@@ -82,52 +82,67 @@ export class TypeQueries {
   /**
    * The type a mapped type maps over by its own keys, like `T` of `Readonly<T>`, `Partial<T>`,
    * or `Pick<T, K>`, not the argument of `{ [K in 'data']: T }`, whose values are not `T`.
+   * Also through several of them, `Date` of `Partial<Readonly<Date>>`.
    */
   getMappedSource(type: Type): Type | undefined {
     return this.memo('mappedSource', type.id, () => {
+      const source = this.getDirectMappedSource(type)
+      return source && (this.getMappedSource(source) ?? source)
+    })
+  }
+
+  private getDirectMappedSource(type: Type): Type | undefined {
+    return this.memo('directMappedSource', type.id, () => {
       if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
         return undefined
       }
 
-      // `Readonly<C>` by its argument, an alias without arguments (`type View = Omit<C, 'x'>`)
-      // by the declarations its properties keep
-      const source = this.getTypeArguments(type)[0] ?? this.getDeclaringType(type)
-
-      if (!source || !(source.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
-        return undefined
+      // `Readonly<C>` by its argument, an alias of one (`type View = Omit<C, 'x'>`, also
+      // `type PickBox<K> = Pick<Box, K>`) by the type it is declared with
+      const [argument] = this.getTypeArguments(type)
+      if (argument && this.isMappedSourceOf(type, argument)) {
+        return argument
       }
 
-      // the keys are the source's, and each value is the source's (`T[K]`, maybe optional)
-      const sourceProperties = new Map(this.getProperties(source).map((p) => [p.name, p]))
-      const properties = this.getProperties(type)
-      const pairs = properties.map((p) => sourceProperties.get(p.name))
-
-      if (pairs.some((p) => p === undefined)) {
-        return undefined
-      }
-
-      const mappedTypes = properties.length ? this.checker.getTypeOfSymbol([...properties]) : []
-      const sourceTypes = pairs.length ? this.checker.getTypeOfSymbol(pairs as TSSymbol[]) : []
-
-      return mappedTypes.every((t, i) => {
-        const original = sourceTypes[i]
-        return (
-          t !== undefined &&
-          original !== undefined &&
-          (t.id === original.id ||
-            this.checker.getNonNullableType(t)?.id ===
-              this.checker.getNonNullableType(original)?.id)
-        )
-      })
-        ? source
-        : undefined
+      const declaring = type.getAliasSymbol() ? this.getDeclaringType(type) : undefined
+      return declaring && this.isMappedSourceOf(type, declaring) ? declaring : undefined
     })
   }
 
   /**
-   * The source of a mapped type named by an alias without arguments: the first argument
-   * of the utility it is declared with (`type View = Omit<Box<string>, 'x'>`), or else
-   * the class or interface declaring all its properties.
+   * Whether a mapped type keeps the keys and values of a type (`T[K]`, maybe optional).
+   */
+  private isMappedSourceOf(type: Type, source: Type): boolean {
+    if (!(source.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
+      return false
+    }
+
+    const sourceProperties = new Map(this.getProperties(source).map((p) => [p.name, p]))
+    const properties = this.getProperties(type)
+    const pairs = properties.map((p) => sourceProperties.get(p.name))
+
+    if (pairs.some((p) => p === undefined)) {
+      return false
+    }
+
+    const mappedTypes = properties.length ? this.checker.getTypeOfSymbol([...properties]) : []
+    const sourceTypes = pairs.length ? this.checker.getTypeOfSymbol(pairs as TSSymbol[]) : []
+
+    return mappedTypes.every((t, i) => {
+      const original = sourceTypes[i]
+      return (
+        t !== undefined &&
+        original !== undefined &&
+        (t.id === original.id ||
+          this.checker.getNonNullableType(t)?.id === this.checker.getNonNullableType(original)?.id)
+      )
+    })
+  }
+
+  /**
+   * The source of a mapped type named by an alias: the first argument of the utility it is
+   * declared with (`type View = Omit<Box<string>, 'x'>`), or else the class or interface
+   * declaring all its properties.
    */
   private getDeclaringType(type: Type): Type | undefined {
     const declaration = type.getAliasSymbol()?.declarations[0]?.resolve() as any

@@ -36,7 +36,8 @@ describe('typeToJsonSchemaConverter', () => {
     expect(convert('Unknown')).toEqual([{}, true])
     expect(convert('Any')).toEqual([{}, true])
     expect(convert('Never')).toEqual([{ not: {} }, false])
-    expect(convert('Obj')).toEqual([{ type: 'object' }, false])
+    // `object` is also an array, a `Date` (a string), or a function
+    expect(convert('Obj')).toEqual([{}, false])
     expect(convert('Sym')).toEqual([{}, false])
   })
 
@@ -377,6 +378,9 @@ describe('typeToJsonSchemaConverter', () => {
       'user-0x1F',
       'user-0b101',
       'user- 1 ',
+      // `+' '` is `0`
+      'user- ',
+      'user-\t',
     ]) {
       expect(pattern.test(valid)).toBe(true)
     }
@@ -1216,7 +1220,8 @@ describe('typeToJsonSchemaConverter', () => {
                 min: { type: 'number', minimum: 1 },
                 ro: { type: 'string', readOnly: true },
                 list: { type: 'array', items: { type: 'string' } },
-                config: { type: 'object', default: { x: 1 } },
+                // `object` is also an array
+                config: { default: { x: 1 } },
               },
               required: ['b', 'a', 'min', 'ro', 'list'],
             },
@@ -2873,6 +2878,31 @@ describe('typeToJsonSchemaConverter', () => {
 
       expect(toString('NotIter')).toBeUndefined()
       expect(toString('BothUsers')).toBeUndefined()
+    })
+  })
+
+  describe('round twenty-five', () => {
+    it('writes a boxed BigInt through its polyfilled toJSON', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const [schema] = converter.convert(project.getExportType('BoxedBigInts').type) as [
+          any,
+          boolean,
+        ]
+        const bigint = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' }
+
+        expect(schema.$defs.BoxedBigInts.properties).toEqual({
+          n: bigint,
+          // `BigInt` also describes bigints, a boxed one is written by `JSON.stringify`
+          boxed: { anyOf: [bigint, { type: 'string' }] },
+        })
+      } finally {
+        project.close()
+      }
     })
   })
 })

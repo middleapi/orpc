@@ -125,6 +125,16 @@ describe('generated schemas match serialized outputs', async () => {
     ['moreToJSON', undefined],
     ['roundTwentyThree', undefined],
     ['eitherForms', undefined],
+    ['expandingViews', undefined],
+    ['accessors', undefined],
+    ['declaredToJSON', undefined],
+    ['functionsAndToJSON', undefined],
+    ['bigintsAndObjects', undefined],
+    ['builtinViewsTwo', undefined],
+    ['interfaceViews', undefined],
+    ['typedArrayFields', undefined],
+    ['alphaViews', undefined],
+    ['alphaDeclared', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -306,9 +316,16 @@ describe('generated schemas match serialized outputs', async () => {
       },
       required: ['tags', 'name', 'extra'],
     })
-    // `private` allows only instances, and a mapped base drops `#private`
+    // `private` allows only instances, and a mapped base drops `#private`, so an interface
+    // extending it is a view of the class, holding an instance (with `toJSON`) or a plain object
     expect(schemas.ExtendsTsPrivate.properties.tags).toEqual({ type: 'object' })
-    expect(schemas.ExtendsPickedPrivate.properties.tags).toEqual(setArray)
+    expect(schemas.ExtendsPickedPrivate).toEqual({
+      anyOf: [
+        { type: 'string' },
+        { type: 'object', properties: { tags: eitherSet }, required: ['tags'] },
+      ],
+      description: 'Mapped views drop `#private` members, so plain objects are assignable',
+    })
     // keys of a class with values of their own are a plain object
     expect(schemas.Flags_TaggedView.properties.tags).toEqual(setArray)
 
@@ -412,6 +429,232 @@ describe('generated schemas match serialized outputs', async () => {
     expect(plain.properties.big).toMatchObject({ 'x-native-type': 'bigint' })
   })
 
+  it('cuts generics expanding through views, and leaves auto-accessors out of instances', () => {
+    const schemas = spec.components?.schemas as any
+    const { properties } = (spec.paths as any)['/expandingViews'].post.responses['200'].content[
+      'application/json'
+    ].schema
+
+    // `Readonly<Growing<T[]>>` expands `Growing`, cut to `{}` after a few levels
+    const third = (schema: any) =>
+      schema.properties.next.anyOf[0].properties.next.anyOf[0].properties.next
+    expect(third(properties.frozen)).toEqual({ anyOf: [{}, { type: 'null' }] })
+    expect(third(schemas.Growing_string)).toEqual({ anyOf: [{}, { type: 'null' }] })
+    expect(third(schemas.GrowingShape_string)).toEqual({ anyOf: [{}, { type: 'null' }] })
+
+    // `accessor x` is a getter and setter on the prototype, which an instance does not write
+    const accessors = (spec.paths as any)['/accessors'].post.responses['200'].content[
+      'application/json'
+    ].schema.properties
+    const xy = {
+      type: 'object',
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      required: ['y'],
+    }
+    expect(accessors.frozen).toEqual(xy)
+    expect(accessors.picked).toEqual(xy)
+    expect(schemas.AccessorModel.properties).toEqual({ y: { type: 'number' } })
+    expect(schemas.HoldsAccessor.properties.v.required).toEqual(['y'])
+  })
+
+  it('writes declared object types with toJSON by it or by their fields', () => {
+    const schemas = spec.components?.schemas as any
+    const response = (spec.paths as any)['/declaredToJSON'].post.responses['200'].content[
+      'application/json'
+    ].schema
+    const { properties } = response
+    const a = { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] }
+    const point = { anyOf: [{ type: 'string' }, a] }
+
+    // the serializer walks a plain object skipping `toJSON`, `JSON.stringify` calls it
+    expect(schemas.PointJSON).toEqual(point)
+    expect(schemas.PointAlias).toEqual({
+      anyOf: [
+        { type: 'string' },
+        { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+      ],
+    })
+    expect(properties.inline).toEqual(point)
+    expect(schemas['Readonly-HoldsPointJSON'].properties.inner).toEqual({
+      $ref: '#/components/schemas/PointJSON',
+    })
+    // a `toJSON` returning only `undefined` adds no branch, its key may be missing
+    expect(schemas['Readonly-HoldsDroppingShape']).toEqual({
+      type: 'object',
+      properties: { d: { $ref: '#/components/schemas/DroppingShape' } },
+    })
+    expect(properties.picked).toEqual(a)
+    expect(properties.pickedList.items).toEqual({ anyOf: [a, { type: 'null' }] })
+    expect(schemas.HoldsPickedDrops).toEqual({ type: 'object', properties: { p: a } })
+    expect(properties.frozenDrops).toEqual(a)
+    expect(response.required).not.toContain('picked')
+    expect(response.required).not.toContain('frozenDrops')
+  })
+
+  it('drops functions with properties, and reads the toJSON an intersection adds', () => {
+    const schemas = spec.components?.schemas as any
+    const { properties } = (spec.paths as any)['/functionsAndToJSON'].post.responses['200'].content[
+      'application/json'
+    ].schema
+
+    expect(Object.keys(properties)).not.toContain('cb')
+    expect(schemas.HoldsTaggedFunction.properties).toEqual({
+      count: { type: 'number' },
+      name: { type: 'string' },
+    })
+    expect(properties.list.items).toEqual({ type: 'null' })
+    expect(properties.callables.items).toEqual({ type: 'null' })
+    // an own `toJSON` shadows the class's, whatever the order of the intersection
+    expect(properties.cents).toEqual({ type: 'number' })
+    expect(properties.swapped).toEqual({ type: 'number' })
+    expect(properties.kind).toEqual({
+      anyOf: [
+        { type: 'number' },
+        { type: 'object', properties: { x: { type: 'number' } }, required: ['x'] },
+      ],
+    })
+  })
+
+  it('names a model with bigints once, and describes object, and boxed toJSON results', () => {
+    const schemas = spec.components?.schemas as any
+    const { properties } = (spec.paths as any)['/bigintsAndObjects'].post.responses['200'].content[
+      'application/json'
+    ].schema
+
+    // without a polyfilled `toJSON`, only the serializer writes a bigint, so a view adds no form
+    expect(Object.keys(schemas)).not.toContain('HasBigintAny')
+    expect(schemas['Readonly-HoldsHasBigint'].properties.h).toEqual({
+      $ref: '#/components/schemas/HasBigint',
+    })
+    // `object` is also an array, a `Date`, or a `Map`
+    expect(properties.list).toEqual({})
+    expect(properties.date).toEqual({})
+    expect(properties.map).toEqual({})
+    expect(properties.boxed.properties).toEqual({
+      s: { type: 'string' },
+      n: { type: 'number' },
+      b: { type: 'boolean' },
+    })
+  })
+
+  it('describes chained views of built-ins and intersections with them in both forms', () => {
+    const schemas = spec.components?.schemas as any
+    const { properties } = (spec.paths as any)['/builtinViewsTwo'].post.responses['200'].content[
+      'application/json'
+    ].schema
+    const uri = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }
+    const dateTime = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+    const href = expect.objectContaining({ type: 'string' })
+
+    expect(properties.partialFrozenDate).toEqual({ anyOf: [dateTime, { type: 'object' }] })
+    expect(properties.frozenPickedURL).toEqual({
+      anyOf: [uri, { type: 'object', properties: { href }, required: ['href'] }],
+    })
+    expect(properties.partialFrozenBytes).toEqual({
+      type: 'object',
+      additionalProperties: { type: 'number' },
+    })
+    // a plain object of a chained view of an array subclass holds its fields
+    expect(schemas['Partial-Readonly-GammaRows'].anyOf[1]).toMatchObject({
+      type: 'object',
+      properties: { label: { type: 'string' } },
+      additionalProperties: { $ref: '#/components/schemas/Gamma' },
+    })
+    // `JSON.stringify` writes a `Set` and a `Map` as `{}`, also through a view
+    expect(schemas.HoldsBuiltinViews.properties.set).toEqual({ type: 'object' })
+    expect(schemas.HoldsBuiltinViews.properties.map).toEqual({ type: 'object' })
+    // an intersection with a view of a built-in may be a plain object of all its fields
+    const urlWithX = {
+      anyOf: [
+        uri,
+        { type: 'object', properties: { href, x: { type: 'number' } }, required: ['href', 'x'] },
+      ],
+    }
+    expect(properties.url).toEqual(urlWithX)
+    expect(schemas.HoldsBuiltinViews.properties.url).toEqual(urlWithX)
+    expect(properties.date).toEqual({
+      anyOf: [dateTime, { type: 'object', properties: { at: dateTime }, required: ['at'] }],
+    })
+    expect(properties.set.anyOf[1]).toEqual({
+      type: 'object',
+      properties: { size: { type: 'number' }, at: dateTime },
+      required: ['at'],
+    })
+    expect(properties.rows.anyOf[1]).toMatchObject({
+      properties: { label: { type: 'string' }, x: { type: 'string' } },
+      required: ['x'],
+    })
+    // under `JSON.stringify`, a view of a date subclass is the date or a plain object
+    const stamped = {
+      anyOf: [
+        dateTime,
+        { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+      ],
+    }
+    expect(schemas.HoldsStampedView.properties.v).toEqual(stamped)
+    expect(schemas.HoldsStampedView.properties.list.items).toEqual(stamped)
+  })
+
+  it('reads interfaces over views and other interfaces as views of the class', () => {
+    const schemas = spec.components?.schemas as any
+
+    for (const name of [
+      'ExtendsTagger',
+      'ExtendsExtendsTagger',
+      'ExtendsFrozenTagger',
+      'ExtendsPickedTagger',
+      'ExtendsTaggerWithX',
+      'PickTagger',
+      'PickTagger_tags',
+    ]) {
+      expect(schemas[name].properties.tags).toEqual(eitherSet)
+    }
+    expect(schemas.ExtendsTaggerWithX.properties.y).toEqual(eitherSet)
+    // a plain object without `toJSON` is written by its fields
+    for (const name of ['ExtendsFrozenTaggerJSON', 'ExtendsExtendsTaggerJSON']) {
+      expect(schemas[name].anyOf[0]).toEqual({
+        type: 'object',
+        properties: { j: { type: 'number' } },
+        required: ['j'],
+      })
+      expect(schemas[name].anyOf[1].properties.tags).toEqual(eitherSet)
+    }
+  })
+
+  it('writes fields added to typed arrays under JSON.stringify, also behind a view', () => {
+    const schemas = spec.components?.schemas as any
+    const { properties } = (spec.paths as any)['/typedArrayFields'].post.responses['200'].content[
+      'application/json'
+    ].schema
+    const labeled = {
+      type: 'object',
+      properties: { label: { type: 'string' } },
+      additionalProperties: { type: 'number' },
+    }
+
+    expect(schemas.BytesWithTags).toEqual({
+      type: 'object',
+      properties: { tags: { type: 'object' } },
+      additionalProperties: { type: 'number' },
+    })
+    expect(schemas.BytesWithLabel).toEqual(labeled)
+    expect(properties.frozen).toEqual(labeled)
+  })
+
+  it('keeps the names of declared types apart from the names of views', () => {
+    const schemas = spec.components?.schemas as any
+
+    expect(schemas.Readonly_AlphaModel.properties).toEqual({ declared: { type: 'string' } })
+    expect(schemas.AlphaModel_View.properties).toEqual({ declared: { type: 'number' } })
+    expect(
+      (spec.paths as any)['/alphaViews'].post.responses['200'].content['application/json'].schema
+        .properties,
+    ).toEqual({
+      frozen: { $ref: '#/components/schemas/Readonly-AlphaModel' },
+      assigned: { $ref: '#/components/schemas/AlphaModel-View' },
+    })
+  })
+
   it('writes each view of a chain of views once', () => {
     const schemas = spec.components?.schemas as any
     // a view reaching other views is written once, as a component
@@ -419,9 +662,9 @@ describe('generated schemas match serialized outputs', async () => {
       Object.keys(schemas)
         .filter((name) => name.includes('Chain'))
         .toSorted(),
-    ).toEqual(['Readonly_ChainA', 'Readonly_ChainB', 'Readonly_ChainC'])
-    expect(schemas.Readonly_ChainA.properties.tags).toEqual(eitherSet)
-    expect(JSON.stringify(schemas.Readonly_ChainA).length).toBeLessThan(1000)
+    ).toEqual(['Readonly-ChainA', 'Readonly-ChainB', 'Readonly-ChainC'])
+    expect(schemas['Readonly-ChainA'].properties.tags).toEqual(eitherSet)
+    expect(JSON.stringify(schemas['Readonly-ChainA']).length).toBeLessThan(1000)
   })
 
   it('describes class instances with JSON.stringify semantics', () => {
@@ -522,6 +765,12 @@ describe('generated schemas match serialized outputs', async () => {
     expect(Object.keys(other.components?.schemas ?? {}).toSorted()).toEqual(
       Object.keys(spec.components?.schemas ?? {}).toSorted(),
     )
+    // a declared type keeps its name, whether a view of the same name comes first or not
+    for (const name of ['Readonly_AlphaModel', 'AlphaModel_View', 'Readonly-AlphaModel']) {
+      expect((other.components?.schemas as any)[name]).toEqual(
+        (spec.components?.schemas as any)[name],
+      )
+    }
   })
 
   it('generates quickly', () => {

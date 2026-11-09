@@ -1,6 +1,7 @@
-import { OpenAPIGeneratorError } from '@orpc/openapi'
+import { OpenAPIGeneratorError, OpenAPIJsonSerializer } from '@orpc/openapi'
 import { Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
+import { Ajv2020 } from 'ajv/dist/2020.js'
 
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken.ts'
 import { contract, implemented } from '../tests/fixtures/app/src/contract.ts'
@@ -10,6 +11,7 @@ import { decomposed, optional, records, spread } from '../tests/fixtures/app/src
 import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
 import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
 import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
+import { viewInputs } from '../tests/fixtures/app/src/round25.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -769,6 +771,57 @@ describe('typeScriptOpenAPIGenerator', () => {
       await expect(
         generator.generate({ proc: errorData }, { source: { file: fixture('round11-broken.ts') } }),
       ).rejects.toThrow('Procedure at proc: Could not resolve its type "Missing"')
+    })
+  })
+
+  describe('round twenty-five', () => {
+    it('documents inputs of views of built-ins as the built-in or a plain object', async () => {
+      const spec = await generator.generate(viewInputs, {
+        source: { file: fixture('round25.ts'), export: 'viewInputs' },
+      })
+      const body = (path: string) =>
+        (spec.paths as any)[path].post.requestBody.content['application/json'].schema
+      const uri = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }
+      const href = expect.objectContaining({ type: 'string' })
+
+      expect(body('/partialDate')).toEqual({
+        anyOf: [
+          { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+          { type: 'object' },
+        ],
+      })
+      expect(body('/pickedURL')).toEqual({
+        anyOf: [uri, { type: 'object', properties: { href }, required: ['href'] }],
+      })
+      expect(body('/pickedURLWithX')).toEqual({
+        anyOf: [
+          uri,
+          { type: 'object', properties: { href, x: { type: 'number' } }, required: ['href', 'x'] },
+        ],
+      })
+      // a request is plain JSON, the fields of a view of an array subclass
+      expect(body('/partialRowsWithX')).toMatchObject({
+        type: 'object',
+        properties: { label: { type: 'string' }, x: { type: 'string' } },
+        required: ['x'],
+      })
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      for (const [path, value] of [
+        ['/partialDate', new Date(0)],
+        ['/partialDate', {}],
+        ['/pickedURL', new URL('http://x/')],
+        ['/pickedURL', { href: 'http://x/' }],
+        ['/pickedURLWithX', Object.assign(new URL('http://x/'), { x: 1 })],
+        ['/pickedURLWithX', { href: 'h', x: 1 }],
+        ['/partialRowsWithX', { label: 'a', x: 'x' }],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : validate.errors).toEqual([])
+      }
     })
   })
 })

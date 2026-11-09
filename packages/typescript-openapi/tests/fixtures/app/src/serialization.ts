@@ -2,6 +2,8 @@ import { os, type } from '@orpc/server'
 import type { FixedLengthArray, Jsonifiable, Tagged } from 'type-fest'
 import * as z from 'zod'
 
+import { roundTwentyFive } from './round25'
+
 export interface Author {
   id: string
   joinedAt: Date
@@ -1012,4 +1014,5 @@ export const router = {
       holder: { tags: new Set(['t']), at: new Date(0) },
     }),
   ),
+  ...roundTwentyFive,
 }

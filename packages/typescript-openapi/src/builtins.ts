@@ -166,6 +166,12 @@ export function isTypedArray(types: TypeQueries, type: Type): boolean {
   }
 
   const source = (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(type) : type
+
+  // `Readonly<Uint8Array & { label: string }>`
+  if (source !== type && source?.isIntersectionType()) {
+    return isTypedArray(types, source)
+  }
+
   const symbol = source?.getSymbol()
 
   if (!symbol) {
@@ -199,7 +205,8 @@ export function getDeclaredBuiltinName(types: TypeQueries, type: Type): string |
 
 /**
  * How `JSON.stringify` writes a built-in by its own fields, as it writes what `toJSON` returned:
- * typed arrays by their index keys, other built-ins have no own enumerable data.
+ * typed arrays by their index keys, boxed primitives as primitives, other built-ins have no own
+ * enumerable data.
  * Also through a mapped type, like `Readonly<Uint8Array>` or `Readonly<Date>`.
  */
 export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | undefined {
@@ -208,7 +215,13 @@ export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | u
   }
 
   const builtin = getDeclaredBuiltinName(types, type) ?? getMappedBuiltinName(types, type)
-  return builtin === undefined ? undefined : { type: 'object' }
+
+  if (builtin === undefined) {
+    return undefined
+  }
+
+  // boxed primitives are written as their primitive (`new String('x')` as `"x"`)
+  return BOXED_PRIMITIVES[builtin]?.(true) ?? { type: 'object' }
 }
 
 /**
@@ -224,7 +237,10 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
     ? types.getMembers(viewed).find((m) => getDeclaredBuiltinName(types, m) !== undefined)
     : viewed
   const viewedBuiltin =
-    viewedMember && getDeclaredBuiltinName(types, viewedMember) !== undefined
+    viewedMember &&
+    getDeclaredBuiltinName(types, viewedMember) !== undefined &&
+    // a typed array is written by its own keys, also the ones an intersection adds
+    !(viewedMember !== viewed && isTypedArray(types, viewedMember))
       ? getBuiltin(types, viewedMember, stringify)
       : undefined
   if (viewedBuiltin !== undefined) {
@@ -373,6 +389,28 @@ export function isBuiltinSymbol(types: TypeQueries, symbol: TSSymbol, isError = 
   return isError
     ? symbol.declarations.length > 0 && symbol.declarations.every(isRuntime)
     : symbol.declarations.some(isRuntime)
+}
+
+/**
+ * The boxed `BigInt` (also describing bigints, `const n: BigInt = 1n`), which the serializer
+ * leaves to `JSON.stringify` when boxed.
+ */
+export function isBoxedBigInt(types: TypeQueries, type: Type): boolean {
+  const symbol = type.getSymbol()
+  return (
+    symbol?.name === 'BigInt' &&
+    Boolean(symbol.flags & SymbolFlags.Interface) &&
+    types.getSymbolSourceKind(symbol) === 'default'
+  )
+}
+
+/**
+ * Whether `JSON.stringify` can write a bigint: `BigInt.prototype.toJSON` is polyfilled
+ * (`declare global { interface BigInt { toJSON(): string } }`).
+ */
+export function hasBigIntToJSON(types: TypeQueries): boolean {
+  const bigint = types.getGlobalType('BigInt')
+  return bigint !== undefined && getToJSON(types, bigint) !== undefined
 }
 
 export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
