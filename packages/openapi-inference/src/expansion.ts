@@ -214,7 +214,8 @@ export class ExpansionGuard {
   /**
    * Whether a type holds what an outer one holds, or what it grows to (see `getRepeatedGrowth`):
    * the same type, one containing it, the same members, type arguments, or keys, with the values
-   * at them, `depth` objects in.
+   * at them, `depth` objects in. Objects without keys hold nothing that could grow: a deep mapped
+   * type maps a function (a method of `Map<string, Model<T[]>>`) to a new `{}` for each model.
    */
   private holdsAgain(outer: Type, inner: Type, depth: number): boolean {
     if (outer.id === inner.id) {
@@ -257,11 +258,11 @@ export class ExpansionGuard {
     }
 
     const keys = this.getKeys(outer)
-    if (keys === undefined || keys !== this.getKeys(inner)) {
+    if (keys !== this.getKeys(inner)) {
       return false
     }
 
-    if (depth === 0) {
+    if (depth === 0 || keys === undefined) {
       return true
     }
 

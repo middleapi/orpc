@@ -897,6 +897,10 @@ describe('openAPIGenerator', () => {
           x3: 'os.handler((): CD<Der3<number>> => ({}) as any)',
           x3i: 'os.input(type<CD<Der3<number>>>()).handler(() => 1)',
           x4: 'os.handler((): CD<Der4<number>> => ({}) as any)',
+          mapped: 'os.handler((): CD<MapDer<number>> => ({}) as any)',
+          mappedInput: 'os.input(type<CD<MapDer<number>>>()).handler(() => 1)',
+          mappedClass: 'os.handler((): CD<MapDerClass<number>> => ({}) as any)',
+          method: 'os.handler((): CD<MethodDer<number>> => ({}) as any)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -927,6 +931,12 @@ describe('openAPIGenerator', () => {
             'type I<T> = BoxVia<T> & { x: T }',
             'interface Der3<T> extends BoxVia<I<Der3<T[]>>> { v: T }',
             'interface Der4<T> extends Base<Der4<T[]>> { v: T; w: BoxVia<T> }',
+            'interface MapBase<T> { a: Map<string, Box<T>>; b: Box<T>[]; c: BoxVia<T> }',
+            'interface MapDer<T> extends MapBase<MapDer<T[]>> { v: T }',
+            'class MapBaseClass<T> { a!: Map<string, Box<T>>; b!: Box<T>[]; c!: BoxVia<T> }',
+            'class MapDerClass<T> extends MapBaseClass<MapDerClass<T[]>> { v!: T }',
+            'interface MethodBase<T> { f: () => Box<T>; b: Box<T>[]; c: BoxVia<T> }',
+            'interface MethodDer<T> extends MethodBase<MethodDer<T[]>> { v: T }',
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',
