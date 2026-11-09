@@ -625,6 +625,28 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
+    it('keeps a component as written when a value the converter returned is changed in place', () => {
+      const { doc, registry } = createRegistry()
+      const shared: any = { type: 'string', enum: ['a', 'b'] }
+      const hoist = (kind: any) =>
+        registry.hoistDefs({ $ref: '#/$defs/Kind', $defs: { Kind: kind } })
+
+      expect(hoist(shared)).toEqual({ $ref: '#/components/schemas/Kind' })
+      expect(hoist(shared)).toEqual({ $ref: '#/components/schemas/Kind' })
+
+      shared.enum.push('c')
+      expect(hoist({ type: 'string', enum: ['a', 'b'] })).toEqual({
+        $ref: '#/components/schemas/Kind',
+      })
+      expect(hoist({ type: 'string', enum: ['a', 'b', 'c'] })).toEqual({
+        $ref: '#/components/schemas/Kind2',
+      })
+      expect(doc.components?.schemas).toEqual({
+        Kind: { type: 'string', enum: ['a', 'b'] },
+        Kind2: { type: 'string', enum: ['a', 'b', 'c'] },
+      })
+    })
+
     it('checks a def again when it holds values compared by identity', () => {
       const { doc, registry } = createRegistry()
       const hoist = (value: unknown) =>

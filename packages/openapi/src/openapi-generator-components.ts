@@ -7,7 +7,14 @@ import {
   mapJsonSchemaRefs,
   visitJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { getOwn, isDeepEqual, isPlainObject, isPlainObjectOrArray, setOwn } from '@orpc/shared'
+import {
+  clone,
+  getOwn,
+  isDeepEqual,
+  isPlainObject,
+  isPlainObjectOrArray,
+  setOwn,
+} from '@orpc/shared'
 
 import type { OpenAPIV3_2 } from './types'
 
@@ -40,7 +47,8 @@ export class OpenAPIComponentRegistry {
   /**
    * Reuse checks already made, by the def, the content of the def schemas it reaches, and the
    * component. A component is never rewritten once written, so a check made again gives the same
-   * result. Keyed by content, not by object, since a converter may change a schema it returned.
+   * result. Keyed by content, not by object, since a converter may change a schema it returned;
+   * components are written as copies for the same reason.
    */
   private readonly reuseResults = new Map<string, boolean>()
   /** An id for each def schema content, so the keys stay short */
@@ -138,7 +146,12 @@ export class OpenAPIComponentRegistry {
     }
 
     for (const { cleanSchema, componentName } of pendingSchemas) {
-      setOwn(componentsSchemas, componentName, rewriteComponentSchemaRefs(cleanSchema, renameMap))
+      // a copy, so a converter changing a value it returned (an `enum` array) leaves the component as written
+      setOwn(
+        componentsSchemas,
+        componentName,
+        clone(rewriteComponentSchemaRefs(cleanSchema, renameMap)),
+      )
     }
 
     return rewriteComponentSchemaRefs(rest, renameMap)
