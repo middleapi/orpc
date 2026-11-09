@@ -1,6 +1,6 @@
 ---
 title: 'OpenAPI Specification'
-description: 'Learn how to configure openapi metadata and generate OpenAPI 3.2, 3.1, or 3.0 documents from your oRPC contracts and routers with OpenAPIGenerator.'
+description: 'Learn how to configure openapi metadata and generate OpenAPI 3.2, 3.1, or 3.0 documents from your oRPC contracts and routers, from schemas or TypeScript types.'
 ---
 
 ## Metadata
@@ -287,3 +287,92 @@ const spec = await generator.generate(router, {
   errorResponseContentType: 'application/problem+json',
 })
 ```
+
+## Type Inference
+
+`TypeScriptOpenAPIGenerator` works like `OpenAPIGenerator`, but infers the schemas your converters cannot handle from your TypeScript types, so procedures without `.output` and inputs defined with [`type`](/docs/procedure#type-utility) are documented too.
+
+:::warning
+This package is experimental. It runs the TypeScript 7 compiler on your source files, so they must be present where it runs. Generate the document once, at build time or on first request, and reuse it.
+:::
+
+```package-install
+npm install @orpc/experimental-openapi-inference@beta
+```
+
+```ts
+import { TypeScriptOpenAPIGenerator } from '@orpc/experimental-openapi-inference'
+
+const generator = new TypeScriptOpenAPIGenerator({
+  converters: [new ZodToJsonSchemaConverter()],
+})
+
+const spec = await generator.generate(router, {
+  source: { file: './src/router.ts', export: 'router' },
+  version: '3.1.1',
+})
+```
+
+`source` points to the router's type:
+
+- `file`: the file exporting the router, relative to the working directory, or a `file:` URL.
+- `export`: the export name, `router` by default (`default` for a default export). It can be a value, a type (`typeof router`), or a [contract](/docs/contract/router).
+- `tsconfig`: the `tsconfig.json` to use, by default the nearest one that includes `file`. Its `paths` resolve aliases like `@/`.
+
+Every other option works as in `OpenAPIGenerator`.
+
+### How Types Are Documented
+
+Inferred schemas come from the input type for inputs, the output type for outputs and error `data`, and the handler's return type when there is no `.output`. Handlers returning async iterators are documented as [event streams](/docs/async-iterator-object). Contract procedures take their types from the contract, so add `.output` there.
+
+Outputs are documented in their [serialized](/docs/openapi/serializer) form: `Date`, `bigint`, `Set`, and `Map` as the serializer writes them, classes with `toJSON` as what it returns, and functions left out. Interfaces with `toJSON` may also be plain objects, so both forms are documented.
+
+Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}` and `bigint` fields cannot be sent. Views of a class, like `Readonly<User>`, can be an instance or a plain object, so both forms are documented.
+
+Types declared in your project become components named after them, like `User` or `Page_User` for `Page<User>`. Pass `defs: 'recursive'` to the constructor to make components only for recursive types.
+
+### JSDoc
+
+On a procedure, the comment's first line becomes the `summary`, the rest the `description`, and `@deprecated` and `@tags a, b` set those fields. On a property or type, the comment becomes the `description`, and tags like `@format`, `@minimum`, `@pattern`, `@default`, `@example`, and `@type integer` set the matching keyword:
+
+```ts
+interface User {
+  /**
+   * Age in years
+   * @type integer
+   * @minimum 0
+   */
+  age: number
+
+  /** @format email */
+  email: string
+}
+```
+
+### Converting Types Directly
+
+`openTypeScriptProject` and `TypeToJsonSchemaConverter` convert any exported type:
+
+```ts
+import {
+  openTypeScriptProject,
+  TypeToJsonSchemaConverter,
+} from '@orpc/experimental-openapi-inference'
+
+const project = openTypeScriptProject({ file: './src/models.ts' })
+
+try {
+  const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+  const [jsonSchema, optional] = converter.convert(project.getExportType('User').type)
+} finally {
+  project.close()
+}
+```
+
+### Limitations
+
+- Types carry no validation rules. Add them with [JSDoc tags](#jsdoc) or keep a converter schema.
+- Class types in inputs are documented as the plain objects a client sends.
+- A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
+- Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
+- Generation throws on types the compiler cannot resolve, like an import with a missing path alias.

@@ -135,7 +135,7 @@ const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFl
  *
  * Named types are emitted as `$defs`. Conversions share a cache, so reuse one converter per program.
  *
- * @see {@link https://orpc.dev/docs/openapi/type-inference#converting-types-directly | OpenAPI Type Inference - Converting Types Directly}
+ * @see {@link https://orpc.dev/docs/openapi/specification#converting-types-directly | OpenAPI Specification - Converting Types Directly}
  */
 export class TypeToJsonSchemaConverter {
   private readonly defsMode: 'named' | 'recursive'

@@ -115,7 +115,7 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  * Generation runs the TypeScript 7 compiler on the source files, so it needs them at runtime.
  * Generate once (at build time or on first request) and reuse the document.
  *
- * @see {@link https://orpc.dev/docs/openapi/type-inference | OpenAPI Type Inference}
+ * @see {@link https://orpc.dev/docs/openapi/specification#type-inference | OpenAPI Specification - Type Inference}
  */
 export class TypeScriptOpenAPIGenerator {
   private readonly converters: JsonSchemaConverter[]
