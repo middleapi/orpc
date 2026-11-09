@@ -278,15 +278,20 @@ export class TypeQueries {
         [...owners.values()].map((o) => [o, new Set(this.getProperties(o).map((p) => p.name))]),
       )
 
-      // the most derived of the owners holding the same properties, a brand narrowing members of a
-      // primitive (`string & { length: 8 }`) derives from none
+      // the most derived of the owners holding the same properties. A brand narrowing members
+      // of a primitive (`string & { length: 8 }`) or of a class (`User & { id: 'fixed' }`) is
+      // derived from neither.
       return [...keys].flatMap(([owner, names], i, all) =>
         all.some(
           ([other, otherNames], j) =>
             other !== owner &&
             !this.isPrimitiveInterface(other) &&
             [...names].every((name) => otherNames.has(name)) &&
-            (otherNames.size > names.size || j < i),
+            (otherNames.size > names.size || j < i) &&
+            !(
+              (owner.getSymbol()?.flags ?? 0) & SymbolFlags.TypeLiteral &&
+              !this.checker.isTypeAssignableTo(other, owner)
+            ),
         )
           ? []
           : [owner],

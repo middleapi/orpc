@@ -213,6 +213,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['deepOrViews', undefined],
     ['mutableDate', undefined],
     ['bigintArrays', undefined],
+    ['maybeToJSON', undefined],
+    ['restTupleViews', undefined],
+    ['narrowedClass', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1447,7 +1450,8 @@ describe('generated schemas match serialized outputs', async () => {
           minItems: 1,
           maxItems: 2,
         },
-        partial: { type: 'array', items: {} },
+        // the number index holds the items
+        partial: { type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'null' }] } },
       })
     })
 
@@ -1474,6 +1478,55 @@ describe('generated schemas match serialized outputs', async () => {
       const never = { type: 'object', additionalProperties: { not: {} } }
 
       expect(schemaOf('bigintArrays').properties).toEqual({ signed: never, unsigned: never })
+    })
+  })
+
+  describe('round thirty', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const word = { type: 'object', properties: { w: { type: 'string' } }, required: ['w'] }
+
+    it('writes an object whose toJSON may not be a function by toJSON or by its fields', () => {
+      expect(schemas().StringOrToJSONJson.anyOf).toEqual([
+        word,
+        {
+          type: 'object',
+          properties: { a: { type: 'number' }, toJSON: { type: 'string' } },
+          required: ['a'],
+        },
+      ])
+      expect(schemas().NumberOrToJSONJson.anyOf[1].properties.toJSON).toEqual({ type: 'number' })
+      // a view of the method may still hold it, which is called
+      expect(schemas().OrFrozen_WithWordJson.anyOf).toBeUndefined()
+    })
+
+    it('writes views of rest tuples intersected with an object by their leading elements and items', () => {
+      expect(schemaOf('restTupleViews').properties).toEqual({
+        frozen: {
+          type: 'array',
+          prefixItems: [{ type: 'number' }],
+          items: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+          minItems: 1,
+        },
+        partial: {
+          type: 'array',
+          prefixItems: [{ anyOf: [{ type: 'number' }, { type: 'null' }] }],
+          items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] },
+        },
+      })
+    })
+
+    it('reads views of a class intersected with a literal narrowing its member as views of the class', () => {
+      const { properties } = schemaOf('narrowedClass')
+
+      for (const view of [properties.deep, properties.simple]) {
+        expect(view.properties.id).toEqual({ type: 'string', const: 'fixed' })
+        expect(view.properties.tags.anyOf).toEqual([
+          expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+          { type: 'object' },
+        ])
+      }
     })
   })
 

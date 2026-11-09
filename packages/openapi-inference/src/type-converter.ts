@@ -1009,7 +1009,7 @@ export class TypeToJsonSchemaConverter {
       dataProperties = dataProperties.filter((p) => !isBuiltinMember(this.types, p))
     } else if (!((plain || eitherView) && this.isViewOfArraySubclass(type))) {
       // (a plain object of `Partial<class Rows extends Array>` holds the fields, not items)
-      const arrayLike = this.convertArrayLikeObject(properties)
+      const arrayLike = this.convertArrayLikeObject(type, properties)
       if (arrayLike !== undefined) {
         return arrayLike
       }
@@ -1287,7 +1287,10 @@ export class TypeToJsonSchemaConverter {
    * An object type derived from an array or tuple, like type-fest's `FixedLengthArray<T, 3>`
    * (a tuple without its length mutating methods), whose values are still arrays.
    */
-  private convertArrayLikeObject(properties: readonly TSSymbol[]): JsonSchema | undefined {
+  private convertArrayLikeObject(
+    type: Type,
+    properties: readonly TSSymbol[],
+  ): JsonSchema | undefined {
     const length = properties.find((p) => p.name === 'length')
     const slice = properties.find((p) => p.name === 'slice')
 
@@ -1324,6 +1327,26 @@ export class TypeToJsonSchemaConverter {
         prefixItems: elementTypes.map((t) => this.visitElement(t)),
         minItems: Math.min(...fixed),
         maxItems: Math.max(...fixed),
+      }
+    }
+
+    // the number index of an array or a rest tuple (`Readonly<[number, ...string[]] & { x }>`)
+    // holds every item, after the leading elements of a tuple
+    const index = this.checker
+      .getIndexInfosOfType(type)
+      .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+
+    if (index) {
+      const leading = ordered === elements ? ordered : []
+      const minItems = leading.filter((p) => !(p.flags & SymbolFlags.Optional)).length
+
+      return {
+        type: 'array',
+        ...(leading.length
+          ? { prefixItems: elementTypes.slice(0, leading.length).map((t) => this.visitElement(t)) }
+          : {}),
+        items: this.visitElement(index),
+        ...(minItems ? { minItems } : {}),
       }
     }
 

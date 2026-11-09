@@ -334,8 +334,10 @@ function getOwnToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
 }
 
 /**
- * Whether the `toJSON` of a type may be missing (`toJSON?(): string`, or `Partial<Money>`),
- * so a value is either what `toJSON` returns or its own fields.
+ * Whether the `toJSON` of a type may be missing (`toJSON?(): string`, or `Partial<Money>`), or
+ * may be a value `JSON.stringify` does not call (`toJSON: string | (() => R)`), so a value is
+ * either what `toJSON` returns or its own fields. A view of the method
+ * (`(() => R) | Readonly<() => R>`) may still hold it, and is called.
  */
 export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
   const toJSON = getOwnToJSON(types, type)
@@ -343,7 +345,15 @@ export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
   return Boolean(
     toJSON &&
     (toJSON.flags & SymbolFlags.Optional ||
-      (method?.isUnionType() && types.getMembers(method).some((m) => m.flags & NULLISH_FLAGS))),
+      (method?.isUnionType() &&
+        types
+          .getMembers(method)
+          .some(
+            (m) =>
+              m.flags & NULLISH_FLAGS ||
+              (getCallReturnType(types.checker, m) === undefined &&
+                getViewedFunction(types, m) === undefined),
+          ))),
   )
 }
 
