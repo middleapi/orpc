@@ -34,6 +34,11 @@ export interface Box<T> {
   v: T
 }
 
+/** A generic model nesting its type argument through another generic model */
+export interface BoxVia<T> {
+  inner: Box<T>
+}
+
 /**
  * Conditional deep mapped types over cycles through generic models, which are cut, and over a
  * generic model nested in itself, which ends.
@@ -55,6 +60,15 @@ export const roundThirtySeven = {
   deepBoxes: os.handler((): ConditionalDeep<Box<Box<Box<Box<Box<Box<Box<Box<number>>>>>>>>> => ({
     v: { v: { v: { v: { v: { v: { v: { v: 1 } } } } } } },
   })),
+  viaBoxes: os.handler(
+    (): ConditionalDeep<BoxVia<BoxVia<BoxVia<BoxVia<BoxVia<BoxVia<number>>>>>>> => ({
+      inner: {
+        v: {
+          inner: { v: { inner: { v: { inner: { v: { inner: { v: { inner: { v: 1 } } } } } } } } },
+        },
+      },
+    }),
+  ),
 }
 
 /** Inputs of the same types, as a client sends them */

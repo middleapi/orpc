@@ -351,7 +351,8 @@ function definedKeysOf(object: Record<string, unknown>): string[] {
 
 /**
  * A `JSON.stringify` replacer throwing on values the reuse check compares otherwise than their JSON
- * form: by identity (a `Date`, a class instance, a function), `NaN`, or `undefined` in an array.
+ * form: by identity (a `Date`, a class instance, a function), an object with `toJSON`, `NaN`, `-0`,
+ * or `undefined` in an array.
  */
 function assertJsonContent(this: unknown, key: string, value: unknown): unknown {
   const raw = (this as Record<string, unknown>)[key]
@@ -359,9 +360,11 @@ function assertJsonContent(this: unknown, key: string, value: unknown): unknown 
   if (
     typeof raw === 'function' ||
     typeof raw === 'symbol' ||
-    (typeof raw === 'number' && !Number.isFinite(raw)) ||
+    (typeof raw === 'number' && (!Number.isFinite(raw) || Object.is(raw, -0))) ||
     (raw === undefined && Array.isArray(this)) ||
-    (typeof raw === 'object' && raw !== null && !isPlainObjectOrArray(raw))
+    (typeof raw === 'object' &&
+      raw !== null &&
+      (!isPlainObjectOrArray(raw) || typeof (raw as { toJSON?: unknown }).toJSON === 'function'))
   ) {
     throw new TypeError('Not comparable by its JSON form')
   }

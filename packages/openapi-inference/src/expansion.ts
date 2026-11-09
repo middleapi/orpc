@@ -285,8 +285,8 @@ export class ExpansionGuard {
   }
 
   /**
-   * Whether a type is made only of type parameters, primitives, and the default library's types
-   * and object literals of them.
+   * Whether a type is made only of type parameters, primitives, and the default library's types,
+   * object literals, and interfaces or classes of them.
    */
   private isParametric(type: Type, depth: number): boolean {
     if (type.flags & TypeFlags.UnionOrIntersection) {
@@ -311,13 +311,13 @@ export class ExpansionGuard {
     if (
       depth === 0 ||
       type.getAliasSymbol() ||
-      !(objectFlags & ObjectFlags.Anonymous) ||
+      !(objectFlags & (ObjectFlags.Anonymous | ObjectFlags.Reference | ObjectFlags.Interface)) ||
       objectFlags & ObjectFlags.Mapped
     ) {
       return false
     }
 
-    // `{ inner: T }`
+    // `{ inner: T }`, or `Inner<T>` of `interface Inner<T> { v: T }`
     return this.types
       .getPropertyTypes(type)
       .every((t) => t === undefined || this.isParametric(t, depth - 1))

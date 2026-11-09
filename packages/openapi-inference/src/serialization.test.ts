@@ -271,6 +271,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['wrapCycle', undefined],
     ['growingPair', undefined],
     ['deepBoxes', undefined],
+    ['viaBoxes', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2365,6 +2366,10 @@ describe('generated schemas match serialized outputs', async () => {
 
     it('expands a conditional deep mapped type over a generic model nested in itself in full', () => {
       expect(schemaOf('deepBoxes')).toEqual(levels(8, (v) => model({ v }), { type: 'number' }))
+      // also through another generic model
+      expect(schemaOf('viaBoxes')).toEqual(
+        levels(6, (v) => model({ inner: model({ v }) }), { type: 'number' }),
+      )
     })
   })
 

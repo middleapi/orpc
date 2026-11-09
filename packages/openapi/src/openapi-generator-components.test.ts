@@ -660,6 +660,17 @@ describe('openAPIComponentRegistry', () => {
       expect(Object.keys(doc.components?.schemas ?? {})).toHaveLength(4)
     })
 
+    it('checks a def again when it holds an object with toJSON, whose JSON form differs', () => {
+      const { doc, registry } = createRegistry()
+      const hoist = (value: unknown) =>
+        registry.hoistDefs({ $ref: '#/$defs/Shape', $defs: { Shape: { default: value } } })
+
+      expect(hoist({ x: 1 })).toEqual({ $ref: '#/components/schemas/Shape' })
+      expect(hoist({ x: 1 })).toEqual({ $ref: '#/components/schemas/Shape' })
+      expect(hoist({ toJSON: () => ({ x: 1 }) })).toEqual({ $ref: '#/components/schemas/Shape2' })
+      expect(Object.keys(doc.components?.schemas ?? {})).toHaveLength(2)
+    })
+
     it('checks a def again once a ref to a missing component resolves', () => {
       const { doc, registry } = createRegistry({
         schemas: { Box: { items: { $ref: '#/components/schemas/Left' } } },
