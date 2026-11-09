@@ -250,6 +250,19 @@ describe('generated schemas match serialized outputs', async () => {
     ['keylessClassViews', undefined],
     ['symbolViews', undefined],
     ['brandedSymbols', undefined],
+    ['expandingCycle', undefined],
+    ['twiceExpandingCycle', undefined],
+    ['anyRecords', undefined],
+    ['literalUnionViews', undefined],
+    ['brandedLiteralViews', undefined],
+    ['deepSymbolViews', undefined],
+    ['omittedLengths', undefined],
+    ['keylessIntersections', undefined],
+    ['structuralTypes', undefined],
+    ['arrayLikeRoot', undefined],
+    ['writtenAlike', undefined],
+    ['counted', undefined],
+    ['looseCounted', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1407,13 +1420,17 @@ describe('generated schemas match serialized outputs', async () => {
         type: 'object',
         properties: {
           deep: { type: 'string', description: deep },
-          simple: { type: 'string' },
-          one: { type: 'number' },
+          // the brand declaring the members leads back to the alias, and its comment
+          simple: { type: 'string', description: 'A string of eight characters' },
+          one: { type: 'number', description: 'A number whose value is one' },
           deepOne: { type: 'number', description: deep },
         },
         required: ['deep', 'simple', 'one', 'deepOne'],
       })
-      expect(schemaOf('narrowedBrandRoot')).toEqual({ type: 'string' })
+      expect(schemaOf('narrowedBrandRoot')).toEqual({
+        type: 'string',
+        description: 'A string of eight characters',
+      })
     })
 
     it('writes the fields of a class intersected with a view of a built-in in both forms', () => {
@@ -1846,8 +1863,13 @@ describe('generated schemas match serialized outputs', async () => {
         },
         num: { anyOf: [{ type: 'number' }, { type: 'object' }] },
         bool: { anyOf: [{ type: 'boolean' }, { type: 'object' }] },
+        // an array of strings has the number index too
         index: {
-          anyOf: [{ type: 'string' }, { type: 'object', additionalProperties: { type: 'string' } }],
+          anyOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+            { type: 'object', additionalProperties: { type: 'string' } },
+          ],
         },
       })
     })
@@ -1959,9 +1981,11 @@ describe('generated schemas match serialized outputs', async () => {
           },
         ],
       }
+      // an array has a length too
       const picked = {
         anyOf: [
           { type: 'string' },
+          { type: 'array', items: {} },
           { type: 'object', properties: { length }, required: ['length'] },
         ],
       }
@@ -2026,7 +2050,8 @@ describe('generated schemas match serialized outputs', async () => {
         type: 'object',
         properties: {
           omit: symbolObject,
-          pick: { type: 'object' },
+          // what has a `toString` method, also an array or a string
+          pick: { anyOf: [{ type: 'array', items: {} }, { type: 'string' }, { type: 'object' }] },
           list: { type: 'array', items: { anyOf: [symbolObject, { type: 'null' }] } },
         },
         required: ['list'],
@@ -2041,6 +2066,203 @@ describe('generated schemas match serialized outputs', async () => {
           views: { type: 'array', items: { anyOf: [{}, { type: 'null' }] } },
         },
         required: ['list', 'views'],
+      })
+    })
+  })
+
+  describe('round thirty-five', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const strings = { type: 'string' }
+    const stringObject = {
+      type: 'object',
+      properties: { length: expect.objectContaining({ type: 'number' }) },
+      required: ['length'],
+      additionalProperties: strings,
+    }
+
+    it('cuts a cycle through a conditional deep mapped type where it expands again', () => {
+      const a = { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] }
+      const level = (f0: object) => ({
+        type: 'object',
+        properties: { f0: { anyOf: [f0, { type: 'null' }] }, f2: a },
+        required: ['f0', 'f2'],
+      })
+
+      expect(schemas().ExpandingCycle).toEqual({
+        ...level(level(level(level({})))),
+        description: expect.any(String),
+      })
+      // the compiler gives up on the instantiation first, which is cut too
+      expect(JSON.stringify(schemas().TwiceExpandingCycle)).toContain('"a":{}')
+    })
+
+    it('writes an index signature of any like object, which may hold any value', () => {
+      expect(schemaOf('anyRecords')).toEqual({
+        type: 'object',
+        properties: {
+          list: {},
+          date: {},
+          url: {},
+          set: {},
+          partial: {},
+          fn: {},
+          record: {},
+        },
+      })
+    })
+
+    it('writes views of unions of literals, and views dropping a brand, as their primitive', () => {
+      expect(schemaOf('literalUnionViews').properties).toEqual({
+        shade: { anyOf: [strings, stringObject] },
+        letters: { anyOf: [strings, stringObject] },
+        template: { anyOf: [strings, stringObject] },
+        rank: { anyOf: [{ type: 'number' }, { type: 'object' }] },
+        digits: { anyOf: [{ type: 'number' }, { type: 'object' }] },
+        flag: { anyOf: [{ type: 'boolean' }, { type: 'object' }] },
+      })
+
+      const anyKeys = { type: 'object', additionalProperties: strings }
+      expect(schemaOf('brandedLiteralViews').properties).toEqual({
+        literal: { anyOf: [strings, stringObject] },
+        extended: {
+          anyOf: [strings, { ...anyKeys, properties: { extra: strings } }],
+        },
+        template: { anyOf: [strings, anyKeys] },
+        nested: { anyOf: [strings, anyKeys] },
+      })
+    })
+
+    it('reads the branded primitive of a conditional deep mapped type by its brand', () => {
+      const { properties, required } = schemaOf('deepSymbolViews')
+
+      // symbols are left out
+      expect(required).toEqual(['list', 'picked'])
+      expect(properties.list).toEqual({ type: 'array', items: { anyOf: [{}, { type: 'null' }] } })
+      expect(properties.simplified).toEqual({})
+      expect(properties.picked).toEqual({
+        anyOf: [
+          strings,
+          {
+            type: 'object',
+            properties: { __brand: { type: 'string', const: 'TextBrand' } },
+            required: ['__brand'],
+          },
+        ],
+      })
+    })
+
+    it('writes views of arrays leaving out the length as arrays too', () => {
+      expect(schemaOf('omittedLengths').properties).toEqual({
+        list: {
+          anyOf: [
+            { type: 'array', items: strings },
+            { type: 'object', additionalProperties: strings },
+          ],
+        },
+        readonly: {
+          anyOf: [
+            { type: 'array', items: strings },
+            { type: 'object', additionalProperties: strings },
+          ],
+        },
+        tuple: {
+          anyOf: [
+            {
+              type: 'array',
+              prefixItems: [{ type: 'number' }, strings],
+              minItems: 2,
+              maxItems: 2,
+            },
+            expect.objectContaining({ type: 'object', required: ['0', '1'] }),
+          ],
+        },
+        maps: {
+          anyOf: [
+            { type: 'array', items: expect.objectContaining({ 'x-native-type': 'map' }) },
+            expect.objectContaining({ type: 'object' }),
+          ],
+        },
+      })
+    })
+
+    it('writes intersections of a keyless type and optional properties as any value', () => {
+      const extra = { anyOf: [{}, { type: 'object', properties: { extra: strings } }] }
+
+      // and leaves out the key of a function
+      expect(schemaOf('keylessIntersections')).toEqual({
+        type: 'object',
+        properties: { list: extra, fn: extra, picked: extra, omitted: extra },
+      })
+    })
+
+    it('writes types arrays and strings satisfy by their members as those too', () => {
+      const lookup = 'An interface of methods only, which a `Set` satisfies'
+      const arrayLike = {
+        anyOf: [
+          { type: 'array', items: { type: 'number' } },
+          {
+            type: 'object',
+            properties: { length: { type: 'number' } },
+            required: ['length'],
+            additionalProperties: { type: 'number' },
+          },
+        ],
+      }
+
+      expect(schemaOf('structuralTypes').properties).toEqual({
+        iterable: {},
+        set: {},
+        entries: {},
+        chars: {},
+        ids: { type: 'object', properties: { ids: {} }, required: ['ids'] },
+        arrayLike,
+        numbered: {
+          anyOf: [
+            { type: 'array', items: strings },
+            strings,
+            { type: 'object', additionalProperties: strings },
+          ],
+        },
+        indexed: {
+          anyOf: [
+            { type: 'array', items: { $ref: '#/components/schemas/IndexedItem' } },
+            {
+              type: 'object',
+              additionalProperties: { $ref: '#/components/schemas/IndexedItem' },
+            },
+          ],
+        },
+        lookup: { $ref: '#/components/schemas/Lookup' },
+        empty: { $ref: '#/components/schemas/EmptyClass' },
+      })
+      expect(schemas().Lookup).toEqual({ description: lookup })
+      expect(schemas().EmptyClass).toEqual({ description: expect.any(String) })
+      expect(schemaOf('arrayLikeRoot')).toEqual(arrayLike)
+    })
+
+    it('writes sets as unique items only of values written apart', () => {
+      const set = (items: object) => ({ 'type': 'array', items, 'x-native-type': 'set' })
+
+      expect(schemaOf('writtenAlike').properties).toEqual({
+        dates: set({ 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }),
+        items: set({ $ref: '#/components/schemas/SetItem' }),
+        lists: set({ type: 'array', items: strings }),
+        strings: { ...set(strings), uniqueItems: true },
+      })
+    })
+
+    it('reads the comment of an alias only where a property has its type', () => {
+      const numberOrString = { anyOf: [strings, { type: 'number' }] }
+
+      expect(schemas().CountedValues.properties).toEqual({
+        c: { type: 'integer' },
+        d: numberOrString,
+      })
+      expect(schemas().Loose_CountedValues.properties).toEqual({
+        c: numberOrString,
+        d: numberOrString,
       })
     })
   })

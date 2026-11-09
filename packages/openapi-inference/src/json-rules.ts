@@ -186,7 +186,7 @@ export function mayBeNonSerializable(types: TypeQueries, type: Type): boolean {
 /**
  * Whether a value of this type may be a symbol: a view of one, or of the `Symbol` interface
  * (`Omit<symbol, 'k'>`, `Readonly<SymbolId>` of `SymbolId = symbol & { __brand: 'Id' }`), also in
- * an intersection.
+ * an intersection, or through a conditional mapped type.
  */
 function mayHoldSymbol(types: TypeQueries, type: Type, visited: Set<number> = new Set()): boolean {
   if (visited.has(type.id)) {
@@ -207,18 +207,32 @@ function mayHoldSymbol(types: TypeQueries, type: Type, visited: Set<number> = ne
     return mayHoldSymbol(types, source, visited)
   }
 
+  // the members a conditional mapped type maps over (`DeepReadonly<symbol & { __brand: 'Id' }>`)
+  if (
+    [...types.getMappedSourceMembers(type), ...types.getBrandedOwners(type)].some((m) =>
+      mayHoldSymbol(types, m, visited),
+    )
+  ) {
+    return true
+  }
+
   const symbol = type.getSymbol()
   return symbol?.name === 'Symbol' && types.getSymbolSourceKind(symbol) === 'default'
 }
 
 /**
- * Whether a function is assignable to a type that is no function: `object`, `Object`, and the
- * empty object type `{}`, also as a mapped type without keys (`Omit<{ a: number }, 'a'>`, also of
- * a class: `Pick<User, never>`), unless it is a view of a function (see `isFunctionView`).
+ * Whether a function is assignable to a type that is no function: `object`, `Object`, the empty
+ * object type `{}`, also as a mapped type without keys (`Omit<{ a: number }, 'a'>`, also of a
+ * class: `Pick<User, never>`), unless it is a view of a function (see `isFunctionView`),
+ * `Record<string, any>`, and an intersection of one with optional properties.
  */
 function mayHoldFunction(types: TypeQueries, type: Type): boolean {
   if (type.flags & TypeFlags.NonPrimitive) {
     return true
+  }
+
+  if (type.isIntersectionType()) {
+    return isLooseIntersection(types, type)
   }
 
   if (
@@ -238,9 +252,53 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
 
   return (
     !types.getProperties(type).length &&
-    !types.checker.getIndexInfosOfType(type).length &&
+    (!types.checker.getIndexInfosOfType(type).length || isAnyRecord(types, type)) &&
     !types.isCallable(type) &&
     mayBePlainObject(types, type)
+  )
+}
+
+/**
+ * Whether an intersection holds what a member holding any value does (`object`, `{}`,
+ * `Pick<User, never>`): its other members have only optional properties
+ * (`object & { extra?: string }`), which an array, a date, or a function satisfies too.
+ */
+export function isLooseIntersection(types: TypeQueries, type: Type): boolean {
+  if (!type.isIntersectionType()) {
+    return false
+  }
+
+  const members = types.getMembers(type)
+  const loose = members.filter((m) => mayHoldFunction(types, m))
+
+  return (
+    loose.length > 0 &&
+    members.every(
+      (m) =>
+        loose.includes(m) ||
+        (m.flags & TypeFlags.Object &&
+          !types.isCallable(m) &&
+          !types.checker.getIndexInfosOfType(m).length &&
+          types.getProperties(m).every((p) => p.flags & SymbolFlags.Optional)),
+    )
+  )
+}
+
+/**
+ * Whether a type is only a string index signature of `any` (`Record<string, any>`, `Readonly<any>`),
+ * which, like `object`, every object type is assignable to: arrays, dates, and functions too.
+ */
+export function isAnyRecord(types: TypeQueries, type: Type): boolean {
+  if (!(type.flags & TypeFlags.Object) || types.getProperties(type).length) {
+    return false
+  }
+
+  const infos = types.checker.getIndexInfosOfType(type)
+  return (
+    infos.length > 0 &&
+    infos.every(
+      (info) => info.keyType.flags & TypeFlags.String && info.valueType.flags & TypeFlags.Any,
+    )
   )
 }
 

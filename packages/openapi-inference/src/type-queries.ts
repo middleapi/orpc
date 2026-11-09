@@ -192,14 +192,38 @@ export class TypeQueries {
   private getPrimitiveViewSource(type: Type): Type | undefined {
     const [argument] = this.getTypeArguments(type)
     const primitive = argument ?? this.getDeclaringType(type)
-    const apparent =
-      primitive && primitive.flags & PRIMITIVE_FLAGS
-        ? this.checker.getApparentType(primitive)
-        : undefined
+    const apparent = primitive && this.getPrimitiveInterface(primitive)
 
     return apparent && this.isMappedViewOf(type, apparent) && this.keepsIndexes(type, apparent)
       ? apparent
       : undefined
+  }
+
+  /**
+   * The interface of the members of a primitive, also of a union of literals of one primitive
+   * (`'a' | 'b'`, an enum) or of branded ones (`boolean & { __brand: 'Flag' }`), which a view of
+   * them maps over.
+   */
+  private getPrimitiveInterface(type: Type): Type | undefined {
+    if (type.flags & PRIMITIVE_FLAGS) {
+      return this.checker.getApparentType(type)
+    }
+
+    if (!type.isUnionType()) {
+      return undefined
+    }
+
+    const interfaces = this.getMembers(type).map((member) => {
+      const primitive = member.isIntersectionType()
+        ? this.getMembers(member).find((m) => m.flags & PRIMITIVE_FLAGS)
+        : member
+      return primitive && primitive.flags & PRIMITIVE_FLAGS
+        ? this.checker.getApparentType(primitive)
+        : undefined
+    })
+    const [first] = interfaces
+
+    return first && interfaces.every((i) => i?.id === first.id) ? first : undefined
   }
 
   /**
@@ -231,6 +255,37 @@ export class TypeQueries {
         : source.isIntersectionType()
           ? this.getMembers(source)
           : [source]
+    })
+  }
+
+  /**
+   * The branded primitives whose brand declares a property of a type (`string & { __brand: 'Id' }`
+   * declaring `__brand`), which a conditional mapped type over one has no other trace of
+   * (`T extends object ? { readonly [K in keyof T]: ... } : T` over `Pick<Id, '__brand'>`).
+   */
+  getBrandedOwners(type: Type): readonly Type[] {
+    return this.memo('brandedOwners', type.id, (): readonly Type[] => {
+      const owners = new Map<number, Type>()
+
+      for (const p of this.getProperties(type)) {
+        for (const declaration of p.declarations) {
+          const literal = (declaration.resolve() as any)?.parent
+          const intersection = literal?.kind === SyntaxKind.TypeLiteral ? literal.parent : undefined
+          const owner =
+            intersection?.kind === SyntaxKind.IntersectionType
+              ? this.checker.getTypeAtLocation(intersection)
+              : undefined
+
+          if (
+            owner?.isIntersectionType() &&
+            this.getMembers(owner).some((m) => m.flags & PRIMITIVE_FLAGS)
+          ) {
+            owners.set(owner.id, owner)
+          }
+        }
+      }
+
+      return [...owners.values()]
     })
   }
 

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -44,6 +44,7 @@ import {
   roundThirtyFourJSDoc,
   roundThirtyFourOuter,
 } from '../tests/fixtures/app/src/round34'
+import { roundThirtyFiveInputs } from '../tests/fixtures/app/src/round35'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -589,6 +590,7 @@ describe('openAPIGenerator', () => {
           `Procedure at b: Could not resolve its type "any". ${resolution}`,
           [
             'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
             config,
             undeclared,
             `${file('sub.ts')}:1:27 - error TS2307: Cannot find module './nope-user' or its corresponding type declarations.`,
@@ -598,6 +600,149 @@ describe('openAPIGenerator', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
+  })
+
+  describe('compiler errors of project setups', () => {
+    const procedure = os.handler(() => 1)
+    const roots: string[] = []
+    afterAll(() => {
+      for (const root of roots) {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    /** A project in a temporary directory, which resolves `@orpc/server` */
+    const project = (files: Record<string, string>) => {
+      const root = mkdtempSync(path.join(tmpdir(), 'orpc-inference-'))
+      roots.push(root)
+      symlinkSync(
+        fileURLToPath(new URL('../node_modules', import.meta.url)),
+        path.join(root, 'node_modules'),
+      )
+      for (const [name, content] of Object.entries(files)) {
+        mkdirSync(path.dirname(path.join(root, name)), { recursive: true })
+        writeFileSync(path.join(root, name), content)
+      }
+      return (name: string) => path.join(root, name)
+    }
+    const options = { strict: true, module: 'esnext', moduleResolution: 'bundler' }
+    const message = (promise: Promise<unknown>) =>
+      promise.then(
+        () => '',
+        (e: Error) => e.message,
+      )
+    const unresolved = (name: string) =>
+      `Could not resolve the type "${name}". Check its import, and the tsconfig "paths" for aliases like "@/".`
+
+    it('shows the errors of the compiler options, like a removed baseUrl', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: { ...options, baseUrl: 'src', paths: { '@/*': ['*'] } },
+          include: ['src'],
+        }),
+        'src/model.ts': 'export interface M { v: number; at: Date }\n',
+        'src/router.ts': `import { os } from '@orpc/server'\nimport type { M } from '@/model'\nexport const router = { m: os.handler((): M => ({ v: 1, at: new Date(0) })) }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate({ m: procedure }, { source: { file: file('src/router.ts') } }),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          `Procedure at m: ${unresolved('M')}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('tsconfig.json')} - error TS5102: Option 'baseUrl' has been removed. Please remove it from your configuration.`,
+            `${file('tsconfig.json')} - error TS5090: Non-relative paths are not allowed. Did you forget a leading './'?`,
+            `${file('src/router.ts')}:2:24 - error TS2307: Cannot find module '@/model' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('shows the errors of the files declaring the types that lead to an unresolved one', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/models.ts': `import type { Address } from './adress'\nexport interface Bad { a: string; missing: Missing }\nexport interface Holder { addr: Address }\n`,
+        'src/router.ts': `import { os } from '@orpc/server'\nimport type { Bad, Holder } from './models'\nexport const router = { bad: os.handler((): Bad => ({ a: 'x' }) as any), holder: os.handler((): Holder => ({}) as any) }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { bad: procedure, holder: procedure },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at bad: ${unresolved('Missing')}`,
+          `Procedure at holder: ${unresolved('Address')}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/models.ts')}:1:30 - error TS2307: Cannot find module './adress' or its corresponding type declarations.`,
+            `${file('src/models.ts')}:2:44 - error TS2304: Cannot find name 'Missing'.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('names the nearest tsconfig when it does not include the file, and why', async () => {
+      const file = project({
+        'app/tsconfig.json': JSON.stringify({
+          extends: '@scr/tsconfig/base',
+          compilerOptions: { paths: { '@/*': ['./src/*'] } },
+        }),
+        'app/node_modules/@scr/tsconfig/package.json': JSON.stringify({ name: '@scr/tsconfig' }),
+        'app/node_modules/@scr/tsconfig/base.json': JSON.stringify({
+          compilerOptions: options,
+          include: ['src'],
+        }),
+        'app/src/model.ts': 'export interface M { v: number }\n',
+        'app/src/router.ts': `import { os } from '@orpc/server'\nimport type { M } from '@/model'\nexport const router = { m: os.handler((): M => ({ v: 1 })) }\n`,
+      })
+      const router = file('app/src/router.ts')
+      const noInputs = `error TS18003: No inputs were found in config file '${file('app/tsconfig.json')}'. Specified 'include' paths were '["node_modules/@scr/tsconfig/src"]' and 'exclude' paths were '[]'.`
+
+      // the include of a base tsconfig is relative to the base
+      const nearest = await message(
+        generator.generate({ m: procedure }, { source: { file: router } }),
+      )
+      expect(nearest).toContain(
+        [
+          'Compiler errors:',
+          `"${file('app/tsconfig.json')}" does not include "${router}".`,
+          noInputs,
+        ].join('\n  '),
+      )
+      expect(nearest).toContain(
+        `${router}:2:24 - error TS2307: Cannot find module '@/model' or its corresponding type declarations.`,
+      )
+
+      // passing the nearest tsconfig, leaving it out is no help
+      expect(
+        await message(
+          generator.generate({ m: procedure }, { source: { file: router, tsconfig: file('app') } }),
+        ),
+      ).toBe(
+        `[TypeScript] "${router}" is not part of the project "${file('app/tsconfig.json')}". Pass the tsconfig that includes it.\n  ${noInputs}`,
+      )
+    }, 20_000)
+
+    it('names files of other languages, which the compiler can not parse', async () => {
+      const file = project({ 'App.vue': 'export const router = {}\n', 'notes.txt': '' })
+
+      for (const name of ['App.vue', 'notes.txt']) {
+        await expect(generator.generate({}, { source: { file: file(name) } })).rejects.toThrow(
+          `[TypeScript] File "${file(name)}" is not a TypeScript or JavaScript source file (.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs).`,
+        )
+      }
+    })
   })
 
   it('documents with recursive defs only', async () => {
@@ -1603,6 +1748,60 @@ describe('openAPIGenerator', () => {
         ['/plainBoolean', { v: true }],
         ['/plainBooleanRoot', {}],
         ['/plainBooleanRoot', false],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('round thirty-five', () => {
+    it('documents inputs of the values a client holding them sends', async () => {
+      const spec = await generator.generate(roundThirtyFiveInputs, {
+        source: { file: fixture('round35.ts'), export: 'roundThirtyFiveInputs' },
+      })
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // an instance of a view of a class, written by `JSON.stringify`, or a plain object
+      expect(body('/moneyView').properties.m).toEqual({
+        anyOf: [
+          { type: 'string' },
+          { type: 'object', properties: { cents: { type: 'number' } }, required: ['cents'] },
+        ],
+      })
+      expect(body('/taggedView').properties.t.properties.tags).toEqual({
+        anyOf: [expect.objectContaining({ 'x-native-type': 'set' }), { type: 'object' }],
+      })
+      expect(body('/anyRecord')).toEqual({ type: 'object', properties: { v: {} } })
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/expandingCycle', { f0: null, f2: { a: 1 } }],
+        ['/twiceExpandingCycle', { f0: null, f2: { a: { b: 1 } } }],
+        ['/anyRecord', { v: [1, 2] }],
+        ['/primitiveView', { v: 'x' }],
+        ['/omittedLength', { v: [[1]] }],
+        ['/objectIntersection', { v: [1] }],
+        ['/keylessIntersection', { v: 5 }],
+        ['/iterable', { ids: ['a'] }],
+        ['/arrayLike', { ids: [1, 2] }],
+        ['/numbered', { ids: ['a', 'b'] }],
+        ['/moneyView', { m: '1c' }],
+        ['/moneyView', { m: { cents: 1 } }],
+        ['/taggedView', { t: { tags: {} } }],
+        ['/taggedView', { t: { tags: ['a'] } }],
       ] as const) {
         const validate = ajv.compile(body(path))
         expect(validate(value) ? [] : [path, validate.errors]).toEqual([])

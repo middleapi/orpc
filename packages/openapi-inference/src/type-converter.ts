@@ -42,7 +42,9 @@ import {
   getToJSONResultTypes,
   getViewedFunction,
   hasOptionalToJSON,
+  isAnyRecord,
   isClassView,
+  isLooseIntersection,
   isDropped,
   isInstanceOrPlain,
   mayBePlainObject,
@@ -80,7 +82,16 @@ import { getIteratorTypes } from './utils'
 /**
  * A type the converter cannot resolve, such as an unresolved import.
  */
-export class TypeScriptTypeResolutionError extends TypeError {}
+export class TypeScriptTypeResolutionError extends TypeError {
+  /** The files declaring the types and properties the conversion went through to reach it */
+  readonly files = new Set<string>()
+
+  addDeclarations(symbol: TSSymbol | undefined): void {
+    for (const declaration of symbol?.declarations ?? []) {
+      this.files.add(declaration.path)
+    }
+  }
+}
 
 export interface TypeToJsonSchemaConverterOptions {
   /**
@@ -172,6 +183,10 @@ export class TypeToJsonSchemaConverter {
   private voidType: Type | undefined
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
+  private anyArrayType: Type | null | undefined
+  /** The types being converted, and the properties being converted in them, outermost first */
+  private roots: readonly Type[] = []
+  private readonly path: TSSymbol[] = []
 
   /**
    * Who writes the value being converted:
@@ -237,6 +252,7 @@ export class TypeToJsonSchemaConverter {
 
     const cuts = this.expansion.cuts
     this.expansion.reset()
+    this.roots = values
 
     let schema: JsonSchema
     let $defs: Record<string, JsonSchema>
@@ -366,6 +382,19 @@ export class TypeToJsonSchemaConverter {
   }
 
   private visit(type: Type): JsonSchema {
+    try {
+      return this.visitType(type)
+    } catch (error) {
+      // where the compiler errors behind an unresolved type are
+      if (error instanceof TypeScriptTypeResolutionError) {
+        error.addDeclarations(type.getAliasSymbol())
+        error.addDeclarations(type.getSymbol())
+      }
+      throw error
+    }
+  }
+
+  private visitType(type: Type): JsonSchema {
     // `DeepReadonly<DeepReadonly<X>>` (a deep view of a class holding one) is `DeepReadonly<X>`,
     // which keeps a graph of deep views from nesting them without end
     const flattened = this.types.getFlattenedView(type)
@@ -381,6 +410,12 @@ export class TypeToJsonSchemaConverter {
     }
 
     if (type.isErrorType()) {
+      // the compiler gives up on an instantiation nested too deep, which is cut like an expansion
+      if (this.isInstantiationError()) {
+        this.expansion.cuts++
+        return {}
+      }
+
       throw new TypeScriptTypeResolutionError(
         `Could not resolve the type "${this.checker.typeToString(type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
       )
@@ -759,6 +794,11 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
+    // `object & { extra?: string }` also holds arrays and dates, `{} & { extra?: string }` strings
+    if (isLooseIntersection(this.types, type)) {
+      return anyOfDeduped([{}, this.convertObject(type)])
+    }
+
     return this.convertObject(type)
   }
 
@@ -820,6 +860,18 @@ export class TypeToJsonSchemaConverter {
     const eitherView = isView && this.mode === 'either'
     const sentView = sentClass !== undefined && isClassView(this.types, type)
     const instanceClass = classType ?? sentClass
+
+    // a client's serializer leaves an instance to `JSON.stringify`, which calls its `toJSON` and
+    // writes its `Set` fields as `{}`, so each value is either form, as in a view of an output
+    // (the built-in a class extends is written as the built-in, see below)
+    if (sentView && this.mode === 'serializer') {
+      const results = getClassTypes(this.types, type)
+        .filter((c) => !hasBuiltinForm(this.types, c))
+        .flatMap((c) => getToJSONResultTypes(this.types, c, true))
+      const fields = this.withMode('either', () => this.convertObject(type, options))
+
+      return results.length ? anyOfDeduped([...this.convertToJSONResults(results), fields]) : fields
+    }
 
     if (instanceClass && !ownFields) {
       // of each class behind it (`interface L extends Pick<A, 'id'>, Pick<class B extends Date, 'v'>`)
@@ -939,14 +991,16 @@ export class TypeToJsonSchemaConverter {
       return {}
     }
 
-    // the empty object type `{}` (also `NonNullable<unknown>`, or `Pick<User, never>`) accepts any
-    // value but `null` and `undefined`
+    // the empty object type `{}` (also `NonNullable<unknown>`, `Pick<User, never>`, or a class
+    // without members) accepts any value but `null` and `undefined`, a type of methods only
+    // (`Iterable<string>`, `interface Lookup { has(key: string): boolean }`) arrays, sets, or strings
+    // too, and `Record<string, any>` any object
     if (
-      !properties.length &&
-      (!classType || isView) &&
-      !isObjectLiteral(type) &&
-      !this.checker.getIndexInfosOfType(type).length &&
-      !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length
+      (properties.every((p) => p.flags & SymbolFlags.Method || p.escapedName.startsWith('__@')) &&
+        !isObjectLiteral(type) &&
+        !this.checker.getIndexInfosOfType(type).length &&
+        !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length) ||
+      isAnyRecord(this.types, type)
     ) {
       return {}
     }
@@ -1020,9 +1074,20 @@ export class TypeToJsonSchemaConverter {
       // `string | (() => void)`: JSON serialization drops the key when it holds a function
       const serializable = this.getSerializableMembers(propertyType)
 
-      let propertySchema = serializable
-        ? this.convertMembers(serializable, convertValue)
-        : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
+      let propertySchema: JsonSchema
+      this.path.push(property)
+      try {
+        propertySchema = serializable
+          ? this.convertMembers(serializable, convertValue)
+          : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
+      } catch (error) {
+        if (error instanceof TypeScriptTypeResolutionError) {
+          error.addDeclarations(property)
+        }
+        throw error
+      } finally {
+        this.path.pop()
+      }
 
       // an alias of a primitive or literal (`type Count = number`) leaves no trace in the type,
       // so its JSDoc is read through the property's type annotation
@@ -1080,8 +1145,77 @@ export class TypeToJsonSchemaConverter {
       delete (schema as ObjectJsonSchema).properties
     }
 
-    // an array-like view may also hold a plain object
-    return arrayLike ? anyOfDeduped([arrayLike.schema, schema]) : schema
+    // an array-like view may also hold a plain object, and an array or a string may satisfy
+    // an object type by its members (`ArrayLike<number>`, `Record<number, string>`)
+    const forms = arrayLike
+      ? [arrayLike.schema]
+      : classType || typedArray
+        ? []
+        : this.convertStructuralForms(type, properties)
+    return forms.length ? anyOfDeduped([...forms, schema]) : schema
+  }
+
+  /**
+   * The arrays and strings an object type of their members (`length`, a number index) holds.
+   */
+  private convertStructuralForms(type: Type, properties: readonly TSSymbol[]): JsonSchema[] {
+    const forms: JsonSchema[] = []
+    const keys = this.checker.getIndexInfosOfType(type).map((info) => info.keyType)
+
+    // neither has a string index
+    if (keys.some((key) => !(key.flags & TypeFlags.Number))) {
+      return forms
+    }
+
+    for (const [name, primitive] of [
+      ['Array', undefined],
+      ['String', this.checker.getStringType()],
+    ] as const) {
+      const members = this.types.getGlobalType(name)
+      // only types of their members, checked by the compiler, `{ filter: string }` is no array
+      if (!members || !properties.every((p) => this.getPropertyNames(members).has(p.name))) {
+        continue
+      }
+
+      if (primitive) {
+        if (this.checker.isTypeAssignableTo(primitive, type)) {
+          forms.push({ type: 'string' })
+        }
+        continue
+      }
+
+      const anyArray = this.getAnyArrayType()
+      if (anyArray && this.checker.isTypeAssignableTo(anyArray, type)) {
+        forms.push({
+          type: 'array',
+          items: this.visitElement(getNumberIndexType(this.types, type)),
+        })
+      }
+    }
+
+    return forms
+  }
+
+  private getPropertyNames(type: Type): ReadonlySet<string> {
+    return this.types.memo(
+      'propertyNames',
+      type.id,
+      () => new Set(this.types.getProperties(type).map((p) => p.name)),
+    )
+  }
+
+  /**
+   * `any[]`, the type of `Array.prototype`.
+   */
+  private getAnyArrayType(): Type | undefined {
+    if (this.anyArrayType === undefined) {
+      const constructor = this.checker.resolveName('Array', SymbolFlags.Value)
+      const constructorType = constructor && this.checker.getTypeOfSymbol(constructor)
+      const prototype = constructorType && this.types.getProperty(constructorType, 'prototype')
+      this.anyArrayType = (prototype && this.checker.getTypeOfSymbol(prototype)) ?? null
+    }
+
+    return this.anyArrayType ?? undefined
   }
 
   /**
@@ -1256,7 +1390,7 @@ export class TypeToJsonSchemaConverter {
    * (a tuple without its length mutating methods), whose values are still arrays, `only` unless
    * it may also hold a plain object: when a view makes `length` optional (`Partial<[number] & X>`),
    * widens it (`{ [K in keyof T]: T[K] | string }`), or leaves it or `slice` out
-   * (`Pick<[number, string], 0>`).
+   * (`Pick<[number, string], 0>`, `Omit<string[], 'length'>`).
    */
   private convertArrayLikeObject(
     type: Type,
@@ -1265,11 +1399,11 @@ export class TypeToJsonSchemaConverter {
     const slice = properties.find((p) => p.name === 'slice')
     // the `slice` of an array, not of a string (`Partial<class Tag extends String>`)
     const keptSlice = slice !== undefined && this.isArrayMember(slice)
-    const source = keptSlice ? undefined : this.types.getMappedSource(type)
+    const keptLength = properties.find((p) => p.name === 'length')
+    // a view leaving `length` out (`Omit<string[], 'length'>`) has it by the array it is over
+    const source = keptSlice && keptLength ? undefined : this.types.getMappedSource(type)
     const viewed = source && this.types.getReferenceKind(source) !== undefined ? source : undefined
-    const length =
-      properties.find((p) => p.name === 'length') ??
-      (viewed && this.types.getProperty(viewed, 'length'))
+    const length = keptLength ?? (viewed && this.types.getProperty(viewed, 'length'))
 
     if (!length || (!keptSlice && !viewed)) {
       return undefined
@@ -1292,6 +1426,7 @@ export class TypeToJsonSchemaConverter {
 
     const only =
       keptSlice &&
+      keptLength !== undefined &&
       !((length.flags | slice.flags) & SymbolFlags.Optional) &&
       lengths.length === members.length
     const array = (schema: JsonSchema) => ({ schema, only })
@@ -1567,9 +1702,11 @@ export class TypeToJsonSchemaConverter {
       return views.some((view) => this.mayHoldPlainObject(view))
     }
 
-    // the members of an intersection a conditional mapped type maps over, which it has no trace of
+    // the members of an intersection a conditional mapped type maps over, which it has no trace of,
+    // or the branded primitive its brand is declared by
     const source = this.types.getMappedSource(type)
-    const sources = source ? [source] : this.types.getMappedSourceMembers(type)
+    const members = source ? [source] : this.types.getMappedSourceMembers(type)
+    const sources = members.length ? members : this.types.getBrandedOwners(type)
 
     if (!sources.length) {
       return false
@@ -1597,8 +1734,27 @@ export class TypeToJsonSchemaConverter {
    * The branded primitive (`string & { __brand: 'UserId' }`) a mapped type is a view of, keeping
    * the values of the keys it keeps (`Readonly<T>`, `DeepReadonly<T>`, `Omit<T, '__brand'>`), which
    * may hold the primitive. One changing them (`{ [K in keyof T]?: true }`) is an object.
+   * A view keeping only members of the primitive's interface holds any value of the primitive,
+   * not only the literal or template of the brand (`Omit<'lit' & { __brand: 'Lit' }, '__brand'>`).
    */
   private getMappedBrandedPrimitive(type: Type): Type | undefined {
+    const branded = this.findMappedBrandedPrimitive(type)
+    const primitive =
+      branded && this.types.getMembers(branded).find((m) => m.flags & PRIMITIVE_FLAGS)
+
+    if (!primitive || !(primitive.flags & (LITERAL_FLAGS | TypeFlags.TemplateLiteral))) {
+      return branded
+    }
+
+    // by the names of all members, a symbol key (`[Symbol.iterator]`) is not found by its name
+    const apparent = this.checker.getApparentType(primitive)
+    const members = apparent && this.getPropertyNames(apparent)
+    return members && this.types.getProperties(type).every((p) => members.has(p.name))
+      ? (this.checker.getBaseTypeOfLiteralType(primitive) ?? branded)
+      : branded
+  }
+
+  private findMappedBrandedPrimitive(type: Type): Type | undefined {
     if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
       return undefined
     }
@@ -1610,8 +1766,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     const source = this.types.getMappedSource(type)
-
-    return [...(source ? [source] : []), ...this.types.getTypeArguments(type)].find((candidate) => {
+    const isViewed = (candidate: Type) => {
       if (
         !candidate.isIntersectionType() ||
         !this.types.getMembers(candidate).some((m) => m.flags & PRIMITIVE_FLAGS)
@@ -1624,7 +1779,13 @@ export class TypeToJsonSchemaConverter {
         [...keys].every((key) => candidateKeys.has(key)) &&
         this.types.isMappedViewOf(type, candidate)
       )
-    })
+    }
+
+    // a conditional mapped type keeps no trace of the branded primitive but its brand
+    return (
+      [...(source ? [source] : []), ...this.types.getTypeArguments(type)].find(isViewed) ??
+      this.types.getBrandedOwners(type).find(isViewed)
+    )
   }
 
   /**
@@ -1736,6 +1897,27 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
+   * Whether an error type comes from an instantiation the compiler gave up on (nested too deep),
+   * not from an unresolved name, which leaves an error type in the declared type of the converted
+   * type, or of a property on the way to it (`Missing[]`, `Page<Missing>`).
+   */
+  private isInstantiationError(): boolean {
+    if (!this.path.length) {
+      return false
+    }
+
+    const declared = this.path.map((property) => {
+      const name = (property.declarations[0]?.resolve() as any)?.name
+      const original = name && this.checker.getSymbolAtLocation(name)
+      return this.checker.getTypeOfSymbol(original ?? property)
+    })
+
+    return ![...this.roots, ...declared].some(
+      (t) => t !== undefined && holdsErrorType(this.types, t),
+    )
+  }
+
+  /**
    * Keys of conversion results, which differ between the modes.
    */
   private key(type: Type): number {
@@ -1810,8 +1992,8 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * The project type alias a property's type annotation names (`count?: Count | null`),
-   * when the property still has that type: a mapped type like `{ [K in keyof T]: boolean }`
-   * keeps the source declaration but not its type.
+   * when the property still has that type, but for `null` and `undefined`: a mapped type like
+   * `{ [K in keyof T]: boolean }` keeps the source declaration but not its type.
    */
   private getAnnotationAlias(property: TSSymbol, type: Type): TSSymbol | undefined {
     const annotation = this.types.getAnnotation(property)
@@ -1820,8 +2002,16 @@ export class TypeToJsonSchemaConverter {
       return undefined
     }
 
-    return annotation.type.id === type.id ||
-      this.types.getUnionMembers(type).some((m) => m.id === annotation.type.id)
+    // `Count | null`, not `Count | string`, whose other members the alias does not describe
+    const defined = (t: Type) =>
+      this.types
+        .getUnionMembers(t)
+        .filter((m) => !(m.flags & NULLISH_FLAGS))
+        .map((m) => m.id)
+    const annotated = new Set(defined(annotation.type))
+    const members = defined(type)
+
+    return members.length === annotated.size && members.every((id) => annotated.has(id))
       ? annotation.alias
       : undefined
   }
@@ -1857,6 +2047,23 @@ function withNullBranch(schema: JsonSchema | undefined, hasNull: boolean): JsonS
   }
 
   return schema === undefined ? { type: 'null' } : withNull(schema)
+}
+
+/**
+ * Whether a type is an error type, or written with one: a member, or a type argument
+ * (`Missing | null`, `Missing[]`, `Page<Missing>`), not one deep inside a model it refers to.
+ */
+function holdsErrorType(types: TypeQueries, type: Type, depth = 3): boolean {
+  if (type.isErrorType()) {
+    return true
+  }
+
+  const children =
+    type.flags & TypeFlags.UnionOrIntersection
+      ? types.getMembers(type)
+      : types.getTypeArguments(type)
+
+  return depth > 0 && children.some((child) => holdsErrorType(types, child, depth - 1))
 }
 
 /**

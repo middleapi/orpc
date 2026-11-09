@@ -32,13 +32,7 @@ import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { SourceFile } from 'typescript/unstable/ast'
-import type {
-  Checker,
-  Diagnostic,
-  Program,
-  Symbol as TSSymbol,
-  Type,
-} from 'typescript/unstable/sync'
+import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { DiagnosticCategory, TypeFlags } from 'typescript/unstable/sync'
 
 import { mergeEquivalentComponents } from './components'
@@ -54,7 +48,13 @@ import type {
 } from './type-converter'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter'
 import type { SourceKind } from './utils'
-import { createSourceKindChecker, getAssignedSymbol, getImplementedSymbol, getJSDoc } from './utils'
+import {
+  createSourceKindChecker,
+  formatDiagnostic,
+  getAssignedSymbol,
+  getImplementedSymbol,
+  getJSDoc,
+} from './utils'
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
@@ -94,6 +94,7 @@ interface InferenceContext {
   resolver: RouterTypeResolver
   converters: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverter>
   getSourceKind: (path: string) => SourceKind
+  describeConfig: () => readonly string[]
 }
 
 export interface OpenAPIGeneratorOptions
@@ -174,6 +175,7 @@ export class OpenAPIGenerator {
           }),
         },
         getSourceKind: createSourceKindChecker(project.program),
+        describeConfig: () => project.describeConfig(),
       }
 
       inferred = await this.inferRouter(ctx, router, filter)
@@ -210,7 +212,7 @@ export class OpenAPIGenerator {
     let inferred: RouterContract = {}
     const errors: string[] = []
     // printed once, many unresolved procedures share the errors of the router file
-    const diagnostics = new Set<string>()
+    let diagnostics: Set<string> | undefined
     let walked = 0
     let found = 0
 
@@ -246,7 +248,8 @@ export class OpenAPIGenerator {
         }
         // the compiler knows why a type is unresolved: a missing module, an undeclared name, ...
         if (e instanceof TypeScriptTypeResolutionError) {
-          for (const diagnostic of getCompilerErrors(ctx, resolved)) {
+          diagnostics ??= new Set(ctx.describeConfig())
+          for (const diagnostic of getCompilerErrors(ctx, resolved, e)) {
             diagnostics.add(diagnostic)
           }
         }
@@ -263,7 +266,8 @@ export class OpenAPIGenerator {
     }
 
     if (errors.length) {
-      const compilerErrors = diagnostics.size
+      // after where the compiler options come from, which an unresolved alias depends on
+      const compilerErrors = diagnostics
         ? `\n\nCompiler errors:${[...diagnostics].map((d) => `\n  ${d}`).join('')}`
         : ''
 
@@ -449,12 +453,14 @@ function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType
 }
 
 /**
- * The compiler errors of the tsconfig and of the files declaring a procedure: the router file,
- * and where a procedure assigned to it (`{ ping }`) is declared.
+ * The compiler errors of the files declaring a procedure (the router file, and where a procedure
+ * assigned to it, `{ ping }`, is declared), and of the project files the conversion went through
+ * to reach an unresolved type.
  */
 function getCompilerErrors(
   ctx: InferenceContext,
   resolved: ResolvedRouterType | undefined,
+  error: TypeScriptTypeResolutionError,
 ): string[] {
   const files = new Set<string>([ctx.sourceFile.fileName])
 
@@ -467,36 +473,19 @@ function getCompilerErrors(
     }
   }
 
-  const diagnostics = [
-    ...ctx.program.getConfigFileParsingDiagnostics(),
-    ...[...files].flatMap((file) => [
-      ...ctx.program.getSyntacticDiagnostics(file),
-      ...ctx.program.getSemanticDiagnostics(file),
-    ]),
-  ]
-
-  return [
-    ...new Set(
-      diagnostics
-        .filter((d) => d.category === DiagnosticCategory.Error)
-        .map((d) => formatDiagnostic(ctx.program, d)),
-    ),
-  ]
-}
-
-/**
- * Formats a diagnostic like `tsc`: `file:line:column - error TS2304: Cannot find name 'x'.`
- */
-function formatDiagnostic(program: Program, diagnostic: Diagnostic): string {
-  const message = `error TS${diagnostic.code}: ${diagnostic.text}`
-  const sourceFile = diagnostic.fileName ? program.getSourceFile(diagnostic.fileName) : undefined
-
-  if (!sourceFile) {
-    return diagnostic.fileName ? `${diagnostic.fileName} - ${message}` : message
+  for (const file of error.files) {
+    if (ctx.getSourceKind(file) === 'project') {
+      files.add(file)
+    }
   }
 
-  const { line, character } = sourceFile.getLineAndCharacterOfPosition(diagnostic.pos)
-  return `${diagnostic.fileName}:${line + 1}:${character + 1} - ${message}`
+  return [...files]
+    .flatMap((file) => [
+      ...ctx.program.getSyntacticDiagnostics(file),
+      ...ctx.program.getSemanticDiagnostics(file),
+    ])
+    .filter((d) => d.category === DiagnosticCategory.Error)
+    .map((d) => formatDiagnostic(ctx.program, d))
 }
 
 /**

@@ -160,8 +160,52 @@ export class ExpansionGuard {
       ? outer.growth + 1
       : argumentsKept(this.types, outer.type, type)
         ? outer.growth
-        : 0
+        : this.getRepeatedGrowth(stack, type)
     return growth >= MAX_GROWTH ? undefined : growth
+  }
+
+  /**
+   * An instantiation without type arguments (a conditional type resolved to a mapped type) shows
+   * no growth by them: it grows when it maps over the keys an outer one maps over again, as a
+   * different type, which a cycle through it (`T extends object ? { [K in keyof T]: X<T[K]> } : T`
+   * over a model holding `X<Model>`) expands without end.
+   */
+  private getRepeatedGrowth(stack: readonly Expansion[], type: Type): number {
+    if (this.types.getTypeArguments(type).length) {
+      return 0
+    }
+
+    const keys = this.getKeys(type)
+
+    if (keys === undefined) {
+      return 0
+    }
+
+    // the innermost one
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (this.getKeys(stack[i]!.type) === keys) {
+        return stack[i]!.growth + 1
+      }
+    }
+
+    return 0
+  }
+
+  /**
+   * The declarations of the properties of a type, which a mapped type keeps from its source.
+   */
+  private getKeys(type: Type): string | undefined {
+    return this.types.memo('expansionKeys', type.id, () => {
+      const properties = this.types.getProperties(type)
+      return properties.length
+        ? properties
+            .map((p) => {
+              const declaration = p.declarations[0]
+              return declaration ? `${declaration.path}:${declaration.index}` : p.name
+            })
+            .join(',')
+        : undefined
+    })
   }
 }
 

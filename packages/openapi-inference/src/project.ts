@@ -3,9 +3,22 @@ import path from 'node:path'
 
 import type { SourceFile } from 'typescript/unstable/ast'
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { API } from 'typescript/unstable/sync'
+import { API, DiagnosticCategory } from 'typescript/unstable/sync'
 
-import { createTypeScriptProject, toAbsolutePath } from './utils'
+import { createTypeScriptProject, formatDiagnostic, toAbsolutePath } from './utils'
+
+/** The extensions of the files TypeScript parses, also of declaration files (`.d.ts`) */
+const SOURCE_EXTENSIONS = new Set([
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.json',
+])
 
 export interface TypeScriptProjectOptions {
   /**
@@ -44,6 +57,12 @@ export interface TypeScriptProject {
   getExportType(name: string): TypeScriptExport
 
   /**
+   * Where the compiler options come from, the tsconfig used or default options, with their errors,
+   * and the errors of a nearer tsconfig that does not include the file.
+   */
+  describeConfig(): readonly string[]
+
+  /**
    * Stops the compiler process.
    */
   close(): void
@@ -68,6 +87,13 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
 
   if (fileStats.isDirectory()) {
     throw new Error(`[TypeScript] File "${file}" is a directory, expected a source file.`)
+  }
+
+  // the compiler process can not parse other files (`.vue`), and stops
+  if (!SOURCE_EXTENSIONS.has(path.extname(file).toLowerCase())) {
+    throw new Error(
+      `[TypeScript] File "${file}" is not a TypeScript or JavaScript source file (.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs).`,
+    )
   }
 
   if (tsconfig !== undefined) {
@@ -117,9 +143,13 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
       }
     }
 
+    const nearest = findAncestorTsconfigs(path.dirname(file)).next().value
+    // the nearest tsconfig.json, when it does not include the file, with why (`No inputs were found`)
+    let skipped: string[] = []
+
     // the nearest tsconfig.json may not include the file (e.g. `include: ["src"]` for a script),
     // look further up for one that does before settling for default compiler options
-    if (!tsconfig && project?.configFileName.startsWith('/dev/null/')) {
+    if (!tsconfig && project && isInferred(project.configFileName)) {
       for (const candidate of findAncestorTsconfigs(path.dirname(file))) {
         snapshot = api.updateSnapshot({ openProjects: [candidate] })
         const candidateProject = snapshot.getProject(candidate)
@@ -127,6 +157,13 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
         if (candidateProject?.program.getSourceFile(file)) {
           project = candidateProject
           break
+        }
+
+        if (candidate === nearest) {
+          skipped = [
+            `"${candidate}" does not include "${file}".`,
+            ...getConfigErrors(candidateProject?.program),
+          ]
         }
       }
     }
@@ -138,18 +175,70 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     const sourceFile = project.program.getSourceFile(file)
 
     if (!sourceFile) {
+      // unless the nearest one is the one passed, which does not include the file either
+      const hint =
+        tsconfig !== undefined && nearest !== undefined && nearest !== tsconfig
+          ? `Pass the tsconfig that includes it, or leave out "tsconfig" to use the nearest one.`
+          : 'Pass the tsconfig that includes it.'
+      const errors = getConfigErrors(project.program)
+
       throw new Error(
-        `[TypeScript] "${file}" is not part of the project "${project.configFileName}". Pass the tsconfig that includes it, or leave out "tsconfig" to use the nearest one.`,
+        `[TypeScript] "${file}" is not part of the project "${project.configFileName}". ${hint}${errors.map((e) => `\n  ${e}`).join('')}`,
       )
     }
 
-    return createTypeScriptProject(file, project.checker, project.program, sourceFile, () =>
-      api.close(),
+    const { configFileName, program } = project
+    const describeConfig = () =>
+      isInferred(configFileName)
+        ? [...skipped, `Using default compiler options, no tsconfig.json includes "${file}".`]
+        : [
+            ...skipped,
+            `Using the compiler options of "${configFileName}".`,
+            // options the compiler rejects, like `baseUrl`
+            ...getConfigErrors(program, true),
+          ]
+
+    return createTypeScriptProject(
+      file,
+      project.checker,
+      program,
+      sourceFile,
+      () => api.close(),
+      describeConfig,
     )
   } catch (error) {
     api.close()
     throw error
   }
+}
+
+/**
+ * Whether the compiler made up the project of a file no tsconfig includes, with default options.
+ */
+function isInferred(configFileName: string): boolean {
+  return configFileName.startsWith('/dev/null/')
+}
+
+/**
+ * The errors of a tsconfig, with `all`, also of the options and the program as a whole.
+ */
+function getConfigErrors(program: Program | undefined, all = false): string[] {
+  if (!program) {
+    return []
+  }
+
+  const diagnostics = [
+    ...program.getConfigFileParsingDiagnostics(),
+    ...(all ? [...program.getProgramDiagnostics(), ...program.getGlobalDiagnostics()] : []),
+  ]
+
+  return [
+    ...new Set(
+      diagnostics
+        .filter((d) => d.category === DiagnosticCategory.Error)
+        .map((d) => formatDiagnostic(program, d)),
+    ),
+  ]
 }
 
 function* findAncestorTsconfigs(directory: string): Generator<string> {

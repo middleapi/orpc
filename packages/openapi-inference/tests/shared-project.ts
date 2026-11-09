@@ -41,6 +41,7 @@ export function shareProjects(
         shared.program,
         sourceFile,
         () => {},
+        shared.describeConfig,
       )
     },
     close() {

@@ -6,6 +6,7 @@ import type { SourceFile } from 'typescript/unstable/ast'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
+  Diagnostic,
   JSDocTagInfo,
   Program,
   Symbol as TSSymbol,
@@ -276,6 +277,7 @@ export function createTypeScriptProject(
   program: Program,
   sourceFile: SourceFile,
   close: () => void,
+  describeConfig: () => readonly string[],
 ): TypeScriptProject {
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile)
   const exports = moduleSymbol ? checker.getExportsOfModule(moduleSymbol) : []
@@ -312,6 +314,22 @@ export function createTypeScriptProject(
 
       return { type, symbol }
     },
+    describeConfig,
     close,
   }
+}
+
+/**
+ * Formats a diagnostic like `tsc`: `file:line:column - error TS2304: Cannot find name 'x'.`
+ */
+export function formatDiagnostic(program: Program, diagnostic: Diagnostic): string {
+  const message = `error TS${diagnostic.code}: ${diagnostic.text}`
+  const sourceFile = diagnostic.fileName ? program.getSourceFile(diagnostic.fileName) : undefined
+
+  if (!sourceFile) {
+    return diagnostic.fileName ? `${diagnostic.fileName} - ${message}` : message
+  }
+
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(diagnostic.pos)
+  return `${diagnostic.fileName}:${line + 1}:${character + 1} - ${message}`
 }

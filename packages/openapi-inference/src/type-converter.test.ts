@@ -170,7 +170,16 @@ describe('typeToJsonSchemaConverter', () => {
     expect(convert('NumDict')).toEqual([
       {
         $ref: '#/$defs/NumDict',
-        $defs: { NumDict: { type: 'object', additionalProperties: { type: 'string' } } },
+        $defs: {
+          // an array or a string has a number index too
+          NumDict: {
+            anyOf: [
+              { type: 'array', items: { type: 'string' } },
+              { type: 'string' },
+              { type: 'object', additionalProperties: { type: 'string' } },
+            ],
+          },
+        },
       },
       false,
     ])
@@ -927,7 +936,13 @@ describe('typeToJsonSchemaConverter', () => {
         {
           $ref: '#/$defs/NumberKeys',
           $defs: {
-            NumberKeys: { type: 'object', additionalProperties: { type: 'string' } },
+            NumberKeys: {
+              anyOf: [
+                { type: 'array', items: { type: 'string' } },
+                { type: 'string' },
+                { type: 'object', additionalProperties: { type: 'string' } },
+              ],
+            },
           },
         },
         false,
@@ -1694,10 +1709,7 @@ describe('typeToJsonSchemaConverter', () => {
             ],
           },
           tags: {
-            anyOf: [
-              { 'type': 'array', 'uniqueItems': true, 'items': {}, 'x-native-type': 'set' },
-              plainObject,
-            ],
+            anyOf: [{ 'type': 'array', 'items': {}, 'x-native-type': 'set' }, plainObject],
           },
           link: {
             anyOf: [{ 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }, plainObject],
@@ -3023,6 +3035,35 @@ describe('typeToJsonSchemaConverter', () => {
 
       expect(toString('NotIter')).toBeUndefined()
       expect(toString('BothUsers')).toBeUndefined()
+    })
+  })
+
+  describe('round thirty-five', () => {
+    it('converts types no handler returns as a value of their own', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/app/src/round35.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program, {
+          defs: 'recursive',
+        })
+        const convert = (name: string) => converter.convert(project.getExportType(name).type)
+
+        // like `object`, also a function, which is written as nothing
+        expect(convert('AnyRecord')).toEqual([
+          { description: 'Any object, an array or a function too' },
+          true,
+        ])
+        expect(convert('StringIterable')).toEqual([
+          { description: 'Strings, as an array, a set, or a string' },
+          false,
+        ])
+        // the compiler gives up on instantiating it, which is no unresolved type
+        expect(() => convert('TwiceExpandingCycle')).not.toThrow()
+      } finally {
+        project.close()
+      }
     })
   })
 
