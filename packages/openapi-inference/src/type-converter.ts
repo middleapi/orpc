@@ -157,8 +157,9 @@ const SHARED = new WeakMap<Checker, { types: TypeQueries; names: DefNames }>()
 const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
 
 /**
- * Converts TypeScript types into JSON Schemas (draft 2020-12), describing values
- * as they look after oRPC's OpenAPI JSON serialization, e.g. `Date` as a `date-time` string.
+ * Converts TypeScript types into JSON Schemas (draft 2020-12), describing values as the server
+ * sends them after oRPC's OpenAPI JSON serialization (e.g. `Date` as a `date-time` string), or,
+ * with `direction: 'input'`, as a client sends them (classes as plain objects).
  *
  * Named types are emitted as `$defs`. Conversions share a cache, so reuse one converter per program.
  *
@@ -1157,49 +1158,46 @@ export class TypeToJsonSchemaConverter {
    * The arrays and strings an object type of their members (`length`, a number index) holds.
    */
   private convertStructuralForms(type: Type, properties: readonly TSSymbol[]): JsonSchema[] {
-    const forms: JsonSchema[] = []
-    const keys = this.checker.getIndexInfosOfType(type).map((info) => info.keyType)
-
     // neither has a string index
-    if (keys.some((key) => !(key.flags & TypeFlags.Number))) {
-      return forms
+    if (
+      this.checker
+        .getIndexInfosOfType(type)
+        .some((info) => !(info.keyType.flags & TypeFlags.Number))
+    ) {
+      return []
     }
 
+    const forms: JsonSchema[] = []
     const weak = properties.every((p) => p.flags & SymbolFlags.Optional)
 
-    for (const [name, primitive] of [
-      ['Array', undefined],
-      ['String', this.checker.getStringType()],
-    ] as const) {
+    // only types of their members, checked by the compiler, `{ filter: string }` is no array,
+    // `{ length: number; extra?: string }` is one without `extra`. Of a type of optional
+    // properties only, which any value sharing one satisfies (`Partial<Date>` an array by its
+    // `toString`), all are.
+    const isTypeOfMembers = (name: 'Array' | 'String') => {
       const members = this.types.getGlobalType(name)
-      // only types of their members, checked by the compiler, `{ filter: string }` is no array,
-      // `{ length: number; extra?: string }` is one without `extra`. Of a type of optional
-      // properties only, which any value sharing one satisfies (`Partial<Date>` an array by its
-      // `toString`), all are.
-      if (
-        !members ||
-        !properties.every(
+      return (
+        members !== undefined &&
+        properties.every(
           (p) =>
             (p.flags & SymbolFlags.Optional && !weak) || this.getPropertyNames(members).has(p.name),
         )
-      ) {
-        continue
-      }
+      )
+    }
 
-      if (primitive) {
-        if (this.checker.isTypeAssignableTo(primitive, type)) {
-          forms.push({ type: 'string' })
-        }
-        continue
-      }
+    const anyArray = isTypeOfMembers('Array') ? this.getAnyArrayType() : undefined
+    if (anyArray && this.checker.isTypeAssignableTo(anyArray, type)) {
+      forms.push({
+        type: 'array',
+        items: this.visitElement(getNumberIndexType(this.types, type)),
+      })
+    }
 
-      const anyArray = this.getAnyArrayType()
-      if (anyArray && this.checker.isTypeAssignableTo(anyArray, type)) {
-        forms.push({
-          type: 'array',
-          items: this.visitElement(getNumberIndexType(this.types, type)),
-        })
-      }
+    if (
+      isTypeOfMembers('String') &&
+      this.checker.isTypeAssignableTo(this.checker.getStringType(), type)
+    ) {
+      forms.push({ type: 'string' })
     }
 
     return forms
@@ -1802,19 +1800,18 @@ export class TypeToJsonSchemaConverter {
    * do not cover: of the view, ones JSON writes as something else than a number (`buffer`).
    */
   private mayHoldPlainFields(type: Type): boolean {
-    return getTypedArrayViewBases(this.types, type).some((view) => {
-      const properties = this.types.getProperties(view)
-      const propertyTypes = properties.length ? this.checker.getTypeOfSymbol([...properties]) : []
-
-      return propertyTypes.some(
-        (t) =>
-          t !== undefined &&
-          !isDropped(this.types, t) &&
-          this.types
-            .getUnionMembers(t)
-            .some((m) => !(m.flags & (TypeFlags.NumberLike | UNDEFINED_FLAGS))),
-      )
-    })
+    return getTypedArrayViewBases(this.types, type).some((view) =>
+      this.types
+        .getPropertyTypes(view)
+        .some(
+          (t) =>
+            t !== undefined &&
+            !isDropped(this.types, t) &&
+            this.types
+              .getUnionMembers(t)
+              .some((m) => !(m.flags & (TypeFlags.NumberLike | UNDEFINED_FLAGS))),
+        ),
+    )
   }
 
   private isViewOfArraySubclass(type: Type): boolean {

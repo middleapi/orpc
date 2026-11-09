@@ -214,12 +214,10 @@ export class TypeQueries {
     }
 
     const interfaces = this.getMembers(type).map((member) => {
-      const primitive = member.isIntersectionType()
-        ? this.getMembers(member).find((m) => m.flags & PRIMITIVE_FLAGS)
-        : member
-      return primitive && primitive.flags & PRIMITIVE_FLAGS
-        ? this.checker.getApparentType(primitive)
-        : undefined
+      const primitive = (member.isIntersectionType() ? this.getMembers(member) : [member]).find(
+        (m) => m.flags & PRIMITIVE_FLAGS,
+      )
+      return primitive && this.checker.getApparentType(primitive)
     })
     const [first] = interfaces
 
@@ -519,7 +517,7 @@ export class TypeQueries {
   /**
    * The types of the properties of a type, in the order of `getProperties`.
    */
-  private getPropertyTypes(type: Type): readonly (Type | undefined)[] {
+  getPropertyTypes(type: Type): readonly (Type | undefined)[] {
     return this.getSymbolTypes(this.getProperties(type))
   }
 

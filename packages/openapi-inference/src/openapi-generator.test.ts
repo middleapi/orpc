@@ -49,6 +49,7 @@ import {
 import { roundThirtyFiveInputs } from '../tests/fixtures/app/src/round35'
 import { roundThirtySixInputs } from '../tests/fixtures/app/src/round36'
 import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
+import { roundThirtyEightJSDoc } from '../tests/fixtures/app/src/round38'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -553,6 +554,20 @@ describe('openAPIGenerator', () => {
       summary: 'Describe it',
       description: 'From the comment.',
     })
+  })
+
+  it('takes the success description from @returns, keeping one set by the openapi metadata', async () => {
+    const spec = await generator.generate(roundThirtyEightJSDoc, {
+      source: { file: fixture('round38.ts'), export: 'roundThirtyEightJSDoc' },
+    })
+    const description = (path: string, method: string, status: number) =>
+      (spec.paths as any)[path][method].responses[status].description
+
+    expect(description('/created', 'post', 201)).toBe('The created account')
+    expect(description('/found', 'post', 200)).toBe('The found account')
+    expect(description('/updated', 'post', 200)).toBe('From the route')
+    expect(description('/removed', 'post', 200)).toBe('From the metadata')
+    expect(description('/listed', 'post', 200)).toBe('OK')
   })
 
   it('shows the compiler errors behind an unresolved type', async () => {

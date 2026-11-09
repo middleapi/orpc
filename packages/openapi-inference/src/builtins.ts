@@ -374,10 +374,9 @@ function extendsProjectClass(types: TypeQueries, type: Type, visited: Set<number
     return (
       symbol !== undefined &&
       !isBuiltinSymbol(types, symbol) &&
-      (symbol.flags & SymbolFlags.Class
-        ? true
-        : Boolean(symbol.flags & SymbolFlags.Interface) &&
-          extendsProjectClass(types, base, visited))
+      (Boolean(symbol.flags & SymbolFlags.Class) ||
+        (Boolean(symbol.flags & SymbolFlags.Interface) &&
+          extendsProjectClass(types, base, visited)))
     )
   })
 }

@@ -125,7 +125,8 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  * so procedures without `.output` (or with type-only schemas) are fully documented.
  *
  * Schemas supported by `converters` are converted as usual, everything else falls back to type inference.
- * JSDoc comments of procedures fill `summary`, `description`, and `deprecated` when not set by `.route`, and `@tags` adds tags.
+ * JSDoc comments of procedures fill `summary`, `description`, `deprecated`, and (from `@returns`) `successDescription`
+ * when the `openapi` metadata (`openapi(...)` or `.route`) does not set them, and `@tags` adds tags.
  *
  * @remarks
  * Generation runs the TypeScript 7 compiler on the source files, so it needs them at runtime.
@@ -518,11 +519,11 @@ function hasReturn(types: readonly Type[]): boolean {
 }
 
 /**
- * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by `.route`.
+ * Fills the OpenAPI meta from the procedure's JSDoc, keeping values set by the `openapi` metadata.
  * The JSDoc is read from the router property, the variable assigned to it (`{ ping }`),
  * or the contract property either of them implements:
  * the first line is the `summary`, the rest the `description`,
- * `@summary`, `@description`, `@deprecated` override them, and `@tags` adds tags.
+ * `@summary`, `@description`, `@deprecated` override them, `@returns` is the `successDescription`, and `@tags` adds tags.
  */
 function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | undefined): Meta {
   if (!symbol) {
@@ -565,6 +566,8 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
       fromJSDoc.description = text || fromJSDoc.description
     } else if (tag.name === 'deprecated') {
       fromJSDoc.deprecated = true
+    } else if (tag.name === 'returns' || tag.name === 'return') {
+      fromJSDoc.successDescription = text || fromJSDoc.successDescription
     } else if (tag.name === 'tags' || tag.name === 'tag') {
       fromJSDoc.tags = [
         ...(fromJSDoc.tags ?? []),
@@ -579,7 +582,7 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
   const openapi = (meta['~openapi'] ?? {}) as OpenAPIMeta
   const merged: OpenAPIMeta = { ...openapi }
 
-  for (const key of ['summary', 'description', 'deprecated'] as const) {
+  for (const key of ['summary', 'description', 'deprecated', 'successDescription'] as const) {
     if (merged[key] === undefined && fromJSDoc[key] !== undefined) {
       ;(merged as Record<string, unknown>)[key] = fromJSDoc[key]
     }

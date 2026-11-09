@@ -331,7 +331,7 @@ Types declared in your project become components named after them, like `User` o
 
 ### JSDoc
 
-On a procedure, the comment's first line becomes the `summary`, the rest the `description`, and `@deprecated` and `@tags a, b` set those fields. On a property or type, the comment becomes the `description`, and tags like `@format`, `@minimum`, `@pattern`, `@default`, `@example`, and `@type integer` set the matching keyword:
+On a procedure, the comment's first line becomes the `summary`, the rest the `description`, `@returns` the success response's description, and `@deprecated` and `@tags a, b` set those fields. On a property or type, the comment becomes the `description`, and tags like `@format`, `@minimum`, `@pattern`, `@default`, `@example`, and `@type integer` set the matching keyword:
 
 ```ts
 interface User {

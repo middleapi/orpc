@@ -101,22 +101,17 @@ export class RouterTypeResolver {
       expansion.expand(
         current,
         () =>
-          this.getPropertyTypes(current, types).some((property) =>
-            this.holdsProcedureIn(property, types, expansion, seen),
-          ) ||
+          types
+            .getPropertyTypes(current)
+            .some(
+              (property) =>
+                property !== undefined && this.holdsProcedureIn(property, types, expansion, seen),
+            ) ||
           this.checker
             .getIndexInfosOfType(current)
             .some((info) => this.holdsProcedureIn(info.valueType, types, expansion, seen)),
       ) ?? false
     )
-  }
-
-  /** The types of all properties, in one compiler request */
-  private getPropertyTypes(type: Type, types: TypeQueries): Type[] {
-    const properties = types.getProperties(type)
-    return properties.length
-      ? this.checker.getTypeOfSymbol(properties).filter((t) => t !== undefined)
-      : []
   }
 
   /**

@@ -151,10 +151,12 @@ export class ModeSensitivity {
 
     // the serializer leaves typed arrays, also with added fields, to `JSON.stringify`, but not
     // the plain object a view of a typed array class may hold (`Pick<class B extends Uint8Array, 's'>`)
-    if (flags & (TypeFlags.Object | TypeFlags.Intersection) && isTypedArray(types, type)) {
-      if (!isClassView(types, type)) {
-        return false
-      }
+    if (
+      flags & (TypeFlags.Object | TypeFlags.Intersection) &&
+      isTypedArray(types, type) &&
+      !isClassView(types, type)
+    ) {
+      return false
     }
 
     if (flags & TypeFlags.UnionOrIntersection) {
@@ -244,19 +246,15 @@ export class ModeSensitivity {
       return isModeSensitiveBuiltin(types, type)
     }
 
-    const properties = types.getProperties(type)
-    const hasToJSON = properties.some((p) => p.name === 'toJSON')
+    const hasToJSON = types.getProperties(type).some((p) => p.name === 'toJSON')
 
     // the serializer skips `toJSON` of plain objects, `JSON.stringify` calls it. An object literal
     // is a plain object, a declared object type (`interface Point { toJSON(): string }`) may be
     // one, so the serializer writes what `toJSON` returns or its fields, the `either` mode too.
-    if (hasToJSON) {
-      return (
-        this.mode === 'stringify' || isObjectLiteral(type) || this.computeFields(type, isSensitive)
-      )
-    }
-
-    return this.computeFields(type, isSensitive)
+    return (
+      (hasToJSON && (this.mode === 'stringify' || isObjectLiteral(type))) ||
+      this.computeFields(type, isSensitive)
+    )
   }
 
   /**

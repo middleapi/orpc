@@ -97,10 +97,7 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
   }
 
   if (tsconfig !== undefined) {
-    // a directory stands for its tsconfig.json, like `tsc -p <directory>`
-    if (statSync(tsconfig, { throwIfNoEntry: false })?.isDirectory()) {
-      tsconfig = path.join(tsconfig, 'tsconfig.json')
-    }
+    tsconfig = toTsconfigPath(tsconfig)
 
     if (!existsSync(tsconfig)) {
       throw new Error(`[TypeScript] tsconfig "${tsconfig}" does not exist.`)
@@ -257,6 +254,15 @@ function* findAncestorTsconfigs(directory: string): Generator<string> {
 }
 
 /**
+ * A directory stands for its tsconfig.json, like `tsc -p <directory>` or a project reference.
+ */
+function toTsconfigPath(target: string): string {
+  return statSync(target, { throwIfNoEntry: false })?.isDirectory()
+    ? path.join(target, 'tsconfig.json')
+    : target
+}
+
+/**
  * The existing tsconfigs a solution tsconfig references, also through the solutions it references.
  */
 function getReferencedTsconfigs(tsconfig: string): Set<string> {
@@ -265,12 +271,7 @@ function getReferencedTsconfigs(tsconfig: string): Set<string> {
 
   for (const config of queue) {
     for (const reference of readReferencePaths(config)) {
-      let target = path.resolve(path.dirname(config), reference)
-
-      // a reference to a directory stands for its tsconfig.json
-      if (statSync(target, { throwIfNoEntry: false })?.isDirectory()) {
-        target = path.join(target, 'tsconfig.json')
-      }
+      const target = toTsconfigPath(path.resolve(path.dirname(config), reference))
 
       if (target !== tsconfig && !references.has(target) && existsSync(target)) {
         references.add(target)

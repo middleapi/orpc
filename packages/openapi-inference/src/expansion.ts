@@ -319,7 +319,7 @@ export class ExpansionGuard {
 
     // `{ inner: T }`
     return this.types
-      .getSymbolTypes(this.types.getProperties(type))
+      .getPropertyTypes(type)
       .every((t) => t === undefined || this.isParametric(t, depth - 1))
   }
 
@@ -348,7 +348,7 @@ export class ExpansionGuard {
    */
   private getValues(type: Type): readonly (Type | undefined)[] {
     return this.types.memo('expansionValues', type.id, () => [
-      ...this.types.getSymbolTypes(this.types.getProperties(type)),
+      ...this.types.getPropertyTypes(type),
       ...this.types.checker.getIndexInfosOfType(type).map((info) => info.valueType),
     ])
   }
@@ -447,8 +447,7 @@ function containsType(types: TypeQueries, type: Type, id: number, depth: number)
     !type.getAliasSymbol()
   ) {
     // `Thread<{ parent: T }>` grows through the literal's properties
-    const properties = types.getProperties(type)
-    children = properties.length ? types.checker.getTypeOfSymbol(properties) : []
+    children = types.getPropertyTypes(type)
   } else {
     children = types.getTypeArguments(type)
   }
