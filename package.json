@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter './packages/*' run prepack",
+    "build": "pnpm --filter './packages/*' --no-sort run prepack",
     "check": "oxlint",
     "fix": "oxlint --fix",
     "format": "oxfmt",

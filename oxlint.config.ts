@@ -93,6 +93,12 @@ export default defineConfig({
   },
   overrides: [
     {
+      files: ['packages/*/src/**'],
+      rules: {
+        'import/no-cycle': ['error', { ignoreTypes: true }],
+      },
+    },
+    {
       files: [
         '**/*.test.ts',
         '**/*.test.tsx',

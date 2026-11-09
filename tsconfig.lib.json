@@ -4,8 +4,8 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [],
-    // packages build with obuild (see build.config.ts), which emits declarations per file with oxc
     "declaration": true,
+    // obuild emits declarations per file (build.config.ts)
     "isolatedDeclarations": true
   },
   "include": ["${configDir}/src"],
