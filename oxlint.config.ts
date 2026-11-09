@@ -9,7 +9,7 @@ export default defineConfig({
     '.agents/skills/**',
     '.claude/skills/**',
     // type-aware rules require strictNullChecks, which this fixture turns off on purpose
-    'packages/typescript-openapi/tests/fixtures/loose/**',
+    'packages/openapi-inference/tests/fixtures/loose/**',
   ],
   categories: {
     correctness: 'error',

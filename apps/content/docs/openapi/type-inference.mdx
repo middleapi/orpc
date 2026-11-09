@@ -14,7 +14,7 @@ This package is experimental. It runs the TypeScript 7 compiler on your source f
 ## Installation
 
 ```package-install
-npm install @orpc/experimental-typescript-openapi@beta
+npm install @orpc/experimental-openapi-inference@beta
 ```
 
 ## Basic Usage
@@ -43,7 +43,7 @@ export const router = {
 
 ```ts
 // scripts/generate-openapi.ts
-import { TypeScriptOpenAPIGenerator } from '@orpc/experimental-typescript-openapi'
+import { TypeScriptOpenAPIGenerator } from '@orpc/experimental-openapi-inference'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { router } from '../src/router'
 
@@ -167,7 +167,7 @@ The compiler keeps no trace of aliases of primitives and literals, like `type Us
 import {
   openTypeScriptProject,
   TypeToJsonSchemaConverter,
-} from '@orpc/experimental-typescript-openapi'
+} from '@orpc/experimental-openapi-inference'
 
 const project = openTypeScriptProject({ file: './src/models.ts' })
 

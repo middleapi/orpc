@@ -1,5 +1,5 @@
 {
-  "name": "@orpc/experimental-typescript-openapi",
+  "name": "@orpc/experimental-openapi-inference",
   "version": "2.0.0-beta.49",
   "description": "Generate OpenAPI specs for oRPC routers from their TypeScript types, no output schemas required",
   "keywords": [
@@ -16,7 +16,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
-    "directory": "packages/typescript-openapi"
+    "directory": "packages/openapi-inference"
   },
   "funding": [
     "https://github.com/sponsors/dinwwwh",
