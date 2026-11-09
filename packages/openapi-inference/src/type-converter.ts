@@ -31,7 +31,7 @@ import {
 } from './builtins'
 import type { DefNameRecord } from './components'
 import { getDefName, getFallbackDefName, getViewDefName } from './def-names'
-import type { ConversionMode, Def } from './defs'
+import type { ConversionMode } from './defs'
 import { DefNames, DefRegistry, toModeKey } from './defs'
 import { ExpansionGuard } from './expansion'
 import {
@@ -44,6 +44,8 @@ import {
   hasOptionalToJSON,
   isClassView,
   isDropped,
+  isInstanceOrPlain,
+  mayBePlainObject,
   isFunction,
   isNonSerializable,
   mayBeNonSerializable,
@@ -127,6 +129,18 @@ export interface AsyncIteratorTypes {
   returnTypes: readonly Type[]
 }
 
+/**
+ * Which form of an object type `convertObject` writes.
+ */
+interface ObjectForm {
+  /** Converts the own fields of a type with `toJSON`, as if it had none */
+  ignoreToJSON?: boolean
+  /** Converts a view of a built-in (`Partial<Date>`) as the plain object it may hold */
+  plain?: boolean
+  /** Converts a built-in subclass by its own fields, as `JSON.stringify` writes what `toJSON` returned */
+  ownFields?: boolean
+}
+
 const SHARED = new WeakMap<Checker, { types: TypeQueries; names: DefNames }>()
 
 const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
@@ -152,16 +166,9 @@ export class TypeToJsonSchemaConverter {
   /** Types whose `either` form differs from their serializer form */
   private readonly eitherSensitivity: ModeSensitivity
 
-  /** Anonymous types being converted, with the named depth they were entered at */
-  private readonly visiting = new Map<number, number>()
-  private readonly visitingStack: { type: Type; key: number }[] = []
-  /** Types that close a cycle, preferred over wrappers around them for the def */
-  private readonly cycleClosers = new Set<number>()
+  private readonly cycles: AnonymousCycles
   /** Non-null cores of named nullable unions, back to the union (`Json` without `null` -> `Json`) */
   private readonly nullableCores = new Map<number, Type>()
-  private namedDepth = 0
-  /** Defs by their class (of a view) or name and their schema, shared by the same schema */
-  private readonly sharedDefs = new Map<string, Def>()
   private voidType: Type | undefined
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
@@ -200,6 +207,7 @@ export class TypeToJsonSchemaConverter {
     this.names = shared.names
     this.defs = new DefRegistry(shared.names)
     this.expansion = new ExpansionGuard(this.types)
+    this.cycles = new AnonymousCycles(this.types)
     this.stringifySensitivity = new ModeSensitivity(this.types, 'stringify')
     this.eitherSensitivity = new ModeSensitivity(this.types, 'either')
   }
@@ -216,7 +224,7 @@ export class TypeToJsonSchemaConverter {
 
     // a function (also with properties, `(() => number) & { tag: string }`) is written as nothing,
     // like `undefined`, also as a member of a union
-    const unions = members.flatMap((t) => (t.isUnionType() ? this.types.getMembers(t) : [t]))
+    const unions = members.flatMap((t) => this.types.getUnionMembers(t))
     const serializable = unions.filter((t) => !isNonSerializable(this.types, t))
     const filtered = serializable.length < unions.length
     const optional =
@@ -418,99 +426,83 @@ export class TypeToJsonSchemaConverter {
     // a view of a project class (`Readonly<User>`) is shared by the models referring to it,
     // so it is written once, like the class
     const viewName =
-      this.defsMode === 'named' && !projectSymbol ? this.getViewDefName(type) : undefined
+      this.defsMode === 'named' && !projectSymbol ? this.getProjectClassViewName(type) : undefined
 
     if (
       this.defsMode === 'named' &&
       (projectSymbol || viewName) &&
       !(type.flags & TypeFlags.Boolean)
     ) {
-      // the name of a view yields to a declared type of that name, whichever comes first
-      const preferredName = viewName ?? getDefName(this.types, type, projectSymbol!)
-      const def = this.defs.create(key, preferredName)
-      const cuts = this.expansion.cuts
-
-      this.namedDepth++
-      let schema: JsonSchema
-      try {
-        schema = this.annotate(this.convertType(type), projectSymbol)
-      } finally {
-        this.namedDepth--
-      }
-
-      def.stable = cuts === this.expansion.cuts
-
-      // a named primitive, like `type UserId = string & { __brand: 'UserId' }`, is clearer inline.
-      // It has no refs, so nothing references the def yet.
-      if (isTrivialSchema(schema)) {
-        this.defs.inline(def, schema)
-        return schema
-      }
-
-      def.schema = schema
-      this.defs.reclaimName(def, preferredName)
-
-      // a view referring to no defs is written in place, like an anonymous type: only views
-      // reaching other defs are shared, which keeps graphs of views linear. So is a view of
-      // a function (`DeepReadonly<() => void>`).
-      if (
-        (viewName || getViewedFunction(this.types, type)) &&
-        !collectDefRefs(schema).size &&
-        this.defs.replaceIfUnreferenced(def, schema)
-      ) {
-        return schema
-      }
-
-      // views of one class with the same schema (`Readonly<C>`, `Pick<C, keyof C>`) share a def,
-      // and so do types printed the same (`DeepPartial<Map<string, number>>`, instantiated
-      // once for a union it distributes over and once more alone) with the same schema
-      const signature = `${viewName ? getClassType(this.types, type)!.id : preferredName}:${this.defs.stringify(schema)}`
-      const existing = this.sharedDefs.get(signature)
-      const ref = existing && { $ref: toRef(existing.name) }
-
-      if (
-        existing &&
-        existing.key !== key &&
-        this.defs.get(existing.key)?.name === existing.name &&
-        this.defs.replaceIfUnreferenced(def, ref!)
-      ) {
-        return ref!
-      }
-
-      this.sharedDefs.set(signature, def)
-
-      return { $ref: toRef(def.name) }
+      return this.visitNamed(type, key, projectSymbol, viewName)
     }
 
-    const enteredAt = this.visiting.get(key)
+    return this.visitAnonymous(type, key, projectSymbol)
+  }
 
-    // the same anonymous type again, without a named def in between to stop at: a cycle.
-    // Through a named def (`Tree[]` in `Tree`), converting it again ends at that def.
-    if (enteredAt === this.namedDepth) {
-      const closer = this.getCycleCloser(type, key)
+  /**
+   * Converts a type written as a def: a named project type, or a view of a project class.
+   */
+  private visitNamed(
+    type: Type,
+    key: number,
+    projectSymbol: TSSymbol | undefined,
+    viewName: string | undefined,
+  ): JsonSchema {
+    // the name of a view yields to a declared type of that name, whichever comes first
+    const preferredName = viewName ?? getDefName(this.types, type, projectSymbol!)
+    const def = this.defs.create(key, preferredName)
+    const cuts = this.expansion.cuts
 
-      if (closer === undefined) {
-        return { $ref: toRef(this.defs.create(key, getFallbackDefName(this.types, type)).name) }
-      }
+    const schema = this.cycles.named(() => this.annotate(this.convertType(type), projectSymbol))
 
-      // convert this wrapper (`TreeNode[]`) once more, so the cycle closes at `TreeNode` instead
-      this.cycleClosers.add(closer.key)
+    def.stable = cuts === this.expansion.cuts
+
+    // a named primitive, like `type UserId = string & { __brand: 'UserId' }`, is clearer inline.
+    // It has no refs, so nothing references the def yet.
+    if (isTrivialSchema(schema)) {
+      this.defs.inline(def, schema)
+      return schema
     }
 
-    this.visiting.set(key, this.namedDepth)
-    this.visitingStack.push({ type, key })
+    def.schema = schema
+    this.defs.reclaimName(def, preferredName)
+
+    // a view referring to no defs is written in place, like an anonymous type: only views
+    // reaching other defs are shared, which keeps graphs of views linear. So is a view of
+    // a function (`DeepReadonly<() => void>`).
+    if (
+      (viewName || getViewedFunction(this.types, type)) &&
+      !collectDefRefs(schema).size &&
+      this.defs.replaceIfUnreferenced(def, schema)
+    ) {
+      return schema
+    }
+
+    // views of one class with the same schema (`Readonly<C>`, `Pick<C, keyof C>`) share a def,
+    // and so do types printed the same (`DeepPartial<Map<string, number>>`, instantiated
+    // once for a union it distributes over and once more alone) with the same schema
+    const group = viewName ? String(getClassType(this.types, type)!.id) : preferredName
+
+    return { $ref: toRef(this.defs.share(def, group).name) }
+  }
+
+  /**
+   * Converts a type written in place, unless it comes back to itself: a cycle makes it a def.
+   */
+  private visitAnonymous(type: Type, key: number, projectSymbol: TSSymbol | undefined): JsonSchema {
+    const enteredAt = this.cycles.enter(type, key)
+
+    if (enteredAt === 'closed') {
+      return { $ref: toRef(this.defs.create(key, getFallbackDefName(this.types, type)).name) }
+    }
+
     const cuts = this.expansion.cuts
 
     let schema: JsonSchema
     try {
       schema = this.convertType(type)
     } finally {
-      this.visitingStack.pop()
-      if (enteredAt === undefined) {
-        this.visiting.delete(key)
-      } else {
-        this.visiting.set(key, enteredAt)
-      }
+      this.cycles.leave(key, enteredAt)
     }
 
     schema = this.annotate(schema, projectSymbol)
@@ -532,35 +524,6 @@ export class TypeToJsonSchemaConverter {
     }
 
     return schema
-  }
-
-  /**
-   * When a cycle comes back to a type without a good name, like `TreeNode[]` or
-   * `Record<string, Dict>`, returns the named type in the cycle (`TreeNode`) to make the def for.
-   */
-  private getCycleCloser(type: Type, key: number): { type: Type; key: number } | undefined {
-    if (this.cycleClosers.has(key) || this.hasCycleName(type)) {
-      return undefined
-    }
-
-    const start = this.visitingStack.findIndex((entry) => entry.key === key)
-
-    // converted once more already, the closer did not come back
-    if (this.visitingStack.filter((entry) => entry.key === key).length > 1) {
-      return undefined
-    }
-
-    return this.visitingStack.slice(start + 1).find((entry) => this.hasCycleName(entry.type))
-  }
-
-  private hasCycleName(type: Type): boolean {
-    const symbol = getNamedSymbol(type)
-
-    return Boolean(
-      symbol &&
-      !symbol.name.startsWith('__') &&
-      this.types.getSymbolSourceKind(symbol) !== 'default',
-    )
   }
 
   private convertType(type: Type): JsonSchema {
@@ -799,17 +762,9 @@ export class TypeToJsonSchemaConverter {
     return this.convertObject(type)
   }
 
-  /**
-   * `ignoreToJSON` converts the own fields of a type with `toJSON`. `plain` converts a view of a
-   * built-in (`Partial<Date>`) as the plain object it may hold. `ownFields` converts a built-in
-   * subclass by its own fields, as `JSON.stringify` writes what `toJSON` returned.
-   */
-  private convertObject(
-    type: Type,
-    ignoreToJSON = false,
-    plain = false,
-    ownFields = false,
-  ): JsonSchema {
+  private convertObject(type: Type, options: ObjectForm = {}): JsonSchema {
+    let { ignoreToJSON = false, plain = false } = options
+    const { ownFields = false } = options
     // a request carries plain JSON, also for a class type. A client may still send an instance
     // of the class behind a view (`Readonly<User>`), written without its getters, or as the
     // built-in the class extends (`Pick<class Stamp extends Date, 'label'>`).
@@ -850,15 +805,14 @@ export class TypeToJsonSchemaConverter {
     // a view of a class may hold an instance or a plain object, unless only instances
     // are assignable to it (an interface or intersection over a class with private members),
     // and so may an interface extending a built-in class (`interface AppError extends Error`)
-    const isView =
-      classType !== undefined
-        ? isClassView(this.types, type)
-        : !plain && extendsBuiltinClass(this.types, type)
+    const isView = !plain && isInstanceOrPlain(this.types, type)
 
     // the serializer leaves an instance to `JSON.stringify` and walks a plain object,
     // so each value of a view is written by either one
     if (isView && this.mode === 'serializer') {
-      return this.withMode('either', () => this.convertObject(type, ignoreToJSON, plain, ownFields))
+      return this.withMode('either', () =>
+        this.convertObject(type, { ignoreToJSON, plain, ownFields }),
+      )
     }
 
     // in the either mode, a view is an instance or a plain object, field by field
@@ -879,9 +833,9 @@ export class TypeToJsonSchemaConverter {
         // extending none) by its fields
         return anyOfDeduped(
           isView || sentView
-            ? [...subclasses, this.convertObject(type, ignoreToJSON, true)]
+            ? [...subclasses, this.convertObject(type, { ignoreToJSON, plain: true })]
             : subclasses.length < classes.length
-              ? [...subclasses, this.convertObject(type, ignoreToJSON, plain, true)]
+              ? [...subclasses, this.convertObject(type, { ignoreToJSON, plain, ownFields: true })]
               : subclasses,
         )
       }
@@ -910,7 +864,7 @@ export class TypeToJsonSchemaConverter {
     if (viewedResults.length) {
       return anyOfDeduped([
         ...this.convertToJSONResults(viewedResults),
-        this.convertObject(type, true, plain, ownFields),
+        this.convertObject(type, { ignoreToJSON: true, plain, ownFields }),
       ])
     }
 
@@ -947,7 +901,7 @@ export class TypeToJsonSchemaConverter {
 
       // without `toJSON`, a value is its own fields, of an instance or (for a view or an interface)
       // of a plain object. A `toJSON` returning only `undefined` writes nothing, the fields remain.
-      const fields = this.convertObject(type, true, plain, ownFields)
+      const fields = this.convertObject(type, { ignoreToJSON: true, plain, ownFields })
       return anyOfDeduped([
         ...converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!)),
         fields,
@@ -1009,7 +963,7 @@ export class TypeToJsonSchemaConverter {
       const convertForm = (next: 'typed' | 'plain') => {
         this.typedArrayForms.set(type.id, next)
         try {
-          return this.convertObject(type, ignoreToJSON, plain, ownFields)
+          return this.convertObject(type, { ignoreToJSON, plain, ownFields })
         } finally {
           this.typedArrayForms.delete(type.id)
         }
@@ -1289,7 +1243,7 @@ export class TypeToJsonSchemaConverter {
 
     const forms = builtins.map(
       (builtin, i) =>
-        builtin ?? this.withMode(modes[i]!, () => this.convertObject(type, false, false, true)),
+        builtin ?? this.withMode(modes[i]!, () => this.convertObject(type, { ownFields: true })),
     )
     // a boxed `BigInt` can not be written by `JSON.stringify`
     const writable = forms.filter((form) => !isNeverSchema(form))
@@ -1328,11 +1282,7 @@ export class TypeToJsonSchemaConverter {
     const [lengthType, ...elementTypes] = this.checker.getTypeOfSymbol([length, ...ordered])
     // `Partial` makes the length optional, a tuple with optional elements has several
     // (`1 | 2` of `Readonly<[number, string?] & { extra?: string }>`)
-    const members = lengthType
-      ? lengthType.isUnionType()
-        ? this.types.getMembers(lengthType)
-        : [lengthType]
-      : []
+    const members = lengthType ? this.types.getUnionMembers(lengthType) : []
     const lengths = members.filter((t) => t.flags & TypeFlags.NumberLike)
 
     // a mapped type changing the values (`{ [K in keyof T]?: true }`) is no array
@@ -1538,7 +1488,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     if (typedArray || (classType && getBuiltinBaseName(this.types, classType) !== undefined)) {
-      return this.convertObject(resolved, true, false, !typedArray)
+      return this.convertObject(resolved, { ignoreToJSON: true, ownFields: !typedArray })
     }
 
     // a branded value is serialized as its base: the primitive of `string & { __brand: 'Id' }`,
@@ -1562,7 +1512,9 @@ export class TypeToJsonSchemaConverter {
     }
 
     // a returned built-in is written by its own fields, also through `Readonly<Date>`
-    return getBuiltinFields(this.types, resolved) ?? this.convertObject(resolved, true)
+    return (
+      getBuiltinFields(this.types, resolved) ?? this.convertObject(resolved, { ignoreToJSON: true })
+    )
   }
 
   /**
@@ -1586,7 +1538,11 @@ export class TypeToJsonSchemaConverter {
     // an instance of a class besides the built-in (`Holder & Pick<Date, 'getTime'>`) is written by its
     // fields too, of a view of the class
     const classView = getClassTypes(this.types, type).some((c) => !hasBuiltinForm(this.types, c))
-    const fields = this.convertObject(type, true, !classView, true)
+    const fields = this.convertObject(type, {
+      ignoreToJSON: true,
+      plain: !classView,
+      ownFields: true,
+    })
 
     // `JSON.stringify` writes a `Set` as `{}`, which also covers its plain object
     return isPlain(builtin, 'object') && typeof fields === 'object' && fields.type === 'object'
@@ -1684,9 +1640,9 @@ export class TypeToJsonSchemaConverter {
         (t) =>
           t !== undefined &&
           !isDropped(this.types, t) &&
-          (t.isUnionType() ? this.types.getMembers(t) : [t]).some(
-            (m) => !(m.flags & (TypeFlags.NumberLike | UNDEFINED_FLAGS)),
-          ),
+          this.types
+            .getUnionMembers(t)
+            .some((m) => !(m.flags & (TypeFlags.NumberLike | UNDEFINED_FLAGS))),
       )
     })
   }
@@ -1715,7 +1671,7 @@ export class TypeToJsonSchemaConverter {
       return false
     }
 
-    return getClassType(this.types, type) === undefined || isClassView(this.types, type)
+    return mayBePlainObject(this.types, type)
   }
 
   /**
@@ -1723,9 +1679,7 @@ export class TypeToJsonSchemaConverter {
    * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
    */
   private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
-    const members = type.isUnionType() ? this.types.getMembers(type) : [type]
-
-    return members.some((member) => {
+    return this.types.getUnionMembers(type).some((member) => {
       // a function without its optional `toJSON` is dropped, also by a client sending it
       if (mayBeNonSerializable(this.types, member)) {
         return true
@@ -1755,7 +1709,7 @@ export class TypeToJsonSchemaConverter {
   /**
    * The def name of an anonymous view of a project class, like `Readonly<User>` or `User & { x }`.
    */
-  private getViewDefName(type: Type): string | undefined {
+  private getProjectClassViewName(type: Type): string | undefined {
     if (!(type.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
       return undefined
     }
@@ -1866,9 +1820,8 @@ export class TypeToJsonSchemaConverter {
       return undefined
     }
 
-    const members = type.isUnionType() ? this.types.getMembers(type) : [type]
-
-    return annotation.type.id === type.id || members.some((m) => m.id === annotation.type.id)
+    return annotation.type.id === type.id ||
+      this.types.getUnionMembers(type).some((m) => m.id === annotation.type.id)
       ? annotation.alias
       : undefined
   }
@@ -1964,4 +1917,92 @@ function toPattern(types: TypeQueries, type: Type): string {
 
   // `.` does not match line terminators
   return '[\\s\\S]*'
+}
+
+/**
+ * The anonymous types being converted, to find cycles that come back to one without a named def
+ * in between to stop at. Through a named def (`Tree[]` in `Tree`), converting it again ends there.
+ */
+class AnonymousCycles {
+  /** Anonymous types being converted, with the named depth they were entered at */
+  private readonly visiting = new Map<number, number>()
+  private readonly stack: { type: Type; key: number }[] = []
+  /** Types that close a cycle, preferred over wrappers around them for the def */
+  private readonly closers = new Set<number>()
+  private namedDepth = 0
+
+  constructor(private readonly types: TypeQueries) {}
+
+  /**
+   * Converts a named def, which a cycle through it ends at.
+   */
+  named<T>(convert: () => T): T {
+    this.namedDepth++
+    try {
+      return convert()
+    } finally {
+      this.namedDepth--
+    }
+  }
+
+  /**
+   * Enters an anonymous type, returning the named depth it was entered at before (pass it to
+   * `leave`), or `closed` when it closes a cycle here and becomes a def.
+   */
+  enter(type: Type, key: number): number | 'closed' | undefined {
+    const enteredAt = this.visiting.get(key)
+
+    if (enteredAt === this.namedDepth) {
+      const closer = this.getCycleCloser(type, key)
+
+      if (closer === undefined) {
+        return 'closed'
+      }
+
+      // convert this wrapper (`TreeNode[]`) once more, so the cycle closes at `TreeNode` instead
+      this.closers.add(closer.key)
+    }
+
+    this.visiting.set(key, this.namedDepth)
+    this.stack.push({ type, key })
+    return enteredAt
+  }
+
+  leave(key: number, enteredAt: number | undefined): void {
+    this.stack.pop()
+    if (enteredAt === undefined) {
+      this.visiting.delete(key)
+    } else {
+      this.visiting.set(key, enteredAt)
+    }
+  }
+
+  /**
+   * When a cycle comes back to a type without a good name, like `TreeNode[]` or
+   * `Record<string, Dict>`, returns the named type in the cycle (`TreeNode`) to make the def for.
+   */
+  private getCycleCloser(type: Type, key: number): { type: Type; key: number } | undefined {
+    if (this.closers.has(key) || this.hasCycleName(type)) {
+      return undefined
+    }
+
+    const start = this.stack.findIndex((entry) => entry.key === key)
+
+    // converted once more already, the closer did not come back
+    if (this.stack.filter((entry) => entry.key === key).length > 1) {
+      return undefined
+    }
+
+    return this.stack.slice(start + 1).find((entry) => this.hasCycleName(entry.type))
+  }
+
+  private hasCycleName(type: Type): boolean {
+    const symbol = getNamedSymbol(type)
+
+    return Boolean(
+      symbol &&
+      !symbol.name.startsWith('__') &&
+      this.types.getSymbolSourceKind(symbol) !== 'default',
+    )
+  }
 }

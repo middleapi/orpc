@@ -2,7 +2,6 @@ import type { Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import {
-  extendsBuiltinClass,
   getBuiltinBaseName,
   getDeclaredBuiltinName,
   getNumberIndexType,
@@ -14,7 +13,13 @@ import {
   isTypedArray,
 } from './builtins'
 import { ExpansionGuard } from './expansion'
-import { getClassType, getClassTypes, getDataProperties, isClassView } from './json-rules'
+import {
+  getClassType,
+  getClassTypes,
+  getDataProperties,
+  isClassView,
+  isInstanceOrPlain,
+} from './json-rules'
 import type { TypeQueries } from './type-queries'
 import { INSTANTIABLE_FLAGS, isObjectLiteral } from './type-queries'
 
@@ -212,11 +217,7 @@ export class ModeSensitivity {
     // the serializer converts a view in the `either` mode, also an interface extending a built-in
     // class (`interface AppError extends Error`), unless it is a built-in
     // (`Readonly<class Tags extends Set<string>>`)
-    if (
-      this.mode === 'either' &&
-      (classType !== undefined ? isClassView(types, type) : extendsBuiltinClass(types, type)) &&
-      !hasBuiltinForm(types, type)
-    ) {
+    if (this.mode === 'either' && isInstanceOrPlain(types, type) && !hasBuiltinForm(types, type)) {
       return false
     }
 

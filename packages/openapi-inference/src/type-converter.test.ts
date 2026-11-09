@@ -838,6 +838,119 @@ describe('typeToJsonSchemaConverter', () => {
       ])
     })
 
+    it('generic results nested in arrays, unions of arrays, and intersections with enums', () => {
+      const RESULT_ERROR = {
+        type: 'object',
+        properties: { ok: { type: 'boolean', const: false }, error: { type: 'string' } },
+        required: ['ok', 'error'],
+      }
+
+      expect(convertComplex('DeepGeneric')).toEqual([
+        {
+          $ref: '#/$defs/DeepGeneric',
+          $defs: {
+            DeepGeneric: {
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    ok: { type: 'boolean', const: true },
+                    value: { type: 'array', items: { $ref: '#/$defs/Result' } },
+                  },
+                  required: ['ok', 'value'],
+                },
+                RESULT_ERROR,
+              ],
+            },
+            Result: {
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    ok: { type: 'boolean', const: true },
+                    value: {
+                      type: 'object',
+                      properties: { id: { type: 'number' } },
+                      required: ['id'],
+                    },
+                  },
+                  required: ['ok', 'value'],
+                },
+                // an `Error` instance is written by `JSON.stringify`
+                {
+                  ...RESULT_ERROR,
+                  properties: { ...RESULT_ERROR.properties, error: { type: 'object' } },
+                },
+              ],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertComplex('UnionOfArrays')).toEqual([
+        {
+          $ref: '#/$defs/UnionOfArrays',
+          $defs: {
+            UnionOfArrays: {
+              anyOf: [
+                { type: 'array', items: { type: 'string' } },
+                { type: 'array', items: { type: 'number' } },
+              ],
+            },
+          },
+        },
+        false,
+      ])
+      expect(convertComplex('Combined')).toEqual([
+        {
+          $ref: '#/$defs/Combined',
+          $defs: {
+            Combined: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                role: { $ref: '#/$defs/Role' },
+              },
+              required: ['id', 'name', 'role'],
+            },
+            Role: { type: 'string', enum: ['admin', 'member'] },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('records keyed by numbers, and objects requiring one of their keys', () => {
+      // a JSON key is a string, so a numeric key is left unconstrained
+      expect(convertComplex('NumberKeys')).toEqual([
+        {
+          $ref: '#/$defs/NumberKeys',
+          $defs: {
+            NumberKeys: { type: 'object', additionalProperties: { type: 'string' } },
+          },
+        },
+        false,
+      ])
+      expect(convertComplex('AtLeastOne')).toEqual([
+        {
+          anyOf: [
+            {
+              type: 'object',
+              properties: { a: { type: 'string' }, b: { type: 'number' } },
+              required: ['a'],
+            },
+            {
+              type: 'object',
+              properties: { b: { type: 'number' }, a: { type: 'string' } },
+              required: ['b'],
+            },
+          ],
+        },
+        false,
+      ])
+    })
+
     it('records keyed by enums', () => {
       expect(convertComplex('RoleRecord')).toEqual([
         {

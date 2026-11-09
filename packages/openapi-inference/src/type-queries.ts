@@ -778,8 +778,8 @@ export class TypeQueries {
 
   private keepsStructure(value: Type, source: Type): boolean {
     if (value.isUnionType() || source.isUnionType()) {
-      const values = value.isUnionType() ? this.getMembers(value) : [value]
-      const sources = source.isUnionType() ? this.getMembers(source) : [source]
+      const values = this.getUnionMembers(value)
+      const sources = this.getUnionMembers(source)
 
       // each value is a source or a view of one (`T[K] | Readonly<T[K]>`), or a union widening one
       // with other values the source is assignable to (`T[K] | string`, `T[K] | T[K][]`)
@@ -941,6 +941,13 @@ export class TypeQueries {
 
   getMembers(type: Type): readonly Type[] {
     return this.memo('members', type.id, (): readonly Type[] => (type as any).getTypes() ?? [])
+  }
+
+  /**
+   * The members of a union, or the type itself.
+   */
+  getUnionMembers(type: Type): readonly Type[] {
+    return type.isUnionType() ? this.getMembers(type) : [type]
   }
 
   /**

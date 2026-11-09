@@ -1,3 +1,8 @@
+import path from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+
+import type { SourceFile } from 'typescript/unstable/ast'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
@@ -7,6 +12,8 @@ import type {
   Type,
 } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+
+import type { TypeScriptProject } from './project'
 
 export interface JSDoc {
   comment: string
@@ -250,4 +257,61 @@ export function getIteratorTypes(
   }
 
   return yieldTypes.length ? { yieldTypes, returnTypes } : undefined
+}
+
+/**
+ * Resolves a path relative to the current working directory, or a `file:` URL.
+ */
+export function toAbsolutePath(file: string | URL): string {
+  const filePath = file instanceof URL || file.startsWith('file:') ? fileURLToPath(file) : file
+  return path.resolve(process.cwd(), filePath)
+}
+
+/**
+ * The project of a source file of a loaded program (see `openTypeScriptProject`).
+ */
+export function createTypeScriptProject(
+  file: string,
+  checker: Checker,
+  program: Program,
+  sourceFile: SourceFile,
+  close: () => void,
+): TypeScriptProject {
+  const moduleSymbol = checker.getSymbolAtLocation(sourceFile)
+  const exports = moduleSymbol ? checker.getExportsOfModule(moduleSymbol) : []
+
+  return {
+    checker,
+    program,
+    sourceFile,
+    getExportType(name) {
+      const exported = exports.find((s) => s.name === name)
+
+      if (!exported) {
+        const names = exports.map((s) => s.name)
+        const hint = names.includes('default')
+          ? ` Use export: 'default' for the default export.`
+          : ''
+        throw new Error(
+          `[TypeScript] "${file}" has no export named "${name}". Available exports: ${names.join(', ') || '(none)'}.${hint}`,
+        )
+      }
+
+      const symbol =
+        exported.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported
+
+      // classes and enums are both, their declared type is the instance/member type
+      const type =
+        symbol.flags & SymbolFlags.Type
+          ? checker.getDeclaredTypeOfSymbol(symbol)
+          : checker.getTypeOfSymbol(symbol)
+
+      if (!type || type.isErrorType()) {
+        throw new Error(`[TypeScript] Could not resolve the type of "${name}" in "${file}".`)
+      }
+
+      return { type, symbol }
+    },
+    close,
+  }
 }

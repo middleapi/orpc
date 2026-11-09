@@ -2,7 +2,13 @@ import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import { getBuiltin, getBuiltinBaseName, getToJSON, isBuiltinSymbol } from './builtins'
+import {
+  extendsBuiltinClass,
+  getBuiltin,
+  getBuiltinBaseName,
+  getToJSON,
+  isBuiltinSymbol,
+} from './builtins'
 import type { TypeQueries } from './type-queries'
 import { INSTANTIABLE_FLAGS, isObjectLiteral, UNDEFINED_FLAGS } from './type-queries'
 import { isClassAccessor } from './utils'
@@ -122,8 +128,9 @@ export function isBuiltinMember(types: TypeQueries, property: TSSymbol, isError 
  * and symbols, optionally mixed with `undefined` (`cb?: () => void`).
  */
 export function isDropped(types: TypeQueries, type: Type): boolean {
-  const members = type.isUnionType() ? types.getMembers(type) : [type]
-  return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m))
+  return types
+    .getUnionMembers(type)
+    .every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m))
 }
 
 /**
@@ -155,7 +162,7 @@ export function isNonSerializable(
   seen.add(type.id)
 
   const members = getToJSONResultTypes(types, type, true).flatMap((result) =>
-    result.isUnionType() ? types.getMembers(result) : [result],
+    types.getUnionMembers(result),
   )
 
   return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m, seen))
@@ -233,7 +240,7 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
     !types.getProperties(type).length &&
     !types.checker.getIndexInfosOfType(type).length &&
     !types.isCallable(type) &&
-    (getClassType(types, type) === undefined || isClassView(types, type))
+    mayBePlainObject(types, type)
   )
 }
 
@@ -371,7 +378,7 @@ export function getToJSONResultTypes(
 function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
   const toJSON = getOwnToJSON(types, type)
   const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
-  return method?.isUnionType() ? types.getMembers(method) : method ? [method] : []
+  return method ? types.getUnionMembers(method) : []
 }
 
 /**
@@ -585,4 +592,22 @@ function createsInterface(types: TypeQueries, type: Type, name: string, depth = 
 export function isClassView(types: TypeQueries, type: Type): boolean {
   const classType = getClassType(types, type)
   return classType !== undefined && classType.id !== type.id && !types.isNominalClass(type)
+}
+
+/**
+ * Whether a value of this type may be a plain object the serializer walks: no class instance,
+ * or a view of a class (see `isClassView`).
+ */
+export function mayBePlainObject(types: TypeQueries, type: Type): boolean {
+  return getClassType(types, type) === undefined || isClassView(types, type)
+}
+
+/**
+ * Whether a value of this type may be an instance or a plain object: a view of a class (see
+ * `isClassView`), or an interface extending a built-in class (`interface AppError extends Error`).
+ */
+export function isInstanceOrPlain(types: TypeQueries, type: Type): boolean {
+  return getClassType(types, type) !== undefined
+    ? isClassView(types, type)
+    : extendsBuiltinClass(types, type)
 }

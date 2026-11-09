@@ -1,5 +1,11 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+
 import { OpenAPIGeneratorError, OpenAPIJsonSerializer } from '@orpc/openapi'
-import { Procedure } from '@orpc/server'
+import { call, os, Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
@@ -33,10 +39,27 @@ import {
 import { roundThirtyOneInputs } from '../tests/fixtures/app/src/round31'
 import { roundThirtyTwoInputs } from '../tests/fixtures/app/src/round32'
 import { roundThirtyThreeInputs } from '../tests/fixtures/app/src/round33'
+import { roundThirtyFourJSDoc } from '../tests/fixtures/app/src/round34'
 import { router } from '../tests/fixtures/app/src/router'
+import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
+import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
 import { OpenAPIGenerator } from './openapi-generator'
+
+// the documents of the `app` fixture are generated from one compiler, started once
+const projects = vi.hoisted(() => ({ close: () => {} }))
+vi.mock('./project', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./project')>()
+  const { shareProjects } = await import('../tests/shared-project')
+  const shared = shareProjects(
+    actual.openTypeScriptProject,
+    new URL('../tests/fixtures/app/src/', import.meta.url),
+  )
+  projects.close = shared.close
+  return { ...actual, openTypeScriptProject: shared.open }
+})
+afterAll(() => projects.close())
 
 const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, import.meta.url)
 
@@ -315,6 +338,174 @@ describe('openAPIGenerator', () => {
     await expect(
       generator.generate(router, { source: { file: fixture('missing.ts') } }),
     ).rejects.toThrow('does not exist')
+  })
+
+  it('lists the exports of the file when the export is missing', async () => {
+    await expect(
+      generator.generate(streamRouter, { source: { file: fixture('routers/stream.ts') } }),
+    ).rejects.toThrow(
+      `has no export named "router". Available exports: default. Use export: 'default' for the default export.`,
+    )
+    await expect(
+      generator.generate(router, { source: { file: fixture('router.ts'), export: 'nope' } }),
+    ).rejects.toThrow('Available exports: router, AppRouter.')
+  })
+
+  it('names missing files, missing tsconfigs, and directories', async () => {
+    const src = fileURLToPath(fixture(''))
+
+    await expect(generator.generate(router, { source: { file: src } })).rejects.toThrow(
+      `File "${path.resolve(src)}" is a directory, expected a source file.`,
+    )
+    await expect(
+      generator.generate(router, {
+        source: { file: fixture('router.ts'), tsconfig: fixture('../nope.json') },
+      }),
+    ).rejects.toThrow(`tsconfig "${fileURLToPath(fixture('../nope.json'))}" does not exist.`)
+
+    // a directory stands for its tsconfig.json
+    const spec = await generator.generate(router, {
+      source: { file: fixture('router.ts'), tsconfig: fixture('..') },
+    })
+    expect(spec.components?.schemas?.Planet).toEqual(PLANET)
+  })
+
+  it('accepts a solution tsconfig, using the referenced project that includes the file', async () => {
+    const solution = new URL('../tests/fixtures/solution/tsconfig.json', import.meta.url)
+    const spec = await generator.generate(solutionRouter, {
+      source: {
+        file: new URL('../tests/fixtures/solution/app/router.ts', import.meta.url),
+        tsconfig: solution,
+      },
+    })
+    expect((spec.paths?.['/ping']?.post?.responses?.['200'] as any).content).toEqual({
+      'application/json': {
+        schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      },
+    })
+
+    // a file outside the solution is not part of it
+    await expect(
+      generator.generate(router, { source: { file: fixture('router.ts'), tsconfig: solution } }),
+    ).rejects.toThrow('Pass the tsconfig that includes it, or leave out "tsconfig"')
+  })
+
+  it.each([
+    ['a file URL string', () => fixture('routers/stream.ts').href],
+    [
+      'a path relative to the current working directory',
+      () => path.relative(process.cwd(), fileURLToPath(fixture('routers/stream.ts'))),
+    ],
+  ])('reads the default export from %s', async (_, file) => {
+    const fromURL = await generator.generate(streamRouter, {
+      source: { file: fixture('routers/stream.ts'), export: 'default' },
+    })
+    expect(Object.keys(fromURL.paths ?? {})).toEqual(['/ticks', '/plain'])
+
+    const spec = await generator.generate(streamRouter, {
+      source: { file: file(), export: 'default' },
+    })
+    expect(spec).toEqual(fromURL)
+  })
+
+  it('reports an export that is not a router once', async () => {
+    const procedure = router.health
+    const value = { a: procedure, b: procedure, c: { d: procedure } }
+    const file = fixture('round34.ts')
+
+    for (const [exportName, typeName] of [
+      ['notARouter', '1'],
+      ['NotARouterShape', 'NotARouterShape'],
+      ['notARouterFunction', '() => number'],
+    ]) {
+      await expect(
+        generator.generate(value, { source: { file, export: exportName } }),
+      ).rejects.toThrow(
+        `[OpenAPIGenerator] The export "${exportName}" of "${fileURLToPath(file)}" has type "${typeName}", which is not a router, procedure or contract.`,
+      )
+    }
+  })
+
+  it('keeps the first line of the comment for an empty @summary or @description', async () => {
+    const spec = await generator.generate(roundThirtyFourJSDoc, {
+      source: { file: fixture('round34.ts'), export: 'roundThirtyFourJSDoc' },
+    })
+    const meta = (path: string) => {
+      const { summary, description } = (spec.paths as any)[path].post
+      return { summary, description }
+    }
+
+    expect(meta('/emptySummary')).toEqual({ summary: 'Get it', description: undefined })
+    expect(meta('/emptyDescription')).toEqual({
+      summary: 'Describe it',
+      description: 'From the comment.',
+    })
+  })
+
+  it('shows the compiler errors behind an unresolved type', async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'orpc-inference-'))
+
+    try {
+      writeFileSync(
+        path.join(directory, 'tsconfig.json'),
+        JSON.stringify({ extends: './missing-base.json', include: ['*.ts'] }),
+      )
+      writeFileSync(
+        path.join(directory, 'sub.ts'),
+        `import type { User } from './nope-user'\nexport const a = null as unknown as User\n`,
+      )
+      writeFileSync(
+        path.join(directory, 'router.ts'),
+        `import { a } from './sub'\nexport const router = { a, b: undefinedVariable }\n`,
+      )
+
+      const procedure = os.handler(() => 1)
+      const error = await generator
+        .generate(
+          { a: procedure, b: procedure },
+          { source: { file: path.join(directory, 'router.ts') } },
+        )
+        .catch((e: unknown) => e as Error)
+
+      const file = (name: string) => path.join(directory, name)
+      expect(error).toBeInstanceOf(OpenAPIGeneratorError)
+      const resolution = `Check its import, and the tsconfig "paths" for aliases like "@/".`
+      const config = `error TS5083: Cannot read file '${file('missing-base.json')}'.`
+      const undeclared = `${file('router.ts')}:2:31 - error TS2304: Cannot find name 'undefinedVariable'.`
+
+      // of the router file, and of the file a procedure assigned to it is declared in
+      expect((error as Error).message).toContain(
+        [
+          `Procedure at a: Could not resolve its type "User". ${resolution}`,
+          config,
+          undeclared,
+          `${file('sub.ts')}:1:27 - error TS2307: Cannot find module './nope-user' or its corresponding type declarations.`,
+        ].join('\n  '),
+      )
+      expect((error as Error).message).toContain(
+        [
+          `Procedure at b: Could not resolve its type "any". ${resolution}`,
+          config,
+          undeclared,
+        ].join('\n  '),
+      )
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('documents with recursive defs only', async () => {
+    const spec = await new OpenAPIGenerator({
+      converters: [new ZodToJsonSchemaConverter()],
+      defs: 'recursive',
+    }).generate(router, { source: { file: fixture('router.ts') } })
+    const schemas = spec.components?.schemas ?? {}
+
+    // `Planet` refers to itself, `PlanetKind` is written where it is used
+    expect(schemas.Planet).toEqual(PLANET)
+    expect(schemas).not.toHaveProperty('PlanetKind')
+    expect(JSON.stringify(spec)).not.toContain('PlanetKind')
+    expect(JSON.stringify(spec)).toMatch(/"enum":\["(rocky|gas)","(rocky|gas)"\]/u)
   })
 
   it('works without converters, inferring zod schemas from their types', async () => {
@@ -766,6 +957,14 @@ describe('openAPIGenerator', () => {
       // the server sends an instance, which `JSON.stringify` writes
       const output = component(operation.responses['200'].content['application/json'].schema)
       expect(output.properties.tags).toEqual({ type: 'object' })
+      // which throws on a bigint field
+      expect(output.properties.views).toEqual({ not: {} })
+      expect(output.required).toContain('views')
+
+      const value = await call(classes.create, { title: 't', tags: new Set(['a']), views: 1n })
+      expect(() => JSON.stringify(new OpenAPIJsonSerializer().serializeJson(value).json)).toThrow(
+        'BigInt',
+      )
     })
 
     it('names a model the same in both directions, and ignores toJSON in inputs', async () => {

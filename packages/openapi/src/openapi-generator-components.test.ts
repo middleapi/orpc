@@ -579,6 +579,50 @@ describe('openAPIComponentRegistry', () => {
       expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual(['Data', 'Wrapper'])
     })
 
+    it('checks a def again when a def it refers to is another schema', () => {
+      const { doc, registry } = createRegistry()
+      const list = { type: 'array' as const, items: { $ref: '#/$defs/Item' } }
+
+      registry.hoistDefs({ $ref: '#/$defs/List', $defs: { List: list, Item: { type: 'string' } } })
+
+      // the same `List` schema, but its `Item` differs, so the existing `List` is not reused
+      expect(
+        registry.hoistDefs({
+          $ref: '#/$defs/List',
+          $defs: { List: list, Item: { type: 'number' } },
+        }),
+      ).toEqual({ $ref: '#/components/schemas/List2' })
+      expect(
+        registry.hoistDefs({
+          $ref: '#/$defs/List',
+          $defs: { List: list, Item: { type: 'string' } },
+        }),
+      ).toEqual({ $ref: '#/components/schemas/List' })
+      expect(doc.components?.schemas?.List2).toEqual({
+        type: 'array',
+        items: { $ref: '#/components/schemas/Item2' },
+      })
+    })
+
+    it('checks a def again once a ref to a missing component resolves', () => {
+      const { doc, registry } = createRegistry({
+        schemas: { Box: { items: { $ref: '#/components/schemas/Left' } } },
+      })
+      const box = { items: { $ref: '#/components/schemas/Right' } }
+
+      // `Left` and `Right` are missing, so the refs are compared as they are
+      expect(registry.hoistDefs({ $ref: '#/$defs/Box', $defs: { Box: box } })).toEqual({
+        $ref: '#/components/schemas/Box2',
+      })
+
+      doc.components!.schemas!.Left = { type: 'string' }
+      doc.components!.schemas!.Right = { type: 'string' }
+
+      expect(registry.hoistDefs({ $ref: '#/$defs/Box', $defs: { Box: box } })).toEqual({
+        $ref: '#/components/schemas/Box',
+      })
+    })
+
     it.each([
       {
         name: 'at the bare name',

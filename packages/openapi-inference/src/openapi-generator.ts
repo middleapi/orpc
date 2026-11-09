@@ -31,11 +31,18 @@ import {
 import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
-import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { TypeFlags } from 'typescript/unstable/sync'
+import type { SourceFile } from 'typescript/unstable/ast'
+import type {
+  Checker,
+  Diagnostic,
+  Program,
+  Symbol as TSSymbol,
+  Type,
+} from 'typescript/unstable/sync'
+import { DiagnosticCategory, TypeFlags } from 'typescript/unstable/sync'
 
 import { mergeEquivalentComponents } from './components'
-import type { TypeScriptProjectOptions } from './project'
+import type { TypeScriptExport, TypeScriptProjectOptions } from './project'
 import { openTypeScriptProject } from './project'
 import type { ResolvedRouterType } from './router-type'
 import { RouterTypeResolver } from './router-type'
@@ -80,6 +87,10 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
 
 interface InferenceContext {
   checker: Checker
+  program: Program
+  sourceFile: SourceFile
+  /** The export `source` names, and its name */
+  source: TypeScriptExport & { name: string }
   resolver: RouterTypeResolver
   converters: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverter>
   getSourceKind: (path: string) => SourceKind
@@ -143,12 +154,15 @@ export class OpenAPIGenerator {
     let ctx: InferenceContext
 
     try {
+      const name = source.export ?? 'router'
+      const exported = { ...project.getExportType(name), name }
+
       ctx = {
         checker: project.checker,
-        resolver: new RouterTypeResolver(
-          project.checker,
-          project.getExportType(source.export ?? 'router'),
-        ),
+        program: project.program,
+        sourceFile: project.sourceFile,
+        source: exported,
+        resolver: new RouterTypeResolver(project.checker, exported),
         converters: {
           input: new TypeToJsonSchemaConverter(project.checker, project.program, {
             ...this.options,
@@ -195,20 +209,27 @@ export class OpenAPIGenerator {
   ): Promise<RouterContract> {
     let inferred: RouterContract = {}
     const errors: string[] = []
+    let walked = 0
+    let found = 0
 
     await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(filter, contract, path) === false) {
         return
       }
 
+      walked++
+      let resolved: ResolvedRouterType | undefined
+
       try {
-        const resolved = ctx.resolver.resolve(path)
+        resolved = ctx.resolver.resolve(path)
 
         if (!resolved) {
           throw new OpenAPIGeneratorError(
             `its type was not found in the router type, make sure "source" points to the type of this router.`,
           )
         }
+
+        found++
 
         const procedure = this.inferProcedure(ctx, contract, resolved)
 
@@ -221,9 +242,22 @@ export class OpenAPIGenerator {
         if (!(e instanceof OpenAPIGeneratorError || e instanceof TypeScriptTypeResolutionError)) {
           throw e
         }
-        errors.push(`Procedure at ${path.length ? path.join('.') : '(root)'}: ${e.message}`)
+        // the compiler knows why a type is unresolved: a missing module, an undeclared name, ...
+        const diagnostics =
+          e instanceof TypeScriptTypeResolutionError ? getCompilerErrors(ctx, resolved) : []
+
+        errors.push(
+          `Procedure at ${path.length ? path.join('.') : '(root)'}: ${e.message}${diagnostics.map((d) => `\n  ${d}`).join('')}`,
+        )
       }
     })
+
+    // no procedure is in the export's type: it is not the router
+    if (walked && !found) {
+      throw new OpenAPIGeneratorError(
+        `[OpenAPIGenerator] The export "${ctx.source.name}" of "${ctx.sourceFile.fileName}" has type "${ctx.checker.typeToString(ctx.source.type)}", which is not a router, procedure or contract.`,
+      )
+    }
 
     if (errors.length) {
       throw new OpenAPIGeneratorError(
@@ -408,6 +442,57 @@ function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType
 }
 
 /**
+ * The compiler errors of the tsconfig and of the files declaring a procedure: the router file,
+ * and where a procedure assigned to it (`{ ping }`) is declared.
+ */
+function getCompilerErrors(
+  ctx: InferenceContext,
+  resolved: ResolvedRouterType | undefined,
+): string[] {
+  const files = new Set<string>([ctx.sourceFile.fileName])
+
+  for (const symbol of [
+    resolved?.symbol,
+    resolved?.symbol && getAssignedSymbol(ctx.checker, resolved.symbol),
+  ]) {
+    for (const declaration of symbol?.declarations ?? []) {
+      files.add(declaration.path)
+    }
+  }
+
+  const diagnostics = [
+    ...ctx.program.getConfigFileParsingDiagnostics(),
+    ...[...files].flatMap((file) => [
+      ...ctx.program.getSyntacticDiagnostics(file),
+      ...ctx.program.getSemanticDiagnostics(file),
+    ]),
+  ]
+
+  return [
+    ...new Set(
+      diagnostics
+        .filter((d) => d.category === DiagnosticCategory.Error)
+        .map((d) => formatDiagnostic(ctx.program, d)),
+    ),
+  ]
+}
+
+/**
+ * Formats a diagnostic like `tsc`: `file:line:column - error TS2304: Cannot find name 'x'.`
+ */
+function formatDiagnostic(program: Program, diagnostic: Diagnostic): string {
+  const message = `error TS${diagnostic.code}: ${diagnostic.text}`
+  const sourceFile = diagnostic.fileName ? program.getSourceFile(diagnostic.fileName) : undefined
+
+  if (!sourceFile) {
+    return diagnostic.fileName ? `${diagnostic.fileName} - ${message}` : message
+  }
+
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(diagnostic.pos)
+  return `${diagnostic.fileName}:${line + 1}:${character + 1} - ${message}`
+}
+
+/**
  * The yield and return types of an async iterator, one per member of an intersection
  * of async iterators (several `eventIterator` schemas).
  */
@@ -477,10 +562,11 @@ function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | und
   for (const tag of tags) {
     const text = tag.text?.trim() ?? ''
 
+    // an empty `@summary` or `@description` keeps the one taken from the comment
     if (tag.name === 'summary') {
-      fromJSDoc.summary = text
+      fromJSDoc.summary = text || fromJSDoc.summary
     } else if (tag.name === 'description') {
-      fromJSDoc.description = text
+      fromJSDoc.description = text || fromJSDoc.description
     } else if (tag.name === 'deprecated') {
       fromJSDoc.deprecated = true
     } else if (tag.name === 'tags' || tag.name === 'tag') {

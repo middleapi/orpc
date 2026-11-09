@@ -5,6 +5,7 @@ import {
   ensureJsonSchemaObject,
   getJsonSchemaKeywordKind,
   mapJsonSchemaRefs,
+  visitJsonSchemaRefs,
 } from '@orpc/json-schema'
 import { getOwn, isDeepEqual, isPlainObject, isPlainObjectOrArray, setOwn } from '@orpc/shared'
 
@@ -35,6 +36,16 @@ export class OpenAPIComponentRegistry {
    * no sanitizing, which keeps `base.components` family reuse (`Planet`, `Planet2`) intact.
    */
   private readonly componentSources = new Map<string, string>()
+
+  /**
+   * Reuse checks already made, by the def, the def schemas it reaches, and the component.
+   * A component is never rewritten once written, so a check made again gives the same result.
+   */
+  private readonly reuseResults = new Map<string, boolean>()
+  private readonly schemaIds = new WeakMap<object, number>()
+  private nextSchemaId = 0
+  /** The `#/$defs/` names a def schema refers to */
+  private readonly defRefs = new WeakMap<object, string[]>()
 
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
@@ -99,13 +110,20 @@ export class OpenAPIComponentRegistry {
     for (const [defName, cleanSchema] of defs) {
       const sourceName = this.componentName ? this.componentName(defName, cleanSchema) : defName
       const preferredName = toValidComponentName(sourceName)
+      let closureKey: string | undefined
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
         new Set(renameMap.values()),
-        defName,
         preferredName,
-        (name) => (this.componentSources.get(name) ?? preferredName) === sourceName,
-        defs,
+        (name) =>
+          (this.componentSources.get(name) ?? preferredName) === sourceName &&
+          this.isEquivalentForReuse(
+            defName,
+            (closureKey ??= this.getDefClosureKey(defName, defs)),
+            name,
+            defs,
+            componentsSchemas,
+          ),
         direction,
       )
 
@@ -122,6 +140,99 @@ export class OpenAPIComponentRegistry {
     }
 
     return rewriteComponentSchemaRefs(rest, renameMap)
+  }
+
+  /**
+   * Whether a def is equivalent to an existing component, so the component can be reused.
+   */
+  private isEquivalentForReuse(
+    defName: string,
+    closureKey: string,
+    componentName: string,
+    defs: ReadonlyMap<string, JsonSchema>,
+    componentsSchemas: Record<string, any>,
+  ): boolean {
+    const key = `${closureKey}\0${componentName}`
+    let result = this.reuseResults.get(key)
+
+    if (result === undefined) {
+      const ctx: ReuseComparisonContext = {
+        defs,
+        componentsSchemas,
+        candidateToExistingKeys: new Map(),
+        pairedExistingKeys: new Set(),
+        visited: new WeakMap(),
+        unresolved: false,
+      }
+
+      result = areSchemaRefsEquivalentForReuse(
+        DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
+        COMPONENTS_REF_PREFIX + componentName,
+        ctx,
+      )
+
+      // a ref to a missing schema may resolve once more components are written
+      if (!ctx.unresolved) {
+        this.reuseResults.set(key, result)
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Identifies a def and the def schemas it reaches through `#/$defs/` refs, which a reuse
+   * check compares.
+   */
+  private getDefClosureKey(defName: string, defs: ReadonlyMap<string, JsonSchema>): string {
+    const names = new Set([defName])
+
+    for (const name of names) {
+      const schema = defs.get(name)
+
+      if (typeof schema !== 'object') {
+        continue
+      }
+
+      let refs = this.defRefs.get(schema)
+
+      if (!refs) {
+        const collected: string[] = []
+        visitJsonSchemaRefs(schema, (ref) => {
+          const refName = parseRefName(ref, DEFS_REF_PREFIX)
+          if (refName !== undefined) {
+            collected.push(refName)
+          }
+        })
+        refs = collected
+        this.defRefs.set(schema, refs)
+      }
+
+      for (const ref of refs) {
+        names.add(ref)
+      }
+    }
+
+    const ids = [...names]
+      .map((name) => {
+        const schema = defs.get(name)
+        return `${name}=${typeof schema === 'object' ? this.getSchemaId(schema) : ''}`
+      })
+      // oxlint-disable-next-line unicorn/no-array-sort
+      .sort()
+
+    return `${defName}\0${ids.join('\0')}`
+  }
+
+  private getSchemaId(schema: object): number {
+    let id = this.schemaIds.get(schema)
+
+    if (id === undefined) {
+      id = this.nextSchemaId++
+      this.schemaIds.set(schema, id)
+    }
+
+    return id
   }
 
   toOpenAPISchema(
@@ -145,10 +256,8 @@ export class OpenAPIComponentRegistry {
 function resolveComponentName(
   componentsSchemas: Record<string, any>,
   claimedNames: Set<string>,
-  defName: string,
   preferredName: string,
   isReusable: (componentName: string) => boolean,
-  defs: ReadonlyMap<string, JsonSchema>,
   direction: JsonSchemaConverterDirection | undefined,
 ): [componentName: string, reuseExisting: boolean] {
   let mintName: string | undefined
@@ -170,20 +279,7 @@ function resolveComponentName(
       continue
     }
 
-    if (
-      isReusable(componentName) &&
-      areSchemaRefsEquivalentForReuse(
-        DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
-        COMPONENTS_REF_PREFIX + componentName,
-        {
-          defs,
-          componentsSchemas,
-          candidateToExistingKeys: new Map(),
-          pairedExistingKeys: new Set(),
-          visited: new WeakMap(),
-        },
-      )
-    ) {
+    if (isReusable(componentName)) {
       return [componentName, true]
     }
   }
@@ -232,6 +328,8 @@ interface ReuseComparisonContext {
   candidateToExistingKeys: Map<string, string>
   pairedExistingKeys: Set<string>
   visited: WeakMap<object, WeakSet<object>>
+  /** Whether a ref to a missing schema was compared */
+  unresolved: boolean
 }
 
 /**
@@ -398,6 +496,7 @@ function areSchemaRefsEquivalentForReuse(
   const existing = resolveNamedRef(existingRef, COMPONENTS_REF_PREFIX, getComponent)
 
   if (candidate === undefined || existing === undefined) {
+    ctx.unresolved = true
     return !candidate && !existing && candidateRef === existingRef
   }
 

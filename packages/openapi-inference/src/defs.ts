@@ -1,7 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
-import { collectDefRefs, fromRef } from './schema-utils'
+import { collectDefRefs, fromRef, toRef } from './schema-utils'
 
 /**
  * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class
@@ -65,6 +65,8 @@ export class DefRegistry {
    * and of named types whose schema is clearer inline, like `type UserId = string & { ... }`
    */
   private readonly anonymous = new Map<number, JsonSchema>()
+  /** Finished defs by their group and schema, see `share` */
+  private readonly shared = new Map<string, Def>()
 
   private createdDefs: Def[] = []
   /** Anonymous results the conversion added, with whether they are stable (see `Def.stable`) */
@@ -165,6 +167,27 @@ export class DefRegistry {
     this.names.byKey.delete(def.key)
     this.names.used.delete(def.name)
     return true
+  }
+
+  /**
+   * The live def of the same group with the same schema, replacing this finished def when nothing
+   * refers to it yet; otherwise this def, which later ones of the group and schema share.
+   */
+  share(def: Def, group: string): Def {
+    const signature = `${group}:${this.stringify(def.schema!)}`
+    const existing = this.shared.get(signature)
+
+    if (
+      existing &&
+      existing.key !== def.key &&
+      this.defs.get(existing.key)?.name === existing.name &&
+      this.replaceIfUnreferenced(def, { $ref: toRef(existing.name) })
+    ) {
+      return existing
+    }
+
+    this.shared.set(signature, def)
+    return def
   }
 
   /**

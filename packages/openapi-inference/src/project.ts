@@ -1,11 +1,11 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
-import process from 'node:process'
-import { fileURLToPath } from 'node:url'
 
 import type { SourceFile } from 'typescript/unstable/ast'
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { API, SymbolFlags } from 'typescript/unstable/sync'
+import { API } from 'typescript/unstable/sync'
+
+import { createTypeScriptProject, toAbsolutePath } from './utils'
 
 export interface TypeScriptProjectOptions {
   /**
@@ -17,7 +17,8 @@ export interface TypeScriptProjectOptions {
   file: string | URL
 
   /**
-   * The `tsconfig.json` of the project. Its `paths` resolve aliased imports like `@/`.
+   * The `tsconfig.json` of the project, or its directory. Its `paths` resolve aliased imports like `@/`.
+   * For a solution tsconfig (`"files": []` with `references`), the referenced project including `file` is used.
    *
    * @default the nearest `tsconfig.json` that includes `file`
    */
@@ -57,10 +58,27 @@ export interface TypeScriptProject {
  */
 export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeScriptProject {
   const file = toAbsolutePath(options.file)
-  const tsconfig = options.tsconfig === undefined ? undefined : toAbsolutePath(options.tsconfig)
+  let tsconfig = options.tsconfig === undefined ? undefined : toAbsolutePath(options.tsconfig)
 
-  if (!existsSync(file)) {
+  const fileStats = statSync(file, { throwIfNoEntry: false })
+
+  if (!fileStats) {
     throw new Error(`[TypeScript] File "${file}" does not exist.`)
+  }
+
+  if (fileStats.isDirectory()) {
+    throw new Error(`[TypeScript] File "${file}" is a directory, expected a source file.`)
+  }
+
+  if (tsconfig !== undefined) {
+    // a directory stands for its tsconfig.json, like `tsc -p <directory>`
+    if (statSync(tsconfig, { throwIfNoEntry: false })?.isDirectory()) {
+      tsconfig = path.join(tsconfig, 'tsconfig.json')
+    }
+
+    if (!existsSync(tsconfig)) {
+      throw new Error(`[TypeScript] tsconfig "${tsconfig}" does not exist.`)
+    }
   }
 
   const api = new API({ cwd: path.dirname(tsconfig ?? file) })
@@ -71,6 +89,22 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     )
 
     let project = tsconfig ? snapshot.getProject(tsconfig) : snapshot.getDefaultProjectForFile(file)
+
+    // a solution tsconfig (`"files": []` with `references`) has no files of its own,
+    // the file is in the referenced project the compiler picks for it, under the solution
+    if (tsconfig && project && !project.rootFiles.length && !project.program.getSourceFile(file)) {
+      snapshot = api.updateSnapshot({ openProjects: [tsconfig], openFiles: [file] })
+      const referenced = snapshot.getDefaultProjectForFile(file)
+
+      if (
+        referenced &&
+        !referenced.configFileName.startsWith('/dev/null/') &&
+        !path.relative(path.dirname(tsconfig), referenced.configFileName).startsWith('..') &&
+        referenced.program.getSourceFile(file)
+      ) {
+        project = referenced
+      }
+    }
 
     // the nearest tsconfig.json may not include the file (e.g. `include: ["src"]` for a script),
     // look further up for one that does before settling for default compiler options
@@ -94,42 +128,13 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
 
     if (!sourceFile) {
       throw new Error(
-        `[TypeScript] "${file}" is not part of the project "${project.configFileName}".`,
+        `[TypeScript] "${file}" is not part of the project "${project.configFileName}". Pass the tsconfig that includes it, or leave out "tsconfig" to use the nearest one.`,
       )
     }
 
-    const checker = project.checker
-    const moduleSymbol = checker.getSymbolAtLocation(sourceFile)
-    const exports = moduleSymbol ? checker.getExportsOfModule(moduleSymbol) : []
-
-    return {
-      checker,
-      program: project.program,
-      sourceFile,
-      getExportType(name) {
-        const exported = exports.find((s) => s.name === name)
-
-        if (!exported) {
-          throw new Error(`[TypeScript] "${file}" has no export named "${name}".`)
-        }
-
-        const symbol =
-          exported.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported
-
-        // classes and enums are both, their declared type is the instance/member type
-        const type =
-          symbol.flags & SymbolFlags.Type
-            ? checker.getDeclaredTypeOfSymbol(symbol)
-            : checker.getTypeOfSymbol(symbol)
-
-        if (!type || type.isErrorType()) {
-          throw new Error(`[TypeScript] Could not resolve the type of "${name}" in "${file}".`)
-        }
-
-        return { type, symbol }
-      },
-      close: () => api.close(),
-    }
+    return createTypeScriptProject(file, project.checker, project.program, sourceFile, () =>
+      api.close(),
+    )
   } catch (error) {
     api.close()
     throw error
@@ -148,9 +153,4 @@ function* findAncestorTsconfigs(directory: string): Generator<string> {
       return
     }
   }
-}
-
-function toAbsolutePath(file: string | URL): string {
-  const filePath = file instanceof URL || file.startsWith('file:') ? fileURLToPath(file) : file
-  return path.resolve(process.cwd(), filePath)
 }
