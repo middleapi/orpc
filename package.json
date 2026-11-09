@@ -58,7 +58,7 @@
     "changelogithub": "^15.0.4",
     "crossws": "^0.4.17",
     "github-slugger": "^2.0.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^31.0.0",
     "oxfmt": "^0.77.0",
     "oxlint": "^1.92.0",
     "oxlint-tsgolint": "^7.0.2006",
