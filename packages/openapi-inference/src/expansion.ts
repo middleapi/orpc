@@ -195,7 +195,14 @@ export class ExpansionGuard {
       const outer = stack[i]!
       if (this.getKeys(outer.type) === keys) {
         return this.holdsAgain(outer.type, type, MAX_GROWTH) &&
-          this.path.slice(outer.at).some((property) => this.declaresNesting(property))
+          this.path
+            .slice(outer.at)
+            .some((property, index) =>
+              this.declaresNesting(
+                property,
+                stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type,
+              ),
+            )
           ? outer.growth + 1
           : 0
       }
@@ -273,9 +280,22 @@ export class ExpansionGuard {
    * Whether a property is declared with a type that may nest a model in itself: one naming more
    * than the type parameters of its model (`next: Expanding<Model<T>> | null`, `nested: Pair<T[]>`),
    * not `v: T` or `items: T[]`, which nest only the type arguments a model is written with
-   * (`Box<Box<Box<number>>>`), a finite type.
+   * (`Box<Box<Box<number>>>`), a finite type. In the declaration of the model holding it, also
+   * through generic interfaces of them (`inner: Box<T>`), unless it inherits the property with
+   * more (`a: Box<Der<T[]>>` of `interface Der<T> extends Base<Der<T[]>>`).
    */
-  private declaresNesting(property: TSSymbol): boolean {
+  private declaresNesting(property: TSSymbol, owner: Type | undefined): boolean {
+    const source = owner && (this.types.getMappedSource(owner) ?? owner)
+    const declaring = source?.isTypeReference() ? source.getTarget() : source
+    const declared = declaring && this.types.checker.getPropertyOfType(declaring, property.name)
+
+    if (declared) {
+      return this.types.memo('declaresNestingIn', declared.id, () => {
+        const type = this.types.checker.getTypeOfSymbol(declared)
+        return type !== undefined && !this.isParametric(type, 3, true)
+      })
+    }
+
     return this.types.memo('declaresNesting', property.id, () => {
       const name = (property.declarations[0]?.resolve() as any)?.name
       const original = name && this.types.checker.getSymbolAtLocation(name)
@@ -286,11 +306,11 @@ export class ExpansionGuard {
 
   /**
    * Whether a type is made only of type parameters, primitives, and the default library's types
-   * and object literals of them.
+   * and object literals of them, also interfaces and classes of them with `interfaces`.
    */
-  private isParametric(type: Type, depth: number): boolean {
+  private isParametric(type: Type, depth: number, interfaces = false): boolean {
     if (type.flags & TypeFlags.UnionOrIntersection) {
-      return this.types.getMembers(type).every((m) => this.isParametric(m, depth))
+      return this.types.getMembers(type).every((m) => this.isParametric(m, depth, interfaces))
     }
 
     if (type.flags & (TypeFlags.Conditional | TypeFlags.Substitution)) {
@@ -305,22 +325,27 @@ export class ExpansionGuard {
     const objectFlags = (type as any).objectFlags as number
 
     if (symbol && this.types.getSymbolSourceKind(symbol) === 'default') {
-      return this.types.getTypeArguments(type).every((t) => this.isParametric(t, depth))
+      return this.types.getTypeArguments(type).every((t) => this.isParametric(t, depth, interfaces))
     }
 
     if (
       depth === 0 ||
       type.getAliasSymbol() ||
-      !(objectFlags & ObjectFlags.Anonymous) ||
+      !(
+        objectFlags &
+        (interfaces
+          ? ObjectFlags.Anonymous | ObjectFlags.Reference | ObjectFlags.Interface
+          : ObjectFlags.Anonymous)
+      ) ||
       objectFlags & ObjectFlags.Mapped
     ) {
       return false
     }
 
-    // `{ inner: T }`
+    // `{ inner: T }`, or `Box<T>` of `interface Box<T> { v: T }`
     return this.types
       .getPropertyTypes(type)
-      .every((t) => t === undefined || this.isParametric(t, depth - 1))
+      .every((t) => t === undefined || this.isParametric(t, depth - 1, interfaces))
   }
 
   /**
