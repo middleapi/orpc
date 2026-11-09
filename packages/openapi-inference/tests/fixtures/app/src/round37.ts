@@ -34,7 +34,7 @@ export interface Box<T> {
   v: T
 }
 
-/** A generic model nesting its type argument through another generic model */
+/** A generic model nesting its type argument through another generic model, cut after a few levels */
 export interface BoxVia<T> {
   inner: Box<T>
 }

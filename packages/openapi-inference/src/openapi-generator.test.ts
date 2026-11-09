@@ -888,6 +888,9 @@ describe('openAPIGenerator', () => {
           index: 'os.handler((): IndexCycle => ({}) as any)',
           aliased: 'os.handler((): AliasCycle => ({}) as any)',
           recursive: 'os.handler((): Expanding<Rec> => ({}) as any)',
+          branches: 'os.handler((): CD<Der<number>> => ({}) as any)',
+          branchesInput: 'os.input(type<CD<Der<number>>>()).handler(() => 1)',
+          viewed: 'os.handler((): CD<DerView<number>> => ({}) as any)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -907,6 +910,9 @@ describe('openAPIGenerator', () => {
             'interface AliasCycle { f0: Aliased | null; f2: { a: number } }',
             'interface Box<T> { v: T }',
             'type Rec = Box<Expanding<Rec>>',
+            'interface Base<T> { a: Box<T>; b: Box<T> }',
+            'interface Der<T> extends Base<Der<T[]>> { v: T }',
+            'interface DerView<T> extends Base<CD<DerView<T>>> { v: T }',
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',

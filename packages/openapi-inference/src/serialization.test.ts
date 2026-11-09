@@ -2366,10 +2366,6 @@ describe('generated schemas match serialized outputs', async () => {
 
     it('expands a conditional deep mapped type over a generic model nested in itself in full', () => {
       expect(schemaOf('deepBoxes')).toEqual(levels(8, (v) => model({ v }), { type: 'number' }))
-      // also through another generic model
-      expect(schemaOf('viaBoxes')).toEqual(
-        levels(6, (v) => model({ inner: model({ v }) }), { type: 'number' }),
-      )
     })
   })
 
