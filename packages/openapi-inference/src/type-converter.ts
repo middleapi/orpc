@@ -1591,7 +1591,9 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * Whether a mapped view of a built-in or class may hold a plain object: it makes members
-   * optional (`Partial<Date>`) or leaves some out (`Pick<URL, 'href'>`), also in an intersection.
+   * optional (`Partial<Date>`) or leaves some out (`Pick<URL, 'href'>`), also in an intersection,
+   * and any view of a primitive, whose few members a plain object easily has
+   * (`{ valueOf: () => true }` of `Omit<boolean, 'k'>`).
    */
   private mayHoldPlainObject(type: Type): boolean {
     if (type.isIntersectionType()) {
@@ -1618,6 +1620,7 @@ export class TypeToJsonSchemaConverter {
     const properties = this.types.getProperties(type)
 
     return (
+      this.types.isPrimitiveView(type) ||
       // the source may hold one (`Readonly<Link>` of `interface Link extends Pick<URL, 'href'>`)
       sources.some((s) => getViewBases(s).some((view) => this.mayHoldPlainObject(view))) ||
       properties.length < sourceProperties.size ||

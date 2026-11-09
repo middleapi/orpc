@@ -31,6 +31,7 @@ import {
   TaggedURL,
 } from '../tests/fixtures/app/src/round29'
 import { roundThirtyOneInputs } from '../tests/fixtures/app/src/round31'
+import { roundThirtyTwoInputs } from '../tests/fixtures/app/src/round32'
 import { router } from '../tests/fixtures/app/src/router'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
@@ -1235,7 +1236,7 @@ describe('typeScriptOpenAPIGenerator', () => {
           { type: 'object', properties: { 0: { type: 'number' } }, required: ['0'] },
         ],
       })
-      expect(body('/omittedString')).toEqual({ type: 'string' })
+      expect(body('/omittedString').anyOf[0]).toEqual({ type: 'string' })
       expect(body('/brandedView')).toEqual({ type: 'string' })
       expect(body('/objectField')).toEqual({ type: 'object', properties: { v: {} } })
       expect(schemas.OrString.anyOf[0]).toEqual({ type: 'array', items: { type: 'string' } })
@@ -1260,6 +1261,42 @@ describe('typeScriptOpenAPIGenerator', () => {
         ['/omittedString', 'abc'],
         ['/brandedView', 'abc'],
         ['/objectField', {}],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('round thirty-two', () => {
+    it('documents inputs of views of primitives a plain object satisfies', async () => {
+      const spec = await generator.generate(roundThirtyTwoInputs, {
+        source: { file: fixture('round32.ts'), export: 'roundThirtyTwoInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      expect(schemas.PlainBoolean.anyOf).toEqual([{ type: 'boolean' }, { type: 'object' }])
+
+      // what a client holding these values sends
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/plainBoolean', { v: {} }],
+        ['/plainBoolean', { v: true }],
+        ['/plainBooleanRoot', {}],
+        ['/plainBooleanRoot', false],
       ] as const) {
         const validate = ajv.compile(body(path))
         expect(validate(value) ? [] : [path, validate.errors]).toEqual([])

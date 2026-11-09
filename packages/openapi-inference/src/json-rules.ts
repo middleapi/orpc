@@ -19,7 +19,7 @@ import {
 import { ExpansionGuard } from './expansion'
 import type { TypeQueries } from './type-queries'
 import { INSTANTIABLE_FLAGS, isObjectLiteral, UNDEFINED_FLAGS } from './type-queries'
-import { getCallReturnType, isClassAccessor } from './utils'
+import { isClassAccessor } from './utils'
 
 /*
  * How values are written as JSON: by the OpenAPI JSON serializer, or by `JSON.stringify`,
@@ -186,7 +186,8 @@ export function mayBeNonSerializable(types: TypeQueries, type: Type): boolean {
 
 /**
  * Whether a function is assignable to a type that is no function: `object`, `Object`, and the
- * empty object type `{}` (a mapped type without keys is a view, see `isFunctionView`).
+ * empty object type `{}`, also as a mapped type without keys (`Omit<{ a: number }, 'a'>`), unless it
+ * is a view of a function (see `isFunctionView`).
  */
 function mayHoldFunction(types: TypeQueries, type: Type): boolean {
   if (type.flags & TypeFlags.NonPrimitive) {
@@ -196,7 +197,9 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
   if (
     !(type.flags & TypeFlags.Object) ||
     isObjectLiteral(type) ||
-    (type as any).objectFlags & ObjectFlags.Mapped
+    ((type as any).objectFlags & ObjectFlags.Mapped &&
+      (getViewedFunction(types, type) !== undefined ||
+        type.getAliasTypeArguments().some((a) => a.flags & INSTANTIABLE_FLAGS)))
   ) {
     return false
   }
@@ -334,8 +337,7 @@ export function getToJSONResultTypes(
   const results = new Map<number, Type>()
 
   for (const member of getToJSONMembers(types, type)) {
-    const result = getMethodResultType(types, member)
-    if (result) {
+    for (const result of getMethodResultTypes(types, member)) {
       results.set(result.id, result)
     }
   }
@@ -353,14 +355,21 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
 }
 
 /**
- * What a function returns when `JSON.stringify` calls it: of a function type, of the function a
- * view of it may hold (`Readonly<() => R>`), or anything (`Function`).
+ * What a function returns when `JSON.stringify` calls it: of each signature of a function type
+ * (an overload taking the key may be the one that answers), of the function a view of it may hold
+ * (`Readonly<() => R>`), or anything (`Function`, and `any` or `unknown`, which may hold one).
  */
-function getMethodResultType(types: TypeQueries, member: Type): Type | undefined {
-  const viewed = getViewedFunction(types, member)
-  const result = getCallReturnType(types.checker, viewed ?? member)
+function getMethodResultTypes(types: TypeQueries, member: Type): readonly Type[] {
+  if (member.flags & (TypeFlags.Any | TypeFlags.Unknown)) {
+    return [types.checker.getAnyType()]
+  }
 
-  return result ?? (isFunction(types, viewed ?? member) ? types.checker.getAnyType() : undefined)
+  const method = getViewedFunction(types, member) ?? member
+  const results = types.checker
+    .getSignaturesOfType(method, SignatureKind.Call)
+    .flatMap((signature) => types.checker.getReturnTypeOfSignature(signature) ?? [])
+
+  return results.length || !isFunction(types, method) ? results : [types.checker.getAnyType()]
 }
 
 /**

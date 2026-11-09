@@ -235,6 +235,12 @@ describe('generated schemas match serialized outputs', async () => {
     ['omittedPrimitives', undefined],
     ['brandedViews', undefined],
     ['objectFields', undefined],
+    ['plainBooleans', undefined],
+    ['plainBooleanRoot', undefined],
+    ['anyToJSON', undefined],
+    ['overloadedToJSON', undefined],
+    ['overloadedToJSONRoot', undefined],
+    ['keylessViews', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1804,10 +1810,20 @@ describe('generated schemas match serialized outputs', async () => {
 
     it('writes views of primitives through Omit or the number index as the primitive', () => {
       expect(schemaOf('omittedPrimitives').properties).toEqual({
-        // keeping every member
-        str: { type: 'string' },
+        // also keeping every member, a plain object may have them (`{ valueOf: () => true }`)
+        str: {
+          anyOf: [
+            { type: 'string' },
+            {
+              type: 'object',
+              properties: { length: expect.objectContaining({ type: 'number' }) },
+              required: ['length'],
+              additionalProperties: { type: 'string' },
+            },
+          ],
+        },
         num: { anyOf: [{ type: 'number' }, { type: 'object' }] },
-        bool: { type: 'boolean' },
+        bool: { anyOf: [{ type: 'boolean' }, { type: 'object' }] },
         index: {
           anyOf: [{ type: 'string' }, { type: 'object', additionalProperties: { type: 'string' } }],
         },
@@ -1833,6 +1849,43 @@ describe('generated schemas match serialized outputs', async () => {
         },
         required: ['list'],
       })
+    })
+  })
+
+  describe('round thirty-two', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+
+    it('writes views of primitives keeping every member as the primitive or a plain object', () => {
+      const plain = { anyOf: [{ type: 'boolean' }, { type: 'object' }] }
+
+      expect(schemas().PlainBoolean).toEqual({
+        ...plain,
+        description: 'A boolean view a plain object holding `valueOf` satisfies',
+      })
+      expect(schemaOf('plainBooleans').properties.picked).toEqual(plain)
+      expect(deref(schemaOf('plainBooleans').properties.frozen).anyOf).toEqual(plain.anyOf)
+    })
+
+    it('writes a toJSON typed any or unknown as anything or the fields', () => {
+      // a `toJSON` that is no function is written as a field
+      const fields = {
+        type: 'object',
+        properties: { a: { type: 'number' }, toJSON: {} },
+        required: ['a'],
+      }
+
+      expect(schemas().AnyJSONField.anyOf).toEqual([{}, fields])
+      expect(schemas().UnknownJSONField.anyOf).toEqual([{}, fields])
+    })
+
+    it('writes an overloaded toJSON by what any of its signatures returns', () => {
+      expect(schemas().OverloadedJSON.anyOf).toEqual([{ type: 'string' }, { type: 'number' }])
+    })
+
+    it('leaves out fields of mapped types without keys, which hold functions', () => {
+      expect(schemaOf('keylessViews').required).toBeUndefined()
     })
   })
 

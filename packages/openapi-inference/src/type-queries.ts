@@ -151,14 +151,9 @@ export class TypeQueries {
       return argument
     }
 
-    // a view of a primitive (`Omit<string, 'k'>`, `Pick<string, number>`) by the interface of its
-    // members, also of its index keys
-    const apparent =
-      argument && argument.flags & PRIMITIVE_FLAGS
-        ? this.checker.getApparentType(argument)
-        : undefined
-    if (apparent && this.isMappedViewOf(type, apparent) && this.keepsIndexes(type, apparent)) {
-      return apparent
+    const primitive = this.getPrimitiveViewSource(type)
+    if (primitive) {
+      return primitive
     }
 
     // the declared type is not instantiated with the alias's arguments
@@ -167,6 +162,44 @@ export class TypeQueries {
     // has no alias, its properties are still declared by the source.
     const declaring = this.getDeclaringType(type)
     return declaring && this.isMappedSourceOf(type, declaring, true) ? declaring : undefined
+  }
+
+  /**
+   * Whether a mapped type is a view of a primitive by the interface of its members
+   * (`Omit<boolean, 'k'>`, `Pick<string, number>`), also through views of one
+   * (`Readonly<Omit<boolean, 'k'>>`), not of a branded primitive.
+   */
+  isPrimitiveView(type: Type): boolean {
+    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+      return false
+    }
+
+    return this.memo('primitiveView', type.id, (): boolean => {
+      if (this.getPrimitiveViewSource(type)) {
+        return true
+      }
+
+      const source = this.getDirectMappedSource(type)
+      return source !== undefined && this.isPrimitiveView(source)
+    })
+  }
+
+  /**
+   * The interface of the members of the primitive a mapped type is a view of (`Boolean` of
+   * `Omit<boolean, 'k'>`, also of `type PlainBoolean = Omit<boolean, 'k'>`), when it keeps its
+   * values, also of its index keys (`Pick<string, number>`).
+   */
+  private getPrimitiveViewSource(type: Type): Type | undefined {
+    const [argument] = this.getTypeArguments(type)
+    const primitive = argument ?? this.getDeclaringType(type)
+    const apparent =
+      primitive && primitive.flags & PRIMITIVE_FLAGS
+        ? this.checker.getApparentType(primitive)
+        : undefined
+
+    return apparent && this.isMappedViewOf(type, apparent) && this.keepsIndexes(type, apparent)
+      ? apparent
+      : undefined
   }
 
   /**
