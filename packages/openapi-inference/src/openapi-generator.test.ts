@@ -10,6 +10,7 @@ import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import { Program } from 'typescript/unstable/sync'
 
+import { canGenerateWithin, generateWithin } from '../tests/bounded-generate'
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
 import { contract, implemented } from '../tests/fixtures/app/src/contract'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
@@ -47,6 +48,7 @@ import {
 } from '../tests/fixtures/app/src/round34'
 import { roundThirtyFiveInputs } from '../tests/fixtures/app/src/round35'
 import { roundThirtySixInputs } from '../tests/fixtures/app/src/round36'
+import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -704,12 +706,20 @@ describe('openAPIGenerator', () => {
           'interface Box<T> { v: T }',
           'type Serialized<T> = { [K in keyof T]: Jsonify<T[K]> }',
           'type Queried<T> = { [K in keyof T]: typeof missingValue }',
+          'type Bare<T> = { [K in keyof T]: Missing }',
+          'type CD<T> = T extends object ? { readonly [K in keyof T]: CD<T[K]> } : T',
           'export const router = {',
           '  serialized: os.handler((): { v: Serialized<Model> } => ({}) as any),',
           '  queried: os.handler((): { v: Queried<Model> } => ({}) as any),',
           '  lists: os.handler((): { v: Missing[][][][] } => ({}) as any),',
           '  boxes: os.handler((): { v: Box<Box<Box<Box<Missing>>>> } => ({}) as any),',
           '  typed: os.handler((): { v: Box<Box<Box<Box<typeof missingValue>>>> } => ({}) as any),',
+          // under a mapped view of a mapped type, whose declaration is on no way to the error
+          '  cdSerialized: os.handler((): CD<Serialized<Model>> => ({}) as any),',
+          '  cdNested: os.handler((): CD<{ c: Serialized<Model> }> => ({}) as any),',
+          '  cdBare: os.handler((): CD<{ c: Bare<Model> }> => ({}) as any),',
+          '  cdQueried: os.handler((): CD<Queried<Model>> => ({}) as any),',
+          '  partialQueried: os.handler((): Partial<Queried<Model>> => ({}) as any),',
           '  twice: os.handler((): Twice => ({ f0: null, f2: { a: { b: 1 } } })),',
           '}',
           'type Expanding<T> = T extends object ? { [K in keyof T]: Expanding<Expanding<T[K]>> } : T',
@@ -717,31 +727,198 @@ describe('openAPIGenerator', () => {
           '',
         ].join('\n'),
       })
-      const procedures = { serialized: procedure, queried: procedure, lists: procedure }
+      const names = [
+        'serialized',
+        'queried',
+        'lists',
+        'boxes',
+        'typed',
+        'cdSerialized',
+        'cdNested',
+        'cdBare',
+        'cdQueried',
+        'partialQueried',
+        'twice',
+      ]
 
       const thrown = await message(
-        generator.generate(
-          { ...procedures, boxes: procedure, typed: procedure },
-          { source: { file: file('src/router.ts') } },
-        ),
+        generator.generate(Object.fromEntries(names.map((name) => [name, procedure])), {
+          source: { file: file('src/router.ts') },
+        }),
       )
-      expect(thrown).toContain('(5 errors)')
+      expect(thrown).toContain(`(${names.length} errors)`)
       expect(thrown).toContain(`Procedure at serialized: ${unresolved('Jsonify<T[K]>')}`)
       expect(thrown).toContain(`Procedure at queried: ${unresolved('any')}`)
       expect(thrown).toContain(`Procedure at lists: ${unresolved('Missing')}`)
       expect(thrown).toContain(`Procedure at boxes: ${unresolved('Missing')}`)
       expect(thrown).toContain(`Procedure at typed: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdSerialized: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdNested: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdBare: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdQueried: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at partialQueried: ${unresolved('any')}`)
       expect(thrown).toContain(
         `${file('src/router.ts')}:6:44 - error TS2304: Cannot find name 'missingValue'.`,
       )
 
-      // an instantiation the compiler gives up on is cut, the errors of the file are elsewhere
-      const twice = await generator.generate(
-        { twice: procedure },
-        { source: { file: file('src/router.ts') } },
+      // the error type of an instantiation the compiler gives up on is not told from an
+      // unresolved name, which is never written as any value
+      expect(thrown).toContain(
+        `Procedure at twice: ${unresolved('any')} It may also be an unresolved name under a mapped type, or a type nested too deep for the compiler to instantiate.`,
       )
-      expect(JSON.stringify(twice.components?.schemas?.Twice)).toContain('"a":{}')
     })
+
+    it('throws on unresolved names in files whose errors the compiler does not report', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: { ...options, skipLibCheck: true },
+          include: ['src'],
+        }),
+        'src/types.d.ts': [
+          'export interface DModel { a: number; at: Date }',
+          'export type DQueried<T> = { [K in keyof T]: typeof missingValue }',
+          'export type DBare<T> = { [K in keyof T]: Missing }',
+          '',
+        ].join('\n'),
+        'src/unchecked.ts': [
+          '// @ts-nocheck',
+          `import { os } from '@orpc/server'`,
+          'interface Model { a: number; at: Date }',
+          'interface Box<T> { v: T }',
+          'type Queried<T> = { [K in keyof T]: typeof missingValue }',
+          'export const unchecked = {',
+          '  queried: os.handler((): { v: Queried<Model> } => ({}) as any),',
+          '  boxes: os.handler((): { v: Box<Box<Box<Box<Queried<Model>>>>> } => ({}) as any),',
+          '  bare: os.handler((): { v: Missing } => ({}) as any),',
+          '}',
+          '',
+        ].join('\n'),
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          `import type { DBare, DModel, DQueried } from './types'`,
+          `export { unchecked } from './unchecked'`,
+          'export const router = {',
+          '  declared: os.handler((): { v: DQueried<DModel> } => ({}) as any),',
+          '  declaredBare: os.handler((): { v: DBare<DModel> } => ({}) as any),',
+          '}',
+          '',
+        ].join('\n'),
+      })
+
+      const declared = await message(
+        generator.generate(
+          { declared: procedure, declaredBare: procedure },
+          { source: { file: file('src/router.ts') } },
+        ),
+      )
+      expect(declared).toContain('(2 errors)')
+      expect(declared).toContain(`Procedure at declared: ${unresolved('any')}`)
+      expect(declared).toContain(`Procedure at declaredBare: ${unresolved('Missing')}`)
+
+      const unchecked = await message(
+        generator.generate(
+          { queried: procedure, boxes: procedure, bare: procedure },
+          { source: { file: file('src/router.ts'), export: 'unchecked' } },
+        ),
+      )
+      expect(unchecked).toContain('(3 errors)')
+      expect(unchecked).toContain(`Procedure at queried: ${unresolved('any')}`)
+      expect(unchecked).toContain(`Procedure at boxes: ${unresolved('any')}`)
+      expect(unchecked).toContain(`Procedure at bare: ${unresolved('Missing')}`)
+    })
+
+    it('throws on index signatures of unresolved names, which are no index signature of any', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          'export const router = {',
+          '  record: os.handler((): { v: Record<string, Missing> } => ({}) as any),',
+          '  root: os.handler((): Record<string, Missing> => ({}) as any),',
+          '  signature: os.handler((): { v: { [k: string]: Missing } } => ({}) as any),',
+          '  partial: os.handler((): { v: Partial<Record<string, Missing>> } => ({}) as any),',
+          '  lists: os.handler((): { v: Record<string, Missing>[][][] } => ({}) as any),',
+          '  intersection: os.handler((): { v: object & Record<string, Missing> } => ({}) as any),',
+          '}',
+          '',
+        ].join('\n'),
+      })
+      const names = ['record', 'root', 'signature', 'partial', 'lists', 'intersection']
+
+      const thrown = await message(
+        generator.generate(Object.fromEntries(names.map((name) => [name, procedure])), {
+          source: { file: file('src/router.ts') },
+        }),
+      )
+      expect(thrown).toContain(`(${names.length} errors)`)
+      for (const name of names) {
+        expect(thrown).toContain(
+          `Procedure at ${name}: ${unresolved(name === 'partial' ? 'any' : 'Missing')}`,
+        )
+      }
+    })
+
+    it.runIf(canGenerateWithin)(
+      'cuts cycles through conditional deep mapped types, also over generic models, in time',
+      () => {
+        const cases: Record<string, string> = {
+          generic: 'os.handler((): GenCycle<number> => ({}) as any)',
+          genericInput: 'os.input(type<GenCycle<number>>()).handler(() => 1)',
+          self: 'os.handler((): GenSelf<string> => ({}) as any)',
+          wrap: 'os.handler((): Wrap<{ a: number }> => ({}) as any)',
+          wrapInput: 'os.input(type<Wrap<{ a: number }>>()).handler(() => 1)',
+          pair: 'os.handler((): CD<Pair<number>> => ({}) as any)',
+          mutual: 'os.handler((): Expanding<MA> => ({}) as any)',
+          list: 'os.handler((): ListCycle => ({}) as any)',
+          index: 'os.handler((): IndexCycle => ({}) as any)',
+          aliased: 'os.handler((): AliasCycle => ({}) as any)',
+          recursive: 'os.handler((): Expanding<Rec> => ({}) as any)',
+        }
+        const file = project({
+          'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+          'src/router.ts': [
+            `import { os, type } from '@orpc/server'`,
+            'type Expanding<T> = T extends object ? { [K in keyof T]: Expanding<T[K]> } : T',
+            'type CD<T> = T extends object ? { readonly [K in keyof T]: CD<T[K]> } : T',
+            'interface GenCycle<T> { f0: Expanding<GenCycle<T>> | null; f2: { a: T } }',
+            'interface GenSelf<T> { v: T; self: CD<GenSelf<T>> | null }',
+            'interface Wrap<T> { inner: T; f0: Expanding<Wrap<T>> | null }',
+            'interface Pair<T> { v: T; nested: Pair<T[]> | null }',
+            'interface MA { b: Expanding<MB> | null; x: { a: number } }',
+            'interface MB { a: Expanding<MA> | null; y: { b: string } }',
+            'interface ListCycle { kids: Expanding<ListCycle>[]; f2: { a: number } }',
+            'interface IndexCycle { m: Record<string, Expanding<IndexCycle>>; f2: { a: number } }',
+            'type Aliased = Expanding<AliasCycle>',
+            'interface AliasCycle { f0: Aliased | null; f2: { a: number } }',
+            'interface Box<T> { v: T }',
+            'type Rec = Box<Expanding<Rec>>',
+            'export const router = {',
+            ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
+            '}',
+            '',
+          ].join('\n'),
+        })
+
+        const { spec, error } = generateWithin(file('src/router.ts'), 60_000)
+        expect(error).toBeUndefined()
+
+        const schemas = spec.components?.schemas ?? {}
+        const deref = (schema: any): any =>
+          schema?.$ref ? deref(schemas[schema.$ref.replace('#/components/schemas/', '')]) : schema
+        for (const [name, procedure] of Object.entries(cases)) {
+          const operation = spec.paths[`/${name}`].post
+          const schema = procedure.includes('input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+          // cut after a few levels
+          expect([name, JSON.stringify(deref(schema))]).toEqual([
+            name,
+            expect.stringMatching(/\{\}/),
+          ])
+        }
+      },
+      120_000,
+    )
 
     it('reads no diagnostics of the whole program, which would check all of it', async () => {
       const file = project({
@@ -1859,7 +2036,6 @@ describe('openAPIGenerator', () => {
       )
       for (const [path, value] of [
         ['/expandingCycle', { f0: null, f2: { a: 1 } }],
-        ['/twiceExpandingCycle', { f0: null, f2: { a: { b: 1 } } }],
         ['/anyRecord', { v: [1, 2] }],
         ['/primitiveView', { v: 'x' }],
         ['/omittedLength', { v: [[1]] }],
@@ -1925,6 +2101,41 @@ describe('openAPIGenerator', () => {
         ['/nestedBoxes', { v: { v: { v: { v: 1 } } } }, true],
         ['/nestedBoxes', { v: { v: { v: { v: 'x' } } } }, false],
         ['/lengthExtra', { v: [1] }, true],
+      ] as const) {
+        expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
+      }
+    })
+  })
+  describe('round thirty-seven', () => {
+    it('documents inputs of cycles through conditional deep mapped types over generic models', async () => {
+      const spec = await generator.generate(roundThirtySevenInputs, {
+        source: { file: fixture('round37.ts'), export: 'roundThirtySevenInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const boxes = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { v: boxes(depth - 1, end) }
+
+      for (const [path, value, valid] of [
+        ['/genericCycle', { f0: { f0: null, f2: { a: 2 } }, f2: { a: 1 } }, true],
+        ['/genericCycle', { f0: { f0: null, f2: { a: 'x' } }, f2: { a: 1 } }, false],
+        ['/genericSelf', { v: 'a', self: { v: 'b', self: null } }, true],
+        ['/wrapCycle', { inner: { a: 1 }, f0: { inner: { a: 2 }, f0: null } }, true],
+        ['/deepBoxes', boxes(8, 1), true],
+        ['/deepBoxes', boxes(8, 'x'), false],
       ] as const) {
         expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
       }

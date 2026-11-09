@@ -15,6 +15,8 @@ interface Expansion {
   type: Type
   /** How many times in a row the type arguments grew */
   growth: number
+  /** How many properties were being converted when it was entered */
+  at: number
 }
 
 /**
@@ -24,11 +26,11 @@ interface Expansion {
 export class ExpansionGuard {
   /** How many expansions were cut, a conversion that cut one depends on where it started */
   cuts = 0
+  /** The properties being converted, outermost first */
+  readonly path: TSSymbol[] = []
 
   private readonly expansions = new Map<number, Expansion[]>()
   private readonly instantiations = new Map<number, Set<number>>()
-  /** Whether a generic declaration holds a declaration, by its location */
-  private readonly generics = new Map<string, boolean>()
 
   constructor(private readonly types: TypeQueries) {}
 
@@ -77,7 +79,7 @@ export class ExpansionGuard {
     }
 
     this.expansions.set(declaration, stack)
-    stack.push({ type, growth })
+    stack.push({ type, growth, at: this.path.length })
 
     try {
       return convert()
@@ -168,18 +170,21 @@ export class ExpansionGuard {
 
   /**
    * An instantiation without type arguments (a conditional type resolved to a mapped type) shows
-   * no growth by them: it grows when it maps over the properties of the model an outer one maps
-   * over again, as a different type, which a cycle through it (`T extends object ? { [K in keyof T]:
-   * X<T[K]> } : T` over a model holding `X<Model>`) expands without end. The properties of a
-   * generic model (`Page<T>`) are mapped again over its other instantiations
-   * (`Page<Post>` holding `Page<Comment>`), which ends.
+   * no growth by them: it grows when it maps again over what an outer one with the same keys maps
+   * over, as a different type, which a cycle through it (`T extends object ? { [K in keyof T]:
+   * X<T[K]> } : T` over a model holding `X<Model>`, also `X<Model<T>>`) expands without end. It
+   * does when it holds at each key what the outer one holds there (a mapping of the same keys
+   * again), or what that grows to (`T[]` of `T`), as far as `MAX_GROWTH` mappings in. Another
+   * instantiation of a generic model (`Page<Post>` holding `Page<Comment>`) holds another model at
+   * a key, and one nested in itself (`Box<Box<Box<number>>>`) another value once its end is that
+   * near, so both are expanded in full.
    */
   private getRepeatedGrowth(stack: readonly Expansion[], type: Type): number {
     if (this.types.getTypeArguments(type).length) {
       return 0
     }
 
-    const keys = this.getModelKeys(type)
+    const keys = this.getKeys(type)
 
     if (keys === undefined) {
       return 0
@@ -187,8 +192,12 @@ export class ExpansionGuard {
 
     // the innermost one
     for (let i = stack.length - 1; i >= 0; i--) {
-      if (this.getModelKeys(stack[i]!.type) === keys) {
-        return stack[i]!.growth + 1
+      const outer = stack[i]!
+      if (this.getKeys(outer.type) === keys) {
+        return this.holdsAgain(outer.type, type, MAX_GROWTH) &&
+          this.path.slice(outer.at).some((property) => this.declaresNesting(property))
+          ? outer.growth + 1
+          : 0
       }
     }
 
@@ -196,42 +205,152 @@ export class ExpansionGuard {
   }
 
   /**
-   * The declarations of the properties of a type, which a mapped type keeps from its source, when
-   * no generic declaration holds them, so each mapping over them maps over the same model.
+   * Whether a type holds what an outer one holds, or what it grows to (see `getRepeatedGrowth`):
+   * the same type, one containing it, the same members, type arguments, or keys, with the values
+   * at them, `depth` objects in.
    */
-  private getModelKeys(type: Type): string | undefined {
-    return this.types.memo('expansionKeys', type.id, () => {
-      const properties = this.types.getProperties(type)
-      const keys: string[] = []
+  private holdsAgain(outer: Type, inner: Type, depth: number): boolean {
+    if (outer.id === inner.id) {
+      return true
+    }
 
-      for (const p of properties) {
-        const declaration = p.declarations[0]
-        if (!declaration || this.isInGeneric(declaration)) {
-          return undefined
-        }
-        keys.push(`${declaration.path}:${declaration.index}`)
-      }
+    // `T[]` of `T`, not any value holding `undefined` of a `T | undefined`
+    if (
+      !(outer.flags & (TypeFlags.Undefined | TypeFlags.Null | TypeFlags.Void)) &&
+      containsType(this.types, inner, outer.id, 3)
+    ) {
+      return true
+    }
 
-      return keys.length ? keys.join(',') : undefined
+    if (outer.flags & TypeFlags.UnionOrIntersection) {
+      const outers = this.types.getMembers(outer)
+      const inners = this.types.getMembers(inner)
+      return (
+        (outer.flags & TypeFlags.UnionOrIntersection) ===
+          (inner.flags & TypeFlags.UnionOrIntersection) &&
+        outers.length === inners.length &&
+        inners.every((i) => outers.some((o) => this.holdsAgain(o, i, depth)))
+      )
+    }
+
+    if (!(outer.flags & TypeFlags.Object) || !(inner.flags & TypeFlags.Object)) {
+      return false
+    }
+
+    if (outer.isTypeReference() || inner.isTypeReference()) {
+      const outerArguments = this.types.getReferenceArguments(outer)
+      const innerArguments = this.types.getReferenceArguments(inner)
+      return (
+        outer.isTypeReference() &&
+        inner.isTypeReference() &&
+        outer.getTarget().id === inner.getTarget().id &&
+        outerArguments.length === innerArguments.length &&
+        innerArguments.every((i, index) => this.holdsAgain(outerArguments[index]!, i, depth))
+      )
+    }
+
+    const keys = this.getKeys(outer)
+    if (keys === undefined || keys !== this.getKeys(inner)) {
+      return false
+    }
+
+    if (depth === 0) {
+      return true
+    }
+
+    const outerValues = this.getValues(outer)
+    const innerValues = this.getValues(inner)
+    return innerValues.every((value, index) => {
+      const outerValue = outerValues[index]
+      return (
+        value === undefined ||
+        (outerValue !== undefined && this.holdsAgain(outerValue, value, depth - 1))
+      )
     })
   }
 
-  private isInGeneric(declaration: TSSymbol['declarations'][number]): boolean {
-    const location = `${declaration.path}:${declaration.index}`
-    let generic = this.generics.get(location)
+  /**
+   * Whether a property is declared with a type that may nest a model in itself: one naming more
+   * than the type parameters of its model (`next: Expanding<Model<T>> | null`, `nested: Pair<T[]>`),
+   * not `v: T` or `items: T[]`, which nest only the type arguments a model is written with
+   * (`Box<Box<Box<number>>>`), a finite type.
+   */
+  private declaresNesting(property: TSSymbol): boolean {
+    return this.types.memo('declaresNesting', property.id, () => {
+      const name = (property.declarations[0]?.resolve() as any)?.name
+      const original = name && this.types.checker.getSymbolAtLocation(name)
+      const declared = this.types.checker.getTypeOfSymbol(original ?? property)
+      return declared !== undefined && !this.isParametric(declared, 3)
+    })
+  }
 
-    if (generic === undefined) {
-      generic = false
-      for (let node = declaration.resolve() as any; node; node = node.parent) {
-        if (node.typeParameters?.length) {
-          generic = true
-          break
-        }
-      }
-      this.generics.set(location, generic)
+  /**
+   * Whether a type is made only of type parameters, primitives, and the default library's types
+   * and object literals of them.
+   */
+  private isParametric(type: Type, depth: number): boolean {
+    if (type.flags & TypeFlags.UnionOrIntersection) {
+      return this.types.getMembers(type).every((m) => this.isParametric(m, depth))
     }
 
-    return generic
+    if (type.flags & (TypeFlags.Conditional | TypeFlags.Substitution)) {
+      return false
+    }
+
+    if (!(type.flags & TypeFlags.Object)) {
+      return true
+    }
+
+    const symbol = type.getAliasSymbol() ?? type.getSymbol()
+    const objectFlags = (type as any).objectFlags as number
+
+    if (symbol && this.types.getSymbolSourceKind(symbol) === 'default') {
+      return this.types.getTypeArguments(type).every((t) => this.isParametric(t, depth))
+    }
+
+    if (
+      depth === 0 ||
+      type.getAliasSymbol() ||
+      !(objectFlags & ObjectFlags.Anonymous) ||
+      objectFlags & ObjectFlags.Mapped
+    ) {
+      return false
+    }
+
+    // `{ inner: T }`
+    return this.types
+      .getSymbolTypes(this.types.getProperties(type))
+      .every((t) => t === undefined || this.isParametric(t, depth - 1))
+  }
+
+  /**
+   * The declarations of the properties of a type, which a mapped type keeps from its source, and
+   * the key types of its index signatures.
+   */
+  private getKeys(type: Type): string | undefined {
+    return this.types.memo('expansionKeys', type.id, () => {
+      const properties = this.types.getProperties(type)
+      const indexes = this.types.checker.getIndexInfosOfType(type)
+      return properties.length || indexes.length
+        ? [
+            ...properties.map((p) => {
+              const declaration = p.declarations[0]
+              return declaration ? `${declaration.path}:${declaration.index}` : p.name
+            }),
+            ...indexes.map((info) => `[${info.keyType.id}]`),
+          ].join(',')
+        : undefined
+    })
+  }
+
+  /**
+   * The values at the keys of a type (see `getKeys`).
+   */
+  private getValues(type: Type): readonly (Type | undefined)[] {
+    return this.types.memo('expansionValues', type.id, () => [
+      ...this.types.getSymbolTypes(this.types.getProperties(type)),
+      ...this.types.checker.getIndexInfosOfType(type).map((info) => info.valueType),
+    ])
   }
 }
 

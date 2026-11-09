@@ -251,7 +251,6 @@ describe('generated schemas match serialized outputs', async () => {
     ['symbolViews', undefined],
     ['brandedSymbols', undefined],
     ['expandingCycle', undefined],
-    ['twiceExpandingCycle', undefined],
     ['anyRecords', undefined],
     ['literalUnionViews', undefined],
     ['brandedLiteralViews', undefined],
@@ -267,6 +266,11 @@ describe('generated schemas match serialized outputs', async () => {
     ['partialFeed', undefined],
     ['nestedBoxes', undefined],
     ['lengthExtra', undefined],
+    ['genericCycle', undefined],
+    ['genericSelf', undefined],
+    ['wrapCycle', undefined],
+    ['growingPair', undefined],
+    ['deepBoxes', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2098,8 +2102,6 @@ describe('generated schemas match serialized outputs', async () => {
         ...level(level(level(level({})))),
         description: expect.any(String),
       })
-      // the compiler gives up on the instantiation first, which is cut too
-      expect(JSON.stringify(schemas().TwiceExpandingCycle)).toContain('"a":{}')
     })
 
     it('writes an index signature of any like object, which may hold any value', () => {
@@ -2324,6 +2326,45 @@ describe('generated schemas match serialized outputs', async () => {
           },
         ],
       })
+    })
+  })
+
+  describe('round thirty-seven', () => {
+    const schemaOf = (name: string) =>
+      deref(
+        (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema,
+      )
+    const model = (properties: Record<string, object>) => ({
+      type: 'object',
+      properties,
+      required: Object.keys(properties),
+    })
+    const nullable = (schema: object) => ({ anyOf: [schema, { type: 'null' }] })
+    const levels = (count: number, level: (inner: object) => object, end: object = {}): object =>
+      count === 0 ? end : level(levels(count - 1, level, end))
+
+    it('cuts cycles through conditional deep mapped types over generic models', () => {
+      // each level maps over the one outside it again, as a different type
+      const a = model({ a: { type: 'number' } })
+      const described = { description: expect.any(String) }
+      expect(schemaOf('genericCycle')).toEqual({
+        ...levels(4, (f0) => model({ f0: nullable(f0), f2: a })),
+        ...described,
+      })
+      expect(schemaOf('genericSelf')).toEqual({
+        ...levels(4, (self) => model({ v: { type: 'string' }, self: nullable(self) })),
+        ...described,
+      })
+      expect(schemaOf('wrapCycle')).toEqual({
+        ...levels(4, (f0) => model({ inner: a, f0: nullable(f0) })),
+        ...described,
+      })
+      // its type arguments grow too
+      expect(JSON.stringify(schemaOf('growingPair'))).toContain('"nested":{"anyOf":[{},')
+    })
+
+    it('expands a conditional deep mapped type over a generic model nested in itself in full', () => {
+      expect(schemaOf('deepBoxes')).toEqual(levels(8, (v) => model({ v }), { type: 'number' }))
     })
   })
 

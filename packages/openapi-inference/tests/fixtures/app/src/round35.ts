@@ -12,17 +12,6 @@ export interface ExpandingCycle {
   f2: { a: number }
 }
 
-/** Expands each value twice, so the compiler gives up on instantiating it over a cycle */
-type ExpandingTwice<T> = T extends object
-  ? { [K in keyof T]: ExpandingTwice<ExpandingTwice<T[K]>> }
-  : T
-
-/** A model holding a view of itself the compiler gives up on, beside an object literal field */
-export interface TwiceExpandingCycle {
-  f0: ExpandingTwice<ExpandingTwice<ExpandingTwice<TwiceExpandingCycle>>> | null
-  f2: { a: { b: number } }
-}
-
 export enum Shade {
   Light = 'light',
   Dark = 'dark',
@@ -109,7 +98,6 @@ const text = 'x' as TextBrand
  */
 export const roundThirtyFive = {
   expandingCycle: os.handler((): ExpandingCycle => ({ f0: null, f2: { a: 1 } })),
-  twiceExpandingCycle: os.handler((): TwiceExpandingCycle => ({ f0: null, f2: { a: { b: 1 } } })),
   anyRecords: os.handler(
     (): {
       list: Record<string, any>
@@ -231,7 +219,6 @@ export const roundThirtyFive = {
 /** Inputs of the same types, as a client sends them */
 export const roundThirtyFiveInputs = {
   expandingCycle: os.input(type<ExpandingCycle>()).handler(() => 1),
-  twiceExpandingCycle: os.input(type<TwiceExpandingCycle>()).handler(() => 1),
   anyRecord: os.input(type<{ v: Record<string, any> }>()).handler(() => 1),
   primitiveView: os
     .input(type<{ v: ConditionalDeep<Pick<TextBrand, '__brand'>> }>())

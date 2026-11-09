@@ -286,7 +286,8 @@ export function isLooseIntersection(types: TypeQueries, type: Type): boolean {
 
 /**
  * Whether a type is only a string index signature of `any` (`Record<string, any>`, `Readonly<any>`),
- * which, like `object`, every object type is assignable to: arrays, dates, and functions too.
+ * which, like `object`, every object type is assignable to: arrays, dates, and functions too. Not
+ * one of an unresolved name (`Record<string, Missing>`), whose error type is `any` to the compiler.
  */
 export function isAnyRecord(types: TypeQueries, type: Type): boolean {
   if (!(type.flags & TypeFlags.Object) || types.getProperties(type).length) {
@@ -297,7 +298,10 @@ export function isAnyRecord(types: TypeQueries, type: Type): boolean {
   return (
     infos.length > 0 &&
     infos.every(
-      (info) => info.keyType.flags & TypeFlags.String && info.valueType.flags & TypeFlags.Any,
+      (info) =>
+        info.keyType.flags & TypeFlags.String &&
+        info.valueType.flags & TypeFlags.Any &&
+        !info.valueType.isErrorType(),
     )
   )
 }

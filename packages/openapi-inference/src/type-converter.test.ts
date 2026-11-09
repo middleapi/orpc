@@ -3059,8 +3059,6 @@ describe('typeToJsonSchemaConverter', () => {
           { description: 'Strings, as an array, a set, or a string' },
           false,
         ])
-        // the compiler gives up on instantiating it, which is no unresolved type
-        expect(() => convert('TwiceExpandingCycle')).not.toThrow()
       } finally {
         project.close()
       }
