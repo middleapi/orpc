@@ -160,22 +160,41 @@ export const TYPED_ARRAY_SCHEMA: JsonSchema = {
  * Unless `toJSON` is called, they are written by their index keys.
  */
 export function isTypedArray(types: TypeQueries, type: Type): boolean {
+  const kind = getTypedArrayKind(types, type)
+  return kind !== undefined && (kind === true || kind.length > 0)
+}
+
+/**
+ * The views of typed arrays a type is a typed array through: an interface extending one
+ * (`interface Sized extends Pick<Uint8Array, 'length'>`), also behind a view, whose values may
+ * also be plain objects written by their fields. Empty for other typed arrays.
+ */
+export function getTypedArrayViewBases(types: TypeQueries, type: Type): readonly Type[] {
+  const kind = getTypedArrayKind(types, type)
+  return Array.isArray(kind) ? kind : []
+}
+
+/**
+ * `true` for a typed array, the views of typed arrays it extends for an interface over them.
+ */
+function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | undefined {
   // `Uint8Array & { label: string }`
   if (type.isIntersectionType()) {
-    return types.getMembers(type).some((member) => isTypedArray(types, member))
+    const kinds = types.getMembers(type).map((member) => getTypedArrayKind(types, member))
+    return kinds.includes(true) ? true : kinds.flatMap((kind) => (Array.isArray(kind) ? kind : []))
   }
 
   const source = (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(type) : type
 
   // `Readonly<Uint8Array & { label: string }>`
   if (source !== type && source?.isIntersectionType()) {
-    return isTypedArray(types, source)
+    return getTypedArrayKind(types, source)
   }
 
   const symbol = source?.getSymbol()
 
   if (!symbol) {
-    return false
+    return undefined
   }
 
   if (TYPED_ARRAYS.has(symbol.name) && isBuiltinSymbol(types, symbol)) {
@@ -186,7 +205,11 @@ export function isTypedArray(types: TypeQueries, type: Type): boolean {
     symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
       ? getBuiltinBaseName(types, source!)
       : undefined
-  return base !== undefined && TYPED_ARRAYS.has(base)
+
+  // also an interface extending a view of one (`interface Sized extends Pick<Uint8Array, 'length'>`)
+  return base !== undefined
+    ? TYPED_ARRAYS.has(base) || undefined
+    : getViewBases(source!).filter((view) => isTypedArray(types, view))
 }
 
 /**
@@ -260,6 +283,23 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
     return viewedBuiltin
   }
 
+  // a view of an interface extending a built-in or a view of one (`Readonly<Link>` with
+  // `interface Link extends Pick<URL, 'href'>`) is the built-in or a plain object, like the interface
+  // (one extending a project class is a view of the class)
+  const viewedSymbol = viewed?.getSymbol()
+  if (
+    viewed &&
+    viewedSymbol &&
+    viewedSymbol.flags & SymbolFlags.Interface &&
+    !(viewedSymbol.flags & SymbolFlags.Class) &&
+    !extendsProjectClass(types, viewed, new Set())
+  ) {
+    const extended = getBuiltin(types, viewed, stringify)
+    if (extended !== undefined) {
+      return extended
+    }
+  }
+
   const builtin = getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {
@@ -325,6 +365,30 @@ export function getMappedBuiltinName(types: TypeQueries, type: Type): string | u
 }
 
 /**
+ * Whether an interface extends a class declared outside the runtime, also through other interfaces.
+ */
+function extendsProjectClass(types: TypeQueries, type: Type, visited: Set<number>): boolean {
+  const target = type.isTypeReference() ? type.getTarget() : type
+
+  if (visited.has(target.id)) {
+    return false
+  }
+  visited.add(target.id)
+
+  return (target.getBaseTypes() ?? []).some((base) => {
+    const symbol = base.getSymbol()
+    return (
+      symbol !== undefined &&
+      !isBuiltinSymbol(types, symbol) &&
+      (symbol.flags & SymbolFlags.Class
+        ? true
+        : Boolean(symbol.flags & SymbolFlags.Interface) &&
+          extendsProjectClass(types, base, visited))
+    )
+  })
+}
+
+/**
  * A class extending a built-in, like `Map`, `Set`, `Array`, or `Date`, is serialized like it,
  * the serializer checks with `instanceof` and `Array.isArray`.
  */
@@ -339,6 +403,11 @@ function getBuiltinSubclass(
     // an interface extending a view of a built-in (`interface Link extends Pick<URL, 'href'>`)
     // holds the built-in or a plain object
     for (const view of getViewBases(type)) {
+      // a typed array is written by its index keys and the fields the interface adds
+      if (isTypedArray(types, view)) {
+        continue
+      }
+
       const builtin = getMappedBuiltin(types, view, stringify)
       if (builtin !== undefined) {
         return builtin
@@ -373,7 +442,7 @@ function getBuiltinSubclass(
  * The name of the default library class a class extends, also through other classes.
  */
 export function getBuiltinBaseName(types: TypeQueries, type: Type): string | undefined {
-  return getBuiltinBase(types, type)?.name
+  return types.memo('builtinBaseName', type.id, () => getBuiltinBase(types, type)?.name)
 }
 
 /**
@@ -424,13 +493,15 @@ export function getViewBases(type: Type, depth = 0): Type[] {
 
 /**
  * Whether a declared interface extends a built-in class (`interface AppError extends Error`),
- * so a value may be an instance, which does not write the members it inherits from the built-in.
+ * also through a view of it (`Readonly<AppError>`), so a value may be an instance, which does not
+ * write the members it inherits from the built-in.
  * Not a library interface of plain data, like `PromiseFulfilledResult<T>`.
  */
-export function extendsBuiltinClass(types: TypeQueries, type: Type): boolean {
-  const symbol = type.getSymbol()
+export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
+  const type = (view as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSource(view) : view
+  const symbol = type?.getSymbol()
   const base =
-    symbol && symbol.flags & SymbolFlags.Interface ? getBuiltinBase(types, type) : undefined
+    symbol && symbol.flags & SymbolFlags.Interface ? getBuiltinBase(types, type!) : undefined
   return base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))
 }
 
@@ -477,7 +548,7 @@ export function hasBigIntToJSON(types: TypeQueries): boolean {
 }
 
 export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
-  return types.getProperties(type).find((p) => p.name === 'toJSON')
+  return types.getProperty(type, 'toJSON')
 }
 
 export function hasOwnToJSON(types: TypeQueries, type: Type): boolean {

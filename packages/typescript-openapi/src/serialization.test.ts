@@ -2,6 +2,12 @@ import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
+import {
+  longDeepChain,
+  longerDeepChain,
+  mixedDeepChain,
+  shortDeepChain,
+} from '../tests/fixtures/app/src/deep-view-chains.ts'
 import { router } from '../tests/fixtures/app/src/serialization.ts'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains.ts'
 import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
@@ -146,6 +152,35 @@ describe('generated schemas match serialized outputs', async () => {
     ['typedArrayViews', undefined],
     ['prioritizedView', undefined],
     ['priorities', undefined],
+    ['holdsLevels', undefined],
+    ['errorFields', undefined],
+    ['classOrder', undefined],
+    ['maskedBrand', undefined],
+    ['mask', undefined],
+    ['deepClassViews', undefined],
+    ['deepJSON', undefined],
+    ['redeclaredErrors', undefined],
+    ['deepBuiltins', undefined],
+    ['builtinInterfaceViews', undefined],
+    ['partialStr', undefined],
+    ['typedLabel', undefined],
+    ['optionalDeep', undefined],
+    ['functionJSON', undefined],
+    ['constructorJSON', undefined],
+    ['functionJSONField', undefined],
+    ['deepUnfolding', undefined],
+    ['readonlyDeepUnfolding', undefined],
+    ['partialDeepUnfolding', undefined],
+    ['deepNest', undefined],
+    ['maybeFunctionJSON', undefined],
+    ['maybeFunctionJSONRoot', undefined],
+    ['bufView', undefined],
+    ['conditionalDeepViews', undefined],
+    ['conditionalDeepJSON', undefined],
+    ['functionViews', undefined],
+    ['plainFunctionViews', undefined],
+    ['functionViewRoot', undefined],
+    ['functionRoot', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -825,6 +860,283 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
+  describe('round twenty-seven', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const mapArray = expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' })
+    const eitherMap = { anyOf: [mapArray, { type: 'object' }] }
+    const uri = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }
+
+    it('documents what toJSON of a function or a class constructor returns', () => {
+      expect(schemaOf('functionJSON')).toEqual({ type: 'string' })
+      expect(schemaOf('constructorJSON')).toEqual({ type: 'string' })
+      expect(schemaOf('functionJSONField')).toEqual({
+        type: 'object',
+        properties: { f: { type: 'string' }, list: { type: 'array', items: { type: 'string' } } },
+        required: ['f', 'list'],
+      })
+    })
+
+    it('documents the fields of an interface extending a built-in class in both forms', () => {
+      expect(schemas().SetError.properties.tags).toEqual(eitherSet)
+      expect(schemas().SetError.required).toEqual(['tags'])
+      expect(schemas().MapError.properties.m).toEqual(eitherMap)
+      expect(schemas().MetaError.properties.meta.properties.tags).toEqual(eitherSet)
+    })
+
+    it('adds the built-in of every class behind an interface, in any order', () => {
+      for (const name of ['IdTags', 'TagsId']) {
+        expect(schemas()[name].anyOf[0]).toEqual(setArray)
+        expect(schemas()[name].anyOf.at(-1)).toEqual(
+          expect.objectContaining({ type: 'object', required: ['id', 'label'] }),
+        )
+      }
+    })
+
+    it('converts mapped types changing the values of a branded primitive as objects', () => {
+      expect(schemaOf('mask')).toEqual({ $ref: '#/components/schemas/Mask_AccountId' })
+      expect(schemas().Mask_AccountId).toEqual(
+        expect.objectContaining({
+          type: 'object',
+          properties: expect.objectContaining({ __brand: { type: 'boolean', const: true } }),
+        }),
+      )
+      expect(schemas().Mask_AccountId.required).toBeUndefined()
+    })
+
+    it('reads deep mapped types over a class as views of it', () => {
+      const deepSet = { $ref: '#/components/schemas/DeepRO_Set_stringAny' }
+
+      expect(schemas().DeepRO_Holder.properties).toEqual({
+        tags: deepSet,
+        map: { $ref: '#/components/schemas/DeepRO_Map_string_numberAny' },
+        n: { type: 'number' },
+      })
+      const description = 'Read-only all the way down'
+      expect(schemas().DeepRO_Set_stringAny).toEqual({ ...eitherSet, description })
+      expect(schemas().DeepRO_Map_string_numberAny).toEqual({ ...eitherMap, description })
+      expect(schemas().DeepRO_OuterHolder.properties).toEqual({
+        inner: { $ref: '#/components/schemas/DeepRO_Holder' },
+        tags: deepSet,
+      })
+      expect(schemas().DeepRO_WritesJ.anyOf).toEqual([
+        { type: 'object', properties: { j: { type: 'string' } }, required: ['j'] },
+        { type: 'object', properties: { v: { type: 'string' } }, required: ['v'] },
+      ])
+      const { properties } = schemaOf('deepClassViews')
+      for (const name of ['readonlyDeep', 'partialDeep']) {
+        expect(properties[name].properties.tags).toEqual(eitherSet)
+        expect(properties[name].properties.map).toEqual(eitherMap)
+      }
+    })
+
+    it('does not require members an interface redeclares over a built-in class', () => {
+      for (const name of [
+        'MsgError',
+        'NameError',
+        'StackError',
+        'LiteralError',
+        'AppErrMsg',
+        'TypeErrMsg',
+        'SizedParams',
+        'ByteLen',
+        'ReLast',
+        'AbortMsg',
+      ]) {
+        expect(schemas()[name].required).toBeUndefined()
+      }
+      expect(schemas().ViaMsgError.required).toEqual(['code'])
+      expect(schemas().LiteralError.properties.message).toEqual({ type: 'string', const: 'boom' })
+    })
+
+    it('converts deep mapped types over built-ins as the built-in', () => {
+      const typedArray = { type: 'object', additionalProperties: { type: 'number' } }
+
+      expect(schemas().DeepRO_RegExp).toEqual({ description: 'Read-only all the way down' })
+      expect(schemas().DeepRO_Uint8Array_ArrayBufferLike).toEqual({
+        ...typedArray,
+        description: 'Read-only all the way down',
+      })
+      expect(schemas().DeepPartialOf_Uint8Array_ArrayBufferLike).toEqual({
+        ...typedArray,
+        description: 'Optional all the way down',
+      })
+      expect(schemas().DeepRO_URLSearchParams.required).toBeUndefined()
+      expect(schemas().DeepRO_SizedSet.anyOf[0]).toEqual(setArray)
+    })
+
+    it('reads views of interfaces over built-ins like the interface', () => {
+      const { properties } = schemaOf('builtinInterfaceViews')
+
+      for (const name of ['readonlyLink', 'pickedLink', 'readonlyLinkX']) {
+        expect(properties[name].anyOf[0]).toEqual(uri)
+      }
+      expect(properties.partialSized.anyOf[0]).toEqual(setArray)
+      // a view of an interface over a class is a view of the class
+      expect(properties.pickedStamp).toEqual({
+        anyOf: [
+          { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+          { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+        ],
+      })
+      expect(properties.readonlyCode.required).toBeUndefined()
+      expect(properties.pickedCode).toEqual({
+        type: 'object',
+        properties: { message: { type: 'string' }, code: { type: 'number' } },
+      })
+    })
+
+    it('documents the plain object of a view of a String subclass by its fields', () => {
+      expect(schemaOf('partialStr').anyOf).toEqual([
+        { type: 'string' },
+        expect.objectContaining({
+          type: 'object',
+          properties: expect.objectContaining({ a: { type: 'number' } }),
+        }),
+      ])
+    })
+
+    it('writes the fields of an interface over a view of a typed array with its index keys', () => {
+      expect(schemas().TypedLabel).toEqual({
+        type: 'object',
+        properties: { label: { type: 'string' } },
+        required: ['label'],
+        additionalProperties: { type: 'number' },
+        description: 'Labeled bytes, or a plain object',
+      })
+    })
+
+    it('keeps one def for a deep mapped type over optional and required fields', () => {
+      const names = Object.keys(schemas())
+
+      expect(schemas().DeepRO_OptionalMaps.properties).toEqual({
+        a: { $ref: '#/components/schemas/DeepRO_Map_string_boolean' },
+        b: { $ref: '#/components/schemas/DeepRO_Map_string_boolean' },
+      })
+      expect(names.filter((name) => name.startsWith('DeepRO_Map_string_boolean'))).toEqual([
+        'DeepRO_Map_string_boolean',
+      ])
+      const dates = schemas().DeepRO_OptionalDates.properties
+      expect(dates.a).toEqual(dates.b)
+      expect(names.filter((name) => /^DeepRO\d*$/u.test(name))).toEqual(['DeepRO'])
+      // no def is only a reference to another one
+      for (const name of names) {
+        expect(Object.keys(schemas()[name])).not.toEqual(['$ref'])
+      }
+    })
+
+    it('names a type next to a cut expansion once, also converted again', () => {
+      expect(schemas().LevelO.properties.u).toEqual({
+        $ref: '#/components/schemas/Unfolding_number',
+      })
+      expect(Object.keys(schemas()).filter((name) => name.startsWith('Unfolding_number'))).toEqual([
+        'Unfolding_number',
+        'Unfolding_numberArray',
+        'Unfolding_numberArrayArray',
+      ])
+    })
+
+    it('cuts expanding generics under deep mapped types like the generics themselves', () => {
+      const names = Object.keys(schemas())
+      expect(names.filter((name) => name.startsWith('DeepFrozen_Unfolding'))).toEqual([
+        'DeepFrozen_Unfolding_number',
+        'DeepFrozen_Unfolding_numberArray',
+        'DeepFrozen_Unfolding_numberArrayArray',
+      ])
+      // nested in a generic class, the growth of its argument is cut too
+      expect(names.filter((name) => name.startsWith('DeepPartialOf_GrowingNest'))).toEqual([
+        'DeepPartialOf_GrowingNest_number',
+        'DeepPartialOf_GrowingNest_numberArray',
+        'DeepPartialOf_GrowingNest_numberArrayArray',
+      ])
+      for (const name of ['readonlyDeepUnfolding', 'partialDeepUnfolding']) {
+        expect(JSON.stringify(schemaOf(name)).length).toBeLessThan(1000)
+      }
+    })
+
+    it('writes a function with an optional toJSON as its result or as nothing', () => {
+      const description = 'A function JSON writes by its `toJSON` when it has one, else as nothing'
+      const result = { type: 'string', description }
+
+      expect(schemaOf('maybeFunctionJSON')).toEqual({
+        type: 'object',
+        properties: {
+          f: result,
+          g: result,
+          list: { type: 'array', items: { anyOf: [result, { type: 'null' }] } },
+        },
+        required: ['list'],
+      })
+      expect(schemaOf('maybeFunctionJSONRoot')).toEqual(result)
+    })
+
+    it('writes an interface over a view of a typed array as bytes or a plain object', () => {
+      expect(schemas().BufView).toEqual({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { label: { type: 'string' } },
+            required: ['label'],
+            additionalProperties: { type: 'number' },
+          },
+          {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              buffer: expect.objectContaining({ type: 'object' }),
+            },
+            required: ['label', 'buffer'],
+          },
+        ],
+        description: 'Bytes, or a plain object holding their buffer',
+      })
+    })
+
+    it('reads conditional deep mapped types over a class as views of it', () => {
+      const { properties } = schemaOf('conditionalDeepViews')
+      const fields = { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] }
+
+      // an instance is written by `toJSON`, a plain object by its fields
+      expect(properties.json).toEqual({ anyOf: [{ type: 'string' }, fields] })
+      expect(schemaOf('conditionalDeepJSON')).toEqual({ anyOf: [{ type: 'string' }, fields] })
+      // an instance writes a `Set` as `{}`, a plain object as an array
+      expect(properties.partial.properties.tags.anyOf.slice(0, 2)).toEqual([
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+        { type: 'object' },
+      ])
+      expect(properties.partial.properties.map.anyOf.slice(0, 2)).toEqual([
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+        { type: 'object' },
+      ])
+    })
+
+    it('makes a mapped view of a function optional, which may hold the function', () => {
+      const deep = 'Read-only all the way down'
+      const tag = { type: 'object', properties: { tag: { type: 'string' } }, required: ['tag'] }
+      const { properties, required } = schemaOf('functionViews')
+
+      expect(required).toEqual(['deep', 'conditional', 'deepMaybe', 'list'])
+      expect(schemas().DeepRO_WithCallback).toEqual({
+        type: 'object',
+        properties: { cb: { description: deep }, n: { type: 'number' } },
+        required: ['n'],
+        description: deep,
+      })
+      expect(properties.conditional.required).toEqual(['n'])
+      // the function is written by its `toJSON`, a plain object by its fields
+      expect(schemas().DeepRO_FnAndHolder.required).toEqual(['h'])
+      expect(schemas().DeepRO_FnAndHolder.properties.f.anyOf[0]).toEqual({ type: 'string' })
+      expect(properties.readonlyMaybe).toEqual({
+        anyOf: [{ type: 'string' }, tag],
+      })
+      expect(properties.list).toEqual({
+        type: 'array',
+        items: { anyOf: [tag, { type: 'null' }] },
+      })
+    })
+  })
+
   it('writes each view of a chain of views once', () => {
     const schemas = spec.components?.schemas as any
     // a view reaching other views is written once, as a component
@@ -1009,5 +1321,58 @@ describe('chains of views of classes', async () => {
       'tags',
       'next',
     ])
+  })
+})
+
+describe('chains of deep views of classes', async () => {
+  const file = new URL('../tests/fixtures/app/src/deep-view-chains.ts', import.meta.url)
+  const routers = { shortDeepChain, longDeepChain, longerDeepChain, mixedDeepChain }
+  const generate = async (name: keyof typeof routers) => {
+    const start = performance.now()
+    const spec = await new TypeScriptOpenAPIGenerator().generate(routers[name], {
+      source: { file, export: name },
+    })
+    return { spec, time: performance.now() - start }
+  }
+
+  // the first generation also starts the compiler
+  await generate('shortDeepChain')
+  const results = {
+    shortDeepChain: await generate('shortDeepChain'),
+    longDeepChain: await generate('longDeepChain'),
+    longerDeepChain: await generate('longerDeepChain'),
+    mixedDeepChain: await generate('mixedDeepChain'),
+  }
+  const serializer = new OpenAPIJsonSerializer()
+
+  it.each([
+    ['shortDeepChain', 'chain'],
+    ['longDeepChain', 'chain'],
+    ['longerDeepChain', 'chain'],
+    ['longerDeepChain', 'root'],
+    ['mixedDeepChain', 'chain'],
+  ] as const)('match serialized outputs (%s, %s)', async (name, procedure) => {
+    const { spec } = results[name]
+    const ajv = new Ajv2020({ strict: false, allErrors: true })
+    const json = JSON.stringify({
+      $id: 'spec',
+      $defs: spec.components?.schemas ?? {},
+      ...(spec.paths as any)[`/${procedure}`].post.responses['200'].content['application/json']
+        .schema,
+    }).replaceAll('#/components/schemas/', '#/$defs/')
+    const validate = ajv.compile(JSON.parse(json))
+    const output = await call((routers[name] as any)[procedure], undefined)
+    const serialized = JSON.parse(JSON.stringify(serializer.serializeJson(output).json))
+
+    expect(validate(serialized) ? [] : validate.errors).toEqual([])
+  })
+
+  it('generate in time growing linearly with the length of the chain', () => {
+    expect(results.longDeepChain.time).toBeLessThan(3000)
+    expect(results.longerDeepChain.time).toBeLessThan(3000)
+    expect(results.mixedDeepChain.time).toBeLessThan(3000)
+    // the checks of a view reuse what the views of the next classes were found to keep
+    expect(results.longDeepChain.time / results.shortDeepChain.time).toBeLessThan(3)
+    expect(results.longerDeepChain.time / results.longDeepChain.time).toBeLessThan(3)
   })
 })

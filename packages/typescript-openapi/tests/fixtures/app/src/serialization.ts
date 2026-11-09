@@ -4,6 +4,7 @@ import * as z from 'zod'
 
 import { roundTwentyFive } from './round25'
 import { roundTwentySix } from './round26'
+import { roundTwentySeven } from './round27'
 
 export interface Author {
   id: string
@@ -1017,4 +1018,5 @@ export const router = {
   ),
   ...roundTwentyFive,
   ...roundTwentySix,
+  ...roundTwentySeven,
 }

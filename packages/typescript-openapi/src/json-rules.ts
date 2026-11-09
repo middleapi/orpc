@@ -3,6 +3,7 @@ import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import {
+  extendsBuiltinClass,
   getBuiltin,
   getBuiltinBaseName,
   getDeclaredBuiltinName,
@@ -87,8 +88,50 @@ export function getDataProperties(
         )
       ) &&
       // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
-      !(isClassInstance && isBuiltinSymbol(types, p, isError)),
+      !(isClassInstance && isBuiltinMember(types, p, isError)),
   )
+}
+
+/**
+ * Whether a property is a member an instance inherits from a built-in class, which it does not
+ * write as own data: declared by the runtime (`Error#message`), or redeclared by an interface
+ * over a built-in declaring it (`interface AppError extends Error { message: 'boom' }`), also
+ * through other interfaces, unless a class between them declares it (as a field).
+ */
+export function isBuiltinMember(types: TypeQueries, property: TSSymbol, isError = false): boolean {
+  if (isBuiltinSymbol(types, property, isError)) {
+    return true
+  }
+
+  return types.memo('redeclaredBuiltinMember', property.id, () => {
+    const declarations = property.declarations
+
+    if (
+      !declarations.length ||
+      !declarations.every((d) => d.kind === SyntaxKind.PropertySignature)
+    ) {
+      return false
+    }
+
+    return declarations.some((declaration) => {
+      const owner = (declaration.resolve() as any)?.parent
+      const symbol =
+        owner?.kind === SyntaxKind.InterfaceDeclaration && owner.name
+          ? types.checker.getSymbolAtLocation(owner.name)
+          : undefined
+      const declared = symbol && types.checker.getDeclaredTypeOfSymbol(symbol)
+      const target = declared?.isTypeReference() ? declared.getTarget() : declared
+
+      return (target?.getBaseTypes() ?? []).some((base) => {
+        const inherited = types.checker.getPropertyOfType(base, property.name)
+        return (
+          inherited !== undefined &&
+          inherited.id !== property.id &&
+          isBuiltinMember(types, inherited)
+        )
+      })
+    })
+  })
 }
 
 /**
@@ -100,14 +143,112 @@ export function isDropped(types: TypeQueries, type: Type): boolean {
   return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m))
 }
 
-export function isNonSerializable(types: TypeQueries, type: Type): boolean {
+/**
+ * Whether JSON serialization drops a value of this type: symbols and functions, unless a function
+ * has a `toJSON` (`JSON.stringify` calls it, also of a class constructor's static `toJSON`).
+ */
+export function isNonSerializable(
+  types: TypeQueries,
+  type: Type,
+  seen: Set<number> = new Set(),
+): boolean {
   if (type.flags & TypeFlags.ESSymbolLike) {
     return true
   }
 
-  // a function with properties (`(() => void) & { tag: string }`) is still a function
+  if (!isFunction(types, type)) {
+    return false
+  }
+
+  // `toJSON(): this` of a function is a function again
+  if (seen.has(type.id)) {
+    return true
+  }
+  seen.add(type.id)
+
+  const result = getToJSONResultType(types, type, true)
+  const members = result?.isUnionType() ? types.getMembers(result) : result ? [result] : []
+
+  return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m, seen))
+}
+
+/**
+ * Whether JSON serialization may drop a value of this type: a function whose `toJSON` is optional
+ * (`(() => void) & { toJSON?: () => string }`) is written by `toJSON`, or else as nothing.
+ */
+export function mayBeNonSerializable(types: TypeQueries, type: Type): boolean {
+  return (
+    (isFunction(types, type) &&
+      (isNonSerializable(types, type) || hasOptionalToJSON(types, type))) ||
+    isFunctionView(types, type)
+  )
+}
+
+/**
+ * Whether a mapped type may hold the function it is a view of, which JSON drops unless it has a
+ * `toJSON` (`Readonly<() => void>`, `cb` of `DeepReadonly<{ cb: () => void }>`, see
+ * `getViewedFunction`).
+ */
+function isFunctionView(types: TypeQueries, type: Type): boolean {
+  const viewed = getViewedFunction(types, type)
+  return (
+    viewed !== undefined &&
+    (viewed === type || isNonSerializable(types, viewed) || hasOptionalToJSON(types, viewed))
+  )
+}
+
+/**
+ * The function a mapped type is a view of (`Readonly<FnWithJSON>`), or the mapped type itself when
+ * it has no keys, as a mapped type over a function has when its source is not found
+ * (`T extends object ? { readonly [K in keyof T]: ... } : T`).
+ */
+export function getViewedFunction(types: TypeQueries, type: Type): Type | undefined {
+  if (!(type.flags & TypeFlags.Object) || !((type as any).objectFlags & ObjectFlags.Mapped)) {
+    return undefined
+  }
+
+  return types.memo('viewedFunction', type.id, () => {
+    const source = types.getMappedSource(type)
+
+    if (source) {
+      return isFunction(types, source) ? source : undefined
+    }
+
+    return isKeyOfMapping(type) &&
+      !(
+        type.getAliasSymbol() &&
+        type.getAliasTypeArguments().some((a) => a.flags & INSTANTIABLE_FLAGS)
+      ) &&
+      !types.getProperties(type).length &&
+      !types.checker.getIndexInfosOfType(type).length
+      ? type
+      : undefined
+  })
+}
+
+/**
+ * Whether a mapped type maps each key of a type to a value (`{ [K in keyof T]: ... }`), not
+ * to keys of its own (`as`).
+ */
+function isKeyOfMapping(type: Type): boolean {
+  const mapped = type.getSymbol()?.declarations[0]?.resolve() as any
+  const constraint = mapped?.typeParameter?.constraint
+
+  return (
+    mapped?.kind === SyntaxKind.MappedType &&
+    !mapped.nameType &&
+    constraint?.kind === SyntaxKind.TypeOperator &&
+    constraint.operator === SyntaxKind.KeyOfKeyword
+  )
+}
+
+/**
+ * Functions, also with properties (`{ (): void; displayName: string }`, `(() => void) & { tag }`)
+ * or as constructors.
+ */
+export function isFunction(types: TypeQueries, type: Type): boolean {
   if (type.isIntersectionType()) {
-    return types.getMembers(type).some((m) => isNonSerializable(types, m))
+    return types.getMembers(type).some((m) => isFunction(types, m))
   }
 
   if (
@@ -119,7 +260,6 @@ export function isNonSerializable(types: TypeQueries, type: Type): boolean {
     return false
   }
 
-  // functions, also with properties (`{ (): void; displayName: string }`) or as constructors
   const symbol = type.getSymbol()
   if (symbol?.name === 'Function' && types.getSymbolSourceKind(symbol) === 'default') {
     return true
@@ -373,6 +513,11 @@ export function isClassView(types: TypeQueries, type: Type, classType: Type): bo
  */
 export class ModeSensitivity {
   private readonly cache = new Map<number, boolean>()
+  /**
+   * Results of the current walk that a cut expansion made not final, by the type and the
+   * expansions around it, which decide where it is cut, so each is walked once per walk
+   */
+  private readonly walked = new Map<string, boolean>()
   /** Types on the current path, with their visit order, and whether they found a sensitive part */
   private readonly onPath = new Map<number, { order: number; sensitive: boolean }>()
   private readonly path: number[] = []
@@ -388,7 +533,11 @@ export class ModeSensitivity {
   }
 
   isSensitive(type: Type): boolean {
-    return this.visit(type).sensitive
+    try {
+      return this.visit(type).sensitive
+    } finally {
+      this.walked.clear()
+    }
   }
 
   /**
@@ -401,6 +550,13 @@ export class ModeSensitivity {
 
     if (cached !== undefined) {
       return { sensitive: cached, low: Infinity }
+    }
+
+    const walkKey = `${type.id}:${this.expansion.getContext()}`
+    const walked = this.walked.get(walkKey)
+
+    if (walked !== undefined) {
+      return { sensitive: walked, low: Infinity }
     }
 
     const current = this.onPath.get(type.id)
@@ -441,7 +597,8 @@ export class ModeSensitivity {
     }
 
     // a cut hides what the expansion reaches further down, so only a sensitive part found is
-    // final: the same type reached from elsewhere (or directly) is walked deeper
+    // final: the same type reached from elsewhere (or directly) is walked deeper. In the same
+    // expansions, this walk reuses it, which keeps a DAG of types (`{ a: L; b: L }`) linear.
     const final = sensitive || cuts === this.expansion.cuts
 
     for (const id of members) {
@@ -449,6 +606,10 @@ export class ModeSensitivity {
       if (final) {
         this.cache.set(id, sensitive)
       }
+    }
+
+    if (!final) {
+      this.walked.set(walkKey, sensitive)
     }
 
     return { sensitive, low: Infinity }
@@ -533,12 +694,14 @@ export class ModeSensitivity {
       classType ?? (symbol && symbol.flags & SymbolFlags.Interface ? type : undefined)
     const extended = declared && getBuiltinBaseName(types, declared)
 
-    // the serializer converts a view in the `either` mode, unless it is a built-in
+    // the serializer converts a view in the `either` mode, also an interface extending a built-in
+    // class (`interface AppError extends Error`), unless it is a built-in
     // (`Readonly<class Tags extends Set<string>>`)
     if (
       this.mode === 'either' &&
-      classType !== undefined &&
-      isClassView(types, type, classType) &&
+      (classType !== undefined
+        ? isClassView(types, type, classType)
+        : extendsBuiltinClass(types, type)) &&
       getBuiltin(types, type, false) === undefined &&
       getBuiltin(types, type, true) === undefined
     ) {
@@ -638,7 +801,7 @@ export class ModeSensitivity {
     }
 
     const data = properties.filter((p) => !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)))
-    const dataTypes = data.length ? types.checker.getTypeOfSymbol(data) : []
+    const dataTypes = types.getSymbolTypes(data)
 
     return (
       dataTypes.some((t) => t !== undefined && isSensitive(t)) ||

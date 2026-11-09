@@ -8,6 +8,7 @@ import type {
 } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
+import { argumentsGrow, MAX_GROWTH, MAX_NESTING } from './expansion.ts'
 import type { JSDoc, SourceKind } from './utils.ts'
 import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils.ts'
 
@@ -41,6 +42,27 @@ export interface PropertyAnnotation {
 }
 
 /**
+ * A mapped type declaration keeping every value: `T[K]` of `Readonly<T>`, or with `deep`, the
+ * alias over it (`DeepReadonly<T[K]>`).
+ */
+interface ValueMapping {
+  alias: number
+  deep: boolean
+}
+
+interface KeepingFrame {
+  key: string
+  source: Type
+  /** The declarations of the source and the value, which an expansion instantiates again */
+  declaration: number | undefined
+  valueDeclaration: number | undefined
+  /** How often in a row the source grew, `undefined` when it keeps expanding */
+  growth: number | undefined
+  /** Where the growth began */
+  root: number
+}
+
+/**
  * Compiler requests the conversion repeats for the same types and symbols, cached by their id.
  */
 export class TypeQueries {
@@ -48,6 +70,17 @@ export class TypeQueries {
 
   private readonly globalTypes = new Map<string, Type | undefined>()
   private readonly memos = new Map<string, Map<number, unknown>>()
+  private readonly ownerTypes = new Map<string, Type | undefined>()
+  private readonly symbolTypes = new Map<number, Type | undefined>()
+
+  /** Pairs of a value and its source found kept or not (see `keepsValue`) */
+  private readonly keptValues = new Map<string, boolean>()
+  /** Pairs being checked, innermost last */
+  private readonly keeping: KeepingFrame[] = []
+  /** Pairs found kept assuming an enclosing pair is kept, innermost last */
+  private readonly provisionallyKept: string[] = []
+  /** The outermost pair assumed kept in the check of the current pair */
+  private assumedDepth = Number.POSITIVE_INFINITY
 
   constructor(
     readonly checker: Checker,
@@ -100,48 +133,384 @@ export class TypeQueries {
       // `Readonly<C>` by its argument, an alias of one (`type View = Omit<C, 'x'>`, also
       // `type PickBox<K> = Pick<Box, K>`) by the type it is declared with
       const [argument] = this.getTypeArguments(type)
-      if (argument && this.isMappedSourceOf(type, argument)) {
+      if (argument && this.isMappedViewOf(type, argument)) {
         return argument
       }
 
       // the declared type is not instantiated with the alias's arguments
-      // (`Box<T>` of `type PickBox<T> = Pick<Box<T>, 'a'>`), so its type parameters match any type
-      const declaring = type.getAliasSymbol() ? this.getDeclaringType(type) : undefined
+      // (`Box<T>` of `type PickBox<T> = Pick<Box<T>, 'a'>`), so its type parameters match any type.
+      // A conditional type resolving to a mapped type (`T extends object ? { [K in keyof T]: ... } : T`)
+      // has no alias, its properties are still declared by the source.
+      const declaring = this.getDeclaringType(type)
       return declaring && this.isMappedSourceOf(type, declaring, true) ? declaring : undefined
     })
   }
 
   /**
-   * Whether a mapped type keeps the keys and values of a type (`T[K]`, maybe optional),
-   * with `generic`, also values of the source with type parameters, which match any type.
+   * Whether a mapped type is a view of a type: it keeps its values (see `isMappedSourceOf`).
+   */
+  isMappedViewOf(type: Type, source: Type): boolean {
+    return (
+      Boolean(source.flags & (TypeFlags.Object | TypeFlags.Intersection)) &&
+      Boolean((type as any).objectFlags & ObjectFlags.Mapped) &&
+      this.keepsValue(type, source)
+    )
+  }
+
+  /**
+   * Whether a mapped type keeps the keys and values of a type (`T[K]`, maybe optional, or a deep
+   * view of it, see `keepsValue`), with `generic`, also values of the source with type parameters,
+   * which match any type.
    */
   private isMappedSourceOf(type: Type, source: Type, generic = false): boolean {
     if (!(source.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
       return false
     }
 
-    const sourceProperties = new Map(this.getProperties(source).map((p) => [p.name, p]))
+    const sourceIndexes = new Map(this.getProperties(source).map((p, i) => [p.name, i]))
     const properties = this.getProperties(type)
-    const pairs = properties.map((p) => sourceProperties.get(p.name))
 
-    if (pairs.some((p) => p === undefined)) {
+    if (properties.some((p) => !sourceIndexes.has(p.name))) {
       return false
     }
 
-    const mappedTypes = properties.length ? this.checker.getTypeOfSymbol([...properties]) : []
-    const sourceTypes = pairs.length ? this.checker.getTypeOfSymbol(pairs as TSSymbol[]) : []
-
-    return mappedTypes.every((t, i) => {
-      const original = sourceTypes[i]
+    const mappedTypes = this.getPropertyTypes(type)
+    const sourceTypes = this.getPropertyTypes(source)
+    const keeps = (t: Type | undefined, i: number) => {
+      const original = sourceTypes[sourceIndexes.get(properties[i]!.name)!]
       return (
         t !== undefined &&
         original !== undefined &&
-        (t.id === original.id ||
-          this.checker.getNonNullableType(t)?.id ===
-            this.checker.getNonNullableType(original)?.id ||
-          (generic && this.hasTypeParameter(original, 3)))
+        (this.keepsValue(t, original) || (generic && this.hasTypeParameter(original, 3)))
       )
-    })
+    }
+    // values that are no mapped type first, which a mismatch shows without nesting deeper
+    return (
+      mappedTypes.every((t, i) => nests(t) || keeps(t, i)) &&
+      mappedTypes.every((t, i) => !nests(t) || keeps(t, i))
+    )
+  }
+
+  /**
+   * The types of the properties of a type, in the order of `getProperties`.
+   */
+  private getPropertyTypes(type: Type): readonly (Type | undefined)[] {
+    return this.getSymbolTypes(this.getProperties(type))
+  }
+
+  /**
+   * The types of symbols, like `checker.getTypeOfSymbol`, cached by symbol, requested together.
+   */
+  getSymbolTypes(symbols: readonly TSSymbol[]): (Type | undefined)[] {
+    const missing = symbols.filter((s) => !this.symbolTypes.has(s.id))
+
+    if (missing.length) {
+      const fetched = this.checker.getTypeOfSymbol([...missing])
+      missing.forEach((s, i) => this.symbolTypes.set(s.id, fetched[i]))
+    }
+
+    return symbols.map((s) => this.symbolTypes.get(s.id))
+  }
+
+  /**
+   * A property of a type by its name, read from its properties once they were requested.
+   */
+  getProperty(type: Type, name: string): TSSymbol | undefined {
+    const properties = this.memos.get('properties')?.get(type.id) as readonly TSSymbol[] | undefined
+
+    if (properties) {
+      return properties.find((p) => p.name === name)
+    }
+
+    return this.memo(`property:${name}`, type.id, () => this.checker.getPropertyOfType(type, name))
+  }
+
+  private getNonNullable(type: Type): Type {
+    // only a union, `null`, `undefined`, or a generic type may hold them
+    if (!(type.flags & (TypeFlags.UnionOrIntersection | NULLISH_FLAGS | INSTANTIABLE_FLAGS))) {
+      return type
+    }
+
+    return this.memo('nonNullable', type.id, () => this.checker.getNonNullableType(type) ?? type)
+  }
+
+  /**
+   * Whether a value of a mapped type is still the value of its source: `T[K]`, maybe optional,
+   * or a recursive mapped type over it (`DeepReadonly<T[K]>`), also over the members of a union
+   * it distributes over, and the items of the arrays and read-only built-ins it maps them to
+   * (type-fest's `ReadonlySet<ReadonlyDeep<V>>` for a `Set<V>`).
+   *
+   * A recursive type is kept unless a value shows otherwise: a pair being checked is assumed kept
+   * inside its own check, and so is a pair whose source expands an instantiation it is nested in
+   * (`DeepReadonly<Unfolding<T[]>>` inside `DeepReadonly<Unfolding<T>>`), like `ExpansionGuard`
+   * cuts them. Results are cached by the pair, those relying on an assumption about an enclosing
+   * pair only once that pair is found kept.
+   */
+  private keepsValue(value: Type, original: Type): boolean {
+    if (value.id === original.id) {
+      return true
+    }
+
+    const kept = this.getNonNullable(value)
+    const source = this.getNonNullable(original)
+
+    if (kept.id === source.id) {
+      return true
+    }
+
+    if (this.isIdentityViewOf(kept, source)) {
+      return true
+    }
+
+    const key = `${kept.id}:${source.id}`
+    const cached = this.keptValues.get(key)
+
+    if (cached !== undefined) {
+      return cached
+    }
+
+    const pending = this.keeping.findIndex((frame) => frame.key === key)
+
+    if (pending !== -1) {
+      this.assumedDepth = Math.min(this.assumedDepth, pending)
+      return true
+    }
+
+    const frame = this.createKeepingFrame(key, kept, source)
+
+    if (frame.growth === undefined) {
+      this.assumedDepth = Math.min(this.assumedDepth, frame.root)
+      return true
+    }
+
+    const depth = this.keeping.length
+    const outerAssumedDepth = this.assumedDepth
+    const provisional = this.provisionallyKept.length
+
+    this.keeping.push(frame)
+    this.assumedDepth = Number.POSITIVE_INFINITY
+
+    let result: boolean
+    try {
+      result = this.keepsStructure(kept, source)
+    } finally {
+      this.keeping.pop()
+    }
+
+    const assumedDepth = this.assumedDepth
+    this.assumedDepth = Math.min(
+      outerAssumedDepth,
+      assumedDepth < depth ? assumedDepth : Number.POSITIVE_INFINITY,
+    )
+
+    if (!result) {
+      // a pair is not kept whatever is assumed, but what was found assuming this one is not known
+      this.provisionallyKept.length = provisional
+      this.keptValues.set(key, false)
+    } else if (assumedDepth < depth) {
+      this.provisionallyKept.push(key)
+    } else {
+      for (const provisionalKey of this.provisionallyKept.splice(provisional)) {
+        this.keptValues.set(provisionalKey, true)
+      }
+      this.keptValues.set(key, true)
+    }
+
+    return result
+  }
+
+  /**
+   * Whether a mapped type is an instantiation over a type of an alias whose declaration keeps
+   * every value of any type it maps over (see `getValueMapping`): `Readonly<T>`, `Pick<T, K>`,
+   * or `DeepReadonly<T>` declared as `{ readonly [K in keyof T]: DeepReadonly<T[K]> }`, so none
+   * of its values needs to be compared with the source's.
+   */
+  private isIdentityViewOf(value: Type, source: Type): boolean {
+    if (!((value as any).objectFlags & ObjectFlags.Mapped) || source.flags & INSTANTIABLE_FLAGS) {
+      return false
+    }
+
+    const alias = value.getAliasSymbol()
+    const [argument] = alias ? value.getAliasTypeArguments() : []
+
+    return (
+      argument !== undefined &&
+      (argument.id === source.id || this.getNonNullable(argument).id === source.id) &&
+      this.getValueMapping(value)?.alias === alias!.id
+    )
+  }
+
+  /**
+   * The type a deep mapped type over itself (`DeepReadonly<DeepReadonly<X>>`) is the same as:
+   * the inner one, as mapping each value once more changes nothing (see `getValueMapping`).
+   */
+  getFlattenedView(type: Type): Type {
+    let current = type
+
+    while ((current as any).objectFlags & ObjectFlags.Mapped) {
+      const alias = current.getAliasSymbol()
+      const [argument] = alias ? current.getAliasTypeArguments() : []
+
+      if (
+        !argument ||
+        argument.getAliasSymbol()?.id !== alias!.id ||
+        !((argument as any).objectFlags & ObjectFlags.Mapped)
+      ) {
+        break
+      }
+
+      const mapping = this.getValueMapping(current)
+      if (mapping?.alias !== alias!.id || !mapping.deep) {
+        break
+      }
+
+      current = argument
+    }
+
+    return current
+  }
+
+  /**
+   * How a mapped type maps values, when its declaration is an alias mapping every value of its first
+   * type parameter `T` to itself: `T[K]` (`Readonly<T>`, `Pick<T, K>`), or the alias over it
+   * (`DeepReadonly<T[K]>`). Instantiations of a conditional type resolving to a mapped type have
+   * no alias, so they are compared value by value.
+   */
+  private getValueMapping(type: Type): ValueMapping | undefined {
+    const symbol = type.getSymbol()
+
+    return (
+      symbol &&
+      this.memo('valueMapping', symbol.id, (): ValueMapping | undefined => {
+        const mapped = symbol.declarations[0]?.resolve() as any
+
+        if (mapped?.kind !== SyntaxKind.MappedType || mapped.nameType) {
+          return undefined
+        }
+
+        const alias = mapped.parent
+        const parameter = alias?.typeParameters?.[0]?.name?.text
+        const key = mapped.typeParameter?.name?.text
+
+        if (alias?.kind !== SyntaxKind.TypeAliasDeclaration || !parameter || !key) {
+          return undefined
+        }
+
+        const aliasSymbol = this.checker.getSymbolAtLocation(alias.name)
+        const template = mapped.type
+
+        if (isIndexOf(template, parameter, key)) {
+          return aliasSymbol && { alias: aliasSymbol.id, deep: false }
+        }
+
+        // the alias over the value: `DeepReadonly<T[K]>` of `{ readonly [K in keyof T]: ... }`
+        const constraint = mapped.typeParameter.constraint
+
+        if (
+          template?.kind !== SyntaxKind.TypeReference ||
+          template.typeArguments?.length !== 1 ||
+          alias.typeParameters.length !== 1 ||
+          !isIndexOf(template.typeArguments[0], parameter, key) ||
+          constraint?.kind !== SyntaxKind.TypeOperator ||
+          constraint.operator !== SyntaxKind.KeyOfKeyword ||
+          !isTypeName(constraint.type, parameter)
+        ) {
+          return undefined
+        }
+
+        const referenced = this.checker.getSymbolAtLocation(template.typeName)
+        return aliasSymbol && referenced?.id === aliasSymbol.id
+          ? { alias: aliasSymbol.id, deep: true }
+          : undefined
+      })
+    )
+  }
+
+  /**
+   * A pair to check, with how often in a row its source grew an instantiation of the same
+   * declaration it is nested in (`undefined` when it keeps expanding), and where that began.
+   */
+  private createKeepingFrame(key: string, value: Type, source: Type): KeepingFrame {
+    const declaration = getDeclarationId(source)
+    const valueDeclaration = getDeclarationId(value)
+    const frame: KeepingFrame = { key, source, declaration, valueDeclaration, growth: 0, root: 0 }
+
+    if (declaration === undefined) {
+      return frame
+    }
+
+    let nesting = 0
+    let outer: KeepingFrame | undefined
+    let outerDepth = -1
+
+    for (let depth = this.keeping.length - 1; depth >= 0; depth--) {
+      const candidate = this.keeping[depth]!
+      if (
+        candidate.declaration === declaration &&
+        candidate.valueDeclaration === valueDeclaration
+      ) {
+        nesting++
+        if (!outer) {
+          outer = candidate
+          outerDepth = depth
+        }
+      }
+    }
+
+    if (!outer) {
+      frame.root = this.keeping.length
+      return frame
+    }
+
+    frame.root = outer.growth ? outer.root : outerDepth
+    const growth = argumentsGrow(this, outer.source, source) ? outer.growth! + 1 : 0
+    frame.growth = growth >= MAX_GROWTH || nesting >= MAX_NESTING ? undefined : growth
+    return frame
+  }
+
+  private keepsStructure(value: Type, source: Type): boolean {
+    if (value.isUnionType() || source.isUnionType()) {
+      const values = value.isUnionType() ? this.getMembers(value) : [value]
+      const sources = source.isUnionType() ? this.getMembers(source) : [source]
+
+      return (
+        values.length === sources.length &&
+        values.every((v) => sources.some((s) => this.keepsValue(v, s)))
+      )
+    }
+
+    if (!(value.flags & TypeFlags.Object)) {
+      return false
+    }
+
+    if ((value as any).objectFlags & ObjectFlags.Mapped) {
+      // a mapped type over a generic type keeps its values only as the alias over it, found above
+      // (`Readonly<Box<T>>`), not as one over an instantiation (`DeepPartial<Nest<number[]>>` of
+      // `Nest<T[]>`, nested in the declared class a conditional type's mapped type is read as)
+      return !this.hasTypeParameter(source, 3) && this.isMappedSourceOf(value, source)
+    }
+
+    const kind = this.getReferenceKind(value)
+    const symbol = value.getSymbol()
+    const sourceSymbol = source.getSymbol()
+    const sameBuiltin =
+      symbol !== undefined &&
+      sourceSymbol !== undefined &&
+      this.getSymbolSourceKind(symbol) === 'default' &&
+      this.getSymbolSourceKind(sourceSymbol) === 'default' &&
+      symbol.name.replace(/^Readonly/u, '') === sourceSymbol.name.replace(/^Readonly/u, '')
+
+    if ((kind === undefined || kind !== this.getReferenceKind(source)) && !sameBuiltin) {
+      return false
+    }
+
+    const items = this.getReferenceArguments(value)
+    const sourceItems = this.getReferenceArguments(source)
+
+    return (
+      items.length === sourceItems.length &&
+      items.every((item, i) => this.keepsValue(item, sourceItems[i]!))
+    )
   }
 
   private hasTypeParameter(type: Type, depth: number): boolean {
@@ -158,9 +527,9 @@ export class TypeQueries {
   }
 
   /**
-   * The source of a mapped type named by an alias: the first argument of the utility it is
-   * declared with (`type View = Omit<Box<string>, 'x'>`), or else the class or interface
-   * declaring all its properties.
+   * The source of a mapped type: the first argument of the utility an alias of it is declared
+   * with (`type View = Omit<Box<string>, 'x'>`), or else the class or interface declaring all
+   * its properties.
    */
   private getDeclaringType(type: Type): Type | undefined {
     const declaration = type.getAliasSymbol()?.declarations[0]?.resolve() as any
@@ -171,20 +540,29 @@ export class TypeQueries {
     }
 
     const properties = this.getProperties(type)
-    const owners = properties.flatMap((p) => {
-      const owner = (p.declarations[0]?.resolve() as any)?.parent
-      return owner &&
+
+    if (!properties.length) {
+      return undefined
+    }
+
+    const owners = new Map<string, any>()
+
+    for (const p of properties) {
+      const declaration = p.declarations[0]
+      const owner = (declaration?.resolve() as any)?.parent
+      if (
+        owner &&
         (owner.kind === SyntaxKind.ClassDeclaration ||
           owner.kind === SyntaxKind.InterfaceDeclaration) &&
         owner.name
-        ? [owner.name]
-        : []
-    })
+      ) {
+        owners.set(`${declaration!.path}:${owner.pos}`, owner.name)
+      }
+    }
 
     // the most derived owner, which has every property
-    for (const name of owners) {
-      const symbol = this.checker.getSymbolAtLocation(name)
-      const candidate = symbol && this.checker.getDeclaredTypeOfSymbol(symbol)
+    for (const [location, name] of owners) {
+      const candidate = this.getOwnerType(location, name)
       const keys = candidate && new Set(this.getProperties(candidate).map((p) => p.name))
 
       if (keys && properties.every((p) => keys.has(p.name))) {
@@ -193,6 +571,18 @@ export class TypeQueries {
     }
 
     return undefined
+  }
+
+  /**
+   * The declared type of a class or interface, by the location of its declaration.
+   */
+  private getOwnerType(location: string, name: any): Type | undefined {
+    if (!this.ownerTypes.has(location)) {
+      const symbol = this.checker.getSymbolAtLocation(name)
+      this.ownerTypes.set(location, symbol && this.checker.getDeclaredTypeOfSymbol(symbol))
+    }
+
+    return this.ownerTypes.get(location)
   }
 
   /**
@@ -263,11 +653,13 @@ export class TypeQueries {
       return undefined
     }
 
-    return this.checker.isArrayType(type)
-      ? 'array'
-      : this.checker.isTupleType(type)
-        ? 'tuple'
-        : undefined
+    return this.memo('referenceKind', type.id, () =>
+      this.checker.isArrayType(type)
+        ? 'array'
+        : this.checker.isTupleType(type)
+          ? 'tuple'
+          : undefined,
+    )
   }
 
   getGlobalType(name: string): Type | undefined {
@@ -340,6 +732,37 @@ export class TypeQueries {
       return type ? { alias, type } : undefined
     })
   }
+}
+
+/** Whether comparing a value with its source may nest deeper: a union or a mapped type */
+function nests(type: Type | undefined): boolean {
+  return (
+    type !== undefined &&
+    Boolean(type.flags & TypeFlags.Union || (type as any).objectFlags & ObjectFlags.Mapped)
+  )
+}
+
+/** Whether a type node is a type parameter's name, without type arguments */
+function isTypeName(node: any, name: string): boolean {
+  return (
+    node?.kind === SyntaxKind.TypeReference &&
+    !node.typeArguments?.length &&
+    node.typeName?.kind === SyntaxKind.Identifier &&
+    node.typeName.text === name
+  )
+}
+
+/** Whether a type node is `T[K]` */
+function isIndexOf(node: any, parameter: string, key: string): boolean {
+  return (
+    node?.kind === SyntaxKind.IndexedAccessType &&
+    isTypeName(node.objectType, parameter) &&
+    isTypeName(node.indexType, key)
+  )
+}
+
+function getDeclarationId(type: Type): number | undefined {
+  return (type.getAliasSymbol() ?? type.getSymbol())?.id
 }
 
 /**

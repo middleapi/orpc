@@ -1,5 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import { setOwn } from '@orpc/shared'
+import { setOwn, stringifyJSON } from '@orpc/shared'
 
 import { collectDefRefs, fromRef } from './schema-utils.ts'
 
@@ -56,8 +56,9 @@ export class DefNames {
 export class DefRegistry {
   private readonly defs = new Map<number, Def>()
   private readonly defsByName = new Map<string, Def>()
-  /** Names emitted by discarded conversions */
-  private readonly reservedNames = new Set<string>()
+  /** Names emitted by discarded conversions, with the schema they were emitted with */
+  private readonly reservedNames = new Map<string, JsonSchema | undefined>()
+  private readonly printed = new WeakMap<object, string>()
   /**
    * Finished conversions of anonymous types, shared between their uses,
    * and of named types whose schema is clearer inline, like `type UserId = string & { ... }`
@@ -112,6 +113,34 @@ export class DefRegistry {
   }
 
   /**
+   * Gives a finished def the name a discarded conversion emitted for the same schema
+   * (a type next to a cut expansion, converted again), instead of a numbered one.
+   */
+  reclaimName(def: Def, preferredName: string): void {
+    const name = `${preferredName}${getModeSuffix(def.key)}`
+
+    const reserved = this.reservedNames.get(name)
+
+    if (
+      def.name === name ||
+      def.schema === undefined ||
+      reserved === undefined ||
+      this.defsByName.has(name) ||
+      this.stringify(reserved) !== this.stringify(def.schema) ||
+      this.isReferenced(def)
+    ) {
+      return
+    }
+
+    this.defsByName.delete(def.name)
+    this.names.used.delete(def.name)
+    def.name = name
+    this.defsByName.set(name, def)
+    this.names.byKey.set(def.key, name)
+    this.names.used.add(name)
+  }
+
+  /**
    * Replaces a def nothing references yet by its schema, used inline.
    */
   inline(def: Def, schema: JsonSchema): void {
@@ -124,14 +153,7 @@ export class DefRegistry {
    * neither its schema nor the defs created while it was converted.
    */
   replaceIfUnreferenced(def: Def, schema: JsonSchema): boolean {
-    const later = this.createdDefs.slice(this.createdDefs.indexOf(def) + 1)
-
-    if (
-      collectDefRefs(def.schema ?? {}).has(def.name) ||
-      later.some(
-        (other) => other.schema === undefined || collectDefRefs(other.schema).has(def.name),
-      )
-    ) {
+    if (this.isReferenced(def)) {
       return false
     }
 
@@ -139,6 +161,18 @@ export class DefRegistry {
     this.names.byKey.delete(def.key)
     this.names.used.delete(def.name)
     return true
+  }
+
+  /**
+   * Whether its schema or the defs created while it was converted may refer to a def.
+   */
+  private isReferenced(def: Def): boolean {
+    const later = this.createdDefs.slice(this.createdDefs.indexOf(def) + 1)
+
+    return (
+      this.getDeps(def).has(def.name) ||
+      later.some((other) => other.schema === undefined || this.getDeps(other).has(def.name))
+    )
   }
 
   setAnonymous(key: number, schema: JsonSchema, stable = true): void {
@@ -186,7 +220,7 @@ export class DefRegistry {
       if (!kept.has(def.name)) {
         this.remove(def)
         // it was emitted by the discarded conversion, a different schema must not take its name
-        this.reservedNames.add(def.name)
+        this.reservedNames.set(def.name, def.schema)
       }
     }
     for (const { key, stable } of this.createdAnonymous) {
@@ -251,6 +285,24 @@ export class DefRegistry {
     }
 
     return root
+  }
+
+  /**
+   * The JSON of a def's schema, which does not change once the def is finished.
+   */
+  stringify(schema: JsonSchema): string {
+    if (typeof schema !== 'object') {
+      return stringifyJSON(schema)!
+    }
+
+    let json = this.printed.get(schema)
+
+    if (json === undefined) {
+      json = stringifyJSON(schema)!
+      this.printed.set(schema, json)
+    }
+
+    return json
   }
 
   private remove(def: Def): void {

@@ -18,6 +18,7 @@ import {
   instanceInputs,
   LabeledStamp,
 } from '../tests/fixtures/app/src/round26.ts'
+import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/round27.ts'
 import { router } from '../tests/fixtures/app/src/router.ts'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
@@ -917,6 +918,97 @@ describe('typeScriptOpenAPIGenerator', () => {
         const validate = ajv.compile(body(path))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
         expect(validate(json) ? [] : validate.errors).toEqual([])
+      }
+    })
+  })
+
+  describe('round twenty-seven', () => {
+    it('documents inputs of views, deep views, and redeclared built-in members', async () => {
+      const spec = await generator.generate(viewedInputs, {
+        source: { file: fixture('round27.ts'), export: 'viewedInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const dateTime = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+      const stamped = {
+        anyOf: [
+          dateTime,
+          {
+            type: 'object',
+            properties: { id: { type: 'number' }, label: { type: 'string' } },
+            required: ['id', 'label'],
+          },
+        ],
+      }
+
+      // the built-in of each class behind it, whatever their order
+      expect(schemas.IdStamp).toEqual(stamped)
+      expect(schemas.StampId).toEqual(stamped)
+      expect(schemas.InterStamp).toEqual(stamped)
+      // a getter is optional in a deep view too
+      expect(schemas.DeepRO_Getters.required).toBeUndefined()
+      // redeclared members of a built-in are not written by an instance
+      expect(schemas.MsgError.required).toBeUndefined()
+      expect(schemas.ViaMsgError.required).toEqual(['code'])
+      expect(schemas.SizedParams.required).toBeUndefined()
+      expect(schemas.DeepRO_RegExp).toEqual({ description: 'Read-only all the way down' })
+      expect(body('/partialSized').anyOf[0]).toEqual(
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+      )
+      expect(body('/readonlyLink').anyOf[0]).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect(body('/partialStr').anyOf[1]).toEqual(
+        expect.objectContaining({
+          type: 'object',
+          properties: expect.objectContaining({ a: { type: 'number' } }),
+        }),
+      )
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/idStamp', Object.assign(new StampedDate(0), { id: 1 })],
+        ['/idStamp', { id: 1, label: 'l' }],
+        ['/interStamp', Object.assign(new StampedDate(0), { id: 1 })],
+        ['/stampId', Object.assign(new StampedDate(0), { id: 1 })],
+        ['/deepGetters', new Getters()],
+        ['/msg', new Error('m')],
+        ['/msg', { message: 'm' }],
+        ['/via', { e: Object.assign(new Error('m'), { code: 'c' }) }],
+        ['/params', { p: new URLSearchParams('a=1') }],
+        ['/deepRe', { r: /a/u }],
+        ['/dateOrSized', new Set(['a'])],
+        ['/dateOrSized', new Date(0)],
+        ['/readonlyLink', new URL('http://x/')],
+        ['/readonlyLink', { href: 'h', label: 'l' }],
+        ['/pickedLink', new URL('http://x/')],
+        ['/partialSized', new Set(['a'])],
+        ['/partialSized', {}],
+        ['/partialStr', {}],
+        ['/partialStr', 'abc'],
+        ['/bufView', { buffer: new ArrayBuffer(1), label: 'l' }],
+        ['/bufView', Object.assign(new Uint8Array([1]), { label: 'l' })],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
       }
     })
   })

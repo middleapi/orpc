@@ -1,5 +1,5 @@
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { SymbolFlags } from 'typescript/unstable/sync'
+import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import type { TypeQueries } from './type-queries.ts'
 
@@ -17,8 +17,7 @@ export function getDefName(types: TypeQueries, type: Type, symbol: TSSymbol): st
   }
 
   return (
-    toDefName(types.checker.typeToString(type)) ??
-    (internal ? getFallbackDefName(types, type) : symbolName)
+    toDefName(printType(types, type)) ?? (internal ? getFallbackDefName(types, type) : symbolName)
   )
 }
 
@@ -39,7 +38,7 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
     return name
   }
 
-  const printed = toDefName(types.checker.typeToString(type))
+  const printed = toDefName(printType(types, type))
   return printed && printed !== name ? printed : 'Recursive'
 }
 
@@ -50,9 +49,24 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
 export function getViewDefName(types: TypeQueries, type: Type, classSymbol: TSSymbol): string {
   // joined with `-`, which no declared type name has, so a view never takes one
   return (
-    toDefName(types.checker.typeToString(type))?.replace(/_/gu, '-') ??
-    `${getSymbolName(classSymbol)}-View`
+    toDefName(printType(types, type))?.replace(/_/gu, '-') ?? `${getSymbolName(classSymbol)}-View`
   )
+}
+
+/**
+ * The printed type, or nothing for an object literal type without an alias (an anonymous mapped
+ * type a conditional type resolves to), printed as `{ ... }`, which names no def.
+ */
+function printType(types: TypeQueries, type: Type): string {
+  if (
+    type.flags & TypeFlags.Object &&
+    (type as any).objectFlags & (ObjectFlags.Anonymous | ObjectFlags.Mapped) &&
+    !type.getAliasSymbol()
+  ) {
+    return '{}'
+  }
+
+  return types.memo('printed', type.id, () => types.checker.typeToString(type))
 }
 
 /**

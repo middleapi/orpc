@@ -1324,7 +1324,17 @@ describe('typeToJsonSchemaConverter', () => {
               },
             },
             account: { type: 'object', properties: { id: { type: 'string' } } },
-            map: { 'type': 'array', 'items': {}, 'x-native-type': 'map' },
+            // a view of the interface, whose optional members may hold a plain object
+            map: {
+              anyOf: [
+                {
+                  'type': 'array',
+                  'items': { type: 'array', prefixItems: [{}, {}], maxItems: 2, minItems: 2 },
+                  'x-native-type': 'map',
+                },
+                { type: 'object', properties: { size: { type: 'number' } } },
+              ],
+            },
           },
         },
         false,
@@ -1555,19 +1565,37 @@ describe('typeToJsonSchemaConverter', () => {
         },
         false,
       ])
-      expect(convertR5('PartialPost')).toEqual([
-        {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            createdAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
-            tags: { 'type': 'array', 'uniqueItems': true, 'items': {}, 'x-native-type': 'set' },
-            link: { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' },
-            counts: { 'type': 'array', 'items': {}, 'x-native-type': 'map' },
+      // a conditional deep partial is a view of the interface, like `DeepPartial<Post>`: its
+      // values are the built-ins or, all members being optional, plain objects
+      const [partial] = convertR5('PartialPost') as [any, boolean]
+      const plainObject = expect.objectContaining({ type: 'object' })
+      expect(partial).toEqual({
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          createdAt: {
+            anyOf: [
+              { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+              plainObject,
+            ],
+          },
+          tags: {
+            anyOf: [
+              { 'type': 'array', 'uniqueItems': true, 'items': {}, 'x-native-type': 'set' },
+              plainObject,
+            ],
+          },
+          link: {
+            anyOf: [{ 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }, plainObject],
+          },
+          counts: {
+            anyOf: [
+              expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+              plainObject,
+            ],
           },
         },
-        false,
-      ])
+      })
     })
 
     it('names generics with literal arguments', () => {
@@ -2902,6 +2930,49 @@ describe('typeToJsonSchemaConverter', () => {
           // `BigInt` also describes bigints, a boxed one is written by `JSON.stringify`
           boxed: { anyOf: [bigint, { type: 'string' }] },
         })
+      } finally {
+        project.close()
+      }
+    })
+  })
+
+  describe('round twenty-eight', () => {
+    it('makes a function with an optional toJSON optional, at the root too', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/app/src/round27.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const [schema, optional] = converter.convert(project.getExportType('FnMaybeJSON').type)
+
+        expect(schema).toEqual({
+          type: 'string',
+          description: 'A function JSON writes by its `toJSON` when it has one, else as nothing',
+        })
+        expect(optional).toBe(true)
+      } finally {
+        project.close()
+      }
+    })
+  })
+
+  describe('round twenty-nine', () => {
+    it('makes a view of a function optional, at the root too', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/app/src/round27.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const [schema, optional] = converter.convert(project.getExportType('FnPropsView').type)
+
+        expect(schema).toEqual({
+          type: 'object',
+          properties: { tag: { type: 'string' } },
+          required: ['tag'],
+        })
+        expect(optional).toBe(true)
       } finally {
         project.close()
       }

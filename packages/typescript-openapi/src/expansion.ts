@@ -4,12 +4,12 @@ import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 import type { TypeQueries } from './type-queries.ts'
 
 /** Nested instantiations of one declaration, like `Maybe<A>` inside `Maybe<B>` */
-const MAX_NESTING = 64
+export const MAX_NESTING = 64
 /** Distinct instantiations nested in one outermost instantiation, once nested this deep */
 const MAX_INSTANTIATIONS = 256
 const MIN_BUDGET_NESTING = 4
 /** Nested instantiations in a row whose type arguments contain the previous ones */
-const MAX_GROWTH = 3
+export const MAX_GROWTH = 3
 
 interface Expansion {
   type: Type
@@ -32,6 +32,19 @@ export class ExpansionGuard {
 
   reset(): void {
     this.instantiations.clear()
+  }
+
+  /**
+   * The instantiations being expanded, which decide where an expansion inside is cut.
+   */
+  getContext(): string {
+    let context = ''
+    for (const stack of this.expansions.values()) {
+      for (const entry of stack) {
+        context += `${entry.type.id},`
+      }
+    }
+    return context
   }
 
   /**
@@ -141,49 +154,112 @@ export class ExpansionGuard {
       return undefined
     }
 
-    const growth = this.argumentsGrow(outer.type, type) ? outer.growth + 1 : 0
+    // an instantiation over part of the arguments of the outer one (a mapped type inside the union
+    // its alias distributes over) neither grows nor starts anew
+    const growth = argumentsGrow(this.types, outer.type, type)
+      ? outer.growth + 1
+      : argumentsKept(this.types, outer.type, type)
+        ? outer.growth
+        : 0
     return growth >= MAX_GROWTH ? undefined : growth
   }
+}
 
-  private argumentsGrow(outer: Type, inner: Type): boolean {
-    const outerArguments = this.types.getTypeArguments(outer)
+/**
+ * Whether the type arguments of an instantiation contain those of the instantiation it is
+ * nested in (`Expand<string[]>` inside `Expand<string>`), so nesting it again never ends.
+ */
+export function argumentsGrow(types: TypeQueries, outer: Type, inner: Type, depth = 0): boolean {
+  const outerArguments = types.getTypeArguments(outer)
 
-    return this.types
-      .getTypeArguments(inner)
-      .some((innerArgument) =>
-        outerArguments.some(
-          (outerArgument) =>
-            innerArgument.id !== outerArgument.id &&
-            this.containsType(innerArgument, outerArgument.id, 3),
-        ),
+  return types
+    .getTypeArguments(inner)
+    .some((innerArgument) =>
+      outerArguments.some((outerArgument) => grows(types, outerArgument, innerArgument, depth)),
+    )
+}
+
+/**
+ * Whether the type arguments of an instantiation are those of the instantiation it is nested in,
+ * or part of them (`DeepPartial<Nest<T>>` inside `DeepPartial<Nest<T> | null>`): the nesting
+ * neither grows nor starts anew.
+ */
+function argumentsKept(types: TypeQueries, outer: Type, inner: Type): boolean {
+  const innerArguments = types.getTypeArguments(inner)
+  const outerArguments = types.getTypeArguments(outer)
+
+  return (
+    innerArguments.length > 0 &&
+    innerArguments.every((innerArgument) =>
+      outerArguments.some((outerArgument) =>
+        containsType(types, outerArgument, innerArgument.id, 1),
+      ),
+    )
+  )
+}
+
+/**
+ * Whether a type argument contains the one it is nested in (`T[]` of `T`), also as the argument of
+ * the same declaration (`Nest<T[]>` of `Nest<T>`), or of a member of a union (`Nest<T[]> | null`).
+ */
+function grows(types: TypeQueries, outer: Type, inner: Type, depth: number): boolean {
+  if (inner.id === outer.id) {
+    return false
+  }
+
+  if (containsType(types, inner, outer.id, 3)) {
+    return true
+  }
+
+  if (depth >= 3) {
+    return false
+  }
+
+  const inners = inner.flags & TypeFlags.UnionOrIntersection ? types.getMembers(inner) : [inner]
+  const outers = outer.flags & TypeFlags.UnionOrIntersection ? types.getMembers(outer) : [outer]
+
+  return inners.some((innerMember) => {
+    const declaration = getDeclaration(innerMember)
+    return (
+      declaration !== undefined &&
+      outers.some(
+        (outerMember) =>
+          outerMember.id !== innerMember.id &&
+          getDeclaration(outerMember) === declaration &&
+          argumentsGrow(types, outerMember, innerMember, depth + 1),
       )
+    )
+  })
+}
+
+function getDeclaration(type: Type): number | undefined {
+  return (type.getAliasSymbol() ?? type.getSymbol())?.id
+}
+
+function containsType(types: TypeQueries, type: Type, id: number, depth: number): boolean {
+  if (type.id === id) {
+    return true
   }
 
-  private containsType(type: Type, id: number, depth: number): boolean {
-    if (type.id === id) {
-      return true
-    }
-
-    if (depth === 0) {
-      return false
-    }
-
-    let children: readonly (Type | undefined)[]
-
-    if (type.flags & TypeFlags.UnionOrIntersection) {
-      children = this.types.getMembers(type)
-    } else if (
-      type.flags & TypeFlags.Object &&
-      (type as any).objectFlags & ObjectFlags.Anonymous &&
-      !type.getAliasSymbol()
-    ) {
-      // `Thread<{ parent: T }>` grows through the literal's properties
-      const properties = this.types.getProperties(type)
-      children = properties.length ? this.types.checker.getTypeOfSymbol(properties) : []
-    } else {
-      children = this.types.getTypeArguments(type)
-    }
-
-    return children.some((child) => child !== undefined && this.containsType(child, id, depth - 1))
+  if (depth === 0) {
+    return false
   }
+
+  let children: readonly (Type | undefined)[]
+
+  if (type.flags & TypeFlags.UnionOrIntersection) {
+    children = types.getMembers(type)
+  } else if (
+    type.flags & TypeFlags.Object &&
+    (type as any).objectFlags & ObjectFlags.Anonymous &&
+    !type.getAliasSymbol()
+  ) {
+    // `Thread<{ parent: T }>` grows through the literal's properties
+    const properties = types.getProperties(type)
+    children = properties.length ? types.checker.getTypeOfSymbol(properties) : []
+  } else {
+    children = types.getTypeArguments(type)
+  }
+
+  return children.some((child) => child !== undefined && containsType(types, child, id, depth - 1))
 }
