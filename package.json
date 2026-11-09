@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "pnpm --filter './packages/*' run prepack",
     "check": "oxlint",
     "fix": "oxlint --fix",
     "format": "oxfmt",
@@ -59,6 +60,7 @@
     "crossws": "^0.4.17",
     "github-slugger": "^2.0.0",
     "jsdom": "^29.1.1",
+    "obuild": "^0.4.45",
     "oxfmt": "^0.76.0",
     "oxlint": "^1.91.0",
     "oxlint-tsgolint": "^7.0.2005",

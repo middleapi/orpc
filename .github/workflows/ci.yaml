@@ -21,6 +21,9 @@ jobs:
 
       - run: pnpm run check
 
+      # also verifies dist: declarations, imports, dependencies and package.json paths
+      - run: pnpm run build
+
       - run: pnpm run docs:validate
 
   test_matrix:

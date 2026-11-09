@@ -26,8 +26,8 @@
   ],
   "type": "module",
   "sideEffects": [
-    "./dist/extensions/effect.js",
-    "./dist/extensions/schema.js"
+    "./dist/extensions/effect.mjs",
+    "./dist/extensions/schema.mjs"
   ],
   "exports": {
     "./package.json": "./package.json",
@@ -39,24 +39,24 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "default": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
       },
       "./extensions/effect": {
-        "types": "./dist/extensions/effect.d.ts",
-        "import": "./dist/extensions/effect.js",
-        "default": "./dist/extensions/effect.js"
+        "types": "./dist/extensions/effect.d.mts",
+        "import": "./dist/extensions/effect.mjs",
+        "default": "./dist/extensions/effect.mjs"
       },
       "./extensions/schema": {
-        "types": "./dist/extensions/schema.d.ts",
-        "import": "./dist/extensions/schema.js",
-        "default": "./dist/extensions/schema.js"
+        "types": "./dist/extensions/schema.d.mts",
+        "import": "./dist/extensions/schema.mjs",
+        "default": "./dist/extensions/schema.mjs"
       }
     }
   },
   "scripts": {
-    "prepack": "tsc"
+    "prepack": "node ../../build.config.ts"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

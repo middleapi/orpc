@@ -29,7 +29,7 @@
   ],
   "type": "module",
   "sideEffects": [
-    "./dist/extensions/actionable.js"
+    "./dist/extensions/actionable.mjs"
   ],
   "exports": {
     "./package.json": "./package.json",
@@ -41,24 +41,24 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "default": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
       },
       "./hooks": {
-        "types": "./dist/hooks/index.d.ts",
-        "import": "./dist/hooks/index.js",
-        "default": "./dist/hooks/index.js"
+        "types": "./dist/hooks/index.d.mts",
+        "import": "./dist/hooks/index.mjs",
+        "default": "./dist/hooks/index.mjs"
       },
       "./extensions/actionable": {
-        "types": "./dist/extensions/actionable.d.ts",
-        "import": "./dist/extensions/actionable.js",
-        "default": "./dist/extensions/actionable.js"
+        "types": "./dist/extensions/actionable.d.mts",
+        "import": "./dist/extensions/actionable.mjs",
+        "default": "./dist/extensions/actionable.mjs"
       }
     }
   },
   "scripts": {
-    "prepack": "tsc"
+    "prepack": "node ../../build.config.ts"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

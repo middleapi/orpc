@@ -8,11 +8,7 @@ import type {
 } from '@orpc/contract'
 import type {
   Context,
-  // Aliased on purpose: `extensions/schema.ts` augments `DecoratedProcedure` into '@orpc/server',
-  // so inside the `declare module` below the bare name resolves to that augmentation instead of
-  // this import, and tsc drops the import from the emitted `.d.ts`. Loaded without the schema
-  // extension, the published types then can't resolve `DecoratedProcedure`.
-  DecoratedProcedure as EffectDecoratedProcedure,
+  DecoratedProcedure,
   ImplementedProcedure,
   MergedContext,
   ORPCErrorConstructorMap,
@@ -34,13 +30,7 @@ declare module '@orpc/server' {
         ORPCErrorConstructorMap<TErrorMap>,
         TYield
       >,
-    ): EffectDecoratedProcedure<
-      TInitialContext,
-      object,
-      InitialInputSchema,
-      Schema<TReturn>,
-      TErrorMap
-    >
+    ): DecoratedProcedure<TInitialContext, object, InitialInputSchema, Schema<TReturn>, TErrorMap>
   }
 
   interface BuilderWithMiddlewares<
@@ -63,7 +53,7 @@ declare module '@orpc/server' {
         ORPCErrorConstructorMap<TErrorMap>,
         TYield
       >,
-    ): EffectDecoratedProcedure<
+    ): DecoratedProcedure<
       TInitialContext,
       TInjectedContext,
       InitialInputSchema,
@@ -93,7 +83,7 @@ declare module '@orpc/server' {
         ORPCErrorConstructorMap<TErrorMap>,
         TYield
       >,
-    ): EffectDecoratedProcedure<
+    ): DecoratedProcedure<
       TInitialContext,
       TInjectedContext,
       TInputSchema,
@@ -123,7 +113,7 @@ declare module '@orpc/server' {
         ORPCErrorConstructorMap<TErrorMap>,
         TYield
       >,
-    ): EffectDecoratedProcedure<
+    ): DecoratedProcedure<
       TInitialContext,
       TInjectedContext,
       InitialInputSchema,
@@ -154,13 +144,7 @@ declare module '@orpc/server' {
         ORPCErrorConstructorMap<TErrorMap>,
         TYield
       >,
-    ): EffectDecoratedProcedure<
-      TInitialContext,
-      TInjectedContext,
-      TInputSchema,
-      TOutputSchema,
-      TErrorMap
-    >
+    ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
   }
 
   interface ProcedureImplementer<

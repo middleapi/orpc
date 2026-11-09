@@ -38,19 +38,19 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "default": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
       },
       "./plugins": {
-        "types": "./dist/plugins/index.d.ts",
-        "import": "./dist/plugins/index.js",
-        "default": "./dist/plugins/index.js"
+        "types": "./dist/plugins/index.d.mts",
+        "import": "./dist/plugins/index.mjs",
+        "default": "./dist/plugins/index.mjs"
       }
     }
   },
   "scripts": {
-    "prepack": "tsc"
+    "prepack": "node ../../build.config.ts"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

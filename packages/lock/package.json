@@ -41,34 +41,34 @@
     "exports": {
       "./package.json": "./package.json",
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "default": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
       },
       "./base-redis": {
-        "types": "./dist/adapters/base-redis.d.ts",
-        "import": "./dist/adapters/base-redis.js",
-        "default": "./dist/adapters/base-redis.js"
+        "types": "./dist/adapters/base-redis.d.mts",
+        "import": "./dist/adapters/base-redis.mjs",
+        "default": "./dist/adapters/base-redis.mjs"
       },
       "./memory": {
-        "types": "./dist/adapters/memory.d.ts",
-        "import": "./dist/adapters/memory.js",
-        "default": "./dist/adapters/memory.js"
+        "types": "./dist/adapters/memory.d.mts",
+        "import": "./dist/adapters/memory.mjs",
+        "default": "./dist/adapters/memory.mjs"
       },
       "./redis": {
-        "types": "./dist/adapters/redis.d.ts",
-        "import": "./dist/adapters/redis.js",
-        "default": "./dist/adapters/redis.js"
+        "types": "./dist/adapters/redis.d.mts",
+        "import": "./dist/adapters/redis.mjs",
+        "default": "./dist/adapters/redis.mjs"
       },
       "./upstash": {
-        "types": "./dist/adapters/upstash.d.ts",
-        "import": "./dist/adapters/upstash.js",
-        "default": "./dist/adapters/upstash.js"
+        "types": "./dist/adapters/upstash.d.mts",
+        "import": "./dist/adapters/upstash.mjs",
+        "default": "./dist/adapters/upstash.mjs"
       }
     }
   },
   "scripts": {
-    "prepack": "tsc"
+    "prepack": "node ../../build.config.ts"
   },
   "dependencies": {
     "@orpc/server": "workspace:*",
