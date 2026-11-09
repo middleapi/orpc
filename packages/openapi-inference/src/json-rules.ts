@@ -7,6 +7,7 @@ import {
   getBuiltin,
   getBuiltinBaseName,
   getDeclaredBuiltinName,
+  getNumberIndexType,
   getToJSON,
   hasBigIntToJSON,
   hasBuiltinForm,
@@ -17,7 +18,7 @@ import {
 } from './builtins'
 import { ExpansionGuard } from './expansion'
 import type { TypeQueries } from './type-queries'
-import { INSTANTIABLE_FLAGS, isObjectLiteral, NULLISH_FLAGS, UNDEFINED_FLAGS } from './type-queries'
+import { INSTANTIABLE_FLAGS, isObjectLiteral, UNDEFINED_FLAGS } from './type-queries'
 import { getCallReturnType, isClassAccessor } from './utils'
 
 /*
@@ -162,21 +163,54 @@ export function isNonSerializable(
   }
   seen.add(type.id)
 
-  const result = getToJSONResultType(types, type, true)
-  const members = result?.isUnionType() ? types.getMembers(result) : result ? [result] : []
+  const members = getToJSONResultTypes(types, type, true).flatMap((result) =>
+    result.isUnionType() ? types.getMembers(result) : [result],
+  )
 
   return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m, seen))
 }
 
 /**
  * Whether JSON serialization may drop a value of this type: a function whose `toJSON` is optional
- * (`(() => void) & { toJSON?: () => string }`) is written by `toJSON`, or else as nothing.
+ * (`(() => void) & { toJSON?: () => string }`) is written by `toJSON`, or else as nothing, and
+ * a type a function is assignable to (`object`, `{}`, `Object`).
  */
 export function mayBeNonSerializable(types: TypeQueries, type: Type): boolean {
   return (
     (isFunction(types, type) &&
       (isNonSerializable(types, type) || hasOptionalToJSON(types, type))) ||
-    isFunctionView(types, type)
+    isFunctionView(types, type) ||
+    mayHoldFunction(types, type)
+  )
+}
+
+/**
+ * Whether a function is assignable to a type that is no function: `object`, `Object`, and the
+ * empty object type `{}` (a mapped type without keys is a view, see `isFunctionView`).
+ */
+function mayHoldFunction(types: TypeQueries, type: Type): boolean {
+  if (type.flags & TypeFlags.NonPrimitive) {
+    return true
+  }
+
+  if (
+    !(type.flags & TypeFlags.Object) ||
+    isObjectLiteral(type) ||
+    (type as any).objectFlags & ObjectFlags.Mapped
+  ) {
+    return false
+  }
+
+  const symbol = type.getSymbol()
+  if (symbol?.name === 'Object' && types.getSymbolSourceKind(symbol) === 'default') {
+    return true
+  }
+
+  return (
+    !types.getProperties(type).length &&
+    !types.checker.getIndexInfosOfType(type).length &&
+    !types.isCallable(type) &&
+    getClassType(types, type) === undefined
   )
 }
 
@@ -269,16 +303,17 @@ export function isFunction(types: TypeQueries, type: Type): boolean {
 }
 
 /**
- * What `toJSON` of a value of this type returns, when it is called during serialization.
+ * What `toJSON` of a value of this type may return, when it is called during serialization,
+ * empty when it is not: one type per function it may be (`(() => A) | (() => B)`).
  * The serializer walks plain objects key by key, `JSON.stringify` calls their `toJSON` too.
  */
-export function getToJSONResultType(
+export function getToJSONResultTypes(
   types: TypeQueries,
   type: Type,
   stringify: boolean,
-): Type | undefined {
+): readonly Type[] {
   if (!(type.flags & (TypeFlags.Object | TypeFlags.Intersection))) {
-    return undefined
+    return []
   }
 
   // the serializer walks arrays and plain objects, also with a brand
@@ -290,25 +325,42 @@ export function getToJSONResultType(
       members.some((m) => types.getReferenceKind(m) !== undefined) ||
       members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m))
     ) {
-      return undefined
+      return []
     }
   }
-
-  const toJSON = getOwnToJSON(types, type)
-  const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
 
   // `Partial<Money>` maps the method to an optional property, the instance still has it, and
   // `OrFrozen<Money>` to the method or a view of it (`(() => R) | Readonly<() => R>`)
-  const members = method?.isUnionType() ? types.getMembers(method) : [method]
+  const results = new Map<number, Type>()
 
-  for (const member of members) {
-    const result = member && getCallReturnType(types.checker, member)
+  for (const member of getToJSONMembers(types, type)) {
+    const result = getMethodResultType(types, member)
     if (result) {
-      return result
+      results.set(result.id, result)
     }
   }
 
-  return undefined
+  return [...results.values()]
+}
+
+/**
+ * The members of the type of the `toJSON` a value of this type calls.
+ */
+function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
+  const toJSON = getOwnToJSON(types, type)
+  const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
+  return method?.isUnionType() ? types.getMembers(method) : method ? [method] : []
+}
+
+/**
+ * What a function returns when `JSON.stringify` calls it: of a function type, of the function a
+ * view of it may hold (`Readonly<() => R>`), or anything (`Function`).
+ */
+function getMethodResultType(types: TypeQueries, member: Type): Type | undefined {
+  const viewed = getViewedFunction(types, member)
+  const result = getCallReturnType(types.checker, viewed ?? member)
+
+  return result ?? (isFunction(types, viewed ?? member) ? types.checker.getAnyType() : undefined)
 }
 
 /**
@@ -332,20 +384,14 @@ function getOwnToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
  * Whether the `toJSON` of a type may be missing (`toJSON?(): string`, or `Partial<Money>`), or
  * may be a value `JSON.stringify` does not call (`toJSON: string | (() => R)`), so a value is
  * either what `toJSON` returns or its own fields. A view of the method
- * (`(() => R) | Readonly<() => R>`) may hold any value, not only the method.
+ * (`Readonly<() => R>`) may hold any value, not only the method.
  */
 export function hasOptionalToJSON(types: TypeQueries, type: Type): boolean {
   const toJSON = getOwnToJSON(types, type)
-  const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
   return Boolean(
     toJSON &&
     (toJSON.flags & SymbolFlags.Optional ||
-      (method?.isUnionType() &&
-        types
-          .getMembers(method)
-          .some(
-            (m) => m.flags & NULLISH_FLAGS || getCallReturnType(types.checker, m) === undefined,
-          ))),
+      getToJSONMembers(types, type).some((m) => !isFunction(types, m))),
   )
 }
 
@@ -506,8 +552,9 @@ function createsInterface(types: TypeQueries, type: Type, name: string, depth = 
  * keeping the private members of a class, which only instances are assignable to
  * (`Readonly<C>` and `Pick<C, K>` drop them).
  */
-export function isClassView(types: TypeQueries, type: Type, classType: Type): boolean {
-  return classType.id !== type.id && !types.isNominalClass(type)
+export function isClassView(types: TypeQueries, type: Type): boolean {
+  const classType = getClassType(types, type)
+  return classType !== undefined && classType.id !== type.id && !types.isNominalClass(type)
 }
 
 /**
@@ -639,8 +686,7 @@ export class ModeSensitivity {
     // the serializer leaves typed arrays, also with added fields, to `JSON.stringify`, but not
     // the plain object a view of a typed array class may hold (`Pick<class B extends Uint8Array, 's'>`)
     if (flags & (TypeFlags.Object | TypeFlags.Intersection) && isTypedArray(types, type)) {
-      const classType = getClassType(types, type)
-      if (classType === undefined || !isClassView(types, type, classType)) {
+      if (!isClassView(types, type)) {
         return false
       }
     }
@@ -665,7 +711,7 @@ export class ModeSensitivity {
         // `MyMap & { x: string }` is written as a map or by `JSON.stringify`
         return (
           isModeSensitiveBuiltin(types, classType) ||
-          (isClassView(types, type, classType) && this.computeView(type, classType, isSensitive))
+          (isClassView(types, type) && this.computeView(type, classType, isSensitive))
         )
       }
 
@@ -707,9 +753,7 @@ export class ModeSensitivity {
     // (`Readonly<class Tags extends Set<string>>`)
     if (
       this.mode === 'either' &&
-      (classType !== undefined
-        ? isClassView(types, type, classType)
-        : extendsBuiltinClass(types, type)) &&
+      (classType !== undefined ? isClassView(types, type) : extendsBuiltinClass(types, type)) &&
       !hasBuiltinForm(types, type)
     ) {
       return false
@@ -720,20 +764,16 @@ export class ModeSensitivity {
       return true
     }
 
-    if (extended !== undefined) {
-      // `class Rows extends Array<Set<string>>` is an array of its items
-      if (extended === 'Array' || extended === 'ReadonlyArray') {
-        const item = types.checker
-          .getIndexInfosOfType(type)
-          .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
-        return item !== undefined && isSensitive(item)
-      }
+    // `class Rows extends Array<Set<string>>` is an array of its items
+    if (extended === 'Array' || extended === 'ReadonlyArray') {
+      const item = getNumberIndexType(types, type)
+      return item !== undefined && isSensitive(item)
     }
 
     // class instances are converted under `JSON.stringify` rules either way, views may also
     // hold plain objects
     if (classType !== undefined) {
-      return isClassView(types, type, classType) && this.computeView(type, classType, isSensitive)
+      return isClassView(types, type) && this.computeView(type, classType, isSensitive)
     }
 
     // a view of a built-in (`Pick<Set<string>, 'size'>`), also when it keeps too few members

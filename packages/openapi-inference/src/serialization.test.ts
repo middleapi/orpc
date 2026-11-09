@@ -219,6 +219,22 @@ describe('generated schemas match serialized outputs', async () => {
     ['frozenToJSON', undefined],
     ['frozenFieldRoot', undefined],
     ['pickedTuples', undefined],
+    ['partialArrays', undefined],
+    ['partialArrayRoot', undefined],
+    ['toJSONUnions', undefined],
+    ['toJSONUnionRoot', undefined],
+    ['recordViews', undefined],
+    ['recordViewRoot', undefined],
+    ['widenedEnums', undefined],
+    ['toJSONViews', undefined],
+    ['frozenMethodRoot', undefined],
+    ['widenedArrays', undefined],
+    ['widenedArrayRoot', undefined],
+    ['pickedArrays', undefined],
+    ['pickedArrayRoot', undefined],
+    ['omittedPrimitives', undefined],
+    ['brandedViews', undefined],
+    ['objectFields', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1454,8 +1470,13 @@ describe('generated schemas match serialized outputs', async () => {
           minItems: 1,
           maxItems: 2,
         },
-        // the number index holds the items
-        partial: { type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'null' }] } },
+        // the number index holds the items, `Partial` also admits a plain object
+        partial: {
+          anyOf: [
+            { type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'null' }] } },
+            expect.objectContaining({ type: 'object' }),
+          ],
+        },
       })
     })
 
@@ -1557,9 +1578,14 @@ describe('generated schemas match serialized outputs', async () => {
           minItems: 1,
         },
         partial: {
-          type: 'array',
-          prefixItems: [{ anyOf: [{ type: 'number' }, { type: 'null' }] }],
-          items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] },
+          anyOf: [
+            {
+              type: 'array',
+              prefixItems: [{ anyOf: [{ type: 'number' }, { type: 'null' }] }],
+              items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] },
+            },
+            expect.objectContaining({ type: 'object' }),
+          ],
         },
       })
     })
@@ -1574,6 +1600,239 @@ describe('generated schemas match serialized outputs', async () => {
           { type: 'object' },
         ])
       }
+    })
+  })
+
+  describe('round thirty-one', () => {
+    const schemas = () => spec.components?.schemas as any
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const word = { type: 'object', properties: { w: { type: 'string' } }, required: ['w'] }
+    const nullable = (type: string) => ({ anyOf: [{ type }, { type: 'null' }] })
+    const strings = { type: 'array', items: { type: 'string' } }
+    const tupleIndex = { anyOf: [{ type: 'string' }, { type: 'number' }] }
+
+    it('writes array-like views with an optional length as arrays or plain objects', () => {
+      const pair = {
+        anyOf: [
+          {
+            type: 'array',
+            prefixItems: [nullable('number'), nullable('string')],
+            minItems: 2,
+            maxItems: 2,
+          },
+          {
+            type: 'object',
+            properties: {
+              0: { type: 'number' },
+              1: { type: 'string' },
+              extra: { type: 'string' },
+              length: { type: 'number', const: 2 },
+            },
+            additionalProperties: tupleIndex,
+          },
+        ],
+      }
+      const { properties } = schemaOf('partialArrays')
+
+      expect(schemaOf('partialArrayRoot')).toEqual(pair)
+      expect(properties.empty).toEqual(pair)
+      expect(properties.fixed.anyOf[1]).toEqual({
+        type: 'object',
+        properties: {
+          0: { type: 'number' },
+          1: { type: 'number' },
+          length: { type: 'number', const: 2 },
+        },
+      })
+      expect(properties.list.anyOf).toEqual([
+        { type: 'array', items: nullable('number') },
+        {
+          type: 'object',
+          properties: {
+            length: expect.objectContaining({ type: 'number' }),
+            x: { type: 'string' },
+          },
+          additionalProperties: { type: 'number' },
+        },
+      ])
+      expect(properties.rest.anyOf[1]).toEqual({
+        type: 'object',
+        properties: {
+          0: { type: 'number' },
+          extra: { type: 'string' },
+          length: { type: 'number' },
+        },
+        additionalProperties: tupleIndex,
+      })
+    })
+
+    it('writes a toJSON that is one of several functions by what any of them returns', () => {
+      const x = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] }
+
+      expect(schemas().TwoResults).toEqual({
+        anyOf: [x, { type: 'number' }],
+        description: 'A class whose `toJSON` is one of two functions',
+      })
+      expect(schemas().KeyedResult.anyOf).toEqual([
+        { type: 'string' },
+        { type: 'object', properties: { k: { type: 'string' } }, required: ['k'] },
+      ])
+      expect(schemas().TwoFunctionsJson.anyOf).toEqual([
+        { type: 'object', properties: { x: { type: 'number' } }, required: ['x'] },
+        { type: 'object', properties: { y: { type: 'string' } }, required: ['y'] },
+      ])
+      expect(schemaOf('toJSONUnions').properties.frozen).toEqual({
+        anyOf: [
+          x,
+          { type: 'number' },
+          { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+        ],
+      })
+    })
+
+    it('reads views of a class intersected with a record or an object literal type as views', () => {
+      const { properties } = schemaOf('recordViews')
+
+      for (const view of Object.values<any>(properties)) {
+        expect(view.properties.tags.anyOf).toEqual([
+          expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+          { type: 'object' },
+        ])
+        expect(view.required).toEqual(['tags', 'id', 'x'])
+      }
+      expect(schemaOf('recordViewRoot')).toEqual(properties.deepRecord)
+    })
+
+    it('reads mapped types widening an enum member to its primitive as views', () => {
+      const tags = {
+        anyOf: [
+          {
+            'type': 'array',
+            'uniqueItems': true,
+            'items': { type: 'string' },
+            'x-native-type': 'set',
+          },
+          { type: 'object' },
+        ],
+      }
+
+      expect(schemas().Widen_NumericKinded.properties).toEqual({ e: { type: 'number' }, tags })
+      expect(schemas().Widen_TextKinded.properties).toEqual({ s: { type: 'string' }, tags })
+    })
+
+    it('calls a toJSON typed as a view of the method or as any function', () => {
+      const fields = {
+        type: 'object',
+        properties: { a: { type: 'number' }, toJSON: {} },
+        required: ['a'],
+      }
+
+      expect(schemas().OnlyFrozenJson.anyOf).toEqual([word, fields])
+      expect(schemas().FrozenMethod.anyOf).toEqual([word, fields])
+      expect(schemas().PartialMethod.anyOf).toEqual([word, fields])
+      expect(schemas().StrOrFrozenJson.anyOf).toEqual([
+        word,
+        {
+          ...fields,
+          properties: { ...fields.properties, toJSON: { anyOf: [{ type: 'string' }, {}] } },
+        },
+      ])
+      // `Function` may return anything, also `undefined`
+      expect(schemas().AnyFunctionMethod).toEqual({
+        description: 'A class whose `toJSON` is any function',
+      })
+      expect(schemaOf('toJSONViews').required).toEqual([
+        'only',
+        'str',
+        'strValue',
+        'frozen',
+        'partial',
+      ])
+    })
+
+    it('writes mapped types widening the length of an array as arrays or plain objects', () => {
+      expect(schemas().OrString.anyOf).toEqual([
+        strings,
+        {
+          type: 'object',
+          properties: {
+            length: expect.objectContaining({ anyOf: [{ type: 'string' }, { type: 'number' }] }),
+            extra: { type: 'string' },
+          },
+          required: ['length'],
+          additionalProperties: { type: 'string' },
+        },
+      ])
+      expect(schemas().OrNull.anyOf[0]).toEqual({ type: 'array', items: nullable('string') })
+      expect(schemas().OrList.anyOf[0]).toEqual({
+        type: 'array',
+        prefixItems: [
+          { anyOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' } }] },
+        ],
+        minItems: 1,
+        maxItems: 1,
+      })
+    })
+
+    it('writes views of arrays leaving out length or slice as arrays or plain objects', () => {
+      const { properties } = schemaOf('pickedArrays')
+      const first = {
+        type: 'array',
+        prefixItems: [{ type: 'number' }, {}],
+        minItems: 2,
+        maxItems: 2,
+      }
+
+      expect(schemaOf('pickedArrayRoot')).toEqual({
+        anyOf: [first, { type: 'object', properties: { 0: { type: 'number' } }, required: ['0'] }],
+      })
+      expect(properties.firstLength.anyOf[0]).toEqual(first)
+      expect(properties.noSlice.anyOf[0]).toEqual({
+        type: 'array',
+        prefixItems: [{ type: 'number' }, { type: 'string' }],
+        minItems: 2,
+        maxItems: 2,
+      })
+      expect(properties.listNoSlice.anyOf[0]).toEqual(strings)
+      expect(properties.listFirst.anyOf[0]).toEqual({
+        type: 'array',
+        prefixItems: [{ type: 'string' }],
+      })
+      expect(properties.map).toEqual({ anyOf: [{ type: 'array' }, { type: 'object' }] })
+    })
+
+    it('writes views of primitives through Omit or the number index as the primitive', () => {
+      expect(schemaOf('omittedPrimitives').properties).toEqual({
+        // keeping every member
+        str: { type: 'string' },
+        num: { anyOf: [{ type: 'number' }, { type: 'object' }] },
+        bool: { type: 'boolean' },
+        index: {
+          anyOf: [{ type: 'string' }, { type: 'object', additionalProperties: { type: 'string' } }],
+        },
+      })
+    })
+
+    it('writes views of branded primitives intersected with an object type as the primitive', () => {
+      expect(schemaOf('brandedViews').properties).toEqual({
+        tag: { type: 'string' },
+        eight: { type: 'string', description: 'A string of eight characters' },
+        one: { type: 'number', description: 'A number whose value is one' },
+      })
+    })
+
+    it('leaves out fields of types holding functions', () => {
+      expect(schemaOf('objectFields')).toEqual({
+        type: 'object',
+        properties: {
+          obj: {},
+          empty: {},
+          boxed: {},
+          list: { type: 'array', items: { anyOf: [{}, { type: 'null' }] } },
+        },
+        required: ['list'],
+      })
     })
   })
 

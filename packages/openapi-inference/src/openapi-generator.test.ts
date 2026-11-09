@@ -30,6 +30,7 @@ import {
   TaggedSet,
   TaggedURL,
 } from '../tests/fixtures/app/src/round29'
+import { roundThirtyOneInputs } from '../tests/fixtures/app/src/round31'
 import { router } from '../tests/fixtures/app/src/router'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
@@ -1212,6 +1213,57 @@ describe('typeScriptOpenAPIGenerator', () => {
       expect(componentName.mock.calls.map(([name]) => name).toSorted()).toEqual(['Item', 'Item2'])
       expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual(['FirstItem', 'Item2'])
       expect(responseOf(spec, '/second').properties.i).toEqual(ref('Item2'))
+    })
+  })
+
+  describe('round thirty-one', () => {
+    it('documents inputs of array-like views, views of primitives, and object', async () => {
+      const spec = await generator.generate(roundThirtyOneInputs, {
+        source: { file: fixture('round31.ts'), export: 'roundThirtyOneInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      expect(body('/pickedTuple')).toEqual({
+        anyOf: [
+          { type: 'array', prefixItems: [{ type: 'number' }, {}], minItems: 2, maxItems: 2 },
+          { type: 'object', properties: { 0: { type: 'number' } }, required: ['0'] },
+        ],
+      })
+      expect(body('/omittedString')).toEqual({ type: 'string' })
+      expect(body('/brandedView')).toEqual({ type: 'string' })
+      expect(body('/objectField')).toEqual({ type: 'object', properties: { v: {} } })
+      expect(schemas.OrString.anyOf[0]).toEqual({ type: 'array', items: { type: 'string' } })
+
+      // what a client holding these values sends
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/partialPair', {}],
+        ['/partialPair', { extra: 'x' }],
+        ['/partialPair', [1, 'a']],
+        ['/widenedArray', ['a']],
+        ['/pickedTuple', [1, 'a']],
+        ['/pickedTuple', { 0: 1 }],
+        ['/omittedString', 'abc'],
+        ['/brandedView', 'abc'],
+        ['/objectField', {}],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
     })
   })
 })

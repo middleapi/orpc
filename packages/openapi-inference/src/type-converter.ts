@@ -22,6 +22,7 @@ import {
   getBoxedPrimitiveSchema,
   getBuiltinBaseName,
   getBuiltinFields,
+  getNumberIndexType,
   getTypedArrayViewBases,
   getViewBases,
   hasBuiltinForm,
@@ -38,7 +39,7 @@ import {
   isBuiltinMember,
   getClassTypes,
   getDataProperties,
-  getToJSONResultType,
+  getToJSONResultTypes,
   getViewedFunction,
   hasOptionalToJSON,
   isClassView,
@@ -393,11 +394,16 @@ export class TypeToJsonSchemaConverter {
       return this.convertType(type)
     }
 
-    return this.expansion.expand(type, () => this.visitStructured(type, singleMemberEnum)) ?? {}
+    return (
+      this.expansion.expand(type, () => this.visitStructured(type, key, singleMemberEnum)) ?? {}
+    )
   }
 
-  private visitStructured(type: Type, singleMemberEnum: TSSymbol | undefined): JsonSchema {
-    const key = this.key(type)
+  private visitStructured(
+    type: Type,
+    key: number,
+    singleMemberEnum: TSSymbol | undefined,
+  ): JsonSchema {
     const memoized = this.defs.getAnonymous(key)
 
     if (memoized !== undefined) {
@@ -428,8 +434,7 @@ export class TypeToJsonSchemaConverter {
       this.namedDepth++
       let schema: JsonSchema
       try {
-        const converted = this.convertType(type)
-        schema = projectSymbol ? this.annotate(converted, projectSymbol) : converted
+        schema = this.annotate(this.convertType(type), projectSymbol)
       } finally {
         this.namedDepth--
       }
@@ -509,9 +514,7 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    if (projectSymbol) {
-      schema = this.annotate(schema, projectSymbol)
-    }
+    schema = this.annotate(schema, projectSymbol)
 
     // a self reference was found while converting, so the type became a def
     const def = this.defs.get(key)
@@ -603,9 +606,10 @@ export class TypeToJsonSchemaConverter {
       }
 
       // `JSON.stringify` throws on a bigint, unless `BigInt.prototype.toJSON` is polyfilled
-      const toJSONResult = this.getBigIntToJSONResultType()
-      const stringified =
-        toJSONResult && this.withMode('stringify', () => this.convertToJSONResult(toJSONResult))
+      const toJSONResults = this.getBigIntToJSONResultTypes()
+      const stringified = toJSONResults.length
+        ? anyOfDeduped(this.convertToJSONResults(toJSONResults))
+        : undefined
 
       if (this.mode === 'stringify') {
         return stringified || { not: {} }
@@ -743,8 +747,11 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertIntersection(type: Type, members: readonly Type[]): JsonSchema {
-    // branded primitives, e.g. `string & { __brand: 'UserId' }`
-    const primitive = members.find((m) => m.flags & PRIMITIVE_FLAGS)
+    // branded primitives, e.g. `string & { __brand: 'UserId' }`, also through a view of one
+    // (`Readonly<UserId> & { extra?: string }`)
+    const primitive =
+      members.find((m) => m.flags & PRIMITIVE_FLAGS) ??
+      members.map((m) => this.getMappedBrandedPrimitive(m)).find((m) => m !== undefined)
     if (primitive) {
       return this.visit(primitive)
     }
@@ -752,22 +759,22 @@ export class TypeToJsonSchemaConverter {
     const arrayLike = members.find((m) => this.types.getReferenceKind(m) !== undefined)
     if (arrayLike) {
       // `JSON.stringify` calls `toJSON` of arrays, the serializer walks them
-      const toJSONResult = this.mode !== 'serializer' && getToJSONResultType(this.types, type, true)
+      const toJSONResults =
+        this.mode !== 'serializer' ? getToJSONResultTypes(this.types, type, true) : []
 
-      if (!toJSONResult) {
+      if (!toJSONResults.length) {
         return this.visit(arrayLike)
       }
 
-      const converted = this.withMode('stringify', () => this.convertToJSONResult(toJSONResult))
+      const converted = this.convertToJSONResults(toJSONResults)
 
       if (this.mode === 'stringify') {
-        return converted
+        return anyOfDeduped(converted)
       }
 
       // a `toJSON` returning only `undefined` writes nothing, the walked array remains
-      return isDropped(this.types, toJSONResult)
-        ? this.visit(arrayLike)
-        : anyOfDeduped([converted, this.visit(arrayLike)])
+      const written = converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!))
+      return anyOfDeduped([...written, this.visit(arrayLike)])
     }
 
     // `Uint8Array & { label: string }` is written by its index keys and the added fields
@@ -839,7 +846,7 @@ export class TypeToJsonSchemaConverter {
     // and so may an interface extending a built-in class (`interface AppError extends Error`)
     const isView =
       classType !== undefined
-        ? isClassView(this.types, type, classType)
+        ? isClassView(this.types, type)
         : !plain && extendsBuiltinClass(this.types, type)
 
     // the serializer leaves an instance to `JSON.stringify` and walks a plain object,
@@ -851,7 +858,7 @@ export class TypeToJsonSchemaConverter {
     // in the either mode, a view is an instance or a plain object, field by field
     // (under `JSON.stringify`, a view is written as an instance)
     const eitherView = isView && this.mode === 'either'
-    const sentView = sentClass !== undefined && isClassView(this.types, type, sentClass)
+    const sentView = sentClass !== undefined && isClassView(this.types, type)
     const instanceClass = classType ?? sentClass
 
     if (instanceClass && !ownFields) {
@@ -881,39 +888,39 @@ export class TypeToJsonSchemaConverter {
     // (`interface L extends Pick<A, 'id'>, Pick<B, 'v'>`). `JSON.stringify` also calls
     // the `toJSON` of plain objects, which the serializer skips.
     const stringifyRules = this.mode !== 'serializer'
-    const ownToJSON = ignoreToJSON
-      ? undefined
-      : getToJSONResultType(this.types, type, stringifyRules)
+    const ownToJSON = ignoreToJSON ? [] : getToJSONResultTypes(this.types, type, stringifyRules)
 
     // a view of a function (`DeepReadonly<(() => number) & { toJSON(): string }>`) may hold the
     // function, which `JSON.stringify` writes by its `toJSON`, or a plain object of its fields
     const viewedFunction =
-      ownToJSON || ignoreToJSON ? undefined : getViewedFunction(this.types, type)
-    const viewedResult =
-      viewedFunction &&
-      viewedFunction !== type &&
-      getToJSONResultType(this.types, viewedFunction, true)
+      ownToJSON.length || ignoreToJSON ? undefined : getViewedFunction(this.types, type)
+    const viewedResults =
+      viewedFunction && viewedFunction !== type
+        ? getToJSONResultTypes(this.types, viewedFunction, true).filter(
+            (result) => !isDropped(this.types, result),
+          )
+        : []
 
-    if (viewedResult && !isDropped(this.types, viewedResult)) {
+    if (viewedResults.length) {
       return anyOfDeduped([
-        this.withMode('stringify', () => this.convertToJSONResult(viewedResult)),
+        ...this.convertToJSONResults(viewedResults),
         this.convertObject(type, true, plain, ownFields),
       ])
     }
 
-    const jsonSources = ownToJSON || !classType ? [type] : getClassTypes(this.types, type)
-    const toJSONResults = ownToJSON
+    const jsonSources = ownToJSON.length || !classType ? [type] : getClassTypes(this.types, type)
+    // of each source, empty when it has no `toJSON`
+    const sourceResults = ownToJSON.length
       ? [ownToJSON]
       : ignoreToJSON || !classType
         ? []
-        : jsonSources.flatMap((c) => getToJSONResultType(this.types, c, stringifyRules) ?? [])
+        : jsonSources.map((c) => getToJSONResultTypes(this.types, c, stringifyRules))
+    const toJSONResults = sourceResults.flat()
     if (toJSONResults.length) {
-      const converted = toJSONResults.map((result) =>
-        this.withMode('stringify', () => this.convertToJSONResult(result)),
-      )
+      const converted = this.convertToJSONResults(toJSONResults)
 
       const mayLackToJSON =
-        toJSONResults.length < jsonSources.length ||
+        sourceResults.some((results) => !results.length) ||
         jsonSources.some((source) => hasOptionalToJSON(this.types, source)) ||
         // the serializer does not walk a function, `JSON.stringify` calls its `toJSON`
         (!isFunction(this.types, type) &&
@@ -989,6 +996,7 @@ export class TypeToJsonSchemaConverter {
     // is written by its index keys, and by the fields it adds
     const form = this.typedArrayForms.get(type.id)
     const typedArray = form !== 'plain' && isTypedArray(this.types, type)
+    let arrayLike: { schema: JsonSchema; only: boolean } | undefined
 
     // an interface over a view of a typed array (`interface Buf extends Pick<Uint8Array, 'buffer'>`)
     // may also be a plain object, written by the fields of the view, unless the index keys cover them
@@ -1009,9 +1017,9 @@ export class TypeToJsonSchemaConverter {
       dataProperties = dataProperties.filter((p) => !isBuiltinMember(this.types, p))
     } else if (!((plain || eitherView) && this.isViewOfArraySubclass(type))) {
       // (a plain object of `Partial<class Rows extends Array>` holds the fields, not items)
-      const arrayLike = this.convertArrayLikeObject(type, properties)
-      if (arrayLike !== undefined) {
-        return arrayLike
+      arrayLike = this.convertArrayLikeObject(type, properties)
+      if (arrayLike?.only) {
+        return arrayLike.schema
       }
     }
 
@@ -1038,13 +1046,13 @@ export class TypeToJsonSchemaConverter {
       // also when `toJSON` returns them (in either mode, when the serializer calls it too)
       const serialized =
         !this.input && propertyType
-          ? getToJSONResultType(this.types, propertyType, fieldsMode === 'stringify')
-          : undefined
+          ? getToJSONResultTypes(this.types, propertyType, fieldsMode === 'stringify')
+          : []
       if (
         !propertyType ||
         isDropped(this.types, propertyType) ||
-        (serialized &&
-          isDropped(this.types, serialized) &&
+        (serialized.length &&
+          serialized.every((result) => isDropped(this.types, result)) &&
           !this.mayLackToJSON(propertyType, fieldsMode))
       ) {
         continue
@@ -1113,7 +1121,8 @@ export class TypeToJsonSchemaConverter {
       delete (schema as ObjectJsonSchema).properties
     }
 
-    return schema
+    // an array-like view may also hold a plain object
+    return arrayLike ? anyOfDeduped([arrayLike.schema, schema]) : schema
   }
 
   /**
@@ -1285,17 +1294,25 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * An object type derived from an array or tuple, like type-fest's `FixedLengthArray<T, 3>`
-   * (a tuple without its length mutating methods), whose values are still arrays.
+   * (a tuple without its length mutating methods), whose values are still arrays, `only` unless
+   * it may also hold a plain object: when a view makes `length` optional (`Partial<[number] & X>`),
+   * widens it (`{ [K in keyof T]: T[K] | string }`), or leaves it or `slice` out
+   * (`Pick<[number, string], 0>`).
    */
   private convertArrayLikeObject(
     type: Type,
     properties: readonly TSSymbol[],
-  ): JsonSchema | undefined {
-    const length = properties.find((p) => p.name === 'length')
+  ): { schema: JsonSchema; only: boolean } | undefined {
     const slice = properties.find((p) => p.name === 'slice')
-
     // the `slice` of an array, not of a string (`Partial<class Tag extends String>`)
-    if (!length || !slice || !this.isArrayMember(slice)) {
+    const keptSlice = slice !== undefined && this.isArrayMember(slice)
+    const source = keptSlice ? undefined : this.types.getMappedSource(type)
+    const viewed = source && this.types.getReferenceKind(source) !== undefined ? source : undefined
+    const length =
+      properties.find((p) => p.name === 'length') ??
+      (viewed && this.types.getProperty(viewed, 'length'))
+
+    if (!length || (!keptSlice && !viewed)) {
       return undefined
     }
 
@@ -1306,16 +1323,23 @@ export class TypeToJsonSchemaConverter {
     const [lengthType, ...elementTypes] = this.checker.getTypeOfSymbol([length, ...ordered])
     // `Partial` makes the length optional, a tuple with optional elements has several
     // (`1 | 2` of `Readonly<[number, string?] & { extra?: string }>`)
-    const lengths = lengthType
-      ? (lengthType.isUnionType() ? this.types.getMembers(lengthType) : [lengthType]).filter(
-          (t) => !(t.flags & UNDEFINED_FLAGS),
-        )
+    const members = lengthType
+      ? lengthType.isUnionType()
+        ? this.types.getMembers(lengthType)
+        : [lengthType]
       : []
+    const lengths = members.filter((t) => t.flags & TypeFlags.NumberLike)
 
     // a mapped type changing the values (`{ [K in keyof T]?: true }`) is no array
-    if (!lengths.length || !lengths.every((t) => t.flags & TypeFlags.NumberLike)) {
+    if (!lengths.length) {
       return undefined
     }
+
+    const only =
+      keptSlice &&
+      !((length.flags | slice.flags) & SymbolFlags.Optional) &&
+      lengths.length === members.length
+    const array = (schema: JsonSchema) => ({ schema, only })
 
     const fixed = lengths.every((t) => t.flags & TypeFlags.NumberLiteral)
       ? lengths.map((t) => (t as any).value as number)
@@ -1333,36 +1357,34 @@ export class TypeToJsonSchemaConverter {
     const count = byIndex.size ? Math.max(...byIndex.keys()) + 1 : 0
 
     if (fixed !== undefined && count <= Math.max(...fixed)) {
-      return {
+      return array({
         type: 'array',
         prefixItems: prefixItems(Math.max(...fixed)),
         minItems: Math.min(...fixed),
         maxItems: Math.max(...fixed),
-      }
+      })
     }
 
     // the number index of an array or a rest tuple (`Readonly<[number, ...string[]] & { x }>`)
     // holds every item, after the leading elements of a tuple
-    const index = this.checker
-      .getIndexInfosOfType(type)
-      .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+    const index = getNumberIndexType(this.types, type)
 
     if (index) {
       const leading = ordered === elements ? ordered : []
       const minItems = leading.filter((p) => !(p.flags & SymbolFlags.Optional)).length
 
-      return {
+      return array({
         type: 'array',
         ...(leading.length
           ? { prefixItems: elementTypes.slice(0, leading.length).map((t) => this.visitElement(t)) }
           : {}),
         items: this.visitElement(index),
         ...(minItems ? { minItems } : {}),
-      }
+      })
     }
 
     // without a number index, the items after the elements are unknown
-    return count ? { type: 'array', prefixItems: prefixItems(count) } : { type: 'array' }
+    return array(count ? { type: 'array', prefixItems: prefixItems(count) } : { type: 'array' })
   }
 
   /**
@@ -1445,6 +1467,15 @@ export class TypeToJsonSchemaConverter {
       !this.types.hasMember(type, TypeFlags.Null)
       ? withNull(schema)
       : schema
+  }
+
+  /**
+   * What `JSON.stringify` writes of each result of `toJSON`.
+   */
+  private convertToJSONResults(results: readonly Type[]): JsonSchema[] {
+    return this.withMode('stringify', () =>
+      results.map((result) => this.convertToJSONResult(result)),
+    )
   }
 
   /**
@@ -1533,9 +1564,9 @@ export class TypeToJsonSchemaConverter {
    * What a polyfilled `BigInt.prototype.toJSON` returns, declared with
    * `declare global { interface BigInt { toJSON(): string } }`.
    */
-  private getBigIntToJSONResultType(): Type | undefined {
+  private getBigIntToJSONResultTypes(): readonly Type[] {
     const bigint = this.types.getGlobalType('BigInt')
-    return bigint && getToJSONResultType(this.types, bigint, true)
+    return bigint ? getToJSONResultTypes(this.types, bigint, true) : []
   }
 
   /**
@@ -1672,8 +1703,7 @@ export class TypeToJsonSchemaConverter {
       return false
     }
 
-    const classType = getClassType(this.types, type)
-    return classType === undefined || isClassView(this.types, type, classType)
+    return getClassType(this.types, type) === undefined || isClassView(this.types, type)
   }
 
   /**
@@ -1695,11 +1725,11 @@ export class TypeToJsonSchemaConverter {
       }
 
       // also of the classes behind a view leaving `toJSON` out (`Omit<C, 'toJSON'>`)
-      const own = getToJSONResultType(this.types, member, stringify)
-      const results = own
-        ? [own]
-        : getClassTypes(this.types, member).flatMap(
-            (c) => getToJSONResultType(this.types, c, stringify) ?? [],
+      const own = getToJSONResultTypes(this.types, member, stringify)
+      const results = own.length
+        ? own
+        : getClassTypes(this.types, member).flatMap((c) =>
+            getToJSONResultTypes(this.types, c, stringify),
           )
       return results.some(
         (serialized) =>

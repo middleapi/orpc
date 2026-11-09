@@ -86,7 +86,7 @@ export class DefRegistry {
     return def !== undefined && def.schema === undefined
   }
 
-  constructor(private readonly names = new DefNames()) {}
+  constructor(private readonly names: DefNames) {}
 
   create(key: number, preferredName: string): Def {
     const taken = (name: string) => this.defsByName.has(name) || this.reservedNames.has(name)

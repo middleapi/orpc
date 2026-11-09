@@ -36,8 +36,8 @@ describe('typeToJsonSchemaConverter', () => {
     expect(convert('Unknown')).toEqual([{}, true])
     expect(convert('Any')).toEqual([{}, true])
     expect(convert('Never')).toEqual([{ not: {} }, false])
-    // `object` is also an array, a `Date` (a string), or a function
-    expect(convert('Obj')).toEqual([{}, false])
+    // `object` is also an array, a `Date` (a string), or a function, which is written as nothing
+    expect(convert('Obj')).toEqual([{}, true])
     // a symbol (like a function) is written as nothing, like `undefined`
     expect(convert('Sym')).toEqual([{}, true])
   })
@@ -151,7 +151,8 @@ describe('typeToJsonSchemaConverter', () => {
       },
       false,
     ])
-    expect(convert('Empty')).toEqual([{}, false])
+    // `{}` also holds a function
+    expect(convert('Empty')).toEqual([{}, true])
     expect(convert('EmptyRecord')).toEqual([
       {
         $ref: '#/$defs/EmptyRecord',
@@ -2268,8 +2269,9 @@ describe('typeToJsonSchemaConverter', () => {
           $defs: {
             FnProp: {
               type: 'object',
+              // `Object` also holds a function
               properties: { name: { type: 'string' }, data: {} },
-              required: ['name', 'data'],
+              required: ['name'],
             },
           },
         },

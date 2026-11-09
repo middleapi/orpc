@@ -151,6 +151,16 @@ export class TypeQueries {
       return argument
     }
 
+    // a view of a primitive (`Omit<string, 'k'>`, `Pick<string, number>`) by the interface of its
+    // members, also of its index keys
+    const apparent =
+      argument && argument.flags & PRIMITIVE_FLAGS
+        ? this.checker.getApparentType(argument)
+        : undefined
+    if (apparent && this.isMappedViewOf(type, apparent) && this.keepsIndexes(type, apparent)) {
+      return apparent
+    }
+
     // the declared type is not instantiated with the alias's arguments
     // (`Box<T>` of `type PickBox<T> = Pick<Box<T>, 'a'>`), so its type parameters match any type.
     // A conditional type resolving to a mapped type (`T extends object ? { [K in keyof T]: ... } : T`)
@@ -192,18 +202,16 @@ export class TypeQueries {
   }
 
   /**
-   * The types declaring the properties of a mapped type without a source, more than one,
+   * The types declaring the properties of a mapped type without a source, more than one, or one
+   * besides properties no type declares (`x` of `Record<'x', number>` or of an object literal),
    * when it keeps the value of each of their properties.
    */
   private getKeptOwners(type: Type): readonly Type[] | undefined {
     const owners = this.getPropertyOwners(type)
-
-    if (owners === undefined || owners.length < 2) {
-      return undefined
-    }
+    const properties = this.getProperties(type)
 
     // of each owner declaring it, a brand may narrow a member (`length` of `string & { length: 8 }`)
-    const originals = this.getProperties(type).map((p) =>
+    const originals = properties.map((p) =>
       this.getSymbolTypes(
         owners.flatMap((o) => {
           const original = this.getProperty(o, p.name)
@@ -211,12 +219,20 @@ export class TypeQueries {
         }),
       ),
     )
+    const owned = properties.flatMap((_, i) => (originals[i]!.length ? [i] : []))
 
-    if (originals.some((o) => !o.length)) {
+    if (!owners.length || (owners.length < 2 && owned.length === properties.length)) {
       return undefined
     }
 
-    return this.keepsValues(this.getPropertyTypes(type), originals, true) ? owners : undefined
+    const values = this.getPropertyTypes(type)
+    return this.keepsValues(
+      owned.map((i) => values[i]),
+      owned.map((i) => originals[i]!),
+      true,
+    )
+      ? owners
+      : undefined
   }
 
   /**
@@ -251,23 +267,17 @@ export class TypeQueries {
 
   /**
    * The classes, interfaces, and object type literals declaring the properties of a type, without
-   * the ones another of them derives from (`Base` of `class Holder extends Base`), or `undefined`
-   * when a property has none.
+   * the ones another of them derives from (`Base` of `class Holder extends Base`).
    */
-  private getPropertyOwners(type: Type): readonly Type[] | undefined {
-    return this.memo('propertyOwners', type.id, (): readonly Type[] | undefined => {
+  private getPropertyOwners(type: Type): readonly Type[] {
+    return this.memo('propertyOwners', type.id, (): readonly Type[] => {
       const owners = new Map<number, Type>()
 
       for (const p of this.getProperties(type)) {
         // also of the other declarations of a property of an intersection (the brand
         // redeclaring the `length` of `string & { length: 8 }`)
-        const [first, ...others] = p.declarations.map((d) => this.getDeclarationOwner(p, true, d))
-
-        if (first === undefined) {
-          return undefined
-        }
-
-        for (const ownerType of [first, ...others]) {
+        for (const declaration of p.declarations) {
+          const ownerType = this.getDeclarationOwner(p, true, declaration)
           if (ownerType !== undefined) {
             owners.set(ownerType.id, ownerType)
           }
@@ -401,6 +411,21 @@ export class TypeQueries {
       properties.map((p) => [sourceTypes[sourceIndexes.get(p.name)!]]),
       generic,
     )
+  }
+
+  /**
+   * Whether each index signature of a type is one of the source, with its value kept.
+   */
+  private keepsIndexes(type: Type, source: Type): boolean {
+    const sourceInfos = this.checker.getIndexInfosOfType(source)
+
+    return this.checker
+      .getIndexInfosOfType(type)
+      .every((info) =>
+        sourceInfos.some(
+          (s) => s.keyType.id === info.keyType.id && this.keepsValue(info.valueType, s.valueType),
+        ),
+      )
   }
 
   /**
@@ -733,12 +758,21 @@ export class TypeQueries {
       )
     }
 
-    // a literal widened to its primitive, `'a' | string` is `string`
+    // a literal widened to its primitive, `'a' | string` is `string`, also of an enum member,
+    // whose base type is its enum
     if (
       source.flags &
       (TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BigIntLiteral)
     ) {
-      return this.checker.getBaseTypeOfLiteralType(source)?.id === value.id
+      const primitive =
+        source.flags & TypeFlags.StringLiteral
+          ? this.checker.getStringType()
+          : source.flags & TypeFlags.NumberLiteral
+            ? this.checker.getNumberType()
+            : this.checker.getBigIntType()
+      return (
+        primitive.id === value.id || this.checker.getBaseTypeOfLiteralType(source)?.id === value.id
+      )
     }
 
     if (!(value.flags & TypeFlags.Object)) {
