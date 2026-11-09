@@ -8,8 +8,8 @@ import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/node'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
-import type { CreateBatchClientServerTest } from './client-server.ts'
-import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server.ts'
+import type { CreateBatchClientServerTest } from './client-server'
+import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 /**
  * The same suite as the plain node-http one, with batch responses compressed on the wire.

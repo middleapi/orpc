@@ -1,8 +1,8 @@
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import * as z from 'zod'
 
-import { openapi, OpenAPIGenerator } from '../../src/index.ts'
-import { zodJsonSchemaConverter } from '../__shared__/schema.ts'
+import { openapi, OpenAPIGenerator } from '../../src/index'
+import { zodJsonSchemaConverter } from '../__shared__/schema'
 
 describe('openAPIGenerator e2e: server-sent event streaming', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })

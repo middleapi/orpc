@@ -9,15 +9,15 @@ import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/cont
 import type { Promisable } from '@orpc/shared'
 import { getOwn, isNonPrimitive, omit, setOwn } from '@orpc/shared'
 
-import type { Context, MergedInitialContext } from './context.ts'
-import type { Lazyable } from './lazy.ts'
-import { Lazy, unlazy } from './lazy.ts'
-import type { AnyMiddleware } from './middleware.ts'
-import { createContractProcedure } from './procedure-utils.ts'
-import type { AnyProcedure, ProcedureConfig } from './procedure.ts'
-import { Procedure } from './procedure.ts'
-import { getHiddenRouterContract } from './router-hidden.ts'
-import type { AnyRouter } from './router.ts'
+import type { Context, MergedInitialContext } from './context'
+import type { Lazyable } from './lazy'
+import { Lazy, unlazy } from './lazy'
+import type { AnyMiddleware } from './middleware'
+import type { AnyProcedure, ProcedureConfig } from './procedure'
+import { Procedure } from './procedure'
+import { createContractProcedure } from './procedure-utils'
+import type { AnyRouter } from './router'
+import { getHiddenRouterContract } from './router-hidden'
 
 export type AugmentedRouter<T extends AnyRouter, TErrorMap extends ErrorMap> =
   T extends Procedure<

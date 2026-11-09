@@ -3,8 +3,8 @@ import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { Redis } from '@upstash/redis'
 
-import type { UpstashPublisherOptions } from './upstash.ts'
-import { UpstashPublisher } from './upstash.ts'
+import type { UpstashPublisherOptions } from './upstash'
+import { UpstashPublisher } from './upstash'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN

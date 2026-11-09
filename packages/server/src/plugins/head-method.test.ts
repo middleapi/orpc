@@ -2,12 +2,12 @@ import type { StandardResponse } from '@standard-server/core'
 import { toFetchResponse } from '@standard-server/fetch'
 import supertest from 'supertest'
 
-import { RPCHandler } from '../adapters/fetch/index.ts'
-import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
-import { os } from '../builder.ts'
-import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection.ts'
-import { HeadMethodHandlerPlugin } from './head-method.ts'
-import { ResponseCompressionHandlerPlugin } from './response-compression.ts'
+import { RPCHandler } from '../adapters/fetch/index'
+import { RPCHandler as NodeRPCHandler } from '../adapters/node/index'
+import { os } from '../builder'
+import { GetMethodCsrfProtectionHandlerPlugin } from './get-method-csrf-protection'
+import { HeadMethodHandlerPlugin } from './head-method'
+import { ResponseCompressionHandlerPlugin } from './response-compression'
 
 function getInterceptors() {
   const existingInterceptor = vi.fn()

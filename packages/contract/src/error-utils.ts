@@ -3,7 +3,7 @@ import { cloneORPCError } from '@orpc/client'
 import type { Writable } from '@orpc/shared'
 import { getOwn } from '@orpc/shared'
 
-import type { ErrorMap } from './error.ts'
+import type { ErrorMap } from './error'
 
 export type MergedErrorMap<T1 extends ErrorMap, T2 extends ErrorMap> = keyof T1 extends
   // oxlint-disable-next-line typescript/no-redundant-type-constituents

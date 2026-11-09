@@ -6,8 +6,8 @@ import type {
   PublisherOptions,
   PublisherResumeOptions,
   PublisherSubscribeListenerOptions,
-} from '../publisher.ts'
-import { Publisher } from '../publisher.ts'
+} from '../publisher'
+import { Publisher } from '../publisher'
 
 export interface MemoryPublisherOptions extends PublisherOptions {
   /**

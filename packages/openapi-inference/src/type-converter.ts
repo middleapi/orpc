@@ -27,12 +27,12 @@ import {
   hasBuiltinForm,
   isBoxedBigInt,
   isTypedArray,
-} from './builtins.ts'
-import type { DefNameRecord } from './components.ts'
-import { getDefName, getFallbackDefName, getViewDefName } from './def-names.ts'
-import type { ConversionMode, Def } from './defs.ts'
-import { DefNames, DefRegistry, toModeKey } from './defs.ts'
-import { ExpansionGuard } from './expansion.ts'
+} from './builtins'
+import type { DefNameRecord } from './components'
+import { getDefName, getFallbackDefName, getViewDefName } from './def-names'
+import type { ConversionMode, Def } from './defs'
+import { DefNames, DefRegistry, toModeKey } from './defs'
+import { ExpansionGuard } from './expansion'
 import {
   getClassType,
   isBuiltinMember,
@@ -47,8 +47,8 @@ import {
   isNonSerializable,
   mayBeNonSerializable,
   ModeSensitivity,
-} from './json-rules.ts'
-import type { ObjectJsonSchema } from './schema-utils.ts'
+} from './json-rules'
+import type { ObjectJsonSchema } from './schema-utils'
 import {
   applyJSDoc,
   bigintSchema,
@@ -62,7 +62,7 @@ import {
   setSchema,
   toRef,
   withNull,
-} from './schema-utils.ts'
+} from './schema-utils'
 import {
   getNamedSymbol,
   INSTANTIABLE_FLAGS,
@@ -71,8 +71,8 @@ import {
   PRIMITIVE_FLAGS,
   TypeQueries,
   UNDEFINED_FLAGS,
-} from './type-queries.ts'
-import { getIteratorTypes } from './utils.ts'
+} from './type-queries'
+import { getIteratorTypes } from './utils'
 
 /**
  * A type the converter cannot resolve, such as an unresolved import.
@@ -136,7 +136,7 @@ const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFl
  *
  * Named types are emitted as `$defs`. Conversions share a cache, so reuse one converter per program.
  *
- * @see {@link https://orpc.dev/docs/openapi/type-inference#converting-types-directly | OpenAPI Type Inference - Converting Types Directly}
+ * @see {@link https://orpc.dev/docs/openapi/specification#converting-types-directly | OpenAPI Specification - Converting Types Directly}
  */
 export class TypeToJsonSchemaConverter {
   private readonly defsMode: 'named' | 'recursive'

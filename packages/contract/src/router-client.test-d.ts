@@ -1,8 +1,8 @@
 import type { Client, ClientContext, NestedClient, ORPCError, ThrowableError } from '@orpc/client'
 import { z } from 'zod'
 
-import { oc } from './builder.ts'
-import type { RouterContractClient } from './router-client.ts'
+import { oc } from './builder'
+import type { RouterContractClient } from './router-client'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
 const ping = oc.input(z.object({ input: z.number().transform((n) => `${n}`) }))

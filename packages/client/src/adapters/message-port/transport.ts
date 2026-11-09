@@ -14,10 +14,10 @@ import {
   isServerPeerSendMessage,
 } from '@standard-server/peer'
 
-import type { ClientContext, ClientOptions } from '../../types.ts'
-import type { StandardLinkTransport } from '../standard/index.ts'
-import type { SupportedMessagePort } from './message-port.ts'
-import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port.ts'
+import type { ClientContext, ClientOptions } from '../../types'
+import type { StandardLinkTransport } from '../standard/index'
+import type { SupportedMessagePort } from './message-port'
+import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
 type DecodedRequestMessage = ConstructorParameters<typeof ClientPeer>[0] extends (
   message: infer TMessage,

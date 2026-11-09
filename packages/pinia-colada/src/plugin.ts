@@ -2,8 +2,8 @@ import type { AnyNestedClient, InferClientContext, InferClientError } from '@orp
 import type { OrderablePlugin } from '@orpc/shared'
 import { sortPlugins } from '@orpc/shared'
 
-import type { ProcedureUtilsOptions } from './procedure-utils.ts'
-import type { RouterUtilsOptions } from './router-utils.ts'
+import type { ProcedureUtilsOptions } from './procedure-utils'
+import type { RouterUtilsOptions } from './router-utils'
 
 export interface RouterUtilsPlugin<T extends AnyNestedClient> extends OrderablePlugin {
   /**

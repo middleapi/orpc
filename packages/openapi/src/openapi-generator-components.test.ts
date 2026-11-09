@@ -1,7 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 
-import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
-import type { OpenAPIV3_2 } from './types.ts'
+import { OpenAPIComponentRegistry } from './openapi-generator-components'
+import type { OpenAPIV3_2 } from './types'
 
 describe('openAPIComponentRegistry', () => {
   function createRegistry(

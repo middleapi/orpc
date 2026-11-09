@@ -1,6 +1,6 @@
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 
-import { MemoryPublisher } from './memory.ts'
+import { MemoryPublisher } from './memory'
 
 type TestEvents = {
   message: { text: string }

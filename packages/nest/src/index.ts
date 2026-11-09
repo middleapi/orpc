@@ -1,9 +1,9 @@
-export * from './constants.ts'
-export * from './implement.ts'
+export * from './constants'
+export * from './implement'
 export {
   /**
    * @alias Implement
    */
   Implement as Impl,
-} from './implement.ts'
-export * from './module.ts'
+} from './implement'
+export * from './module'

@@ -8,9 +8,9 @@ import type {
   StandardLinkPlugin,
   StandardLinkTransportInterceptor,
   StandardLinkTransportInterceptorOptions,
-} from '../adapters/standard/index.ts'
-import { COMMON_ERROR_STATUS_MAP } from '../error.ts'
-import type { ClientContext } from '../types.ts'
+} from '../adapters/standard/index'
+import { COMMON_ERROR_STATUS_MAP } from '../error'
+import type { ClientContext } from '../types'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   /**

@@ -1,13 +1,13 @@
 import * as z from 'zod'
 
-import { ContractBuilder, oc } from './builder.ts'
-import * as ErrorUtilsModule from './error-utils.ts'
-import type { ErrorMap } from './error.ts'
-import * as MetaUtilsModule from './meta-utils.ts'
-import type { AnyMetaPlugin } from './meta.ts'
-import { setHiddenMetaPlugins } from './meta.ts'
-import { ProcedureContract } from './procedure.ts'
-import * as RouterUtilsModule from './router-utils.ts'
+import { ContractBuilder, oc } from './builder'
+import type { ErrorMap } from './error'
+import * as ErrorUtilsModule from './error-utils'
+import type { AnyMetaPlugin } from './meta'
+import { setHiddenMetaPlugins } from './meta'
+import * as MetaUtilsModule from './meta-utils'
+import { ProcedureContract } from './procedure'
+import * as RouterUtilsModule from './router-utils'
 
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')

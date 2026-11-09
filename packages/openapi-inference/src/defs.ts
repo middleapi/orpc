@@ -1,7 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
-import { collectDefRefs, fromRef } from './schema-utils.ts'
+import { collectDefRefs, fromRef } from './schema-utils'
 
 /**
  * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class

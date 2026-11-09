@@ -30,25 +30,20 @@ import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { Checker, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { TypeFlags } from 'typescript/unstable/sync'
 
-import { mergeEquivalentComponents } from './components.ts'
-import type { TypeScriptProjectOptions } from './project.ts'
-import { openTypeScriptProject } from './project.ts'
-import type { ResolvedRouterType } from './router-type.ts'
-import { RouterTypeResolver } from './router-type.ts'
-import { withoutDescribedSchemas, withRequiredFrom } from './schema-subtraction.ts'
+import { mergeEquivalentComponents } from './components'
+import type { TypeScriptProjectOptions } from './project'
+import { openTypeScriptProject } from './project'
+import type { ResolvedRouterType } from './router-type'
+import { RouterTypeResolver } from './router-type'
+import { withoutDescribedSchemas, withRequiredFrom } from './schema-subtraction'
 import type {
   AsyncIteratorTypes,
   TypeToJsonSchemaConverterOptions,
   TypeToJsonSchemaConvertOptions,
-} from './type-converter.ts'
-import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter.ts'
-import type { SourceKind } from './utils.ts'
-import {
-  createSourceKindChecker,
-  getAssignedSymbol,
-  getImplementedSymbol,
-  getJSDoc,
-} from './utils.ts'
+} from './type-converter'
+import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter'
+import type { SourceKind } from './utils'
+import { createSourceKindChecker, getAssignedSymbol, getImplementedSymbol, getJSDoc } from './utils'
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
@@ -120,7 +115,7 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  * Generation runs the TypeScript 7 compiler on the source files, so it needs them at runtime.
  * Generate once (at build time or on first request) and reuse the document.
  *
- * @see {@link https://orpc.dev/docs/openapi/type-inference | OpenAPI Type Inference}
+ * @see {@link https://orpc.dev/docs/openapi/specification#type-inference | OpenAPI Specification - Type Inference}
  */
 export class TypeScriptOpenAPIGenerator {
   private readonly converters: JsonSchemaConverter[]

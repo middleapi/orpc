@@ -1,7 +1,7 @@
 import type { Promisable } from '@orpc/shared'
 import { listenAbort, takeLast, throwIfAborted } from '@orpc/shared'
 
-import type { UseQueryFnContext } from './types.ts'
+import type { UseQueryFnContext } from './types'
 
 export interface SerializableStreamedQueryOptions {
   /**

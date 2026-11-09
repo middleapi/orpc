@@ -9,8 +9,8 @@ import type {
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 
-import type { ProcedureServerFunction } from './server-function.ts'
-import { createServerFunction } from './server-function.ts'
+import type { ProcedureServerFunction } from './server-function'
+import { createServerFunction } from './server-function'
 
 export interface ServerFunctionable<TInitialContext extends Context> {
   <

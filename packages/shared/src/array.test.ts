@@ -1,4 +1,4 @@
-import { splitInHalf, takeLast, toArray } from './array.ts'
+import { splitInHalf, takeLast, toArray } from './array'
 
 it('toArray', () => {
   expect(toArray(undefined)).toEqual([])

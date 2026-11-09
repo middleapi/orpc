@@ -3,8 +3,8 @@ import { isNonPrimitive } from '@orpc/shared'
 // oxlint-disable-next-line no-restricted-imports
 import type { StandardJSONSchemaV1 } from '@standard-schema/spec'
 
-import type { JsonSchemaConverter, JsonSchemaConverterDirection } from './convert.ts'
-import type { JsonSchema } from './types.ts'
+import type { JsonSchemaConverter, JsonSchemaConverterDirection } from './convert'
+import type { JsonSchema } from './types'
 
 /**
  * Returns true when the schema accepts `undefined` in the given direction,

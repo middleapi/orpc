@@ -1,10 +1,10 @@
 import { getTracer, isAsyncIteratorObject, setTracer } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
-import { ORPCError } from '../../error.ts'
-import type { StandardLinkCodec } from './codec.ts'
-import { StandardLink } from './link.ts'
-import type { StandardLinkTransport } from './transport.ts'
+import { ORPCError } from '../../error'
+import type { StandardLinkCodec } from './codec'
+import { StandardLink } from './link'
+import type { StandardLinkTransport } from './transport'
 
 beforeEach(() => {
   vi.clearAllMocks()

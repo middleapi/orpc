@@ -3,17 +3,17 @@ import type { AnyProcedureContract, AnySchema, ErrorMap } from '@orpc/contract'
 import { asyncIteratorObject, error } from '@orpc/contract'
 import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter } from '@orpc/json-schema'
 
-import { testSchema, testSchemaConverter } from '../tests/__shared__/schema.ts'
-import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
-import type { OpenAPIOperationContext } from './openapi-generator-operation.ts'
+import { testSchema, testSchemaConverter } from '../tests/__shared__/schema'
+import { OpenAPIComponentRegistry } from './openapi-generator-components'
+import type { OpenAPIOperationContext } from './openapi-generator-operation'
 import {
   buildErrorResponse,
   buildRequest,
   buildSuccessResponse,
   toOpenAPIPath,
-} from './openapi-generator-operation.ts'
-import type { OpenAPIV3_2 } from './types.ts'
-import { getDynamicPathParams } from './utils.ts'
+} from './openapi-generator-operation'
+import type { OpenAPIV3_2 } from './types'
+import { getDynamicPathParams } from './utils'
 
 describe('openAPIGenerator operation builders', () => {
   function createContext(

@@ -17,11 +17,11 @@ import type {
 } from '@tanstack/query-core'
 import { skipToken } from '@tanstack/query-core'
 
-import type { OperationKeyBaseOptions } from './key.ts'
-import { liveQuery } from './live-query.ts'
-import { SharedUtils } from './shared-utils.ts'
-import { serializableStreamedQuery } from './stream-query.ts'
-import { createStructuralSharing } from './structural-sharing.ts'
+import type { OperationKeyBaseOptions } from './key'
+import { liveQuery } from './live-query'
+import { SharedUtils } from './shared-utils'
+import { serializableStreamedQuery } from './stream-query'
+import { createStructuralSharing } from './structural-sharing'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
@@ -39,8 +39,8 @@ import type {
   StreamedKeyOptions,
   StreamedOptionsIn,
   StreamedOptionsOut,
-} from './types.ts'
-import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
+} from './types'
+import { OPERATION_CONTEXT_SYMBOL } from './types'
 
 export interface ProcedureUtilsQueryInterceptorOptions<
   TClientContext extends ClientContext,

@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-import { captureAsyncContext, promiseWithResolvers } from './promise.ts'
+import { captureAsyncContext, promiseWithResolvers } from './promise'
 
 describe('promiseWithResolvers', () => {
   it('resolves the promise', async () => {

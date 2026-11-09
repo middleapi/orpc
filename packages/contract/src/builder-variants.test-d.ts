@@ -5,10 +5,10 @@ import type {
   ProcedureContractBuilderWithInput,
   ProcedureContractBuilderWithInputOutput,
   ProcedureContractBuilderWithOutput,
-} from './builder-variants.ts'
-import type { MergedErrorMap } from './error-utils.ts'
-import type { Meta } from './meta.ts'
-import type { MergedSchema, Schema } from './schema.ts'
+} from './builder-variants'
+import type { MergedErrorMap } from './error-utils'
+import type { Meta } from './meta'
+import type { MergedSchema, Schema } from './schema'
 
 const errorMap = {
   BASE: {

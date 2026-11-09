@@ -1,6 +1,6 @@
 import { expectTypeOf, it } from 'vitest'
 
-import type { MergedContext, MergedInitialContext } from './context.ts'
+import type { MergedContext, MergedInitialContext } from './context'
 
 describe('MergedInitialContext', () => {
   it('no extra', () => {

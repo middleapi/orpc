@@ -3,9 +3,9 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { z } from 'zod'
 
-import { MemoryLocker } from '../src/adapters/memory.ts'
-import type { Locker } from '../src/index.ts'
-import { lock } from '../src/index.ts'
+import { MemoryLocker } from '../src/adapters/memory'
+import type { Locker } from '../src/index'
+import { lock } from '../src/index'
 
 it('works', async () => {
   let active = 0

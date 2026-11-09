@@ -19,9 +19,9 @@ import {
   ServerPeer,
 } from '@standard-server/peer'
 
-import type { Context } from '../../context.ts'
-import { createStandardPeerRequestHandler } from '../standard-peer/index.ts'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
+import type { Context } from '../../context'
+import { createStandardPeerRequestHandler } from '../standard-peer/index'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (
   message: infer TMessage,

@@ -2,7 +2,7 @@ import { ORPCError } from '@orpc/client'
 import { skipToken, useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 
-import { orpc, queryClient, router } from './__shared__/orpc.tsx'
+import { orpc, queryClient, router } from './__shared__/orpc'
 
 beforeEach(() => {
   queryClient.clear()

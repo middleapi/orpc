@@ -1,7 +1,7 @@
 import { sleep } from '@orpc/shared'
 import { QueryClient, QueryObserver } from '@tanstack/query-core'
 
-import { liveQuery } from './live-query.ts'
+import { liveQuery } from './live-query'
 
 export const queryClient = new QueryClient({
   defaultOptions: {

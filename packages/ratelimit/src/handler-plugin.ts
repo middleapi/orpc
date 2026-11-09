@@ -7,7 +7,7 @@ import type {
 import { toArray } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
 
-import type { RateLimitResult } from './types.ts'
+import type { RateLimitResult } from './types'
 
 export const RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_RATELIMIT_HANDLER_PLUGIN_CONTEXT',

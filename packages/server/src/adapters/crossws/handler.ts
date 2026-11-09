@@ -9,9 +9,9 @@ import {
 } from '@standard-server/peer'
 import type { Message, Peer } from 'crossws'
 
-import type { Context } from '../../context.ts'
-import { createStandardPeerRequestHandler } from '../standard-peer/index.ts'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
+import type { Context } from '../../context'
+import { createStandardPeerRequestHandler } from '../standard-peer/index'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
 
 export type CrosswsPeerLike = Pick<Peer, 'send'>
 export type CrosswsMessageLike = Pick<Message, 'rawData' | 'uint8Array'>

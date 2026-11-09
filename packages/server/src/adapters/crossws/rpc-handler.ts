@@ -1,9 +1,9 @@
-import type { Context } from '../../context.ts'
-import type { Router } from '../../router.ts'
-import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard/index.ts'
-import { RPCHandlerCodec, StandardHandler } from '../standard/index.ts'
-import type { experimental_CrosswsHandlerOptions as CrosswsHandlerOptions } from './handler.ts'
-import { experimental_CrosswsHandler as CrosswsHandler } from './handler.ts'
+import type { Context } from '../../context'
+import type { Router } from '../../router'
+import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard/index'
+import { RPCHandlerCodec, StandardHandler } from '../standard/index'
+import type { experimental_CrosswsHandlerOptions as CrosswsHandlerOptions } from './handler'
+import { experimental_CrosswsHandler as CrosswsHandler } from './handler'
 
 export interface experimental_RPCHandlerOptions<T extends Context>
   extends StandardHandlerOptions<T>, RPCHandlerCodecOptions<T>, CrosswsHandlerOptions<T> {}

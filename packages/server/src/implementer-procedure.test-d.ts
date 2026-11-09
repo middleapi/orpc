@@ -2,9 +2,9 @@ import type { ORPCErrorConstructorMap, Schema } from '@orpc/contract'
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
 
-import type { MergedContext, MergedInitialContext } from './context.ts'
-import type { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
-import type { Middleware, MiddlewareDone } from './middleware.ts'
+import type { MergedContext, MergedInitialContext } from './context'
+import type { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
+import type { Middleware, MiddlewareDone } from './middleware'
 
 const errorMap = {
   BASE: {

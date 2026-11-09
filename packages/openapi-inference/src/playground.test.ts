@@ -3,10 +3,10 @@ import { OpenAPIGenerator } from '@orpc/openapi'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
-import { router as bunRouter } from '../../../playgrounds/bun/src/routers/index.ts'
-import { router as cloudflareRouter } from '../../../playgrounds/cloudflare/worker/routers/index.ts'
-import { contract as nestContract } from '../../../playgrounds/nest/src/contracts/index.ts'
-import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
+import { router as bunRouter } from '../../../playgrounds/bun/src/routers/index'
+import { router as cloudflareRouter } from '../../../playgrounds/cloudflare/worker/routers/index'
+import { contract as nestContract } from '../../../playgrounds/nest/src/contracts/index'
+import { TypeScriptOpenAPIGenerator } from './openapi-generator'
 
 const PLAYGROUNDS = [
   ['bun', bunRouter, '../../../playgrounds/bun/src/routers/index.ts', 'router'],

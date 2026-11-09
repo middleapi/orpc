@@ -1,8 +1,8 @@
 import type { ClientContext } from '@orpc/client'
 
-import type { ProcedureContractClient } from './procedure-client.ts'
-import type { ProcedureContract } from './procedure.ts'
-import type { RouterContract } from './router.ts'
+import type { ProcedureContract } from './procedure'
+import type { ProcedureContractClient } from './procedure-client'
+import type { RouterContract } from './router'
 
 /**
  * Client type inferred from a router contract, preserving its shape.

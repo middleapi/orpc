@@ -2,7 +2,7 @@ import type { Client, ThrowableError } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import * as z from 'zod'
 
-import type { ProcedureClient } from './procedure-client.ts'
+import type { ProcedureClient } from './procedure-client'
 
 const errorMap = {
   BASE: {

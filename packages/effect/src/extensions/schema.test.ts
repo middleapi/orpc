@@ -4,8 +4,8 @@ import { call, os } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
 
-import * as SchemaModule from '../schema.ts'
-import './schema.ts'
+import * as SchemaModule from '../schema'
+import './schema'
 
 const toStandardSchemaSpy = vi.spyOn(SchemaModule, 'toStandardSchema')
 

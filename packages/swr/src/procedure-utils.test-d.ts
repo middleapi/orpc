@@ -5,8 +5,8 @@ import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
 
-import type { OperationKey } from './key.ts'
-import type { ProcedureUtils } from './procedure-utils.ts'
+import type { OperationKey } from './key'
+import type { ProcedureUtils } from './procedure-utils'
 
 describe('procedureUtils', () => {
   type UtilsInput = { search?: string; cursor?: number } | undefined

@@ -17,7 +17,7 @@ import type {
 import { QueryClient, skipToken } from '@tanstack/query-core'
 import * as z from 'zod'
 
-import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
 import type {
   InfiniteOptionsIn,
   LiveOptionsIn,
@@ -27,7 +27,7 @@ import type {
   QueryOptionsIn,
   StreamedKeyOptions,
   StreamedOptionsIn,
-} from './types.ts'
+} from './types'
 
 export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 

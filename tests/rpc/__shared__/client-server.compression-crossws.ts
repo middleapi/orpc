@@ -12,8 +12,8 @@ import {
 import crossws from 'crossws/adapters/node'
 import { WebSocket as FallbackWebSocket } from 'ws'
 
-import type { CreateClientServerTest } from './client-server.ts'
-import { defaultSerializer } from './client-server.ts'
+import type { CreateClientServerTest } from './client-server'
+import { defaultSerializer } from './client-server'
 
 export const createCompressionCrosswsClientServerTest: CreateClientServerTest = (
   router,

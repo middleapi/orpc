@@ -14,7 +14,7 @@ import {
   pathToHttpPath,
   stripHttpPathPrefix,
   varyByAcceptEncoding,
-} from './http.ts'
+} from './http'
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {

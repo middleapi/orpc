@@ -11,7 +11,7 @@ import type {
   OpenAPIV3_0,
   OpenAPIV3_1,
   OpenAPIV3_2,
-} from './types.ts'
+} from './types'
 
 describe('OpenAPIDocument', () => {
   it('resolves the document type of a version, patch segment ignored', () => {

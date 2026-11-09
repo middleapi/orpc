@@ -8,7 +8,7 @@ import { mount as baseMount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import * as z from 'zod'
 
-import { createPiniaColadaUtils } from '../../src/index.ts'
+import { createPiniaColadaUtils } from '../../src/index'
 
 export const router = {
   ping: os

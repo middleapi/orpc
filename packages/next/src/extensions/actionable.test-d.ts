@@ -1,8 +1,8 @@
 import type { DecoratedProcedure, Procedure } from '@orpc/server'
 import { z } from 'zod'
 
-import type { ProcedureServerFunction } from '../server-function.ts'
-import './actionable.ts'
+import type { ProcedureServerFunction } from '../server-function'
+import './actionable'
 
 const errorMap = {
   BASE: {

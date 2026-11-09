@@ -1,8 +1,8 @@
 import { promiseWithResolvers } from '@orpc/shared'
 import { effectScope, watch } from 'vue'
 
-import { createChunkController, createQueryCache, mountQuery } from '../tests/__shared__/utils.ts'
-import { liveQuery } from './live-query.ts'
+import { createChunkController, createQueryCache, mountQuery } from '../tests/__shared__/utils'
+import { liveQuery } from './live-query'
 
 describe('liveQuery', () => {
   it('publishes each chunk to the cache, replacing the previous value', async () => {

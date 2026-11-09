@@ -3,8 +3,8 @@ import type { PartialDeep, Public } from '@orpc/shared'
 import { stringifyJSON } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
 
-import type { SerializableStreamedQueryOptions } from './stream-query.ts'
-import type { OperationType } from './types.ts'
+import type { SerializableStreamedQueryOptions } from './stream-query'
+import type { OperationType } from './types'
 
 export interface OperationKeyPrefixOptions {
   /**

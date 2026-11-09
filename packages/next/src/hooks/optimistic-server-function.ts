@@ -2,9 +2,9 @@ import type { AnyORPCErrorJSON } from '@orpc/client'
 import { onStart, toArray } from '@orpc/shared'
 import { useMemo, useOptimistic } from 'react'
 
-import type { ServerFunction, ServerFunctionError } from '../server-function.ts'
-import type { UseServerFunctionOptions, UseServerFunctionResult } from './server-function.ts'
-import { useServerFunction } from './server-function.ts'
+import type { ServerFunction, ServerFunctionError } from '../server-function'
+import type { UseServerFunctionOptions, UseServerFunctionResult } from './server-function'
+import { useServerFunction } from './server-function'
 
 export interface UseOptimisticServerFunctionOptions<
   TInput,

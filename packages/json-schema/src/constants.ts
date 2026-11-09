@@ -1,4 +1,4 @@
-import type { JsonSchemaKeywords } from './types.ts'
+import type { JsonSchemaKeywords } from './types'
 
 export const JSON_SCHEMA_LOGIC_KEYWORDS: Set<JsonSchemaKeywords | (string & {})> =
   /* @__PURE__ */ new Set([

@@ -1,5 +1,5 @@
-import { consumeAsyncIterator } from './iterator.ts'
-import type { PromiseWithError } from './types.ts'
+import { consumeAsyncIterator } from './iterator'
+import type { PromiseWithError } from './types'
 
 describe('consumeAsyncIterator', () => {
   it('can infer types from PromiseWithError + AsyncGenerator', () => {

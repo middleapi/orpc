@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 import { AsyncIteratorClass, sleep } from '@standard-server/shared'
 
-import { promiseWithResolvers } from './promise.ts'
+import { promiseWithResolvers } from './promise'
 import {
   asyncIteratorToStream,
   asyncIteratorToUnproxiedDataStream,
@@ -10,8 +10,8 @@ import {
   streamToAsyncIteratorObject,
   traceReadableStream,
   wrapReadableStream,
-} from './stream.ts'
-import * as Tracing from './tracing.ts'
+} from './stream'
+import * as Tracing from './tracing'
 
 const runInSpanContextSpy = vi.spyOn(Tracing, 'runInSpanContext')
 const startSpanSpy = vi.spyOn(Tracing, 'startSpan')

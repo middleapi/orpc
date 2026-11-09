@@ -1,4 +1,4 @@
-import { ProcedureContract } from './procedure.ts'
+import { ProcedureContract } from './procedure'
 
 describe('procedureContract', () => {
   const procedure = new ProcedureContract({

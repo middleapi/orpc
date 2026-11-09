@@ -2,9 +2,9 @@ import type { MergedErrorMap, MetaPlugin, ORPCErrorConstructorMap, Schema } from
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
 
-import type { MergedInitialContext } from './context.ts'
-import type { Middleware, MiddlewareDone } from './middleware.ts'
-import type { DecoratedProcedure } from './procedure-decorated.ts'
+import type { MergedInitialContext } from './context'
+import type { Middleware, MiddlewareDone } from './middleware'
+import type { DecoratedProcedure } from './procedure-decorated'
 
 const errorMap = {
   BASE: {

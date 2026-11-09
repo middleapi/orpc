@@ -13,14 +13,14 @@ import type {
   BuilderWithInputOutput,
   BuilderWithMiddlewares,
   BuilderWithOutput,
-} from './builder-variants.ts'
-import type { MergedContext, MergedInitialContext } from './context.ts'
-import type { Lazy } from './lazy.ts'
-import type { DecoratedMiddleware } from './middleware-decorated.ts'
-import type { Middleware, MiddlewareDone } from './middleware.ts'
-import type { DecoratedProcedure } from './procedure-decorated.ts'
-import type { Procedure } from './procedure.ts'
-import type { AugmentedRouterWithMiddlewares } from './router-utils.ts'
+} from './builder-variants'
+import type { MergedContext, MergedInitialContext } from './context'
+import type { Lazy } from './lazy'
+import type { Middleware, MiddlewareDone } from './middleware'
+import type { DecoratedMiddleware } from './middleware-decorated'
+import type { Procedure } from './procedure'
+import type { DecoratedProcedure } from './procedure-decorated'
+import type { AugmentedRouterWithMiddlewares } from './router-utils'
 
 const errorMap = {
   BASE: {

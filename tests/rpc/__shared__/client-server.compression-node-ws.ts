@@ -10,8 +10,8 @@ import {
 import { RPCHandler } from '@orpc/server/websocket'
 import { WebSocket, WebSocketServer } from 'ws'
 
-import type { CreateClientServerTest } from './client-server.ts'
-import { defaultSerializer } from './client-server.ts'
+import type { CreateClientServerTest } from './client-server'
+import { defaultSerializer } from './client-server'
 
 export const createCompressionNodeWsClientServerTest: CreateClientServerTest = (
   router,

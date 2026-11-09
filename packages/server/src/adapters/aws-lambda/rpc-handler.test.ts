@@ -7,9 +7,9 @@ import type {
   HttpResponseStream,
 } from '@standard-server/aws-lambda'
 
-import { os } from '../../builder.ts'
-import type { StandardHandlerPlugin } from '../standard/index.ts'
-import { RPCHandler } from './rpc-handler.ts'
+import { os } from '../../builder'
+import type { StandardHandlerPlugin } from '../standard/index'
+import { RPCHandler } from './rpc-handler'
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []

@@ -1,5 +1,5 @@
-import type { RouterUtilsPlugin } from './plugin.ts'
-import { CompositeRouterUtilsPlugin } from './plugin.ts'
+import type { RouterUtilsPlugin } from './plugin'
+import { CompositeRouterUtilsPlugin } from './plugin'
 
 describe('compositeRouterUtilsPlugin', () => {
   beforeEach(() => {

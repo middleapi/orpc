@@ -1,4 +1,4 @@
-import { RPCLink } from './rpc-link.ts'
+import { RPCLink } from './rpc-link'
 
 describe('RPCLink', () => {
   it('accepts QUERY only for body-bearing request methods', () => {

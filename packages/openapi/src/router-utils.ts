@@ -2,7 +2,7 @@ import type { RouterContract } from '@orpc/contract'
 import { ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { isNonPrimitive, pathToHttpPath, toArray } from '@orpc/shared'
 
-import { getOpenAPIMeta, openapi } from './meta.ts'
+import { getOpenAPIMeta, openapi } from './meta'
 
 export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>

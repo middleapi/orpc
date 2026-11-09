@@ -9,8 +9,8 @@ import {
 } from '@orpc/server/plugins'
 import { RPCHandler } from '@orpc/server/websocket'
 
-import type { CreateClientServerTest } from './client-server.ts'
-import { defaultSerializer } from './client-server.ts'
+import type { CreateClientServerTest } from './client-server'
+import { defaultSerializer } from './client-server'
 
 export const createCompressionBunWebSocketClientServerTest: CreateClientServerTest = (
   router,

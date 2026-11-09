@@ -1,10 +1,10 @@
 import { AbortError, promiseWithResolvers } from '@orpc/shared'
 
-import { RPCHandler } from '../adapters/fetch/index.ts'
-import { os } from '../builder.ts'
-import type { AnyProcedure } from '../procedure.ts'
-import { SignalSyncHandlerPlugin } from './signal-sync.ts'
-import { TimeoutHandlerPlugin } from './timeout.ts'
+import { RPCHandler } from '../adapters/fetch/index'
+import { os } from '../builder'
+import type { AnyProcedure } from '../procedure'
+import { SignalSyncHandlerPlugin } from './signal-sync'
+import { TimeoutHandlerPlugin } from './timeout'
 
 describe('signalSyncHandlerPlugin', () => {
   async function handle(procedure: AnyProcedure, init?: RequestInit): Promise<Response> {

@@ -2,9 +2,9 @@ import * as ContractModule from '@orpc/contract'
 import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 
-import { Lazy, unlazy } from './lazy.ts'
-import { Procedure } from './procedure.ts'
-import { withHiddenRouterContract } from './router-hidden.ts'
+import { Lazy, unlazy } from './lazy'
+import { Procedure } from './procedure'
+import { withHiddenRouterContract } from './router-hidden'
 import {
   augmentImplementedRouter,
   augmentRouter,
@@ -13,7 +13,7 @@ import {
   unlazyRouter,
   walkProcedureContractsAsync,
   walkProcedureContractsSync,
-} from './router-utils.ts'
+} from './router-utils'
 
 const oc = ContractModule.oc
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')

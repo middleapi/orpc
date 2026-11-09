@@ -11,9 +11,9 @@ import {
   QueryObserver,
 } from '@tanstack/query-core'
 
-import { distinctData } from '../tests/__shared__/utils.ts'
-import { createRouterUtils } from './router-utils.ts'
-import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr.ts'
+import { distinctData } from '../tests/__shared__/utils'
+import { createRouterUtils } from './router-utils'
+import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr'
 
 describe('createHydrationOptions', () => {
   function roundTrip(data: unknown, options = createHydrationOptions()): unknown {

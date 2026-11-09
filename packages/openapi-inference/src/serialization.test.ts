@@ -7,11 +7,11 @@ import {
   longerDeepChain,
   mixedDeepChain,
   shortDeepChain,
-} from '../tests/fixtures/app/src/deep-view-chains.ts'
-import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings.ts'
-import { router } from '../tests/fixtures/app/src/serialization.ts'
-import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains.ts'
-import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
+} from '../tests/fixtures/app/src/deep-view-chains'
+import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings'
+import { router } from '../tests/fixtures/app/src/serialization'
+import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
+import { TypeScriptOpenAPIGenerator } from './openapi-generator'
 
 /**
  * Runs real handlers, serializes their output as oRPC sends it, and validates it

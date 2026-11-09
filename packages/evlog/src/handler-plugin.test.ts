@@ -4,8 +4,8 @@ import { EventStreamErrorEvent } from '@standard-server/core'
 import type { LogLevel } from 'evlog'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { LOGGER_CONTEXT_SYMBOL } from './context.ts'
-import { EvlogHandlerPlugin } from './handler-plugin.ts'
+import { LOGGER_CONTEXT_SYMBOL } from './context'
+import { EvlogHandlerPlugin } from './handler-plugin'
 
 const mocks = vi.hoisted(() => ({
   defineFrameworkIntegration: vi.fn(),

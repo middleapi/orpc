@@ -19,7 +19,7 @@ import type {
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
 
-import './schema.ts'
+import './schema'
 
 const errorMap = {
   BASE: {

@@ -8,9 +8,9 @@ import type {
 } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import { argumentsGrow, getDeclarationId, MAX_GROWTH, MAX_NESTING } from './expansion.ts'
-import type { JSDoc, SourceKind } from './utils.ts'
-import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils.ts'
+import { argumentsGrow, getDeclarationId, MAX_GROWTH, MAX_NESTING } from './expansion'
+import type { JSDoc, SourceKind } from './utils'
+import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils'
 
 export const UNDEFINED_FLAGS = TypeFlags.Undefined | TypeFlags.Void
 

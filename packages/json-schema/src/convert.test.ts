@@ -1,8 +1,8 @@
 import { type } from '@orpc/contract'
 import * as z from 'zod'
 
-import type { JsonSchemaConverter } from './convert.ts'
-import { DelegatingJsonSchemaConverter } from './convert.ts'
+import type { JsonSchemaConverter } from './convert'
+import { DelegatingJsonSchemaConverter } from './convert'
 
 describe('delegatingJsonSchemaConverter', () => {
   it('uses the first matching custom converter', () => {

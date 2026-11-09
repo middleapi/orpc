@@ -4,8 +4,8 @@ import type { FastifyInstance } from 'fastify'
 import Fastify from 'fastify'
 import request from 'supertest'
 
-import { openapi } from '../../meta.ts'
-import { OpenAPIHandler } from './openapi-handler.ts'
+import { openapi } from '../../meta'
+import { OpenAPIHandler } from './openapi-handler'
 
 describe('openapiHandler', () => {
   let app: FastifyInstance

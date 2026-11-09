@@ -7,9 +7,9 @@ import type {
 } from '@standard-server/fastify'
 import { sendStandardResponse, toStandardLazyRequest } from '@standard-server/fastify'
 
-import type { Context } from '../../context.ts'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index.ts'
+import type { Context } from '../../context'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index'
 
 export type FastifyHandlerHandleResult = { matched: true } | { matched: false }
 

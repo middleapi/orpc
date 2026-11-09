@@ -1,7 +1,7 @@
 import type { ORPCError } from '@orpc/client'
 import * as z from 'zod'
 
-import type { ORPCErrorFromErrorMap } from './error.ts'
+import type { ORPCErrorFromErrorMap } from './error'
 
 describe('ORPCErrorFromErrorMap', () => {
   it('converts an error map to an ORPCError union and defaults to unknown when schema is undefined', () => {

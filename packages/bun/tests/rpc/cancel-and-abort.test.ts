@@ -4,10 +4,10 @@ import { AsyncIteratorClass, os } from '@orpc/server'
 import { sleep } from 'bun'
 import { z } from 'zod'
 
-import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch.ts'
-import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket.ts'
-import { createCompressionBunFetchClientServerTest } from './__shared__/client-server.compression-bun-fetch.ts'
-import { createCompressionBunWebSocketClientServerTest } from './__shared__/client-server.compression-bun-websocket.ts'
+import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch'
+import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket'
+import { createCompressionBunFetchClientServerTest } from './__shared__/client-server.compression-bun-fetch'
+import { createCompressionBunWebSocketClientServerTest } from './__shared__/client-server.compression-bun-websocket'
 
 describe.each([
   ['bun-fetch', createBunFetchClientServerTest],

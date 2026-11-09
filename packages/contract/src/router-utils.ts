@@ -1,13 +1,13 @@
 import { getOwn, isNonPrimitive, setOwn } from '@orpc/shared'
 
-import type { MergedErrorMap } from './error-utils.ts'
-import { mergeErrorMap } from './error-utils.ts'
-import type { ErrorMap } from './error.ts'
-import { resolveMetaPlugins } from './meta-utils.ts'
-import type { AnyMetaPlugin, Meta } from './meta.ts'
-import type { AnyProcedureContract } from './procedure.ts'
-import { ProcedureContract } from './procedure.ts'
-import type { RouterContract } from './router.ts'
+import type { ErrorMap } from './error'
+import type { MergedErrorMap } from './error-utils'
+import { mergeErrorMap } from './error-utils'
+import type { AnyMetaPlugin, Meta } from './meta'
+import { resolveMetaPlugins } from './meta-utils'
+import type { AnyProcedureContract } from './procedure'
+import { ProcedureContract } from './procedure'
+import type { RouterContract } from './router'
 
 export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>

@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 
-import { encodeBase64, loadBytes, toStringOrBytes } from './buffer.ts'
+import { encodeBase64, loadBytes, toStringOrBytes } from './buffer'
 
 it('loadBytes', async () => {
   const blob = new Blob(['test'], { type: 'text/plain' })

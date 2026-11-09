@@ -3,23 +3,23 @@ import { Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
-import { router as brokenRouter } from '../tests/fixtures/app/src/broken.ts'
-import { contract, implemented } from '../tests/fixtures/app/src/contract.ts'
-import { router as detailedRouter } from '../tests/fixtures/app/src/detailed.ts'
-import { router as headersRouter } from '../tests/fixtures/app/src/headers.ts'
-import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2.ts'
-import { router as round3Router } from '../tests/fixtures/app/src/round3.ts'
-import { errorData } from '../tests/fixtures/app/src/round11-broken.ts'
-import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11.ts'
-import { StringRows, viewInputs } from '../tests/fixtures/app/src/round25.ts'
+import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
+import { contract, implemented } from '../tests/fixtures/app/src/contract'
+import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
+import { router as headersRouter } from '../tests/fixtures/app/src/headers'
+import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2'
+import { router as round3Router } from '../tests/fixtures/app/src/round3'
+import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11'
+import { errorData } from '../tests/fixtures/app/src/round11-broken'
+import { StringRows, viewInputs } from '../tests/fixtures/app/src/round25'
 import {
   callables,
   FullName,
   instanceInputs,
   LabeledStamp,
-} from '../tests/fixtures/app/src/round26.ts'
-import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/round27.ts'
-import { WithArrow, roundTwentyEightInputs } from '../tests/fixtures/app/src/round28.ts'
+} from '../tests/fixtures/app/src/round26'
+import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/round27'
+import { WithArrow, roundTwentyEightInputs } from '../tests/fixtures/app/src/round28'
 import {
   GetterOnly,
   roundTwentyNineComponents,
@@ -29,11 +29,11 @@ import {
   TaggedDate,
   TaggedSet,
   TaggedURL,
-} from '../tests/fixtures/app/src/round29.ts'
-import { router } from '../tests/fixtures/app/src/router.ts'
-import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand.ts'
-import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router.ts'
-import { TypeScriptOpenAPIGenerator } from './openapi-generator.ts'
+} from '../tests/fixtures/app/src/round29'
+import { router } from '../tests/fixtures/app/src/router'
+import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
+import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
+import { TypeScriptOpenAPIGenerator } from './openapi-generator'
 
 const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, import.meta.url)
 

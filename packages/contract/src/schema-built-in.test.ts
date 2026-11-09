@@ -3,12 +3,12 @@ import { ORPCError } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import * as z from 'zod'
 
-import { ValidationError } from './error.ts'
+import { ValidationError } from './error'
 import {
   asyncIteratorObject,
   getAsyncIteratorObjectSchemaDetails,
   getAsyncIteratorObjectSchemasDetails,
-} from './schema-built-in.ts'
+} from './schema-built-in'
 
 const ORDER_SCHEMA = z.object({ order: z.number() })
 

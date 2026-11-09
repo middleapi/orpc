@@ -1,6 +1,6 @@
 import { setFlagsFromString } from 'node:v8'
 
-import { BracketNotationSerializer } from './bracket-notation.ts'
+import { BracketNotationSerializer } from './bracket-notation'
 
 describe('bracket notation serializer', () => {
   const serializer = new BracketNotationSerializer()

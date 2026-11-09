@@ -2,7 +2,7 @@ import type { ClientContext } from '@orpc/client'
 import type { PartialDeep } from '@orpc/shared'
 import type { SWRSubscriptionOptions } from 'swr/subscription'
 
-import type { OperationKey } from './key.ts'
+import type { OperationKey } from './key'
 
 export type InferSubscriberOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
 export type InferLiveSubscriberOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never

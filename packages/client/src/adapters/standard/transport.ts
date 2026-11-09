@@ -1,6 +1,6 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
-import type { ClientContext, ClientOptions } from '../../types.ts'
+import type { ClientContext, ClientOptions } from '../../types'
 
 /**
  * Handles the transport layer for sending requests and receiving responses.

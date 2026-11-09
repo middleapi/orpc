@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.lib.json",
-  "compilerOptions": {
-    "lib": ["ES2022"],
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "types": ["node"]
-  }
-}
