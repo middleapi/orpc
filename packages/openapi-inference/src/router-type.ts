@@ -56,6 +56,42 @@ export class RouterTypeResolver {
   }
 
   /**
+   * Whether a procedure or contract is anywhere in the type, so a router of other paths
+   * is told apart from an export that is no router at all.
+   */
+  holdsProcedure(type: Type = this.root.type, seen = new Set<number>()): boolean {
+    const current = this.unlazy(this.stripNullish(type))
+
+    if (seen.has(current.id)) {
+      return false
+    }
+
+    seen.add(current.id)
+
+    if (this.isProcedure(current)) {
+      return true
+    }
+
+    if (current.isUnionType()) {
+      return current.getTypes().some((member) => this.holdsProcedure(member, seen))
+    }
+
+    // primitives have no sub-routers, only the members of their wrapper types
+    if (!(current.flags & TypeFlags.Object)) {
+      return false
+    }
+
+    return (
+      this.checker
+        .getPropertiesOfType(current)
+        .some((symbol) => this.holdsProcedure(this.checker.getTypeOfSymbol(symbol), seen)) ||
+      this.checker
+        .getIndexInfosOfType(current)
+        .some((info) => this.holdsProcedure(info.valueType, seen))
+    )
+  }
+
+  /**
    * The input or output type of a procedure, read from its `~orpc` definition.
    */
   getSchemaType(procedure: Type, direction: 'input' | 'output'): Type | undefined {

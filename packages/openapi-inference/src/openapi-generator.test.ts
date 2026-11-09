@@ -39,7 +39,11 @@ import {
 import { roundThirtyOneInputs } from '../tests/fixtures/app/src/round31'
 import { roundThirtyTwoInputs } from '../tests/fixtures/app/src/round32'
 import { roundThirtyThreeInputs } from '../tests/fixtures/app/src/round33'
-import { roundThirtyFourJSDoc } from '../tests/fixtures/app/src/round34'
+import {
+  roundThirtyFourInner,
+  roundThirtyFourJSDoc,
+  roundThirtyFourOuter,
+} from '../tests/fixtures/app/src/round34'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -424,6 +428,25 @@ describe('openAPIGenerator', () => {
         `[OpenAPIGenerator] The export "${exportName}" of "${fileURLToPath(file)}" has type "${typeName}", which is not a router, procedure or contract.`,
       )
     }
+  })
+
+  it('reports the unmatched paths when "source" names another level of the router', async () => {
+    const file = fixture('round34.ts')
+    const hint = 'its type was not found in the router type'
+
+    const outer = generator.generate(roundThirtyFourOuter, {
+      source: { file, export: 'roundThirtyFourInner' },
+    })
+    await expect(outer).rejects.toThrow(`Procedure at inner.list: ${hint}`)
+    await expect(outer).rejects.toThrow(`Procedure at inner.find: ${hint}`)
+    await expect(outer).rejects.not.toThrow('which is not a router')
+
+    const inner = generator.generate(roundThirtyFourInner, {
+      source: { file, export: 'roundThirtyFourOuter' },
+    })
+    await expect(inner).rejects.toThrow(`Procedure at list: ${hint}`)
+    await expect(inner).rejects.toThrow(`Procedure at find: ${hint}`)
+    await expect(inner).rejects.not.toThrow('which is not a router')
   })
 
   it('keeps the first line of the comment for an empty @summary or @description', async () => {

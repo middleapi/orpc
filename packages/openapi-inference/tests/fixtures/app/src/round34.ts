@@ -25,3 +25,11 @@ export interface NotARouterShape {
 export function notARouterFunction(): number {
   return 1
 }
+
+/** Two levels of one router, for a `source` pointing at the other level */
+export const roundThirtyFourInner = {
+  list: os.handler(() => 1),
+  find: os.handler(() => 'x'),
+}
+
+export const roundThirtyFourOuter = { inner: roundThirtyFourInner }

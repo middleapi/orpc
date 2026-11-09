@@ -252,8 +252,8 @@ export class OpenAPIGenerator {
       }
     })
 
-    // no procedure is in the export's type: it is not the router
-    if (walked && !found) {
+    // no procedure is in the export's type: it is not a router, unlike a router of other paths
+    if (walked && !found && !ctx.resolver.holdsProcedure()) {
       throw new OpenAPIGeneratorError(
         `[OpenAPIGenerator] The export "${ctx.source.name}" of "${ctx.sourceFile.fileName}" has type "${ctx.checker.typeToString(ctx.source.type)}", which is not a router, procedure or contract.`,
       )
