@@ -8,6 +8,7 @@ import { OpenAPIGeneratorError, OpenAPIJsonSerializer } from '@orpc/openapi'
 import { call, os, Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
+import { Program } from 'typescript/unstable/sync'
 
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
 import { contract, implemented } from '../tests/fixtures/app/src/contract'
@@ -45,6 +46,7 @@ import {
   roundThirtyFourOuter,
 } from '../tests/fixtures/app/src/round34'
 import { roundThirtyFiveInputs } from '../tests/fixtures/app/src/round35'
+import { roundThirtySixInputs } from '../tests/fixtures/app/src/round36'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -690,6 +692,74 @@ describe('openAPIGenerator', () => {
           ].join('\n  '),
         ].join('\n\n'),
       )
+    })
+
+    it('throws on unresolved names in the template of a mapped type, and nested deep', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          `import type { Jsonify } from './nope'`,
+          'interface Model { a: number; at: Date }',
+          'interface Box<T> { v: T }',
+          'type Serialized<T> = { [K in keyof T]: Jsonify<T[K]> }',
+          'type Queried<T> = { [K in keyof T]: typeof missingValue }',
+          'export const router = {',
+          '  serialized: os.handler((): { v: Serialized<Model> } => ({}) as any),',
+          '  queried: os.handler((): { v: Queried<Model> } => ({}) as any),',
+          '  lists: os.handler((): { v: Missing[][][][] } => ({}) as any),',
+          '  boxes: os.handler((): { v: Box<Box<Box<Box<Missing>>>> } => ({}) as any),',
+          '  typed: os.handler((): { v: Box<Box<Box<Box<typeof missingValue>>>> } => ({}) as any),',
+          '  twice: os.handler((): Twice => ({ f0: null, f2: { a: { b: 1 } } })),',
+          '}',
+          'type Expanding<T> = T extends object ? { [K in keyof T]: Expanding<Expanding<T[K]>> } : T',
+          'interface Twice { f0: Expanding<Expanding<Expanding<Twice>>> | null; f2: { a: { b: number } } }',
+          '',
+        ].join('\n'),
+      })
+      const procedures = { serialized: procedure, queried: procedure, lists: procedure }
+
+      const thrown = await message(
+        generator.generate(
+          { ...procedures, boxes: procedure, typed: procedure },
+          { source: { file: file('src/router.ts') } },
+        ),
+      )
+      expect(thrown).toContain('(5 errors)')
+      expect(thrown).toContain(`Procedure at serialized: ${unresolved('Jsonify<T[K]>')}`)
+      expect(thrown).toContain(`Procedure at queried: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at lists: ${unresolved('Missing')}`)
+      expect(thrown).toContain(`Procedure at boxes: ${unresolved('Missing')}`)
+      expect(thrown).toContain(`Procedure at typed: ${unresolved('any')}`)
+      expect(thrown).toContain(
+        `${file('src/router.ts')}:6:44 - error TS2304: Cannot find name 'missingValue'.`,
+      )
+
+      // an instantiation the compiler gives up on is cut, the errors of the file are elsewhere
+      const twice = await generator.generate(
+        { twice: procedure },
+        { source: { file: file('src/router.ts') } },
+      )
+      expect(JSON.stringify(twice.components?.schemas?.Twice)).toContain('"a":{}')
+    })
+
+    it('reads no diagnostics of the whole program, which would check all of it', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import { os } from '@orpc/server'\nimport type { M } from './nope'\nexport const router = { m: os.handler((): M => ({}) as any) }\n`,
+      })
+      const global = vi.spyOn(Program.prototype, 'getGlobalDiagnostics')
+
+      try {
+        expect(
+          await message(
+            generator.generate({ m: procedure }, { source: { file: file('src/router.ts') } }),
+          ),
+        ).toContain(`Procedure at m: ${unresolved('M')}`)
+        expect(global).not.toHaveBeenCalled()
+      } finally {
+        global.mockRestore()
+      }
     })
 
     it('names the nearest tsconfig when it does not include the file, and why', async () => {
@@ -1805,6 +1875,58 @@ describe('openAPIGenerator', () => {
       ] as const) {
         const validate = ajv.compile(body(path))
         expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('round thirty-six', () => {
+    it('documents inputs of conditional deep mapped types over finite models in full', async () => {
+      const spec = await generator.generate(roundThirtySixInputs, {
+        source: { file: fixture('round36.ts'), export: 'roundThirtySixInputs' },
+      })
+      const body = (path: string) =>
+        (spec.paths as any)[path].post.requestBody.content['application/json'].schema
+
+      // the fourth nested page is documented, not cut
+      expect(JSON.stringify(body('/deepFeed'))).toContain(
+        '"likes":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"by":{"type":"string"}},"required":["by"]}}',
+      )
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const page = <T>(items: T[]) => ({ items, total: items.length })
+      for (const [path, value, valid] of [
+        [
+          '/deepFeed',
+          {
+            name: 'a',
+            posts: page([
+              {
+                title: 't',
+                comments: page([
+                  { text: 'c', replies: page([{ text: 'r', likes: page([{ by: 'b' }]) }]) },
+                ]),
+              },
+            ]),
+          },
+          true,
+        ],
+        [
+          '/deepFeed',
+          {
+            name: 'a',
+            posts: page([
+              {
+                title: 't',
+                comments: page([{ text: 'c', replies: page([{ text: 'r', likes: 1 }]) }]),
+              },
+            ]),
+          },
+          false,
+        ],
+        ['/nestedBoxes', { v: { v: { v: { v: 1 } } } }, true],
+        ['/nestedBoxes', { v: { v: { v: { v: 'x' } } } }, false],
+        ['/lengthExtra', { v: [1] }, true],
+      ] as const) {
+        expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
       }
     })
   })

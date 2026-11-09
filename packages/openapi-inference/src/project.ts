@@ -220,7 +220,8 @@ function isInferred(configFileName: string): boolean {
 }
 
 /**
- * The errors of a tsconfig, with `all`, also of the options and the program as a whole.
+ * The errors of a tsconfig, with `all`, also of its options (`baseUrl`), not the global errors,
+ * which would check the whole program.
  */
 function getConfigErrors(program: Program | undefined, all = false): string[] {
   if (!program) {
@@ -229,7 +230,7 @@ function getConfigErrors(program: Program | undefined, all = false): string[] {
 
   const diagnostics = [
     ...program.getConfigFileParsingDiagnostics(),
-    ...(all ? [...program.getProgramDiagnostics(), ...program.getGlobalDiagnostics()] : []),
+    ...(all ? program.getProgramDiagnostics() : []),
   ]
 
   return [

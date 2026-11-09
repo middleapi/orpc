@@ -373,5 +373,5 @@ try {
 - Class types in inputs are documented as the plain objects a client sends.
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
-- Types a built-in satisfies only through its prototype, like `ArrayBufferView` holding a `Uint8Array`, are documented as plain objects.
+- Types a built-in satisfies only through its prototype, like `ArrayBufferView` holding a `Uint8Array` or `Partial<Date>` an array, are documented without that built-in.
 - Generation throws on types the compiler cannot resolve, like an import with a missing path alias.

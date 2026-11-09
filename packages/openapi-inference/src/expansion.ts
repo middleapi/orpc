@@ -1,4 +1,4 @@
-import type { Type } from 'typescript/unstable/sync'
+import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import type { TypeQueries } from './type-queries'
@@ -27,6 +27,8 @@ export class ExpansionGuard {
 
   private readonly expansions = new Map<number, Expansion[]>()
   private readonly instantiations = new Map<number, Set<number>>()
+  /** Whether a generic declaration holds a declaration, by its location */
+  private readonly generics = new Map<string, boolean>()
 
   constructor(private readonly types: TypeQueries) {}
 
@@ -166,16 +168,18 @@ export class ExpansionGuard {
 
   /**
    * An instantiation without type arguments (a conditional type resolved to a mapped type) shows
-   * no growth by them: it grows when it maps over the keys an outer one maps over again, as a
-   * different type, which a cycle through it (`T extends object ? { [K in keyof T]: X<T[K]> } : T`
-   * over a model holding `X<Model>`) expands without end.
+   * no growth by them: it grows when it maps over the properties of the model an outer one maps
+   * over again, as a different type, which a cycle through it (`T extends object ? { [K in keyof T]:
+   * X<T[K]> } : T` over a model holding `X<Model>`) expands without end. The properties of a
+   * generic model (`Page<T>`) are mapped again over its other instantiations
+   * (`Page<Post>` holding `Page<Comment>`), which ends.
    */
   private getRepeatedGrowth(stack: readonly Expansion[], type: Type): number {
     if (this.types.getTypeArguments(type).length) {
       return 0
     }
 
-    const keys = this.getKeys(type)
+    const keys = this.getModelKeys(type)
 
     if (keys === undefined) {
       return 0
@@ -183,7 +187,7 @@ export class ExpansionGuard {
 
     // the innermost one
     for (let i = stack.length - 1; i >= 0; i--) {
-      if (this.getKeys(stack[i]!.type) === keys) {
+      if (this.getModelKeys(stack[i]!.type) === keys) {
         return stack[i]!.growth + 1
       }
     }
@@ -192,20 +196,42 @@ export class ExpansionGuard {
   }
 
   /**
-   * The declarations of the properties of a type, which a mapped type keeps from its source.
+   * The declarations of the properties of a type, which a mapped type keeps from its source, when
+   * no generic declaration holds them, so each mapping over them maps over the same model.
    */
-  private getKeys(type: Type): string | undefined {
+  private getModelKeys(type: Type): string | undefined {
     return this.types.memo('expansionKeys', type.id, () => {
       const properties = this.types.getProperties(type)
-      return properties.length
-        ? properties
-            .map((p) => {
-              const declaration = p.declarations[0]
-              return declaration ? `${declaration.path}:${declaration.index}` : p.name
-            })
-            .join(',')
-        : undefined
+      const keys: string[] = []
+
+      for (const p of properties) {
+        const declaration = p.declarations[0]
+        if (!declaration || this.isInGeneric(declaration)) {
+          return undefined
+        }
+        keys.push(`${declaration.path}:${declaration.index}`)
+      }
+
+      return keys.length ? keys.join(',') : undefined
     })
+  }
+
+  private isInGeneric(declaration: TSSymbol['declarations'][number]): boolean {
+    const location = `${declaration.path}:${declaration.index}`
+    let generic = this.generics.get(location)
+
+    if (generic === undefined) {
+      generic = false
+      for (let node = declaration.resolve() as any; node; node = node.parent) {
+        if (node.typeParameters?.length) {
+          generic = true
+          break
+        }
+      }
+      this.generics.set(location, generic)
+    }
+
+    return generic
   }
 }
 

@@ -2,6 +2,7 @@ import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn } from '@orpc/shared'
 import type {
   Checker,
+  Diagnostic,
   Program,
   Symbol as TSSymbol,
   TemplateLiteralType,
@@ -78,6 +79,14 @@ import {
   UNDEFINED_FLAGS,
 } from './type-queries'
 import { getIteratorTypes } from './utils'
+
+/**
+ * The compiler errors of references it cannot resolve: a name (`Cannot find name`), a module or
+ * its export, a namespace member, or a property of an indexed access type.
+ */
+const UNRESOLVED_REFERENCE_CODES = new Set([
+  2304, 2305, 2306, 2307, 2339, 2503, 2552, 2614, 2694, 2724, 2749, 2792,
+])
 
 /**
  * A type the converter cannot resolve, such as an unresolved import.
@@ -184,9 +193,15 @@ export class TypeToJsonSchemaConverter {
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
   private anyArrayType: Type | null | undefined
-  /** The types being converted, and the properties being converted in them, outermost first */
+  /**
+   * The types being converted, the types being visited and the properties being converted in
+   * them, outermost first
+   */
   private roots: readonly Type[] = []
+  private readonly visiting: Type[] = []
   private readonly path: TSSymbol[] = []
+  /** The compiler errors of unresolved references, by the path of their file */
+  private readonly unresolvedReferences = new Map<string, readonly Diagnostic[]>()
 
   /**
    * Who writes the value being converted:
@@ -203,7 +218,7 @@ export class TypeToJsonSchemaConverter {
 
   constructor(
     private readonly checker: Checker,
-    program: Program,
+    private readonly program: Program,
     options: TypeToJsonSchemaConverterOptions = {},
   ) {
     this.defsMode = options.defs ?? 'named'
@@ -382,6 +397,7 @@ export class TypeToJsonSchemaConverter {
   }
 
   private visit(type: Type): JsonSchema {
+    this.visiting.push(type)
     try {
       return this.visitType(type)
     } catch (error) {
@@ -391,6 +407,8 @@ export class TypeToJsonSchemaConverter {
         error.addDeclarations(type.getSymbol())
       }
       throw error
+    } finally {
+      this.visiting.pop()
     }
   }
 
@@ -411,7 +429,7 @@ export class TypeToJsonSchemaConverter {
 
     if (type.isErrorType()) {
       // the compiler gives up on an instantiation nested too deep, which is cut like an expansion
-      if (this.isInstantiationError()) {
+      if (this.isInstantiationError(type)) {
         this.expansion.cuts++
         return {}
       }
@@ -1167,13 +1185,24 @@ export class TypeToJsonSchemaConverter {
       return forms
     }
 
+    const weak = properties.every((p) => p.flags & SymbolFlags.Optional)
+
     for (const [name, primitive] of [
       ['Array', undefined],
       ['String', this.checker.getStringType()],
     ] as const) {
       const members = this.types.getGlobalType(name)
-      // only types of their members, checked by the compiler, `{ filter: string }` is no array
-      if (!members || !properties.every((p) => this.getPropertyNames(members).has(p.name))) {
+      // only types of their members, checked by the compiler, `{ filter: string }` is no array,
+      // `{ length: number; extra?: string }` is one without `extra`. Of a type of optional
+      // properties only, which any value sharing one satisfies (`Partial<Date>` an array by its
+      // `toString`), all are.
+      if (
+        !members ||
+        !properties.every(
+          (p) =>
+            (p.flags & SymbolFlags.Optional && !weak) || this.getPropertyNames(members).has(p.name),
+        )
+      ) {
         continue
       }
 
@@ -1898,11 +1927,14 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * Whether an error type comes from an instantiation the compiler gave up on (nested too deep),
-   * not from an unresolved name, which leaves an error type in the declared type of the converted
-   * type, or of a property on the way to it (`Missing[]`, `Page<Missing>`).
+   * which is the compiler's error type without a name, reported nowhere. An unresolved name keeps
+   * the name it is written with (`Missing`, `Jsonify<T[K]>` of a missing import, also in the
+   * template of a mapped type), another unresolved reference (`typeof missing`, `Model['nope']`)
+   * leaves an error type in the declared type of a property on the way to it (`Box<typeof x>[]`),
+   * or a compiler error in the declaration of a type or property on the way.
    */
-  private isInstantiationError(): boolean {
-    if (!this.path.length) {
+  private isInstantiationError(type: Type): boolean {
+    if (type.getAliasSymbol() || !this.path.length) {
       return false
     }
 
@@ -1912,9 +1944,45 @@ export class TypeToJsonSchemaConverter {
       return this.checker.getTypeOfSymbol(original ?? property)
     })
 
-    return ![...this.roots, ...declared].some(
-      (t) => t !== undefined && holdsErrorType(this.types, t),
-    )
+    if (
+      [...this.roots, ...declared].some((t) => t !== undefined && holdsErrorType(this.types, t))
+    ) {
+      return false
+    }
+
+    const declarations = [
+      ...this.path,
+      ...[...this.roots, ...this.visiting].flatMap((t) => [t.getAliasSymbol(), t.getSymbol()]),
+    ].flatMap((symbol) => symbol?.declarations ?? [])
+
+    return !declarations.some((declaration) => {
+      const errors = this.getUnresolvedReferences(declaration.path)
+      if (!errors.length) {
+        return false
+      }
+
+      const node = declaration.resolve() as any
+      return errors.some((d) => node && d.pos >= node.pos && d.pos < node.end)
+    })
+  }
+
+  /**
+   * The compiler errors of the references a project file can not resolve.
+   */
+  private getUnresolvedReferences(file: string): readonly Diagnostic[] {
+    let errors = this.unresolvedReferences.get(file)
+
+    if (errors === undefined) {
+      errors =
+        this.types.getSourceKind(file) === 'project'
+          ? this.program
+              .getSemanticDiagnostics(file)
+              .filter((d) => UNRESOLVED_REFERENCE_CODES.has(d.code))
+          : []
+      this.unresolvedReferences.set(file, errors)
+    }
+
+    return errors
   }
 
   /**
@@ -2050,20 +2118,27 @@ function withNullBranch(schema: JsonSchema | undefined, hasNull: boolean): JsonS
 }
 
 /**
- * Whether a type is an error type, or written with one: a member, or a type argument
- * (`Missing | null`, `Missing[]`, `Page<Missing>`), not one deep inside a model it refers to.
+ * Whether a type is an error type, or written with one: a member, or a type argument, also nested
+ * (`Missing | null`, `Missing[]`, `Page<Box<Missing>>`), not one inside a model it refers to.
  */
-function holdsErrorType(types: TypeQueries, type: Type, depth = 3): boolean {
+function holdsErrorType(types: TypeQueries, type: Type, seen = new Set<number>()): boolean {
   if (type.isErrorType()) {
     return true
   }
+
+  // `type Json = string | Json[]` refers to itself through its arguments
+  if (seen.has(type.id)) {
+    return false
+  }
+
+  seen.add(type.id)
 
   const children =
     type.flags & TypeFlags.UnionOrIntersection
       ? types.getMembers(type)
       : types.getTypeArguments(type)
 
-  return depth > 0 && children.some((child) => holdsErrorType(types, child, depth - 1))
+  return children.some((child) => holdsErrorType(types, child, seen))
 }
 
 /**

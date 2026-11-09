@@ -263,6 +263,10 @@ describe('generated schemas match serialized outputs', async () => {
     ['writtenAlike', undefined],
     ['counted', undefined],
     ['looseCounted', undefined],
+    ['deepFeed', undefined],
+    ['partialFeed', undefined],
+    ['nestedBoxes', undefined],
+    ['lengthExtra', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2263,6 +2267,62 @@ describe('generated schemas match serialized outputs', async () => {
       expect(schemas().Loose_CountedValues.properties).toEqual({
         c: numberOrString,
         d: numberOrString,
+      })
+    })
+  })
+
+  describe('round thirty-six', () => {
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+    const page = (items: object) => ({
+      type: 'object',
+      properties: { items: { type: 'array', items }, total: { type: 'number' } },
+      required: ['items', 'total'],
+    })
+    const model = (properties: Record<string, object>) => ({
+      type: 'object',
+      properties,
+      required: Object.keys(properties),
+    })
+    const text = { type: 'string' }
+
+    it('expands conditional deep mapped types over finite models with nested generic relations', () => {
+      // each page maps over the properties of `FeedPage` again, of another instantiation
+      expect(schemaOf('deepFeed')).toEqual(
+        model({
+          name: text,
+          posts: page(
+            model({
+              title: text,
+              comments: page(
+                model({
+                  text,
+                  replies: page(model({ text, likes: page(model({ by: text })) })),
+                }),
+              ),
+            }),
+          ),
+        }),
+      )
+      expect(JSON.stringify(schemaOf('partialFeed'))).toContain(
+        '"likes":{"type":"object","properties":{"items":{"type":"array","items":{"anyOf":[{"type":"object","properties":{"by":{"type":"string"}}}',
+      )
+      expect(schemaOf('nestedBoxes')).toEqual(
+        model({ v: model({ v: model({ v: model({ v: { type: 'number' } }) }) }) }),
+      )
+    })
+
+    it('writes an array form of a type an array satisfies besides optional properties', () => {
+      expect(schemaOf('lengthExtra')).toEqual({
+        anyOf: [
+          { type: 'array', items: {} },
+          text,
+          {
+            type: 'object',
+            properties: { length: { type: 'number' }, extra: text },
+            required: ['length'],
+          },
+        ],
       })
     })
   })
