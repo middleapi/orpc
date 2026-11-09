@@ -3,7 +3,7 @@ import { os } from '@orpc/server'
 import { useActionState } from 'react'
 import { z } from 'zod'
 
-import { createServerFunction } from './server-function.ts'
+import { createServerFunction } from './server-function'
 
 const errorMap = {
   BASE: {

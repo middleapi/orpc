@@ -1,4 +1,4 @@
-import type { ORPCError } from './error.ts'
+import type { ORPCError } from './error'
 import type {
   Client,
   ClientContext,
@@ -9,7 +9,7 @@ import type {
   InferClientErrors,
   InferClientInputs,
   InferClientOutputs,
-} from './types.ts'
+} from './types'
 
 describe('client', () => {
   const client: Client<

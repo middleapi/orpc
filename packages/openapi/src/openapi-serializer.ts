@@ -8,10 +8,10 @@ import { isAsyncIteratorObject } from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
 import { EventStreamErrorEvent } from '@standard-server/core'
 
-import type { BracketNotationSerializerOptions } from './bracket-notation.ts'
-import { BracketNotationSerializer } from './bracket-notation.ts'
-import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer.ts'
-import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
+import type { BracketNotationSerializerOptions } from './bracket-notation'
+import { BracketNotationSerializer } from './bracket-notation'
+import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer'
 
 export interface OpenAPISerializerSerializeOptions {
   /**

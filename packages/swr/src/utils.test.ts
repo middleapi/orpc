@@ -1,4 +1,4 @@
-import { isSubsetOf } from './utils.ts'
+import { isSubsetOf } from './utils'
 
 describe('isSubsetOf', () => {
   it('returns true for identical values and valid subsets', () => {

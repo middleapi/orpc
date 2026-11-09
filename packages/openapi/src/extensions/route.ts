@@ -3,8 +3,8 @@ import { ContractBuilder } from '@orpc/contract'
 import type { Context } from '@orpc/server'
 import { Builder, DecoratedProcedure } from '@orpc/server'
 
-import type { OpenAPIMeta } from '../meta.ts'
-import { openapi } from '../meta.ts'
+import type { OpenAPIMeta } from '../meta'
+import { openapi } from '../meta'
 
 declare module '@orpc/contract' {
   interface ContractBuilder<TErrorMap extends ErrorMap> {

@@ -1,6 +1,6 @@
-import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types.ts'
-import type { RPCJsonSerialization } from './rpc-json-serializer.ts'
-import { RPCJsonSerializer } from './rpc-json-serializer.ts'
+import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
+import type { RPCJsonSerialization } from './rpc-json-serializer'
+import { RPCJsonSerializer } from './rpc-json-serializer'
 
 class Person {
   constructor(

@@ -1,5 +1,5 @@
-import type { StandardLinkPlugin } from './plugin.ts'
-import { CompositeStandardLinkPlugin } from './plugin.ts'
+import type { StandardLinkPlugin } from './plugin'
+import { CompositeStandardLinkPlugin } from './plugin'
 
 describe('compositeStandardLinkPlugin', () => {
   beforeEach(() => {

@@ -1,13 +1,13 @@
 import type { Writable } from '@orpc/shared'
 
+import { ORPCError } from './error'
 import {
   cloneORPCError,
   createORPCErrorFromJson,
   isDefinedError,
   isORPCErrorJson,
   toORPCError,
-} from './error-utils.ts'
-import { ORPCError } from './error.ts'
+} from './error-utils'
 
 it('isDefinedError', () => {
   const definedError = new ORPCError('BAD_REQUEST')

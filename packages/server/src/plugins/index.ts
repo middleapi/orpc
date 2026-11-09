@@ -1,44 +1,44 @@
-export * from './batch.ts'
-export * from './cors.ts'
+export * from './batch'
+export * from './cors'
 export {
   /**
    * @deprecated Use `CORSHandlerPlugin` instead.
    */
   CORSHandlerPlugin as CORSPlugin,
-} from './cors.ts'
-export * from './get-method-csrf-protection.ts'
-export * from './head-method.ts'
-export * from './method-override.ts'
-export * from './request-compression.ts'
-export * from './request-headers.ts'
+} from './cors'
+export * from './get-method-csrf-protection'
+export * from './head-method'
+export * from './method-override'
+export * from './request-compression'
+export * from './request-headers'
 export {
   /**
    * @deprecated Use `RequestHeadersHandlerPlugin` instead.
    */
   RequestHeadersHandlerPlugin as RequestHeadersPlugin,
-} from './request-headers.ts'
+} from './request-headers'
 export type {
   /**
    * @deprecated Use `RequestHeadersHandlerPluginContext` instead.
    */
   RequestHeadersHandlerPluginContext as RequestHeadersPluginContext,
-} from './request-headers.ts'
-export * from './request-limit.ts'
-export * from './response-compression.ts'
-export * from './response-headers.ts'
+} from './request-headers'
+export * from './request-limit'
+export * from './response-compression'
+export * from './response-headers'
 export {
   /**
    * @deprecated Use `ResponseHeadersHandlerPlugin` instead.
    */
   ResponseHeadersHandlerPlugin as ResponseHeadersPlugin,
-} from './response-headers.ts'
+} from './response-headers'
 export type {
   /**
    * @deprecated Use `ResponseHeadersHandlerPluginContext` instead.
    */
   ResponseHeadersHandlerPluginContext as ResponseHeadersPluginContext,
-} from './response-headers.ts'
-export * from './rethrow.ts'
-export * from './signal-sync.ts'
-export * from './timeout.ts'
+} from './response-headers'
+export * from './rethrow'
+export * from './signal-sync'
+export * from './timeout'
 export { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'

@@ -1,4 +1,4 @@
-import { INTEGER_REGEX, NON_NEGATIVE_INTEGER_REGEX } from './regex.ts'
+import { INTEGER_REGEX, NON_NEGATIVE_INTEGER_REGEX } from './regex'
 
 it.each([
   ['0', true],

@@ -1,7 +1,7 @@
 import { isSchemaIssue } from '@orpc/contract'
 import { isNonPrimitive, NON_NEGATIVE_INTEGER_REGEX } from '@orpc/shared'
 
-import { BracketNotationSerializer } from '../bracket-notation.ts'
+import { BracketNotationSerializer } from '../bracket-notation'
 
 /**
  * Parse a form data with [bracket notation](https://orpc.dev/docs/openapi/bracket-notation) syntax

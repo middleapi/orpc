@@ -1,4 +1,4 @@
-import { isDeepEqual } from './compare.ts'
+import { isDeepEqual } from './compare'
 
 describe('deepEqual', () => {
   it('returns true for the same primitive reference', () => {

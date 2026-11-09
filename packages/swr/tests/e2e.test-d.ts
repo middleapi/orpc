@@ -4,7 +4,7 @@ import useSWRInfinite from 'swr/infinite'
 import useSWRMutation from 'swr/mutation'
 import useSWRSubscription from 'swr/subscription'
 
-import { client, orpc } from './__shared__/orpc.ts'
+import { client, orpc } from './__shared__/orpc'
 
 it('.call', () => {
   expectTypeOf(orpc.static.call).toEqualTypeOf(client.static)

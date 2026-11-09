@@ -8,7 +8,7 @@ import type {
   EffectWrapOptions,
   InferEffectServices,
   WithEffectContext,
-} from './context.ts'
+} from './context'
 
 class Service1 extends Context.Service<
   Service1,

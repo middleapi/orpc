@@ -1,8 +1,8 @@
 import { ORPCError } from '@orpc/client'
 
-import { os } from '../../builder.ts'
-import { DEFAULT_ERROR_STATUS } from '../../constants.ts'
-import { RPCHandlerCodec } from './rpc-handler-codec.ts'
+import { os } from '../../builder'
+import { DEFAULT_ERROR_STATUS } from '../../constants'
+import { RPCHandlerCodec } from './rpc-handler-codec'
 
 beforeEach(() => {
   vi.clearAllMocks()

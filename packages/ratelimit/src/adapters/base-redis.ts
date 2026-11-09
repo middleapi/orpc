@@ -1,5 +1,5 @@
-import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types.ts'
-import { blockUntilReady, resolveWeight } from '../utils.ts'
+import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
+import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
  * Consumes `ARGV[1]` points from the counter at `KEYS[1]`, starts a window of

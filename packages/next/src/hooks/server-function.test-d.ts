@@ -2,8 +2,8 @@ import type { ORPCError } from '@orpc/server'
 import { os, safe } from '@orpc/server'
 import * as z from 'zod'
 
-import { createServerFunction } from '../server-function.ts'
-import { useServerFunction } from './server-function.ts'
+import { createServerFunction } from '../server-function'
+import { useServerFunction } from './server-function'
 
 export const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 

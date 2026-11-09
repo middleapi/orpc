@@ -1,6 +1,6 @@
 import { createRequestLogger } from 'evlog'
 
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 
 it('getLogger', async () => {
   expect(getLogger({})).toBeUndefined()

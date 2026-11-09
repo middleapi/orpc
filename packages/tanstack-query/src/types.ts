@@ -10,7 +10,7 @@ import type {
   SkipToken,
 } from '@tanstack/query-core'
 
-import type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query.ts'
+import type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
 
 export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
 export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never

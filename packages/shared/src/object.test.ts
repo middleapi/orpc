@@ -20,7 +20,7 @@ import {
   pick,
   set,
   setOwn,
-} from './object.ts'
+} from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches((v) => typeof v === 'string', {

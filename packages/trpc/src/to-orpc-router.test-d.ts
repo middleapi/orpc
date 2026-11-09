@@ -4,7 +4,7 @@ import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import type { TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as z from 'zod'
 
-import { toORPCRouter } from './to-orpc-router.ts'
+import { toORPCRouter } from './to-orpc-router'
 
 type TRPCContext = { a: string }
 

@@ -1,4 +1,4 @@
-import type { MaybeOptionalOptions } from './args.ts'
+import type { MaybeOptionalOptions } from './args'
 
 it('MaybeOptionalOptions', () => {
   const a = (...[options]: MaybeOptionalOptions<{ a: number }>) => {

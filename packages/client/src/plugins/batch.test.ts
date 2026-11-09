@@ -4,9 +4,9 @@ import { promiseWithResolvers, sleep } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import { encodePeerMessage } from '@standard-server/peer'
 
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
-import { StandardLink } from '../adapters/standard/index.ts'
-import { BatchLinkPlugin } from './batch.ts'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
+import { StandardLink } from '../adapters/standard/index'
+import { BatchLinkPlugin } from './batch'
 
 interface TestContext {
   tag?: string

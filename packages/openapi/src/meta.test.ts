@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 
-import { getOpenAPIMeta, openapi } from './meta.ts'
+import { getOpenAPIMeta, openapi } from './meta'
 
 describe('openapi meta', () => {
   describe('openapi() function', () => {

@@ -1,10 +1,10 @@
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { AbortError } from '@orpc/shared'
 
-import { RPCHandler } from '../adapters/fetch/index.ts'
-import { os } from '../builder.ts'
-import type { TimeoutHandlerPluginOptions } from './timeout.ts'
-import { TimeoutHandlerPlugin } from './timeout.ts'
+import { RPCHandler } from '../adapters/fetch/index'
+import { os } from '../builder'
+import type { TimeoutHandlerPluginOptions } from './timeout'
+import { TimeoutHandlerPlugin } from './timeout'
 
 beforeEach(() => {
   vi.clearAllMocks()

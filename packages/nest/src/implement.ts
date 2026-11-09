@@ -60,8 +60,8 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import { mergeMap } from 'rxjs'
 
-import { ORPC_MODULE_CONFIG_SYMBOL } from './constants.ts'
-import type { NestStandardLazyRequest, ORPCModuleConfig } from './module.ts'
+import { ORPC_MODULE_CONFIG_SYMBOL } from './constants'
+import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
 
 // Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
 const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined

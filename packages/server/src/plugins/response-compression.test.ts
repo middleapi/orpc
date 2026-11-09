@@ -1,9 +1,9 @@
 import supertest from 'supertest'
 
-import { RPCHandler } from '../adapters/fetch/index.ts'
-import { RPCHandler as NodeRPCHandler } from '../adapters/node/index.ts'
-import { os } from '../builder.ts'
-import { ResponseCompressionHandlerPlugin } from './response-compression.ts'
+import { RPCHandler } from '../adapters/fetch/index'
+import { RPCHandler as NodeRPCHandler } from '../adapters/node/index'
+import { os } from '../builder'
+import { ResponseCompressionHandlerPlugin } from './response-compression'
 
 async function decompressStream(
   stream: ReadableStream,

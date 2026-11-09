@@ -11,11 +11,11 @@ import {
 } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
-import type { ClientContext, ClientLink, ClientOptions } from '../../types.ts'
-import type { StandardLinkCodec } from './codec.ts'
-import type { StandardLinkPlugin } from './plugin.ts'
-import { CompositeStandardLinkPlugin } from './plugin.ts'
-import type { StandardLinkTransport } from './transport.ts'
+import type { ClientContext, ClientLink, ClientOptions } from '../../types'
+import type { StandardLinkCodec } from './codec'
+import type { StandardLinkPlugin } from './plugin'
+import { CompositeStandardLinkPlugin } from './plugin'
+import type { StandardLinkTransport } from './transport'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
   path: string[]

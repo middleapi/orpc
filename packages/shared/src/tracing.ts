@@ -1,6 +1,6 @@
 import type { Promisable } from 'type-fest'
 
-import { isAbortError } from './error.ts'
+import { isAbortError } from './error'
 
 const TRACER_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_TRACER')
 

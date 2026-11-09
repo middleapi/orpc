@@ -2,8 +2,8 @@ import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import type { AsyncIteratorClass } from '@orpc/shared'
 import { isAsyncIteratorObject, ORPC_NAME, override } from '@orpc/shared'
 
-import { ValidationError } from './error.ts'
-import type { AnySchema, Schema } from './schema.ts'
+import { ValidationError } from './error'
+import type { AnySchema, Schema } from './schema'
 
 const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = /* @__PURE__ */ Symbol.for(
   'ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS',

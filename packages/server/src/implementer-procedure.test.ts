@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure.ts'
+import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
 
 describe('procedureImplementer', () => {
   const definition = {

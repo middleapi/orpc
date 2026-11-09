@@ -2,13 +2,7 @@ import { type as arktypeType } from 'arktype'
 import * as v from 'valibot'
 import * as z from 'zod'
 
-import type {
-  AnySchema,
-  InferSchemaInput,
-  InferSchemaOutput,
-  MergedSchema,
-  Schema,
-} from './schema.ts'
+import type { AnySchema, InferSchemaInput, InferSchemaOutput, MergedSchema, Schema } from './schema'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })

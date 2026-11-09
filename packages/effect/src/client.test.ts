@@ -2,7 +2,7 @@ import type { Client, ClientContext, ORPCError } from '@orpc/client'
 import { sleep } from '@orpc/shared'
 import { Effect, Exit, Schedule } from 'effect'
 
-import { createEffectClient } from './client.ts'
+import { createEffectClient } from './client'
 
 beforeEach(() => {
   vi.clearAllMocks()

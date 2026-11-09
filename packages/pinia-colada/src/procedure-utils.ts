@@ -13,10 +13,10 @@ import type {
   UseInfiniteQueryFnContext,
 } from '@pinia/colada'
 
-import type { OperationKeyBaseOptions } from './key.ts'
-import { liveQuery } from './live-query.ts'
-import { SharedUtils } from './shared-utils.ts'
-import { serializableStreamedQuery } from './stream-query.ts'
+import type { OperationKeyBaseOptions } from './key'
+import { liveQuery } from './live-query'
+import { SharedUtils } from './shared-utils'
+import { serializableStreamedQuery } from './stream-query'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
@@ -36,8 +36,8 @@ import type {
   StreamedOptionsOut,
   UseMutationFnContext,
   UseQueryFnContext,
-} from './types.ts'
-import { OPERATION_CONTEXT_SYMBOL } from './types.ts'
+} from './types'
+import { OPERATION_CONTEXT_SYMBOL } from './types'
 
 export interface ProcedureUtilsQueryInterceptorOptions<
   TClientContext extends ClientContext,

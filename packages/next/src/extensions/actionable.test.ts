@@ -1,8 +1,8 @@
 import { os, Procedure } from '@orpc/server'
 import { z } from 'zod'
 
-import * as ServerFunctionModule from '../server-function.ts'
-import './actionable.ts'
+import * as ServerFunctionModule from '../server-function'
+import './actionable'
 
 const createServerFunctionSpy = vi.spyOn(ServerFunctionModule, 'createServerFunction')
 

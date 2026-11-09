@@ -8,9 +8,9 @@ import { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
 import { environmentManager } from '@tanstack/query-core'
 
-import type { RouterUtilsPlugin } from './plugin.ts'
-import type { ProcedureUtilsOptions } from './procedure-utils.ts'
-import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
+import type { RouterUtilsPlugin } from './plugin'
+import type { ProcedureUtilsOptions } from './procedure-utils'
+import { mergeProcedureUtilsOptions } from './procedure-utils'
 
 /**
  * Creates `dehydrate` and `hydrate` query client defaults that preserve oRPC types.

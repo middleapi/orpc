@@ -1,7 +1,7 @@
 import type { Promisable } from 'type-fest'
 
-import type { Value } from './value.ts'
-import { value } from './value.ts'
+import type { Value } from './value'
+import { value } from './value'
 
 describe('value', () => {
   it('types', () => {

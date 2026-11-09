@@ -1,4 +1,4 @@
-import type { JsonSchema } from './types.ts'
+import type { JsonSchema } from './types'
 import {
   containsJsonFileSchema,
   ensureJsonSchemaObject,
@@ -7,7 +7,7 @@ import {
   isJsonObjectSchema,
   isJsonPrimitiveSchema,
   isUnconstrainedSchema,
-} from './utils.ts'
+} from './utils'
 
 it('isJsonPrimitiveSchema', () => {
   expect(isJsonPrimitiveSchema({ type: 'string' })).toBe(true)

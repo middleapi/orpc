@@ -11,7 +11,7 @@ import {
   EVENTS_10KB,
   handlers,
   PAYLOAD_10KB,
-} from './__shared__/payloads.ts'
+} from './__shared__/payloads'
 
 const serializer = new RPCSerializer({ handlers })
 

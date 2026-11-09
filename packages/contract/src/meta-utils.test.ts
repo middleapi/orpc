@@ -1,6 +1,6 @@
-import { oc } from './builder.ts'
-import { defineMeta, resolveMetaPlugins } from './meta-utils.ts'
-import type { AnyMetaPlugin } from './meta.ts'
+import { oc } from './builder'
+import type { AnyMetaPlugin } from './meta'
+import { defineMeta, resolveMetaPlugins } from './meta-utils'
 
 it('resolveMetaPlugins', () => {
   const baseMeta = { mode: 'base' }

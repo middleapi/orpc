@@ -2,8 +2,8 @@ import type { ClientContext, ORPCError } from '@orpc/client'
 import { oc, type } from '@orpc/contract'
 import type { PromiseWithError } from '@orpc/shared'
 
-import { piniaColada } from './meta.ts'
-import type { OperationContext } from './types.ts'
+import { piniaColada } from './meta'
+import type { OperationContext } from './types'
 
 describe('piniaColada', () => {
   it('infers input, output and error types from the contract', () => {

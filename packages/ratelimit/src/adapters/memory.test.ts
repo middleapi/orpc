@@ -1,4 +1,4 @@
-import { MemoryRateLimiter } from './memory.ts'
+import { MemoryRateLimiter } from './memory'
 
 describe('memoryRateLimiter', () => {
   beforeEach(() => {

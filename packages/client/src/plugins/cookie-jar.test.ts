@@ -1,12 +1,12 @@
 import type { StandardHeaders, StandardLazyResponse } from '@standard-server/core'
 
-import { RPCLink } from '../adapters/fetch/index.ts'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index.ts'
-import { StandardLink } from '../adapters/standard/index.ts'
-import { createORPCClient } from '../client.ts'
-import { BatchLinkPlugin } from './batch.ts'
-import type { CookieJarLinkPluginOptions } from './cookie-jar.ts'
-import { CookieJar, CookieJarLinkPlugin } from './cookie-jar.ts'
+import { RPCLink } from '../adapters/fetch/index'
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
+import { StandardLink } from '../adapters/standard/index'
+import { createORPCClient } from '../client'
+import { BatchLinkPlugin } from './batch'
+import type { CookieJarLinkPluginOptions } from './cookie-jar'
+import { CookieJar, CookieJarLinkPlugin } from './cookie-jar'
 
 const origin = 'https://api.example.com'
 

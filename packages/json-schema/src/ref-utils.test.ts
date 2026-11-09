@@ -6,8 +6,8 @@ import {
   resolveJsonSchemaLocalPointer,
   resolveJsonSchemaRootLocalRef,
   visitJsonSchemaRefs,
-} from './ref-utils.ts'
-import type { JsonSchema } from './types.ts'
+} from './ref-utils'
+import type { JsonSchema } from './types'
 
 describe('visitJsonSchemaRefs', () => {
   it('visits refs under the same keywords mapJsonSchemaRefs rewrites, and skips non-schema keywords', () => {

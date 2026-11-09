@@ -3,8 +3,8 @@ import type { Meta } from '@orpc/server'
 import { defineMeta } from '@orpc/server'
 import { initTRPC } from '@trpc/server'
 
-import { toORPCRouter } from './to-orpc-router.ts'
-import { toTRPCMeta } from './to-trpc-meta.ts'
+import { toORPCRouter } from './to-orpc-router'
+import { toTRPCMeta } from './to-trpc-meta'
 
 describe('toTRPCMeta', () => {
   it('resolves meta plugins into a plain meta object', () => {

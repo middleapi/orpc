@@ -2,7 +2,7 @@ import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
 import { Effect } from 'effect'
 
-import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from './error.ts'
+import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from './error'
 
 class Service1 {
   declare id: 'Service1'

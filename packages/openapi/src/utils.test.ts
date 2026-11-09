@@ -1,4 +1,4 @@
-import { getDynamicPathParams, isBodylessMethod } from './utils.ts'
+import { getDynamicPathParams, isBodylessMethod } from './utils'
 
 describe('isBodylessMethod', () => {
   it('treats GET and HEAD as bodyless', () => {

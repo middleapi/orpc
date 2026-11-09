@@ -1,7 +1,7 @@
 import { type } from 'arktype'
 import * as z from 'zod'
 
-import { ArkTypeToJsonSchemaConverter } from './converter.ts'
+import { ArkTypeToJsonSchemaConverter } from './converter'
 
 describe('arkTypeToJsonSchemaConverter', () => {
   const converter = new ArkTypeToJsonSchemaConverter()

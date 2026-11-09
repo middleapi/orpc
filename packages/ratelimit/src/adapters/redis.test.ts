@@ -1,7 +1,7 @@
 import { sleep } from '@orpc/shared'
 import { createClient } from 'redis'
 
-import { RedisRateLimiter } from './redis.ts'
+import { RedisRateLimiter } from './redis'
 
 const REDIS_URL = process.env.REDIS_URL
 

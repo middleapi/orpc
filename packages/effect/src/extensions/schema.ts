@@ -12,7 +12,7 @@ import type { Context } from '@orpc/server'
 import { Builder, DecoratedProcedure } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 
-import { toStandardSchema } from '../schema.ts'
+import { toStandardSchema } from '../schema'
 
 /**
  * Like `ErrorMapItem`, but `data` can also be an Effect Schema.

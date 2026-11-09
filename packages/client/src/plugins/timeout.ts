@@ -6,8 +6,8 @@ import type {
   StandardLinkInterceptorOptions,
   StandardLinkOptions,
   StandardLinkPlugin,
-} from '../adapters/standard/index.ts'
-import type { ClientContext } from '../types.ts'
+} from '../adapters/standard/index'
+import type { ClientContext } from '../types'
 
 export interface TimeoutLinkPluginOptions<T extends ClientContext> {
   /**

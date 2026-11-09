@@ -1,4 +1,4 @@
-import { resolveFriendlyStandardHandlerHandleOptions } from './utils.ts'
+import { resolveFriendlyStandardHandlerHandleOptions } from './utils'
 
 describe('resolveFriendlyStandardHandlerHandleOptions', () => {
   it('defaults context to empty object', () => {

@@ -1,6 +1,6 @@
 import { expectTypeOf, it } from 'vitest'
 
-import type { MergedErrorMap } from './error-utils.ts'
+import type { MergedErrorMap } from './error-utils'
 
 it('MergedErrorMap', () => {
   expectTypeOf<

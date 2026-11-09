@@ -15,8 +15,8 @@ import type {
   StandardHandlerInterceptorOptions,
   StandardHandlerOptions,
   StandardHandlerPlugin,
-} from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 export interface TimeoutHandlerPluginOptions<T extends Context> {
   /**

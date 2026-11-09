@@ -1,4 +1,4 @@
-import { defer, isAsyncGeneratorFunction, once, tryOrUndefined } from './function.ts'
+import { defer, isAsyncGeneratorFunction, once, tryOrUndefined } from './function'
 
 it('once', () => {
   const fn = vi.fn(() => ({}))

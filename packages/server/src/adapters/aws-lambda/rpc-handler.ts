@@ -1,9 +1,9 @@
-import type { Context } from '../../context.ts'
-import type { Router } from '../../router.ts'
-import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard/index.ts'
-import { RPCHandlerCodec, StandardHandler } from '../standard/index.ts'
-import type { AwsLambdaHandlerOptions } from './handler.ts'
-import { AwsLambdaHandler } from './handler.ts'
+import type { Context } from '../../context'
+import type { Router } from '../../router'
+import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard/index'
+import { RPCHandlerCodec, StandardHandler } from '../standard/index'
+import type { AwsLambdaHandlerOptions } from './handler'
+import { AwsLambdaHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
   extends AwsLambdaHandlerOptions<T>, StandardHandlerOptions<T>, RPCHandlerCodecOptions<T> {}

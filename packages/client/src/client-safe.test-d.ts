@@ -1,6 +1,6 @@
-import type { SafeClient } from './client-safe.ts'
-import type { ORPCError } from './error.ts'
-import type { Client, ClientContext } from './types.ts'
+import type { SafeClient } from './client-safe'
+import type { ORPCError } from './error'
+import type { Client, ClientContext } from './types'
 
 it('SafeClient', async () => {
   const client = {} as {

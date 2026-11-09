@@ -1,3 +1,3 @@
-export * from './message-port.ts'
-export * from './rpc-link.ts'
-export * from './transport.ts'
+export * from './message-port'
+export * from './rpc-link'
+export * from './transport'

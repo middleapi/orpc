@@ -7,7 +7,7 @@ import {
   PAYLOAD_5MB,
   PAYLOAD_5MB_WITH_FILES,
   PAYLOAD_100KB,
-} from './__shared__/payloads.ts'
+} from './__shared__/payloads'
 
 const serializer = new OpenAPISerializer({ handlers })
 

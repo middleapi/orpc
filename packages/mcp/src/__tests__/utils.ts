@@ -1,7 +1,7 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { createMcpHandler, InMemoryTransport, McpServer } from '@modelcontextprotocol/server'
 
-import type { McpRegistrar, McpRegistrarRegisterOptions } from '../registrar.ts'
+import type { McpRegistrar, McpRegistrarRegisterOptions } from '../registrar'
 
 export type ProtocolEra = 'legacy' | 'modern'
 

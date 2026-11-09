@@ -12,9 +12,9 @@ import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { z } from 'zod'
 
-import { createTestClient, createTestServer, PROTOCOL_ERAS } from './__tests__/utils.ts'
-import { mcp } from './meta.ts'
-import { McpRegistrar } from './registrar.ts'
+import { createTestClient, createTestServer, PROTOCOL_ERAS } from './__tests__/utils'
+import { mcp } from './meta'
+import { McpRegistrar } from './registrar'
 
 const planetSchema = z.object({ id: z.number(), name: z.string() })
 

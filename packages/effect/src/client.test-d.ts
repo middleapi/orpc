@@ -2,9 +2,9 @@ import type { Client, ClientContext, ORPCError } from '@orpc/client'
 import { isDefinedError } from '@orpc/client'
 import { Effect } from 'effect'
 
-import type { EffectClient } from './client.ts'
-import { createEffectClient } from './client.ts'
-import { catchORPCErrorCodes } from './error.ts'
+import type { EffectClient } from './client'
+import { createEffectClient } from './client'
+import { catchORPCErrorCodes } from './error'
 
 describe('createEffectClient', () => {
   const client = {} as {

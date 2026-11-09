@@ -5,8 +5,8 @@ import { AbortError, promiseWithResolvers } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { WebSocketServer, WebSocket as WsWebSocket } from 'ws'
 
-import { createORPCClient } from '../../client.ts'
-import { RPCLink } from './rpc-link.ts'
+import { createORPCClient } from '../../client'
+import { RPCLink } from './rpc-link'
 
 beforeEach(() => {
   vi.clearAllMocks()

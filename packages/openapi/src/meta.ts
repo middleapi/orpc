@@ -4,7 +4,7 @@ import type { Value } from '@orpc/shared'
 import { mergeHttpPath } from '@orpc/shared'
 import type { StandardBodyHint } from '@standard-server/core'
 
-import type { OpenAPIV3_2 } from './types.ts'
+import type { OpenAPIV3_2 } from './types'
 
 export interface OpenAPIMeta {
   /**

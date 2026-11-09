@@ -11,9 +11,9 @@ import { createPinia } from 'pinia'
 import { createSSRApp, defineComponent, h, nextTick, ref, watch } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 
-import type { RouterUtils } from '../src/index.ts'
-import { createRouterUtils, StreamQuerySSRUtilsPlugin } from '../src/index.ts'
-import { createChunkController } from './__shared__/utils.ts'
+import type { RouterUtils } from '../src/index'
+import { createRouterUtils, StreamQuerySSRUtilsPlugin } from '../src/index'
+import { createChunkController } from './__shared__/utils'
 
 type StreamClient = { stream: Client<object, undefined, AsyncIterable<number>, Error> }
 

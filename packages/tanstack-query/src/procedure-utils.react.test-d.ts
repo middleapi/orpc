@@ -12,7 +12,7 @@ import {
 } from '@tanstack/react-query'
 import * as z from 'zod'
 
-import type { ProcedureUtils } from './procedure-utils.ts'
+import type { ProcedureUtils } from './procedure-utils'
 
 export const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 

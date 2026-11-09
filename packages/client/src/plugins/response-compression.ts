@@ -7,8 +7,8 @@ import type {
   StandardLinkOptions,
   StandardLinkPlugin,
   StandardLinkTransportInterceptor,
-} from '../adapters/standard/index.ts'
-import type { ClientContext } from '../types.ts'
+} from '../adapters/standard/index'
+import type { ClientContext } from '../types'
 
 /**
  * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
