@@ -8,7 +8,7 @@ import type {
 } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
-import { argumentsGrow, MAX_GROWTH, MAX_NESTING } from './expansion.ts'
+import { argumentsGrow, getDeclarationId, MAX_GROWTH, MAX_NESTING } from './expansion.ts'
 import type { JSDoc, SourceKind } from './utils.ts'
 import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils.ts'
 
@@ -137,25 +137,23 @@ export class TypeQueries {
   }
 
   private getDirectMappedSource(type: Type): Type | undefined {
-    return this.memo('directMappedSource', type.id, () => {
-      if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
-        return undefined
-      }
+    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+      return undefined
+    }
 
-      // `Readonly<C>` by its argument, an alias of one (`type View = Omit<C, 'x'>`, also
-      // `type PickBox<K> = Pick<Box, K>`) by the type it is declared with
-      const [argument] = this.getTypeArguments(type)
-      if (argument && this.isMappedViewOf(type, argument)) {
-        return argument
-      }
+    // `Readonly<C>` by its argument, an alias of one (`type View = Omit<C, 'x'>`, also
+    // `type PickBox<K> = Pick<Box, K>`) by the type it is declared with
+    const [argument] = this.getTypeArguments(type)
+    if (argument && this.isMappedViewOf(type, argument)) {
+      return argument
+    }
 
-      // the declared type is not instantiated with the alias's arguments
-      // (`Box<T>` of `type PickBox<T> = Pick<Box<T>, 'a'>`), so its type parameters match any type.
-      // A conditional type resolving to a mapped type (`T extends object ? { [K in keyof T]: ... } : T`)
-      // has no alias, its properties are still declared by the source.
-      const declaring = this.getDeclaringType(type)
-      return declaring && this.isMappedSourceOf(type, declaring, true) ? declaring : undefined
-    })
+    // the declared type is not instantiated with the alias's arguments
+    // (`Box<T>` of `type PickBox<T> = Pick<Box<T>, 'a'>`), so its type parameters match any type.
+    // A conditional type resolving to a mapped type (`T extends object ? { [K in keyof T]: ... } : T`)
+    // has no alias, its properties are still declared by the source.
+    const declaring = this.getDeclaringType(type)
+    return declaring && this.isMappedSourceOf(type, declaring, true) ? declaring : undefined
   }
 
   /**
@@ -211,22 +209,38 @@ export class TypeQueries {
       return undefined
     }
 
-    const values = this.getPropertyTypes(type)
-    const originalTypes = this.getSymbolTypes(originals as TSSymbol[])
+    return this.keepsValues(
+      this.getPropertyTypes(type),
+      this.getSymbolTypes(originals as TSSymbol[]),
+      true,
+    )
+      ? owners
+      : undefined
+  }
+
+  /**
+   * Whether each value keeps the original at its index (see `keepsValue`), with `generic`, also
+   * an original with type parameters, which match any type.
+   */
+  private keepsValues(
+    values: readonly (Type | undefined)[],
+    originals: readonly (Type | undefined)[],
+    generic: boolean,
+  ): boolean {
     const keeps = (value: Type | undefined, i: number) => {
-      const original = originalTypes[i]
+      const original = originals[i]
       return (
         value !== undefined &&
         original !== undefined &&
-        (this.keepsValue(value, original) || this.hasTypeParameter(original, 3))
+        (this.keepsValue(value, original) || (generic && this.hasTypeParameter(original, 3)))
       )
     }
 
     // values that are no mapped type first, which a mismatch shows without nesting deeper
-    return values.every((t, i) => nests(t) || keeps(t, i)) &&
+    return (
+      values.every((t, i) => nests(t) || keeps(t, i)) &&
       values.every((t, i) => !nests(t) || keeps(t, i))
-      ? owners
-      : undefined
+    )
   }
 
   /**
@@ -347,20 +361,11 @@ export class TypeQueries {
       return false
     }
 
-    const mappedTypes = this.getPropertyTypes(type)
     const sourceTypes = this.getPropertyTypes(source)
-    const keeps = (t: Type | undefined, i: number) => {
-      const original = sourceTypes[sourceIndexes.get(properties[i]!.name)!]
-      return (
-        t !== undefined &&
-        original !== undefined &&
-        (this.keepsValue(t, original) || (generic && this.hasTypeParameter(original, 3)))
-      )
-    }
-    // values that are no mapped type first, which a mismatch shows without nesting deeper
-    return (
-      mappedTypes.every((t, i) => nests(t) || keeps(t, i)) &&
-      mappedTypes.every((t, i) => !nests(t) || keeps(t, i))
+    return this.keepsValues(
+      this.getPropertyTypes(type),
+      properties.map((p) => sourceTypes[sourceIndexes.get(p.name)!]),
+      generic,
     )
   }
 
@@ -961,10 +966,6 @@ function isIndexOf(node: any, parameter: string, key: string): boolean {
     isTypeName(node.objectType, parameter) &&
     isTypeName(node.indexType, key)
   )
-}
-
-function getDeclarationId(type: Type): number | undefined {
-  return (type.getAliasSymbol() ?? type.getSymbol())?.id
 }
 
 /**

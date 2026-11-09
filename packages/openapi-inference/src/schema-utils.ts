@@ -1,14 +1,20 @@
 import type { JsonSchema } from '@orpc/json-schema'
-import { JsonSchemaFormat, JsonSchemaXNativeType, visitJsonSchemaRefs } from '@orpc/json-schema'
+import {
+  decodeJsonPointerSegment,
+  encodeJsonPointerSegment,
+  JsonSchemaFormat,
+  JsonSchemaXNativeType,
+  visitJsonSchemaRefs,
+} from '@orpc/json-schema'
 import { stringifyJSON } from '@orpc/shared'
 import type { JSDocTagInfo } from 'typescript/unstable/sync'
 
 export type ObjectJsonSchema = Exclude<JsonSchema, boolean>
 
-export const DEFS_REF_PREFIX = '#/$defs/'
+const DEFS_REF_PREFIX = '#/$defs/'
 
 export function toRef(name: string): string {
-  return `${DEFS_REF_PREFIX}${name.replace(/~/gu, '~0').replace(/\//gu, '~1')}`
+  return `${DEFS_REF_PREFIX}${encodeJsonPointerSegment(name)}`
 }
 
 /**
@@ -24,7 +30,7 @@ export function fromRef(schema: JsonSchema): string | undefined {
     return undefined
   }
 
-  return decodeDefName(schema.$ref.slice(DEFS_REF_PREFIX.length))
+  return decodeJsonPointerSegment(schema.$ref.slice(DEFS_REF_PREFIX.length))
 }
 
 /**
@@ -35,15 +41,11 @@ export function collectDefRefs(schema: JsonSchema): Set<string> {
 
   visitJsonSchemaRefs(schema, (ref) => {
     if (ref.startsWith(DEFS_REF_PREFIX)) {
-      names.add(decodeDefName(ref.slice(DEFS_REF_PREFIX.length).split('/')[0]!))
+      names.add(decodeJsonPointerSegment(ref.slice(DEFS_REF_PREFIX.length).split('/')[0]!))
     }
   })
 
   return names
-}
-
-function decodeDefName(segment: string): string {
-  return segment.replace(/~1/gu, '/').replace(/~0/gu, '~')
 }
 
 export function bigintSchema(): ObjectJsonSchema {

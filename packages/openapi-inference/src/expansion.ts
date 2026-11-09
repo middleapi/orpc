@@ -54,9 +54,9 @@ export class ExpansionGuard {
   expand<T>(wrapper: Type, convert: () => T): T | undefined {
     // `Readonly<Expand<T[]>>` expands `Expand`, the library's mapped type only wraps it
     const type = this.unwrap(wrapper)
-    const declaration: number = (type as any).aliasSymbol || (type as any).symbol
+    const declaration = getDeclarationId(type)
 
-    if (!declaration) {
+    if (declaration === undefined) {
       return convert()
     }
 
@@ -219,20 +219,23 @@ function grows(types: TypeQueries, outer: Type, inner: Type, depth: number): boo
   const outers = outer.flags & TypeFlags.UnionOrIntersection ? types.getMembers(outer) : [outer]
 
   return inners.some((innerMember) => {
-    const declaration = getDeclaration(innerMember)
+    const declaration = getDeclarationId(innerMember)
     return (
       declaration !== undefined &&
       outers.some(
         (outerMember) =>
           outerMember.id !== innerMember.id &&
-          getDeclaration(outerMember) === declaration &&
+          getDeclarationId(outerMember) === declaration &&
           argumentsGrow(types, outerMember, innerMember, depth + 1),
       )
     )
   })
 }
 
-function getDeclaration(type: Type): number | undefined {
+/**
+ * The declaration a type is an instantiation of: its alias, else its symbol.
+ */
+export function getDeclarationId(type: Type): number | undefined {
   return (type.getAliasSymbol() ?? type.getSymbol())?.id
 }
 

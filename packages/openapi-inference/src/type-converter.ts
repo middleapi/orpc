@@ -210,16 +210,16 @@ export class TypeToJsonSchemaConverter {
     options: TypeToJsonSchemaConvertOptions = {},
   ): [jsonSchema: JsonSchema, optional: boolean] {
     // a list of types is their union, like the yield types of a union of async iterators
-    let members = (Array.isArray(type) ? type : [type]).flatMap((t) => this.getAwaitedTypes(t))
-    let optional = members.some((t) => this.isOptional(t))
+    const members = (Array.isArray(type) ? type : [type]).flatMap((t) => this.getAwaitedTypes(t))
 
     // a function (also with properties, `(() => number) & { tag: string }`) is written as nothing,
     // like `undefined`, also as a member of a union
     const unions = members.flatMap((t) => (t.isUnionType() ? this.types.getMembers(t) : [t]))
-    if (unions.some((t) => isNonSerializable(this.types, t))) {
-      members = unions.filter((t) => !isNonSerializable(this.types, t))
-      optional = true
-    }
+    const serializable = unions.filter((t) => !isNonSerializable(this.types, t))
+    const filtered = serializable.length < unions.length
+    let optional = filtered || members.some((t) => this.isOptional(t))
+    // a single value is visited whole, so a union keeps its def
+    const values = filtered ? serializable : members
 
     // a function whose `toJSON` is optional may be written as nothing too
     if (unions.some((t) => mayBeNonSerializable(this.types, t))) {
@@ -233,12 +233,7 @@ export class TypeToJsonSchemaConverter {
     let $defs: Record<string, JsonSchema>
 
     try {
-      schema =
-        members.length === 1
-          ? this.visit(members[0]!)
-          : this.convertMembers(
-              members.flatMap((t) => (t.isUnionType() ? this.types.getMembers(t) : [t])),
-            )
+      schema = values.length === 1 ? this.visit(values[0]!) : this.convertMembers(serializable)
 
       if (options.inlineRoot) {
         schema = this.defs.inlineRoot(schema, options.inlineProperties ?? [])
@@ -1465,11 +1460,6 @@ export class TypeToJsonSchemaConverter {
         return this.visit(resolved)
       }
 
-      // `Uint8Array & { label }` keeps its added fields
-      if (isTypedArray(this.types, resolved)) {
-        return this.convertObject(resolved, true)
-      }
-
       const base = members.find(
         (m) =>
           this.types.getReferenceKind(m) !== undefined ||
@@ -1651,8 +1641,8 @@ export class TypeToJsonSchemaConverter {
       const own = getToJSONResultType(this.types, member, stringify)
       const results = own
         ? [own]
-        : getClassTypes(this.types, member).flatMap((c) =>
-            c.id === member.id ? [] : (getToJSONResultType(this.types, c, stringify) ?? []),
+        : getClassTypes(this.types, member).flatMap(
+            (c) => getToJSONResultType(this.types, c, stringify) ?? [],
           )
       return results.some(
         (serialized) =>

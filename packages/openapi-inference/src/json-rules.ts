@@ -9,6 +9,7 @@ import {
   getDeclaredBuiltinName,
   getToJSON,
   hasBigIntToJSON,
+  hasBuiltinForm,
   isBoxedBigInt,
   isBuiltinSymbol,
   isModeSensitiveBuiltin,
@@ -679,10 +680,7 @@ export class ModeSensitivity {
 
     // a built-in the serializer or `JSON.stringify` handles, not a library interface
     // holding data (`PromiseFulfilledResult<T>`)
-    if (
-      getDeclaredBuiltinName(types, type) !== undefined &&
-      (getBuiltin(types, type, false) ?? getBuiltin(types, type, true)) !== undefined
-    ) {
+    if (getDeclaredBuiltinName(types, type) !== undefined && hasBuiltinForm(types, type)) {
       // the serializer converts a boxed `BigInt` in the `either` mode already
       return (
         isModeSensitiveBuiltin(types, type) &&
@@ -705,8 +703,7 @@ export class ModeSensitivity {
       (classType !== undefined
         ? isClassView(types, type, classType)
         : extendsBuiltinClass(types, type)) &&
-      getBuiltin(types, type, false) === undefined &&
-      getBuiltin(types, type, true) === undefined
+      !hasBuiltinForm(types, type)
     ) {
       return false
     }
@@ -734,10 +731,7 @@ export class ModeSensitivity {
 
     // a view of a built-in (`Pick<Set<string>, 'size'>`), also when it keeps too few members
     // to tell the built-in by them
-    if (
-      (type as any).objectFlags & ObjectFlags.Mapped &&
-      (getBuiltin(types, type, false) ?? getBuiltin(types, type, true)) !== undefined
-    ) {
+    if ((type as any).objectFlags & ObjectFlags.Mapped && hasBuiltinForm(types, type)) {
       return isModeSensitiveBuiltin(types, type)
     }
 
@@ -749,9 +743,7 @@ export class ModeSensitivity {
     // one, so the serializer writes what `toJSON` returns or its fields, the `either` mode too.
     if (hasToJSON) {
       return (
-        this.mode === 'stringify' ||
-        isObjectLiteral(type) ||
-        this.computeFields(type, isSensitive, false)
+        this.mode === 'stringify' || isObjectLiteral(type) || this.computeFields(type, isSensitive)
       )
     }
 
@@ -772,20 +764,14 @@ export class ModeSensitivity {
       return false
     }
 
-    if (
-      getClassTypes(types, type).some(
-        (c) =>
-          getToJSON(types, c) ||
-          getBuiltin(types, c, false) !== undefined ||
-          getBuiltin(types, c, true) !== undefined,
-      )
-    ) {
+    if (getClassTypes(types, type).some((c) => getToJSON(types, c) || hasBuiltinForm(types, c))) {
       return true
     }
 
     const properties = types.getProperties(type)
 
     return (
+      properties.some((p) => p.name === 'toJSON') ||
       getDataProperties(types, properties, undefined, true).length !==
         getDataProperties(types, properties, classType).length ||
       this.computeFields(type, isSensitive)
@@ -793,16 +779,11 @@ export class ModeSensitivity {
   }
 
   /**
-   * Whether the fields of a type convert differently, or (with `toJSON`) it has `toJSON`.
+   * Whether the fields of a type convert differently.
    */
-  private computeFields(type: Type, isSensitive: (type: Type) => boolean, toJSON = true): boolean {
+  private computeFields(type: Type, isSensitive: (type: Type) => boolean): boolean {
     const types = this.types
     const properties = types.getProperties(type)
-
-    if (toJSON && properties.some((p) => p.name === 'toJSON')) {
-      return true
-    }
-
     const data = properties.filter((p) => !(p.flags & (SymbolFlags.Method | SymbolFlags.Prototype)))
     const dataTypes = types.getSymbolTypes(data)
 

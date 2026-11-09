@@ -7,7 +7,7 @@ import { bigintSchema, getLeafBuiltinSchema } from './schema-utils.ts'
 import type { TypeQueries } from './type-queries.ts'
 import { getIteratorTypes } from './utils.ts'
 
-export const TYPED_ARRAYS = new Set([
+const TYPED_ARRAYS = new Set([
   'Int8Array',
   'Uint8Array',
   'Uint8ClampedArray',
@@ -133,6 +133,13 @@ export function getBuiltin(
 }
 
 /**
+ * Whether the serializer or `JSON.stringify` writes a value of this type as a built-in.
+ */
+export function hasBuiltinForm(types: TypeQueries, type: Type): boolean {
+  return getBuiltin(types, type, false) !== undefined || getBuiltin(types, type, true) !== undefined
+}
+
+/**
  * Whether the serializer and `JSON.stringify` write a built-in differently, like `Set`, `Map`,
  * `Blob`, or a built-in subclass with its own `toJSON`, which only `JSON.stringify` calls.
  */
@@ -149,7 +156,7 @@ export function isModeSensitiveBuiltin(types: TypeQueries, type: Type): boolean 
 const BINARY = new Set([...TYPED_ARRAYS, 'ArrayBuffer', 'SharedArrayBuffer', 'DataView'])
 
 /** How the serializer and `JSON.stringify` write a typed array: by its index keys */
-export const TYPED_ARRAY_SCHEMA: JsonSchema = {
+const TYPED_ARRAY_SCHEMA: JsonSchema = {
   type: 'object',
   additionalProperties: { type: 'number' },
 }
@@ -178,17 +185,14 @@ export function getTypedArrayViewBases(types: TypeQueries, type: Type): readonly
  * `true` for a typed array, the views of typed arrays it extends for an interface over them.
  */
 function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | undefined {
-  // `Uint8Array & { label: string }`
-  if (type.isIntersectionType()) {
-    const kinds = types.getMembers(type).map((member) => getTypedArrayKind(types, member))
-    return kinds.includes(true) ? true : kinds.flatMap((kind) => (Array.isArray(kind) ? kind : []))
-  }
+  const members = type.isIntersectionType()
+    ? types.getMembers(type)
+    : (type as any).objectFlags & ObjectFlags.Mapped
+      ? types.getMappedSourceMembers(type)
+      : [type]
 
-  const members =
-    (type as any).objectFlags & ObjectFlags.Mapped ? types.getMappedSourceMembers(type) : [type]
-
-  // `Readonly<Uint8Array & { label: string }>`
-  if (members.length !== 1) {
+  // `Uint8Array & { label: string }`, `Readonly<Uint8Array & { label: string }>`
+  if (type.isIntersectionType() || members.length !== 1) {
     const kinds = members.map((member) => getTypedArrayKind(types, member))
     return kinds.includes(true) ? true : kinds.flatMap((kind) => (Array.isArray(kind) ? kind : []))
   }
@@ -232,15 +236,10 @@ export function getDeclaredBuiltinName(types: TypeQueries, type: Type): string |
 
 /**
  * How `JSON.stringify` writes a built-in by its own fields, as it writes what `toJSON` returned:
- * typed arrays by their index keys, boxed primitives as primitives, other built-ins have no own
- * enumerable data.
- * Also through a mapped type, like `Readonly<Uint8Array>` or `Readonly<Date>`.
+ * boxed primitives as primitives, other built-ins have no own enumerable data.
+ * Also through a mapped type, like `Readonly<Date>`.
  */
 export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | undefined {
-  if (isTypedArray(types, type)) {
-    return TYPED_ARRAY_SCHEMA
-  }
-
   const builtin = getDeclaredBuiltinName(types, type) ?? getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {
@@ -252,14 +251,11 @@ export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | u
 }
 
 /**
- * How `JSON.stringify` writes a boxed primitive, also of a subclass (`class Tag extends String`)
- * or through a mapped type: as its primitive (`new String('x')` as `"x"`).
+ * How `JSON.stringify` writes an instance of a subclass of a boxed primitive
+ * (`class Tag extends String`): as its primitive (`new String('x')` as `"x"`).
  */
 export function getBoxedPrimitiveSchema(types: TypeQueries, type: Type): JsonSchema | undefined {
-  const name =
-    getDeclaredBuiltinName(types, type) ??
-    getMappedBuiltinName(types, type) ??
-    getBuiltinBaseName(types, type)
+  const name = getBuiltinBaseName(types, type)
 
   return name === undefined ? undefined : BOXED_PRIMITIVES[name]?.(true)
 }
@@ -334,7 +330,7 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
  * by its source (`Readonly<Uint8Array>`), the others by their members, which keep the built-in's
  * own declarations (`Date#getTime`) and tell `Map` apart from look-alikes like `URLSearchParams`.
  */
-export function getMappedBuiltinName(types: TypeQueries, type: Type): string | undefined {
+function getMappedBuiltinName(types: TypeQueries, type: Type): string | undefined {
   if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
     return undefined
   }
@@ -564,7 +560,7 @@ export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined 
   return types.getProperty(type, 'toJSON')
 }
 
-export function hasOwnToJSON(types: TypeQueries, type: Type): boolean {
+function hasOwnToJSON(types: TypeQueries, type: Type): boolean {
   const toJSON = getToJSON(types, type)
   return toJSON !== undefined && !isBuiltinSymbol(types, toJSON)
 }

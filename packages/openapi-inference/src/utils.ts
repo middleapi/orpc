@@ -185,7 +185,7 @@ export function isClassAccessor(symbol: TSSymbol): boolean {
   })
 }
 
-export function getPropertyType(checker: Checker, type: Type, name: string): Type | undefined {
+function getPropertyType(checker: Checker, type: Type, name: string): Type | undefined {
   const property = checker.getPropertyOfType(type, name)
   return property && checker.getTypeOfSymbol(property)
 }
@@ -198,7 +198,7 @@ export function getCallReturnType(checker: Checker, type: Type | undefined): Typ
 /**
  * The `T` of `Promise<T>`.
  */
-export function getPromisedType(checker: Checker, type: Type): Type | undefined {
+function getPromisedType(checker: Checker, type: Type): Type | undefined {
   return type.isTypeReference() ? checker.getTypeArguments(type)[0] : undefined
 }
 

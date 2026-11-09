@@ -1,3 +1,4 @@
+import { decodeJsonPointerSegment, encodeJsonPointerSegment } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
@@ -155,7 +156,8 @@ function mapRefs(value: unknown, map: (name: string) => string): unknown {
       copy,
       key,
       key === '$ref' && typeof child === 'string' && child.startsWith(COMPONENTS_REF_PREFIX)
-        ? COMPONENTS_REF_PREFIX + map(decodeName(child.slice(COMPONENTS_REF_PREFIX.length)))
+        ? COMPONENTS_REF_PREFIX +
+            map(decodeJsonPointerSegment(child.slice(COMPONENTS_REF_PREFIX.length)))
         : mapRefs(child, map),
     )
   }
@@ -181,21 +183,13 @@ function rewriteRefs(value: unknown, resolve: (name: string) => string): void {
     const child = object[key]
 
     if (key === '$ref' && typeof child === 'string' && child.startsWith(COMPONENTS_REF_PREFIX)) {
-      const name = decodeName(child.slice(COMPONENTS_REF_PREFIX.length))
+      const name = decodeJsonPointerSegment(child.slice(COMPONENTS_REF_PREFIX.length))
       const resolved = resolve(name)
       if (resolved !== name) {
-        object[key] = COMPONENTS_REF_PREFIX + encodeName(resolved)
+        object[key] = COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(resolved)
       }
     } else {
       rewriteRefs(child, resolve)
     }
   }
-}
-
-function decodeName(segment: string): string {
-  return segment.replace(/~1/gu, '/').replace(/~0/gu, '~')
-}
-
-function encodeName(name: string): string {
-  return name.replace(/~/gu, '~0').replace(/\//gu, '~1')
 }

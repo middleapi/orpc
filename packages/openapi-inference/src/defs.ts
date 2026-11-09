@@ -60,7 +60,6 @@ export class DefRegistry {
   private readonly defsByName = new Map<string, Def>()
   /** Names emitted by discarded conversions, with the schema they were emitted with */
   private readonly reservedNames = new Map<string, JsonSchema | undefined>()
-  private readonly printed = new WeakMap<object, string>()
   /**
    * Finished conversions of anonymous types, shared between their uses,
    * and of named types whose schema is clearer inline, like `type UserId = string & { ... }`
@@ -293,21 +292,10 @@ export class DefRegistry {
   }
 
   /**
-   * The JSON of a def's schema, which does not change once the def is finished.
+   * The JSON of a def's schema.
    */
   stringify(schema: JsonSchema): string {
-    if (typeof schema !== 'object') {
-      return stringifyJSON(schema)!
-    }
-
-    let json = this.printed.get(schema)
-
-    if (json === undefined) {
-      json = stringifyJSON(schema)!
-      this.printed.set(schema, json)
-    }
-
-    return json
+    return stringifyJSON(schema)!
   }
 
   private remove(def: Def): void {
