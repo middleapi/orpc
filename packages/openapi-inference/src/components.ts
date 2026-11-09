@@ -178,14 +178,46 @@ function mapRefs(value: unknown, map: (name: string) => string): unknown {
     setOwn(
       copy,
       key,
-      key === '$ref' && typeof child === 'string' && child.startsWith(COMPONENTS_REF_PREFIX)
+      key === '$ref' && isComponentRef(child)
         ? COMPONENTS_REF_PREFIX +
             map(decodeJsonPointerSegment(child.slice(COMPONENTS_REF_PREFIX.length)))
         : mapRefs(child, map),
     )
   }
 
+  // the refs of a discriminator's mapping, the same as those of its `oneOf`
+  const mapping = getDiscriminatorMapping(copy)
+  if (mapping) {
+    for (const name of Object.keys(mapping)) {
+      const ref = mapping[name]
+      if (isComponentRef(ref)) {
+        setOwn(
+          mapping,
+          name,
+          COMPONENTS_REF_PREFIX +
+            map(decodeJsonPointerSegment(ref.slice(COMPONENTS_REF_PREFIX.length))),
+        )
+      }
+    }
+  }
+
   return copy
+}
+
+function isComponentRef(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith(COMPONENTS_REF_PREFIX)
+}
+
+function getDiscriminatorMapping(
+  schema: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const discriminator = schema.discriminator as { mapping?: unknown } | undefined
+  return typeof discriminator === 'object' &&
+    discriminator !== null &&
+    typeof discriminator.mapping === 'object' &&
+    discriminator.mapping !== null
+    ? (discriminator.mapping as Record<string, unknown>)
+    : undefined
 }
 
 function rewriteRefs(value: unknown, resolve: (name: string) => string): void {
@@ -202,17 +234,29 @@ function rewriteRefs(value: unknown, resolve: (name: string) => string): void {
 
   const object = value as Record<string, unknown>
 
-  for (const key of Object.keys(object)) {
-    const child = object[key]
-
-    if (key === '$ref' && typeof child === 'string' && child.startsWith(COMPONENTS_REF_PREFIX)) {
-      const name = decodeJsonPointerSegment(child.slice(COMPONENTS_REF_PREFIX.length))
+  const rewrite = (holder: Record<string, unknown>, key: string) => {
+    const ref = holder[key]
+    if (isComponentRef(ref)) {
+      const name = decodeJsonPointerSegment(ref.slice(COMPONENTS_REF_PREFIX.length))
       const resolved = resolve(name)
       if (resolved !== name) {
-        object[key] = COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(resolved)
+        holder[key] = COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(resolved)
       }
+    }
+  }
+
+  for (const key of Object.keys(object)) {
+    if (key === '$ref' && isComponentRef(object[key])) {
+      rewrite(object, key)
     } else {
-      rewriteRefs(child, resolve)
+      rewriteRefs(object[key], resolve)
+    }
+  }
+
+  const mapping = getDiscriminatorMapping(object)
+  if (mapping) {
+    for (const name of Object.keys(mapping)) {
+      rewrite(mapping, name)
     }
   }
 }

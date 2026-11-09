@@ -1730,10 +1730,17 @@ describe('typeToJsonSchemaConverter', () => {
           $ref: '#/$defs/AnyChatEvent',
           $defs: {
             AnyChatEvent: {
-              anyOf: [
+              oneOf: [
                 { $ref: '#/$defs/ChatEvent_message_Message' },
                 { $ref: '#/$defs/ChatEvent_ping_null' },
               ],
+              discriminator: {
+                propertyName: 'type',
+                mapping: {
+                  message: '#/$defs/ChatEvent_message_Message',
+                  ping: '#/$defs/ChatEvent_ping_null',
+                },
+              },
             },
             ChatEvent_ping_null: {
               type: 'object',
@@ -3149,6 +3156,104 @@ describe('typeToJsonSchemaConverter', () => {
       } finally {
         project.close()
       }
+    })
+  })
+
+  describe('round thirty-nine', () => {
+    const ref = (name: string) => ({ $ref: `#/$defs/${name}` })
+    const discriminated = (propertyName: string, mapping: Record<string, string>) => ({
+      oneOf: [...new Set(Object.values(mapping))].map((name) => ref(name)),
+      discriminator: {
+        propertyName,
+        mapping: Object.fromEntries(
+          Object.entries(mapping).map(([value, name]) => [value, `#/$defs/${name}`]),
+        ),
+      },
+    })
+
+    let project: TypeScriptProject
+    let defsOf: (name: string, direction?: 'input' | 'output') => Record<string, any>
+
+    beforeAll(() => {
+      project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/app/src/round39.ts', import.meta.url),
+      })
+      const converters = {
+        input: new TypeToJsonSchemaConverter(project.checker, project.program, {
+          direction: 'input',
+        }),
+        output: new TypeToJsonSchemaConverter(project.checker, project.program),
+      }
+      defsOf = (name, direction = 'output') =>
+        (converters[direction].convert(project.getExportType(name).type)[0] as any).$defs
+    })
+
+    afterAll(() => {
+      project.close()
+    })
+
+    it('writes a union of models told apart by a literal property with a discriminator', () => {
+      expect(defsOf('Shape').Shape).toEqual({
+        description: 'A shape, told apart by its kind',
+        ...discriminated('kind', { circle: 'Circle', square: 'Square' }),
+      })
+      // a model of several kinds, and kinds of enum members
+      expect(defsOf('Rounded').Rounded).toEqual(
+        discriminated('kind', { circle: 'Ellipse', ellipse: 'Ellipse', square: 'Square' }),
+      )
+      expect(defsOf('KindEnumShape').KindEnumShape).toEqual(
+        discriminated('kind', { flat: 'FlatShape', round: 'RoundShape' }),
+      )
+    })
+
+    it('discriminates by the kinds as serialized', () => {
+      // `toJSON` writes another kind, which a client does not send
+      expect(defsOf('RelabelledShape').RelabelledShape).toEqual(
+        discriminated('kind', { renamed: 'Relabelled', square: 'Square' }),
+      )
+      expect(defsOf('RelabelledShape', 'input').RelabelledShape).toEqual(
+        discriminated('kind', { relabelled: 'Relabelled', square: 'Square' }),
+      )
+    })
+
+    it('does not discriminate unions whose members can not be told apart by a property', () => {
+      // kinds that clash, a kind that may be left out, and a member that is no model
+      expect(defsOf('Clashing').Clashing).toEqual({ anyOf: [ref('Circle'), ref('Disc')] })
+      expect(defsOf('MaybeKinds').MaybeKinds).toEqual({ anyOf: [ref('MaybeKind'), ref('Square')] })
+      expect(defsOf('ShapeOrText').ShapeOrText).toEqual({
+        anyOf: [{ type: 'string' }, ref('Circle'), ref('Square')],
+      })
+      // a view of a class is an instance, written by `toJSON` with another kind, or a plain object
+      expect(defsOf('LabelledView').LabelledView.anyOf).toEqual([
+        {
+          anyOf: [
+            expect.objectContaining({ properties: { kind: { type: 'string', const: 'json' } } }),
+            expect.objectContaining({
+              properties: { kind: { type: 'string', const: 'labelled' } },
+            }),
+          ],
+        },
+        ref('Square'),
+      ])
+    })
+
+    it('discriminates a recursive union however it is reached', () => {
+      const tree = discriminated('kind', { branch: 'Branch', leaf: 'Leaf' })
+      expect(defsOf('Branch').Tree).toEqual({ description: 'A tree of leaves', ...tree })
+      expect(defsOf('Tree').Tree).toEqual({ description: 'A tree of leaves', ...tree })
+    })
+
+    it('does not discriminate members inlined at the root', () => {
+      const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+      const [schema] = converter.convert(project.getExportType('Shape').type, { inlineRoot: true })
+
+      expect(schema).toEqual({
+        description: 'A shape, told apart by its kind',
+        anyOf: [
+          expect.objectContaining({ type: 'object', required: ['kind', 'radius'] }),
+          expect.objectContaining({ type: 'object', required: ['kind', 'size'] }),
+        ],
+      })
     })
   })
 })

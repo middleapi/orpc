@@ -50,6 +50,7 @@ import { roundThirtyFiveInputs } from '../tests/fixtures/app/src/round35'
 import { roundThirtySixInputs } from '../tests/fixtures/app/src/round36'
 import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
 import { roundThirtyEightJSDoc } from '../tests/fixtures/app/src/round38'
+import { roundThirtyNine, roundThirtyNineInputs } from '../tests/fixtures/app/src/round39'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2213,6 +2214,68 @@ describe('openAPIGenerator', () => {
         const validate = ajv.compile(body(path))
         expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
       }
+    })
+  })
+
+  describe('round thirty-nine', () => {
+    const component = (name: string) => `#/components/schemas/${name}`
+
+    it.each(['3.2.0', '3.1.1', '3.0.4'] as const)(
+      'documents discriminated unions with a discriminator in %s',
+      async (version) => {
+        const spec = await generator.generate(roundThirtyNine, {
+          source: { file: fixture('round39.ts'), export: 'roundThirtyNine' },
+          version,
+        })
+        const schemas = spec.components?.schemas as any
+        const discriminated = (mapping: Record<string, string>) => ({
+          oneOf: [...new Set(Object.values(mapping))].map((name) => ({ $ref: component(name) })),
+          discriminator: {
+            propertyName: 'kind',
+            mapping: Object.fromEntries(
+              Object.entries(mapping).map(([value, name]) => [value, component(name)]),
+            ),
+          },
+        })
+
+        expect(schemas.Shape).toEqual({
+          description: 'A shape, told apart by its kind',
+          ...discriminated({ circle: 'Circle', square: 'Square' }),
+        })
+        expect(schemas.Tree).toEqual({
+          description: 'A tree of leaves',
+          ...discriminated({ branch: 'Branch', leaf: 'Leaf' }),
+        })
+        expect(
+          (spec.paths as any)['/relabelled'].post.responses['200'].content['application/json']
+            .schema.items,
+        ).toEqual(discriminated({ renamed: 'Relabelled', square: 'Square' }))
+        expect(schemas.Circle.properties.kind).toEqual(
+          version === '3.0.4'
+            ? { type: 'string', enum: ['circle'] }
+            : { type: 'string', const: 'circle' },
+        )
+      },
+    )
+
+    it('documents inputs of discriminated unions, not when they are split into parameters', async () => {
+      const spec = await generator.generate(roundThirtyNineInputs, {
+        source: { file: fixture('round39.ts'), export: 'roundThirtyNineInputs' },
+      })
+      const paths = spec.paths as any
+
+      expect(paths['/shape'].post.requestBody.content['application/json'].schema).toEqual({
+        $ref: component('Shape'),
+      })
+      expect(
+        paths['/relabelled'].post.requestBody.content['application/json'].schema.discriminator
+          .mapping,
+      ).toEqual({ relabelled: component('Relabelled'), square: component('Square') })
+      expect(paths['/queried'].get.parameters.map((p: any) => p.name)).toEqual([
+        'kind',
+        'radius',
+        'size',
+      ])
     })
   })
 })

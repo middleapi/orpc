@@ -2,11 +2,12 @@ import type { JsonSchema } from '@orpc/json-schema'
 import {
   decodeJsonPointerSegment,
   encodeJsonPointerSegment,
+  getJsonSchemaKeywordKind,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
   visitJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { stringifyJSON } from '@orpc/shared'
+import { setOwn, stringifyJSON } from '@orpc/shared'
 import type { JSDocTagInfo } from 'typescript/unstable/sync'
 
 export type ObjectJsonSchema = Exclude<JsonSchema, boolean>
@@ -46,6 +47,127 @@ export function collectDefRefs(schema: JsonSchema): Set<string> {
   })
 
   return names
+}
+
+/**
+ * Writes each union of refs to object defs that all require a property of distinct string literals
+ * (`Circle | Square` by `kind`) as `oneOf` with an OpenAPI `discriminator`, like Zod and Valibot
+ * write discriminated unions as `oneOf`. Being decided on the schemas, it holds for the values
+ * as serialized, and does not depend on how the union was reached.
+ */
+export function withDiscriminators(
+  schema: JsonSchema,
+  getDef: (name: string) => JsonSchema | undefined,
+): JsonSchema {
+  const map = (value: unknown, schemaLevel: boolean): any => {
+    if (Array.isArray(value)) {
+      return value.map((item) => map(item, schemaLevel))
+    }
+
+    if (typeof value !== 'object' || value === null) {
+      return value
+    }
+
+    const result: Record<string, unknown> = {}
+
+    for (const key of Object.keys(value)) {
+      const child = (value as Record<string, unknown>)[key]
+      const kind = getJsonSchemaKeywordKind(key, child, schemaLevel)
+      setOwn(
+        result,
+        key,
+        kind === 'schema' ? map(child, true) : kind === 'schema-record' ? map(child, false) : child,
+      )
+    }
+
+    const { anyOf, ...rest } = result as ObjectJsonSchema
+    const discriminator =
+      schemaLevel && anyOf && rest.oneOf === undefined && rest.discriminator === undefined
+        ? getDiscriminator(anyOf, getDef)
+        : undefined
+
+    return discriminator ? { ...rest, oneOf: anyOf, discriminator } : result
+  }
+
+  return map(schema, true)
+}
+
+/**
+ * The first property of the first member that each member requires as distinct string literals.
+ */
+function getDiscriminator(
+  members: readonly JsonSchema[],
+  getDef: (name: string) => JsonSchema | undefined,
+): { propertyName: string; mapping: Record<string, string> } | undefined {
+  const defs: ObjectJsonSchema[] = []
+
+  for (const member of members) {
+    const name = fromRef(member)
+    const def = name === undefined ? undefined : getDef(name)
+
+    if (typeof def !== 'object' || def.type !== 'object' || !def.properties) {
+      return undefined
+    }
+    defs.push(def)
+  }
+
+  if (defs.length < 2) {
+    return undefined
+  }
+
+  for (const propertyName of Object.keys(defs[0]!.properties!)) {
+    const mapping: Record<string, string> = {}
+
+    const discriminates = defs.every((def, i) => {
+      const values = def.required?.includes(propertyName)
+        ? getStringLiterals(def.properties![propertyName]!, getDef)
+        : undefined
+
+      return values?.every((value) => {
+        if (Object.hasOwn(mapping, value)) {
+          return false
+        }
+        setOwn(mapping, value, (members[i] as ObjectJsonSchema).$ref!)
+        return true
+      })
+    })
+
+    if (discriminates) {
+      return { propertyName, mapping }
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * The values of a schema of string literals (`'a'` or `'a' | 'b'`), also through refs to defs.
+ */
+function getStringLiterals(
+  schema: JsonSchema,
+  getDef: (name: string) => JsonSchema | undefined,
+): string[] | undefined {
+  let resolved: JsonSchema | undefined = schema
+  const seen = new Set<string>()
+
+  for (let name = fromRef(schema); name !== undefined; name = fromRef(resolved)) {
+    resolved = seen.has(name) ? undefined : getDef(name)
+    if (resolved === undefined) {
+      return undefined
+    }
+    seen.add(name)
+  }
+
+  if (!isLiteralSchema(resolved) || (resolved as ObjectJsonSchema).type !== 'string') {
+    return undefined
+  }
+
+  const { const: value, enum: values } = resolved as ObjectJsonSchema
+  const literals: unknown[] = values ?? [value]
+
+  return literals.length && literals.every((v) => typeof v === 'string')
+    ? (literals as string[])
+    : undefined
 }
 
 export function bigintSchema(): ObjectJsonSchema {

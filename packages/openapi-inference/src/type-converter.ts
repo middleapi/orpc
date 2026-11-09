@@ -66,6 +66,7 @@ import {
   mapSchema,
   setSchema,
   toRef,
+  withDiscriminators,
   withNull,
 } from './schema-utils'
 import {
@@ -185,6 +186,8 @@ export class TypeToJsonSchemaConverter {
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
   private anyArrayType: Type | null | undefined
+  /** Def schemas with their unions written as discriminated ones, see `withDiscriminators` */
+  private readonly discriminated = new WeakMap<object, JsonSchema>()
 
   /**
    * Who writes the value being converted:
@@ -262,6 +265,19 @@ export class TypeToJsonSchemaConverter {
       }
 
       $defs = this.defs.getReferencedDefs(schema)
+
+      // on the final schemas, once inlined members are no longer refs
+      const getDef = (name: string) => (Object.hasOwn($defs, name) ? $defs[name] : undefined)
+      schema = withDiscriminators(schema, getDef)
+      for (const [name, def] of Object.entries($defs)) {
+        // a def's schema is final, and so are those of the defs it refers to
+        let discriminated = this.discriminated.get(def as object)
+        if (!discriminated) {
+          discriminated = withDiscriminators(def, getDef)
+          this.discriminated.set(def as object, discriminated)
+        }
+        setOwn($defs, name, discriminated)
+      }
     } catch (error) {
       // defs of a failed conversion may be unfinished or reference unfinished ones
       this.defs.discardCreated()

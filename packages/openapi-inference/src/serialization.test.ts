@@ -272,6 +272,18 @@ describe('generated schemas match serialized outputs', async () => {
     ['growingPair', undefined],
     ['deepBoxes', undefined],
     ['viaBoxes', undefined],
+    ['shapes', undefined],
+    ['maybeShape', undefined],
+    ['maybeShapes', undefined],
+    ['rounded', undefined],
+    ['clashing', undefined],
+    ['maybeKinds', undefined],
+    ['withText', undefined],
+    ['relabelled', undefined],
+    ['labelledViews', undefined],
+    ['enumShapes', undefined],
+    ['treeBranch', undefined],
+    ['shapeTree', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2370,6 +2382,54 @@ describe('generated schemas match serialized outputs', async () => {
       expect(schemaOf('viaBoxes')).toEqual(
         levels(6, (v) => model({ inner: model({ v }) }), { type: 'number' }),
       )
+    })
+  })
+
+  describe('round thirty-nine', () => {
+    const itemsOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema.items
+    const component = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+
+    it('discriminates unions by the kinds as serialized', () => {
+      const schemas = spec.components?.schemas as any
+
+      expect(schemas.Shape.discriminator).toEqual({
+        propertyName: 'kind',
+        mapping: { circle: component('Circle').$ref, square: component('Square').$ref },
+      })
+      expect(schemas.Tree.oneOf).toEqual([component('Branch'), component('Leaf')])
+      // `toJSON` writes another kind
+      expect(itemsOf('relabelled').discriminator.mapping).toEqual({
+        renamed: component('Relabelled').$ref,
+        square: component('Square').$ref,
+      })
+      expect(Object.keys(itemsOf('rounded').discriminator.mapping)).toEqual([
+        'circle',
+        'ellipse',
+        'square',
+      ])
+    })
+
+    it('maps each serialized value to the member it matches', async () => {
+      for (const name of ['shapes', 'rounded', 'relabelled', 'enumShapes']) {
+        const { discriminator } = deref(itemsOf(name))
+
+        for (const value of serialize(await call((router as any)[name], undefined))) {
+          const target = discriminator.mapping[value[discriminator.propertyName]]
+          const validate = ajv.compile({
+            $ref: target.replace('#/components/schemas/', 'spec#/$defs/'),
+          })
+
+          expect(validate(value) ? [] : validate.errors).toEqual([])
+        }
+      }
+    })
+
+    it('does not discriminate unions whose members can not be told apart by a property', () => {
+      for (const name of ['clashing', 'maybeKinds', 'withText', 'labelledViews', 'maybeShapes']) {
+        expect(itemsOf(name).anyOf).toBeDefined()
+        expect(itemsOf(name).discriminator).toBeUndefined()
+      }
     })
   })
 
