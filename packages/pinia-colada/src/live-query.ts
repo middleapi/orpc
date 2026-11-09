@@ -1,8 +1,8 @@
 import type { Promisable } from '@orpc/shared'
 import { listenAbort, stringifyJSON, throwIfAborted } from '@orpc/shared'
 
-import type { SettleOnFirstDataOptions } from './stream-query.ts'
-import type { UseQueryFnContext } from './types.ts'
+import type { SettleOnFirstDataOptions } from './stream-query'
+import type { UseQueryFnContext } from './types'
 
 /**
  * A Pinia Colada query function that publishes each streamed chunk to the

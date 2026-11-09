@@ -1,6 +1,6 @@
 import { NullProtoObj } from '@orpc/shared'
 
-import { MalformedResponseError, ORPCError, ResponseError } from './error.ts'
+import { MalformedResponseError, ORPCError, ResponseError } from './error'
 
 describe('oRPCError', () => {
   it('works', () => {

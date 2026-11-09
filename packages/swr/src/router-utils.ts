@@ -3,9 +3,9 @@ import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import type { Public } from '@orpc/shared'
 import { bindMethods, isNonPrimitive, toArray } from '@orpc/shared'
 
-import type { OperationKeyPrefixOptions } from './key.ts'
-import { ProcedureUtils } from './procedure-utils.ts'
-import { SharedUtils } from './shared-utils.ts'
+import type { OperationKeyPrefixOptions } from './key'
+import { ProcedureUtils } from './procedure-utils'
+import { SharedUtils } from './shared-utils'
 
 export type RouterUtils<T extends AnyNestedClient> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>

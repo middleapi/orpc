@@ -9,8 +9,8 @@ import { ORPCError, os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
 
-import type { WithEffectContext } from './context.ts'
-import { handlerGen } from './handler.ts'
+import type { WithEffectContext } from './context'
+import { handlerGen } from './handler'
 
 class Service1 extends Context.Service<
   Service1,

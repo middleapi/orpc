@@ -8,7 +8,7 @@ import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import type { StandardLazyRequest } from '@standard-server/core'
 import { bench } from 'vitest'
 
-import { drainBody } from './__shared__/payloads.ts'
+import { drainBody } from './__shared__/payloads'
 
 const rootDir = mkdtempSync(path.join(tmpdir(), 'orpc-static-file-bench-'))
 

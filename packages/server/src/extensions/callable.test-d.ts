@@ -1,7 +1,7 @@
 import type { DecoratedProcedure, Procedure, ProcedureClient } from '@orpc/server'
 import { z } from 'zod'
 
-import './callable.ts'
+import './callable'
 
 const errorMap = {
   BASE: {

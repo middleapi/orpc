@@ -1,2 +1,2 @@
-export * from './tool.ts'
-export * from './tool-meta.ts'
+export * from './tool'
+export * from './tool-meta'

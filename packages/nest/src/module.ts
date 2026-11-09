@@ -7,8 +7,8 @@ import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import type { ToEventStreamOptions } from '@standard-server/node'
 
-import { ORPC_MODULE_CONFIG_SYMBOL } from './constants.ts'
-import { ImplementInterceptor } from './implement.ts'
+import { ORPC_MODULE_CONFIG_SYMBOL } from './constants'
+import { ImplementInterceptor } from './implement'
 
 /**
  * A standard lazy request extended with NestJS route parameters,
@@ -54,9 +54,10 @@ export type ORPCModuleConfig = OpenAPIHandlerCodecCoreOptions<DefaultInitialCont
  *
  * @see {@link https://orpc.dev/docs/integrations/nest#configuration | Implement oRPC contract with NestJS - Configuration}
  */
+export
 @Module({})
 // oxlint-disable-next-line typescript/no-extraneous-class
-export class ORPCModule {
+class ORPCModule {
   static forRoot(config: ORPCModuleConfig): DynamicModule {
     return {
       module: ORPCModule,

@@ -1,5 +1,5 @@
-import type { StandardHandlerPlugin } from './plugin.ts'
-import { CompositeStandardHandlerPlugin } from './plugin.ts'
+import type { StandardHandlerPlugin } from './plugin'
+import { CompositeStandardHandlerPlugin } from './plugin'
 
 describe('compositeStandardHandlerPlugin', () => {
   beforeEach(() => {

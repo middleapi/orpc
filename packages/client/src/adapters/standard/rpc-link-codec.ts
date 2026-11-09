@@ -15,11 +15,11 @@ import type {
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 
-import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils.ts'
-import { MalformedResponseError, ResponseError } from '../../error.ts'
-import { RPCSerializer } from '../../rpc-serializer.ts'
-import type { ClientContext, ClientOptions } from '../../types.ts'
-import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard/index.ts'
+import { MalformedResponseError, ResponseError } from '../../error'
+import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils'
+import { RPCSerializer } from '../../rpc-serializer'
+import type { ClientContext, ClientOptions } from '../../types'
+import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard/index'
 
 export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**

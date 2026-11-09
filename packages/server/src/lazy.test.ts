@@ -1,4 +1,4 @@
-import { Lazy, unlazy } from './lazy.ts'
+import { Lazy, unlazy } from './lazy'
 
 describe('lazy', () => {
   const meta = { title: 'test' }

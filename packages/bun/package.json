@@ -42,7 +42,7 @@
     }
   },
   "scripts": {
-    "prepack": "tsc -p tsconfig.build.json",
+    "prepack": "tsdown",
     "test": "bun --env-file=../../.env test",
     "test:coverage": "bun --env-file=../../.env test --coverage"
   },

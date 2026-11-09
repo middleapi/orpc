@@ -3,19 +3,19 @@ import { toArray } from '@orpc/shared'
 import type {
   ProcedureContractBuilderWithInput,
   ProcedureContractBuilderWithOutput,
-} from './builder-variants.ts'
-import type { MergedErrorMap } from './error-utils.ts'
-import { mergeErrorMap } from './error-utils.ts'
-import type { ErrorMap } from './error.ts'
-import { resolveMetaPlugins } from './meta-utils.ts'
-import type { MetaPlugin } from './meta.ts'
-import { getHiddenMetaPlugins } from './meta.ts'
-import type { ProcedureContractDefinition } from './procedure.ts'
-import { ProcedureContract } from './procedure.ts'
-import type { AugmentedContractRouter } from './router-utils.ts'
-import { augmentContractRouter } from './router-utils.ts'
-import type { RouterContract } from './router.ts'
-import type { AnySchema, Schema } from './schema.ts'
+} from './builder-variants'
+import type { ErrorMap } from './error'
+import type { MergedErrorMap } from './error-utils'
+import { mergeErrorMap } from './error-utils'
+import type { MetaPlugin } from './meta'
+import { getHiddenMetaPlugins } from './meta'
+import { resolveMetaPlugins } from './meta-utils'
+import type { ProcedureContractDefinition } from './procedure'
+import { ProcedureContract } from './procedure'
+import type { RouterContract } from './router'
+import type { AugmentedContractRouter } from './router-utils'
+import { augmentContractRouter } from './router-utils'
+import type { AnySchema, Schema } from './schema'
 
 /**
  * The input schema type used before `.input` is called.

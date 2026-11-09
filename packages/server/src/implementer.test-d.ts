@@ -1,7 +1,7 @@
 import type { ProcedureContract, RouterContract } from '@orpc/contract'
 
-import type { RouterImplementer } from './implementer-router.ts'
-import type { Implementer } from './implementer.ts'
+import type { Implementer } from './implementer'
+import type { RouterImplementer } from './implementer-router'
 
 const contract = {
   ping: {} as ProcedureContract<any, any, any>,

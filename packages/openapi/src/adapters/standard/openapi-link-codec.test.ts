@@ -1,9 +1,9 @@
 import { MalformedResponseError, ORPCError, ResponseError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 
-import { openapi } from '../../meta.ts'
-import { OpenAPISerializer } from '../../openapi-serializer.ts'
-import { OpenAPILinkCodec } from './openapi-link-codec.ts'
+import { openapi } from '../../meta'
+import { OpenAPISerializer } from '../../openapi-serializer'
+import { OpenAPILinkCodec } from './openapi-link-codec'
 
 const serializer = new OpenAPISerializer()
 

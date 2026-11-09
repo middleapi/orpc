@@ -6,8 +6,8 @@ import type {
 } from '@orpc/server'
 import { Effect, Context as EffectContext } from 'effect'
 
-import type { InferEffectServices, WithEffectContext } from './context.ts'
-import { runPromise } from './runtime.ts'
+import type { InferEffectServices, WithEffectContext } from './context'
+import { runPromise } from './runtime'
 
 export interface HandlerGen<
   TCurrentContext extends Context,

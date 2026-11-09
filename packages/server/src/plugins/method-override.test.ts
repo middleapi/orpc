@@ -1,6 +1,6 @@
-import { RPCHandler } from '../adapters/fetch/index.ts'
-import { os } from '../builder.ts'
-import { MethodOverrideHandlerPlugin } from './method-override.ts'
+import { RPCHandler } from '../adapters/fetch/index'
+import { os } from '../builder'
+import { MethodOverrideHandlerPlugin } from './method-override'
 
 function getInterceptor(options?: ConstructorParameters<typeof MethodOverrideHandlerPlugin>[0]) {
   const existingInterceptor = vi.fn()

@@ -1,7 +1,7 @@
 import type { Client, ORPCError, ThrowableError } from '@orpc/client'
 import { z } from 'zod'
 
-import type { ProcedureContractClient } from './procedure-client.ts'
+import type { ProcedureContractClient } from './procedure-client'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })

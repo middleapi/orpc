@@ -10,8 +10,8 @@ import {
 } from '@orpc/server/plugins'
 import { promiseWithResolvers } from '@orpc/shared'
 
-import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin.ts'
-import { BatchResponseCompressionHandlerPlugin } from './batch-response-compression-handler-plugin.ts'
+import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin'
+import { BatchResponseCompressionHandlerPlugin } from './batch-response-compression-handler-plugin'
 
 // Long enough that a compressed body is unmistakably smaller than the identity one
 const largeValue = 'batched-payload-'.repeat(64)

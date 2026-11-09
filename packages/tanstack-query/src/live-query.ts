@@ -2,7 +2,7 @@ import type { Promisable } from '@orpc/shared'
 import { listenAbort, stringifyJSON, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
-import type { SettleOnFirstDataOptions } from './stream-query.ts'
+import type { SettleOnFirstDataOptions } from './stream-query'
 
 export function liveQuery<TQueryFnData = unknown, TQueryKey extends QueryKey = QueryKey>(
   queryFn: (context: QueryFunctionContext<TQueryKey>) => Promisable<AsyncIterable<TQueryFnData>>,

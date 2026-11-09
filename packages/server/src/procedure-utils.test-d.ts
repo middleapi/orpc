@@ -1,7 +1,7 @@
 import * as z from 'zod'
 
-import { os } from './builder.ts'
-import { call } from './procedure-utils.ts'
+import { os } from './builder'
+import { call } from './procedure-utils'
 
 describe('call', () => {
   it('requires input, options if context is required', async () => {

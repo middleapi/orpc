@@ -2,7 +2,7 @@ import { isDefinedError } from '@orpc/client'
 import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
 
-import { client, orpc } from './__shared__/orpc.ts'
+import { client, orpc } from './__shared__/orpc'
 
 it('.key', () => {
   const queryCache = useQueryCache()

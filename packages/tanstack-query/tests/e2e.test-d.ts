@@ -11,7 +11,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query'
 
-import { client, orpc, queryClient } from './__shared__/orpc.tsx'
+import { client, orpc, queryClient } from './__shared__/orpc'
 
 it('.key', () => {
   void queryClient.invalidateQueries({

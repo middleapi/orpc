@@ -5,17 +5,17 @@ import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import { parseStandardUrl } from '@standard-server/core'
 
-import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants.ts'
-import type { Context } from '../../context.ts'
-import type { AnyProcedure } from '../../procedure.ts'
-import type { AnyRouter } from '../../router.ts'
+import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
+import type { Context } from '../../context'
+import type { AnyProcedure } from '../../procedure'
+import type { AnyRouter } from '../../router'
 import type {
   ResolvedStandardHandlerHandleOptions,
   StandardHandlerCodec,
   StandardHandlerCodecResolvedProcedure,
-} from '../standard/index.ts'
-import type { RPCMatcherOptions } from './rpc-matcher.ts'
-import { RPCMatcher } from './rpc-matcher.ts'
+} from '../standard/index'
+import type { RPCMatcherOptions } from './rpc-matcher'
+import { RPCMatcher } from './rpc-matcher'
 
 export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOptions {
   /**

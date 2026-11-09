@@ -9,8 +9,8 @@ import type {
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 
-import type { ServerFormFunction } from './server-form-function.ts'
-import { createServerFormFunction } from './server-form-function.ts'
+import type { ServerFormFunction } from './server-form-function'
+import { createServerFormFunction } from './server-form-function'
 
 export interface ServerFormFunctionable<TInitialContext extends Context> {
   <

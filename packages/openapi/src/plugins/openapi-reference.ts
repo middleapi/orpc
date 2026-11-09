@@ -17,7 +17,7 @@ import type { ApiReferenceConfiguration as ScalarProviderConfig } from '@scalar/
 import type { StandardUrl } from '@standard-server/core'
 import type { SwaggerUIOptions } from 'swagger-ui'
 
-import type { OpenAPIDocument, OpenAPIVersion } from '../types.ts'
+import type { OpenAPIDocument, OpenAPIVersion } from '../types'
 
 export type OpenAPIReferenceHandlerPluginProvider = 'scalar' | 'swagger'
 

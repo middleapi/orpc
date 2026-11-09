@@ -1,11 +1,11 @@
 import { AsyncIteratorClass } from '@standard-server/shared'
 import type { Promisable } from 'type-fest'
 
-import { once } from './function.ts'
-import { AsyncIdQueue } from './queue.ts'
-import type { StartSpanOptions } from './tracing.ts'
-import { recordSpanError, runInSpanContext, startSpan } from './tracing.ts'
-import type { PromiseWithError, ThrowableError } from './types.ts'
+import { once } from './function'
+import { AsyncIdQueue } from './queue'
+import type { StartSpanOptions } from './tracing'
+import { recordSpanError, runInSpanContext, startSpan } from './tracing'
+import type { PromiseWithError, ThrowableError } from './types'
 
 export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn> {
   /**

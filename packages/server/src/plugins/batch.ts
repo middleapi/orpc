@@ -23,8 +23,8 @@ import type {
   StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
   StandardHandlerRoutingInterceptorOptions,
-} from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,

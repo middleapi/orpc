@@ -2,7 +2,7 @@ import { AbortError } from '@orpc/shared'
 import { Cause, Context, Effect, Option, Scheduler } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
 
-import { runPromise } from './runtime.ts'
+import { runPromise } from './runtime'
 
 describe('runPromise & extractErrorFromCause', () => {
   describe('success', () => {

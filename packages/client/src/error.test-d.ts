@@ -1,4 +1,4 @@
-import { ORPCError } from './error.ts'
+import { ORPCError } from './error'
 
 describe('ORPCError', () => {
   it('constructor', () => {

@@ -9,8 +9,8 @@ import {
   JSON_SCHEMA_LITERAL_KEYWORDS,
   JSON_SCHEMA_LOGIC_KEYWORDS,
   JSON_SCHEMA_RECORD_KEYWORDS,
-} from './constants.ts'
-import type { JsonSchema } from './types.ts'
+} from './constants'
+import type { JsonSchema } from './types'
 
 /**
  * Encodes a JSON Pointer segment according to RFC 6901.

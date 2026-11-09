@@ -17,10 +17,10 @@ import type {
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
 
-import type { OperationKeyBaseOptions } from './key.ts'
-import type { RouterUtilsPlugin } from './plugin.ts'
-import type { ProcedureUtilsOptions } from './procedure-utils.ts'
-import { mergeProcedureUtilsOptions } from './procedure-utils.ts'
+import type { OperationKeyBaseOptions } from './key'
+import type { RouterUtilsPlugin } from './plugin'
+import type { ProcedureUtilsOptions } from './procedure-utils'
+import { mergeProcedureUtilsOptions } from './procedure-utils'
 
 export type TanstackQueryMetaOptions<
   TClientContext extends ClientContext,

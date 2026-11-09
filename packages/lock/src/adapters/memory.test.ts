@@ -1,7 +1,7 @@
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 
-import { LockTimeoutError } from '../error.ts'
-import { MemoryLocker } from './memory.ts'
+import { LockTimeoutError } from '../error'
+import { MemoryLocker } from './memory'
 
 describe('memoryLocker', () => {
   it('runs the callback right away when the lock is free and releases it afterwards', async () => {

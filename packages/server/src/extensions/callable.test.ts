@@ -1,6 +1,6 @@
-import { os } from '../builder.ts'
-import { Procedure } from '../procedure.ts'
-import './callable.ts'
+import { os } from '../builder'
+import { Procedure } from '../procedure'
+import './callable'
 
 it('adds .callable into decorated procedure', async () => {
   const callable = os

@@ -7,19 +7,19 @@ import type {
 import { expectTypeOf } from 'vitest'
 import { z } from 'zod'
 
-import type { MergedContext, MergedInitialContext } from './context.ts'
-import type { ProcedureImplementer } from './implementer-procedure.ts'
+import type { MergedContext, MergedInitialContext } from './context'
+import type { ProcedureImplementer } from './implementer-procedure'
 import type {
   RouterImplementer,
   RouterImplementerWithMiddlewares,
   SharedRouterImplementer,
   SharedRouterImplementerWithMiddlewares,
-} from './implementer-router.ts'
-import { Lazy } from './lazy.ts'
-import type { DecoratedMiddleware } from './middleware-decorated.ts'
-import type { Middleware, MiddlewareDone } from './middleware.ts'
-import type { Procedure } from './procedure.ts'
-import type { AugmentedRouterWithMiddlewares } from './router-utils.ts'
+} from './implementer-router'
+import { Lazy } from './lazy'
+import type { Middleware, MiddlewareDone } from './middleware'
+import type { DecoratedMiddleware } from './middleware-decorated'
+import type { Procedure } from './procedure'
+import type { AugmentedRouterWithMiddlewares } from './router-utils'
 
 const errorMap = {
   BASE: {

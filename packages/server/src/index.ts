@@ -1,44 +1,44 @@
-export * from './builder.ts'
-export * from './builder-variants.ts'
-export * from './constants.ts'
-export * from './context.ts'
-export * from './implementer.ts'
-export * from './implementer-procedure.ts'
-export { SharedRouterImplementer } from './implementer-router.ts'
+export * from './builder'
+export * from './builder-variants'
+export * from './constants'
+export * from './context'
+export * from './implementer'
+export * from './implementer-procedure'
+export { SharedRouterImplementer } from './implementer-router'
 export type {
   RouterImplementer,
   RouterImplementerWithMiddlewares,
   SharedRouterImplementerWithMiddlewares,
-} from './implementer-router.ts'
-export * from './lazy.ts'
-export * from './middleware.ts'
-export type { DecoratedMiddleware } from './middleware-decorated.ts'
-export * from './procedure.ts'
-export * from './procedure-client.ts'
-export * from './procedure-decorated.ts'
-export { call } from './procedure-utils.ts'
-export type { CallOptions, CallRest } from './procedure-utils.ts'
-export * from './router.ts'
+} from './implementer-router'
+export * from './lazy'
+export * from './middleware'
+export type { DecoratedMiddleware } from './middleware-decorated'
+export * from './procedure'
+export * from './procedure-client'
+export * from './procedure-decorated'
+export { call } from './procedure-utils'
+export type { CallOptions, CallRest } from './procedure-utils'
+export * from './router'
 export type {
   /**
    * @deprecated Use `InferRouterFinalContexts` instead.
    */
   InferRouterFinalContexts as InferRouterCurrentContexts,
-} from './router.ts'
-export * from './router-client.ts'
+} from './router'
+export * from './router-client'
 export {
   getRouter,
   resolveContractProcedure,
   unlazyRouter,
   walkProcedureContractsAsync,
   walkProcedureContractsSync,
-} from './router-utils.ts'
+} from './router-utils'
 export type {
   AugmentedRouter,
   AugmentedRouterWithMiddlewares,
   UnlaziedRouter,
   WalkProcedureContractsLazyResult,
-} from './router-utils.ts'
+} from './router-utils'
 
 export type {
   AnyORPCError,

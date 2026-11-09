@@ -17,27 +17,27 @@ import { walkProcedureContractsAsync } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
 import { clone, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
 
-import { DEFAULT_OPENAPI_METHOD } from './constants.ts'
-import type { OpenAPIMeta } from './meta.ts'
-import { getOpenAPIMeta } from './meta.ts'
-import { OpenAPIComponentRegistry } from './openapi-generator-components.ts'
+import { DEFAULT_OPENAPI_METHOD } from './constants'
+import type { OpenAPIMeta } from './meta'
+import { getOpenAPIMeta } from './meta'
+import { OpenAPIComponentRegistry } from './openapi-generator-components'
 import type {
   OpenAPIErrorBodyDefinition,
   OpenAPIOperationContext,
-} from './openapi-generator-operation.ts'
+} from './openapi-generator-operation'
 import {
   buildErrorResponse,
   buildRequest,
   buildSuccessResponse,
   OpenAPIGeneratorError,
   toOpenAPIPath,
-} from './openapi-generator-operation.ts'
-import { OpenAPIJsonSerializer } from './openapi-json-serializer.ts'
-import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types.ts'
-import { getDynamicPathParams } from './utils.ts'
+} from './openapi-generator-operation'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer'
+import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types'
+import { getDynamicPathParams } from './utils'
 
-export { OpenAPIGeneratorError } from './openapi-generator-operation.ts'
-export type { OpenAPIErrorBodyDefinition } from './openapi-generator-operation.ts'
+export { OpenAPIGeneratorError } from './openapi-generator-operation'
+export type { OpenAPIErrorBodyDefinition } from './openapi-generator-operation'
 
 export interface OpenAPIGeneratorOptions {
   converters?: JsonSchemaConverter[] | undefined

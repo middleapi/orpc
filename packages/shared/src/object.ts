@@ -1,6 +1,6 @@
 import { getOrBind, isNonPrimitive } from '@standard-server/shared'
 
-import type { AnyFunction } from './function.ts'
+import type { AnyFunction } from './function'
 
 export type Segment = string | number
 

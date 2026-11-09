@@ -5,9 +5,9 @@ import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { RedisClient } from 'bun'
 
-import { waitFor } from '../tests/__shared__/utils.ts'
-import type { BunRedisPublisherOptions } from './redis-publisher.ts'
-import { BunRedisPublisher } from './redis-publisher.ts'
+import { waitFor } from '../tests/__shared__/utils'
+import type { BunRedisPublisherOptions } from './redis-publisher'
+import { BunRedisPublisher } from './redis-publisher'
 
 const REDIS_URL = process.env.REDIS_URL
 

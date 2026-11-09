@@ -1,4 +1,4 @@
-import { INTEGER_REGEX } from './regex.ts'
+import { INTEGER_REGEX } from './regex'
 
 /**
  * Default maximum digits, excluding a leading `-`, when parsing a `bigint` from a string.

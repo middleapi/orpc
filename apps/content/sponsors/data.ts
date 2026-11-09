@@ -1,6 +1,6 @@
 // The GitHub Sponsors wall behind the landing page and the /sponsors table.
 // Paid ad slots are a separate concern and live in ads.ts.
-import sponsors from './sponsors.ts'
+import sponsors from './sponsors'
 
 export const GITHUB_SPONSORS_URL = 'https://github.com/sponsors/dinwwwh'
 export const OPEN_COLLECTIVE_URL = 'https://opencollective.com/middleapi'

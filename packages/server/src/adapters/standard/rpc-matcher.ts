@@ -3,12 +3,12 @@ import type { Value } from '@orpc/shared'
 import { normalizeHttpPath, pathToHttpPath, stripHttpPathPrefix, value } from '@orpc/shared'
 import type { StandardMethod } from '@standard-server/core'
 
-import { unlazy } from '../../lazy.ts'
-import type { AnyProcedure } from '../../procedure.ts'
-import { Procedure } from '../../procedure.ts'
-import type { WalkProcedureContractsLazyResult } from '../../router-utils.ts'
-import { resolveContractProcedure, walkProcedureContractsSync } from '../../router-utils.ts'
-import type { AnyRouter } from '../../router.ts'
+import { unlazy } from '../../lazy'
+import type { AnyProcedure } from '../../procedure'
+import { Procedure } from '../../procedure'
+import type { AnyRouter } from '../../router'
+import type { WalkProcedureContractsLazyResult } from '../../router-utils'
+import { resolveContractProcedure, walkProcedureContractsSync } from '../../router-utils'
 
 /**
  * Methods that can invoke procedures by default. Browsers cannot trigger them

@@ -1,8 +1,8 @@
 import type { ThrowableError } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
 
-import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis.ts'
-import { BaseRedisPublisher } from './base-redis.ts'
+import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
+import { BaseRedisPublisher } from './base-redis'
 
 export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
   /**

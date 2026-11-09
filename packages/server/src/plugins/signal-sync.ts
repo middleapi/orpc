@@ -10,9 +10,9 @@ import {
   toArray,
 } from '@orpc/shared'
 
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index.ts'
-import type { Context } from '../context.ts'
-import type { ProcedureClientInterceptor } from '../procedure-client.ts'
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index'
+import type { Context } from '../context'
+import type { ProcedureClientInterceptor } from '../procedure-client'
 
 /**
  * Keeps the request signal and a streaming output (async iterator object or readable stream) in sync:

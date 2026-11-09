@@ -29,7 +29,7 @@ import type {
 } from 'evlog/toolkit'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
 
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context.ts'
+import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 
 export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlogOptions {
   /**

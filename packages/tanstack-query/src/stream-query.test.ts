@@ -9,8 +9,8 @@ import {
   QueryObserver,
 } from '@tanstack/query-core'
 
-import { distinctData } from '../tests/__shared__/utils.ts'
-import { serializableStreamedQuery } from './stream-query.ts'
+import { distinctData } from '../tests/__shared__/utils'
+import { serializableStreamedQuery } from './stream-query'
 
 describe('serializableStreamedQuery', () => {
   const queryClient = new QueryClient({

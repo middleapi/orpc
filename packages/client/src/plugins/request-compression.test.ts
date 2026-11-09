@@ -1,7 +1,7 @@
 import { RPCLink } from '@orpc/client/fetch'
 
-import type { StandardLinkTransportInterceptor } from '../adapters/standard/index.ts'
-import { RequestCompressionLinkPlugin } from './request-compression.ts'
+import type { StandardLinkTransportInterceptor } from '../adapters/standard/index'
+import { RequestCompressionLinkPlugin } from './request-compression'
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -3,9 +3,9 @@ import { resolveMaybeOptionalOptions } from '@orpc/shared'
 import type { ToFetchResponseOptions } from '@standard-server/fetch'
 import { toFetchResponse, toStandardLazyRequest } from '@standard-server/fetch'
 
-import type { Context } from '../../context.ts'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index.ts'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index.ts'
+import type { Context } from '../../context'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index'
 
 export type FetchHandlerHandleResult =
   | { matched: true; response: Response }

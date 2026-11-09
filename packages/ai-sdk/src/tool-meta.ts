@@ -9,7 +9,7 @@ import type {
 import type { Lazy } from '@orpc/server'
 import type { JSONValue, Tool } from 'ai'
 
-import type { ToolOutput } from './tool.ts'
+import type { ToolOutput } from './tool'
 
 /**
  * The [function tool](https://ai-sdk.dev/docs/foundations/tools) member of the AI SDK `Tool` union,

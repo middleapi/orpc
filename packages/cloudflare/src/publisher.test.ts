@@ -4,8 +4,8 @@ import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { DurablePublisherOptions } from './publisher.ts'
-import { DurablePublisher } from './publisher.ts'
+import type { DurablePublisherOptions } from './publisher'
+import { DurablePublisher } from './publisher'
 
 type MockSocket = WebSocket &
   EventTarget & {

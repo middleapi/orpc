@@ -1,4 +1,4 @@
-import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port.ts'
+import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
 describe('postMessagePortMessage', () => {
   it('posts message without transfer', () => {

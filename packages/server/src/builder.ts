@@ -19,17 +19,17 @@ import type {
   BuilderWithInput,
   BuilderWithMiddlewares,
   BuilderWithOutput,
-} from './builder-variants.ts'
-import type { Context, MergedInitialContext } from './context.ts'
-import { Lazy } from './lazy.ts'
-import type { DecoratedMiddleware } from './middleware-decorated.ts'
-import { decorateMiddleware } from './middleware-decorated.ts'
-import type { Middleware } from './middleware.ts'
-import { DecoratedProcedure } from './procedure-decorated.ts'
-import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure.ts'
-import type { AugmentedRouter } from './router-utils.ts'
-import { augmentRouter } from './router-utils.ts'
-import type { AnyRouter } from './router.ts'
+} from './builder-variants'
+import type { Context, MergedInitialContext } from './context'
+import { Lazy } from './lazy'
+import type { Middleware } from './middleware'
+import type { DecoratedMiddleware } from './middleware-decorated'
+import { decorateMiddleware } from './middleware-decorated'
+import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure'
+import { DecoratedProcedure } from './procedure-decorated'
+import type { AnyRouter } from './router'
+import type { AugmentedRouter } from './router-utils'
+import { augmentRouter } from './router-utils'
 
 /**
  * The initial context type used when `.$context` is not called.

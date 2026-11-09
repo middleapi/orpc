@@ -3,8 +3,8 @@ import { ORPCError } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import { toArray, value } from '@orpc/shared'
 
-import { LockTimeoutError } from './error.ts'
-import type { Locker } from './types.ts'
+import { LockTimeoutError } from './error'
+import type { Locker } from './types'
 
 export const LOCK_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_LOCK_MIDDLEWARE_CONTEXT',

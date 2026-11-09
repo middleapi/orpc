@@ -8,8 +8,8 @@ import { implement } from '@orpc/server'
 import supertest from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Implement } from './implement.ts'
-import { ORPCModule } from './module.ts'
+import { Implement } from './implement'
+import { ORPCModule } from './module'
 
 beforeEach(() => {
   vi.clearAllMocks()

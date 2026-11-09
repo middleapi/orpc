@@ -5,8 +5,8 @@ import { generateText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import * as z from 'zod'
 
-import { aiSdkTool } from './tool-meta.ts'
-import { createToolFactory, implementToolFactory } from './tool.ts'
+import { createToolFactory, implementToolFactory } from './tool'
+import { aiSdkTool } from './tool-meta'
 
 function toolCallModel(toolName: string, args: unknown) {
   return new MockLanguageModelV4({

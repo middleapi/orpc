@@ -36,7 +36,7 @@
     }
   },
   "scripts": {
-    "prepack": "tsc"
+    "prepack": "tsdown"
   },
   "dependencies": {
     "@standard-server/shared": "~0.15.0",

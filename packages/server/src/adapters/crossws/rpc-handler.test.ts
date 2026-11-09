@@ -1,7 +1,7 @@
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 
-import { os } from '../../builder.ts'
-import { experimental_RPCHandler as RPCHandler } from './rpc-handler.ts'
+import { os } from '../../builder'
+import { experimental_RPCHandler as RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
   beforeEach(() => {

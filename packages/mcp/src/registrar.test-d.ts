@@ -8,8 +8,8 @@ import type { AnyProcedure, StandardLazyRequest } from '@orpc/server'
 import { implement, os } from '@orpc/server'
 import { z } from 'zod'
 
-import type { McpRegistered } from './registrar.ts'
-import { McpRegistrar } from './registrar.ts'
+import type { McpRegistered } from './registrar'
+import { McpRegistrar } from './registrar'
 
 const server = new McpServer({ name: 'test-server', version: '1.0.0' })
 

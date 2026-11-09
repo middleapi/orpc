@@ -1,9 +1,9 @@
 import { isAsyncIteratorObject, parseEmptyableJSON } from '@orpc/shared'
 import { EventStreamErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
 
-import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types.ts'
-import { ORPCError } from './error.ts'
-import { RPCSerializer } from './rpc-serializer.ts'
+import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
+import { ORPCError } from './error'
+import { RPCSerializer } from './rpc-serializer'
 
 describe('rpcSerializer', () => {
   describe.each(builtInRPCSupportDataTypes)('$name', ({ value, expected }) => {

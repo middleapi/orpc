@@ -3,9 +3,9 @@ import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import * as z from 'zod'
 
-import type { HTTPProcedureUtils } from './http-procedure-utils.ts'
-import type { HTTPRouterUtils } from './http-router-utils.ts'
-import { createHTTPUtils } from './http-router-utils.ts'
+import type { HTTPProcedureUtils } from './http-procedure-utils'
+import type { HTTPRouterUtils } from './http-router-utils'
+import { createHTTPUtils } from './http-router-utils'
 
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })

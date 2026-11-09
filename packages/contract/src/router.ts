@@ -1,8 +1,8 @@
 import type { ThrowableError } from '@orpc/shared'
 
-import type { ORPCErrorFromErrorMap } from './error.ts'
-import type { AnyProcedureContract, ProcedureContract } from './procedure.ts'
-import type { InferSchemaInput, InferSchemaOutput } from './schema.ts'
+import type { ORPCErrorFromErrorMap } from './error'
+import type { AnyProcedureContract, ProcedureContract } from './procedure'
+import type { InferSchemaInput, InferSchemaOutput } from './schema'
 
 /**
  * A router contract: a single procedure contract or a nested record of them.

@@ -4,8 +4,8 @@ import { oc, type } from '@orpc/contract'
 import type { PromiseWithError } from '@orpc/shared'
 import type { SkipToken } from '@tanstack/query-core'
 
-import { tanstackQuery } from './meta.ts'
-import type { OperationContext } from './types.ts'
+import { tanstackQuery } from './meta'
+import type { OperationContext } from './types'
 
 describe('tanstackQuery', () => {
   it('infers input, output and error types from the contract', () => {

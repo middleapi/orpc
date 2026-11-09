@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 
-import { BunRedisRateLimiter } from './redis-ratelimit.ts'
+import { BunRedisRateLimiter } from './redis-ratelimit'
 
 const REDIS_URL = Bun.env.REDIS_URL
 

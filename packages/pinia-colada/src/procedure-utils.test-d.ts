@@ -6,7 +6,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/c
 import { computed } from 'vue'
 import * as z from 'zod'
 
-import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils.ts'
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
 import type {
   InfiniteOptionsIn,
   LiveOptionsIn,
@@ -18,7 +18,7 @@ import type {
   StreamedOptionsIn,
   UseMutationFnContext,
   UseQueryFnContext,
-} from './types.ts'
+} from './types'
 
 const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 

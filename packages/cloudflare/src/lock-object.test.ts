@@ -3,7 +3,7 @@ import { evictDurableObject, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { experimental_DurableLockObject as DurableLockObject } from './lock-object.ts'
+import type { experimental_DurableLockObject as DurableLockObject } from './lock-object'
 
 describe('durableLockObject', () => {
   function createStub() {
