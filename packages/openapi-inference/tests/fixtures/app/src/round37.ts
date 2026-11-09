@@ -39,6 +39,30 @@ export interface BoxVia<T> {
   inner: Box<T>
 }
 
+/** Its type argument beside a function returning it, which a deep mapped type maps to a `{}` */
+type WithGetter<T> = { a: T; f: () => T }
+
+/** A generic model nesting its type argument through an alias holding a function */
+export interface ViaGetter<T> {
+  inner: WithGetter<T>
+}
+
+/** A generic model nesting its type argument through an object literal holding a map of it */
+export interface ViaMapLiteral<T> {
+  inner: { a: T; m: Map<string, T> }
+}
+
+/** Its type argument beside a function returning it, in a list linking more of them */
+type LinkedGetter<T> = { a: T; f: () => T; next: LinkedGetter<T> | null }
+
+/** A generic model nesting its type argument through an alias naming itself, not the model */
+export interface ViaLinkedGetter<T> {
+  inner: LinkedGetter<T>
+}
+
+const viaGetter = <T>(a: T): ViaGetter<T> => ({ inner: { a, f: () => a } })
+const viaMapLiteral = <T>(a: T): ViaMapLiteral<T> => ({ inner: { a, m: new Map([['k', a]]) } })
+
 /**
  * Conditional deep mapped types over cycles through generic models, which are cut, and over a
  * generic model nested in itself, which ends.
@@ -69,6 +93,15 @@ export const roundThirtySeven = {
       },
     }),
   ),
+  viaGetters: os.handler(
+    (): ConditionalDeep<ViaGetter<ViaGetter<ViaGetter<ViaGetter<ViaGetter<ViaGetter<number>>>>>>> =>
+      viaGetter(viaGetter(viaGetter(viaGetter(viaGetter(viaGetter(1)))))),
+  ),
+  viaMapLiterals: os.handler(
+    (): Expanding<
+      ViaMapLiteral<ViaMapLiteral<ViaMapLiteral<ViaMapLiteral<ViaMapLiteral<number>>>>>
+    > => viaMapLiteral(viaMapLiteral(viaMapLiteral(viaMapLiteral(viaMapLiteral(1))))),
+  ),
 }
 
 /** Inputs of the same types, as a client sends them */
@@ -78,5 +111,25 @@ export const roundThirtySevenInputs = {
   wrapCycle: os.input(type<WrapCycle<{ a: number }>>()).handler(() => 1),
   deepBoxes: os
     .input(type<ConditionalDeep<Box<Box<Box<Box<Box<Box<Box<Box<number>>>>>>>>>>())
+    .handler(() => 1),
+  viaGetters: os
+    .input(
+      type<
+        ConditionalDeep<ViaGetter<ViaGetter<ViaGetter<ViaGetter<ViaGetter<ViaGetter<number>>>>>>>
+      >(),
+    )
+    .handler(() => 1),
+  viaLinkedGetters: os
+    .input(
+      type<
+        Expanding<
+          ViaLinkedGetter<
+            ViaLinkedGetter<
+              ViaLinkedGetter<ViaLinkedGetter<ViaLinkedGetter<ViaLinkedGetter<number>>>>
+            >
+          >
+        >
+      >(),
+    )
     .handler(() => 1),
 }

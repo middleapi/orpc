@@ -355,7 +355,7 @@ export class TypeQueries {
    * The classes, interfaces, and object type literals declaring the properties of a type, without
    * the ones another of them derives from (`Base` of `class Holder extends Base`).
    */
-  private getPropertyOwners(type: Type): readonly Type[] {
+  getPropertyOwners(type: Type): readonly Type[] {
     return this.memo('propertyOwners', type.id, (): readonly Type[] => {
       const owners = new Map<number, Type>()
 

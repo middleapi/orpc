@@ -284,6 +284,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['enumShapes', undefined],
     ['treeBranch', undefined],
     ['shapeTree', undefined],
+    ['viaGetters', undefined],
+    ['viaMapLiterals', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2381,6 +2383,19 @@ describe('generated schemas match serialized outputs', async () => {
       // also through another generic model
       expect(schemaOf('viaBoxes')).toEqual(
         levels(6, (v) => model({ inner: model({ v }) }), { type: 'number' }),
+      )
+      // through an alias holding a function, and an object literal holding a map, of each level
+      expect(schemaOf('viaGetters')).toEqual(
+        levels(
+          6,
+          (a) => model({ inner: { type: 'object', properties: { a, f: {} }, required: ['a'] } }),
+          { type: 'number' },
+        ),
+      )
+      expect(schemaOf('viaMapLiterals')).toEqual(
+        levels(5, (a) => model({ inner: model({ a, m: expect.any(Object) }) }), {
+          type: 'number',
+        }),
       )
     })
   })

@@ -19,6 +19,42 @@ interface Expansion {
   at: number
 }
 
+/** What a type holds of an outer one (see `ExpansionGuard#holdsAgain`) */
+interface Held {
+  /** Some value contains the outer one's (`T[]` of `T`) */
+  grows: boolean
+  /** Some values were objects without keys, which show nothing of what they map */
+  keyless: boolean
+}
+
+const HELD: Held = { grows: false, keyless: false }
+const GROWN: Held = { grows: true, keyless: false }
+const KEYLESS: Held = { grows: false, keyless: true }
+
+/**
+ * What all of the items hold together, `undefined` once one of them holds something else.
+ */
+function holdEach<T>(
+  items: readonly T[],
+  compare: (item: T, index: number) => Held | undefined,
+): Held | undefined {
+  let grows = false
+  let keyless = false
+
+  for (const [index, item] of items.entries()) {
+    const held = compare(item, index)
+
+    if (held === undefined) {
+      return undefined
+    }
+
+    grows ||= held.grows
+    keyless ||= held.keyless
+  }
+
+  return { grows, keyless }
+}
+
 /**
  * Cuts infinitely expanding generics: every instantiation of `type Expand<T> = { next: Expand<T[]> }`
  * is a new type, so converting it never comes back to a type it has seen.
@@ -194,15 +230,17 @@ export class ExpansionGuard {
     for (let i = stack.length - 1; i >= 0; i--) {
       const outer = stack[i]!
       if (this.getKeys(outer.type) === keys) {
-        return this.holdsAgain(outer.type, type, MAX_GROWTH) &&
-          this.path
-            .slice(outer.at)
-            .some((property, index) =>
-              this.declaresNesting(
-                property,
-                stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type,
-              ),
-            )
+        const held = this.holdsAgain(outer.type, type, MAX_GROWTH)
+        // what functions it holds is not known (see `holdsAgain`), a nesting of models that
+        // differ only there (`Via<Via<number>>`) ends where it is written
+        const unknown = held?.keyless && !held.grows
+        return held &&
+          this.path.slice(outer.at).some((property, index) => {
+            const owner = stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type
+            return unknown
+              ? this.declaresCycle(property, owner)
+              : this.declaresNesting(property, owner)
+          })
           ? outer.growth + 1
           : 0
       }
@@ -212,14 +250,80 @@ export class ExpansionGuard {
   }
 
   /**
+   * Whether a property is declared, in the model holding it, with a type naming that model again
+   * (`next: Model<T[]>[]`), also through a view of it (`b: Box<DeepReadonly<Model<T>>>` of
+   * `interface Model<T> extends Base<DeepReadonly<Model<T>>>`) or another model, a cycle of
+   * declarations a nesting without end needs.
+   */
+  private declaresCycle(property: TSSymbol, owner: Type | undefined): boolean {
+    return (
+      owner !== undefined &&
+      this.types.getPropertyOwners(owner).some((model) => {
+        const declaration = getDeclarationId(model)
+        const declared =
+          declaration === undefined
+            ? undefined
+            : this.types.checker.getPropertyOfType(model, property.name)
+
+        return (
+          declared !== undefined &&
+          this.types.memo('declaresCycle', declared.id, () => {
+            const type = this.types.checker.getTypeOfSymbol(declared)
+            return type !== undefined && this.reaches(type, declaration!, 4, new Set())
+          })
+        )
+      })
+    )
+  }
+
+  /**
+   * Whether a type is an instantiation of a declaration, or holds one `depth` types in: as a
+   * member, a type argument, the model a view maps over, or a property of a type the project
+   * declares.
+   */
+  private reaches(type: Type, declaration: number, depth: number, seen: Set<number>): boolean {
+    if (getDeclarationId(type) === declaration) {
+      return true
+    }
+
+    if (depth === 0 || seen.has(type.id)) {
+      return false
+    }
+
+    seen.add(type.id)
+
+    const symbol = type.getAliasSymbol() ?? type.getSymbol()
+    const children =
+      type.flags & TypeFlags.UnionOrIntersection
+        ? this.types.getMembers(type)
+        : [
+            ...this.types.getTypeArguments(type),
+            // the models a view maps over (`DeepReadonly<Model<T>>`), by its keys
+            ...((type as any).objectFlags & ObjectFlags.Mapped
+              ? this.types.getPropertyOwners(type)
+              : []),
+            ...(type.flags & TypeFlags.Object &&
+            !(symbol && this.types.getSymbolSourceKind(symbol) === 'default')
+              ? this.types.getPropertyTypes(type)
+              : []),
+          ]
+
+    return children.some(
+      (child) => child !== undefined && this.reaches(child, declaration, depth - 1, seen),
+    )
+  }
+
+  /**
    * Whether a type holds what an outer one holds, or what it grows to (see `getRepeatedGrowth`):
    * the same type, one containing it, the same members, type arguments, or keys, with the values
-   * at them, `depth` objects in. Objects without keys hold nothing that could grow: a deep mapped
-   * type maps a function (a method of `Map<string, Model<T[]>>`) to a new `{}` for each model.
+   * at them, `depth` objects in, `undefined` when it holds something else. A deep mapped type maps
+   * a function (also a method of `Map<K, V>`) to a new `{}` for each instantiation, which shows
+   * nothing of the function: two of them hold the same only as far as is known, as two functions
+   * returning other models (`f: () => Via<T>`) differ.
    */
-  private holdsAgain(outer: Type, inner: Type, depth: number): boolean {
+  private holdsAgain(outer: Type, inner: Type, depth: number): Held | undefined {
     if (outer.id === inner.id) {
-      return true
+      return HELD
     }
 
     // `T[]` of `T`, not any value holding `undefined` of a `T | undefined`
@@ -227,53 +331,61 @@ export class ExpansionGuard {
       !(outer.flags & (TypeFlags.Undefined | TypeFlags.Null | TypeFlags.Void)) &&
       containsType(this.types, inner, outer.id, 3)
     ) {
-      return true
+      return GROWN
     }
 
     if (outer.flags & TypeFlags.UnionOrIntersection) {
       const outers = this.types.getMembers(outer)
       const inners = this.types.getMembers(inner)
-      return (
-        (outer.flags & TypeFlags.UnionOrIntersection) ===
-          (inner.flags & TypeFlags.UnionOrIntersection) &&
-        outers.length === inners.length &&
-        inners.every((i) => outers.some((o) => this.holdsAgain(o, i, depth)))
-      )
+      return (outer.flags & TypeFlags.UnionOrIntersection) ===
+        (inner.flags & TypeFlags.UnionOrIntersection) && outers.length === inners.length
+        ? holdEach(inners, (i) => {
+            for (const o of outers) {
+              const held = this.holdsAgain(o, i, depth)
+              if (held) {
+                return held
+              }
+            }
+            return undefined
+          })
+        : undefined
     }
 
     if (!(outer.flags & TypeFlags.Object) || !(inner.flags & TypeFlags.Object)) {
-      return false
+      return undefined
     }
 
     if (outer.isTypeReference() || inner.isTypeReference()) {
       const outerArguments = this.types.getReferenceArguments(outer)
       const innerArguments = this.types.getReferenceArguments(inner)
-      return (
-        outer.isTypeReference() &&
+      return outer.isTypeReference() &&
         inner.isTypeReference() &&
         outer.getTarget().id === inner.getTarget().id &&
-        outerArguments.length === innerArguments.length &&
-        innerArguments.every((i, index) => this.holdsAgain(outerArguments[index]!, i, depth))
-      )
+        outerArguments.length === innerArguments.length
+        ? holdEach(innerArguments, (i, index) => this.holdsAgain(outerArguments[index]!, i, depth))
+        : undefined
     }
 
     const keys = this.getKeys(outer)
     if (keys !== this.getKeys(inner)) {
-      return false
+      return undefined
     }
 
-    if (depth === 0 || keys === undefined) {
-      return true
+    if (keys === undefined) {
+      return KEYLESS
+    }
+
+    if (depth === 0) {
+      return HELD
     }
 
     const outerValues = this.getValues(outer)
     const innerValues = this.getValues(inner)
-    return innerValues.every((value, index) => {
+    return holdEach(innerValues, (value, index) => {
       const outerValue = outerValues[index]
-      return (
-        value === undefined ||
-        (outerValue !== undefined && this.holdsAgain(outerValue, value, depth - 1))
-      )
+      return value === undefined
+        ? HELD
+        : outerValue && this.holdsAgain(outerValue, value, depth - 1)
     })
   }
 

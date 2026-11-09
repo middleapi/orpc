@@ -901,6 +901,9 @@ describe('openAPIGenerator', () => {
           mappedInput: 'os.input(type<CD<MapDer<number>>>()).handler(() => 1)',
           mappedClass: 'os.handler((): CD<MapDerClass<number>> => ({}) as any)',
           method: 'os.handler((): CD<MethodDer<number>> => ({}) as any)',
+          mapView: 'os.handler((): CD<MapView<number>> => ({}) as any)',
+          mapViewInput: 'os.input(type<Expanding<MapView<number>>>()).handler(() => 1)',
+          mapDirect: 'os.handler((): CD<MapDirect<number>> => ({}) as any)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -937,6 +940,8 @@ describe('openAPIGenerator', () => {
             'class MapDerClass<T> extends MapBaseClass<MapDerClass<T[]>> { v!: T }',
             'interface MethodBase<T> { f: () => Box<T>; b: Box<T>[]; c: BoxVia<T> }',
             'interface MethodDer<T> extends MethodBase<MethodDer<T[]>> { v: T }',
+            'interface MapView<T> extends MapBase<CD<MapView<T>>> { v: T }',
+            'interface MapDirect<T> { a: Map<string, T>; b: MapDirect<T[]>[]; c: BoxVia<MapDirect<T[]>> }',
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',
@@ -2173,6 +2178,10 @@ describe('openAPIGenerator', () => {
         )
       const boxes = (depth: number, end: unknown): unknown =>
         depth === 0 ? end : { v: boxes(depth - 1, end) }
+      const getters = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: getters(depth - 1, end) } }
+      const linked = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: linked(depth - 1, end), next: null } }
 
       for (const [path, value, valid] of [
         ['/genericCycle', { f0: { f0: null, f2: { a: 2 } }, f2: { a: 1 } }, true],
@@ -2181,6 +2190,12 @@ describe('openAPIGenerator', () => {
         ['/wrapCycle', { inner: { a: 1 }, f0: { inner: { a: 2 }, f0: null } }, true],
         ['/deepBoxes', boxes(8, 1), true],
         ['/deepBoxes', boxes(8, 'x'), false],
+        // a function beside the type argument tells the levels apart, so all six are documented
+        ['/viaGetters', getters(6, 1), true],
+        ['/viaGetters', getters(6, 'x'), false],
+        // also when the alias between them names itself
+        ['/viaLinkedGetters', linked(6, 1), true],
+        ['/viaLinkedGetters', linked(6, 'x'), false],
       ] as const) {
         expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
       }
