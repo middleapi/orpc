@@ -11,7 +11,7 @@ import {
 import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
-import { TypeScriptOpenAPIGenerator } from './openapi-generator'
+import { OpenAPIGenerator } from './openapi-generator'
 
 /**
  * Runs real handlers, serializes their output as oRPC sends it, and validates it
@@ -19,7 +19,7 @@ import { TypeScriptOpenAPIGenerator } from './openapi-generator'
  */
 describe('generated schemas match serialized outputs', async () => {
   const start = performance.now()
-  const spec = await new TypeScriptOpenAPIGenerator().generate(router, {
+  const spec = await new OpenAPIGenerator().generate(router, {
     source: { file: new URL('../tests/fixtures/app/src/serialization.ts', import.meta.url) },
   })
 
@@ -1992,7 +1992,7 @@ describe('generated schemas match serialized outputs', async () => {
 
   it('does not depend on the order of procedures', async () => {
     const reversed = Object.fromEntries(Object.entries(router).toReversed())
-    const other = await new TypeScriptOpenAPIGenerator().generate(reversed as typeof router, {
+    const other = await new OpenAPIGenerator().generate(reversed as typeof router, {
       source: { file: new URL('../tests/fixtures/app/src/serialization.ts', import.meta.url) },
     })
 
@@ -2022,7 +2022,7 @@ describe('generated schemas match serialized outputs', async () => {
 
 describe('chains of views of classes', async () => {
   const file = new URL('../tests/fixtures/app/src/view-chains.ts', import.meta.url)
-  const generator = new TypeScriptOpenAPIGenerator()
+  const generator = new OpenAPIGenerator()
   const specs = {
     8: await generator.generate(chain8, { source: { file, export: 'chain8' } }),
     16: await generator.generate(chain16, { source: { file, export: 'chain16' } }),
@@ -2081,7 +2081,7 @@ describe('chains of deep views of classes', async () => {
   const routers = { shortDeepChain, longDeepChain, longerDeepChain, mixedDeepChain }
   const generate = async (name: keyof typeof routers) => {
     const start = performance.now()
-    const spec = await new TypeScriptOpenAPIGenerator().generate(routers[name], {
+    const spec = await new OpenAPIGenerator().generate(routers[name], {
       source: { file, export: name },
     })
     return { spec, time: performance.now() - start }
@@ -2134,7 +2134,7 @@ describe('rings of deep views of classes', async () => {
   const routers = { nullRing, conditionalRing }
   const generate = async (name: keyof typeof routers) => {
     const start = performance.now()
-    const spec = await new TypeScriptOpenAPIGenerator().generate(routers[name], {
+    const spec = await new OpenAPIGenerator().generate(routers[name], {
       source: { file, export: name },
     })
     return { spec, time: performance.now() - start }

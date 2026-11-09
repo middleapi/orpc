@@ -18,12 +18,16 @@ import type {
 import { StandardJsonSchemaConverter } from '@orpc/json-schema'
 import type {
   OpenAPIDocument,
-  OpenAPIGeneratorGenerateOptions,
-  OpenAPIGeneratorOptions,
+  OpenAPIGeneratorGenerateOptions as BaseOpenAPIGeneratorGenerateOptions,
+  OpenAPIGeneratorOptions as BaseOpenAPIGeneratorOptions,
   OpenAPIMeta,
   OpenAPIVersion,
 } from '@orpc/openapi'
-import { getOpenAPIMeta, OpenAPIGenerator, OpenAPIGeneratorError } from '@orpc/openapi'
+import {
+  OpenAPIGenerator as BaseOpenAPIGenerator,
+  getOpenAPIMeta,
+  OpenAPIGeneratorError,
+} from '@orpc/openapi'
 import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
@@ -81,12 +85,12 @@ interface InferenceContext {
   getSourceKind: (path: string) => SourceKind
 }
 
-export interface TypeScriptOpenAPIGeneratorOptions
-  extends OpenAPIGeneratorOptions, Omit<TypeToJsonSchemaConverterOptions, 'direction'> {}
+export interface OpenAPIGeneratorOptions
+  extends BaseOpenAPIGeneratorOptions, Omit<TypeToJsonSchemaConverterOptions, 'direction'> {}
 
-export interface TypeScriptOpenAPIGeneratorGenerateOptions<
+export interface OpenAPIGeneratorGenerateOptions<
   TVersion extends OpenAPIVersion,
-> extends OpenAPIGeneratorGenerateOptions<TVersion> {
+> extends BaseOpenAPIGeneratorGenerateOptions<TVersion> {
   /**
    * Where the type of the router passed to `generate` is exported from.
    */
@@ -104,7 +108,7 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
 }
 
 /**
- * Generates an OpenAPI document like `OpenAPIGenerator`, inferring the JSON schemas
+ * Generates an OpenAPI document like `OpenAPIGenerator` of `@orpc/openapi`, inferring the JSON schemas
  * that no converter can produce from the router's TypeScript types,
  * so procedures without `.output` (or with type-only schemas) are fully documented.
  *
@@ -117,13 +121,13 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  *
  * @see {@link https://orpc.dev/docs/openapi/specification#type-inference | OpenAPI Specification - Type Inference}
  */
-export class TypeScriptOpenAPIGenerator {
+export class OpenAPIGenerator {
   private readonly converters: JsonSchemaConverter[]
-  private readonly generator: OpenAPIGenerator
+  private readonly generator: BaseOpenAPIGenerator
 
-  constructor(private readonly options: TypeScriptOpenAPIGeneratorOptions = {}) {
+  constructor(private readonly options: OpenAPIGeneratorOptions = {}) {
     this.converters = [...toArray(options.converters), new StandardJsonSchemaConverter()]
-    this.generator = new OpenAPIGenerator({
+    this.generator = new BaseOpenAPIGenerator({
       ...options,
       converters: [new InferredJsonSchemaConverter(), ...toArray(options.converters)],
     })
@@ -131,12 +135,7 @@ export class TypeScriptOpenAPIGenerator {
 
   async generate<TVersion extends OpenAPIVersion = '3.2.0'>(
     router: RouterContract | AnyRouter,
-    {
-      source,
-      filter,
-      componentName,
-      ...options
-    }: TypeScriptOpenAPIGeneratorGenerateOptions<TVersion>,
+    { source, filter, componentName, ...options }: OpenAPIGeneratorGenerateOptions<TVersion>,
   ): Promise<OpenAPIDocument<TVersion>> {
     const project = openTypeScriptProject(source)
 
@@ -192,7 +191,7 @@ export class TypeScriptOpenAPIGenerator {
   private async inferRouter(
     ctx: InferenceContext,
     router: RouterContract | AnyRouter,
-    filter: OpenAPIGeneratorGenerateOptions<OpenAPIVersion>['filter'],
+    filter: BaseOpenAPIGeneratorGenerateOptions<OpenAPIVersion>['filter'],
   ): Promise<RouterContract> {
     let inferred: RouterContract = {}
     const errors: string[] = []
@@ -228,7 +227,7 @@ export class TypeScriptOpenAPIGenerator {
 
     if (errors.length) {
       throw new OpenAPIGeneratorError(
-        `[TypeScriptOpenAPIGenerator] Failed to infer types for the OpenAPI document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n${errors.join('\n\n')}`,
+        `[OpenAPIGenerator] Failed to infer types for the OpenAPI document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n${errors.join('\n\n')}`,
       )
     }
 

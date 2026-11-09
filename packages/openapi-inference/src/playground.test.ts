@@ -1,12 +1,12 @@
 import { ProcedureContract } from '@orpc/contract'
-import { OpenAPIGenerator } from '@orpc/openapi'
+import { OpenAPIGenerator as BaseOpenAPIGenerator } from '@orpc/openapi'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 import { router as bunRouter } from '../../../playgrounds/bun/src/routers/index'
 import { router as cloudflareRouter } from '../../../playgrounds/cloudflare/worker/routers/index'
 import { contract as nestContract } from '../../../playgrounds/nest/src/contracts/index'
-import { TypeScriptOpenAPIGenerator } from './openapi-generator'
+import { OpenAPIGenerator } from './openapi-generator'
 
 const PLAYGROUNDS = [
   ['bun', bunRouter, '../../../playgrounds/bun/src/routers/index.ts', 'router'],
@@ -26,7 +26,7 @@ const PLAYGROUNDS = [
  * Only what exists at runtime alone differs, like `format: uuid` or `minLength`.
  */
 describe.each(PLAYGROUNDS)('%s playground', async (_, router, file, exportName) => {
-  const fromZod = await new OpenAPIGenerator({
+  const fromZod = await new BaseOpenAPIGenerator({
     converters: [new ZodToJsonSchemaConverter()],
   }).generate(router)
 
@@ -50,7 +50,7 @@ describe.each(PLAYGROUNDS)('%s playground', async (_, router, file, exportName) 
     })
   })
 
-  const fromTypes = await new TypeScriptOpenAPIGenerator().generate(withoutSchemas, {
+  const fromTypes = await new OpenAPIGenerator().generate(withoutSchemas, {
     source: { file: new URL(file, import.meta.url), export: exportName },
   })
 

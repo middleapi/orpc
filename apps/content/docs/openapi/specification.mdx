@@ -290,7 +290,7 @@ const spec = await generator.generate(router, {
 
 ## Type Inference
 
-`TypeScriptOpenAPIGenerator` works like `OpenAPIGenerator`, but infers the schemas your converters cannot handle from your TypeScript types, so procedures without `.output` and inputs defined with [`type`](/docs/procedure#type-utility) are documented too.
+`@orpc/experimental-openapi-inference` provides a drop-in `OpenAPIGenerator` that also infers the schemas your converters cannot handle from your TypeScript types, so procedures without `.output` and inputs defined with [`type`](/docs/procedure#type-utility) are documented too.
 
 :::warning
 This package is experimental. It runs the TypeScript 7 compiler on your source files, so they must be present where it runs. Generate the document once, at build time or on first request, and reuse it.
@@ -301,9 +301,9 @@ npm install @orpc/experimental-openapi-inference@beta
 ```
 
 ```ts
-import { TypeScriptOpenAPIGenerator } from '@orpc/experimental-openapi-inference'
+import { OpenAPIGenerator } from '@orpc/experimental-openapi-inference'
 
-const generator = new TypeScriptOpenAPIGenerator({
+const generator = new OpenAPIGenerator({
   converters: [new ZodToJsonSchemaConverter()],
 })
 

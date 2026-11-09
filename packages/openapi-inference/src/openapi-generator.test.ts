@@ -35,7 +35,7 @@ import { roundThirtyTwoInputs } from '../tests/fixtures/app/src/round32'
 import { router } from '../tests/fixtures/app/src/router'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
-import { TypeScriptOpenAPIGenerator } from './openapi-generator'
+import { OpenAPIGenerator } from './openapi-generator'
 
 const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, import.meta.url)
 
@@ -52,8 +52,8 @@ const PLANET = {
   description: 'A planet in the solar system',
 }
 
-describe('typeScriptOpenAPIGenerator', () => {
-  const generator = new TypeScriptOpenAPIGenerator({
+describe('openAPIGenerator', () => {
+  const generator = new OpenAPIGenerator({
     converters: [new ZodToJsonSchemaConverter()],
   })
 
@@ -317,7 +317,7 @@ describe('typeScriptOpenAPIGenerator', () => {
   })
 
   it('works without converters, inferring zod schemas from their types', async () => {
-    const spec = await new TypeScriptOpenAPIGenerator().generate(router, {
+    const spec = await new OpenAPIGenerator().generate(router, {
       source: { file: fixture('router.ts') },
     })
 
