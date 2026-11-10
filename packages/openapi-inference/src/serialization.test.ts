@@ -304,6 +304,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['priceSet', undefined],
     ['priceSets', undefined],
     ['linkedUser', undefined],
+    ['fibTwenty', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

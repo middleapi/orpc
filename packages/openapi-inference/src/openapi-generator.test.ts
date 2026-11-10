@@ -2647,11 +2647,11 @@ describe('openAPIGenerator', () => {
       })
 
       // each refers to itself through the others, so none is written again at each use
-      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
-        'LinkedComment',
-        'LinkedPost',
-        'LinkedUser',
-      ])
+      expect(
+        Object.keys(spec.components?.schemas ?? {})
+          .filter((name) => name.startsWith('Linked'))
+          .toSorted(),
+      ).toEqual(['LinkedComment', 'LinkedPost', 'LinkedUser'])
 
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       const validate = ajv.compile(
@@ -2664,6 +2664,34 @@ describe('openAPIGenerator', () => {
         ),
       )
       const output = await call(roundFortyFour.linkedUser, undefined)
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
+      )
+      expect(validate(json) ? [] : validate.errors).toEqual([])
+    })
+
+    it('makes components of models that reach the cycle only through finished defs', async () => {
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(roundFortyFour, {
+        source: { file: fixture('round44.ts'), export: 'roundFortyFour' },
+      })
+
+      // each but the last refers to the first only through the next two, defs before it
+      expect(
+        Object.keys(spec.components?.schemas ?? {}).filter((name) => name.startsWith('FibTwenty')),
+      ).toHaveLength(20)
+      expect(JSON.stringify(spec).length).toBeLessThan(50_000)
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify({
+            $defs: spec.components?.schemas,
+            ...(spec.paths as any)['/fibTwenty'].post.responses['200'].content['application/json']
+              .schema,
+          }).replaceAll('#/components/schemas/', '#/$defs/'),
+        ),
+      )
+      const output = await call(roundFortyFour.fibTwenty, undefined)
       const json = JSON.parse(
         JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
       )

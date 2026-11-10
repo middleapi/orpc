@@ -203,11 +203,11 @@ export class DefRegistry {
   }
 
   /**
-   * Whether a schema refers to a def being converted, which the type it describes is then in a
-   * cycle with.
+   * Whether a schema refers to a def being converted, also through finished defs, which the type it
+   * describes is then in a cycle with.
    */
   refersToConverting(schema: JsonSchema): boolean {
-    return [...collectDefRefs(schema)].some((name) => {
+    return [...this.collectDeps(collectDefRefs(schema))].some((name) => {
       const def = this.defsByName.get(name)
       return def !== undefined && def.schema === undefined
     })
