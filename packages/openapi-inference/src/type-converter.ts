@@ -27,6 +27,7 @@ import {
   getViewBases,
   hasBuiltinForm,
   isBoxedBigInt,
+  isStringifiedBuiltin,
   isTypedArray,
 } from './builtins'
 import type { DefNameRecord } from './components'
@@ -812,13 +813,16 @@ export class TypeToJsonSchemaConverter {
 
     // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`, whose `toJSON` an intersection
     // may add (`Date & { toJSON(): number }`), which `JSON.stringify` calls, the serializer does not
+    // (also one the serializer leaves to `JSON.stringify`, `Error & { toJSON(): string }`, or
+    // another member adds, `Set<string> & Pick<Date, 'toJSON'>`)
     for (const member of members) {
       const builtin =
         member.flags & TypeFlags.Object ? this.convertBuiltinObject(member) : undefined
       if (builtin !== undefined) {
         return this.withAddedToJSON(
-          members.filter((m) => !hasBuiltinForm(this.types, m)),
+          members.filter((m) => m !== member),
           () => this.withPlainForm(type, builtin),
+          isStringifiedBuiltin(this.types, member),
         )
       }
     }
@@ -832,12 +836,18 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * An array or built-in of an intersection (`written`), or, under `JSON.stringify`, what the
-   * `toJSON` of `owners` returns, which the serializer does not call (`Date & { toJSON(): number }`).
+   * An array or built-in of an intersection (`written`), or, under `JSON.stringify` (also of a
+   * built-in the serializer leaves to it, `stringified`), what the `toJSON` of `owners` returns,
+   * which the serializer does not call (`Date & { toJSON(): number }`).
    */
-  private withAddedToJSON(owners: readonly Type[], written: () => JsonSchema): JsonSchema {
+  private withAddedToJSON(
+    owners: readonly Type[],
+    written: () => JsonSchema,
+    stringified = false,
+  ): JsonSchema {
+    const stringify = this.mode === 'stringify' || stringified
     const toJSONResults =
-      this.mode !== 'serializer'
+      this.mode !== 'serializer' || stringified
         ? owners.flatMap((owner) => getToJSONResultTypes(this.types, owner, true))
         : []
 
@@ -848,10 +858,7 @@ export class TypeToJsonSchemaConverter {
     const converted = this.convertToJSONResults(toJSONResults)
 
     // a `toJSON` that may be missing (`toJSON?(): number`, `Partial<Stamp>`) leaves the written value
-    if (
-      this.mode === 'stringify' &&
-      !owners.some((owner) => hasOptionalToJSON(this.types, owner))
-    ) {
+    if (stringify && !owners.some((owner) => hasOptionalToJSON(this.types, owner))) {
       return anyOfDeduped(converted)
     }
 
@@ -861,8 +868,8 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertObject(type: Type, options: ObjectForm = {}): JsonSchema {
-    let { ignoreToJSON = false, plain = false } = options
-    const { ownFields = false } = options
+    let { plain = false } = options
+    const { ignoreToJSON = false, ownFields = false } = options
     // a client sends a value of a class type (or of a view of one, `Readonly<User>`) as an instance,
     // written without its getters, or as the built-in the class extends
     // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object
@@ -883,10 +890,10 @@ export class TypeToJsonSchemaConverter {
       return this.withPlainForm(type, this.visit(branded))
     }
 
+    // a client sends a plain object, whose `toJSON` the serializer skips, or what an instance of a
+    // class implementing the type writes (`interface Point { toJSON(): string }`), as for outputs
     if (this.input && !sentInstance) {
       plain = true
-      // the serializer leaves a function to `JSON.stringify`, which calls its `toJSON`
-      ignoreToJSON ||= !isFunction(this.types, type)
     }
 
     const referenceKind = this.types.getReferenceKind(type)

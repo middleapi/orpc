@@ -454,6 +454,39 @@ function getBuiltinSubclass(
 }
 
 /**
+ * Built-ins whose instances the serializer leaves to `JSON.stringify`, which calls their `toJSON`
+ * (it writes `Date`, `URL`, `Set`, `Map`, and `Blob` itself, and walks arrays and plain objects)
+ */
+const STRINGIFIED_BUILTINS = new Set([
+  'Error',
+  'RegExp',
+  'ArrayBuffer',
+  'SharedArrayBuffer',
+  'DataView',
+  'Promise',
+])
+
+/**
+ * Whether the serializer leaves a value of this type to `JSON.stringify`: an instance of a built-in
+ * like `Error` (also `TypeError`), or of a class extending one, not a view or an interface
+ * extending one, which may be a plain object.
+ */
+export function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
+  const symbol = type.getSymbol()
+
+  return (
+    symbol !== undefined &&
+    Boolean(
+      symbol.flags & SymbolFlags.Class ||
+      (symbol.flags & SymbolFlags.Interface && isBuiltinSymbol(types, symbol)),
+    ) &&
+    [getDeclaredBuiltinName(types, type), getBuiltinBaseName(types, type)].some(
+      (name) => name !== undefined && STRINGIFIED_BUILTINS.has(name),
+    )
+  )
+}
+
+/**
  * The value type of the number index signature of a type, like the items of an array.
  */
 export function getNumberIndexType(types: TypeQueries, type: Type): Type | undefined {

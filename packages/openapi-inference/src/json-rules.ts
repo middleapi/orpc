@@ -368,10 +368,17 @@ function isKeyOfMapping(type: Type): boolean {
   )
 }
 
+/** The library interfaces of functions, which interfaces may extend */
+const FUNCTION_INTERFACES: ReadonlySet<string> = new Set([
+  'Function',
+  'CallableFunction',
+  'NewableFunction',
+])
+
 /**
  * Functions, also with properties (`{ (): void; displayName: string }`, `(() => void) & { tag }`),
  * as constructors, or as interfaces extending `Function` (`CallableFunction`,
- * `interface Handler extends Function { meta: string }`).
+ * `interface Handler extends Function { meta: string }`, also through `CallableFunction`).
  */
 export function isFunction(types: TypeQueries, type: Type): boolean {
   if (type.isIntersectionType()) {
@@ -390,7 +397,7 @@ export function isFunction(types: TypeQueries, type: Type): boolean {
   const symbol = type.getSymbol()
   if (
     (symbol?.name === 'Function' && types.getSymbolSourceKind(symbol) === 'default') ||
-    getBuiltinBaseName(types, type) === 'Function'
+    FUNCTION_INTERFACES.has(getBuiltinBaseName(types, type) ?? '')
   ) {
     return true
   }

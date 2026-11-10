@@ -80,6 +80,12 @@ import {
   roundFortySixInputs,
   StampHolder,
 } from '../tests/fixtures/app/src/round46'
+import {
+  JsonPointImpl,
+  labelledBytes,
+  labelledError,
+  roundFortyEightInputs,
+} from '../tests/fixtures/app/src/round48'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2769,6 +2775,45 @@ describe('openAPIGenerator', () => {
         ['jsonFnForms', { ...new JsonFnForms() }],
         ['jsonFnViews', { added: jsonFn(), fn: jsonFn(), view: jsonFn(), addedView: jsonFn() }],
         ['jsonFnViews', { added: jsonFn(), fn: jsonFn(), view: { name: 'n' }, addedView: {} }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('round forty-eight', () => {
+    it('documents inputs holding errors with an added toJSON, and interfaces declaring toJSON', async () => {
+      const spec = await generator.generate(roundFortyEightInputs, {
+        source: { file: fixture('round48.ts'), export: 'roundFortyEightInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // the serializer leaves an error to `JSON.stringify`, which calls its `toJSON`, and so is
+      // an instance of a class implementing an interface that declares one
+      for (const [name, value] of [
+        ['plainLabelledError', { e: labelledError() }],
+        ['plainLabelledBytes', { b: labelledBytes() }],
+        ['jsonPoint', new JsonPointImpl()],
+        ['jsonPoint', { x: 1 }],
+        ['jsonPoints', { p: new JsonPointImpl(), list: [new JsonPointImpl(), { x: 1 }] }],
+        ['jsonPoints', { p: { x: 1 }, list: [] }],
       ] as const) {
         const validate = ajv.compile(body(`/${name}`))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

@@ -316,6 +316,10 @@ describe('generated schemas match serialized outputs', async () => {
     ['jsonFnHolder', undefined],
     ['jsonFnForms', undefined],
     ['plainFunctions', undefined],
+    ['callHandlerBox', undefined],
+    ['plainCallHandlers', undefined],
+    ['plainLabelledError', undefined],
+    ['setPickBox', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
