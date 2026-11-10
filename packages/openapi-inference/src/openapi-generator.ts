@@ -429,7 +429,10 @@ export class OpenAPIGenerator {
         errorMap,
         code,
         dataType
-          ? { ...config, data: inferredSchema(ctx.converters.output.convert(dataType)) }
+          ? {
+              ...config,
+              data: inferredSchema(ctx.converters.output.convert(dataType, { awaited: false })),
+            }
           : config,
       )
     }

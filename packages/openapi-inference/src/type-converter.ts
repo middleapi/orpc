@@ -131,6 +131,14 @@ export interface TypeToJsonSchemaConvertOptions {
    * like `params` and `query` of a detailed input, or `status` and `headers` of a detailed output.
    */
   inlineProperties?: readonly string[] | undefined
+
+  /**
+   * Describe the value a `Promise` type resolves to, like a handler's result or a yielded value.
+   * Set `false` for values that are not awaited, like an error's `data`, where a promise is `{}`.
+   *
+   * @default true
+   */
+  awaited?: boolean | undefined
 }
 
 export interface AsyncIteratorTypes {
@@ -235,7 +243,9 @@ export class TypeToJsonSchemaConverter {
     options: TypeToJsonSchemaConvertOptions = {},
   ): [jsonSchema: JsonSchema, optional: boolean] {
     // a list of types is their union, like the yield types of a union of async iterators
-    const members = (Array.isArray(type) ? type : [type]).flatMap((t) => this.getAwaitedTypes(t))
+    const members = (Array.isArray(type) ? type : [type]).flatMap((t) =>
+      options.awaited === false ? [t] : this.getAwaitedTypes(t),
+    )
 
     // a function (also with properties, `(() => number) & { tag: string }`) is written as nothing,
     // like `undefined`, also as a member of a union
@@ -244,9 +254,9 @@ export class TypeToJsonSchemaConverter {
     const filtered = serializable.length < unions.length
     const optional =
       filtered ||
-      members.some((t) => this.isOptional(t)) ||
-      // a function whose `toJSON` is optional may be written as nothing too
-      unions.some((t) => mayBeNonSerializable(this.types, t))
+      // written as nothing, like a function whose `toJSON` is optional, or an instance whose
+      // `toJSON` may return `undefined`
+      members.some((t) => this.isOptional(t) || this.mayDropThroughToJSON(t, false))
     // a single value is visited whole, so a union keeps its def
     const values = filtered ? serializable : members
 

@@ -1,4 +1,5 @@
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
@@ -320,6 +321,25 @@ describe('generated schemas match serialized outputs', async () => {
     const json = serialize(output)
     const validate = ajv.compile(responseSchema(`/${name}`))
 
+    expect(validate(json) ? [] : validate.errors).toEqual([])
+  })
+
+  // the body of a defined error, as oRPC sends it
+  it.each(['unlabelledData', 'unlabelledViewData', 'promisedData'])('error of %s', async (name) => {
+    const { response } = await new OpenAPIHandler(router).handle(
+      new Request(`http://localhost/${name}`, { method: 'POST' }),
+    )
+    const status = String(response!.status)
+    const validate = ajv.compile(
+      JSON.parse(
+        JSON.stringify(
+          (spec.paths as any)[`/${name}`].post.responses[status].content['application/json'].schema,
+        ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+      ),
+    )
+    const json = await response!.json()
+
+    expect(json.defined).toBe(true)
     expect(validate(json) ? [] : validate.errors).toEqual([])
   })
 
