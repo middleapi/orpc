@@ -905,11 +905,16 @@ export class TypeQueries {
     }
 
     // a mapped type over the keys of a type parameter (`{ [K in T]: true }` of zod's `BRAND<T>`),
-    // which has no properties until it is instantiated, unlike its instantiations
+    // which has no properties until it is instantiated, unlike its instantiations and mapped types
+    // over other keys (`{ [K in string]: number }`)
     if ((type as any).objectFlags & ObjectFlags.Mapped && !this.getProperties(type).length) {
-      const declaration = type.getSymbol()?.declarations[0]?.resolve()
+      const declaration = type.getSymbol()?.declarations[0]?.resolve() as any
+      const constraint = declaration?.typeParameter?.constraint
+      const keys = constraint && this.checker.getTypeFromTypeNode(constraint)
       return (
-        declaration !== undefined && this.checker.getTypeAtLocation(declaration)?.id === type.id
+        keys !== undefined &&
+        this.checker.getTypeAtLocation(declaration)?.id === type.id &&
+        Boolean(keys.flags & INSTANTIABLE_FLAGS || this.hasTypeParameter(keys, depth))
       )
     }
 

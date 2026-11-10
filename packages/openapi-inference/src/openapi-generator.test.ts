@@ -177,6 +177,7 @@ import {
   roundSixtyThreeInputs,
   viewedFnHolder,
 } from '../tests/fixtures/app/src/round63'
+import { roundSixtyFive } from '../tests/fixtures/app/src/round65'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3604,6 +3605,28 @@ describe('openAPIGenerator', () => {
       )
       expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
       expect(schemas.ViewedFnHolder.required).toEqual(['json', 'jsonDeep'])
+    })
+  })
+
+  describe('round sixty-five', () => {
+    it('reads no mapped type over keys without type parameters as generic', async () => {
+      const spec = await generator.generate(roundSixtyFive, {
+        source: { file: fixture('round65.ts'), export: 'roundSixtyFive' },
+      })
+
+      // changing every value, it is no view of the class, whose `toJSON` it cannot hold
+      expect(
+        (spec.paths as any)['/textualTally'].post.responses['200'].content['application/json']
+          .schema,
+      ).toEqual({
+        type: 'object',
+        properties: {
+          counts: { type: 'string' },
+          codes: { type: 'string' },
+          none: { type: 'string' },
+        },
+        required: ['counts', 'codes', 'none'],
+      })
     })
   })
 })
