@@ -239,6 +239,7 @@ export class ExpansionGuard {
         return path.some((property, index) => {
           const owner = stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type
           return (
+            owner !== undefined &&
             (unknown || this.declaresNesting(property, owner)) &&
             // along the rest of the path and again from where it starts, back to the property
             this.declaresCycle(property, owner, [...path.slice(index + 1), ...path.slice(0, index)])
@@ -248,7 +249,7 @@ export class ExpansionGuard {
             Math.max(
               ...stack
                 .slice(i)
-                .filter((entry) => entry === outer || this.getKeys(entry.type) === keys)
+                .filter((entry) => this.getKeys(entry.type) === keys)
                 .map((entry) => entry.growth),
             ) + 1
           : 0
@@ -266,31 +267,22 @@ export class ExpansionGuard {
    * only those the nesting runs through count (`a` of `inner: { a: T; m: Map<K, Model<T>> }`),
    * also where it repeats a type holding the model (`Box<{ a: T; m: Map<K, Model<T>> }>`).
    */
-  private declaresCycle(
-    property: TSSymbol,
-    owner: Type | undefined,
-    along: readonly TSSymbol[],
-  ): boolean {
+  private declaresCycle(property: TSSymbol, owner: Type, along: readonly TSSymbol[]): boolean {
     // the whole route, which `reaches` ends as it takes one of its properties at each step
     const names = along.map((p) => p.name)
-    return (
-      owner !== undefined &&
-      this.types.getPropertyOwners(owner).some((model) => {
-        const declaration = getDeclarationId(model)
-        const declared =
-          declaration === undefined
-            ? undefined
-            : this.types.checker.getPropertyOfType(model, property.name)
+    return this.types.getPropertyOwners(owner).some((model) => {
+      const declaration = getDeclarationId(model)
+      const declared =
+        declaration !== undefined && this.types.checker.getPropertyOfType(model, property.name)
 
-        return (
-          declared !== undefined &&
-          this.types.memo(`declaresCycle:${names.join('.')}`, declared.id, () => {
-            const type = this.types.checker.getTypeOfSymbol(declared)
-            return type !== undefined && this.reaches(type, declaration!, 4, new Set(), names)
-          })
-        )
-      })
-    )
+      return (
+        !!declared &&
+        this.types.memo(`declaresCycle:${names.join('.')}`, declared.id, () => {
+          const type = this.types.checker.getTypeOfSymbol(declared)
+          return type !== undefined && this.reaches(type, declaration, 4, new Set(), names)
+        })
+      )
+    })
   }
 
   /**
@@ -348,11 +340,7 @@ export class ExpansionGuard {
       ...(mapped ? this.types.getPropertyOwners(type) : []),
     ]
 
-    if (
-      children.some(
-        (child) => child && this.reaches(child, declaration, depth - 1, seen, undefined),
-      )
-    ) {
+    if (children.some((child) => this.reaches(child, declaration, depth - 1, seen, undefined))) {
       return true
     }
 
@@ -479,10 +467,10 @@ export class ExpansionGuard {
    * through generic interfaces of them (`inner: Box<T>`), unless it inherits the property with
    * more (`a: Box<Der<T[]>>` of `interface Der<T> extends Base<Der<T[]>>`).
    */
-  private declaresNesting(property: TSSymbol, owner: Type | undefined): boolean {
-    const source = owner && (this.types.getMappedSource(owner) ?? owner)
-    const declaring = source?.isTypeReference() ? source.getTarget() : source
-    const declared = declaring && this.types.checker.getPropertyOfType(declaring, property.name)
+  private declaresNesting(property: TSSymbol, owner: Type): boolean {
+    const source = this.types.getMappedSource(owner) ?? owner
+    const declaring = source.isTypeReference() ? source.getTarget() : source
+    const declared = this.types.checker.getPropertyOfType(declaring, property.name)
 
     if (declared) {
       return this.types.memo('declaresNestingIn', declared.id, () => {
