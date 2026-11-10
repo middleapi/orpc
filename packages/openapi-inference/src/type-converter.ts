@@ -17,6 +17,8 @@ import {
 } from 'typescript/unstable/sync'
 
 import {
+  addsOwnToJSON,
+  extendsBoxedPrimitive,
   extendsBuiltinClass,
   extendsBuiltinView,
   getBuiltin,
@@ -857,7 +859,13 @@ export class TypeToJsonSchemaConverter {
     builtin: JsonSchema,
   ): JsonSchema {
     return this.withAddedToJSON(
-      members.filter((m) => m !== builtinMember && !hasToJSONOf(this.types, m, builtinMember)),
+      // also the own `toJSON` of an interface over a view of the built-in (`ROnum & { code: number }`
+      // of `interface ROnum extends Readonly<Number> { toJSON(): string }`)
+      members.filter((m) =>
+        m === builtinMember
+          ? addsOwnToJSON(this.types, m)
+          : !hasToJSONOf(this.types, m, builtinMember),
+      ),
       () => this.withPlainForm(type, builtin),
       getStringifiedForm(this.types, type.isIntersectionType() ? builtinMember : type),
     )
@@ -903,13 +911,10 @@ export class TypeToJsonSchemaConverter {
     // written without its getters, or as the built-in the class extends
     // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object, and so a value of an
     // interface extending a built-in class (`interface AppError extends Error`), as for outputs
-    // (not `Function`, whose value is a function a client writes by its `toJSON`)
     const sentClass =
       this.input && !plain && !ownFields
         ? (getClassType(this.types, type) ??
-          (extendsBuiltinClass(this.types, type) && !isFunction(this.types, type)
-            ? type
-            : undefined))
+          (extendsBuiltinClass(this.types, type) ? type : undefined))
         : undefined
     // under `JSON.stringify` (inside an instance), and for a class with private members, which
     // no plain object satisfies, a client sends what an instance writes, as the server does
@@ -949,8 +954,17 @@ export class TypeToJsonSchemaConverter {
       // 'message'> { toJSON(): string }`), which adds it like an intersection, unless its `toJSON`
       // returned it, which `JSON.stringify` does not call again
       const views = getViewBases(type)
-      const sources = [type, ...views].flatMap((v) => this.types.getMappedSourceMembers(v))
-      const viewed = ignoreToJSON ? undefined : sources.find((m) => hasBuiltinForm(this.types, m))
+      const sourcesOf = (view: Type): Type[] =>
+        this.types
+          .getMappedSourceMembers(view)
+          .flatMap((source) => [source, ...getViewBases(source).flatMap(sourcesOf)])
+      const sources = [type, ...views].flatMap(sourcesOf)
+      // the built-in itself, not an interface over a view of it (`Readonly<ROnum>` of `interface
+      // ROnum extends Readonly<Number> { toJSON(): string }`), whose `toJSON` is added
+      const viewed = ignoreToJSON
+        ? undefined
+        : (sources.find((m) => hasBuiltinForm(this.types, m) && !getViewBases(m).length) ??
+          sources.find((m) => hasBuiltinForm(this.types, m)))
       return viewed
         ? this.withBuiltinToJSON(type, views.length ? [type, ...sources] : sources, viewed, builtin)
         : this.withPlainForm(type, builtin)
@@ -1058,12 +1072,18 @@ export class TypeToJsonSchemaConverter {
     const toJSONResults = sourceResults.flat()
     if (toJSONResults.length) {
       const converted = this.convertToJSONResults(toJSONResults)
+      // a function, not a plain object of an interface extending `Function`, which has no call
+      // signature (`interface JsonFn extends Function { toJSON(): string }`)
+      const callable =
+        isFunction(this.types, type) &&
+        (this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
+          this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0)
 
       const mayLackToJSON =
         sourceResults.some((results) => !results.length) ||
         jsonSources.some((source) => hasOptionalToJSON(this.types, source)) ||
         // the serializer does not walk a function, `JSON.stringify` calls its `toJSON`
-        (!isFunction(this.types, type) &&
+        (!callable &&
           (this.mode === 'stringify'
             ? // under `JSON.stringify` rules, a view may also hold a plain object without `toJSON`
               classType !== undefined && classType.id !== type.id
@@ -1077,7 +1097,7 @@ export class TypeToJsonSchemaConverter {
 
       // a function without `toJSON` is written as nothing (the caller makes it optional), not
       // as its fields
-      if (isFunction(this.types, type)) {
+      if (callable) {
         return anyOfDeduped(
           converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!)),
         )
@@ -1126,17 +1146,16 @@ export class TypeToJsonSchemaConverter {
     // the empty object type `{}` (also `NonNullable<unknown>`, `Pick<User, never>`, or a class
     // without members) accepts any value but `null` and `undefined`, a type of methods only
     // (`Iterable<string>`, `interface Lookup { has(key: string): boolean }`) arrays, sets, or strings
-    // too, and `Record<string, any>` any object. Not one extending a built-in class
-    // (`class MyNum extends Number { toJSON(): string }`), whose value is the built-in, written
-    // apart, or a plain object.
+    // too, and `Record<string, any>` any object. Not one extending a boxed primitive
+    // (`class MyNum extends Number { toJSON(): string }`), whose value is the primitive, written
+    // apart, or a plain object (but a `WeakMap` may hold a `Map`, written as an array).
     if (
       (properties.every((p) => p.flags & SymbolFlags.Method || p.escapedName.startsWith('__@')) &&
         !isObjectLiteral(type) &&
         !this.checker.getIndexInfosOfType(type).length &&
         !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length &&
-        !extendsBuiltinClass(this.types, type) &&
-        !getClassTypes(this.types, type).some(
-          (c) => getBuiltinBaseName(this.types, c) !== undefined,
+        ![type, ...getClassTypes(this.types, type)].some((c) =>
+          extendsBoxedPrimitive(this.types, c),
         )) ||
       isAnyRecord(this.types, type)
     ) {
@@ -1879,12 +1898,24 @@ export class TypeToJsonSchemaConverter {
   /**
    * Whether a mapped view of a built-in or class may hold a plain object: it makes members
    * optional (`Partial<Date>`) or leaves some out (`Pick<URL, 'href'>`), also in an intersection,
-   * and any view of a primitive or of its interface, whose few members a plain object easily has
-   * (`{ valueOf: () => true }` of `Omit<boolean, 'k'>` or `Pick<Boolean, 'valueOf'>`).
+   * and any view of a primitive or of its interface, or an interface extending one, whose few
+   * members a plain object easily has (`{ valueOf: () => true }` of `Omit<boolean, 'k'>` or
+   * `Pick<Boolean, 'valueOf'>`).
    */
   private mayHoldPlainObject(type: Type): boolean {
     if (type.isIntersectionType()) {
       return this.types.getMembers(type).some((m) => this.mayHoldPlainObject(m))
+    }
+
+    // so may an interface extending the interface of a primitive (`interface Num extends Number {}`)
+    const symbol = type.getSymbol()
+    if (
+      symbol !== undefined &&
+      symbol.flags & SymbolFlags.Interface &&
+      !(symbol.flags & SymbolFlags.Class) &&
+      getBoxedPrimitiveSchema(this.types, type) !== undefined
+    ) {
+      return true
     }
 
     // an interface extending a view of a built-in (`interface Link extends Pick<URL, 'href'>`)

@@ -28,6 +28,7 @@ import { roundFiftyFour } from './round54'
 import { roundFiftyFive } from './round55'
 import { roundFiftySix } from './round56'
 import { roundFiftySeven } from './round57'
+import { roundSixty } from './round60'
 
 export interface Author {
   id: string
@@ -1065,4 +1066,5 @@ export const router = {
   ...roundFiftyFive,
   ...roundFiftySix,
   ...roundFiftySeven,
+  ...roundSixty,
 }

@@ -368,6 +368,13 @@ describe('generated schemas match serialized outputs', async () => {
     ['plainNumRoot', undefined],
     ['jsonFns', undefined],
     ['jsonFnRoot', undefined],
+    ['weakHolder', undefined],
+    ['plainJsonFnRoot', undefined],
+    ['plainJsonFnHolder', undefined],
+    ['functionJsonFnHolder', undefined],
+    ['numViewJsons', undefined],
+    ['plainNumLikes', undefined],
+    ['boxedNumLikes', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -398,8 +405,30 @@ describe('generated schemas match serialized outputs', async () => {
     // the serializer leaves a boxed number to `JSON.stringify`, which calls its `toJSON`
     expect(schemas.INum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
     expect(schemas.IBool).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
-    // a function is written by its `toJSON`
-    expect(deref(responseSchema('/jsonFnRoot'))).toMatchObject({ type: 'string' })
+    // a function is written by its `toJSON`, a plain object of an interface extending `Function`
+    // by its fields
+    expect(schemas.JsonFn).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+    // under `JSON.stringify` (in a class), a plain object is written by its `toJSON` too
+    expect(schemas.JsonFnHolder.properties.fn).toMatchObject({ type: 'string' })
+  })
+
+  it('keeps weak collections open, and writes plain objects of interfaces extending Number or Function', () => {
+    const schemas = spec.components?.schemas as any
+
+    // a `WeakMap` may hold a `Map`, written as an array
+    for (const name of ['WeakLookup', 'WeakTags', 'WeakLookupClass']) {
+      expect(schemas[name]).not.toHaveProperty('type')
+    }
+    expect(schemas.PlainJsonFn).toMatchObject({
+      anyOf: [{ type: 'string' }, { type: 'object', properties: { length: { type: 'number' } } }],
+    })
+    // the own `toJSON` of an interface over a view of `Number`, also through views of it
+    expect(schemas.NumViewJsons.properties.readonlyView.anyOf[0]).toEqual({ type: 'string' })
+    expect(schemas.NumViewJsons.properties.codedPicked.anyOf[0]).toEqual({ type: 'string' })
+    expect(schemas.NumLike).toMatchObject({ anyOf: [{ type: 'number' }, { type: 'object' }] })
+    expect(schemas.FieldedNumLike).toMatchObject({
+      anyOf: [{ type: 'number' }, { type: 'object', required: ['x'] }],
+    })
   })
 
   it('documents the plain object a view of a boxed primitive toJSON returns may be, and interfaces extending a readonly set as the set', () => {

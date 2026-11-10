@@ -529,13 +529,24 @@ function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
 export function getStringifiedForm(
   types: TypeQueries,
   type: Type,
+  depth = 0,
 ): 'instance' | 'view' | undefined {
   if (isStringifiedBuiltin(types, type)) {
     return 'instance'
   }
 
+  // also of an interface over a view of one (`Readonly<ROnum>` of
+  // `interface ROnum extends Readonly<Number> { toJSON(): string }`)
   return [type, ...getViewBases(type)].some((view) =>
-    types.getMappedSourceMembers(view).some((source) => isStringifiedBuiltin(types, source)),
+    types
+      .getMappedSourceMembers(view)
+      .some(
+        (source) =>
+          isStringifiedBuiltin(types, source) ||
+          (depth < 16 &&
+            getViewBases(source).length > 0 &&
+            getStringifiedForm(types, source, depth + 1) !== undefined),
+      ),
   )
     ? 'view'
     : undefined
@@ -635,6 +646,31 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
   return (
     (base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))) ||
     getViewBases(view).some((viewBase) => isViewOfFieldsBuiltin(types, viewBase))
+  )
+}
+
+/**
+ * Whether a class or an interface extends a boxed primitive (`class MyNum extends Number`,
+ * `interface INum extends Number`), also through a view of it or an intersection with it, whose
+ * value is the primitive or a boxed one, written apart, or a plain object.
+ */
+export function extendsBoxedPrimitive(types: TypeQueries, view: Type): boolean {
+  const members =
+    (view as any).objectFlags & ObjectFlags.Mapped
+      ? types.getMappedSourceMembers(view)
+      : view.isIntersectionType()
+        ? types.getMembers(view)
+        : undefined
+
+  if (members) {
+    return members.some((member) => extendsBoxedPrimitive(types, member))
+  }
+
+  const symbol = view.getSymbol()
+  return (
+    symbol !== undefined &&
+    Boolean(symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)) &&
+    getBoxedPrimitiveSchema(types, view) !== undefined
   )
 }
 
@@ -743,6 +779,14 @@ export function hasToJSONOf(types: TypeQueries, type: Type, builtin: Type): bool
     other.length > 0 &&
     other.every((d) => own.some((o) => o.path === d.path && o.index === d.index))
   )
+}
+
+/**
+ * Whether an interface over a view of a built-in adds its own `toJSON`
+ * (`interface ROnum extends Readonly<Number> { toJSON(): string }`), which an instance has.
+ */
+export function addsOwnToJSON(types: TypeQueries, type: Type): boolean {
+  return getViewBases(type).length > 0 && hasOwnToJSON(types, type)
 }
 
 function hasOwnToJSON(types: TypeQueries, type: Type): boolean {

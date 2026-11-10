@@ -141,6 +141,15 @@ import {
 } from '../tests/fixtures/app/src/round57'
 import { DraftNote, roundFiftyEightInputs, SearchFilter } from '../tests/fixtures/app/src/round58'
 import { roundFiftyNineInputs } from '../tests/fixtures/app/src/round59'
+import {
+  boxedNumLikes,
+  functionJsonFn,
+  numViewJsons,
+  plainJsonFn,
+  plainNumLikes,
+  roundSixtyInputs,
+  weakHolder,
+} from '../tests/fixtures/app/src/round60'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3368,8 +3377,54 @@ describe('openAPIGenerator', () => {
       // a plain object of a subclass of `Number` is written as an object
       expect(schemas.MyNum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
       expect(schemas.INum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
-      // a function is written by its `toJSON`, as in outputs
-      expect(schemas.JsonFns.properties.fn).toMatchObject({ type: 'string' })
+      // a function is written by its `toJSON`, a plain object by its fields, as in outputs
+      expect(schemas.JsonFn).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+    })
+  })
+
+  describe('round sixty', () => {
+    it('documents inputs of weak collections, and of interfaces extending Number or Function', async () => {
+      const spec = await generator.generate(roundSixtyInputs, {
+        source: { file: fixture('round60.ts'), export: 'roundSixtyInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // what a client holding these values sends
+      for (const [name, value] of [
+        ['weakHolder', weakHolder()],
+        ['plainJsonFnRoot', plainJsonFn()],
+        ['plainJsonFnRoot', functionJsonFn()],
+        ['plainJsonFnHolder', { fn: plainJsonFn() }],
+        ['plainJsonFnHolder', { fn: functionJsonFn() }],
+        ['numViewJsons', numViewJsons()],
+        ['numLikes', plainNumLikes()],
+        ['numLikes', boxedNumLikes()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+
+      expect(schemas.WeakLookupClass).not.toHaveProperty('type')
+      expect(schemas.PlainJsonFn).toMatchObject({
+        anyOf: [{ type: 'string' }, { type: 'object' }],
+      })
     })
   })
 })
