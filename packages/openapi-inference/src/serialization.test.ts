@@ -286,6 +286,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['shapeTree', undefined],
     ['viaGetters', undefined],
     ['viaMapLiterals', undefined],
+    ['viaSelfMaps', undefined],
+    ['viaSelfSets', undefined],
+    ['viaParents', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2357,6 +2360,19 @@ describe('generated schemas match serialized outputs', async () => {
     const nullable = (schema: object) => ({ anyOf: [schema, { type: 'null' }] })
     const levels = (count: number, level: (inner: object) => object, end: object = {}): object =>
       count === 0 ? end : level(levels(count - 1, level, end))
+    // every component in place, but those it is inside of
+    const inline = (schema: any, inside: readonly string[] = []): any => {
+      const name = schema?.$ref?.replace('#/components/schemas/', '')
+      return name !== undefined
+        ? inside.includes(name)
+          ? schema
+          : inline((spec.components?.schemas as any)[name], [...inside, name])
+        : schema && typeof schema === 'object'
+          ? Array.isArray(schema)
+            ? schema.map((s) => inline(s, inside))
+            : Object.fromEntries(Object.entries(schema).map(([k, v]) => [k, inline(v, inside)]))
+          : schema
+    }
 
     it('cuts cycles through conditional deep mapped types over generic models', () => {
       // each level maps over the one outside it again, as a different type
@@ -2396,6 +2412,31 @@ describe('generated schemas match serialized outputs', async () => {
         levels(5, (a) => model({ inner: model({ a, m: expect.any(Object) }) }), {
           type: 'number',
         }),
+      )
+      // also when it holds a map or set of itself, or a pointer back to itself, there
+      expect(inline(schemaOf('viaSelfMaps'))).toEqual(
+        levels(6, (a) => model({ inner: model({ a, m: expect.any(Object) }) }), {
+          type: 'number',
+        }),
+      )
+      expect(inline(schemaOf('viaSelfSets'))).toEqual(
+        levels(5, (a) => model({ inner: model({ a, s: expect.any(Object) }) }), {
+          type: 'number',
+        }),
+      )
+      expect(inline(schemaOf('viaParents'))).toEqual(
+        levels(
+          6,
+          (a) =>
+            model({
+              inner: {
+                type: 'object',
+                properties: { a, f: {}, up: expect.any(Object) },
+                required: ['a', 'up'],
+              },
+            }),
+          { type: 'number' },
+        ),
       )
     })
   })

@@ -904,6 +904,10 @@ describe('openAPIGenerator', () => {
           mapView: 'os.handler((): CD<MapView<number>> => ({}) as any)',
           mapViewInput: 'os.input(type<Expanding<MapView<number>>>()).handler(() => 1)',
           mapDirect: 'os.handler((): CD<MapDirect<number>> => ({}) as any)',
+          swapped: 'os.handler((): CD<Swap<number, string>> => ({}) as any)',
+          swappedInput: 'os.input(type<CD<Swap<number, string>>>()).handler(() => 1)',
+          mapSwapped: 'os.handler((): CD<MapSwap<number, string>> => ({}) as any)',
+          mapSwappedInput: 'os.input(type<Expanding<MapSwap<number, string>>>()).handler(() => 1)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -942,6 +946,8 @@ describe('openAPIGenerator', () => {
             'interface MethodDer<T> extends MethodBase<MethodDer<T[]>> { v: T }',
             'interface MapView<T> extends MapBase<CD<MapView<T>>> { v: T }',
             'interface MapDirect<T> { a: Map<string, T>; b: MapDirect<T[]>[]; c: BoxVia<MapDirect<T[]>> }',
+            'interface Swap<T, U> extends Base<Swap<U, T[]>> { v: T; u: U }',
+            'interface MapSwap<T, U> extends MapBase<MapSwap<U, T[]>> { v: T; u: U }',
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',
@@ -2182,6 +2188,10 @@ describe('openAPIGenerator', () => {
         depth === 0 ? end : { inner: { a: getters(depth - 1, end) } }
       const linked = (depth: number, end: unknown): unknown =>
         depth === 0 ? end : { inner: { a: linked(depth - 1, end), next: null } }
+      const mapped = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: mapped(depth - 1, end), m: [] } }
+      const sets = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: sets(depth - 1, end), s: [] } }
 
       for (const [path, value, valid] of [
         ['/genericCycle', { f0: { f0: null, f2: { a: 2 } }, f2: { a: 1 } }, true],
@@ -2196,6 +2206,11 @@ describe('openAPIGenerator', () => {
         // also when the alias between them names itself
         ['/viaLinkedGetters', linked(6, 1), true],
         ['/viaLinkedGetters', linked(6, 'x'), false],
+        // and when the object literal between them holds a map or set of the model
+        ['/viaSelfMaps', mapped(8, 1), true],
+        ['/viaSelfMaps', mapped(8, 'x'), false],
+        ['/viaSelfSets', sets(5, 1), true],
+        ['/viaSelfSets', sets(5, 'x'), false],
       ] as const) {
         expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
       }

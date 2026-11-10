@@ -226,21 +226,23 @@ export class ExpansionGuard {
       return 0
     }
 
-    // the innermost one
+    // the innermost one it holds again, also past one holding something else, as a cycle that
+    // swaps type arguments (`Model<U, T[]>` of `Model<T, U>`) holds them again only every other time
     for (let i = stack.length - 1; i >= 0; i--) {
       const outer = stack[i]!
-      if (this.getKeys(outer.type) === keys) {
-        const held = this.holdsAgain(outer.type, type, MAX_GROWTH)
+      const held =
+        this.getKeys(outer.type) === keys && this.holdsAgain(outer.type, type, MAX_GROWTH)
+      if (held) {
         // what functions it holds is not known (see `holdsAgain`), a nesting of models that
         // differ only there (`Via<Via<number>>`) ends where it is written
-        const unknown = held?.keyless && !held.grows
-        return held &&
-          this.path.slice(outer.at).some((property, index) => {
-            const owner = stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type
-            return unknown
-              ? this.declaresCycle(property, owner)
-              : this.declaresNesting(property, owner)
-          })
+        const unknown = held.keyless && !held.grows
+        const path = this.path.slice(outer.at)
+        return path.some((property, index) => {
+          const owner = stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type
+          return unknown
+            ? this.declaresCycle(property, owner, path.slice(index + 1))
+            : this.declaresNesting(property, owner)
+        })
           ? outer.growth + 1
           : 0
       }
@@ -253,9 +255,17 @@ export class ExpansionGuard {
    * Whether a property is declared, in the model holding it, with a type naming that model again
    * (`next: Model<T[]>[]`), also through a view of it (`b: Box<DeepReadonly<Model<T>>>` of
    * `interface Model<T> extends Base<DeepReadonly<Model<T>>>`) or another model, a cycle of
-   * declarations a nesting without end needs.
+   * declarations a nesting without end needs. Of the properties of the types it is declared with,
+   * only those the nesting runs through count (`a` of `inner: { a: T; m: Map<K, Model<T>> }`).
    */
-  private declaresCycle(property: TSSymbol, owner: Type | undefined): boolean {
+  private declaresCycle(
+    property: TSSymbol,
+    owner: Type | undefined,
+    along: readonly TSSymbol[],
+  ): boolean {
+    const depth = 4
+    // it looks no further than `depth` types in
+    const names = along.slice(0, depth).map((p) => p.name)
     return (
       owner !== undefined &&
       this.types.getPropertyOwners(owner).some((model) => {
@@ -267,9 +277,9 @@ export class ExpansionGuard {
 
         return (
           declared !== undefined &&
-          this.types.memo('declaresCycle', declared.id, () => {
+          this.types.memo(`declaresCycle:${names.join('.')}`, declared.id, () => {
             const type = this.types.checker.getTypeOfSymbol(declared)
-            return type !== undefined && this.reaches(type, declaration!, 4, new Set())
+            return type !== undefined && this.reaches(type, declaration!, depth, new Set(), names)
           })
         )
       })
@@ -279,9 +289,15 @@ export class ExpansionGuard {
   /**
    * Whether a type is an instantiation of a declaration, or holds one `depth` types in: as a
    * member, a type argument, the model a view maps over, or a property of a type the project
-   * declares.
+   * declares: the one named first `along` the path when given, none at its end.
    */
-  private reaches(type: Type, declaration: number, depth: number, seen: Set<number>): boolean {
+  private reaches(
+    type: Type,
+    declaration: number,
+    depth: number,
+    seen: Set<number>,
+    along: readonly string[] | undefined,
+  ): boolean {
     if (getDeclarationId(type) === declaration) {
       return true
     }
@@ -290,27 +306,44 @@ export class ExpansionGuard {
       return false
     }
 
-    seen.add(type.id)
+    // a type passed again along other properties is not the same
+    if (!along) {
+      seen.add(type.id)
+    }
+
+    if (type.flags & TypeFlags.UnionOrIntersection) {
+      return this.types
+        .getMembers(type)
+        .some((member) => this.reaches(member, declaration, depth - 1, seen, along))
+    }
 
     const symbol = type.getAliasSymbol() ?? type.getSymbol()
-    const children =
-      type.flags & TypeFlags.UnionOrIntersection
-        ? this.types.getMembers(type)
-        : [
-            ...this.types.getTypeArguments(type),
-            // the models a view maps over (`DeepReadonly<Model<T>>`), by its keys
-            ...((type as any).objectFlags & ObjectFlags.Mapped
-              ? this.types.getPropertyOwners(type)
-              : []),
-            ...(type.flags & TypeFlags.Object &&
-            !(symbol && this.types.getSymbolSourceKind(symbol) === 'default')
-              ? this.types.getPropertyTypes(type)
-              : []),
-          ]
+    const children = [
+      ...this.types.getTypeArguments(type),
+      // the models a view maps over (`DeepReadonly<Model<T>>`), by its keys
+      ...((type as any).objectFlags & ObjectFlags.Mapped ? this.types.getPropertyOwners(type) : []),
+    ]
 
-    return children.some(
-      (child) => child !== undefined && this.reaches(child, declaration, depth - 1, seen),
-    )
+    if (
+      children.some(
+        (child) => child && this.reaches(child, declaration, depth - 1, seen, undefined),
+      )
+    ) {
+      return true
+    }
+
+    if (
+      !(type.flags & TypeFlags.Object) ||
+      (symbol && this.types.getSymbolSourceKind(symbol) === 'default') ||
+      along?.length === 0
+    ) {
+      return false
+    }
+
+    const property = along && this.types.getProperty(type, along[0]!)
+    return this.types
+      .getSymbolTypes(along ? (property ? [property] : []) : this.types.getProperties(type))
+      .some((child) => child && this.reaches(child, declaration, depth - 1, seen, along?.slice(1)))
   }
 
   /**
