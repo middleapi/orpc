@@ -131,6 +131,7 @@ import {
   readonlySets,
   roundFiftySixInputs,
 } from '../tests/fixtures/app/src/round56'
+import { DraftNote, roundFiftyEightInputs, SearchFilter } from '../tests/fixtures/app/src/round58'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3124,6 +3125,86 @@ describe('openAPIGenerator', () => {
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
         expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
       }
+    })
+  })
+
+  describe('round fifty-eight', () => {
+    it('documents inputs split into parameters by the fields a client sends, not by what toJSON returns', async () => {
+      const spec = await generator.generate(roundFiftyEightInputs, {
+        source: { file: fixture('round58.ts'), export: 'roundFiftyEightInputs' },
+      })
+      const paths = spec.paths as any
+      const parameters = (path: string, method: string) =>
+        paths[path][method].parameters.map((p: any) => [p.in, p.name, p.schema, p.required])
+
+      // a query and path params hold the fields, never the string `toJSON` returns
+      expect(parameters('/search', 'get')).toEqual([
+        ['query', 'term', { type: 'string' }, true],
+        ['query', 'limit', { type: 'number' }, undefined],
+      ])
+      expect(parameters('/page', 'get')).toEqual([['query', 'size', { type: 'number' }, true]])
+      expect(parameters('/labels', 'get')).toEqual([['query', 'label', { type: 'string' }, true]])
+      expect(
+        parameters('/either', 'get')
+          .map((p: any) => p[1])
+          .toSorted(),
+      ).toEqual(['limit', 'size', 'term'])
+      expect(parameters('/term/{term}', 'patch')).toEqual([
+        ['path', 'term', { type: 'string' }, true],
+      ])
+      expect(parameters('/draft/{id}', 'delete')).toEqual([
+        ['path', 'id', { type: 'string' }, true],
+      ])
+      expect(parameters('/detailed', 'post')).toEqual([
+        ['query', 'size', { type: 'number' }, true],
+        ['header', 'x-trace', { type: 'string' }, true],
+      ])
+      // a body is written by `JSON.stringify`, which calls the `toJSON` of an instance
+      expect(paths['/detailed'].post.requestBody.content['application/json'].schema).toEqual({
+        $ref: '#/components/schemas/SearchFilter',
+      })
+
+      // what a client holding these values sends, which the server accepts
+      const handler = new OpenAPIHandler(roundFiftyEightInputs)
+      const sent: Request[] = []
+      const link = new OpenAPILink(roundFiftyEightInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+
+      for (const [name, value, search] of [
+        ['search', { term: 'a', limit: 1, toJSON: () => 'a' }, '?term=a&limit=1'],
+        ['page', { size: 2, toJSON: () => 'all' as const }, '?size=2'],
+        ['labels', { label: 'l' }, '?label=l'],
+        ['either', { size: 2, toJSON: () => 'all' as const }, '?size=2'],
+        // the params and the body of an instance are its fields
+        ['draft', new DraftNote(), ''],
+        ['term', new SearchFilter(), ''],
+      ] as const) {
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+        expect(new URL(sent.at(-1)!.url).search).toBe(search)
+      }
+      expect(new URL(sent.at(-1)!.url).pathname).toBe('/term/t')
+
+      await expect(
+        link.call(
+          ['detailed'],
+          {
+            query: { size: 1, toJSON: () => 'all' as const },
+            headers: { 'x-trace': 't', 'toJSON': () => 't' },
+            body: new SearchFilter(),
+          },
+          { context: {} },
+        ),
+      ).resolves.toBe(1)
+      expect(new URL(sent.at(-1)!.url).search).toBe('?size=1')
+      expect(sent.at(-1)!.headers.get('x-trace')).toBe('t')
+      expect(await sent.at(-1)!.text()).toBe('"t"')
     })
   })
 })

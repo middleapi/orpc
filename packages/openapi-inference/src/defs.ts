@@ -1,7 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
-import { collectDefRefs, fromRef, toRef } from './schema-utils'
+import { collectDefRefs, fromRef, objectMembers, toRef } from './schema-utils'
 
 /**
  * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class
@@ -285,7 +285,8 @@ export class DefRegistry {
 
   /**
    * Inlines the root def, the defs of a root union, and the defs of `properties` of the root
-   * (or of each root union member), unless they are recursive.
+   * (or of each root union member), unless they are recursive. Their parts are read by their
+   * fields, so only the members holding fields are kept.
    */
   inlineRoot(schema: JsonSchema, properties: readonly string[]): JsonSchema {
     const inlineRef = (member: JsonSchema): JsonSchema => {
@@ -293,10 +294,10 @@ export class DefRegistry {
       const def = name === undefined ? undefined : this.defsByName.get(name)
 
       if (!def || this.collectDeps(this.getDeps(def)).has(def.name)) {
-        return member
+        return objectMembers(member)
       }
 
-      return def.schema!
+      return objectMembers(def.schema!)
     }
 
     const inlineProperties = (member: JsonSchema): JsonSchema => {
@@ -319,7 +320,7 @@ export class DefRegistry {
     const root = inlineProperties(schema)
 
     if (typeof root === 'object' && root.anyOf) {
-      return { ...root, anyOf: root.anyOf.map(inlineProperties) }
+      return objectMembers({ ...root, anyOf: root.anyOf.map(inlineProperties) })
     }
 
     return root

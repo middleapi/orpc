@@ -273,6 +273,36 @@ export function dedupe(schemas: JsonSchema[]): JsonSchema[] {
   })
 }
 
+/**
+ * The members of a union holding fields, when it has some, also of nested unions: an input split
+ * into parameters is read by its fields, never by what an instance's `toJSON` returns or the
+ * built-in it extends (an empty object is what `JSON.stringify` writes of a returned `Set`).
+ */
+export function objectMembers(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object' || !schema.anyOf) {
+    return schema
+  }
+
+  const members = dedupe(schema.anyOf.map(objectMembers)).filter(holdsFields)
+
+  // refs only, of recursive defs, can not be told apart
+  if (members.every((m) => m.$ref !== undefined)) {
+    return schema
+  }
+
+  const { anyOf: _, ...rest } = schema
+  return members.length === 1 ? { ...rest, ...members[0] } : { ...rest, anyOf: members }
+}
+
+function holdsFields(schema: JsonSchema): schema is ObjectJsonSchema {
+  return (
+    typeof schema === 'object' &&
+    (schema.$ref !== undefined ||
+      (schema.type === 'object' && !isPlain(schema, 'object')) ||
+      (schema.anyOf?.some(holdsFields) ?? false))
+  )
+}
+
 export function isPlain(schema: JsonSchema, type: string): boolean {
   return typeof schema === 'object' && schema.type === type && Object.keys(schema).length === 1
 }
