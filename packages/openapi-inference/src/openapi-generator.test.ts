@@ -4,7 +4,12 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { OpenAPIGeneratorError, OpenAPIJsonSerializer } from '@orpc/openapi'
+import {
+  OpenAPIGenerator as BaseOpenAPIGenerator,
+  openapi,
+  OpenAPIGeneratorError,
+  OpenAPIJsonSerializer,
+} from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { call, os, Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
@@ -346,6 +351,21 @@ describe('openAPIGenerator', () => {
     ).rejects.toThrow(
       'Failed to infer types for the OpenAPI document (1 error):\n\nProcedure at broken: Could not resolve the type "Missing"',
     )
+  })
+
+  it('documents an operation given whole by a spec object without its types', async () => {
+    const spec = { operationId: 'upload', responses: { 200: { description: 'Uploaded' } } }
+    const withSpec = {
+      ok: brokenRouter.ok,
+      broken: brokenRouter.broken.meta(openapi({ spec })),
+      extra: brokenRouter.ok.meta(openapi({ spec: { ...spec, operationId: 'extra' } })),
+    }
+
+    const document = await generator.generate(withSpec, { source: { file: fixture('broken.ts') } })
+    const stock = await new BaseOpenAPIGenerator().generate(withSpec)
+
+    expect(document.paths?.['/broken']).toEqual(stock.paths?.['/broken'])
+    expect(document.paths?.['/extra']).toEqual(stock.paths?.['/extra'])
   })
 
   it('reports procedures missing from the router type', async () => {

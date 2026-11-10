@@ -217,8 +217,23 @@ export class OpenAPIGenerator {
     let walked = 0
     let found = 0
 
+    const place = (path: readonly string[], procedure: AnyProcedureContract) => {
+      if (path.length === 0) {
+        inferred = procedure
+      } else {
+        setAtPath(inferred, path, procedure)
+      }
+    }
+
     await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(filter, contract, path) === false) {
+        return
+      }
+
+      // an operation the `spec` object gives whole takes nothing from the types
+      const spec = getOpenAPIMeta(contract)?.spec
+      if (spec !== undefined && typeof spec !== 'function') {
+        place(path, contract)
         return
       }
 
@@ -236,13 +251,7 @@ export class OpenAPIGenerator {
 
         found++
 
-        const procedure = this.inferProcedure(ctx, contract, resolved)
-
-        if (path.length === 0) {
-          inferred = procedure
-        } else {
-          setAtPath(inferred, path, procedure)
-        }
+        place(path, this.inferProcedure(ctx, contract, resolved))
       } catch (e) {
         if (!(e instanceof OpenAPIGeneratorError || e instanceof TypeScriptTypeResolutionError)) {
           throw e
