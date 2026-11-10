@@ -87,23 +87,28 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
 
 type StandardJsonSchemaConversion = { jsonSchema: JsonSchema } | { error: unknown }
 
-const standardJsonSchemaConversions = new WeakMap<
+/**
+ * The conversions of Standard JSON Schemas in one generation, which reads each schema as it is
+ * then: a later generation picks up later changes, like metadata added to a Zod registry.
+ */
+type StandardJsonSchemaConversions = WeakMap<
   AnySchema,
   Partial<Record<JsonSchemaConverterDirection, StandardJsonSchemaConversion>>
->()
+>
 
 /**
  * Converts a Standard JSON Schema once per direction, caching the result (or the thrown error),
  * since both deciding whether it converts and converting it need the conversion.
  */
 function convertStandardJsonSchema(
+  cache: StandardJsonSchemaConversions,
   schema: AnySchema,
   direction: JsonSchemaConverterDirection,
 ): StandardJsonSchemaConversion {
-  let conversions = standardJsonSchemaConversions.get(schema)
+  let conversions = cache.get(schema)
   if (!conversions) {
     conversions = {}
-    standardJsonSchemaConversions.set(schema, conversions)
+    cache.set(schema, conversions)
   }
 
   if (!conversions[direction]) {
@@ -123,11 +128,15 @@ function convertStandardJsonSchema(
  * Converts Standard JSON Schemas like {@link StandardJsonSchemaConverter}, reusing each conversion.
  */
 class CachedStandardJsonSchemaConverter extends StandardJsonSchemaConverter {
+  constructor(protected readonly cache: StandardJsonSchemaConversions) {
+    super()
+  }
+
   override convert(
     schema: AnySchema | undefined,
     direction: JsonSchemaConverterDirection,
   ): [jsonSchema: JsonSchema, optional: boolean] {
-    const conversion = convertStandardJsonSchema(schema!, direction)
+    const conversion = convertStandardJsonSchema(this.cache, schema!, direction)
 
     return 'error' in conversion
       ? [{}, true]
@@ -146,7 +155,7 @@ class ConvertibleStandardJsonSchemaConverter extends CachedStandardJsonSchemaCon
   ): boolean {
     return (
       super.condition(schema, direction) &&
-      !('error' in convertStandardJsonSchema(schema!, direction))
+      !('error' in convertStandardJsonSchema(this.cache, schema!, direction))
     )
   }
 }
@@ -159,6 +168,13 @@ interface InferenceContext {
   source: TypeScriptExport & { name: string }
   resolver: RouterTypeResolver
   converters: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverter>
+  /** The converters of schemas kept as they are, the rest is inferred from types */
+  schemaConverters: JsonSchemaConverter[]
+  /**
+   * The converters `OpenAPIGenerator` of `@orpc/openapi` uses, documenting a Standard JSON Schema
+   * whose conversion throws as any value
+   */
+  stockConverters: JsonSchemaConverter[]
   getSourceKind: (path: string) => SourceKind
   describeConfig: () => readonly string[]
 }
@@ -201,26 +217,19 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  * @see {@link https://orpc.dev/docs/openapi/specification#type-inference | OpenAPI Specification - Type Inference}
  */
 export class OpenAPIGenerator {
-  private readonly converters: JsonSchemaConverter[]
-  private readonly generator: BaseOpenAPIGenerator
-
-  constructor(private readonly options: OpenAPIGeneratorOptions = {}) {
-    this.converters = [...toArray(options.converters), new ConvertibleStandardJsonSchemaConverter()]
-    this.generator = new BaseOpenAPIGenerator({
-      ...options,
-      converters: [
-        new InferredJsonSchemaConverter(),
-        ...toArray(options.converters),
-        new CachedStandardJsonSchemaConverter(),
-      ],
-    })
-  }
+  constructor(private readonly options: OpenAPIGeneratorOptions = {}) {}
 
   async generate<TVersion extends OpenAPIVersion = '3.2.0'>(
     router: RouterContract | AnyRouter,
     { source, filter, componentName, ...options }: OpenAPIGeneratorGenerateOptions<TVersion>,
   ): Promise<OpenAPIDocument<TVersion>> {
     const project = openTypeScriptProject(source)
+    // shared by deciding which schemas convert and by converting them, for this generation only
+    const conversions: StandardJsonSchemaConversions = new WeakMap()
+    const stockConverters = [
+      ...toArray(this.options.converters),
+      new CachedStandardJsonSchemaConverter(conversions),
+    ]
 
     let inferred: RouterContract
     let ctx: InferenceContext
@@ -245,6 +254,11 @@ export class OpenAPIGenerator {
             direction: 'output',
           }),
         },
+        schemaConverters: [
+          ...toArray(this.options.converters),
+          new ConvertibleStandardJsonSchemaConverter(conversions),
+        ],
+        stockConverters,
         getSourceKind: createSourceKindChecker(project.program),
         describeConfig: () => project.describeConfig(),
       }
@@ -256,7 +270,11 @@ export class OpenAPIGenerator {
 
     // the components of `base`, and the names `componentName` chose, stay as they are
     const reserved = new Set(Object.keys(options.base?.components?.schemas ?? {}))
-    const document = await this.generator.generate(inferred, {
+    const generator = new BaseOpenAPIGenerator({
+      ...this.options,
+      converters: [new InferredJsonSchemaConverter(), ...stockConverters],
+    })
+    const document = await generator.generate(inferred, {
       ...options,
       componentName:
         componentName &&
@@ -389,7 +407,9 @@ export class OpenAPIGenerator {
     }
 
     const isSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
-      this.converters.some((c) => c.condition(schema, direction))
+      ctx.schemaConverters.some((c) => c.condition(schema, direction))
+    const isStockSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
+      ctx.stockConverters.some((c) => c.condition(schema, direction))
 
     /**
      * Keeps the schemas a converter supports, and adds one inferred from the type for the rest:
@@ -409,104 +429,118 @@ export class OpenAPIGenerator {
         return schemas
       }
 
+      const inferFromType = (type: Type): AnySchema[] => {
+        /**
+         * Keeps the parts a converter supports, and adds the schemas inferred from their types,
+         * without what the kept parts already describe (which keeps query parameters primitive),
+         * when something is left.
+         */
+        const complete = (
+          parts: AnySchema[],
+          partTypes: (Type | readonly Type[] | undefined)[],
+          options?: TypeToJsonSchemaConvertOptions,
+        ): AnySchema[] => {
+          if (parts.length && parts.every(supported)) {
+            return parts
+          }
+
+          const inferred = partTypes.flatMap((t) =>
+            t === undefined ? [] : [ctx.converters[direction].convert(t, options)],
+          )
+
+          // the kept schemas, also requiring the keys the type requires
+          const kept = parts.filter(supported).map((schema) => {
+            const [jsonSchema, optional] = ctx.schemaConverters
+              .find((c) => c.condition(schema, direction))!
+              .convert(schema, direction)
+            // a recursive schema (`$ref: '#'`) shares its levels, so the inferred part keeps them
+            const required = /"\$ref":"#(?:\/properties\/[^"]*)?"/u.test(stringifyJSON(jsonSchema)!)
+              ? jsonSchema
+              : withRequiredFrom(
+                  jsonSchema,
+                  inferred.map(([s]) => s),
+                )
+
+            return {
+              schema: required === jsonSchema ? schema : inferredSchema([required, optional]),
+              jsonSchema: required,
+            }
+          })
+
+          const described = kept.map((k) => k.jsonSchema)
+
+          return [
+            ...kept.map((k) => k.schema),
+            ...inferred.flatMap(([jsonSchema, optional]) => {
+              const rest = withoutDescribedSchemas(jsonSchema, described)
+              return rest === undefined ? [] : [inferredSchema([rest, optional])]
+            }),
+          ]
+        }
+
+        const iteratorTypes = getAllAsyncIteratorTypes(ctx.converters[direction], type)
+
+        // event streams, completing the yield and return parts separately
+        if (iteratorTypes.length) {
+          const yields = complete(
+            iterator?.yieldSchemas ?? [],
+            iteratorTypes.map((t) => t.yieldTypes),
+          )
+          const returns = complete(
+            iterator?.returnSchemas ?? [],
+            iteratorTypes.map((t) => (hasReturn(t.returnTypes) ? t.returnTypes : undefined)),
+          )
+
+          return Array.from({ length: Math.max(yields.length, returns.length) }, (_, i) =>
+            asyncIteratorObject(yields[i] ?? yields[0]!, returns[i]),
+          )
+        }
+
+        return complete(schemas ?? [], [type], inline[direction])
+      }
+
+      // schemas the stock converters document (as any value, when their conversion throws) keep
+      // that when the type of the slot can not be read, like the type of a procedure typed `any`
+      if (leaves.length && leaves.every((s) => isStockSupported(s, direction))) {
+        return (
+          inferWhenReadable(
+            ctx,
+            resolved,
+            (procedure) => ctx.resolver.getSchemaType(procedure, direction),
+            inferFromType,
+          ) ?? schemas
+        )
+      }
+
       assertProcedureType(ctx, resolved)
 
       const type = ctx.resolver.getSchemaType(resolved.type, direction)
 
-      if (!type) {
-        return schemas
-      }
-
-      /**
-       * Keeps the parts a converter supports, and adds the schemas inferred from their types,
-       * without what the kept parts already describe (which keeps query parameters primitive),
-       * when something is left.
-       */
-      const complete = (
-        parts: AnySchema[],
-        partTypes: (Type | readonly Type[] | undefined)[],
-        options?: TypeToJsonSchemaConvertOptions,
-      ): AnySchema[] => {
-        if (parts.length && parts.every(supported)) {
-          return parts
-        }
-
-        const inferred = partTypes.flatMap((t) =>
-          t === undefined ? [] : [ctx.converters[direction].convert(t, options)],
-        )
-
-        // the kept schemas, also requiring the keys the type requires
-        const kept = parts.filter(supported).map((schema) => {
-          const [jsonSchema, optional] = this.converters
-            .find((c) => c.condition(schema, direction))!
-            .convert(schema, direction)
-          // a recursive schema (`$ref: '#'`) shares its levels, so the inferred part keeps them
-          const required = /"\$ref":"#(?:\/properties\/[^"]*)?"/u.test(stringifyJSON(jsonSchema)!)
-            ? jsonSchema
-            : withRequiredFrom(
-                jsonSchema,
-                inferred.map(([s]) => s),
-              )
-
-          return {
-            schema: required === jsonSchema ? schema : inferredSchema([required, optional]),
-            jsonSchema: required,
-          }
-        })
-
-        const described = kept.map((k) => k.jsonSchema)
-
-        return [
-          ...kept.map((k) => k.schema),
-          ...inferred.flatMap(([jsonSchema, optional]) => {
-            const rest = withoutDescribedSchemas(jsonSchema, described)
-            return rest === undefined ? [] : [inferredSchema([rest, optional])]
-          }),
-        ]
-      }
-
-      const iteratorTypes = getAllAsyncIteratorTypes(ctx.converters[direction], type)
-
-      // event streams, completing the yield and return parts separately
-      if (iteratorTypes.length) {
-        const yields = complete(
-          iterator?.yieldSchemas ?? [],
-          iteratorTypes.map((t) => t.yieldTypes),
-        )
-        const returns = complete(
-          iterator?.returnSchemas ?? [],
-          iteratorTypes.map((t) => (hasReturn(t.returnTypes) ? t.returnTypes : undefined)),
-        )
-
-        return Array.from({ length: Math.max(yields.length, returns.length) }, (_, i) =>
-          asyncIteratorObject(yields[i] ?? yields[0]!, returns[i]),
-        )
-      }
-
-      return complete(schemas ?? [], [type], inline[direction])
+      return type ? inferFromType(type) : schemas
     }
 
     const errorMap: ErrorMap = {}
 
     for (const code of Object.keys(def.errorMap)) {
       const config = def.errorMap[code]
-      let dataType: Type | undefined
+      let data: AnySchema | undefined
 
       if (config?.data && !isSupported(config.data, 'output')) {
-        assertProcedureType(ctx, resolved)
-        dataType = ctx.resolver.getErrorDataType(resolved.type, code)
+        const getDataType = (procedure: Type) => ctx.resolver.getErrorDataType(procedure, code)
+        const inferData = (dataType: Type) =>
+          inferredSchema(ctx.converters.output.convert(dataType, { awaited: false }))
+
+        // like the schemas of inputs and outputs, a schema the stock converters document keeps that
+        if (isStockSupported(config.data, 'output')) {
+          data = inferWhenReadable(ctx, resolved, getDataType, inferData)
+        } else {
+          assertProcedureType(ctx, resolved)
+          const dataType = getDataType(resolved.type)
+          data = dataType && inferData(dataType)
+        }
       }
 
-      setOwn(
-        errorMap,
-        code,
-        dataType
-          ? {
-              ...config,
-              data: inferredSchema(ctx.converters.output.convert(dataType, { awaited: false })),
-            }
-          : config,
-      )
+      setOwn(errorMap, code, data ? { ...config, data } : config)
     }
 
     return new ProcedureContract({
@@ -534,6 +568,38 @@ function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType
     throw new OpenAPIGeneratorError(
       `its type "${ctx.checker.typeToString(resolved.type)}" is not a procedure or contract, make sure "source" points to the type of this router.`,
     )
+  }
+}
+
+/**
+ * Infers a slot the stock converters document, when its type can be read: a procedure typed
+ * `any`, a slot typed `any` or `unknown`, or a type the conversion can not resolve keeps the
+ * stock result instead (`undefined`), as the slot was documented before it was inferred.
+ */
+function inferWhenReadable<T>(
+  ctx: InferenceContext,
+  resolved: ResolvedRouterType,
+  getType: (procedure: Type) => Type | undefined,
+  infer: (type: Type) => T,
+): T | undefined {
+  if (resolved.type.isErrorType() || !ctx.resolver.isProcedure(resolved.type)) {
+    return undefined
+  }
+
+  const type = getType(resolved.type)
+
+  if (!type || type.isErrorType() || type.flags & (TypeFlags.Any | TypeFlags.Unknown)) {
+    return undefined
+  }
+
+  try {
+    return infer(type)
+  } catch (e) {
+    if (e instanceof OpenAPIGeneratorError || e instanceof TypeScriptTypeResolutionError) {
+      return undefined
+    }
+
+    throw e
   }
 }
 

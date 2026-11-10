@@ -15,6 +15,7 @@ import { call, os, Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import { Program } from 'typescript/unstable/sync'
+import * as z from 'zod'
 
 import { canGenerateWithin, generateWithin } from '../tests/bounded-generate'
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
@@ -195,6 +196,11 @@ import {
   roundSixtyEightCounted,
   roundSixtyEightZod,
 } from '../tests/fixtures/app/src/round68'
+import {
+  registeredNote,
+  roundSixtyNineAny,
+  roundSixtyNineRegistered,
+} from '../tests/fixtures/app/src/round69'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3861,6 +3867,145 @@ describe('openAPIGenerator', () => {
         },
         required: ['text', 'at'],
       })
+    })
+  })
+
+  describe('round sixty-nine', () => {
+    it('keeps the stock documentation of Standard JSON Schemas that can not be converted, when the procedure types can not be read', async () => {
+      const spec = await new OpenAPIGenerator().generate(roundSixtyNineAny, {
+        source: { file: fixture('round69.ts'), export: 'roundSixtyNineAny' },
+      })
+
+      // the document generated before such schemas were inferred, byte for byte
+      expect(JSON.stringify(spec)).toBe(
+        JSON.stringify({
+          openapi: '3.2.0',
+          info: {
+            title: 'API Reference',
+            version: '0.0.0',
+          },
+          components: {
+            schemas: {
+              UndefinedError: {
+                title: 'UndefinedError',
+                type: 'object',
+                properties: {
+                  defined: {
+                    const: false,
+                  },
+                  code: {
+                    type: 'string',
+                  },
+                  message: {
+                    type: 'string',
+                  },
+                  data: {},
+                },
+                required: ['defined', 'code', 'message'],
+              },
+              Late: {
+                title: 'LATE',
+                type: 'object',
+                properties: {
+                  defined: {
+                    const: true,
+                  },
+                  code: {
+                    const: 'LATE',
+                  },
+                  message: {
+                    type: 'string',
+                  },
+                  data: {},
+                },
+                required: ['defined', 'code', 'message'],
+              },
+            },
+          },
+          paths: {
+            '/dated': {
+              post: {
+                operationId: 'dated',
+                responses: {
+                  '200': {
+                    description: 'OK',
+                    content: {},
+                  },
+                  '400': {
+                    description: '400',
+                    content: {
+                      'application/json': {
+                        schema: {
+                          oneOf: [
+                            {
+                              $ref: '#/components/schemas/Late',
+                            },
+                            {
+                              $ref: '#/components/schemas/UndefinedError',
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            '/listed': {
+              get: {
+                operationId: 'listed',
+                responses: {
+                  '200': {
+                    description: 'OK',
+                    content: {
+                      'application/json': {
+                        schema: {
+                          type: 'array',
+                          items: {
+                            type: 'string',
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      )
+    })
+
+    it('reads Standard JSON Schemas again in each generation', async () => {
+      const generate = (generator: OpenAPIGenerator) =>
+        generator.generate(roundSixtyNineRegistered, {
+          source: { file: fixture('round69.ts'), export: 'roundSixtyNineRegistered' },
+        })
+      const body = (spec: any) =>
+        spec.paths['/note'].post.requestBody.content['application/json'].schema
+      const generator = new OpenAPIGenerator()
+
+      expect(body(await generate(generator))).toEqual({
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text'],
+      })
+
+      z.globalRegistry.add(registeredNote, { description: 'A note' })
+
+      try {
+        const described = {
+          type: 'object',
+          properties: { text: { type: 'string' } },
+          required: ['text'],
+          description: 'A note',
+        }
+
+        expect(body(await generate(new OpenAPIGenerator()))).toEqual(described)
+        expect(body(await generate(generator))).toEqual(described)
+      } finally {
+        z.globalRegistry.remove(registeredNote)
+      }
     })
   })
 })
