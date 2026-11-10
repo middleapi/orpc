@@ -162,16 +162,25 @@ export class ModeSensitivity {
       return false
     }
 
+    // `JSON.stringify` calls a `toJSON` an intersection adds to a built-in (`Date & { toJSON(): number }`),
+    // also through a view of it (`Readonly<Date & { toJSON(): number }>`)
+    const parts =
+      flags & TypeFlags.Intersection ? types.getMembers(type) : types.getMappedSourceMembers(type)
+    if (
+      parts.some((m) => hasBuiltinForm(types, m)) &&
+      parts.some((m) => !hasBuiltinForm(types, m) && getToJSON(types, m))
+    ) {
+      return true
+    }
+
     if (flags & TypeFlags.UnionOrIntersection) {
       const members = types.getMembers(type)
 
-      // `JSON.stringify` calls `toJSON` of an array (`string[] & { toJSON(): number }`), and one
-      // an intersection adds to a built-in (`Date & { toJSON(): number }`)
+      // and one of an array (`string[] & { toJSON(): number }`)
       if (
         flags & TypeFlags.Intersection &&
-        ((members.some((m) => types.getReferenceKind(m) !== undefined) && getToJSON(types, type)) ||
-          (members.some((m) => hasBuiltinForm(types, m)) &&
-            members.some((m) => !hasBuiltinForm(types, m) && getToJSON(types, m))))
+        members.some((m) => types.getReferenceKind(m) !== undefined) &&
+        getToJSON(types, type)
       ) {
         return true
       }

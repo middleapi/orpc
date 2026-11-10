@@ -23,12 +23,12 @@ import {
   getBuiltinBaseName,
   getBuiltinFields,
   getNumberIndexType,
+  getStringifiedForm,
   getTypedArrayViewBases,
   getViewBases,
   hasBuiltinForm,
   hasToJSONOf,
   isBoxedBigInt,
-  isStringifiedBuiltin,
   isTypedArray,
 } from './builtins'
 import type { DefNameRecord } from './components'
@@ -820,11 +820,7 @@ export class TypeToJsonSchemaConverter {
       const builtin =
         member.flags & TypeFlags.Object ? this.convertBuiltinObject(member) : undefined
       if (builtin !== undefined) {
-        return this.withAddedToJSON(
-          members.filter((m) => m !== member && !hasToJSONOf(this.types, m, member)),
-          () => this.withPlainForm(type, builtin),
-          isStringifiedBuiltin(this.types, member),
-        )
+        return this.withBuiltinToJSON(type, members, member, builtin)
       }
     }
 
@@ -837,16 +833,34 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * An array or built-in of an intersection (`written`), or, under `JSON.stringify` (also of a
-   * built-in the serializer leaves to it, `stringified`), what the `toJSON` of `owners` returns,
-   * which the serializer does not call (`Date & { toJSON(): number }`).
+   * A built-in of an intersection (`Date & { toJSON(): number }`), or of a view of one
+   * (`Readonly<Error & { toJSON(): string }>`), with the `toJSON` its other `members` add.
+   */
+  private withBuiltinToJSON(
+    type: Type,
+    members: readonly Type[],
+    builtinMember: Type,
+    builtin: JsonSchema,
+  ): JsonSchema {
+    return this.withAddedToJSON(
+      members.filter((m) => m !== builtinMember && !hasToJSONOf(this.types, m, builtinMember)),
+      () => this.withPlainForm(type, builtin),
+      getStringifiedForm(this.types, type.isIntersectionType() ? builtinMember : type),
+    )
+  }
+
+  /**
+   * An array or built-in of an intersection (`written`), or, under `JSON.stringify`, what the
+   * `toJSON` of `owners` returns, which the serializer does not call (`Date & { toJSON(): number }`).
+   * The serializer leaves an `instance` of some built-ins to `JSON.stringify` (`Error & { toJSON(): string }`),
+   * and a `view` of one may hold an instance, or a plain object the serializer walks.
    */
   private withAddedToJSON(
     owners: readonly Type[],
     written: () => JsonSchema,
-    stringified = false,
+    stringified?: 'instance' | 'view',
   ): JsonSchema {
-    const stringify = this.mode === 'stringify' || stringified
+    const stringify = this.mode === 'stringify' || stringified === 'instance'
     const toJSONResults =
       this.mode !== 'serializer' || stringified
         ? owners.flatMap((owner) => getToJSONResultTypes(this.types, owner, true))
@@ -909,7 +923,13 @@ export class TypeToJsonSchemaConverter {
 
     const builtin = ownFields ? undefined : this.convertBuiltinObject(type)
     if (builtin !== undefined) {
-      return this.withPlainForm(type, builtin)
+      // a view of an intersection with a built-in (`Readonly<Error & { toJSON(): string }>`)
+      const sources = this.types.getMappedSourceMembers(type)
+      const viewed =
+        sources.length > 1 ? sources.find((m) => hasBuiltinForm(this.types, m)) : undefined
+      return viewed
+        ? this.withBuiltinToJSON(type, sources, viewed, builtin)
+        : this.withPlainForm(type, builtin)
     }
 
     // the class behind `Readonly<C>`, `Pick<C, K>`, or `C & { extra }` (`Object.freeze`, `Object.assign`)
@@ -935,12 +955,20 @@ export class TypeToJsonSchemaConverter {
 
     // a client's serializer leaves an instance to `JSON.stringify`, which calls its `toJSON` and
     // writes its `Set` fields as `{}`, so each value is either form, as in a view of an output
-    // (the built-in a class extends is written as the built-in, see below). A `toJSON` returning
-    // only `undefined` writes nothing, the caller makes it optional.
+    // (the built-in a class extends is written as the built-in, see below, not by its `toJSON`). The
+    // `toJSON` is the type's own (also one an intersection adds, `C & { toJSON(): string }`), or of
+    // each class a view leaving it out is over. A `toJSON` returning only `undefined` writes
+    // nothing, the caller makes it optional.
     if (sentForms && !options.ignoreToJSON) {
-      const results = getClassTypes(this.types, type)
-        .filter((c) => !hasBuiltinForm(this.types, c))
-        .flatMap((c) => getToJSONResultTypes(this.types, c, true))
+      const classes = getClassTypes(this.types, type)
+      const results = (this.types.getProperty(type, 'toJSON') ? [type] : classes)
+        .filter(
+          (source) =>
+            !classes.some(
+              (c) => hasBuiltinForm(this.types, c) && hasToJSONOf(this.types, source, c),
+            ),
+        )
+        .flatMap((source) => getToJSONResultTypes(this.types, source, true))
         .filter((result) => !isDropped(this.types, result))
       const fields = this.withMode('either', () =>
         this.convertObject(type, { ...options, ignoreToJSON: true }),

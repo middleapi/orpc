@@ -322,6 +322,11 @@ describe('generated schemas match serialized outputs', async () => {
     ['setPickBox', undefined],
     ['dateViewHolder', undefined],
     ['plainUndefPoint', undefined],
+    ['subErrJson', undefined],
+    ['errorViewJson', undefined],
+    ['plainErrorViewJson', undefined],
+    ['boxedJson', undefined],
+    ['viewJsonHolder', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

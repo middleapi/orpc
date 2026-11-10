@@ -92,6 +92,13 @@ import {
   roundFiftyInputs,
   UndefPointImpl,
 } from '../tests/fixtures/app/src/round50'
+import {
+  boxedJson,
+  errorViewJson,
+  plainErrorViewJson,
+  roundFiftyOneInputs,
+  subErrJson,
+} from '../tests/fixtures/app/src/round51'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2867,6 +2874,41 @@ describe('openAPIGenerator', () => {
       ].properties
       expect(dr).toEqual({ 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' })
       expect(dp).toEqual(dg)
+    })
+  })
+
+  describe('round fifty-one', () => {
+    it('documents inputs whose toJSON an intersection adds to an error, a view of one, or a boxed primitive', async () => {
+      const spec = await generator.generate(roundFiftyOneInputs, {
+        source: { file: fixture('round51.ts'), export: 'roundFiftyOneInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        ['subErrJson', subErrJson()],
+        ['errorViewJson', errorViewJson()],
+        ['errorViewJson', plainErrorViewJson()],
+        ['boxedJson', boxedJson()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
     })
   })
 })

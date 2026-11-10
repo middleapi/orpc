@@ -455,7 +455,8 @@ function getBuiltinSubclass(
 
 /**
  * Built-ins whose instances the serializer leaves to `JSON.stringify`, which calls their `toJSON`
- * (it writes `Date`, `URL`, `Set`, `Map`, and `Blob` itself, and walks arrays and plain objects)
+ * (it writes `Date`, `URL`, `Set`, `Map`, and `Blob` itself, and walks arrays and plain objects),
+ * also boxed primitives, which a value with a `toJSON` is (a primitive has none)
  */
 const STRINGIFIED_BUILTINS = new Set([
   'Error',
@@ -464,6 +465,9 @@ const STRINGIFIED_BUILTINS = new Set([
   'SharedArrayBuffer',
   'DataView',
   'Promise',
+  'String',
+  'Number',
+  'Boolean',
 ])
 
 /**
@@ -471,7 +475,7 @@ const STRINGIFIED_BUILTINS = new Set([
  * like `Error` (also `TypeError`), or of a class extending one, not a view or an interface
  * extending one, which may be a plain object.
  */
-export function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
+function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
   const symbol = type.getSymbol()
 
   return (
@@ -484,6 +488,27 @@ export function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
       (name) => name !== undefined && STRINGIFIED_BUILTINS.has(name),
     )
   )
+}
+
+/**
+ * How the serializer leaves a value of this type to `JSON.stringify`: as an `instance` of a built-in
+ * like `Error` (see `isStringifiedBuiltin`), or a `view` of one (`Readonly<Error>`, also an interface
+ * extending one, `interface Msg extends Pick<Error, 'message'>`), which may also be a plain object
+ * the serializer walks.
+ */
+export function getStringifiedForm(
+  types: TypeQueries,
+  type: Type,
+): 'instance' | 'view' | undefined {
+  if (isStringifiedBuiltin(types, type)) {
+    return 'instance'
+  }
+
+  return [type, ...getViewBases(type)].some((view) =>
+    types.getMappedSourceMembers(view).some((source) => isStringifiedBuiltin(types, source)),
+  )
+    ? 'view'
+    : undefined
 }
 
 /**
