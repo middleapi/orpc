@@ -115,25 +115,24 @@ export class OpenAPIComponentRegistry {
       []
     const contents = new Map<string, DefContent | null | undefined>()
 
+    const closureKeys = new Map<string, string | null>()
+    const getClosureKey = (defName: string): string | null => {
+      if (!closureKeys.has(defName)) {
+        closureKeys.set(defName, this.getDefClosureKey(defName, defs, contents))
+      }
+      return closureKeys.get(defName)!
+    }
+
     for (const [defName, cleanSchema] of defs) {
       const sourceName = this.componentName ? this.componentName(defName, cleanSchema) : defName
       const preferredName = toValidComponentName(sourceName)
-      let closureKey: string | null | undefined
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
         new Set(renameMap.values()),
         preferredName,
         (name) =>
           (this.componentSources.get(name) ?? preferredName) === sourceName &&
-          this.isEquivalentForReuse(
-            defName,
-            closureKey === undefined
-              ? (closureKey = this.getDefClosureKey(defName, defs, contents))
-              : closureKey,
-            name,
-            defs,
-            componentsSchemas,
-          ),
+          this.isEquivalentForReuse(defName, name, getClosureKey, defs, componentsSchemas),
         direction,
       )
 
@@ -162,11 +161,12 @@ export class OpenAPIComponentRegistry {
    */
   private isEquivalentForReuse(
     defName: string,
-    closureKey: string | null,
     componentName: string,
+    getClosureKey: (defName: string) => string | null,
     defs: ReadonlyMap<string, JsonSchema>,
     componentsSchemas: Record<string, any>,
   ): boolean {
+    const closureKey = getClosureKey(defName)
     const key = closureKey === null ? undefined : `${closureKey}\0${componentName}`
     let result = key === undefined ? undefined : this.reuseResults.get(key)
 
@@ -189,6 +189,23 @@ export class OpenAPIComponentRegistry {
       // a ref to a missing schema may resolve once more components are written
       if (key !== undefined && !ctx.unresolved) {
         this.reuseResults.set(key, result)
+
+        // a check that succeeds pairs every def it reaches with an equivalent component, which a
+        // check of that def would pair the same way, so those checks are made too
+        if (result) {
+          for (const [candidateKey, existingKey] of ctx.candidateToExistingKeys) {
+            const pairedKey =
+              candidateKey.startsWith(DEFS_REF_PREFIX) &&
+              getClosureKey(candidateKey.slice(DEFS_REF_PREFIX.length))
+
+            if (pairedKey) {
+              this.reuseResults.set(
+                `${pairedKey}\0${existingKey.slice(COMPONENTS_REF_PREFIX.length)}`,
+                true,
+              )
+            }
+          }
+        }
       }
     }
 

@@ -747,6 +747,33 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
+    it('compares a sibling def once when a reuse check already paired it with its component', () => {
+      const { doc, registry } = createRegistry()
+      const schema = () => ({
+        $ref: '#/$defs/User',
+        $defs: {
+          User: { type: 'object' as const, properties: { team: { $ref: '#/$defs/Team' } } },
+          Team: { type: 'object' as const, properties: { name: { type: 'string' as const } } },
+        },
+      })
+
+      registry.hoistDefs(schema())
+
+      let reads = 0
+      const schemas: Record<string, any> = doc.components!.schemas!
+      schemas.Team = new Proxy(schemas.Team, {
+        ownKeys: (target) => {
+          reads++
+          return Reflect.ownKeys(target)
+        },
+      })
+
+      // checking `User` pairs `Team` with its component, so `Team` is not compared again
+      expect(registry.hoistDefs(schema())).toEqual({ $ref: '#/components/schemas/User' })
+      expect(reads).toBe(1)
+      expect(Object.keys(schemas)).toEqual(['User', 'Team'])
+    })
+
     it('reuses mutually recursive sibling defs', () => {
       const { doc, registry } = createRegistry({
         schemas: {
