@@ -904,17 +904,20 @@ export class TypeQueries {
       return true
     }
 
-    // a mapped type over the keys of a type parameter (`{ [K in T]: true }` of zod's `BRAND<T>`),
-    // which has no properties until it is instantiated, unlike its instantiations and mapped types
-    // over other keys (`{ [K in string]: number }`)
+    // a mapped type over keys of a type parameter (`{ [K in T]: true }` of zod's `BRAND<T>`,
+    // `` { [K in `b-${T}`]: true } ``, `Record<T, true>`), which has no properties until it is
+    // instantiated, unlike its instantiations and mapped types over other keys
+    // (`{ [K in string]: number }`)
     if ((type as any).objectFlags & ObjectFlags.Mapped && !this.getProperties(type).length) {
       const declaration = type.getSymbol()?.declarations[0]?.resolve() as any
       const constraint = declaration?.typeParameter?.constraint
-      const keys = constraint && this.checker.getTypeFromTypeNode(constraint)
+      const keys =
+        constraint && this.checker.getTypeAtLocation(declaration)?.id === type.id
+          ? this.checker.getTypeFromTypeNode(constraint)
+          : undefined
       return (
-        keys !== undefined &&
-        this.checker.getTypeAtLocation(declaration)?.id === type.id &&
-        Boolean(keys.flags & INSTANTIABLE_FLAGS || this.hasTypeParameter(keys, depth))
+        (keys !== undefined && this.involvesTypeParameter(keys, depth)) ||
+        type.getAliasTypeArguments().some((argument) => this.involvesTypeParameter(argument, depth))
       )
     }
 
@@ -924,6 +927,27 @@ export class TypeQueries {
         : this.getReferenceArguments(type)
 
     return depth > 0 && children.some((child) => this.hasTypeParameter(child, depth - 1))
+  }
+
+  /**
+   * Whether a type is or holds a type parameter, also in the spans of a template literal, the
+   * target of a string mapping (`Uppercase<T>`) or another generic type (`keyof T`).
+   */
+  private involvesTypeParameter(type: Type, depth: number): boolean {
+    if (type.flags & INSTANTIABLE_FLAGS) {
+      return true
+    }
+
+    const children =
+      type.flags & (TypeFlags.UnionOrIntersection | TypeFlags.TemplateLiteral)
+        ? (((type as any).getTypes() ?? []) as readonly Type[])
+        : type.flags & TypeFlags.StringMapping
+          ? [(type as any).getTarget() as Type]
+          : undefined
+
+    return children
+      ? depth > 0 && children.some((child) => this.involvesTypeParameter(child, depth - 1))
+      : this.hasTypeParameter(type, depth)
   }
 
   /**

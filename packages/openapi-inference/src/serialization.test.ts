@@ -395,6 +395,17 @@ describe('generated schemas match serialized outputs', async () => {
     ['looseInvoice', undefined],
     ['textualTally', undefined],
     ['emptyLooseCents', undefined],
+    ['looseTplNum', undefined],
+    ['looseKeyNum', undefined],
+    ['looseUpperNum', undefined],
+    ['looseRecordNum', undefined],
+    ['mappedTplNum', undefined],
+    ['mappedKeyNum', undefined],
+    ['mappedUpperNum', undefined],
+    ['mappedRecordNum', undefined],
+    ['looseTplNums', undefined],
+    ['looseUpperHolder', undefined],
+    ['looseBrandedLedger', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

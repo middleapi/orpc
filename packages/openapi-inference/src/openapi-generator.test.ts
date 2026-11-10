@@ -178,6 +178,11 @@ import {
   viewedFnHolder,
 } from '../tests/fixtures/app/src/round63'
 import { roundSixtyFive } from '../tests/fixtures/app/src/round65'
+import {
+  brandedLedger,
+  roundSixtySix,
+  roundSixtySixInputs,
+} from '../tests/fixtures/app/src/round66'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3627,6 +3632,48 @@ describe('openAPIGenerator', () => {
         },
         required: ['counts', 'codes', 'none'],
       })
+    })
+  })
+
+  describe('round sixty-six', () => {
+    const either = { anyOf: [{ type: 'number' }, { type: 'object' }] }
+
+    it('reads brands keyed by template literals, keys, string mappings or records of type parameters as generic', async () => {
+      const spec = await generator.generate(roundSixtySix, {
+        source: { file: fixture('round66.ts'), export: 'roundSixtySix' },
+      })
+      const response = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+
+      for (const name of ['Tpl', 'Key', 'Upper', 'Record']) {
+        // every key of a deep partial type is optional, so a plain object is one too
+        expect(response(`loose${name}Num`)).toEqual(either)
+        expect(response(`mapped${name}Num`)).toEqual({ type: 'number' })
+      }
+      expect(response('looseUpperHolder').properties.v).toEqual(either)
+      expect(response('looseBrandedLedger').properties).toEqual({
+        tpl: either,
+        key: either,
+        upper: either,
+        record: either,
+      })
+    })
+
+    it('documents them as numbers or objects in inputs', async () => {
+      const spec = await generator.generate(roundSixtySixInputs, {
+        source: { file: fixture('round66.ts'), export: 'roundSixtySixInputs' },
+      })
+      const body = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.requestBody.content['application/json'].schema
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const validate = ajv.compile(body('looseBrandedLedger'))
+
+      // what a client holding these values sends
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(brandedLedger()).json),
+      )
+      expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
+      expect(body('looseKeyNum')).toEqual(either)
     })
   })
 })
