@@ -15,7 +15,7 @@ import type {
   JsonSchemaConverter,
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
-import { StandardJsonSchemaConverter } from '@orpc/json-schema'
+import { isStandardSchemaOptional, StandardJsonSchemaConverter } from '@orpc/json-schema'
 import type {
   OpenAPIDocument,
   OpenAPIGeneratorGenerateOptions as BaseOpenAPIGeneratorGenerateOptions,
@@ -85,25 +85,69 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
   }
 }
 
+type StandardJsonSchemaConversion = { jsonSchema: JsonSchema } | { error: unknown }
+
+const standardJsonSchemaConversions = new WeakMap<
+  AnySchema,
+  Partial<Record<JsonSchemaConverterDirection, StandardJsonSchemaConversion>>
+>()
+
+/**
+ * Converts a Standard JSON Schema once per direction, caching the result (or the thrown error),
+ * since both deciding whether it converts and converting it need the conversion.
+ */
+function convertStandardJsonSchema(
+  schema: AnySchema,
+  direction: JsonSchemaConverterDirection,
+): StandardJsonSchemaConversion {
+  let conversions = standardJsonSchemaConversions.get(schema)
+  if (!conversions) {
+    conversions = {}
+    standardJsonSchemaConversions.set(schema, conversions)
+  }
+
+  if (!conversions[direction]) {
+    try {
+      conversions[direction] = {
+        jsonSchema: (schema['~standard'] as any).jsonSchema[direction]({ target: 'draft-2020-12' }),
+      }
+    } catch (error) {
+      conversions[direction] = { error }
+    }
+  }
+
+  return conversions[direction]
+}
+
+/**
+ * Converts Standard JSON Schemas like {@link StandardJsonSchemaConverter}, reusing each conversion.
+ */
+class CachedStandardJsonSchemaConverter extends StandardJsonSchemaConverter {
+  override convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
+    const conversion = convertStandardJsonSchema(schema!, direction)
+
+    return 'error' in conversion
+      ? [{}, true]
+      : [conversion.jsonSchema, isStandardSchemaOptional(schema!, direction)]
+  }
+}
+
 /**
  * Converts the Standard JSON Schemas it can: one that throws (like a Zod date, which JSON Schema
  * can not represent) is inferred from its type, instead of documented as any value.
  */
-class ConvertibleStandardJsonSchemaConverter extends StandardJsonSchemaConverter {
+class ConvertibleStandardJsonSchemaConverter extends CachedStandardJsonSchemaConverter {
   override condition(
     schema: AnySchema | undefined,
     direction: JsonSchemaConverterDirection,
   ): boolean {
-    if (!super.condition(schema, direction)) {
-      return false
-    }
-
-    try {
-      ;(schema!['~standard'] as any).jsonSchema[direction]({ target: 'draft-2020-12' })
-      return true
-    } catch {
-      return false
-    }
+    return (
+      super.condition(schema, direction) &&
+      !('error' in convertStandardJsonSchema(schema!, direction))
+    )
   }
 }
 
@@ -164,7 +208,11 @@ export class OpenAPIGenerator {
     this.converters = [...toArray(options.converters), new ConvertibleStandardJsonSchemaConverter()]
     this.generator = new BaseOpenAPIGenerator({
       ...options,
-      converters: [new InferredJsonSchemaConverter(), ...toArray(options.converters)],
+      converters: [
+        new InferredJsonSchemaConverter(),
+        ...toArray(options.converters),
+        new CachedStandardJsonSchemaConverter(),
+      ],
     })
   }
 

@@ -188,7 +188,13 @@ import {
   roundSixtySeven,
   roundSixtySevenInputs,
 } from '../tests/fixtures/app/src/round67'
-import { roundSixtyEight, roundSixtyEightZod } from '../tests/fixtures/app/src/round68'
+import {
+  countedNoteInput,
+  countedNoteOutput,
+  roundSixtyEight,
+  roundSixtyEightCounted,
+  roundSixtyEightZod,
+} from '../tests/fixtures/app/src/round68'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3829,6 +3835,32 @@ describe('openAPIGenerator', () => {
       await expect(
         link.call(['search'], { q: 'a', from: new Date(0) }, { context: {} }),
       ).resolves.toBe(1)
+    })
+
+    it('converts each Standard JSON Schema once per direction, also when it throws', async () => {
+      const inputConversion = vi.spyOn(countedNoteInput['~standard'].jsonSchema, 'input')
+      const outputConversion = vi.spyOn(countedNoteOutput['~standard'].jsonSchema, 'output')
+
+      const spec = await new OpenAPIGenerator().generate(roundSixtyEightCounted, {
+        source: { file: fixture('round68.ts'), export: 'roundSixtyEightCounted' },
+      })
+      const operation = (spec.paths as any)['/note'].post
+
+      expect(inputConversion).toHaveBeenCalledTimes(1)
+      expect(outputConversion).toHaveBeenCalledTimes(1)
+      expect(operation.requestBody.content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text'],
+      })
+      expect(operation.responses['200'].content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+          at: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+        },
+        required: ['text', 'at'],
+      })
     })
   })
 })

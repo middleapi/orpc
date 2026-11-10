@@ -38,3 +38,15 @@ export const roundSixtyEightZod = {
     .output(z.object({ at: z.date() }))
     .handler(() => ({ at: new Date(0) })),
 }
+
+/** Zod schemas whose conversions a test counts, one converting and one throwing */
+export const countedNoteInput = z.object({ text: z.string() })
+export const countedNoteOutput = z.object({ text: z.string(), at: z.date() })
+
+export const roundSixtyEightCounted = {
+  note: os
+    .route({ method: 'POST', path: '/note' })
+    .input(countedNoteInput)
+    .output(countedNoteOutput)
+    .handler(({ input }) => ({ ...input, at: new Date(0) })),
+}
