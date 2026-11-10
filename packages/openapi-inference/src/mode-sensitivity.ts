@@ -6,6 +6,7 @@ import {
   getDeclaredBuiltinName,
   getNumberIndexType,
   getToJSON,
+  getViewParts,
   hasBigIntToJSON,
   hasBuiltinForm,
   isBoxedBigInt,
@@ -17,9 +18,8 @@ import {
   getClassType,
   getClassTypes,
   getDataProperties,
-  getToJSONResultTypes,
+  getWrittenToJSONResultTypes,
   isClassView,
-  isDroppedResult,
   isInstanceOrPlain,
 } from './json-rules'
 import type { TypeQueries } from './type-queries'
@@ -166,8 +166,7 @@ export class ModeSensitivity {
 
     // `JSON.stringify` calls a `toJSON` an intersection adds to a built-in (`Date & { toJSON(): number }`),
     // also through a view of it (`Readonly<Date & { toJSON(): number }>`)
-    const parts =
-      flags & TypeFlags.Intersection ? types.getMembers(type) : types.getMappedSourceMembers(type)
+    const parts = getViewParts(types, type) ?? []
     if (
       parts.some((m) => hasBuiltinForm(types, m)) &&
       parts.some((m) => !hasBuiltinForm(types, m) && getToJSON(types, m))
@@ -300,8 +299,7 @@ export class ModeSensitivity {
       return false
     }
 
-    const writesToJSON = (t: Type) =>
-      getToJSONResultTypes(types, t, true).some((result) => !isDroppedResult(types, result))
+    const writesToJSON = (t: Type) => getWrittenToJSONResultTypes(types, t).length > 0
 
     if (getClassTypes(types, type).some((c) => writesToJSON(c) || hasBuiltinForm(types, c))) {
       return true

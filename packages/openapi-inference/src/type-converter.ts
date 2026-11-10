@@ -18,11 +18,9 @@ import {
 
 import {
   addsOwnToJSON,
-  extendsBoxedPrimitive,
   extendsBuiltinClass,
   extendsBuiltinView,
   getBuiltin,
-  getBoxedPrimitiveSchema,
   getBuiltinBaseName,
   getBuiltinFields,
   getExtendedPrimitiveSchema,
@@ -30,6 +28,7 @@ import {
   getStringifiedForm,
   getTypedArrayViewBases,
   getViewBases,
+  getViewSources,
   hasBuiltinForm,
   hasToJSONOf,
   isBoxedBigInt,
@@ -48,6 +47,7 @@ import {
   getDataProperties,
   getToJSONResultTypes,
   getViewedFunction,
+  getWrittenToJSONResultTypes,
   hasOptionalToJSON,
   isAnyRecord,
   isLooseIntersection,
@@ -955,11 +955,7 @@ export class TypeToJsonSchemaConverter {
       // 'message'> { toJSON(): string }`), which adds it like an intersection, unless its `toJSON`
       // returned it, which `JSON.stringify` does not call again
       const views = getViewBases(type)
-      const sourcesOf = (view: Type): Type[] =>
-        this.types
-          .getMappedSourceMembers(view)
-          .flatMap((source) => [source, ...getViewBases(source).flatMap(sourcesOf)])
-      const sources = [type, ...views].flatMap(sourcesOf)
+      const sources = getViewSources(this.types, type)
       // the built-in itself, not an interface over a view of it (`Readonly<ROnum>` of `interface
       // ROnum extends Readonly<Number> { toJSON(): string }`), whose `toJSON` is added
       const viewed = ignoreToJSON
@@ -1007,8 +1003,7 @@ export class TypeToJsonSchemaConverter {
               (c) => hasBuiltinForm(this.types, c) && hasToJSONOf(this.types, source, c),
             ),
         )
-        .flatMap((source) => getToJSONResultTypes(this.types, source, true))
-        .filter((result) => !isDroppedResult(this.types, result))
+        .flatMap((source) => getWrittenToJSONResultTypes(this.types, source))
       const fields = this.withMode('either', () =>
         this.convertObject(type, { ...options, ignoreToJSON: true }),
       )
@@ -1059,9 +1054,7 @@ export class TypeToJsonSchemaConverter {
       ownToJSON.length || options.ignoreToJSON ? undefined : getViewedFunction(this.types, type)
     const viewedResults =
       viewedFunction && viewedFunction !== type
-        ? getToJSONResultTypes(this.types, viewedFunction, true).filter(
-            (result) => !isDroppedResult(this.types, result),
-          )
+        ? getWrittenToJSONResultTypes(this.types, viewedFunction)
         : []
 
     if (viewedResults.length) {
@@ -1162,8 +1155,8 @@ export class TypeToJsonSchemaConverter {
         !isObjectLiteral(type) &&
         !this.checker.getIndexInfosOfType(type).length &&
         !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length &&
-        ![type, ...getClassTypes(this.types, type)].some((c) =>
-          extendsBoxedPrimitive(this.types, c),
+        ![type, ...getClassTypes(this.types, type)].some(
+          (c) => getExtendedPrimitiveSchema(this.types, c) !== undefined,
         )) ||
       isAnyRecord(this.types, type)
     ) {
@@ -1799,7 +1792,7 @@ export class TypeToJsonSchemaConverter {
       ((resolved.getSymbol()?.flags ?? 0) & SymbolFlags.Interface ? resolved : undefined)
 
     // a subclass of a boxed primitive (`class Tag extends String`) is written as its primitive
-    const boxed = classType && getBoxedPrimitiveSchema(this.types, classType)
+    const boxed = classType && getExtendedPrimitiveSchema(this.types, classType)
     if (boxed) {
       return boxed
     }
@@ -1921,7 +1914,7 @@ export class TypeToJsonSchemaConverter {
       symbol !== undefined &&
       symbol.flags & SymbolFlags.Interface &&
       !(symbol.flags & SymbolFlags.Class) &&
-      getBoxedPrimitiveSchema(this.types, type) !== undefined
+      getExtendedPrimitiveSchema(this.types, type) !== undefined
     ) {
       return true
     }

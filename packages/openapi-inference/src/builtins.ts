@@ -186,11 +186,7 @@ export function getTypedArrayViewBases(types: TypeQueries, type: Type): readonly
  * `true` for a typed array, the views of typed arrays it extends for an interface over them.
  */
 function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | undefined {
-  const members = type.isIntersectionType()
-    ? types.getMembers(type)
-    : (type as any).objectFlags & ObjectFlags.Mapped
-      ? types.getMappedSourceMembers(type)
-      : [type]
+  const members = getViewParts(types, type) ?? [type]
 
   // `Uint8Array & { label: string }`, `Readonly<Uint8Array & { label: string }>`
   if (type.isIntersectionType() || members.length !== 1) {
@@ -282,16 +278,6 @@ export function getBuiltinFields(
   // boxed primitives are written as their primitive (`new String('x')` as `"x"`), and an `Object`
   // is any value but `null` and `undefined`
   return BOXED_PRIMITIVES[builtin]?.(true) ?? (builtin === 'Object' ? {} : { type: 'object' })
-}
-
-/**
- * How `JSON.stringify` writes an instance of a subclass of a boxed primitive
- * (`class Tag extends String`): as its primitive (`new String('x')` as `"x"`).
- */
-export function getBoxedPrimitiveSchema(types: TypeQueries, type: Type): JsonSchema | undefined {
-  const name = getBuiltinBaseName(types, type)
-
-  return name === undefined ? undefined : BOXED_PRIMITIVES[name]?.(true)
 }
 
 /**
@@ -514,9 +500,16 @@ function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
       symbol.flags & SymbolFlags.Class ||
       (symbol.flags & SymbolFlags.Interface && isBuiltinSymbol(types, symbol)),
     ) &&
-    [getDeclaredBuiltinName(types, type), getBuiltinBaseName(types, type)].some(
-      (name) => name !== undefined && STRINGIFIED_BUILTINS.has(name),
-    )
+    isOrExtendsBuiltin(types, type, STRINGIFIED_BUILTINS)
+  )
+}
+
+/**
+ * Whether a type is a built-in of one of these names, or extends one (`TypeError` is an `Error`).
+ */
+function isOrExtendsBuiltin(types: TypeQueries, type: Type, names: ReadonlySet<string>): boolean {
+  return [getDeclaredBuiltinName(types, type), getBuiltinBaseName(types, type)].some(
+    (name) => name !== undefined && names.has(name),
   )
 }
 
@@ -529,7 +522,6 @@ function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
 export function getStringifiedForm(
   types: TypeQueries,
   type: Type,
-  depth = 0,
 ): 'instance' | 'view' | undefined {
   if (isStringifiedBuiltin(types, type)) {
     return 'instance'
@@ -537,19 +529,33 @@ export function getStringifiedForm(
 
   // also of an interface over a view of one (`Readonly<ROnum>` of
   // `interface ROnum extends Readonly<Number> { toJSON(): string }`)
-  return [type, ...getViewBases(type)].some((view) =>
-    types
-      .getMappedSourceMembers(view)
-      .some(
-        (source) =>
-          isStringifiedBuiltin(types, source) ||
-          (depth < 16 &&
-            getViewBases(source).length > 0 &&
-            getStringifiedForm(types, source, depth + 1) !== undefined),
-      ),
-  )
+  return getViewSources(types, type).some((source) => isStringifiedBuiltin(types, source))
     ? 'view'
     : undefined
+}
+
+/**
+ * The types behind a view (`Readonly<A & B>`) and behind the views an interface extends
+ * (`interface Link extends Pick<URL, 'href'>`), each followed by the types behind the views it
+ * extends in turn (`Readonly<ROnum>` of `interface ROnum extends Readonly<Number>`).
+ */
+export function getViewSources(types: TypeQueries, type: Type): readonly Type[] {
+  return types.memo('viewSources', type.id, () =>
+    getSourcesOfViews(types, [type, ...getViewBases(type)], 0),
+  )
+}
+
+function getSourcesOfViews(types: TypeQueries, views: readonly Type[], depth: number): Type[] {
+  return depth > 16
+    ? []
+    : views.flatMap((view) =>
+        types
+          .getMappedSourceMembers(view)
+          .flatMap((source) => [
+            source,
+            ...getSourcesOfViews(types, getViewBases(source), depth + 1),
+          ]),
+      )
 }
 
 /**
@@ -626,15 +632,10 @@ export function getViewBases(type: Type, depth = 0): Type[] {
  */
 export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
   // also of a member of an intersection (`AppError & { extra: string }`)
-  const members =
-    (view as any).objectFlags & ObjectFlags.Mapped
-      ? types.getMappedSourceMembers(view)
-      : view.isIntersectionType()
-        ? types.getMembers(view)
-        : undefined
+  const parts = getViewParts(types, view)
 
-  if (members) {
-    return members.some((member) => extendsBuiltinClass(types, member))
+  if (parts) {
+    return parts.some((part) => extendsBuiltinClass(types, part))
   }
 
   const symbol = view.getSymbol()
@@ -650,53 +651,51 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
 }
 
 /**
- * Whether a class or an interface extends a boxed primitive (`class MyNum extends Number`,
- * `interface INum extends Number`), also through a view of it or an intersection with it, whose
- * value is the primitive or a boxed one, written apart, or a plain object.
- */
-export function extendsBoxedPrimitive(types: TypeQueries, view: Type): boolean {
-  return getExtendedPrimitiveSchema(types, view) !== undefined
-}
-
-/**
- * How `JSON.stringify` writes the boxed primitive a class or an interface extends, also through a
- * view of it or an intersection with it (`Partial<INum>`, `INum & { code: number }`), as its
- * primitive.
+ * How `JSON.stringify` writes the boxed primitive a class or an interface extends
+ * (`class Tag extends String`, `interface INum extends Number`), also through a view of it or an
+ * intersection with it (`Partial<INum>`, `INum & { code: number }`): as its primitive
+ * (`new String('x')` as `"x"`). A value of an interface may also be the primitive, or a plain object.
  */
 export function getExtendedPrimitiveSchema(types: TypeQueries, view: Type): JsonSchema | undefined {
-  const members =
-    (view as any).objectFlags & ObjectFlags.Mapped
-      ? types.getMappedSourceMembers(view)
-      : view.isIntersectionType()
-        ? types.getMembers(view)
-        : undefined
+  const parts = getViewParts(types, view)
 
-  if (members) {
-    return members
-      .map((member) => getExtendedPrimitiveSchema(types, member))
+  if (parts) {
+    return parts
+      .map((part) => getExtendedPrimitiveSchema(types, part))
       .find((schema) => schema !== undefined)
   }
 
   const symbol = view.getSymbol()
-  return symbol !== undefined && symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
-    ? getBoxedPrimitiveSchema(types, view)
-    : undefined
+  const base =
+    symbol !== undefined && symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
+      ? getBuiltinBaseName(types, view)
+      : undefined
+  return base === undefined ? undefined : BOXED_PRIMITIVES[base]?.(true)
 }
+
+/**
+ * The parts a value of a view or an intersection is made of: the members of an intersection, or
+ * the types a mapped type maps over (`Readonly<A & B>`), `undefined` for other types.
+ */
+export function getViewParts(types: TypeQueries, type: Type): readonly Type[] | undefined {
+  return type.isIntersectionType()
+    ? types.getMembers(type)
+    : (type as any).objectFlags & ObjectFlags.Mapped
+      ? types.getMappedSourceMembers(type)
+      : undefined
+}
+
+const ERROR: ReadonlySet<string> = new Set(['Error'])
 
 /**
  * Whether a class or an interface extends `Error`, also through a view of it
  * (`interface AppError extends Readonly<Error>`), whose members from packages are not data.
  */
 export function extendsError(types: TypeQueries, type: Type): boolean {
-  return types.memo(
-    'extendsError',
-    type.id,
-    (): boolean =>
-      getDeclaredBuiltinName(types, type) === 'Error' ||
-      getBuiltinBaseName(types, type) === 'Error' ||
-      getViewBases(type).some((view) =>
-        types.getMappedSourceMembers(view).some((source) => extendsError(types, source)),
-      ),
+  return types.memo('extendsError', type.id, (): boolean =>
+    [type, ...getSourcesOfViews(types, getViewBases(type), 0)].some((source) =>
+      isOrExtendsBuiltin(types, source, ERROR),
+    ),
   )
 }
 
@@ -722,11 +721,7 @@ export function extendsBuiltinView(types: TypeQueries, type: Type): boolean {
 function isViewOfFieldsBuiltin(types: TypeQueries, view: Type): boolean {
   return types
     .getMappedSourceMembers(view)
-    .some(
-      (source) =>
-        isStringifiedBuiltin(types, source) &&
-        !BOXED_PRIMITIVES[getDeclaredBuiltinName(types, source) ?? ''],
-    )
+    .some((source) => isStringifiedBuiltin(types, source) && !isBoxedPrimitive(types, source))
 }
 
 /**

@@ -150,10 +150,7 @@ export function isNonSerializable(types: TypeQueries, type: Type): boolean {
     return true
   }
 
-  return (
-    isFunction(types, type) &&
-    getToJSONResultTypes(types, type, true).every((result) => isDroppedResult(types, result))
-  )
+  return isFunction(types, type) && !getWrittenToJSONResultTypes(types, type).length
 }
 
 /**
@@ -314,10 +311,7 @@ export function isAnyRecord(types: TypeQueries, type: Type): boolean {
  */
 function isFunctionView(types: TypeQueries, type: Type): boolean {
   if (isInterfaceOverFunctionView(types, type)) {
-    return (
-      getToJSONResultTypes(types, type, true).every((result) => isDroppedResult(types, result)) ||
-      hasOptionalToJSON(types, type)
-    )
+    return !getWrittenToJSONResultTypes(types, type).length || hasOptionalToJSON(types, type)
   }
 
   const viewed = getViewedFunction(types, type)
@@ -335,11 +329,8 @@ function isFunctionView(types: TypeQueries, type: Type): boolean {
  * (`interface V extends Readonly<Function> {}`), or a view of one (`Readonly<V>`).
  */
 function isInterfaceOverFunctionView(types: TypeQueries, type: Type): boolean {
-  const source = types.getMappedSource(type)
-
-  return source
-    ? isInterfaceOverFunctionView(types, source)
-    : getViewBases(type).some((view) => getViewedFunction(types, view) !== undefined)
+  const source = types.getMappedSource(type) ?? type
+  return getViewBases(source).some((view) => getViewedFunction(types, view) !== undefined)
 }
 
 /**
@@ -463,6 +454,14 @@ export function getToJSONResultTypes(
   }
 
   return [...results.values()]
+}
+
+/**
+ * What `toJSON` of a value of this type may return that `JSON.stringify` writes, when it calls
+ * it: not `undefined`, a symbol, or a function (see `isDroppedResult`).
+ */
+export function getWrittenToJSONResultTypes(types: TypeQueries, type: Type): readonly Type[] {
+  return getToJSONResultTypes(types, type, true).filter((result) => !isDroppedResult(types, result))
 }
 
 /**
