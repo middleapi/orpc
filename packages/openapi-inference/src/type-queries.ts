@@ -862,7 +862,9 @@ export class TypeQueries {
     }
 
     if (!(value.flags & TypeFlags.Object)) {
-      return false
+      // an intersection the source is assignable to holds it, like the `(() => void) & { ... }`
+      // type-fest's `ReadonlyDeep` maps a function with properties to
+      return value.isIntersectionType() && this.checker.isTypeAssignableTo(source, value)
     }
 
     if ((value as any).objectFlags & ObjectFlags.Mapped) {
@@ -900,6 +902,15 @@ export class TypeQueries {
   private hasTypeParameter(type: Type, depth: number): boolean {
     if (type.flags & TypeFlags.TypeParameter) {
       return true
+    }
+
+    // a mapped type over the keys of a type parameter (`{ [K in T]: true }` of zod's `BRAND<T>`),
+    // which has no properties until it is instantiated, unlike its instantiations
+    if ((type as any).objectFlags & ObjectFlags.Mapped && !this.getProperties(type).length) {
+      const declaration = type.getSymbol()?.declarations[0]?.resolve()
+      return (
+        declaration !== undefined && this.checker.getTypeAtLocation(declaration)?.id === type.id
+      )
     }
 
     const children =
