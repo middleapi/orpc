@@ -71,6 +71,7 @@ import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
 import { roundThirtyEightJSDoc } from '../tests/fixtures/app/src/round38'
 import { roundThirtyNine, roundThirtyNineInputs } from '../tests/fixtures/app/src/round39'
 import { roundFortyFour } from '../tests/fixtures/app/src/round44'
+import { FunctionHolder, roundFortySixInputs, StampHolder } from '../tests/fixtures/app/src/round46'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2716,6 +2717,44 @@ describe('openAPIGenerator', () => {
         JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
       )
       expect(validate(json) ? [] : validate.errors).toEqual([])
+    })
+  })
+  describe('round forty-six', () => {
+    it('documents inputs holding built-ins with an added toJSON, and functions typed by interfaces', async () => {
+      const spec = await generator.generate(roundFortySixInputs, {
+        source: { file: fixture('round46.ts'), export: 'roundFortySixInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // what a client holding these values sends: an instance by `JSON.stringify`, which calls
+      // the added `toJSON`, a plain object by the serializer, which does not
+      for (const [name, value] of [
+        ['stampHolder', new StampHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['stampHolder', { ...new StampHolder() }],
+        ['functionHolder', new FunctionHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['functionHolder', { ...new FunctionHolder() }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
     })
   })
 })

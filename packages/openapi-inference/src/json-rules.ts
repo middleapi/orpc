@@ -369,8 +369,9 @@ function isKeyOfMapping(type: Type): boolean {
 }
 
 /**
- * Functions, also with properties (`{ (): void; displayName: string }`, `(() => void) & { tag }`)
- * or as constructors.
+ * Functions, also with properties (`{ (): void; displayName: string }`, `(() => void) & { tag }`),
+ * as constructors, or as interfaces extending `Function` (`CallableFunction`,
+ * `interface Handler extends Function { meta: string }`).
  */
 export function isFunction(types: TypeQueries, type: Type): boolean {
   if (type.isIntersectionType()) {
@@ -387,7 +388,10 @@ export function isFunction(types: TypeQueries, type: Type): boolean {
   }
 
   const symbol = type.getSymbol()
-  if (symbol?.name === 'Function' && types.getSymbolSourceKind(symbol) === 'default') {
+  if (
+    (symbol?.name === 'Function' && types.getSymbolSourceKind(symbol) === 'default') ||
+    getBuiltinBaseName(types, type) === 'Function'
+  ) {
     return true
   }
 

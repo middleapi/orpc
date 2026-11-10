@@ -792,22 +792,7 @@ export class TypeToJsonSchemaConverter {
     const arrayLike = members.find((m) => this.types.getReferenceKind(m) !== undefined)
     if (arrayLike) {
       // `JSON.stringify` calls `toJSON` of arrays, the serializer walks them
-      const toJSONResults =
-        this.mode !== 'serializer' ? getToJSONResultTypes(this.types, type, true) : []
-
-      if (!toJSONResults.length) {
-        return this.visit(arrayLike)
-      }
-
-      const converted = this.convertToJSONResults(toJSONResults)
-
-      if (this.mode === 'stringify') {
-        return anyOfDeduped(converted)
-      }
-
-      // a `toJSON` returning only `undefined` writes nothing, the walked array remains
-      const written = converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!))
-      return anyOfDeduped([...written, this.visit(arrayLike)])
+      return this.withAddedToJSON([type], () => this.visit(arrayLike))
     }
 
     // `Uint8Array & { label: string }` is written by its index keys and the added fields
@@ -815,12 +800,16 @@ export class TypeToJsonSchemaConverter {
       return this.convertObject(type)
     }
 
-    // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`
+    // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`, whose `toJSON` an intersection
+    // may add (`Date & { toJSON(): number }`), which `JSON.stringify` calls, the serializer does not
     for (const member of members) {
       const builtin =
         member.flags & TypeFlags.Object ? this.convertBuiltinObject(member) : undefined
       if (builtin !== undefined) {
-        return this.withPlainForm(type, builtin)
+        return this.withAddedToJSON(
+          members.filter((m) => !hasBuiltinForm(this.types, m)),
+          () => this.withPlainForm(type, builtin),
+        )
       }
     }
 
@@ -830,6 +819,31 @@ export class TypeToJsonSchemaConverter {
     }
 
     return this.convertObject(type)
+  }
+
+  /**
+   * An array or built-in of an intersection (`written`), or, under `JSON.stringify`, what the
+   * `toJSON` of `owners` returns, which the serializer does not call (`Date & { toJSON(): number }`).
+   */
+  private withAddedToJSON(owners: readonly Type[], written: () => JsonSchema): JsonSchema {
+    const toJSONResults =
+      this.mode !== 'serializer'
+        ? owners.flatMap((owner) => getToJSONResultTypes(this.types, owner, true))
+        : []
+
+    if (!toJSONResults.length) {
+      return written()
+    }
+
+    const converted = this.convertToJSONResults(toJSONResults)
+
+    if (this.mode === 'stringify') {
+      return anyOfDeduped(converted)
+    }
+
+    // a `toJSON` returning only `undefined` writes nothing, the written value remains
+    const kept = converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!))
+    return anyOfDeduped([...kept, written()])
   }
 
   private convertObject(type: Type, options: ObjectForm = {}): JsonSchema {
