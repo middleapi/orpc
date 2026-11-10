@@ -240,7 +240,8 @@ export class ExpansionGuard {
           const owner = stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type
           return (
             (unknown || this.declaresNesting(property, owner)) &&
-            this.declaresCycle(property, owner, path.slice(index + 1))
+            // along the rest of the path and again from where it starts, back to the property
+            this.declaresCycle(property, owner, [...path.slice(index + 1), ...path.slice(0, index)])
           )
         })
           ? // also as far as the ones between with the same keys grew, which take turns with it
@@ -262,14 +263,15 @@ export class ExpansionGuard {
    * (`next: Model<T[]>[]`), also through a view of it (`b: Box<DeepReadonly<Model<T>>>` of
    * `interface Model<T> extends Base<DeepReadonly<Model<T>>>`) or another model, a cycle of
    * declarations a nesting without end needs. Of the properties of the types it is declared with,
-   * only those the nesting runs through count (`a` of `inner: { a: T; m: Map<K, Model<T>> }`).
+   * only those the nesting runs through count (`a` of `inner: { a: T; m: Map<K, Model<T>> }`),
+   * also where it repeats a type holding the model (`Box<{ a: T; m: Map<K, Model<T>> }>`).
    */
   private declaresCycle(
     property: TSSymbol,
     owner: Type | undefined,
     along: readonly TSSymbol[],
   ): boolean {
-    // the whole path, which `reaches` ends as it takes one of its properties at each step
+    // the whole route, which `reaches` ends as it takes one of its properties at each step
     const names = along.map((p) => p.name)
     return (
       owner !== undefined &&
@@ -294,10 +296,10 @@ export class ExpansionGuard {
   /**
    * Whether a type is an instantiation of a declaration, or holds one `depth` types in: as a
    * member, a type argument, the model a view maps over, or a property of a type the project
-   * declares. When given, only the property named first `along` the path counts, also for the type
-   * arguments of a model the project declares, and none at its end, and the path, however long,
-   * takes none of the `depth` (`c: { d: Box<View<Other<T>>> }` of a model `Other` holds again at
-   * `c.d.v.e.f`).
+   * declares. When given, only the property named first `along` the path counts, also for the
+   * type arguments of a model of the project holding it, and none at its end, and the path, however
+   * long, takes none of the `depth` (`c: { d: Box<View<Other<T>>> }` of a model `Other` holds again
+   * at `c.d.v.e.f`).
    */
   private reaches(
     type: Type,
@@ -329,8 +331,17 @@ export class ExpansionGuard {
     const library = symbol !== undefined && this.types.getSymbolSourceKind(symbol) === 'default'
     const mapped = (type as any).objectFlags & ObjectFlags.Mapped
     // along the path, a model of the project holds its type arguments only at the properties it
-    // goes through (`v` of `Box<{ a: T; m: Map<K, Model<T>> }>` holds no `Model`), a view all of them
-    const model = along !== undefined && type.flags & TypeFlags.Object && !library && !mapped
+    // goes through (`v` of `Box<{ a: T; m: Map<K, Model<T>> }>` holds no `Model`), and none at its
+    // end, a view all of them, as do a tuple and a type holding them where the path names no
+    // property of the project (the values of `Dict<T>`, the items of `List<T> extends Array<T>`)
+    const model =
+      along !== undefined &&
+      symbol !== undefined &&
+      type.flags & TypeFlags.Object &&
+      !library &&
+      !mapped &&
+      this.types.getReferenceKind(type) === undefined &&
+      this.namesProperty(type, along[0])
     const children = [
       ...(model ? [] : this.types.getTypeArguments(type)),
       // the models a view maps over (`DeepReadonly<Model<T>>`), by its keys
@@ -367,6 +378,21 @@ export class ExpansionGuard {
     return this.types
       .getPropertyTypes(type)
       .some((child) => child && this.reaches(child, declaration, depth - 1, seen, undefined))
+  }
+
+  /**
+   * Whether a type has a property of a name the project declares, not one of a library type it
+   * extends (`length` of `interface List<T> extends Array<T>`), or without a name, only such
+   * properties and no index signature.
+   */
+  private namesProperty(type: Type, name: string | undefined): boolean {
+    const declares = (property: TSSymbol | undefined): boolean =>
+      property !== undefined && this.types.getSymbolSourceKind(property) !== 'default'
+
+    return name === undefined
+      ? this.types.checker.getIndexInfosOfType(type).length === 0 &&
+          this.types.getProperties(type).some(declares)
+      : declares(this.types.getProperty(type, name))
   }
 
   /**
@@ -554,10 +580,11 @@ export class ExpansionGuard {
  */
 export function argumentsGrow(types: TypeQueries, outer: Type, inner: Type, depth = 0): boolean {
   const innerArguments = types.getTypeArguments(inner)
-  // one passed on as it is (`string` of `Model<Model<T, string>, string>`) is held again, not grown
+  // one passed on as it is (`string` of `Model<Model<T, string>, string>`) is held, not grown,
+  // in its position, as another may be the same type (`Pass<U, Box<T>>` of `Pass<number, number>`)
   const outerArguments = types
     .getTypeArguments(outer)
-    .filter((outerArgument) => !innerArguments.some((i) => i.id === outerArgument.id))
+    .filter((outerArgument, index) => innerArguments[index]?.id !== outerArgument.id)
 
   return innerArguments.some((innerArgument) =>
     outerArguments.some((outerArgument) => grows(types, outerArgument, innerArgument, depth)),

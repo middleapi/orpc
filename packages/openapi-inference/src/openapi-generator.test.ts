@@ -926,6 +926,25 @@ describe('openAPIGenerator', () => {
           passedOnInput: 'os.input(type<Expanding<PassBox<number>>>()).handler(() => 1)',
           shortRoute: 'os.handler((): CD<Route<number>> => ({}) as any)',
           longRoute: 'os.handler((): CD<LongRoute<number>> => ({}) as any)',
+          tupleView: 'os.handler((): CD<TupleDer<number>> => ({}) as any)',
+          tupleViewInput: 'os.input(type<CD<TupleDer<number>>>()).handler(() => 1)',
+          tupleGrow: 'os.handler((): CD<TupleGrow<number>> => ({}) as any)',
+          tupleGrowInput: 'os.input(type<CD<TupleGrow<number>>>()).handler(() => 1)',
+          pairView: 'os.handler((): CD<PairDer<number>> => ({}) as any)',
+          pairViewInput: 'os.input(type<CD<PairDer<number>>>()).handler(() => 1)',
+          dictView: 'os.handler((): CD<DictDer<number>> => ({}) as any)',
+          dictViewInput: 'os.input(type<CD<DictDer<number>>>()).handler(() => 1)',
+          listView: 'os.handler((): CD<ListDer<number>> => ({}) as any)',
+          listViewInput: 'os.input(type<CD<ListDer<number>>>()).handler(() => 1)',
+          plainSelf: 'os.handler((): CD<PlainSelf<number>> => ({}) as any)',
+          tupleSelf: 'os.handler((): CD<TupleSelf<number>> => ({}) as any)',
+          pairSelf: 'os.handler((): CD<PairSelf<number>> => ({}) as any)',
+          dictSelf: 'os.handler((): CD<DictSelf<number>> => ({}) as any)',
+          listSelf: 'os.handler((): CD<ListSelf<number>> => ({}) as any)',
+          boxedSelf: 'os.handler((): CD<BoxedSelf<number>> => ({}) as any)',
+          passedArgument: 'os.handler((): PassArg<number, string> => ({}) as any)',
+          passedSameArgument: 'os.handler((): PassArg<number, number> => ({}) as any)',
+          passedSameArgumentInput: 'os.input(type<PassArg<number, number>>()).handler(() => 1)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -983,6 +1002,26 @@ describe('openAPIGenerator', () => {
             'interface Route<T> { v: T; c: { p: Route<T[]> | null } }',
             // its route is 17 object literals long
             `interface LongRoute<T> { v: T; c: ${'{ p: '.repeat(17)}LongRoute<T[]> | null${' }'.repeat(17)} }`,
+            // through the items of a tuple, an index signature or an array the project declares
+            'interface TupleBase<T> { a: [T, number]; b: Box<T>; c: BoxVia<T> }',
+            'interface TupleDer<T> extends TupleBase<CD<TupleDer<T>>> { v: T }',
+            'interface TupleGrow<T> extends TupleBase<TupleGrow<T[]>> { v: T }',
+            'type Pairish<T> = [T, number]',
+            'interface PairBase<T> { a: Pairish<T>; b: Pairish<T>; c: Pairish<T> }',
+            'interface PairDer<T> extends PairBase<CD<PairDer<T>>> { v: T }',
+            'interface Dict<T> { [k: string]: T }',
+            'interface DictBase<T> { a: Dict<T>; b: Dict<T>; c: BoxVia<T> }',
+            'interface DictDer<T> extends DictBase<CD<DictDer<T>>> { v: T }',
+            'interface List<T> extends Array<T> {}',
+            'interface ListBase<T> { a: List<T>; b: List<T>; c: BoxVia<T> }',
+            'interface ListDer<T> extends ListBase<CD<ListDer<T>>> { v: T }',
+            'interface PlainSelf<T> { v: T; a: CD<PlainSelf<T>> | null }',
+            'interface TupleSelf<T> { v: T; a: [CD<TupleSelf<T>>, T] | null }',
+            'interface PairSelf<T> { v: T; a: Pairish<CD<PairSelf<T>>> | null }',
+            'interface DictSelf<T> { v: T; a: Dict<CD<DictSelf<T>>> }',
+            'interface ListSelf<T> { v: T; a: List<CD<ListSelf<T>>> }',
+            'interface BoxedSelf<T> { v: T; a: Box<Box<CD<BoxedSelf<T>>>> | null }',
+            'interface PassArg<T, U> { v: T; u: U; next: PassArg<U, Box<T>> | null }',
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',
@@ -996,7 +1035,11 @@ describe('openAPIGenerator', () => {
         const schemas = spec.components?.schemas ?? {}
         const deref = (schema: any): any =>
           schema?.$ref ? deref(schemas[schema.$ref.replace('#/components/schemas/', '')]) : schema
+        const growing = ['passedArgument', 'passedSameArgument', 'passedSameArgumentInput']
         for (const [name, procedure] of Object.entries(cases)) {
+          if (growing.includes(name)) {
+            continue
+          }
           const operation = spec.paths[`/${name}`].post
           const schema = procedure.includes('input')
             ? operation.requestBody.content['application/json'].schema
@@ -1008,7 +1051,14 @@ describe('openAPIGenerator', () => {
           ])
         }
         // a cycle through models holding each other in object literals, cut as early as others
-        for (const name of ['mutualLiterals', 'mutualLiteralsInput']) {
+        for (const name of [
+          'mutualLiterals',
+          'mutualLiteralsInput',
+          ...['tupleView', 'tupleGrow', 'pairView', 'dictView', 'listView'].flatMap((name) => [
+            name,
+            `${name}Input`,
+          ]),
+        ]) {
           const operation = spec.paths[`/${name}`].post
           const schema = name.endsWith('Input')
             ? operation.requestBody.content['application/json'].schema
@@ -1019,6 +1069,30 @@ describe('openAPIGenerator', () => {
         const levels = (name: string) =>
           JSON.stringify(spec.paths[`/${name}`].post.responses['200']).match(/"v":/g)?.length
         expect(levels('longRoute')).toBe(levels('shortRoute'))
+        // a model nesting itself through a tuple, an index signature or an array the project
+        // declares, as early as directly
+        const nested = (name: string) =>
+          JSON.stringify(spec.paths[`/${name}`].post.responses['200']).match(/"a":/g)?.length
+        for (const name of ['tupleSelf', 'pairSelf', 'dictSelf', 'listSelf', 'boxedSelf']) {
+          expect([name, nested(name)]).toEqual([name, nested('plainSelf')])
+        }
+        // a model growing a type argument as many levels when its other one is the same type
+        const inline = (schema: any): any =>
+          schema?.$ref
+            ? inline(schemas[schema.$ref.replace('#/components/schemas/', '')])
+            : schema && typeof schema === 'object'
+              ? Object.fromEntries(Object.entries(schema).map(([k, v]) => [k, inline(v)]))
+              : schema
+        const grown = (name: string) => {
+          const operation = spec.paths[`/${name}`].post
+          const schema = name.endsWith('Input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+          return JSON.stringify(inline(schema)).match(/"next":/g)?.length
+        }
+        for (const name of growing) {
+          expect([name, grown(name)]).toEqual([name, grown('passedArgument')])
+        }
       },
       120_000,
     )
