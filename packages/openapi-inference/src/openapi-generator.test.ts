@@ -131,6 +131,14 @@ import {
   readonlySets,
   roundFiftySixInputs,
 } from '../tests/fixtures/app/src/round56'
+import {
+  boxedInterfaces,
+  errorViewJsons,
+  jsonFns,
+  plainBoxedInterfaces,
+  plainErrorViewJsons,
+  roundFiftySevenInputs,
+} from '../tests/fixtures/app/src/round57'
 import { DraftNote, roundFiftyEightInputs, SearchFilter } from '../tests/fixtures/app/src/round58'
 import { roundFiftyNineInputs } from '../tests/fixtures/app/src/round59'
 import { router } from '../tests/fixtures/app/src/router'
@@ -3317,6 +3325,51 @@ describe('openAPIGenerator', () => {
           expect(present, `${name}: ${p.in} ${p.name}`).toBe(true)
         }
       }
+    })
+  })
+
+  describe('round fifty-seven', () => {
+    it('documents inputs of views of errors and boxed primitives with their own toJSON, and of functions typed by interfaces', async () => {
+      const spec = await generator.generate(roundFiftySevenInputs, {
+        source: { file: fixture('round57.ts'), export: 'roundFiftySevenInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // a client's serializer leaves an instance to `JSON.stringify`, which calls its `toJSON`,
+      // and walks a plain object without it
+      for (const [name, value] of [
+        ['errorViewJsons', errorViewJsons()],
+        ['errorViewJsons', plainErrorViewJsons()],
+        ['boxedInterfaces', boxedInterfaces()],
+        ['boxedInterfaces', plainBoxedInterfaces()],
+        ['jsonFns', jsonFns()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+
+      // a plain object of a subclass of `Number` is written as an object
+      expect(schemas.MyNum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+      expect(schemas.INum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+      // a function is written by its `toJSON`, as in outputs
+      expect(schemas.JsonFns.properties.fn).toMatchObject({ type: 'string' })
     })
   })
 })

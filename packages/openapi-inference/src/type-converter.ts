@@ -903,10 +903,13 @@ export class TypeToJsonSchemaConverter {
     // written without its getters, or as the built-in the class extends
     // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object, and so a value of an
     // interface extending a built-in class (`interface AppError extends Error`), as for outputs
+    // (not `Function`, whose value is a function a client writes by its `toJSON`)
     const sentClass =
       this.input && !plain && !ownFields
         ? (getClassType(this.types, type) ??
-          (extendsBuiltinClass(this.types, type) ? type : undefined))
+          (extendsBuiltinClass(this.types, type) && !isFunction(this.types, type)
+            ? type
+            : undefined))
         : undefined
     // under `JSON.stringify` (inside an instance), and for a class with private members, which
     // no plain object satisfies, a client sends what an instance writes, as the server does
@@ -1123,12 +1126,18 @@ export class TypeToJsonSchemaConverter {
     // the empty object type `{}` (also `NonNullable<unknown>`, `Pick<User, never>`, or a class
     // without members) accepts any value but `null` and `undefined`, a type of methods only
     // (`Iterable<string>`, `interface Lookup { has(key: string): boolean }`) arrays, sets, or strings
-    // too, and `Record<string, any>` any object
+    // too, and `Record<string, any>` any object. Not one extending a built-in class
+    // (`class MyNum extends Number { toJSON(): string }`), whose value is the built-in, written
+    // apart, or a plain object.
     if (
       (properties.every((p) => p.flags & SymbolFlags.Method || p.escapedName.startsWith('__@')) &&
         !isObjectLiteral(type) &&
         !this.checker.getIndexInfosOfType(type).length &&
-        !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length) ||
+        !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length &&
+        !extendsBuiltinClass(this.types, type) &&
+        !getClassTypes(this.types, type).some(
+          (c) => getBuiltinBaseName(this.types, c) !== undefined,
+        )) ||
       isAnyRecord(this.types, type)
     ) {
       return {}

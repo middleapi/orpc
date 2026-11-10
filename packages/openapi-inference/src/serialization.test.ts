@@ -359,6 +359,15 @@ describe('generated schemas match serialized outputs', async () => {
     ['numberViewOwner', undefined],
     ['boxedViewResults', undefined],
     ['readonlySets', undefined],
+    ['errorViewJsons', undefined],
+    ['plainErrorViewJsons', undefined],
+    ['readonlyMsgRoot', undefined],
+    ['codedErrRoot', undefined],
+    ['boxedInterfaces', undefined],
+    ['numRoot', undefined],
+    ['plainNumRoot', undefined],
+    ['jsonFns', undefined],
+    ['jsonFnRoot', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -381,6 +390,16 @@ describe('generated schemas match serialized outputs', async () => {
     expect(deref(responseSchema('/numberViewJson'))).toEqual({
       anyOf: [{ type: 'string' }, { type: 'object' }],
     })
+  })
+
+  it('writes interfaces extending a boxed primitive with their own toJSON by it, or as a plain object', () => {
+    const schemas = spec.components?.schemas as any
+
+    // the serializer leaves a boxed number to `JSON.stringify`, which calls its `toJSON`
+    expect(schemas.INum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+    expect(schemas.IBool).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+    // a function is written by its `toJSON`
+    expect(deref(responseSchema('/jsonFnRoot'))).toMatchObject({ type: 'string' })
   })
 
   it('documents the plain object a view of a boxed primitive toJSON returns may be, and interfaces extending a readonly set as the set', () => {

@@ -81,12 +81,16 @@ export function getBuiltin(
       : undefined
 
     // `JSON.stringify` calls the own `toJSON` of a built-in subclass, the serializer does not,
-    // unless it leaves the instance to `JSON.stringify` (`class MyNum extends Number`)
+    // unless it leaves the instance to `JSON.stringify` (`class MyNum extends Number`, also
+    // `interface INum extends Number { toJSON(): string }`)
     return (
       runtimeGlobal ??
       // classes extending built-ins, and interfaces describing them (`interface Tags extends Set<string>`)
       (symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface) &&
-      !((stringify || isStringifiedBuiltin(types, type)) && hasOwnToJSON(types, type))
+      !(
+        (stringify || STRINGIFIED_BUILTINS.has(getBuiltinBaseName(types, type) ?? '')) &&
+        hasOwnToJSON(types, type)
+      )
         ? getBuiltinSubclass(types, type, stringify)
         : undefined)
     )
