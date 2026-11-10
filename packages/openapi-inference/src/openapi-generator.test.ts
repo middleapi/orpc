@@ -5,6 +5,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { OpenAPIGeneratorError, OpenAPIJsonSerializer } from '@orpc/openapi'
+import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { call, os, Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
@@ -12,6 +13,19 @@ import { Program } from 'typescript/unstable/sync'
 
 import { canGenerateWithin, generateWithin } from '../tests/bounded-generate'
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
+import {
+  classInputs,
+  Guarded,
+  Labels,
+  Link,
+  Lookup,
+  Money,
+  Order,
+  Person,
+  Sealed,
+  Stamp,
+  Tagged,
+} from '../tests/fixtures/app/src/class-inputs'
 import { contract, implemented } from '../tests/fixtures/app/src/contract'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
 import { router as headersRouter } from '../tests/fixtures/app/src/headers'
@@ -1690,7 +1704,7 @@ describe('openAPIGenerator', () => {
       expect(close.required).toEqual(['event'])
     })
 
-    it('documents class inputs as the plain JSON a client sends', async () => {
+    it('documents class inputs as the plain objects or instances a client sends', async () => {
       const spec = await generator.generate(classes, {
         source: { file: fixture('round11.ts'), export: 'classes' },
       })
@@ -1701,7 +1715,13 @@ describe('openAPIGenerator', () => {
           : schema
 
       const input = component(operation.requestBody.content['application/json'].schema)
-      expect(input.properties.tags).toMatchObject({ 'type': 'array', 'x-native-type': 'set' })
+      // `JSON.stringify` writes the `Set` of an instance as `{}`, and throws on its bigint
+      expect(input.properties.tags).toEqual({
+        anyOf: [
+          expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+          { type: 'object' },
+        ],
+      })
       expect(input.properties.views).toMatchObject({ 'type': 'string', 'x-native-type': 'bigint' })
 
       // the server sends an instance, which `JSON.stringify` writes
@@ -1717,7 +1737,7 @@ describe('openAPIGenerator', () => {
       )
     })
 
-    it('names a model the same in both directions, and ignores toJSON in inputs', async () => {
+    it('names a model the same in both directions, and calls toJSON only of instances in inputs', async () => {
       const spec = await generator.generate(directions, {
         source: { file: fixture('round11.ts'), export: 'directions' },
       })
@@ -1732,9 +1752,12 @@ describe('openAPIGenerator', () => {
         two.responses['200'].content['application/json'].schema,
       )
 
+      // an instance of `SecretJSON` is written as nothing, a plain object by its fields
       const secret = (spec.components?.schemas as any).HoldsSecret
-      expect(secret.required).toEqual(['secret', 'list'])
-      expect(secret.properties.list.items).toEqual({ $ref: '#/components/schemas/SecretJSON' })
+      expect(secret.required).toEqual(['list'])
+      expect(secret.properties.list.items).toEqual({
+        anyOf: [{ $ref: '#/components/schemas/SecretJSON' }, { type: 'null' }],
+      })
     })
 
     it('reports unresolved types when only error data needs inference', async () => {
@@ -1881,6 +1904,83 @@ describe('openAPIGenerator', () => {
         const validate = ajv.compile(body(path))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
         expect(validate(json) ? [] : validate.errors).toEqual([])
+      }
+    })
+  })
+
+  describe('class inputs', () => {
+    it('documents inputs of class types as the instances and plain objects a client sends', async () => {
+      const spec = await generator.generate(classInputs, {
+        source: { file: fixture('class-inputs.ts'), export: 'classInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // an instance leaves its getter out, a plain object has it
+      expect(schemas.Person.required).toEqual(['first', 'last'])
+      expect(schemas.Person.properties.full).toEqual({ type: 'string' })
+      // only an instance satisfies a class with private members, `JSON.stringify` writes it
+      expect(schemas.Sealed.properties.tags).toEqual({ type: 'object' })
+
+      // what a client holding these values sends, which the server accepts
+      const handler = new OpenAPIHandler(classInputs)
+      const sent: string[] = []
+      const link = new OpenAPILink(classInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(await handled.clone().text())
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const plainTagged = { tags: new Set(['a']), counts: new Map([['a', 1]]), name: 'n' }
+      const plainMoney = { amount: 1, currency: 'X' }
+
+      for (const [name, value] of [
+        ['money', { m: new Money(1, 'X') }],
+        ['money', { m: plainMoney }],
+        ['tagged', new Tagged()],
+        ['tagged', plainTagged],
+        ['person', new Person()],
+        ['person', { first: 'a', last: 'b', full: 'a b' }],
+        ['readonlyTagged', new Tagged()],
+        ['readonlyTagged', plainTagged],
+        ['pickedMoney', new Money(1, 'X')],
+        ['pickedMoney', { amount: 1 }],
+        ['partialPerson', new Person()],
+        ['partialPerson', { full: 'a b' }],
+        ['order', new Order()],
+        ['order', { total: plainMoney, items: [plainTagged, new Tagged()] }],
+        ['readonlyOrder', new Order()],
+        ['readonlyOrder', { total: new Money(1, 'X'), items: [plainTagged] }],
+        ['moneys', [new Money(1, 'X'), plainMoney]],
+        ['tags', { list: [new Tagged(), plainTagged] }],
+        ['sealed', new Sealed()],
+        ['guarded', { g: new Guarded() }],
+        ['stamp', new Stamp(0)],
+        ['link', new Link('http://x/')],
+        ['labels', new Labels(['a'])],
+        ['lookup', new Lookup([['a', 1]])],
+      ] as const) {
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(sent.at(-1)!)
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
       }
     })
   })
@@ -2527,10 +2627,10 @@ describe('openAPIGenerator', () => {
       expect(paths['/shape'].post.requestBody.content['application/json'].schema).toEqual({
         $ref: component('Shape'),
       })
-      expect(
-        paths['/relabelled'].post.requestBody.content['application/json'].schema.discriminator
-          .mapping,
-      ).toEqual({ relabelled: component('Relabelled'), square: component('Square') })
+      // an instance is sent with the kind of its `toJSON`, a plain object with its own
+      expect(paths['/relabelled'].post.requestBody.content['application/json'].schema).toEqual({
+        anyOf: [{ $ref: component('Relabelled') }, { $ref: component('Square') }],
+      })
       expect(paths['/queried'].get.parameters.map((p: any) => p.name)).toEqual([
         'kind',
         'radius',

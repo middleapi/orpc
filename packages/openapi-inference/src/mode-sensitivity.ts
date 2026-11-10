@@ -34,6 +34,8 @@ import { INSTANTIABLE_FLAGS, isObjectLiteral } from './type-queries'
  *   differs from a plain object: `toJSON` (also of the class), getters, or a built-in base.
  * - `either`: when the value may be written by either one. A view is converted in the `either`
  *   mode under the serializer too, so it never differs.
+ *
+ * In inputs, a class a plain object satisfies (without private members) is a view of itself.
  */
 export class ModeSensitivity {
   private readonly cache = new Map<number, boolean>()
@@ -52,6 +54,7 @@ export class ModeSensitivity {
   constructor(
     private readonly types: TypeQueries,
     private readonly mode: 'stringify' | 'either',
+    private readonly input: boolean,
   ) {
     this.expansion = new ExpansionGuard(types)
   }
@@ -219,7 +222,11 @@ export class ModeSensitivity {
     // the serializer converts a view in the `either` mode, also an interface extending a built-in
     // class (`interface AppError extends Error`), unless it is a built-in
     // (`Readonly<class Tags extends Set<string>>`)
-    if (this.mode === 'either' && isInstanceOrPlain(types, type) && !hasBuiltinForm(types, type)) {
+    if (
+      this.mode === 'either' &&
+      (isInstanceOrPlain(types, type) || this.isView(type)) &&
+      !hasBuiltinForm(types, type)
+    ) {
       return false
     }
 
@@ -237,7 +244,7 @@ export class ModeSensitivity {
     // class instances are converted under `JSON.stringify` rules either way, views may also
     // hold plain objects
     if (classType !== undefined) {
-      return isClassView(types, type) && this.computeView(type, classType, isSensitive)
+      return this.isView(type) && this.computeView(type, classType, isSensitive)
     }
 
     // a view of a built-in (`Pick<Set<string>, 'size'>`), also when it keeps too few members
@@ -255,6 +262,15 @@ export class ModeSensitivity {
       (hasToJSON && (this.mode === 'stringify' || isObjectLiteral(type))) ||
       this.computeFields(type, isSensitive)
     )
+  }
+
+  /**
+   * Whether a value of a class type may be an instance or a plain object, see `isClassView`.
+   */
+  private isView(type: Type): boolean {
+    return this.input
+      ? getClassType(this.types, type) !== undefined && !this.types.isNominalClass(type)
+      : isClassView(this.types, type)
   }
 
   /**

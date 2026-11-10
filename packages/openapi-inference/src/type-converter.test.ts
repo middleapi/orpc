@@ -3207,13 +3207,13 @@ describe('typeToJsonSchemaConverter', () => {
     })
 
     it('discriminates by the kinds as serialized', () => {
-      // `toJSON` writes another kind, which a client does not send
+      // `toJSON` writes another kind, which a client sends for an instance, not for a plain object
       expect(defsOf('RelabelledShape').RelabelledShape).toEqual(
         discriminated('kind', { renamed: 'Relabelled', square: 'Square' }),
       )
-      expect(defsOf('RelabelledShape', 'input').RelabelledShape).toEqual(
-        discriminated('kind', { relabelled: 'Relabelled', square: 'Square' }),
-      )
+      expect(defsOf('RelabelledShape', 'input').RelabelledShape).toEqual({
+        anyOf: [ref('Relabelled'), ref('Square')],
+      })
     })
 
     it('does not discriminate unions whose members can not be told apart by a property', () => {

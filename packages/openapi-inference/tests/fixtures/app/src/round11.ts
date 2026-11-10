@@ -194,7 +194,7 @@ export class CreatePost {
 }
 
 /**
- * Class types sent by clients are plain JSON, sent by the server instances
+ * Class types sent by clients are instances or plain objects, sent by the server instances
  */
 export const classes = {
   create: os
@@ -216,7 +216,7 @@ interface HoldsSecret {
 }
 
 /**
- * Models in both directions, and `toJSON`, which requests never call
+ * Models in both directions, and `toJSON`, which requests call only of instances
  */
 export const directions = {
   one: os.handler((): One => ({ id: '1' })),

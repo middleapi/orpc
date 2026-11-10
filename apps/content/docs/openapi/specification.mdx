@@ -325,7 +325,7 @@ Every other option works as in `OpenAPIGenerator`.
 
 Inferred schemas come from the input type for inputs, the output type for outputs and error `data`, and the handler's return type when there is no `.output`. Handlers returning async iterators are documented as [event streams](/docs/async-iterator-object). Contract procedures take their types from the contract, so add `.output` there.
 
-Outputs are documented in their [serialized](/docs/openapi/serializer) form. Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}` and `bigint` fields cannot be sent. Views of a class, like `Readonly<User>`, can be an instance or a plain object, so both forms are documented.
+Outputs are documented in their [serialized](/docs/openapi/serializer) form. Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}` and `bigint` fields cannot be sent. Views of a class, like `Readonly<User>`, and class types in inputs can be an instance or a plain object, so both forms are documented.
 
 Types declared in your project become components named after them, like `User` or `Page_User` for `Page<User>`, and unions of them told apart by a string literal property, like `kind`, get a `discriminator`. Pass `defs: 'recursive'` to the constructor to make components only for recursive types.
 
@@ -370,7 +370,6 @@ try {
 ### Limitations
 
 - Types carry no validation rules. Add them with [JSDoc tags](#jsdoc) or keep a converter schema.
-- Class types in inputs are documented as the plain objects a client sends.
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
 - `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out.

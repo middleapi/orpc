@@ -43,7 +43,6 @@ import {
   getViewedFunction,
   hasOptionalToJSON,
   isAnyRecord,
-  isClassView,
   isLooseIntersection,
   isDropped,
   isInstanceOrPlain,
@@ -110,7 +109,7 @@ export interface TypeToJsonSchemaConverterOptions {
    *
    * - `output`: values the server sends, serialized by oRPC's OpenAPI JSON serializer, which
    *   leaves class instances to `JSON.stringify`.
-   * - `input`: values a client sends, decoded from JSON, so class types are plain objects.
+   * - `input`: values a client sends, so class types are instances or plain objects.
    *
    * @default 'output'
    */
@@ -160,7 +159,7 @@ const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFl
 /**
  * Converts TypeScript types into JSON Schemas (draft 2020-12), describing values as the server
  * sends them after oRPC's OpenAPI JSON serialization (e.g. `Date` as a `date-time` string), or,
- * with `direction: 'input'`, as a client sends them (classes as plain objects).
+ * with `direction: 'input'`, as a client sends them (classes as instances or plain objects).
  *
  * Named types are emitted as `$defs`. Conversions share a cache, so reuse one converter per program.
  *
@@ -168,7 +167,7 @@ const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFl
  */
 export class TypeToJsonSchemaConverter {
   private readonly defsMode: 'named' | 'recursive'
-  /** Values a client sends, decoded from JSON: classes are plain objects, `toJSON` is not called */
+  /** Values a client sends: classes are instances or plain objects, `toJSON` is called of instances */
   private readonly input: boolean
   private readonly types: TypeQueries
   private readonly names: DefNames
@@ -224,8 +223,8 @@ export class TypeToJsonSchemaConverter {
     this.defs = new DefRegistry(shared.names)
     this.expansion = new ExpansionGuard(this.types)
     this.cycles = new AnonymousCycles(this.types)
-    this.stringifySensitivity = new ModeSensitivity(this.types, 'stringify')
-    this.eitherSensitivity = new ModeSensitivity(this.types, 'either')
+    this.stringifySensitivity = new ModeSensitivity(this.types, 'stringify', this.input)
+    this.eitherSensitivity = new ModeSensitivity(this.types, 'either', this.input)
   }
 
   /**
@@ -820,11 +819,17 @@ export class TypeToJsonSchemaConverter {
   private convertObject(type: Type, options: ObjectForm = {}): JsonSchema {
     let { ignoreToJSON = false, plain = false } = options
     const { ownFields = false } = options
-    // a request carries plain JSON, also for a class type. A client may still send an instance
-    // of the class behind a view (`Readonly<User>`), written without its getters, or as the
-    // built-in the class extends (`Pick<class Stamp extends Date, 'label'>`).
+    // a client sends a value of a class type (or of a view of one, `Readonly<User>`) as an instance,
+    // written without its getters, or as the built-in the class extends
+    // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object
     const sentClass =
       this.input && !plain && !ownFields ? getClassType(this.types, type) : undefined
+    // under `JSON.stringify` (inside an instance), and for a class with private members, which
+    // no plain object satisfies, a client sends what an instance writes, as the server does
+    const sentInstance =
+      this.input &&
+      (this.mode === 'stringify' || (sentClass !== undefined && this.types.isNominalClass(type)))
+    const sentForms = sentClass !== undefined && !sentInstance
 
     // `Readonly<UserId>`, or `DeepReadonly<T>` over `UserId = string & { __brand: 'UserId' }`,
     // maps over the members of the primitive, the value is still the primitive, or also a plain
@@ -834,7 +839,7 @@ export class TypeToJsonSchemaConverter {
       return this.withPlainForm(type, this.visit(branded))
     }
 
-    if (this.input) {
+    if (this.input && !sentInstance) {
       plain = true
       ignoreToJSON = true
     }
@@ -873,17 +878,20 @@ export class TypeToJsonSchemaConverter {
     // in the either mode, a view is an instance or a plain object, field by field
     // (under `JSON.stringify`, a view is written as an instance)
     const eitherView = isView && this.mode === 'either'
-    const sentView = sentClass !== undefined && isClassView(this.types, type)
     const instanceClass = classType ?? sentClass
 
     // a client's serializer leaves an instance to `JSON.stringify`, which calls its `toJSON` and
     // writes its `Set` fields as `{}`, so each value is either form, as in a view of an output
-    // (the built-in a class extends is written as the built-in, see below)
-    if (sentView && this.mode === 'serializer') {
+    // (the built-in a class extends is written as the built-in, see below). A `toJSON` returning
+    // only `undefined` writes nothing, the caller makes it optional.
+    if (sentForms && !options.ignoreToJSON) {
       const results = getClassTypes(this.types, type)
         .filter((c) => !hasBuiltinForm(this.types, c))
         .flatMap((c) => getToJSONResultTypes(this.types, c, true))
-      const fields = this.withMode('either', () => this.convertObject(type, options))
+        .filter((result) => !isDropped(this.types, result))
+      const fields = this.withMode('either', () =>
+        this.convertObject(type, { ...options, ignoreToJSON: true }),
+      )
 
       return results.length ? anyOfDeduped([...this.convertToJSONResults(results), fields]) : fields
     }
@@ -899,7 +907,7 @@ export class TypeToJsonSchemaConverter {
         // an instance is written as the built-in, a plain object (or an instance of a class
         // extending none) by its fields
         return anyOfDeduped(
-          isView || sentView
+          isView || sentForms
             ? [...subclasses, this.convertObject(type, { ignoreToJSON, plain: true })]
             : subclasses.length < classes.length
               ? [...subclasses, this.convertObject(type, { ignoreToJSON, plain, ownFields: true })]
@@ -981,7 +989,7 @@ export class TypeToJsonSchemaConverter {
     // a client sends, or an interface extending a built-in (`interface AppError extends Error`)
     const viewedClass = eitherView
       ? (classType ?? type)
-      : sentView
+      : sentForms
         ? sentClass
         : !classType && extendsBuiltinClass(this.types, type)
           ? type
@@ -1073,7 +1081,7 @@ export class TypeToJsonSchemaConverter {
       // functions, symbols, and always `undefined` values are dropped by JSON serialization,
       // also when `toJSON` returns them (in either mode, when the serializer calls it too)
       const serialized =
-        !this.input && propertyType
+        (!this.input || fieldsMode === 'stringify') && propertyType
           ? getToJSONResultTypes(this.types, propertyType, fieldsMode === 'stringify')
           : []
       if (
@@ -1881,8 +1889,8 @@ export class TypeToJsonSchemaConverter {
         return true
       }
 
-      // the server decodes plain JSON, it calls no `toJSON`
-      if (this.input) {
+      // a client's serializer calls `toJSON` only of the class instances it sends
+      if (this.input && !stringify && getClassType(this.types, member) === undefined) {
         return false
       }
 
