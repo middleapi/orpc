@@ -15,7 +15,11 @@ import type {
   JsonSchemaConverter,
   JsonSchemaConverterDirection,
 } from '@orpc/json-schema'
-import { isStandardSchemaOptional, StandardJsonSchemaConverter } from '@orpc/json-schema'
+import {
+  extractJsonObjectSchemaEntries,
+  isStandardSchemaOptional,
+  StandardJsonSchemaConverter,
+} from '@orpc/json-schema'
 import type {
   OpenAPIDocument,
   OpenAPIGeneratorGenerateOptions as BaseOpenAPIGeneratorGenerateOptions,
@@ -73,6 +77,17 @@ function inferredSchema(inferred: InferredJsonSchema): AnySchema {
       validate: (value) => ({ value }),
     },
   }
+}
+
+/**
+ * Whether a schema inferred from a type documents an object (a schema a converter supports is
+ * documented as the stock generator documents it).
+ */
+function isInferredObject(schema: AnySchema): boolean {
+  const inferred: InferredJsonSchema | undefined = (schema['~standard'] as any)[
+    INFERRED_JSON_SCHEMA_SYMBOL
+  ]
+  return inferred === undefined || extractJsonObjectSchemaEntries(inferred[0]) !== undefined
 }
 
 class InferredJsonSchemaConverter implements JsonSchemaConverter {
@@ -385,13 +400,11 @@ export class OpenAPIGenerator {
     // the stock generator splits these into parts, where a def of the whole would be unused
     const inputDetailed = meta?.inputStructure === 'detailed'
     const outputDetailed = meta?.outputStructure === 'detailed'
+    // the stock generator reads only parameters from these inputs, the fields of an object
+    const parametersOnly = inputDetailed || meta?.method === 'GET' || meta?.method === 'HEAD'
     const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
       input: {
-        inlineRoot:
-          inputDetailed ||
-          meta?.method === 'GET' ||
-          meta?.method === 'HEAD' ||
-          `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
+        inlineRoot: parametersOnly || `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
         inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
         partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
       },
@@ -409,19 +422,22 @@ export class OpenAPIGenerator {
      * Infers a slot (an input, an output or error data) from its type, which `getType` reads from
      * the procedure type, `undefined` when it has none. Schemas the stock converters document (as
      * any value, when their conversion throws) keep that result (`undefined`) when the type can not
-     * be read, like the type of a procedure typed `any`, see {@link inferWhenReadable}.
+     * be read, like the type of a procedure typed `any`, see {@link inferWhenReadable}, or when
+     * `keepsStock` rejects what is inferred.
      */
     const inferSlot = <T>(
       schemas: AnySchema[],
       direction: JsonSchemaConverterDirection,
       getType: (procedure: Type) => Type | undefined,
       infer: (type: Type) => T,
+      keepsStock?: (inferred: T) => boolean,
     ): T | undefined => {
       if (
         schemas.length &&
         schemas.every((s) => ctx.stockConverters.some((c) => c.condition(s, direction)))
       ) {
-        return inferWhenReadable(ctx, resolved, getType, infer)
+        const inferred = inferWhenReadable(ctx, resolved, getType, infer)
+        return inferred !== undefined && keepsStock?.(inferred) ? undefined : inferred
       }
 
       assertProcedureType(ctx, resolved)
@@ -523,6 +539,9 @@ export class OpenAPIGenerator {
           direction,
           (procedure) => ctx.resolver.getSchemaType(procedure, direction),
           inferFromType,
+          // a parameters-only input not inferred as an object would fail to generate
+          (inferred) =>
+            direction === 'input' && parametersOnly && !inferred.every(isInferredObject),
         ) ?? schemas
       )
     }

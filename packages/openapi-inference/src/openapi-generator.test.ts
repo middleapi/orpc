@@ -201,6 +201,7 @@ import {
   roundSixtyNineAny,
   roundSixtyNineRegistered,
 } from '../tests/fixtures/app/src/round69'
+import { roundSeventy } from '../tests/fixtures/app/src/round70'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4006,6 +4007,33 @@ describe('openAPIGenerator', () => {
       } finally {
         z.globalRegistry.remove(registeredNote)
       }
+    })
+  })
+
+  describe('round seventy', () => {
+    it('keeps the stock documentation of parameters-only inputs Zod can not convert, of types not objects', async () => {
+      const spec = await new OpenAPIGenerator().generate(roundSeventy, {
+        source: { file: fixture('round70.ts'), export: 'roundSeventy' },
+      })
+      const stock = await new BaseOpenAPIGenerator().generate(roundSeventy)
+      const paths = spec.paths as any
+
+      for (const [path, method] of [
+        ['/since', 'get'],
+        ['/counts', 'get'],
+        ['/tags', 'get'],
+        ['/detailed-since', 'post'],
+      ] as const) {
+        const operation = (stock.paths as any)[path][method]
+        expect(paths[path][method].parameters).toEqual(operation.parameters)
+        expect(paths[path][method].requestBody).toEqual(operation.requestBody)
+      }
+
+      // an object input still documents its parameters
+      expect(paths['/range'].get.parameters.map((p: any) => [p.in, p.name])).toEqual([
+        ['query', 'from'],
+        ['query', 'to'],
+      ])
     })
   })
 })
