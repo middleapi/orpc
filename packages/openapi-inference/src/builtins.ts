@@ -635,6 +635,23 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
 }
 
 /**
+ * Whether a class or an interface extends `Error`, also through a view of it
+ * (`interface AppError extends Readonly<Error>`), whose members from packages are not data.
+ */
+export function extendsError(types: TypeQueries, type: Type): boolean {
+  return types.memo(
+    'extendsError',
+    type.id,
+    (): boolean =>
+      getDeclaredBuiltinName(types, type) === 'Error' ||
+      getBuiltinBaseName(types, type) === 'Error' ||
+      getViewBases(type).some((view) =>
+        types.getMappedSourceMembers(view).some((source) => extendsError(types, source)),
+      ),
+  )
+}
+
+/**
  * Whether an interface extends a view of a built-in the serializer writes itself
  * (`interface Zoned extends Readonly<Date>`), whose instance `JSON.stringify` writes by its own
  * fields when `toJSON` returns it, as when extending the built-in (not a view of an error or a

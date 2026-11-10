@@ -1148,6 +1148,32 @@ describe('typeToJsonSchemaConverter', () => {
       }
     })
 
+    it('leaves members a package adds to Error out of required through a view of Error', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
+      })
+
+      try {
+        for (const direction of ['output', 'input'] as const) {
+          const converter = new TypeToJsonSchemaConverter(project.checker, project.program, {
+            direction,
+          })
+          const [schema] = converter.convert(project.getExportType('ErrorViews').type) as [
+            any,
+            boolean,
+          ]
+
+          // an instance does not write `~augments/reported`, as for `interface AppError extends Error`
+          for (const name of ['ReadonlyAppError', 'OmittedAppError']) {
+            expect(schema.$defs[name].properties).toHaveProperty(['~augments/reported'])
+            expect(schema.$defs[name].required).toEqual(['code'])
+          }
+        }
+      } finally {
+        project.close()
+      }
+    })
+
     it('treats interfaces as classes only when a library constructor creates them', () => {
       const project = openTypeScriptProject({
         file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),

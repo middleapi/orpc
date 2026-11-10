@@ -88,3 +88,19 @@ export interface BigIntArrays {
   signed: BigInt64Array
   unsigned: BigUint64Array
 }
+
+/** An error through a view of the augmented `Error` */
+export interface ReadonlyAppError extends Readonly<Error> {
+  code: string
+}
+
+/** An error through a view of the augmented `Error`, without its stack */
+export interface OmittedAppError extends Omit<Error, 'stack'> {
+  code: string
+}
+
+/** Errors through views of the augmented `Error` */
+export interface ErrorViews {
+  readonly: ReadonlyAppError
+  omitted: OmittedAppError
+}

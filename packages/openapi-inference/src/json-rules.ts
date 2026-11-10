@@ -4,6 +4,7 @@ import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/u
 
 import {
   extendsBuiltinClass,
+  extendsError,
   getBuiltin,
   getBuiltinBaseName,
   getToJSON,
@@ -57,7 +58,8 @@ export function getDataProperties(
 ): TSSymbol[] {
   const isClassInstance = classType !== undefined
   // members of `Error` subclasses from packages are not data either (`ZodError#issues` is a getter)
-  const isError = isClassInstance && getBuiltinBaseName(types, classType) === 'Error'
+  // (also of an interface extending a view of `Error`, `interface AppError extends Readonly<Error>`)
+  const isError = isClassInstance && extendsError(types, classType)
 
   return properties.filter(
     (p) =>
