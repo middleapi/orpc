@@ -58,6 +58,48 @@ export class DefNames {
    * of `Point`), see `DefRegistry.share`
    */
   readonly numbered = new Map<string, string>()
+  /** Names of a type in a mode, with the name of the type without it (`PointJson` of `Point`) */
+  readonly modes = new Map<string, string>()
+  /** How many registries have a def of each name */
+  private readonly holders = new Map<string, number>()
+
+  /**
+   * Records a def of a name in a registry.
+   */
+  hold(name: string): void {
+    this.holders.set(name, (this.holders.get(name) ?? 0) + 1)
+  }
+
+  /**
+   * Records a registry no longer has a def of a name, whose name stays given.
+   */
+  unhold(name: string): void {
+    const count = (this.holders.get(name) ?? 1) - 1
+    if (count > 0) {
+      this.holders.set(name, count)
+    } else {
+      this.holders.delete(name)
+    }
+  }
+
+  /**
+   * Frees the name of a def a registry no longer has, unless another one has a def of it (a type
+   * the registry of outputs shares the def of another mode of, which the one of inputs names the
+   * same), also for the type it named.
+   */
+  release(name: string, key?: number): void {
+    this.unhold(name)
+
+    if (this.holders.has(name)) {
+      return
+    }
+
+    this.used.delete(name)
+    this.modes.delete(name)
+    if (key !== undefined && this.byKey.get(key) === name) {
+      this.byKey.delete(key)
+    }
+  }
 }
 
 /**
@@ -118,11 +160,15 @@ export class DefRegistry {
       if (name !== base) {
         this.names.numbered.set(name, base)
       }
+      if (base !== preferredName) {
+        this.names.modes.set(name, preferredName)
+      }
     }
 
     const def: Def = { name, key }
     this.defs.set(key, def)
     this.defsByName.set(name, def)
+    this.names.hold(name)
     this.createdDefs.push(def)
     return def
   }
@@ -148,11 +194,15 @@ export class DefRegistry {
     }
 
     this.defsByName.delete(def.name)
-    this.names.used.delete(def.name)
+    this.names.release(def.name)
     def.name = name
     this.defsByName.set(name, def)
+    this.names.hold(name)
     this.names.byKey.set(def.key, name)
     this.names.used.add(name)
+    if (name !== preferredName) {
+      this.names.modes.set(name, preferredName)
+    }
   }
 
   /**
@@ -164,17 +214,19 @@ export class DefRegistry {
   }
 
   /**
-   * Replaces a def by another one (`{ $ref }`), freeing its name, when nothing refers to it:
-   * neither its schema nor the defs created while it was converted.
+   * Replaces a def by another one (`{ $ref }`), freeing its name unless the other registry of
+   * the program has a def of it, when nothing refers to it: neither its schema nor the defs
+   * created while it was converted.
    */
   replaceIfUnreferenced(def: Def, schema: JsonSchema): boolean {
     if (this.isReferenced(def)) {
       return false
     }
 
-    this.inline(def, schema)
-    this.names.byKey.delete(def.key)
-    this.names.used.delete(def.name)
+    this.defs.delete(def.key)
+    this.defsByName.delete(def.name)
+    this.names.release(def.name, def.key)
+    this.setAnonymous(def.key, schema, def.stable)
     return true
   }
 
@@ -382,9 +434,13 @@ export class DefRegistry {
     return stringifyJSON(schema)!
   }
 
+  /**
+   * Removes a def, whose name stays given (see `discardCreated`).
+   */
   private remove(def: Def): void {
     this.defs.delete(def.key)
     this.defsByName.delete(def.name)
+    this.names.unhold(def.name)
   }
 
   private getDeps(def: Def): Set<string> {

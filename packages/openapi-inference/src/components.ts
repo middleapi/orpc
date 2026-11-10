@@ -11,6 +11,8 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 export interface DefNameRecord {
   readonly used: ReadonlySet<string>
   readonly numbered: ReadonlyMap<string, string>
+  /** Names of a type in a mode, with the name of the type without it (`PointJson` of `Point`) */
+  readonly modes?: ReadonlyMap<string, string> | undefined
 }
 
 export interface MergeEquivalentComponentsOptions {
@@ -29,10 +31,11 @@ export interface MergeEquivalentComponentsOptions {
 }
 
 /**
- * Merges the components of defs of one name (but its number) describing the same values, which
- * the conversion emits apart for instantiations of one type within a cycle (`DeepNull<A>`, reached
- * once more through a union it distributes over), whose schemas only differ by the names of such
- * components they refer to.
+ * Merges the components of defs of one name (but its number or mode) describing the same values,
+ * which the conversion emits apart for instantiations of one type within a cycle (`DeepNull<A>`,
+ * reached once more through a union it distributes over), whose schemas only differ by the names
+ * of such components they refer to, and for a type converted the same in two modes by the
+ * converters of inputs and outputs (`Point` and `PointJson`), which takes the shorter name.
  * A numbered name then takes the name it was numbered after, once no component has it
  * (a def holding `DeepReadonly_A` was replaced by a reference to `DeepReadonly_A2`).
  * Rewrites the references of the whole document, in place.
@@ -76,7 +79,7 @@ export function mergeEquivalentComponents(
   let classes = new Map(
     candidates.map((name) => [
       name,
-      `${names.numbered.get(name) ?? name}\u0000${shapes.get(name)!.shape}`,
+      `${names.modes?.get(name) ?? names.numbered.get(name) ?? name}\u0000${shapes.get(name)!.shape}`,
     ]),
   )
 

@@ -56,4 +56,44 @@ describe('mergeEquivalentComponents', () => {
       paths: { '/shape': { get: { responses: { 200: { schema: shape('Circle') } } } } },
     })
   })
+
+  it('merges the components of a type in two modes described the same, by the shorter name', () => {
+    const point = { type: 'object', properties: { x: { type: 'number' } }, required: ['x'] }
+    const document = {
+      components: {
+        schemas: {
+          PointJson: point,
+          Point: point,
+          Holder: {
+            type: 'object',
+            properties: { point: { $ref: ref('PointJson') } },
+            required: ['point'],
+          },
+          Other: { ...point, description: 'Other' },
+          OtherJson: point,
+        },
+      },
+    }
+
+    mergeEquivalentComponents(document, {
+      used: new Set(Object.keys(document.components.schemas)),
+      numbered: new Map(),
+      modes: new Map([
+        ['PointJson', 'Point'],
+        ['OtherJson', 'Other'],
+      ]),
+    })
+
+    // only the same values are merged
+    expect(document.components.schemas).toEqual({
+      Point: point,
+      Holder: {
+        type: 'object',
+        properties: { point: { $ref: ref('Point') } },
+        required: ['point'],
+      },
+      Other: { ...point, description: 'Other' },
+      OtherJson: point,
+    })
+  })
 })

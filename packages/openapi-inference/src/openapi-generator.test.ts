@@ -160,6 +160,18 @@ import {
   roundSixtyOneReverse,
   roundSixtyOneSwapped,
 } from '../tests/fixtures/app/src/round61'
+import {
+  roundSixtyTwoHolderInObject,
+  roundSixtyTwoHolderInRoot,
+  roundSixtyTwoHolderInRootRoot,
+  roundSixtyTwoHolderRootInRoot,
+  roundSixtyTwoInObjectHolder,
+  roundSixtyTwoInRootHolder,
+  roundSixtyTwoInRootHolderRoot,
+  roundSixtyTwoInRootRootHolder,
+  roundSixtyTwoRootHolderInRoot,
+  roundSixtyTwoRootInRootHolder,
+} from '../tests/fixtures/app/src/round62'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3477,5 +3489,72 @@ describe('openAPIGenerator', () => {
       // only a `toJSON` that may be missing drops the function
       expect((spec.components?.schemas as any).FnViewHolder.required).toEqual(['json'])
     })
+  })
+
+  describe('round sixty-two', () => {
+    const routers = {
+      roundSixtyTwoHolderInObject,
+      roundSixtyTwoHolderInRoot,
+      roundSixtyTwoHolderInRootRoot,
+      roundSixtyTwoHolderRootInRoot,
+      roundSixtyTwoInObjectHolder,
+      roundSixtyTwoInRootHolder,
+      roundSixtyTwoInRootHolderRoot,
+      roundSixtyTwoInRootRootHolder,
+      roundSixtyTwoRootHolderInRoot,
+      roundSixtyTwoRootInRootHolder,
+    }
+    const generate = (name: keyof typeof routers) =>
+      generator.generate(routers[name], {
+        source: { file: fixture('round62.ts'), export: name },
+      })
+    const ref = { $ref: '#/components/schemas/SharedMaybeJson' }
+
+    it('names components the same whatever the order of procedures, also beside an input', async () => {
+      const orders = [
+        'roundSixtyTwoInRootRootHolder',
+        'roundSixtyTwoInRootHolderRoot',
+        'roundSixtyTwoRootInRootHolder',
+        'roundSixtyTwoRootHolderInRoot',
+        'roundSixtyTwoHolderInRootRoot',
+        'roundSixtyTwoHolderRootInRoot',
+      ] as const
+      const first = await generate(orders[0])
+
+      // the input, the output root, and the class field share one component
+      expect(Object.keys(first.components?.schemas ?? {}).toSorted()).toEqual([
+        'SharedMaybeJson',
+        'SharedMaybeJsonHolder',
+      ])
+      expect(
+        (first.paths as any)['/root'].post.responses['200'].content['application/json'].schema,
+      ).toEqual(ref)
+      expect((first.components?.schemas as any).SharedMaybeJsonHolder.properties.shared).toEqual(
+        ref,
+      )
+      for (const name of orders.slice(1)) {
+        expect(await generate(name)).toEqual(first)
+      }
+    })
+
+    it.each([
+      'roundSixtyTwoInObjectHolder',
+      'roundSixtyTwoHolderInObject',
+      'roundSixtyTwoInRootHolder',
+      'roundSixtyTwoHolderInRoot',
+    ] as const)(
+      'names a type converted the same in an input and a class field once: %s',
+      async (name) => {
+        const spec = await generate(name)
+
+        expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+          'SharedMaybeJson',
+          'SharedMaybeJsonHolder',
+        ])
+        expect((spec.components?.schemas as any).SharedMaybeJsonHolder.properties.shared).toEqual(
+          ref,
+        )
+      },
+    )
   })
 })
