@@ -207,9 +207,10 @@ export class ExpansionGuard {
   }
 
   /**
-   * An instantiation without type arguments (a conditional type resolved to a mapped type) shows
-   * no growth by them: it grows when it maps again over what an outer one with the same keys maps
-   * over, as a different type, which a cycle through it (`T extends object ? { [K in keyof T]:
+   * An instantiation whose type arguments show no growth (a conditional type resolved to a mapped
+   * type has none, a library's mapped type over one, `ReadonlyObjectDeep<{ ... }>`, shows nothing)
+   * grows when it maps again over what an outer one with the same keys maps over, as a different
+   * type, which a cycle through it (`T extends object ? { [K in keyof T]:
    * X<T[K]> } : T` over a model holding `X<Model>`, also `X<Model<T>>`) expands without end. It
    * does when it holds at each key what the outer one holds there (a mapping of the same keys
    * again), or what that grows to (`T[]` of `T`), as far as `MAX_GROWTH` mappings in. Another
@@ -218,10 +219,6 @@ export class ExpansionGuard {
    * near, so both are expanded in full.
    */
   private getRepeatedGrowth(stack: readonly Expansion[], type: Type): number {
-    if (this.types.getTypeArguments(type).length) {
-      return 0
-    }
-
     const keys = this.getKeys(type)
 
     if (keys === undefined) {

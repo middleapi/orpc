@@ -236,14 +236,20 @@ export function getDeclaredBuiltinName(types: TypeQueries, type: Type): string |
  * Also through a mapped type, like `Readonly<Date>`.
  */
 export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | undefined {
-  const builtin = getDeclaredBuiltinName(types, type) ?? getMappedBuiltinName(types, type)
+  // a library interface without a global of its name (`Iterable<T>`, `ArrayLike<T>`,
+  // `PromiseFulfilledResult<T>`) describes other values, written by their members
+  const builtin =
+    ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Value
+      ? getDeclaredBuiltinName(types, type)
+      : undefined) ?? getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {
     return undefined
   }
 
-  // boxed primitives are written as their primitive (`new String('x')` as `"x"`)
-  return BOXED_PRIMITIVES[builtin]?.(true) ?? { type: 'object' }
+  // boxed primitives are written as their primitive (`new String('x')` as `"x"`), and an `Object`
+  // is any value but `null` and `undefined`
+  return BOXED_PRIMITIVES[builtin]?.(true) ?? (builtin === 'Object' ? {} : { type: 'object' })
 }
 
 /**

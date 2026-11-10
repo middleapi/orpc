@@ -292,6 +292,11 @@ describe('generated schemas match serialized outputs', async () => {
     ['viaDeepMaps', undefined],
     ['viaSelfLists', undefined],
     ['viaSelfRecords', undefined],
+    ['toIterables', undefined],
+    ['toArrayLikes', undefined],
+    ['toObjects', undefined],
+    ['toSettled', undefined],
+    ['readonlyDeepLink', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2505,6 +2510,30 @@ describe('generated schemas match serialized outputs', async () => {
         expect(itemsOf(name).anyOf).toBeDefined()
         expect(itemsOf(name).discriminator).toBeUndefined()
       }
+    })
+  })
+
+  describe('round forty-two', () => {
+    const schemaOf = (name: string) =>
+      (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+
+    it('writes what toJSON returns of a library interface by its members', () => {
+      const schemas = spec.components?.schemas as any
+
+      // an array, a string, or a set satisfy `Iterable<number>`
+      expect(schemas.ToIterable).toEqual({ description: expect.any(String) })
+      expect(schemas.ToArrayLike.anyOf).toContainEqual({ type: 'array', items: { type: 'string' } })
+      expect(schemas.ToObject).toEqual({ description: expect.any(String) })
+      expect(schemas.ToSettled.anyOf).toContainEqual({
+        type: 'object',
+        properties: { status: { type: 'string', const: 'fulfilled' }, value: { type: 'number' } },
+        required: ['status', 'value'],
+      })
+    })
+
+    it('cuts a cycle through an expanding view under a deep mapped type of a library', () => {
+      // each level was a new instantiation of the library's mapped type, expanded 64 levels deep
+      expect(JSON.stringify(schemaOf('readonlyDeepLink')).length).toBeLessThan(1000)
     })
   })
 
