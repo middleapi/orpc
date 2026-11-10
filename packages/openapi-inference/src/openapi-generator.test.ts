@@ -65,6 +65,7 @@ import { roundThirtySixInputs } from '../tests/fixtures/app/src/round36'
 import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
 import { roundThirtyEightJSDoc } from '../tests/fixtures/app/src/round38'
 import { roundThirtyNine, roundThirtyNineInputs } from '../tests/fixtures/app/src/round39'
+import { roundFortyFour } from '../tests/fixtures/app/src/round44'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2636,6 +2637,37 @@ describe('openAPIGenerator', () => {
         'radius',
         'size',
       ])
+    })
+  })
+
+  describe('round forty-four', () => {
+    it('makes components of the models of a cycle with defs: recursive', async () => {
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(roundFortyFour, {
+        source: { file: fixture('round44.ts'), export: 'roundFortyFour' },
+      })
+
+      // each refers to itself through the others, so none is written again at each use
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+        'LinkedComment',
+        'LinkedPost',
+        'LinkedUser',
+      ])
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify({
+            $defs: spec.components?.schemas,
+            ...(spec.paths as any)['/linkedUser'].post.responses['200'].content['application/json']
+              .schema,
+          }).replaceAll('#/components/schemas/', '#/$defs/'),
+        ),
+      )
+      const output = await call(roundFortyFour.linkedUser, undefined)
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
+      )
+      expect(validate(json) ? [] : validate.errors).toEqual([])
     })
   })
 })

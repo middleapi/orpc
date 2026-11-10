@@ -203,19 +203,22 @@ export function getLeafBuiltinSchema(name: string): ObjectJsonSchema | undefined
   return undefined
 }
 
-export function setSchema(items: JsonSchema): ObjectJsonSchema {
+/**
+ * The schema of a `Set`, of unique items when they are `primitives` written as distinct JSON:
+ * distinct objects may be written the same, like two instances of a class by their `toJSON`.
+ */
+export function setSchema(items: JsonSchema, primitives: boolean): ObjectJsonSchema {
   return {
     'type': 'array',
-    ...(writesDistinct(items) ? { uniqueItems: true } : {}),
+    ...(primitives && writesDistinct(items) ? { uniqueItems: true } : {}),
     items,
     'x-native-type': JsonSchemaXNativeType.Set,
   }
 }
 
 /**
- * Whether distinct values of a schema are written as distinct JSON, so the items of a `Set` are
- * unique: primitives and literals, not objects, arrays, dates, or URLs, which distinct values may
- * be written the same as.
+ * Whether distinct primitives of a schema are written as distinct JSON: strings, numbers, and
+ * literals, not of different types, or dates, which distinct values may be written the same as.
  */
 function writesDistinct(schema: JsonSchema): boolean {
   if (typeof schema !== 'object') {

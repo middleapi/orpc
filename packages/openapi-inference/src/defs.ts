@@ -202,6 +202,17 @@ export class DefRegistry {
     )
   }
 
+  /**
+   * Whether a schema refers to a def being converted, which the type it describes is then in a
+   * cycle with.
+   */
+  refersToConverting(schema: JsonSchema): boolean {
+    return [...collectDefRefs(schema)].some((name) => {
+      const def = this.defsByName.get(name)
+      return def !== undefined && def.schema === undefined
+    })
+  }
+
   setAnonymous(key: number, schema: JsonSchema, stable = true): void {
     this.anonymous.set(key, schema)
     this.createdAnonymous.push({ key, stable })

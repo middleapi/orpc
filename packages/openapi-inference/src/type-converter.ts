@@ -567,6 +567,22 @@ export class TypeToJsonSchemaConverter {
       return { $ref: toRef(def.name) }
     }
 
+    // with `defs: 'recursive'`, a model or a view of a class referring to a def being converted
+    // is in a cycle with it, so it refers to itself: a def too, which keeps a graph of models
+    // from being written again at each use
+    const cycleName =
+      this.defsMode === 'recursive' && enteredAt === undefined
+        ? (this.getProjectClassViewName(type) ??
+          (this.cycles.hasCycleName(type) ? getFallbackDefName(this.types, type) : undefined))
+        : undefined
+
+    if (cycleName !== undefined && this.defs.refersToConverting(schema)) {
+      const created = this.defs.create(key, cycleName)
+      created.schema = schema
+      created.stable = cuts === this.expansion.cuts
+      return { $ref: toRef(created.name) }
+    }
+
     // reuse it for siblings, `{ a: C<N>; b: C<N> }` would otherwise grow exponentially in time
     if (enteredAt === undefined && cuts === this.expansion.cuts) {
       this.defs.setAnonymous(key, schema)
@@ -1368,7 +1384,10 @@ export class TypeToJsonSchemaConverter {
       case 'array':
         return { type: 'array', items: this.visitElement(builtin.items) }
       case 'set':
-        return setSchema(this.visitElements(builtin.items))
+        return setSchema(
+          this.visitElements(builtin.items),
+          builtin.items.every((item) => isPrimitive(this.types, item)),
+        )
       case 'map':
         return mapSchema({
           type: 'array',
@@ -2040,6 +2059,20 @@ export class TypeToJsonSchemaConverter {
 }
 
 /**
+ * Whether the values of a type are primitives, also branded ones (`string & { __brand: 'Id' }`),
+ * not objects, which distinct values of may be written the same.
+ */
+function isPrimitive(types: TypeQueries, type: Type): boolean {
+  return types
+    .getUnionMembers(type)
+    .every(
+      (m) =>
+        m.flags & PRIMITIVE_FLAGS ||
+        (m.isIntersectionType() && types.getMembers(m).some((p) => p.flags & PRIMITIVE_FLAGS)),
+    )
+}
+
+/**
  * A schema also accepting any object, which subsumes its object branches.
  */
 function withAnyObject(schema: JsonSchema): JsonSchema {
@@ -2227,7 +2260,7 @@ class AnonymousCycles {
     return this.stack.slice(start + 1).find((entry) => this.hasCycleName(entry.type))
   }
 
-  private hasCycleName(type: Type): boolean {
+  hasCycleName(type: Type): boolean {
     const symbol = getNamedSymbol(type)
 
     return Boolean(
