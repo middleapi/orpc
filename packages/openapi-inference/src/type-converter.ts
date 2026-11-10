@@ -25,6 +25,7 @@ import {
   getBoxedPrimitiveSchema,
   getBuiltinBaseName,
   getBuiltinFields,
+  getExtendedPrimitiveSchema,
   getNumberIndexType,
   getStringifiedForm,
   getTypedArrayViewBases,
@@ -1012,7 +1013,13 @@ export class TypeToJsonSchemaConverter {
         this.convertObject(type, { ...options, ignoreToJSON: true }),
       )
 
-      return results.length ? anyOfDeduped([...this.convertToJSONResults(results), fields]) : fields
+      return results.length
+        ? anyOfDeduped([
+            ...this.convertToJSONResults(results),
+            ...this.getPrimitiveWithoutToJSON(type, [type]),
+            fields,
+          ])
+        : fields
     }
 
     if (instanceClass && !ownFields) {
@@ -1108,6 +1115,7 @@ export class TypeToJsonSchemaConverter {
       const fields = this.convertObject(type, { ignoreToJSON: true, plain, ownFields })
       return anyOfDeduped([
         ...converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!)),
+        ...this.getPrimitiveWithoutToJSON(type, jsonSources),
         fields,
       ])
     }
@@ -2050,6 +2058,18 @@ export class TypeToJsonSchemaConverter {
     const source = this.types.getMappedSource(type)
     const base = source && getBuiltinBaseName(this.types, source)
     return base === 'Array' || base === 'ReadonlyArray'
+  }
+
+  /**
+   * The primitive a value of a type extending a boxed primitive is written as when the `toJSON` of
+   * one of `sources` may be missing (`interface N extends Number { toJSON?(): string }`,
+   * `Partial<INum>`): a primitive or a boxed one, besides a plain object of its fields.
+   */
+  private getPrimitiveWithoutToJSON(type: Type, sources: readonly Type[]): JsonSchema[] {
+    const primitive = sources.some((source) => hasOptionalToJSON(this.types, source))
+      ? getExtendedPrimitiveSchema(this.types, type)
+      : undefined
+    return primitive ? [primitive] : []
   }
 
   /**

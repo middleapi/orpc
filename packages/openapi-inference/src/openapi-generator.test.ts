@@ -145,8 +145,11 @@ import {
   boxedNumLikes,
   functionJsonFn,
   numViewJsons,
+  OptionalJsonHolder,
+  optionalJsons,
   plainJsonFn,
   plainNumLikes,
+  plainOptionalJsons,
   roundSixtyInputs,
   weakHolder,
 } from '../tests/fixtures/app/src/round60'
@@ -3415,6 +3418,9 @@ describe('openAPIGenerator', () => {
         ['numViewJsons', numViewJsons()],
         ['numLikes', plainNumLikes()],
         ['numLikes', boxedNumLikes()],
+        ['optionalJsons', optionalJsons()],
+        ['optionalJsons', plainOptionalJsons()],
+        ['optionalJsonHolder', new OptionalJsonHolder()],
       ] as const) {
         const validate = ajv.compile(body(`/${name}`))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
@@ -3424,6 +3430,10 @@ describe('openAPIGenerator', () => {
       expect(schemas.WeakLookupClass).not.toHaveProperty('type')
       expect(schemas.PlainJsonFn).toMatchObject({
         anyOf: [{ type: 'string' }, { type: 'object' }],
+      })
+      // without its optional `toJSON`, a value is also the primitive, or a boxed one
+      expect(schemas.OptJsonNum).toMatchObject({
+        anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'object' }],
       })
     })
   })

@@ -375,6 +375,12 @@ describe('generated schemas match serialized outputs', async () => {
     ['numViewJsons', undefined],
     ['plainNumLikes', undefined],
     ['boxedNumLikes', undefined],
+    ['optionalJsons', undefined],
+    ['optJsonNumRoot', undefined],
+    ['optJsonBoolRoot', undefined],
+    ['partialJsonNumRoot', undefined],
+    ['plainOptionalJsons', undefined],
+    ['optionalJsonHolder', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -428,6 +434,16 @@ describe('generated schemas match serialized outputs', async () => {
     expect(schemas.NumLike).toMatchObject({ anyOf: [{ type: 'number' }, { type: 'object' }] })
     expect(schemas.FieldedNumLike).toMatchObject({
       anyOf: [{ type: 'number' }, { type: 'object', required: ['x'] }],
+    })
+    // without its optional `toJSON`, a value is also the primitive, or a boxed one
+    expect(schemas.OptJsonNum).toMatchObject({
+      anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'object' }],
+    })
+    expect(schemas.OptJsonBool).toMatchObject({
+      anyOf: [{ type: 'string' }, { type: 'boolean' }, { type: 'object' }],
+    })
+    expect(schemas.OptionalJsons.properties.partial).toMatchObject({
+      anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'object' }],
     })
   })
 

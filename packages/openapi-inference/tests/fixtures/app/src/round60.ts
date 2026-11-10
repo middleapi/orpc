@@ -125,6 +125,87 @@ export const boxedNumLikes = (): NumLikes => ({
   fielded: Object.assign(new Number(2), { x: 'a' }),
 })
 
+/** A project interface extending `Number` with an optional `toJSON` */
+export interface OptJsonNum extends Number {
+  toJSON?(): string
+}
+
+/** A project interface extending `Boolean` with an optional `toJSON` */
+export interface OptJsonBool extends Boolean {
+  toJSON?(): string
+}
+
+/** A project interface extending `String` with an optional `toJSON` */
+export interface OptJsonStr extends String {
+  toJSON?(): number
+}
+
+/** A project interface extending `Number` with its own `toJSON` */
+export interface ReqJsonNum extends Number {
+  toJSON(): string
+}
+
+/** Interfaces extending boxed primitives whose `toJSON` may be missing, and views of them */
+export interface OptionalJsons {
+  num: OptJsonNum
+  boxedNum: OptJsonNum
+  jsonNum: OptJsonNum
+  bool: OptJsonBool
+  boxedBool: OptJsonBool
+  str: OptJsonStr
+  partial: Partial<ReqJsonNum>
+  boxedPartial: Partial<ReqJsonNum>
+  readonlyNum: Readonly<OptJsonNum>
+  codedNum: OptJsonNum & { code: number }
+  pickedNum: Pick<OptJsonNum, 'toJSON' | 'valueOf'>
+  readonlyBool: Readonly<OptJsonBool>
+}
+
+// the primitives and boxed values they hold, and an instance with a `toJSON`
+export const optionalJsons = (): OptionalJsons => ({
+  num: 1,
+  boxedNum: new Number(2),
+  jsonNum: jsonNum(),
+  bool: true,
+  boxedBool: new Boolean(false),
+  str: 's',
+  partial: 3,
+  boxedPartial: new Number(4),
+  readonlyNum: 5,
+  codedNum: Object.assign(new Number(6), { code: 1 }),
+  pickedNum: 7,
+  readonlyBool: false,
+})
+
+/** Plain objects of them without `toJSON`, written by their fields */
+export const plainOptionalJsons = (): OptionalJsons => {
+  const num = { ...numberMethods }
+  const bool = { valueOf: () => true }
+  return {
+    ...optionalJsons(),
+    num,
+    jsonNum: { ...num, toJSON: () => 'p' },
+    bool,
+    partial: num,
+    readonlyNum: num,
+    codedNum: { ...num, code: 1 },
+    pickedNum: { valueOf: () => 1 },
+    readonlyBool: bool,
+  }
+}
+
+/**
+ * A class holding views of them, whose fields `JSON.stringify` writes (views, as a named type
+ * converted the same in both modes takes the name of the first mode reached)
+ */
+export class OptionalJsonHolder {
+  num: Readonly<OptJsonNum> = 1
+  boxedNum: OptJsonNum & { code?: number } = new Number(2)
+  jsonNum: Readonly<OptJsonNum> = jsonNum()
+  bool: Readonly<OptJsonBool> = true
+  partial: Partial<ReqJsonNum> = new Number(3)
+}
+
 export const roundSixty = {
   weakHolder: os.handler(weakHolder),
   plainJsonFnRoot: os.handler(plainJsonFn),
@@ -133,6 +214,12 @@ export const roundSixty = {
   numViewJsons: os.handler(numViewJsons),
   plainNumLikes: os.handler(plainNumLikes),
   boxedNumLikes: os.handler(boxedNumLikes),
+  optionalJsons: os.handler(optionalJsons),
+  optJsonNumRoot: os.handler((): OptJsonNum => 1),
+  optJsonBoolRoot: os.handler((): OptJsonBool => true),
+  partialJsonNumRoot: os.handler((): Partial<ReqJsonNum> => new Number(1)),
+  plainOptionalJsons: os.handler(plainOptionalJsons),
+  optionalJsonHolder: os.handler(() => new OptionalJsonHolder()),
 }
 
 export const roundSixtyInputs = {
@@ -141,4 +228,6 @@ export const roundSixtyInputs = {
   plainJsonFnHolder: os.input(type<PlainJsonFnHolder>()).handler(() => 1),
   numViewJsons: os.input(type<NumViewJsons>()).handler(() => 1),
   numLikes: os.input(type<NumLikes>()).handler(() => 1),
+  optionalJsons: os.input(type<OptionalJsons>()).handler(() => 1),
+  optionalJsonHolder: os.input(type<OptionalJsonHolder>()).handler(() => 1),
 }

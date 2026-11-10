@@ -655,6 +655,15 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
  * value is the primitive or a boxed one, written apart, or a plain object.
  */
 export function extendsBoxedPrimitive(types: TypeQueries, view: Type): boolean {
+  return getExtendedPrimitiveSchema(types, view) !== undefined
+}
+
+/**
+ * How `JSON.stringify` writes the boxed primitive a class or an interface extends, also through a
+ * view of it or an intersection with it (`Partial<INum>`, `INum & { code: number }`), as its
+ * primitive.
+ */
+export function getExtendedPrimitiveSchema(types: TypeQueries, view: Type): JsonSchema | undefined {
   const members =
     (view as any).objectFlags & ObjectFlags.Mapped
       ? types.getMappedSourceMembers(view)
@@ -663,15 +672,15 @@ export function extendsBoxedPrimitive(types: TypeQueries, view: Type): boolean {
         : undefined
 
   if (members) {
-    return members.some((member) => extendsBoxedPrimitive(types, member))
+    return members
+      .map((member) => getExtendedPrimitiveSchema(types, member))
+      .find((schema) => schema !== undefined)
   }
 
   const symbol = view.getSymbol()
-  return (
-    symbol !== undefined &&
-    Boolean(symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)) &&
-    getBoxedPrimitiveSchema(types, view) !== undefined
-  )
+  return symbol !== undefined && symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
+    ? getBoxedPrimitiveSchema(types, view)
+    : undefined
 }
 
 /**
