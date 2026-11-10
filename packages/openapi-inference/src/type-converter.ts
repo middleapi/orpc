@@ -1306,13 +1306,14 @@ export class TypeToJsonSchemaConverter {
     }
 
     // an array-like view may also hold a plain object, and an array or a string may satisfy
-    // an object type by its members (`ArrayLike<number>`, `Record<number, string>`)
+    // an object type by its members (`ArrayLike<number>`, `{ filter?: object }`): forms written
+    // in place of the fields, which an input split into parameters is not read by
     const forms = arrayLike
       ? [arrayLike.schema]
       : classType || typedArray
         ? []
         : this.convertStructuralForms(type, properties)
-    return forms.length ? anyOfDeduped([...forms, schema]) : schema
+    return forms.length ? anyOfDeduped([...forms.map(writtenForm), schema]) : schema
   }
 
   /**

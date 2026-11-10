@@ -85,6 +85,28 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
   }
 }
 
+/**
+ * Converts the Standard JSON Schemas it can: one that throws (like a Zod date, which JSON Schema
+ * can not represent) is inferred from its type, instead of documented as any value.
+ */
+class ConvertibleStandardJsonSchemaConverter extends StandardJsonSchemaConverter {
+  override condition(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): boolean {
+    if (!super.condition(schema, direction)) {
+      return false
+    }
+
+    try {
+      ;(schema!['~standard'] as any).jsonSchema[direction]({ target: 'draft-2020-12' })
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
 interface InferenceContext {
   checker: Checker
   program: Program
@@ -139,7 +161,7 @@ export class OpenAPIGenerator {
   private readonly generator: BaseOpenAPIGenerator
 
   constructor(private readonly options: OpenAPIGeneratorOptions = {}) {
-    this.converters = [...toArray(options.converters), new StandardJsonSchemaConverter()]
+    this.converters = [...toArray(options.converters), new ConvertibleStandardJsonSchemaConverter()]
     this.generator = new BaseOpenAPIGenerator({
       ...options,
       converters: [new InferredJsonSchemaConverter(), ...toArray(options.converters)],

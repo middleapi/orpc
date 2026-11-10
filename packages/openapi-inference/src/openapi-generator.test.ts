@@ -188,6 +188,7 @@ import {
   roundSixtySeven,
   roundSixtySevenInputs,
 } from '../tests/fixtures/app/src/round67'
+import { roundSixtyEight, roundSixtyEightZod } from '../tests/fixtures/app/src/round68'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3739,6 +3740,95 @@ describe('openAPIGenerator', () => {
         const json = JSON.parse(sent.at(-1)!)
         expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
       }
+    })
+  })
+
+  describe('round sixty-eight', () => {
+    it('documents inputs split into parameters by their fields, also of object types an array satisfies by its members', async () => {
+      const spec = await generator.generate(roundSixtyEight, {
+        source: { file: fixture('round68.ts'), export: 'roundSixtyEight' },
+      })
+      const paths = spec.paths as any
+      const parameters = (path: string, method: string) =>
+        paths[path][method].parameters.map((p: any) => [p.in, p.name, p.schema, p.required])
+
+      expect(parameters('/loose-filter', 'get')).toEqual([
+        ['query', 'filter', {}, undefined],
+        ['query', 'page', { type: 'number' }, undefined],
+      ])
+      expect(parameters('/object-sort/{id}', 'get')).toEqual([
+        ['path', 'id', { type: 'string' }, true],
+        ['query', 'sort', {}, undefined],
+      ])
+      expect(parameters('/detailed-values', 'post')).toEqual([['query', 'values', {}, undefined]])
+      // a body may still be an array
+      expect(paths['/detailed-values'].post.requestBody.content['application/json'].schema).toEqual(
+        {
+          anyOf: [
+            { type: 'array', items: {} },
+            { type: 'object', properties: { filter: {} } },
+          ],
+        },
+      )
+
+      // what a client sends, which the server accepts
+      const handler = new OpenAPIHandler(roundSixtyEight)
+      const sent: Request[] = []
+      const link = new OpenAPILink(roundSixtyEight, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+
+      await expect(
+        link.call(['looseFilter'], { filter: { status: 'a' }, page: 2 }, { context: {} }),
+      ).resolves.toBe(1)
+      expect(new URL(sent.at(-1)!.url).search).toBe('?filter%5Bstatus%5D=a&page=2')
+      await expect(
+        link.call(['objectSort'], { id: 'i', sort: { by: 'name' } }, { context: {} }),
+      ).resolves.toBe(1)
+      expect(new URL(sent.at(-1)!.url).search).toBe('?sort%5Bby%5D=name')
+    })
+
+    it('infers the types of Standard JSON Schemas that can not be converted', async () => {
+      const spec = await new OpenAPIGenerator().generate(roundSixtyEightZod, {
+        source: { file: fixture('round68.ts'), export: 'roundSixtyEightZod' },
+      })
+      const paths = spec.paths as any
+      const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+
+      expect(
+        paths['/search'].get.parameters.map((p: any) => [p.in, p.name, p.schema, p.required]),
+      ).toEqual([
+        ['query', 'q', { type: 'string' }, undefined],
+        ['query', 'from', {}, undefined],
+      ])
+      expect(paths['/stamp'].post.requestBody.content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: { at: date, note: { type: 'string' } },
+        required: ['at', 'note'],
+      })
+      expect(paths['/stamp'].post.responses['200'].content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: { at: date },
+        required: ['at'],
+      })
+
+      // the server accepts what a client sends, and its output matches
+      const handler = new OpenAPIHandler(roundSixtyEightZod)
+      const link = new OpenAPILink(roundSixtyEightZod, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) =>
+          (await handler.handle(new Request(request, init))).response!,
+      })
+      await expect(
+        link.call(['search'], { q: 'a', from: new Date(0) }, { context: {} }),
+      ).resolves.toBe(1)
     })
   })
 })
