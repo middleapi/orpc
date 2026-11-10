@@ -624,13 +624,18 @@ export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined 
 }
 
 /**
- * Whether a type has the `toJSON` of a built-in, as a view of it keeps (`Readonly<Date>`,
- * `Pick<Date, 'toJSON'>`), so it adds none to the built-in.
+ * Whether a type has only the `toJSON` of a built-in, as a view of it keeps (`Readonly<Date>`,
+ * `Pick<Date, 'toJSON'>`), so it adds none to the built-in. Every declaration counts: the
+ * `toJSON` of `Readonly<Date & { toJSON(): number }>` also has the date's own.
  */
 export function hasToJSONOf(types: TypeQueries, type: Type, builtin: Type): boolean {
-  const own = getToJSON(types, builtin)?.declarations[0]
-  const other = getToJSON(types, type)?.declarations[0]
-  return own !== undefined && other?.path === own.path && other.index === own.index
+  const own = getToJSON(types, builtin)?.declarations ?? []
+  const other = getToJSON(types, type)?.declarations ?? []
+  return (
+    own.length > 0 &&
+    other.length > 0 &&
+    other.every((d) => own.some((o) => o.path === d.path && o.index === d.index))
+  )
 }
 
 function hasOwnToJSON(types: TypeQueries, type: Type): boolean {

@@ -21,6 +21,21 @@ export class UndefPointImpl implements UndefPoint {
   }
 }
 
+/** Dates intersected with views of a date that also adds a `toJSON`, in either order */
+export class AddedDateViewHolder {
+  drx: Date & Readonly<Date & { toJSON(): number }> = Object.assign(new Date(0), {
+    toJSON: () => 2,
+  })
+
+  dpx: Date & Pick<Date & { toJSON(): number }, 'toJSON'> = Object.assign(new Date(0), {
+    toJSON: () => 3,
+  })
+
+  drs: Date & Readonly<{ toJSON(): number } & Date> = Object.assign(new Date(0), {
+    toJSON: () => 4,
+  })
+}
+
 export const roundFifty = {
   dateViewHolder: os.handler((): DateViewHolder => new DateViewHolder()),
   plainUndefPoint: os.handler((): { p: UndefPoint; n: number } => ({
@@ -32,4 +47,5 @@ export const roundFifty = {
 export const roundFiftyInputs = {
   dateViewHolder: os.input(type<DateViewHolder>()).handler(() => 1),
   undefPoint: os.input(type<{ p: UndefPoint; n: number }>()).handler(() => 1),
+  addedDateViewHolder: os.input(type<AddedDateViewHolder>()).handler(() => 1),
 }

@@ -86,7 +86,12 @@ import {
   labelledError,
   roundFortyEightInputs,
 } from '../tests/fixtures/app/src/round48'
-import { DateViewHolder, roundFiftyInputs, UndefPointImpl } from '../tests/fixtures/app/src/round50'
+import {
+  AddedDateViewHolder,
+  DateViewHolder,
+  roundFiftyInputs,
+  UndefPointImpl,
+} from '../tests/fixtures/app/src/round50'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2847,6 +2852,7 @@ describe('openAPIGenerator', () => {
 
       for (const [name, value] of [
         ['dateViewHolder', new DateViewHolder()],
+        ['addedDateViewHolder', new AddedDateViewHolder()],
         ['undefPoint', { p: new UndefPointImpl(), n: 1 }],
         ['undefPoint', { p: { x: 1 }, n: 1 }],
       ] as const) {
