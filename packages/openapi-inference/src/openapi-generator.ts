@@ -309,10 +309,12 @@ export class OpenAPIGenerator {
           meta?.method === 'HEAD' ||
           `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
         inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
+        partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
       },
       output: {
         inlineRoot: outputDetailed,
         inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
+        partialProperties: outputDetailed ? ['headers'] : undefined,
       },
     }
 

@@ -1,7 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
-import { collectDefRefs, fromRef, objectMembers, toRef } from './schema-utils'
+import { collectDefRefs, fromRef, objectMembers, toRef, withoutRequired } from './schema-utils'
 
 /**
  * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class
@@ -286,19 +286,24 @@ export class DefRegistry {
   /**
    * Inlines the root def, the defs of a root union, and the defs of `properties` of the root
    * (or of each root union member), unless they are recursive. Their parts are read by their
-   * fields, so only the members holding fields are kept.
+   * fields, so only the members a client sends the fields of are kept, also of the defs they
+   * refer to. The fields of `partialProperties` are sent each on their own, so when one of
+   * them may be missing, so may each of its fields.
    */
-  inlineRoot(schema: JsonSchema, properties: readonly string[]): JsonSchema {
-    const inlineRef = (member: JsonSchema): JsonSchema => {
+  inlineRoot(
+    schema: JsonSchema,
+    properties: readonly string[],
+    partialProperties: readonly string[] = [],
+  ): JsonSchema {
+    const resolve = (member: JsonSchema): JsonSchema | undefined => {
       const name = fromRef(member)
       const def = name === undefined ? undefined : this.defsByName.get(name)
 
-      if (!def || this.collectDeps(this.getDeps(def)).has(def.name)) {
-        return objectMembers(member)
-      }
-
-      return objectMembers(def.schema!)
+      return !def || this.collectDeps(this.getDeps(def)).has(def.name) ? undefined : def.schema!
     }
+
+    const inlineRef = (member: JsonSchema): JsonSchema =>
+      objectMembers(resolve(member) ?? member, resolve)
 
     const inlineProperties = (member: JsonSchema): JsonSchema => {
       const inlined = inlineRef(member)
@@ -317,13 +322,41 @@ export class DefRegistry {
       return { ...inlined, properties: inlinedProperties }
     }
 
-    const root = inlineProperties(schema)
+    let root = inlineProperties(schema)
 
     if (typeof root === 'object' && root.anyOf) {
-      return objectMembers({ ...root, anyOf: root.anyOf.map(inlineProperties) })
+      root = objectMembers({ ...root, anyOf: root.anyOf.map(inlineProperties) }, resolve)
     }
 
-    return root
+    const members = typeof root === 'object' ? (root.anyOf ?? [root]) : []
+    const partial = partialProperties.filter((property) =>
+      members.some(
+        (m) => typeof m === 'object' && m.$ref === undefined && !m.required?.includes(property),
+      ),
+    )
+
+    if (!partial.length) {
+      return root
+    }
+
+    const withPartial = (member: JsonSchema): JsonSchema => {
+      if (typeof member !== 'object' || !member.properties) {
+        return member
+      }
+
+      const memberProperties = { ...member.properties }
+      for (const property of partial) {
+        if (memberProperties[property] !== undefined) {
+          memberProperties[property] = withoutRequired(memberProperties[property])
+        }
+      }
+
+      return { ...member, properties: memberProperties }
+    }
+
+    return typeof root === 'object' && root.anyOf
+      ? { ...root, anyOf: root.anyOf.map(withPartial) }
+      : withPartial(root)
   }
 
   /**

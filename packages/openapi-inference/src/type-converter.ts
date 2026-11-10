@@ -72,6 +72,7 @@ import {
   toRef,
   withDiscriminators,
   withNull,
+  writtenForm,
 } from './schema-utils'
 import {
   getNamedSymbol,
@@ -136,6 +137,12 @@ export interface TypeToJsonSchemaConvertOptions {
    * like `params` and `query` of a detailed input, or `status` and `headers` of a detailed output.
    */
   inlineProperties?: readonly string[] | undefined
+
+  /**
+   * With `inlineRoot`, the root properties whose fields are sent each on their own, like `query`
+   * and `headers` of a detailed input: when one may be missing, so may each of its fields.
+   */
+  partialProperties?: readonly string[] | undefined
 
   /**
    * Describe the value a `Promise` type resolves to, like a handler's result or a yielded value.
@@ -275,7 +282,11 @@ export class TypeToJsonSchemaConverter {
       schema = values.length === 1 ? this.visit(values[0]!) : this.convertMembers(serializable)
 
       if (options.inlineRoot) {
-        schema = this.defs.inlineRoot(schema, options.inlineProperties ?? [])
+        schema = this.defs.inlineRoot(
+          schema,
+          options.inlineProperties ?? [],
+          options.partialProperties,
+        )
       }
 
       $defs = this.defs.getReferencedDefs(schema)
@@ -993,6 +1004,7 @@ export class TypeToJsonSchemaConverter {
       const subclasses = classes
         .map((c) => this.convertBuiltinObject(c))
         .filter((schema): schema is JsonSchema => schema !== undefined)
+        .map(writtenForm)
 
       if (subclasses.length) {
         // an instance is written as the built-in, a plain object (or an instance of a class
@@ -1694,7 +1706,7 @@ export class TypeToJsonSchemaConverter {
    */
   private convertToJSONResults(results: readonly Type[]): JsonSchema[] {
     return this.withMode('stringify', () =>
-      results.map((result) => this.convertToJSONResult(result)),
+      results.map((result) => writtenForm(this.convertToJSONResult(result))),
     )
   }
 
@@ -1852,7 +1864,7 @@ export class TypeToJsonSchemaConverter {
     // `JSON.stringify` writes a `Set` as `{}`, which also covers its plain object
     return isPlain(builtin, 'object') && typeof fields === 'object' && fields.type === 'object'
       ? builtin
-      : anyOfDeduped([builtin, fields])
+      : anyOfDeduped([writtenForm(builtin), fields])
   }
 
   /**

@@ -260,47 +260,107 @@ export function withNull(schema: JsonSchema): JsonSchema {
   return { anyOf: [schema, { type: 'null' }] }
 }
 
+/**
+ * Schemas without duplicates, keeping the first of equal ones, or a declared one over what
+ * a value writes (see {@link writtenForm}).
+ */
 export function dedupe(schemas: JsonSchema[]): JsonSchema[] {
-  const seen = new Set<string | undefined>()
+  const indexes = new Map<string | undefined, number>()
+  const deduped: JsonSchema[] = []
 
-  return schemas.filter((schema) => {
+  for (const schema of schemas) {
     const key = stringifyJSON(schema)
-    if (seen.has(key)) {
-      return false
+    const index = indexes.get(key)
+
+    if (index === undefined) {
+      indexes.set(key, deduped.length)
+      deduped.push(schema)
+    } else if (isWrittenForm(deduped[index]!) && !isWrittenForm(schema)) {
+      deduped[index] = schema
     }
-    seen.add(key)
-    return true
-  })
+  }
+
+  return deduped
+}
+
+/** Schemas of what a value writes in place of its fields, see {@link writtenForm} */
+const WRITTEN_FORMS = new WeakSet()
+
+/**
+ * Marks a schema of what a value writes in place of its fields, like what `toJSON` returns or
+ * the built-in a class extends, which an input split into parameters is not read by.
+ */
+export function writtenForm(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  // also its members, which a union it is merged into holds
+  const marked = schema.anyOf ? { ...schema, anyOf: schema.anyOf.map(writtenForm) } : { ...schema }
+  WRITTEN_FORMS.add(marked)
+  return marked
+}
+
+function isWrittenForm(schema: JsonSchema): boolean {
+  return typeof schema === 'object' && WRITTEN_FORMS.has(schema)
 }
 
 /**
- * The members of a union holding fields, when it has some, also of nested unions: an input split
- * into parameters is read by its fields, never by what an instance's `toJSON` returns or the
- * built-in it extends (an empty object is what `JSON.stringify` writes of a returned `Set`).
+ * The members of a union a client sends the fields of, also of nested unions and of the defs
+ * `resolve` returns for refs: an input split into parameters is read by its fields, never by
+ * what an instance's `toJSON` returns or the built-in it extends. A declared empty object (of
+ * `object` or `{}`) holds none of the fields, which keeps them optional. The same schema when
+ * nothing changes.
  */
-export function objectMembers(schema: JsonSchema): JsonSchema {
+export function objectMembers(
+  schema: JsonSchema,
+  resolve: (ref: JsonSchema) => JsonSchema | undefined = () => undefined,
+): JsonSchema {
   if (typeof schema !== 'object' || !schema.anyOf) {
     return schema
   }
 
-  const members = dedupe(schema.anyOf.map(objectMembers)).filter(holdsFields)
+  const sent = schema.anyOf.filter((m) => !isWrittenForm(m))
 
-  // refs only, of recursive defs, can not be told apart
-  if (members.every((m) => m.$ref !== undefined)) {
+  // only written forms, which no client sends as fields
+  if (!sent.length) {
     return schema
   }
 
+  const members = sent.map((member) => {
+    const resolved = resolve(member)
+    const filtered = objectMembers(resolved ?? member, resolve)
+
+    if (filtered === resolved) {
+      return member
+    }
+
+    return typeof filtered === 'object' && Object.keys(filtered).length === 0
+      ? { type: 'object' as const }
+      : filtered
+  })
+
+  if (members.length === schema.anyOf.length && members.every((m, i) => m === schema.anyOf![i])) {
+    return schema
+  }
+
+  const deduped = dedupe(members)
   const { anyOf: _, ...rest } = schema
-  return members.length === 1 ? { ...rest, ...members[0] } : { ...rest, anyOf: members }
+  return deduped.length === 1
+    ? { ...rest, ...(deduped[0] as ObjectJsonSchema) }
+    : { ...rest, anyOf: deduped }
 }
 
-function holdsFields(schema: JsonSchema): schema is ObjectJsonSchema {
-  return (
-    typeof schema === 'object' &&
-    (schema.$ref !== undefined ||
-      (schema.type === 'object' && !isPlain(schema, 'object')) ||
-      (schema.anyOf?.some(holdsFields) ?? false))
-  )
+/**
+ * An object schema, or a union of them, without required properties.
+ */
+export function withoutRequired(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  const { required: _, ...rest } = schema
+  return schema.anyOf ? { ...rest, anyOf: schema.anyOf.map(withoutRequired) } : rest
 }
 
 export function isPlain(schema: JsonSchema, type: string): boolean {

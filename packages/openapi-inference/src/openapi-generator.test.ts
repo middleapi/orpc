@@ -132,6 +132,7 @@ import {
   roundFiftySixInputs,
 } from '../tests/fixtures/app/src/round56'
 import { DraftNote, roundFiftyEightInputs, SearchFilter } from '../tests/fixtures/app/src/round58'
+import { roundFiftyNineInputs } from '../tests/fixtures/app/src/round59'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3205,6 +3206,117 @@ describe('openAPIGenerator', () => {
       expect(new URL(sent.at(-1)!.url).search).toBe('?size=1')
       expect(sent.at(-1)!.headers.get('x-trace')).toBe('t')
       expect(await sent.at(-1)!.text()).toBe('"t"')
+    })
+  })
+  describe('round fifty-nine', () => {
+    it('documents the fields of a part with an empty object as optional, and of unions of named types declaring toJSON', async () => {
+      const spec = await generator.generate(roundFiftyNineInputs, {
+        source: { file: fixture('round59.ts'), export: 'roundFiftyNineInputs' },
+      })
+      const operations = Object.values(spec.paths as any).flatMap((item: any) =>
+        Object.values(item),
+      )
+      const parameters = (operationId: string) =>
+        (operations.find((o: any) => o.operationId === operationId) as any).parameters.map(
+          (p: any) => [p.in, p.name, p.required],
+        )
+
+      // an empty object (`object`, `{}`, an empty interface, a view leaving every key out) holds none of the fields
+      for (const name of ['object', 'shape', 'omitted', 'picked']) {
+        expect(parameters(name)).toEqual([
+          ['path', 'id', true],
+          ['query', 'a', undefined],
+        ])
+      }
+      expect(parameters('empty')).toEqual([
+        ['path', 'id', true],
+        ['query', 'q', undefined],
+      ])
+      expect(parameters('getObject')).toEqual([['query', 'a', undefined]])
+      expect(parameters('getMoney')).toEqual([
+        ['query', 'amount', undefined],
+        ['query', 'currency', undefined],
+      ])
+      expect(parameters('moneyQuery')).toEqual([
+        ['query', 'amount', undefined],
+        ['query', 'currency', undefined],
+      ])
+      expect(parameters('emptyHeaders')).toEqual([['header', 'x-trace', undefined]])
+      // a section missing from a root member is missing with each of its fields
+      expect(parameters('sections')).toEqual([
+        ['query', 'title', undefined],
+        ['header', 'x-trace', undefined],
+      ])
+      // a named type declaring `toJSON` in a union is sent by its fields
+      expect(parameters('refQuery')).toEqual([
+        ['path', 'id', true],
+        ['query', 'title', undefined],
+        ['query', 'q', undefined],
+      ])
+      expect(parameters('classQuery')).toEqual([
+        ['query', 'radius', undefined],
+        ['query', 'title', undefined],
+      ])
+      expect(parameters('refHeaders')).toEqual([
+        ['header', 'x-trace', undefined],
+        ['header', 'x-b', undefined],
+      ])
+      expect(parameters('refParams')).toEqual([['path', 'id', true]])
+      expect(parameters('optionalQuery')).toEqual([['query', 'a', undefined]])
+      expect(
+        (spec.paths as any)['/optional-headers'].get.responses['200'].headers['x-o'].required,
+      ).toBeUndefined()
+
+      // what a client sends, which the server accepts, has the documented parameters
+      const handler = new OpenAPIHandler(roundFiftyNineInputs)
+      const sent: Request[] = []
+      const link = new OpenAPILink(roundFiftyNineInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+
+      for (const [name, value] of [
+        ['object', { params: { id: 'i' }, query: {} }],
+        ['empty', { params: { id: 'i' }, query: {} }],
+        ['shape', { params: { id: 'i' }, query: {} }],
+        ['omitted', { params: { id: 'i' }, query: {} }],
+        ['picked', { params: { id: 'i' }, query: {} }],
+        ['sections', { headers: { 'x-trace': 't', 'toJSON': () => 't' } }],
+        ['sections', { query: { title: 't', toJSON: () => 't' } }],
+        ['getObject', {}],
+        ['getMoney', {}],
+        ['moneyQuery', { query: {} }],
+        ['emptyHeaders', { headers: {} }],
+        ['refQuery', { params: { id: 'i' }, query: { q: 'q' } }],
+        ['refQuery', { params: { id: 'i' }, query: { title: 't', toJSON: () => 't' } }],
+        ['classQuery', { query: { radius: 2 } }],
+        ['refHeaders', { headers: { 'x-b': 'b' } }],
+        ['refParams', { params: { id: 'i', toJSON: () => 1 } }],
+        ['optionalQuery', {}],
+      ] as const) {
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+
+        const request = sent.at(-1)!
+        const documented = (operations.find((o: any) => o.operationId === name) as any).parameters
+        const query = new URL(request.url).searchParams
+        for (const key of query.keys()) {
+          expect(documented).toContainEqual(expect.objectContaining({ in: 'query', name: key }))
+        }
+        for (const p of documented.filter((p: any) => p.required)) {
+          const present =
+            p.in === 'query'
+              ? query.has(p.name)
+              : p.in === 'header'
+                ? request.headers.has(p.name)
+                : true
+          expect(present, `${name}: ${p.in} ${p.name}`).toBe(true)
+        }
+      }
     })
   })
 })
