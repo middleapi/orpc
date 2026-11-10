@@ -1,6 +1,6 @@
 {
   "name": "@orpc/experimental-openapi-inference",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Generate OpenAPI specs for oRPC routers from their TypeScript types, no output schemas required",
   "keywords": [
     "api",
