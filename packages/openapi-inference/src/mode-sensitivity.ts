@@ -17,7 +17,9 @@ import {
   getClassType,
   getClassTypes,
   getDataProperties,
+  getToJSONResultTypes,
   isClassView,
+  isDroppedResult,
   isInstanceOrPlain,
 } from './json-rules'
 import type { TypeQueries } from './type-queries'
@@ -288,8 +290,8 @@ export class ModeSensitivity {
    * Whether a view of a class converts differently: never between the serializer and the
    * `either` mode (the serializer converts it in that mode), and under `JSON.stringify`, which
    * converts it as an instance, when a plain object differs from an instance (`toJSON` of the
-   * view or of its class, getters, members inherited from a built-in, a built-in base), or its
-   * fields do.
+   * view or of its class writing something, getters, members inherited from a built-in, a
+   * built-in base), or its fields do. A `toJSON` writing nothing leaves the fields of either form.
    */
   private computeView(type: Type, classType: Type, isSensitive: (type: Type) => boolean): boolean {
     const types = this.types
@@ -298,14 +300,17 @@ export class ModeSensitivity {
       return false
     }
 
-    if (getClassTypes(types, type).some((c) => getToJSON(types, c) || hasBuiltinForm(types, c))) {
+    const writesToJSON = (t: Type) =>
+      getToJSONResultTypes(types, t, true).some((result) => !isDroppedResult(types, result))
+
+    if (getClassTypes(types, type).some((c) => writesToJSON(c) || hasBuiltinForm(types, c))) {
       return true
     }
 
     const properties = types.getProperties(type)
 
     return (
-      properties.some((p) => p.name === 'toJSON') ||
+      writesToJSON(type) ||
       getDataProperties(types, properties, undefined, true).length !==
         getDataProperties(types, properties, classType).length ||
       this.computeFields(type, isSensitive)

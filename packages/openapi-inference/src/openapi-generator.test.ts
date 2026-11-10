@@ -105,6 +105,14 @@ import {
   roundFiftyTwoInputs,
   viewToJSON,
 } from '../tests/fixtures/app/src/round52'
+import {
+  codedErrors,
+  messageTags,
+  plainTaggedError,
+  relays,
+  roundFiftyThreeInputs,
+  taggedError,
+} from '../tests/fixtures/app/src/round53'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2944,6 +2952,47 @@ describe('openAPIGenerator', () => {
         ['viewToJSON', viewToJSON()],
         ['viewToJSON', plainViewToJSON()],
         ['boxedClassJson', boxedClassJson()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('round fifty-three', () => {
+    it('documents inputs of interfaces extending an error or a view of one in both forms, and functions toJSON returns', async () => {
+      const spec = await generator.generate(roundFiftyThreeInputs, {
+        source: { file: fixture('round53.ts'), export: 'roundFiftyThreeInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // the serializer leaves an error to `JSON.stringify`, which writes a `Set` or `Map` as `{}`
+      for (const [name, value] of [
+        ['taggedError', taggedError()],
+        ['taggedError', plainTaggedError()],
+        ['taggedErrorHolder', { error: taggedError() }],
+        ['taggedErrorHolder', { error: plainTaggedError() }],
+        // a function `toJSON` returns is written as nothing, without calling its own `toJSON`
+        ['relays', relays()],
+        // also of an interface extending a view of an error
+        ['codedErrors', codedErrors()],
+        ['messageTags', messageTags()],
       ] as const) {
         const validate = ajv.compile(body(`/${name}`))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

@@ -136,13 +136,9 @@ export function isDropped(types: TypeQueries, type: Type): boolean {
 /**
  * Whether JSON serialization drops a value of this type: symbols (also branded,
  * `symbol & { __brand: 'Id' }`) and functions, unless a function has a `toJSON` (`JSON.stringify`
- * calls it, also of a class constructor's static `toJSON`).
+ * calls it, also of a class constructor's static `toJSON`) returning a value it writes.
  */
-export function isNonSerializable(
-  types: TypeQueries,
-  type: Type,
-  seen: Set<number> = new Set(),
-): boolean {
+export function isNonSerializable(types: TypeQueries, type: Type): boolean {
   if (
     type.flags & TypeFlags.ESSymbolLike ||
     (type.isIntersectionType() &&
@@ -151,21 +147,21 @@ export function isNonSerializable(
     return true
   }
 
-  if (!isFunction(types, type)) {
-    return false
-  }
-
-  // `toJSON(): this` of a function is a function again
-  if (seen.has(type.id)) {
-    return true
-  }
-  seen.add(type.id)
-
-  const members = getToJSONResultTypes(types, type, true).flatMap((result) =>
-    types.getUnionMembers(result),
+  return (
+    isFunction(types, type) &&
+    getToJSONResultTypes(types, type, true).every((result) => isDroppedResult(types, result))
   )
+}
 
-  return members.every((m) => m.flags & UNDEFINED_FLAGS || isNonSerializable(types, m, seen))
+/**
+ * Whether `JSON.stringify` writes nothing for what a `toJSON` returns: `undefined`, a symbol, or a
+ * function, also one with a `toJSON`, which it does not call on a returned value
+ * (`toJSON(): (() => void) & { toJSON(): string }`, `toJSON(): this` of a function).
+ */
+export function isDroppedResult(types: TypeQueries, type: Type): boolean {
+  return types
+    .getUnionMembers(type)
+    .every((m) => m.flags & UNDEFINED_FLAGS || isFunction(types, m) || isNonSerializable(types, m))
 }
 
 /**

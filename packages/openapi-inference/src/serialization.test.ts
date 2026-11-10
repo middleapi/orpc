@@ -331,6 +331,18 @@ describe('generated schemas match serialized outputs', async () => {
     ['plainViewToJSON', undefined],
     ['boxedClassJson', undefined],
     ['boxedClassHolder', undefined],
+    ['taggedError', undefined],
+    ['plainTaggedError', undefined],
+    ['taggedErrorHolder', undefined],
+    ['relays', undefined],
+    ['relayHolder', undefined],
+    ['codedErrors', undefined],
+    ['messageTags', undefined],
+    ['builtinViewJson', undefined],
+    ['builtinViewJsonRoot', undefined],
+    ['boxedResult', undefined],
+    ['instantOwner', undefined],
+    ['setResult', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

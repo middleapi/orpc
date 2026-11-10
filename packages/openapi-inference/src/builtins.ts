@@ -261,7 +261,15 @@ export function getBuiltinFields(
     return PLAIN_DATA_INTERFACES.has(declared) ? undefined : 'members'
   }
 
-  const builtin = declared ?? getMappedBuiltinName(types, type)
+  const builtin =
+    declared ??
+    getMappedBuiltinName(types, type) ??
+    // a view of a global class, like `Readonly<Number>`
+    types
+      .getMappedSourceMembers(type)
+      .filter((source) => (source.getSymbol()?.flags ?? 0) & SymbolFlags.Value)
+      .map((source) => getDeclaredBuiltinName(types, source))
+      .find((name) => name !== undefined)
 
   if (builtin === undefined) {
     return undefined
@@ -292,7 +300,12 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
   // also over an intersection with a built-in (`Readonly<Set<string> & { x: string }>`)
   const members = types.getMappedSourceMembers(type)
   const viewed = members.length === 1 ? members[0] : undefined
-  const viewedMember = members.find((m) => getDeclaredBuiltinName(types, m) !== undefined)
+  const viewedMember =
+    members.find((m) => getDeclaredBuiltinName(types, m) !== undefined) ??
+    // or with a view of one (`Readonly<Readonly<Set<string>> & { x: string }>`)
+    (members.length > 1
+      ? members.find((m) => (m as any).objectFlags & ObjectFlags.Mapped)
+      : undefined)
   const viewedBuiltin =
     viewedMember &&
     // a typed array is written by its own keys, also the ones an intersection adds
@@ -422,8 +435,9 @@ function getBuiltinSubclass(
     // an interface extending a view of a built-in (`interface Link extends Pick<URL, 'href'>`)
     // holds the built-in or a plain object
     for (const view of getViewBases(type)) {
-      // a typed array is written by its index keys and the fields the interface adds
-      if (isTypedArray(types, view)) {
+      // a typed array is written by its index keys and the fields the interface adds, and an
+      // error (`interface AppError extends Readonly<Error>`) by its fields, as when extending one
+      if (isTypedArray(types, view) || isViewOfFieldsBuiltin(types, view)) {
         continue
       }
 
@@ -598,9 +612,29 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
   }
 
   const symbol = view.getSymbol()
-  const base =
-    symbol && symbol.flags & SymbolFlags.Interface ? getBuiltinBase(types, view) : undefined
-  return base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))
+  if (!symbol || !(symbol.flags & SymbolFlags.Interface)) {
+    return false
+  }
+
+  const base = getBuiltinBase(types, view)
+  return (
+    (base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))) ||
+    getViewBases(view).some((viewBase) => isViewOfFieldsBuiltin(types, viewBase))
+  )
+}
+
+/**
+ * Whether a view is of a built-in that `JSON.stringify` writes by its fields, as an instance of a
+ * class extending it (`Readonly<Error>`, not a boxed primitive, `Readonly<Number>`).
+ */
+function isViewOfFieldsBuiltin(types: TypeQueries, view: Type): boolean {
+  return types
+    .getMappedSourceMembers(view)
+    .some(
+      (source) =>
+        isStringifiedBuiltin(types, source) &&
+        !BOXED_PRIMITIVES[getDeclaredBuiltinName(types, source) ?? ''],
+    )
 }
 
 /**

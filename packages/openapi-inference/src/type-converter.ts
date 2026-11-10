@@ -47,6 +47,7 @@ import {
   isAnyRecord,
   isLooseIntersection,
   isDropped,
+  isDroppedResult,
   isInstanceOrPlain,
   mayBePlainObject,
   isFunction,
@@ -878,7 +879,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     // a `toJSON` returning only `undefined` writes nothing, the written value remains
-    const kept = converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!))
+    const kept = converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!))
     return anyOfDeduped([...kept, written()])
   }
 
@@ -887,9 +888,13 @@ export class TypeToJsonSchemaConverter {
     const { ignoreToJSON = false, ownFields = false } = options
     // a client sends a value of a class type (or of a view of one, `Readonly<User>`) as an instance,
     // written without its getters, or as the built-in the class extends
-    // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object
+    // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object, and so a value of an
+    // interface extending a built-in class (`interface AppError extends Error`), as for outputs
     const sentClass =
-      this.input && !plain && !ownFields ? getClassType(this.types, type) : undefined
+      this.input && !plain && !ownFields
+        ? (getClassType(this.types, type) ??
+          (extendsBuiltinClass(this.types, type) ? type : undefined))
+        : undefined
     // under `JSON.stringify` (inside an instance), and for a class with private members, which
     // no plain object satisfies, a client sends what an instance writes, as the server does
     const sentInstance =
@@ -925,10 +930,11 @@ export class TypeToJsonSchemaConverter {
     if (builtin !== undefined) {
       // a view of an intersection with a built-in (`Readonly<Error & { toJSON(): string }>`), or an
       // interface extending a view of one with its own `toJSON` (`interface Msg extends Pick<Error,
-      // 'message'> { toJSON(): string }`), which adds it like an intersection
+      // 'message'> { toJSON(): string }`), which adds it like an intersection, unless its `toJSON`
+      // returned it, which `JSON.stringify` does not call again
       const views = getViewBases(type)
       const sources = [type, ...views].flatMap((v) => this.types.getMappedSourceMembers(v))
-      const viewed = sources.find((m) => hasBuiltinForm(this.types, m))
+      const viewed = ignoreToJSON ? undefined : sources.find((m) => hasBuiltinForm(this.types, m))
       return viewed
         ? this.withBuiltinToJSON(type, views.length ? [type, ...sources] : sources, viewed, builtin)
         : this.withPlainForm(type, builtin)
@@ -971,7 +977,7 @@ export class TypeToJsonSchemaConverter {
             ),
         )
         .flatMap((source) => getToJSONResultTypes(this.types, source, true))
-        .filter((result) => !isDropped(this.types, result))
+        .filter((result) => !isDroppedResult(this.types, result))
       const fields = this.withMode('either', () =>
         this.convertObject(type, { ...options, ignoreToJSON: true }),
       )
@@ -1016,7 +1022,7 @@ export class TypeToJsonSchemaConverter {
     const viewedResults =
       viewedFunction && viewedFunction !== type
         ? getToJSONResultTypes(this.types, viewedFunction, true).filter(
-            (result) => !isDropped(this.types, result),
+            (result) => !isDroppedResult(this.types, result),
           )
         : []
 
@@ -1055,14 +1061,16 @@ export class TypeToJsonSchemaConverter {
       // a function without `toJSON` is written as nothing (the caller makes it optional), not
       // as its fields
       if (isFunction(this.types, type)) {
-        return anyOfDeduped(converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!)))
+        return anyOfDeduped(
+          converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!)),
+        )
       }
 
       // without `toJSON`, a value is its own fields, of an instance or (for a view or an interface)
       // of a plain object. A `toJSON` returning only `undefined` writes nothing, the fields remain.
       const fields = this.convertObject(type, { ignoreToJSON: true, plain, ownFields })
       return anyOfDeduped([
-        ...converted.filter((_, i) => !isDropped(this.types, toJSONResults[i]!)),
+        ...converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!)),
         fields,
       ])
     }
@@ -1172,7 +1180,7 @@ export class TypeToJsonSchemaConverter {
         !propertyType ||
         isDropped(this.types, propertyType) ||
         (serialized.length &&
-          serialized.every((result) => isDropped(this.types, result)) &&
+          serialized.every((result) => isDroppedResult(this.types, result)) &&
           !this.mayLackToJSON(propertyType, fieldsMode))
       ) {
         continue
@@ -1712,7 +1720,7 @@ export class TypeToJsonSchemaConverter {
       // functions and symbols are dropped like `undefined`
       const schemas = dedupe(
         members
-          .filter((m) => !(m.flags & NULLISH_FLAGS) && !isNonSerializable(this.types, m))
+          .filter((m) => !(m.flags & NULLISH_FLAGS) && !isDroppedResult(this.types, m))
           .map((m) => this.convertToJSONResult(m)),
       )
 
@@ -1730,9 +1738,12 @@ export class TypeToJsonSchemaConverter {
     }
 
     // a typed array by its index keys and the fields it adds, a subclass of another built-in
-    // (`class MyDate extends Date`, also `Readonly<MyDate>` or `MyDate & { x }`) by its own fields
+    // (`class MyDate extends Date`, also `Readonly<MyDate>`, `MyDate & { x }`, or an interface
+    // extending one, `interface Stamp extends Date`) by its own fields
     const typedArray = isTypedArray(this.types, resolved)
-    const classType = getClassType(this.types, resolved)
+    const classType =
+      getClassType(this.types, resolved) ??
+      ((resolved.getSymbol()?.flags ?? 0) & SymbolFlags.Interface ? resolved : undefined)
 
     // a subclass of a boxed primitive (`class Tag extends String`) is written as its primitive
     const boxed = classType && getBoxedPrimitiveSchema(this.types, classType)
@@ -1850,8 +1861,16 @@ export class TypeToJsonSchemaConverter {
 
     return (
       this.types.isPrimitiveView(type) ||
-      // the source may hold one (`Readonly<Link>` of `interface Link extends Pick<URL, 'href'>`)
-      sources.some((s) => getViewBases(s).some((view) => this.mayHoldPlainObject(view))) ||
+      // the source may hold one (`Readonly<Link>` of `interface Link extends Pick<URL, 'href'>`),
+      // also a view in an intersection (`Readonly<Pick<Date, 'getTime'> & { x: string }>`)
+      sources.some((s) =>
+        [
+          ...getViewBases(s),
+          ...(s.isIntersectionType()
+            ? this.types.getMembers(s).filter((m) => (m as any).objectFlags & ObjectFlags.Mapped)
+            : []),
+        ].some((view) => this.mayHoldPlainObject(view)),
+      ) ||
       properties.length < sourceProperties.size ||
       properties.some(
         (p) =>
@@ -1988,8 +2007,7 @@ export class TypeToJsonSchemaConverter {
       return results.some(
         (serialized) =>
           this.isOptional(serialized) ||
-          isNonSerializable(this.types, serialized) ||
-          this.getSerializableMembers(serialized) !== undefined,
+          this.types.getUnionMembers(serialized).some((m) => isDroppedResult(this.types, m)),
       )
     })
   }
