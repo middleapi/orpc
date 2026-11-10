@@ -126,6 +126,11 @@ import {
   plainLabeledViews,
   roundFiftyFiveInputs,
 } from '../tests/fixtures/app/src/round55'
+import {
+  boxedViewResults,
+  readonlySets,
+  roundFiftySixInputs,
+} from '../tests/fixtures/app/src/round56'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3079,6 +3084,41 @@ describe('openAPIGenerator', () => {
         ['labeledViews', plainLabeledViews()],
         // the serializer walks a plain object of a view of `Boolean`
         ['booleanViews', booleanViews()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('round fifty-six', () => {
+    it('documents inputs of plain views of boxed primitives toJSON returns, and of interfaces extending a readonly set', async () => {
+      const spec = await generator.generate(roundFiftySixInputs, {
+        source: { file: fixture('round56.ts'), export: 'roundFiftySixInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        // `JSON.stringify` writes the plain object `toJSON` returns by its own fields
+        ['boxedViewResults', boxedViewResults()],
+        // the serializer writes a set without calling its `toJSON`
+        ['readonlySets', readonlySets()],
       ] as const) {
         const validate = ajv.compile(body(`/${name}`))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

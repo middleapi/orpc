@@ -462,7 +462,10 @@ function getBuiltinSubclass(
     return { kind: 'array', items: getNumberIndexType(types, type) }
   }
 
-  if (base === 'Set' || base === 'Map') {
+  // also an interface extending a readonly one (`interface Tags extends ReadonlySet<string>`), as a
+  // value of `ReadonlySet<string>` is the set
+  const collection = base.replace(/^Readonly/u, '')
+  if (collection === 'Set' || collection === 'Map') {
     if (stringify) {
       return emptyObject()
     }
@@ -470,7 +473,7 @@ function getBuiltinSubclass(
     const items =
       getIteratorTypes(types.checker, type, types.getProperties(type), false)?.yieldTypes ?? []
 
-    return base === 'Set' ? { kind: 'set', items } : { kind: 'map-entries', entries: items }
+    return collection === 'Set' ? { kind: 'set', items } : { kind: 'map-entries', entries: items }
   }
 
   return getLeaf(base, stringify)

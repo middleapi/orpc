@@ -356,6 +356,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['plainLabeledViews', undefined],
     ['booleanViews', undefined],
     ['booleanViewRoot', undefined],
+    ['numberViewOwner', undefined],
+    ['boxedViewResults', undefined],
+    ['readonlySets', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -378,6 +381,31 @@ describe('generated schemas match serialized outputs', async () => {
     expect(deref(responseSchema('/numberViewJson'))).toEqual({
       anyOf: [{ type: 'string' }, { type: 'object' }],
     })
+  })
+
+  it('documents the plain object a view of a boxed primitive toJSON returns may be, and interfaces extending a readonly set as the set', () => {
+    const schemas = spec.components?.schemas as any
+
+    // `JSON.stringify` writes a returned plain object by its own fields, a boxed number as the number
+    expect(schemas.NumberViewOwner).toMatchObject({
+      anyOf: [{ type: 'number' }, { type: 'object' }],
+    })
+    expect(schemas.FieldedNumberOwner).toMatchObject({
+      anyOf: [
+        { type: 'number' },
+        { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] },
+      ],
+    })
+    expect(schemas.BooleanViewOwner).toMatchObject({
+      anyOf: [{ type: 'boolean' }, { type: 'object' }],
+    })
+    expect(schemas.BoxedViewResults.properties.error).toEqual({
+      anyOf: [{ type: 'number' }, { type: 'object' }],
+    })
+    // the serializer writes a set without calling its `toJSON`
+    expect(schemas.ReadonlyTagSet).toMatchObject(setArray)
+    expect(schemas.ReadonlyCodeSet).toMatchObject(setArray)
+    expect(schemas.ReadonlyTextMap).toMatchObject({ 'type': 'array', 'x-native-type': 'map' })
   })
 
   it('leaves the members a view copies from a set or a map out of what toJSON returns, and documents plain views of a boolean', () => {

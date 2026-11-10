@@ -1702,8 +1702,9 @@ export class TypeToJsonSchemaConverter {
    * `JSON.stringify` calls `toJSON` once: the returned value is serialized by its own fields,
    * so a returned `Date` is `{}`, and `this` (or `{ ...this }`) are the instance's fields.
    * Its properties and items go through `toJSON` again, so they are converted as usual.
+   * `plainForm` also documents the plain object a view of a built-in may hold.
    */
-  private convertToJSONResult(type: Type): JsonSchema {
+  private convertToJSONResult(type: Type, plainForm = true): JsonSchema {
     const resolved =
       type.flags & TypeFlags.TypeParameter
         ? (this.checker.getBaseConstraintOfType(type) ?? type)
@@ -1781,14 +1782,31 @@ export class TypeToJsonSchemaConverter {
       )
 
       if (base) {
-        return this.convertToJSONResult(base)
+        // the plain object of the whole intersection holds the fields it adds
+        return this.withPlainResult(resolved, this.convertToJSONResult(base, false))
       }
     }
 
     // a returned built-in is written by its own fields, also through `Readonly<Date>`
-    return (
-      this.convertBuiltinFields(resolved) ?? this.convertObject(resolved, { ignoreToJSON: true })
-    )
+    const fields = this.convertBuiltinFields(resolved)
+    return fields === undefined
+      ? this.convertObject(resolved, { ignoreToJSON: true })
+      : plainForm
+        ? this.withPlainResult(resolved, fields)
+        : fields
+  }
+
+  /**
+   * What `toJSON` returned as a built-in, or also the plain object a view of it may hold, written
+   * by its own fields (`{ valueOf: () => 1, x: 'x' }` of `Pick<Number, 'valueOf'> & { x: string }`).
+   */
+  private withPlainResult(type: Type, builtin: JsonSchema): JsonSchema {
+    return this.mayHoldPlainObject(type)
+      ? anyOfDeduped([
+          builtin,
+          this.convertObject(type, { ignoreToJSON: true, plain: true, ownFields: true }),
+        ])
+      : builtin
   }
 
   /**
