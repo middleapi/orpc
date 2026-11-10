@@ -920,6 +920,12 @@ describe('openAPIGenerator', () => {
           mutualLiteralsInput: 'os.input(type<Expanding<LitA<number>>>()).handler(() => 1)',
           mutualGetters: 'os.handler((): CD<FnA<number>> => ({}) as any)',
           mutualGettersInput: 'os.input(type<CD<FnA<number>>>()).handler(() => 1)',
+          boxedLiteral: 'os.handler((): CD<BoxLit<number>> => ({}) as any)',
+          boxedLiteralInput: 'os.input(type<Expanding<BoxLitMap<number>>>()).handler(() => 1)',
+          passedOn: 'os.handler((): CD<PassBox<number>> => ({}) as any)',
+          passedOnInput: 'os.input(type<Expanding<PassBox<number>>>()).handler(() => 1)',
+          shortRoute: 'os.handler((): CD<Route<number>> => ({}) as any)',
+          longRoute: 'os.handler((): CD<LongRoute<number>> => ({}) as any)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -971,6 +977,12 @@ describe('openAPIGenerator', () => {
             'interface LitB<T> { a: Box<CD<LitA<T>>>; e: { f: CD<LitA<T>> }; v: T; g: () => T }',
             'interface FnA<T> { c: { d: Box<CD<FnB<T>>> }; e: { f: CD<FnB<T>> }; g: () => T }',
             'interface FnB<T> { c: { d: Box<CD<FnA<T>>> }; e: { f: CD<FnA<T>> }; v: T; h: () => T }',
+            'interface BoxLit<T> { inner: Box<{ a: T; b: Box<CD<BoxLit<T>>> }>; m: Map<string, T> }',
+            'interface BoxLitMap<T> { inner: Box<{ a: T; m: Map<string, BoxLitMap<T>>; b: Box<CD<BoxLitMap<T>>> }> }',
+            'interface PassBox<T, U = string> { v: T; u: U; next: Box<PassBox<Box<T>, U>> | null }',
+            'interface Route<T> { v: T; c: { p: Route<T[]> | null } }',
+            // its route is 17 object literals long
+            `interface LongRoute<T> { v: T; c: ${'{ p: '.repeat(17)}LongRoute<T[]> | null${' }'.repeat(17)} }`,
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',
@@ -1003,6 +1015,10 @@ describe('openAPIGenerator', () => {
             : operation.responses['200'].content['application/json'].schema
           expect([name, JSON.stringify(schema).length < 50_000]).toEqual([name, true])
         }
+        // also through a long route, after as many levels as through a short one
+        const levels = (name: string) =>
+          JSON.stringify(spec.paths[`/${name}`].post.responses['200']).match(/"v":/g)?.length
+        expect(levels('longRoute')).toBe(levels('shortRoute'))
       },
       120_000,
     )
@@ -2229,6 +2245,10 @@ describe('openAPIGenerator', () => {
         depth === 0 ? end : { inner: { a: lists(depth - 1, end), l: [] } }
       const records = (depth: number, end: unknown): unknown =>
         depth === 0 ? end : { inner: { a: records(depth - 1, end), r: {} } }
+      const boxed = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { v: { a: boxed(depth - 1, end), m: [] } } }
+      const passed = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: passed(depth - 1, end), b: 'b', m: [] } }
 
       for (const [path, value, valid] of [
         ['/genericCycle', { f0: { f0: null, f2: { a: 2 } }, f2: { a: 1 } }, true],
@@ -2255,6 +2275,13 @@ describe('openAPIGenerator', () => {
         ['/viaSelfLists', lists(8, 'x'), false],
         ['/viaSelfRecords', records(5, 1), true],
         ['/viaSelfRecords', records(5, 'x'), false],
+        // also through a generic model of the object literal, and passing on a type argument
+        ['/viaBoxedMaps', boxed(8, 1), true],
+        ['/viaBoxedMaps', boxed(8, 'x'), false],
+        ['/viaExpandedBoxedMaps', boxed(5, 1), true],
+        ['/viaExpandedBoxedMaps', boxed(5, 'x'), false],
+        ['/viaDefaultMaps', passed(6, 1), true],
+        ['/viaDefaultMaps', passed(6, 'x'), false],
       ] as const) {
         expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
       }

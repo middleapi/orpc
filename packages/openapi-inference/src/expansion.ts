@@ -10,8 +10,6 @@ const MAX_INSTANTIATIONS = 256
 const MIN_BUDGET_NESTING = 4
 /** Nested instantiations in a row whose type arguments contain the previous ones */
 export const MAX_GROWTH = 3
-/** Properties of the path a nesting runs through that are followed to tell it from a cycle */
-const MAX_ALONG = 16
 
 interface Expansion {
   type: Type
@@ -271,8 +269,8 @@ export class ExpansionGuard {
     owner: Type | undefined,
     along: readonly TSSymbol[],
   ): boolean {
-    // a longer path is not followed, any property counts then
-    const names = along.length <= MAX_ALONG ? along.map((p) => p.name) : undefined
+    // the whole path, which `reaches` ends as it takes one of its properties at each step
+    const names = along.map((p) => p.name)
     return (
       owner !== undefined &&
       this.types.getPropertyOwners(owner).some((model) => {
@@ -284,7 +282,7 @@ export class ExpansionGuard {
 
         return (
           declared !== undefined &&
-          this.types.memo(`declaresCycle:${names?.join('.') ?? '*'}`, declared.id, () => {
+          this.types.memo(`declaresCycle:${names.join('.')}`, declared.id, () => {
             const type = this.types.checker.getTypeOfSymbol(declared)
             return type !== undefined && this.reaches(type, declaration!, 4, new Set(), names)
           })
@@ -296,9 +294,10 @@ export class ExpansionGuard {
   /**
    * Whether a type is an instantiation of a declaration, or holds one `depth` types in: as a
    * member, a type argument, the model a view maps over, or a property of a type the project
-   * declares. When given, only the property named first `along` the path counts, and none at its
-   * end, and the path, however long, takes none of the `depth` (`c: { d: Box<View<Other<T>>> }`
-   * of a model `Other` holds again at `c.d.v.e.f`).
+   * declares. When given, only the property named first `along` the path counts, also for the type
+   * arguments of a model the project declares, and none at its end, and the path, however long,
+   * takes none of the `depth` (`c: { d: Box<View<Other<T>>> }` of a model `Other` holds again at
+   * `c.d.v.e.f`).
    */
   private reaches(
     type: Type,
@@ -327,10 +326,15 @@ export class ExpansionGuard {
     }
 
     const symbol = type.getAliasSymbol() ?? type.getSymbol()
+    const library = symbol !== undefined && this.types.getSymbolSourceKind(symbol) === 'default'
+    const mapped = (type as any).objectFlags & ObjectFlags.Mapped
+    // along the path, a model of the project holds its type arguments only at the properties it
+    // goes through (`v` of `Box<{ a: T; m: Map<K, Model<T>> }>` holds no `Model`), a view all of them
+    const model = along !== undefined && type.flags & TypeFlags.Object && !library && !mapped
     const children = [
-      ...this.types.getTypeArguments(type),
+      ...(model ? [] : this.types.getTypeArguments(type)),
       // the models a view maps over (`DeepReadonly<Model<T>>`), by its keys
-      ...((type as any).objectFlags & ObjectFlags.Mapped ? this.types.getPropertyOwners(type) : []),
+      ...(mapped ? this.types.getPropertyOwners(type) : []),
     ]
 
     if (
@@ -341,11 +345,7 @@ export class ExpansionGuard {
       return true
     }
 
-    if (
-      !(type.flags & TypeFlags.Object) ||
-      (symbol && this.types.getSymbolSourceKind(symbol) === 'default') ||
-      along?.length === 0
-    ) {
+    if (!(type.flags & TypeFlags.Object) || library || along?.length === 0) {
       return false
     }
 
@@ -553,13 +553,15 @@ export class ExpansionGuard {
  * nested in (`Expand<string[]>` inside `Expand<string>`), so nesting it again never ends.
  */
 export function argumentsGrow(types: TypeQueries, outer: Type, inner: Type, depth = 0): boolean {
-  const outerArguments = types.getTypeArguments(outer)
+  const innerArguments = types.getTypeArguments(inner)
+  // one passed on as it is (`string` of `Model<Model<T, string>, string>`) is held again, not grown
+  const outerArguments = types
+    .getTypeArguments(outer)
+    .filter((outerArgument) => !innerArguments.some((i) => i.id === outerArgument.id))
 
-  return types
-    .getTypeArguments(inner)
-    .some((innerArgument) =>
-      outerArguments.some((outerArgument) => grows(types, outerArgument, innerArgument, depth)),
-    )
+  return innerArguments.some((innerArgument) =>
+    outerArguments.some((outerArgument) => grows(types, outerArgument, innerArgument, depth)),
+  )
 }
 
 /**

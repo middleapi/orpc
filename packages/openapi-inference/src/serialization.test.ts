@@ -298,6 +298,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['toSettled', undefined],
     ['toInstances', undefined],
     ['readonlyDeepLink', undefined],
+    ['viaBoxedMaps', undefined],
+    ['viaExpandedBoxedMaps', undefined],
+    ['viaDefaultMaps', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2448,6 +2451,28 @@ describe('generated schemas match serialized outputs', async () => {
         levels(5, (a) => model({ inner: model({ a, r: expect.any(Object) }) }), {
           type: 'number',
         }),
+      )
+      // through a generic model of the object literal holding a map of itself
+      expect(inline(schemaOf('viaBoxedMaps'))).toEqual(
+        levels(6, (a) => model({ inner: model({ v: model({ a, m: expect.any(Object) }) }) }), {
+          type: 'number',
+        }),
+      )
+      expect(inline(schemaOf('viaExpandedBoxedMaps'))).toEqual(
+        levels(5, (a) => model({ inner: model({ v: model({ a, m: expect.any(Object) }) }) }), {
+          type: 'number',
+        }),
+      )
+      // a model passing on a type argument, also without a deep mapped type
+      expect(inline(schemaOf('viaDefaultMaps'))).toEqual(
+        levels(
+          6,
+          (a) => ({
+            ...model({ inner: model({ a, b: { type: 'string' }, m: expect.any(Object) }) }),
+            description: expect.any(String),
+          }),
+          { type: 'number' },
+        ),
       )
       expect(inline(schemaOf('viaParents'))).toEqual(
         levels(

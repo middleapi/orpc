@@ -93,6 +93,16 @@ export interface ViaSelfRecord<T> {
   inner: { a: T; r: Record<string, ViaSelfRecord<T>> }
 }
 
+/** A generic model nesting its type argument through a generic model of a literal holding a map of itself */
+export interface ViaBoxedMap<T> {
+  inner: Box<{ a: T; m: Map<string, ViaBoxedMap<T>> }>
+}
+
+/** A generic model nesting its first type argument beside a map of itself, passing on the second */
+export interface ViaDefaultMap<T, U = string> {
+  inner: { a: T; b: U; m: Map<string, ViaDefaultMap<T, U>> }
+}
+
 const viaGetter = <T>(a: T): ViaGetter<T> => ({ inner: { a, f: () => a } })
 const viaMapLiteral = <T>(a: T): ViaMapLiteral<T> => ({ inner: { a, m: new Map([['k', a]]) } })
 const viaSelfMap = <T>(a: T): ViaSelfMap<T> => {
@@ -109,6 +119,14 @@ const viaDeepMap = <T>(a: T): ViaDeepMap<T> => ({
 const viaSelfList = <T>(a: T): ViaSelfList<T> => ({ inner: { a, l: [{ inner: { a, l: [] } }] } })
 const viaSelfRecord = <T>(a: T): ViaSelfRecord<T> => ({
   inner: { a, r: { k: { inner: { a, r: {} } } } },
+})
+const viaBoxedMap = <T>(a: T): ViaBoxedMap<T> => {
+  const model: ViaBoxedMap<T> = { inner: { v: { a, m: new Map() } } }
+  model.inner.v.m.set('k', { inner: { v: { a, m: new Map() } } })
+  return model
+}
+const viaDefaultMap = <T>(a: T): ViaDefaultMap<T> => ({
+  inner: { a, b: 'b', m: new Map([['k', { inner: { a, b: 'c', m: new Map() } }]]) },
 })
 const viaParent = <T>(a: T): ViaParent<T> => {
   const model: ViaParent<T> = { inner: { a, f: () => a, up: null } }
@@ -182,6 +200,21 @@ export const roundThirtySeven = {
       ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<number>>>>>
     > => viaSelfRecord(viaSelfRecord(viaSelfRecord(viaSelfRecord(viaSelfRecord(1))))),
   ),
+  viaBoxedMaps: os.handler(
+    (): ConditionalDeep<
+      ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<number>>>>>>
+    > => viaBoxedMap(viaBoxedMap(viaBoxedMap(viaBoxedMap(viaBoxedMap(viaBoxedMap(1)))))),
+  ),
+  viaExpandedBoxedMaps: os.handler(
+    (): Expanding<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<number>>>>>> =>
+      viaBoxedMap(viaBoxedMap(viaBoxedMap(viaBoxedMap(viaBoxedMap(1))))),
+  ),
+  viaDefaultMaps: os.handler(
+    (): ViaDefaultMap<
+      ViaDefaultMap<ViaDefaultMap<ViaDefaultMap<ViaDefaultMap<ViaDefaultMap<number>>>>>
+    > =>
+      viaDefaultMap(viaDefaultMap(viaDefaultMap(viaDefaultMap(viaDefaultMap(viaDefaultMap(1)))))),
+  ),
 }
 
 /** Inputs of the same types, as a client sends them */
@@ -248,6 +281,33 @@ export const roundThirtySevenInputs = {
     .input(
       type<
         Expanding<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<number>>>>>>
+      >(),
+    )
+    .handler(() => 1),
+  viaBoxedMaps: os
+    .input(
+      type<
+        ConditionalDeep<
+          ViaBoxedMap<
+            ViaBoxedMap<
+              ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<number>>>>>>
+            >
+          >
+        >
+      >(),
+    )
+    .handler(() => 1),
+  viaExpandedBoxedMaps: os
+    .input(
+      type<Expanding<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<ViaBoxedMap<number>>>>>>>(),
+    )
+    .handler(() => 1),
+  viaDefaultMaps: os
+    .input(
+      type<
+        ViaDefaultMap<
+          ViaDefaultMap<ViaDefaultMap<ViaDefaultMap<ViaDefaultMap<ViaDefaultMap<number>>>>>
+        >
       >(),
     )
     .handler(() => 1),
