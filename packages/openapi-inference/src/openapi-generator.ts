@@ -237,6 +237,11 @@ export class OpenAPIGenerator {
     try {
       const name = source.export ?? 'router'
       const exported = { ...project.getExportType(name), name }
+      const converter = (direction: JsonSchemaConverterDirection) =>
+        new TypeToJsonSchemaConverter(project.checker, project.program, {
+          ...this.options,
+          direction,
+        })
 
       ctx = {
         checker: project.checker,
@@ -244,16 +249,7 @@ export class OpenAPIGenerator {
         sourceFile: project.sourceFile,
         source: exported,
         resolver: new RouterTypeResolver(project.checker, project.program, exported),
-        converters: {
-          input: new TypeToJsonSchemaConverter(project.checker, project.program, {
-            ...this.options,
-            direction: 'input',
-          }),
-          output: new TypeToJsonSchemaConverter(project.checker, project.program, {
-            ...this.options,
-            direction: 'output',
-          }),
-        },
+        converters: { input: converter('input'), output: converter('output') },
         schemaConverters: [
           ...toArray(this.options.converters),
           new ConvertibleStandardJsonSchemaConverter(conversions),
@@ -408,8 +404,30 @@ export class OpenAPIGenerator {
 
     const isSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
       ctx.schemaConverters.some((c) => c.condition(schema, direction))
-    const isStockSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
-      ctx.stockConverters.some((c) => c.condition(schema, direction))
+
+    /**
+     * Infers a slot (an input, an output or error data) from its type, which `getType` reads from
+     * the procedure type, `undefined` when it has none. Schemas the stock converters document (as
+     * any value, when their conversion throws) keep that result (`undefined`) when the type can not
+     * be read, like the type of a procedure typed `any`, see {@link inferWhenReadable}.
+     */
+    const inferSlot = <T>(
+      schemas: AnySchema[],
+      direction: JsonSchemaConverterDirection,
+      getType: (procedure: Type) => Type | undefined,
+      infer: (type: Type) => T,
+    ): T | undefined => {
+      if (
+        schemas.length &&
+        schemas.every((s) => ctx.stockConverters.some((c) => c.condition(s, direction)))
+      ) {
+        return inferWhenReadable(ctx, resolved, getType, infer)
+      }
+
+      assertProcedureType(ctx, resolved)
+      const type = getType(resolved.type)
+      return type && infer(type)
+    }
 
     /**
      * Keeps the schemas a converter supports, and adds one inferred from the type for the rest:
@@ -499,24 +517,14 @@ export class OpenAPIGenerator {
         return complete(schemas ?? [], [type], inline[direction])
       }
 
-      // schemas the stock converters document (as any value, when their conversion throws) keep
-      // that when the type of the slot can not be read, like the type of a procedure typed `any`
-      if (leaves.length && leaves.every((s) => isStockSupported(s, direction))) {
-        return (
-          inferWhenReadable(
-            ctx,
-            resolved,
-            (procedure) => ctx.resolver.getSchemaType(procedure, direction),
-            inferFromType,
-          ) ?? schemas
-        )
-      }
-
-      assertProcedureType(ctx, resolved)
-
-      const type = ctx.resolver.getSchemaType(resolved.type, direction)
-
-      return type ? inferFromType(type) : schemas
+      return (
+        inferSlot(
+          leaves,
+          direction,
+          (procedure) => ctx.resolver.getSchemaType(procedure, direction),
+          inferFromType,
+        ) ?? schemas
+      )
     }
 
     const errorMap: ErrorMap = {}
@@ -526,18 +534,12 @@ export class OpenAPIGenerator {
       let data: AnySchema | undefined
 
       if (config?.data && !isSupported(config.data, 'output')) {
-        const getDataType = (procedure: Type) => ctx.resolver.getErrorDataType(procedure, code)
-        const inferData = (dataType: Type) =>
-          inferredSchema(ctx.converters.output.convert(dataType, { awaited: false }))
-
-        // like the schemas of inputs and outputs, a schema the stock converters document keeps that
-        if (isStockSupported(config.data, 'output')) {
-          data = inferWhenReadable(ctx, resolved, getDataType, inferData)
-        } else {
-          assertProcedureType(ctx, resolved)
-          const dataType = getDataType(resolved.type)
-          data = dataType && inferData(dataType)
-        }
+        data = inferSlot(
+          [config.data],
+          'output',
+          (procedure) => ctx.resolver.getErrorDataType(procedure, code),
+          (dataType) => inferredSchema(ctx.converters.output.convert(dataType, { awaited: false })),
+        )
       }
 
       setOwn(errorMap, code, data ? { ...config, data } : config)
