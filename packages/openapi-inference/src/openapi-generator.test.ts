@@ -153,6 +153,13 @@ import {
   roundSixtyInputs,
   weakHolder,
 } from '../tests/fixtures/app/src/round60'
+import {
+  roundSixtyOne,
+  roundSixtyOneForward,
+  roundSixtyOneMixed,
+  roundSixtyOneReverse,
+  roundSixtyOneSwapped,
+} from '../tests/fixtures/app/src/round61'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3435,6 +3442,40 @@ describe('openAPIGenerator', () => {
       expect(schemas.OptJsonNum).toMatchObject({
         anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'object' }],
       })
+    })
+  })
+
+  describe('round sixty-one', () => {
+    it('names components the same whatever the order of procedures', async () => {
+      const generate = (router: Parameters<typeof generator.generate>[0], name: string) =>
+        generator.generate(router, {
+          source: { file: fixture('round61.ts'), export: name },
+        })
+      const forward = await generate(roundSixtyOneForward, 'roundSixtyOneForward')
+
+      // a type converted the same at a root and in a class takes the name without a mode
+      expect(Object.keys(forward.components?.schemas ?? {}).toSorted()).toEqual([
+        'MaybeJsonCount',
+        'MaybeJsonCountHolder',
+        'MaybeJsonPoint',
+        'MaybeJsonPointHolder',
+      ])
+      for (const [router, name] of [
+        [roundSixtyOneReverse, 'roundSixtyOneReverse'],
+        [roundSixtyOneMixed, 'roundSixtyOneMixed'],
+        [roundSixtyOneSwapped, 'roundSixtyOneSwapped'],
+      ] as const) {
+        expect(await generate(router, name)).toEqual(forward)
+      }
+    })
+
+    it('leaves functions typed by interfaces over a view of Function optional', async () => {
+      const spec = await generator.generate(roundSixtyOne, {
+        source: { file: fixture('round61.ts'), export: 'roundSixtyOne' },
+      })
+
+      // only a `toJSON` that may be missing drops the function
+      expect((spec.components?.schemas as any).FnViewHolder.required).toEqual(['json'])
     })
   })
 })

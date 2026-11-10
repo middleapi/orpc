@@ -5,7 +5,8 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
 
 /**
  * The def names of the conversions: every name given, and the ones numbered after a name another
- * def held when they were given (`DeepReadonly_A2` after `DeepReadonly_A`), with that name.
+ * def held when they were given (`DeepReadonly_A2` after `DeepReadonly_A`), with that name, or
+ * named by a mode a def of the same type in another mode shared (`PointJson` of `Point`).
  */
 export interface DefNameRecord {
   readonly used: ReadonlySet<string>

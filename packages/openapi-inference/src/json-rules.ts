@@ -8,6 +8,7 @@ import {
   getBuiltin,
   getBuiltinBaseName,
   getToJSON,
+  getViewBases,
   isBuiltinSymbol,
 } from './builtins'
 import type { TypeQueries } from './type-queries'
@@ -307,9 +308,17 @@ export function isAnyRecord(types: TypeQueries, type: Type): boolean {
 /**
  * Whether a mapped type may hold the function it is a view of, which JSON drops unless it has a
  * `toJSON` (`Readonly<() => void>`, `cb` of `DeepReadonly<{ cb: () => void }>`, see
- * `getViewedFunction`).
+ * `getViewedFunction`), and so may an interface over one whose `toJSON` may be missing
+ * (`interface V extends Readonly<Function> { toJSON?(): string }`).
  */
 function isFunctionView(types: TypeQueries, type: Type): boolean {
+  if (getViewBases(type).some((view) => getViewedFunction(types, view) !== undefined)) {
+    return (
+      getToJSONResultTypes(types, type, true).every((result) => isDroppedResult(types, result)) ||
+      hasOptionalToJSON(types, type)
+    )
+  }
+
   const viewed = getViewedFunction(types, type)
   return (
     viewed !== undefined &&

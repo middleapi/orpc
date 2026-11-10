@@ -194,10 +194,7 @@ export const plainOptionalJsons = (): OptionalJsons => {
   }
 }
 
-/**
- * A class holding views of them, whose fields `JSON.stringify` writes (views, as a named type
- * converted the same in both modes takes the name of the first mode reached)
- */
+/** A class holding views of them, whose fields `JSON.stringify` writes */
 export class OptionalJsonHolder {
   num: Readonly<OptJsonNum> = 1
   boxedNum: OptJsonNum & { code?: number } = new Number(2)

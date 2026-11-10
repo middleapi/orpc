@@ -29,6 +29,11 @@ function getModeSuffix(key: number): string {
   return key < 0 ? 'Json' : key >= EITHER_KEY_OFFSET ? 'Any' : ''
 }
 
+/** The type id of a conversion key */
+function getTypeId(key: number): number {
+  return key < 0 ? -key : key >= EITHER_KEY_OFFSET ? key - EITHER_KEY_OFFSET : key
+}
+
 export interface Def {
   name: string
   /** The conversion key of the type */
@@ -47,7 +52,11 @@ export interface Def {
 export class DefNames {
   readonly byKey = new Map<number, string>()
   readonly used = new Set<string>()
-  /** Names numbered after a name another def held, with that name (`Page2` of `Page`) */
+  /**
+   * Names numbered after a name another def held, with that name (`Page2` of `Page`), and names
+   * of a mode a def of the same type in another mode shared, with its shorter name (`PointJson`
+   * of `Point`), see `DefRegistry.share`
+   */
   readonly numbered = new Map<string, string>()
 }
 
@@ -172,6 +181,9 @@ export class DefRegistry {
   /**
    * The live def of the same group with the same schema, replacing this finished def when nothing
    * refers to it yet; otherwise this def, which later ones of the group and schema share.
+   * A type converted the same in two modes is named by the shorter name of its modes
+   * (`Point` over `PointJson`), whichever comes first: the def kept takes it once no component
+   * has it (see `mergeEquivalentComponents`).
    */
   share(def: Def, group: string): Def {
     const signature = `${group}:${this.stringify(def.schema!)}`
@@ -183,6 +195,10 @@ export class DefRegistry {
       this.defs.get(existing.key)?.name === existing.name &&
       this.replaceIfUnreferenced(def, { $ref: toRef(existing.name) })
     ) {
+      const preferred = this.names.numbered.get(existing.name) ?? existing.name
+      if (getTypeId(def.key) === getTypeId(existing.key) && def.name.length < preferred.length) {
+        this.names.numbered.set(existing.name, def.name)
+      }
       return existing
     }
 

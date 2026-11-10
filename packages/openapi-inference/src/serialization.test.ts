@@ -381,6 +381,11 @@ describe('generated schemas match serialized outputs', async () => {
     ['partialJsonNumRoot', undefined],
     ['plainOptionalJsons', undefined],
     ['optionalJsonHolder', undefined],
+    ['maybeJsonPointRoot', undefined],
+    ['maybeJsonPointHolder', undefined],
+    ['maybeJsonCountRoot', undefined],
+    ['maybeJsonCountHolder', undefined],
+    ['fnViewHolder', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
