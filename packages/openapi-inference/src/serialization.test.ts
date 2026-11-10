@@ -289,6 +289,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['viaSelfMaps', undefined],
     ['viaSelfSets', undefined],
     ['viaParents', undefined],
+    ['viaDeepMaps', undefined],
+    ['viaSelfLists', undefined],
+    ['viaSelfRecords', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2421,6 +2424,22 @@ describe('generated schemas match serialized outputs', async () => {
       )
       expect(inline(schemaOf('viaSelfSets'))).toEqual(
         levels(5, (a) => model({ inner: model({ a, s: expect.any(Object) }) }), {
+          type: 'number',
+        }),
+      )
+      // also two object literals deep, and beside a list or record of itself
+      expect(inline(schemaOf('viaDeepMaps'))).toEqual(
+        levels(6, (a) => model({ inner: model({ deep: model({ a, m: expect.any(Object) }) }) }), {
+          type: 'number',
+        }),
+      )
+      expect(inline(schemaOf('viaSelfLists'))).toEqual(
+        levels(6, (a) => model({ inner: model({ a, l: expect.any(Object) }) }), {
+          type: 'number',
+        }),
+      )
+      expect(inline(schemaOf('viaSelfRecords'))).toEqual(
+        levels(5, (a) => model({ inner: model({ a, r: expect.any(Object) }) }), {
           type: 'number',
         }),
       )

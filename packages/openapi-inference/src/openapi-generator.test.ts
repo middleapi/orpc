@@ -908,6 +908,18 @@ describe('openAPIGenerator', () => {
           swappedInput: 'os.input(type<CD<Swap<number, string>>>()).handler(() => 1)',
           mapSwapped: 'os.handler((): CD<MapSwap<number, string>> => ({}) as any)',
           mapSwappedInput: 'os.input(type<Expanding<MapSwap<number, string>>>()).handler(() => 1)',
+          swappedFour: 'os.handler((): CD<SwapFour<number, string>> => ({}) as any)',
+          swappedFourInput:
+            'os.input(type<Expanding<SwapFour<number, string>>>()).handler(() => 1)',
+          rotated: 'os.handler((): CD<Rotate<number, string, boolean>> => ({}) as any)',
+          rotatedInput: 'os.input(type<CD<Rotate<number, string, boolean>>>()).handler(() => 1)',
+          indexed: 'os.handler((): CD<IndexDer<number>> => ({}) as any)',
+          indexedSwapped: 'os.handler((): CD<IndexSwap<number, string>> => ({}) as any)',
+          indexedSwappedInput: 'os.input(type<CD<IndexSwap<number, string>>>()).handler(() => 1)',
+          mutualLiterals: 'os.handler((): CD<LitA<number>> => ({}) as any)',
+          mutualLiteralsInput: 'os.input(type<Expanding<LitA<number>>>()).handler(() => 1)',
+          mutualGetters: 'os.handler((): CD<FnA<number>> => ({}) as any)',
+          mutualGettersInput: 'os.input(type<CD<FnA<number>>>()).handler(() => 1)',
         }
         const file = project({
           'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
@@ -948,6 +960,17 @@ describe('openAPIGenerator', () => {
             'interface MapDirect<T> { a: Map<string, T>; b: MapDirect<T[]>[]; c: BoxVia<MapDirect<T[]>> }',
             'interface Swap<T, U> extends Base<Swap<U, T[]>> { v: T; u: U }',
             'interface MapSwap<T, U> extends MapBase<MapSwap<U, T[]>> { v: T; u: U }',
+            'interface BaseFour<T> { a: Box<T>; b: Box<T>; c: Box<T>; d: BoxVia<T> }',
+            'interface SwapFour<T, U> extends BaseFour<SwapFour<U, T[]>> { v: T; u: U }',
+            'interface LitBase<T> { a: { x: Box<T>; m: Map<string, T> }; b: { y: Box<T>; f: () => T }; c: { z: BoxVia<T> } }',
+            'interface Rotate<T, U, V> extends LitBase<CD<Rotate<U, V, T>>> { v: T; u: U; w: V }',
+            'interface IndexBase<T> { a: Map<string, Box<T>>; i: { [k: string]: Box<T> }; j: { [k: string]: Box<T> } }',
+            'interface IndexDer<T> extends IndexBase<CD<IndexDer<T>>> { v: T }',
+            'interface IndexSwap<T, U> extends IndexBase<IndexSwap<U, T[]>> { v: T; u: U }',
+            'interface LitA<T> { b: Box<CD<LitB<T>>>; c: { d: Box<CD<LitB<T>>> }; m: Map<string, T> }',
+            'interface LitB<T> { a: Box<CD<LitA<T>>>; e: { f: CD<LitA<T>> }; v: T; g: () => T }',
+            'interface FnA<T> { c: { d: Box<CD<FnB<T>>> }; e: { f: CD<FnB<T>> }; g: () => T }',
+            'interface FnB<T> { c: { d: Box<CD<FnA<T>>> }; e: { f: CD<FnA<T>> }; v: T; h: () => T }',
             'export const router = {',
             ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
             '}',
@@ -971,6 +994,14 @@ describe('openAPIGenerator', () => {
             name,
             expect.stringMatching(/\{\}/),
           ])
+        }
+        // a cycle through models holding each other in object literals, cut as early as others
+        for (const name of ['mutualLiterals', 'mutualLiteralsInput']) {
+          const operation = spec.paths[`/${name}`].post
+          const schema = name.endsWith('Input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+          expect([name, JSON.stringify(schema).length < 50_000]).toEqual([name, true])
         }
       },
       120_000,
@@ -2192,6 +2223,12 @@ describe('openAPIGenerator', () => {
         depth === 0 ? end : { inner: { a: mapped(depth - 1, end), m: [] } }
       const sets = (depth: number, end: unknown): unknown =>
         depth === 0 ? end : { inner: { a: sets(depth - 1, end), s: [] } }
+      const deep = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { deep: { a: deep(depth - 1, end), m: [] } } }
+      const lists = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: lists(depth - 1, end), l: [] } }
+      const records = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: records(depth - 1, end), r: {} } }
 
       for (const [path, value, valid] of [
         ['/genericCycle', { f0: { f0: null, f2: { a: 2 } }, f2: { a: 1 } }, true],
@@ -2211,6 +2248,13 @@ describe('openAPIGenerator', () => {
         ['/viaSelfMaps', mapped(8, 'x'), false],
         ['/viaSelfSets', sets(5, 1), true],
         ['/viaSelfSets', sets(5, 'x'), false],
+        // also two object literals deep, and beside a list or record of the model
+        ['/viaDeepMaps', deep(5, 1), true],
+        ['/viaDeepMaps', deep(5, 'x'), false],
+        ['/viaSelfLists', lists(8, 1), true],
+        ['/viaSelfLists', lists(8, 'x'), false],
+        ['/viaSelfRecords', records(5, 1), true],
+        ['/viaSelfRecords', records(5, 'x'), false],
       ] as const) {
         expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
       }

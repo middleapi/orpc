@@ -78,6 +78,21 @@ export interface ViaParent<T> {
   inner: WithParent<T>
 }
 
+/** A generic model nesting its type argument two object literals deep, beside a map of itself */
+export interface ViaDeepMap<T> {
+  inner: { deep: { a: T; m: Map<string, ViaDeepMap<T>> } }
+}
+
+/** A generic model nesting its type argument through an object literal holding a list of itself */
+export interface ViaSelfList<T> {
+  inner: { a: T; l: ViaSelfList<T>[] }
+}
+
+/** A generic model nesting its type argument through an object literal holding a record of itself */
+export interface ViaSelfRecord<T> {
+  inner: { a: T; r: Record<string, ViaSelfRecord<T>> }
+}
+
 const viaGetter = <T>(a: T): ViaGetter<T> => ({ inner: { a, f: () => a } })
 const viaMapLiteral = <T>(a: T): ViaMapLiteral<T> => ({ inner: { a, m: new Map([['k', a]]) } })
 const viaSelfMap = <T>(a: T): ViaSelfMap<T> => {
@@ -87,6 +102,13 @@ const viaSelfMap = <T>(a: T): ViaSelfMap<T> => {
 }
 const viaSelfSet = <T>(a: T): ViaSelfSet<T> => ({
   inner: { a, s: new Set([{ inner: { a, s: new Set() } }]) },
+})
+const viaDeepMap = <T>(a: T): ViaDeepMap<T> => ({
+  inner: { deep: { a, m: new Map([['k', { inner: { deep: { a, m: new Map() } } }]]) } },
+})
+const viaSelfList = <T>(a: T): ViaSelfList<T> => ({ inner: { a, l: [{ inner: { a, l: [] } }] } })
+const viaSelfRecord = <T>(a: T): ViaSelfRecord<T> => ({
+  inner: { a, r: { k: { inner: { a, r: {} } } } },
 })
 const viaParent = <T>(a: T): ViaParent<T> => {
   const model: ViaParent<T> = { inner: { a, f: () => a, up: null } }
@@ -145,6 +167,21 @@ export const roundThirtySeven = {
     (): ConditionalDeep<ViaParent<ViaParent<ViaParent<ViaParent<ViaParent<ViaParent<number>>>>>>> =>
       viaParent(viaParent(viaParent(viaParent(viaParent(viaParent(1)))))),
   ),
+  viaDeepMaps: os.handler(
+    (): ConditionalDeep<
+      ViaDeepMap<ViaDeepMap<ViaDeepMap<ViaDeepMap<ViaDeepMap<ViaDeepMap<number>>>>>>
+    > => viaDeepMap(viaDeepMap(viaDeepMap(viaDeepMap(viaDeepMap(viaDeepMap(1)))))),
+  ),
+  viaSelfLists: os.handler(
+    (): ConditionalDeep<
+      ViaSelfList<ViaSelfList<ViaSelfList<ViaSelfList<ViaSelfList<ViaSelfList<number>>>>>>
+    > => viaSelfList(viaSelfList(viaSelfList(viaSelfList(viaSelfList(viaSelfList(1)))))),
+  ),
+  viaSelfRecords: os.handler(
+    (): Expanding<
+      ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<number>>>>>
+    > => viaSelfRecord(viaSelfRecord(viaSelfRecord(viaSelfRecord(viaSelfRecord(1))))),
+  ),
 }
 
 /** Inputs of the same types, as a client sends them */
@@ -190,5 +227,28 @@ export const roundThirtySevenInputs = {
     .handler(() => 1),
   viaSelfSets: os
     .input(type<Expanding<ViaSelfSet<ViaSelfSet<ViaSelfSet<ViaSelfSet<ViaSelfSet<number>>>>>>>())
+    .handler(() => 1),
+  viaDeepMaps: os
+    .input(type<Expanding<ViaDeepMap<ViaDeepMap<ViaDeepMap<ViaDeepMap<ViaDeepMap<number>>>>>>>())
+    .handler(() => 1),
+  viaSelfLists: os
+    .input(
+      type<
+        ConditionalDeep<
+          ViaSelfList<
+            ViaSelfList<
+              ViaSelfList<ViaSelfList<ViaSelfList<ViaSelfList<ViaSelfList<ViaSelfList<number>>>>>>
+            >
+          >
+        >
+      >(),
+    )
+    .handler(() => 1),
+  viaSelfRecords: os
+    .input(
+      type<
+        Expanding<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<ViaSelfRecord<number>>>>>>
+      >(),
+    )
     .handler(() => 1),
 }

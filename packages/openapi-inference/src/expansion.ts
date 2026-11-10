@@ -10,6 +10,8 @@ const MAX_INSTANTIATIONS = 256
 const MIN_BUDGET_NESTING = 4
 /** Nested instantiations in a row whose type arguments contain the previous ones */
 export const MAX_GROWTH = 3
+/** Properties of the path a nesting runs through that are followed to tell it from a cycle */
+const MAX_ALONG = 16
 
 interface Expansion {
   type: Type
@@ -234,16 +236,25 @@ export class ExpansionGuard {
         this.getKeys(outer.type) === keys && this.holdsAgain(outer.type, type, MAX_GROWTH)
       if (held) {
         // what functions it holds is not known (see `holdsAgain`), a nesting of models that
-        // differ only there (`Via<Via<number>>`) ends where it is written
+        // differ only there (`Via<Via<number>>`) ends where it is written. Either way it grows
+        // only where its path runs through a declaration naming the model again, not through its
+        // type argument alone (`a` of `inner: { a: T; l: Model<T>[] }`)
         const unknown = held.keyless && !held.grows
         const path = this.path.slice(outer.at)
         return path.some((property, index) => {
           const owner = stack.filter((entry) => entry.at === outer.at + index).at(-1)?.type
-          return unknown
-            ? this.declaresCycle(property, owner, path.slice(index + 1))
-            : this.declaresNesting(property, owner)
+          return (
+            (unknown || this.declaresNesting(property, owner)) &&
+            this.declaresCycle(property, owner, path.slice(index + 1))
+          )
         })
-          ? outer.growth + 1
+          ? // also as far as the ones between with the same keys grew, which take turns with it
+            Math.max(
+              ...stack
+                .slice(i)
+                .filter((entry) => entry === outer || this.getKeys(entry.type) === keys)
+                .map((entry) => entry.growth),
+            ) + 1
           : 0
       }
     }
@@ -263,9 +274,8 @@ export class ExpansionGuard {
     owner: Type | undefined,
     along: readonly TSSymbol[],
   ): boolean {
-    const depth = 4
-    // it looks no further than `depth` types in
-    const names = along.slice(0, depth).map((p) => p.name)
+    // a longer path is not followed, any property counts then
+    const names = along.length <= MAX_ALONG ? along.map((p) => p.name) : undefined
     return (
       owner !== undefined &&
       this.types.getPropertyOwners(owner).some((model) => {
@@ -277,9 +287,9 @@ export class ExpansionGuard {
 
         return (
           declared !== undefined &&
-          this.types.memo(`declaresCycle:${names.join('.')}`, declared.id, () => {
+          this.types.memo(`declaresCycle:${names?.join('.') ?? '*'}`, declared.id, () => {
             const type = this.types.checker.getTypeOfSymbol(declared)
-            return type !== undefined && this.reaches(type, declaration!, depth, new Set(), names)
+            return type !== undefined && this.reaches(type, declaration!, 4, new Set(), names)
           })
         )
       })
@@ -289,7 +299,9 @@ export class ExpansionGuard {
   /**
    * Whether a type is an instantiation of a declaration, or holds one `depth` types in: as a
    * member, a type argument, the model a view maps over, or a property of a type the project
-   * declares: the one named first `along` the path when given, none at its end.
+   * declares. When given, only the property named first `along` the path counts, and none at its
+   * end, and the path, however long, takes none of the `depth` (`c: { d: Box<View<Other<T>>> }`
+   * of a model `Other` holds again at `c.d.v.e.f`).
    */
   private reaches(
     type: Type,
@@ -314,7 +326,7 @@ export class ExpansionGuard {
     if (type.flags & TypeFlags.UnionOrIntersection) {
       return this.types
         .getMembers(type)
-        .some((member) => this.reaches(member, declaration, depth - 1, seen, along))
+        .some((member) => this.reaches(member, declaration, along ? depth : depth - 1, seen, along))
     }
 
     const symbol = type.getAliasSymbol() ?? type.getSymbol()
@@ -340,10 +352,24 @@ export class ExpansionGuard {
       return false
     }
 
-    const property = along && this.types.getProperty(type, along[0]!)
+    // the values of index signatures, which the path does not name
+    if (
+      this.types.checker
+        .getIndexInfosOfType(type)
+        .some((info) => this.reaches(info.valueType, declaration, depth - 1, seen, along))
+    ) {
+      return true
+    }
+
+    if (along) {
+      const property = this.types.getProperty(type, along[0]!)
+      const [next] = property ? this.types.getSymbolTypes([property]) : []
+      return next !== undefined && this.reaches(next, declaration, depth, seen, along.slice(1))
+    }
+
     return this.types
-      .getSymbolTypes(along ? (property ? [property] : []) : this.types.getProperties(type))
-      .some((child) => child && this.reaches(child, declaration, depth - 1, seen, along?.slice(1)))
+      .getPropertyTypes(type)
+      .some((child) => child && this.reaches(child, declaration, depth - 1, seen, undefined))
   }
 
   /**
@@ -488,10 +514,10 @@ export class ExpansionGuard {
       return false
     }
 
-    // `{ inner: T }`, or `Box<T>` of `interface Box<T> { v: T }`
-    return this.types
-      .getPropertyTypes(type)
-      .every((t) => t === undefined || this.isParametric(t, depth - 1, interfaces))
+    // `{ inner: T }`, `{ [key: string]: T }`, or `Box<T>` of `interface Box<T> { v: T }`
+    return this.getValues(type).every(
+      (t) => t === undefined || this.isParametric(t, depth - 1, interfaces),
+    )
   }
 
   /**
