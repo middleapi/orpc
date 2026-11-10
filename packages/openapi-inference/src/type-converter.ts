@@ -2032,9 +2032,6 @@ export class TypeToJsonSchemaConverter {
 }
 
 /**
- * One schema, or `anyOf` of the different ones, flattening nested `anyOf`.
- */
-/**
  * A schema also accepting any object, which subsumes its object branches.
  */
 function withAnyObject(schema: JsonSchema): JsonSchema {
@@ -2053,6 +2050,9 @@ function withAnyObject(schema: JsonSchema): JsonSchema {
   ])
 }
 
+/**
+ * One schema, or `anyOf` of the different ones, flattening nested `anyOf`.
+ */
 function anyOfDeduped(schemas: readonly JsonSchema[]): JsonSchema {
   const flat = dedupe(
     schemas.flatMap((s) =>
