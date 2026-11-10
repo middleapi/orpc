@@ -26,6 +26,7 @@ import {
   getTypedArrayViewBases,
   getViewBases,
   hasBuiltinForm,
+  hasToJSONOf,
   isBoxedBigInt,
   isStringifiedBuiltin,
   isTypedArray,
@@ -814,13 +815,13 @@ export class TypeToJsonSchemaConverter {
     // branded built-ins, e.g. `Date & { __brand: 'CreatedAt' }`, whose `toJSON` an intersection
     // may add (`Date & { toJSON(): number }`), which `JSON.stringify` calls, the serializer does not
     // (also one the serializer leaves to `JSON.stringify`, `Error & { toJSON(): string }`, or
-    // another member adds, `Set<string> & Pick<Date, 'toJSON'>`)
+    // another member adds, `Set<string> & Pick<Date, 'toJSON'>`, not a view of the same built-in)
     for (const member of members) {
       const builtin =
         member.flags & TypeFlags.Object ? this.convertBuiltinObject(member) : undefined
       if (builtin !== undefined) {
         return this.withAddedToJSON(
-          members.filter((m) => m !== member),
+          members.filter((m) => m !== member && !hasToJSONOf(this.types, m, member)),
           () => this.withPlainForm(type, builtin),
           isStringifiedBuiltin(this.types, member),
         )
@@ -1937,17 +1938,14 @@ export class TypeToJsonSchemaConverter {
   /**
    * Whether `toJSON` of a value of this type, or of a union member, may return what JSON
    * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
+   * Inputs follow outputs: an instance of a class implementing an interface sends what its
+   * `toJSON` returns (`interface Point { toJSON(): undefined }`).
    */
   private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
     return this.types.getUnionMembers(type).some((member) => {
       // a function without its optional `toJSON` is dropped, also by a client sending it
       if (mayBeNonSerializable(this.types, member)) {
         return true
-      }
-
-      // a client's serializer calls `toJSON` only of the class instances it sends
-      if (this.input && !stringify && getClassType(this.types, member) === undefined) {
-        return false
       }
 
       // also of the classes behind a view leaving `toJSON` out (`Omit<C, 'toJSON'>`)

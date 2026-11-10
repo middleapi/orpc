@@ -320,12 +320,24 @@ describe('generated schemas match serialized outputs', async () => {
     ['plainCallHandlers', undefined],
     ['plainLabelledError', undefined],
     ['setPickBox', undefined],
+    ['dateViewHolder', undefined],
+    ['plainUndefPoint', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
     const validate = ajv.compile(responseSchema(`/${name}`))
 
     expect(validate(json) ? [] : validate.errors).toEqual([])
+  })
+
+  it('keeps dates intersected with views of a date, and leaves out what toJSON writes as nothing', () => {
+    const schemas = spec.components?.schemas as any
+    const { dr, dp, dg } = schemas.DateViewHolder.properties
+
+    // a view of the date adds no `toJSON` to it
+    expect(dr).toEqual({ 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' })
+    expect(dp).toEqual(dg)
+    expect(deref(responseSchema('/plainUndefPoint')).required).toEqual(['n'])
   })
 
   // the body of a defined error, as oRPC sends it

@@ -86,6 +86,7 @@ import {
   labelledError,
   roundFortyEightInputs,
 } from '../tests/fixtures/app/src/round48'
+import { DateViewHolder, roundFiftyInputs, UndefPointImpl } from '../tests/fixtures/app/src/round50'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2819,6 +2820,47 @@ describe('openAPIGenerator', () => {
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
         expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
       }
+    })
+  })
+
+  describe('round fifty', () => {
+    it('documents inputs holding dates intersected with views of a date, and toJSON writing nothing', async () => {
+      const spec = await generator.generate(roundFiftyInputs, {
+        source: { file: fixture('round50.ts'), export: 'roundFiftyInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        ['dateViewHolder', new DateViewHolder()],
+        ['undefPoint', { p: new UndefPointImpl(), n: 1 }],
+        ['undefPoint', { p: { x: 1 }, n: 1 }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+
+      // a view of the date adds no `toJSON` to it
+      const { dr, dp, dg } = (spec.components?.schemas as any)[
+        body('/dateViewHolder').$ref.replace('spec#/$defs/', '')
+      ].properties
+      expect(dr).toEqual({ 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' })
+      expect(dp).toEqual(dg)
     })
   })
 })

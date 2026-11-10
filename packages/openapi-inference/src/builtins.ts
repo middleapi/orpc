@@ -623,6 +623,16 @@ export function getToJSON(types: TypeQueries, type: Type): TSSymbol | undefined 
   return types.getProperty(type, 'toJSON')
 }
 
+/**
+ * Whether a type has the `toJSON` of a built-in, as a view of it keeps (`Readonly<Date>`,
+ * `Pick<Date, 'toJSON'>`), so it adds none to the built-in.
+ */
+export function hasToJSONOf(types: TypeQueries, type: Type, builtin: Type): boolean {
+  const own = getToJSON(types, builtin)?.declarations[0]
+  const other = getToJSON(types, type)?.declarations[0]
+  return own !== undefined && other?.path === own.path && other.index === own.index
+}
+
 function hasOwnToJSON(types: TypeQueries, type: Type): boolean {
   const toJSON = getToJSON(types, type)
   return toJSON !== undefined && !isBuiltinSymbol(types, toJSON)
