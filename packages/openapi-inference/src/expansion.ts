@@ -580,15 +580,19 @@ export class ExpansionGuard {
  */
 export function argumentsGrow(types: TypeQueries, outer: Type, inner: Type, depth = 0): boolean {
   const innerArguments = types.getTypeArguments(inner)
-  // one passed on as it is (`string` of `Model<Model<T, string>, string>`) is held, not grown,
-  // in its position, as another may be the same type (`Pass<U, Box<T>>` of `Pass<number, number>`)
-  const outerArguments = types
-    .getTypeArguments(outer)
-    .filter((outerArgument, index) => innerArguments[index]?.id !== outerArgument.id)
+  const outerArguments = types.getTypeArguments(outer)
 
-  return innerArguments.some((innerArgument) =>
-    outerArguments.some((outerArgument) => grows(types, outerArgument, innerArgument, depth)),
-  )
+  return innerArguments.some((innerArgument, index) => {
+    // one in its position as it is, or as part of it (`T` of `Model<Model<T, string>, string>`),
+    // is held, not grown, though it holds another (`string`). One another grows into is not
+    // (`Box<T>` of `Model<T, Box<T>>` inside `Model<T, U>`), also as another may be the same type
+    // (`Pass<U, Box<T>>` of `Pass<number, number>`)
+    const inPlace = outerArguments[index]
+    return (
+      (inPlace === undefined || !containsType(types, inPlace, innerArgument.id, 3)) &&
+      outerArguments.some((outerArgument) => grows(types, outerArgument, innerArgument, depth))
+    )
+  })
 }
 
 /**

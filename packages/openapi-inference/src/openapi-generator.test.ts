@@ -1097,6 +1097,81 @@ describe('openAPIGenerator', () => {
       120_000,
     )
 
+    it.runIf(canGenerateWithin)(
+      'cuts cycles growing a type argument from one passed on in place as early, in time',
+      () => {
+        const cases: Record<string, string> = {
+          branches: 'os.handler((): KeepGrow<number, string> => ({}) as any)',
+          branchesSame: 'os.handler((): KeepGrow<number, number> => ({}) as any)',
+          branchesInput: 'os.input(type<KeepGrow<number, string>>()).handler(() => 1)',
+          literal: 'os.handler((): KeepGrowLit<number, string> => ({}) as any)',
+          literalInput: 'os.input(type<KeepGrowLit<number, string>>()).handler(() => 1)',
+          wrapped: 'os.handler((): KeepGrowWrap<number, string> => ({}) as any)',
+          wrappedInput: 'os.input(type<KeepGrowWrap<number, string>>()).handler(() => 1)',
+          three: 'os.handler((): KeepGrowThree<number, string, boolean> => ({}) as any)',
+          kept: `os.handler((): ${'Kept<'.repeat(6)}number${'>'.repeat(6)} => ({}) as any)`,
+          keptInput: `os.input(type<${'Kept<'.repeat(6)}number${'>'.repeat(6)}>()).handler(() => 1)`,
+        }
+        const file = project({
+          'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+          'src/router.ts': [
+            `import { os, type } from '@orpc/server'`,
+            'interface Box<T> { v: T }',
+            'interface KeepGrow<T, U> { v: T; u: U; x: KeepGrow<T, Box<T>> | null; y: KeepGrow<Box<T>, U> | null; z: KeepGrow<T, Set<T>> | null; w: KeepGrow<Set<T>, U> | null }',
+            'interface KeepGrowLit<T, U> { v: T; u: U; n: { x: KeepGrowLit<T, Box<T>> | null; y: KeepGrowLit<Box<T>, U> | null; z: KeepGrowLit<T, Set<T>> | null; w: KeepGrowLit<Set<T>, U> | null } }',
+            'interface KeepGrowWrap<T, U> { v: T; u: U; x: Map<string, KeepGrowWrap<T, Box<T>>>; y: Set<KeepGrowWrap<Box<T>, U>>; z: KeepGrowWrap<T, T[]>[]; w: Record<string, KeepGrowWrap<T[], U>> }',
+            'interface KeepGrowThree<A, B, C> { a: A; b: B; c: C; x: KeepGrowThree<A, Box<A>, C> | null; y: KeepGrowThree<Box<A>, B, C> | null; z: KeepGrowThree<A, B, Box<B>> | null }',
+            'interface Kept<T, U = string> { a: T; b: U; m: Map<string, Kept<T, U>> }',
+            'export const router = {',
+            ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
+            '}',
+            '',
+          ].join('\n'),
+        })
+
+        const { spec, error } = generateWithin(file('src/router.ts'), 60_000)
+        expect(error).toBeUndefined()
+
+        const schemas = spec.components?.schemas ?? {}
+        const component = (ref: string) => schemas[ref.replace('#/components/schemas/', '')]
+        const schemaOf = (name: string) => {
+          const operation = spec.paths[`/${name}`].post
+          return name.endsWith('Input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+        }
+        // the schema with every component it reaches
+        const reached = (schema: unknown, seen = new Set<string>()): number => {
+          const json = JSON.stringify(schema)
+          let size = json.length
+          for (const [, ref] of json.matchAll(/"\$ref":"([^"]+)"/g)) {
+            if (!seen.has(ref!)) {
+              seen.add(ref!)
+              size += reached(component(ref!), seen)
+            }
+          }
+          return size
+        }
+        for (const name of Object.keys(cases).filter((name) => !name.startsWith('kept'))) {
+          expect([name, reached(schemaOf(name)) < 20_000]).toEqual([name, true])
+        }
+
+        // a finite nesting passing on its default type argument is expanded in full
+        const deref = (schema: any): any => (schema?.$ref ? deref(component(schema.$ref)) : schema)
+        for (const name of ['kept', 'keptInput']) {
+          let schema = deref(schemaOf(name))
+          let levels = 0
+          while (schema.type === 'object') {
+            expect([name, levels, schema.properties.b]).toEqual([name, levels, { type: 'string' }])
+            schema = deref(schema.properties.a)
+            levels++
+          }
+          expect([name, levels, schema]).toEqual([name, 6, { type: 'number' }])
+        }
+      },
+      120_000,
+    )
+
     it('reads no diagnostics of the whole program, which would check all of it', async () => {
       const file = project({
         'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
