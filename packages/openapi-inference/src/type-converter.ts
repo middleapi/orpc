@@ -992,11 +992,11 @@ export class TypeToJsonSchemaConverter {
     // writes its `Set` fields as `{}`, so each value is either form, as in a view of an output
     // (the built-in a class extends is written as the built-in, see below, not by its `toJSON`). The
     // `toJSON` is the type's own (also one an intersection adds, `C & { toJSON(): string }`), or of
-    // each class a view leaving it out is over. A `toJSON` returning only `undefined` writes
-    // nothing, the caller makes it optional.
+    // each class a view leaving it out or mapping it to no method (`LooseDeep<C>`) is over. A
+    // `toJSON` returning only `undefined` writes nothing, the caller makes it optional.
     if (sentForms && !options.ignoreToJSON) {
       const classes = getClassTypes(this.types, type)
-      const results = (this.types.getProperty(type, 'toJSON') ? [type] : classes)
+      const results = (getToJSONResultTypes(this.types, type, true).length ? [type] : classes)
         .filter(
           (source) =>
             !classes.some(

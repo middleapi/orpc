@@ -406,6 +406,15 @@ describe('generated schemas match serialized outputs', async () => {
     ['looseTplNums', undefined],
     ['looseUpperHolder', undefined],
     ['looseBrandedLedger', undefined],
+    ['looseUnionKeyNum', undefined],
+    ['looseRecordUnionNum', undefined],
+    ['looseNestedNum', undefined],
+    ['mappedUnionKeyNum', undefined],
+    ['mappedRecordUnionNum', undefined],
+    ['mappedNestedNum', undefined],
+    ['looseUnionKeyNums', undefined],
+    ['looseNestedHolder', undefined],
+    ['looseJsonDicts', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

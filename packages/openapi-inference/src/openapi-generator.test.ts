@@ -183,6 +183,11 @@ import {
   roundSixtySix,
   roundSixtySixInputs,
 } from '../tests/fixtures/app/src/round66'
+import {
+  JsonDicts,
+  roundSixtySeven,
+  roundSixtySevenInputs,
+} from '../tests/fixtures/app/src/round67'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3674,6 +3679,66 @@ describe('openAPIGenerator', () => {
       )
       expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
       expect(body('looseKeyNum')).toEqual(either)
+    })
+  })
+
+  describe('round sixty-seven', () => {
+    const either = { anyOf: [{ type: 'number' }, { type: 'object' }] }
+
+    it('reads brands keyed by type parameters and literals, or nesting them, as generic', async () => {
+      const spec = await generator.generate(roundSixtySeven, {
+        source: { file: fixture('round67.ts'), export: 'roundSixtySeven' },
+      })
+      const response = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+
+      for (const name of ['UnionKey', 'RecordUnion', 'Nested']) {
+        expect(response(`loose${name}Num`)).toEqual(either)
+        expect(response(`mapped${name}Num`)).toEqual({ type: 'number' })
+      }
+      expect(response('looseNestedHolder').properties.v).toEqual(either)
+    })
+
+    it('documents them, and the toJSON results of deep views of classes, in inputs', async () => {
+      const spec = await generator.generate(roundSixtySevenInputs, {
+        source: { file: fixture('round67.ts'), export: 'roundSixtySevenInputs' },
+      })
+      const body = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.requestBody.content['application/json'].schema
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+
+      expect(body('looseUnionKeyNum')).toEqual(either)
+      expect(body('looseRecordUnionNum')).toEqual(either)
+      expect(body('looseNestedHolder').properties.v).toEqual(either)
+
+      // what a client holding these values sends, which the server accepts
+      const handler = new OpenAPIHandler(roundSixtySevenInputs)
+      const sent: string[] = []
+      const link = new OpenAPILink(roundSixtySevenInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(await handled.clone().text())
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const plainDicts = { counts: { a: 1 }, none: {} }
+
+      for (const [name, value] of [
+        ['looseUnionKeyNum', 5],
+        ['looseRecordUnionNum', 5],
+        ['looseNestedHolder', { v: 5 }],
+        ['looseJsonDicts', new JsonDicts()],
+        ['looseJsonDicts', plainDicts],
+        ['looseJsonDictsHolder', { d: new JsonDicts() }],
+        ['looseJsonDictsHolder', { d: plainDicts }],
+      ] as const) {
+        await expect(link.call([name], value as any, { context: {} })).resolves.toBe(1)
+        const validate = ajv.compile(body(name))
+        const json = JSON.parse(sent.at(-1)!)
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
     })
   })
 })

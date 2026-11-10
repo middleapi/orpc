@@ -905,10 +905,10 @@ export class TypeQueries {
     }
 
     // a mapped type over keys of a type parameter (`{ [K in T]: true }` of zod's `BRAND<T>`,
-    // `` { [K in `b-${T}`]: true } ``, `Record<T, true>`), which has no properties until it is
-    // instantiated, unlike its instantiations and mapped types over other keys
-    // (`{ [K in string]: number }`)
-    if ((type as any).objectFlags & ObjectFlags.Mapped && !this.getProperties(type).length) {
+    // `` { [K in `b-${T}`]: true } ``, `{ [K in T | 'extra']: true }`) as it is declared, or by an
+    // alias over one (`Record<T | 'extra', true>`), unlike their instantiations and mapped types
+    // over other keys (`{ [K in string]: number }`)
+    if ((type as any).objectFlags & ObjectFlags.Mapped) {
       const declaration = type.getSymbol()?.declarations[0]?.resolve() as any
       const constraint = declaration?.typeParameter?.constraint
       const keys =
@@ -921,10 +921,13 @@ export class TypeQueries {
       )
     }
 
+    // also the fields of an object type literal (`{ inner: { [K in T]: true } }`)
     const children =
       type.flags & TypeFlags.UnionOrIntersection
         ? this.getMembers(type)
-        : this.getReferenceArguments(type)
+        : (type.getSymbol()?.flags ?? 0) & SymbolFlags.TypeLiteral
+          ? this.getPropertyTypes(type).filter((child) => child !== undefined)
+          : this.getReferenceArguments(type)
 
     return depth > 0 && children.some((child) => this.hasTypeParameter(child, depth - 1))
   }
