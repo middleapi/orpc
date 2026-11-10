@@ -923,12 +923,14 @@ export class TypeToJsonSchemaConverter {
 
     const builtin = ownFields ? undefined : this.convertBuiltinObject(type)
     if (builtin !== undefined) {
-      // a view of an intersection with a built-in (`Readonly<Error & { toJSON(): string }>`)
-      const sources = this.types.getMappedSourceMembers(type)
-      const viewed =
-        sources.length > 1 ? sources.find((m) => hasBuiltinForm(this.types, m)) : undefined
+      // a view of an intersection with a built-in (`Readonly<Error & { toJSON(): string }>`), or an
+      // interface extending a view of one with its own `toJSON` (`interface Msg extends Pick<Error,
+      // 'message'> { toJSON(): string }`), which adds it like an intersection
+      const views = getViewBases(type)
+      const sources = [type, ...views].flatMap((v) => this.types.getMappedSourceMembers(v))
+      const viewed = sources.find((m) => hasBuiltinForm(this.types, m))
       return viewed
-        ? this.withBuiltinToJSON(type, sources, viewed, builtin)
+        ? this.withBuiltinToJSON(type, views.length ? [type, ...sources] : sources, viewed, builtin)
         : this.withPlainForm(type, builtin)
     }
 

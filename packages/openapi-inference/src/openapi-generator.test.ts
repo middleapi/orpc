@@ -99,6 +99,12 @@ import {
   roundFiftyOneInputs,
   subErrJson,
 } from '../tests/fixtures/app/src/round51'
+import {
+  boxedClassJson,
+  plainViewToJSON,
+  roundFiftyTwoInputs,
+  viewToJSON,
+} from '../tests/fixtures/app/src/round52'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2904,6 +2910,40 @@ describe('openAPIGenerator', () => {
         ['errorViewJson', errorViewJson()],
         ['errorViewJson', plainErrorViewJson()],
         ['boxedJson', boxedJson()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('round fifty-two', () => {
+    it('documents inputs of interfaces over a view of an error, and boxed primitive subclasses, with their own toJSON', async () => {
+      const spec = await generator.generate(roundFiftyTwoInputs, {
+        source: { file: fixture('round52.ts'), export: 'roundFiftyTwoInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        ['viewToJSON', viewToJSON()],
+        ['viewToJSON', plainViewToJSON()],
+        ['boxedClassJson', boxedClassJson()],
       ] as const) {
         const validate = ajv.compile(body(`/${name}`))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

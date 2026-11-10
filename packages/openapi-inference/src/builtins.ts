@@ -80,12 +80,13 @@ export function getBuiltin(
       ? getLeaf(symbol.name, stringify)
       : undefined
 
-    // `JSON.stringify` calls the own `toJSON` of a built-in subclass, the serializer does not
+    // `JSON.stringify` calls the own `toJSON` of a built-in subclass, the serializer does not,
+    // unless it leaves the instance to `JSON.stringify` (`class MyNum extends Number`)
     return (
       runtimeGlobal ??
       // classes extending built-ins, and interfaces describing them (`interface Tags extends Set<string>`)
       (symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface) &&
-      !(stringify && hasOwnToJSON(types, type))
+      !((stringify || isStringifiedBuiltin(types, type)) && hasOwnToJSON(types, type))
         ? getBuiltinSubclass(types, type, stringify)
         : undefined)
     )
