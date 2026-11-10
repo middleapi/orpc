@@ -1671,8 +1671,21 @@ export class TypeToJsonSchemaConverter {
 
     // a returned built-in is written by its own fields, also through `Readonly<Date>`
     return (
-      getBuiltinFields(this.types, resolved) ?? this.convertObject(resolved, { ignoreToJSON: true })
+      this.convertBuiltinFields(resolved) ?? this.convertObject(resolved, { ignoreToJSON: true })
     )
+  }
+
+  /**
+   * What `JSON.stringify` writes of a returned built-in by its own fields. A library interface
+   * describing other values (`ArrayLike<string>`) is written by its members, or as any object of
+   * an instance of a runtime class implementing it, whose getters are not written (`Body` of a `Response`).
+   */
+  private convertBuiltinFields(type: Type): JsonSchema | undefined {
+    const fields = getBuiltinFields(this.types, type)
+
+    return fields === 'members'
+      ? withAnyObject(this.convertObject(type, { ignoreToJSON: true }))
+      : fields
   }
 
   /**
@@ -2021,6 +2034,25 @@ export class TypeToJsonSchemaConverter {
 /**
  * One schema, or `anyOf` of the different ones, flattening nested `anyOf`.
  */
+/**
+ * A schema also accepting any object, which subsumes its object branches.
+ */
+function withAnyObject(schema: JsonSchema): JsonSchema {
+  const branches =
+    typeof schema === 'object' && schema.anyOf && Object.keys(schema).length === 1
+      ? schema.anyOf
+      : [schema]
+
+  if (branches.some((b) => b === true || (typeof b === 'object' && Object.keys(b).length === 0))) {
+    return {}
+  }
+
+  return anyOfDeduped([
+    ...branches.filter((b) => !(typeof b === 'object' && b.type === 'object')),
+    { type: 'object' },
+  ])
+}
+
 function anyOfDeduped(schemas: readonly JsonSchema[]): JsonSchema {
   const flat = dedupe(
     schemas.flatMap((s) =>

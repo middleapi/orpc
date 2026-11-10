@@ -39,6 +39,63 @@ export class ToObject {
   }
 }
 
+/** A brand over a value, which `JSON.stringify` writes as the value */
+type Branded<T, N extends string> = T & { readonly __brand?: N }
+
+/** Sent as the typed array its `toJSON` returns, by its index keys */
+export class ToView {
+  toJSON(): ArrayBufferView {
+    return new Uint8Array([1, 2])
+  }
+}
+
+/** Sent as the response its `toJSON` returns, whose getters are not written */
+export class ToBody {
+  toJSON(): Body {
+    return new Response('x')
+  }
+}
+
+/** Sent as the compression stream its `toJSON` returns */
+export class ToTransform {
+  toJSON(): GenericTransformStream {
+    return new CompressionStream('gzip')
+  }
+}
+
+/** Sent as the reader its `toJSON` returns */
+export class ToReader {
+  toJSON(): ReadableStreamGenericReader {
+    return new ReadableStream().getReader()
+  }
+}
+
+/** Sent as the transform stream its `toJSON` returns */
+export class ToPair {
+  toJSON(): ReadableWritablePair<string, string> {
+    return new TransformStream()
+  }
+}
+
+/** Sent as the branded set its `toJSON` returns */
+export class ToSetBrand {
+  toJSON(): Branded<ReadonlySet<number>, 'rs'> {
+    return new Set([1])
+  }
+}
+
+/** Sent as the branded response its `toJSON` returns */
+export class ToBodyBrand {
+  toJSON(): Branded<Body, 'bo'> {
+    return new Response('x')
+  }
+}
+
+/** Holds a value converted with `toJSON` in a field */
+export class BodyHolder {
+  constructor(readonly held: ToBody) {}
+}
+
 /** A generic model holding an expanding view of itself, which a deep mapped type of a library maps again */
 export interface ExpandingLink<T> {
   v: T
@@ -62,5 +119,15 @@ export const roundFortyTwo = {
   ]),
   toObjects: os.handler((): ToObject[] => [new ToObject('text'), new ToObject({ a: 1 })]),
   toSettled: os.handler((): { settled: ToSettled } => ({ settled: new ToSettled() })),
+  toInstances: os.handler(() => ({
+    view: new ToView(),
+    body: new ToBody(),
+    transform: new ToTransform(),
+    reader: new ToReader(),
+    pair: new ToPair(),
+    setBrand: new ToSetBrand(),
+    bodyBrand: new ToBodyBrand(),
+    nested: { held: new BodyHolder(new ToBody()) },
+  })),
   readonlyDeepLink: os.handler((): ReadonlyDeep<ExpandingLink<number>> => link(3)),
 }

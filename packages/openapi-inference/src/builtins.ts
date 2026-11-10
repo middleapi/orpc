@@ -231,17 +231,36 @@ export function getDeclaredBuiltinName(types: TypeQueries, type: Type): string |
 }
 
 /**
+ * Library interfaces without a global of their name whose values the runtime creates as plain data,
+ * written by their members
+ */
+const PLAIN_DATA_INTERFACES = new Set([
+  'PromiseFulfilledResult',
+  'PromiseRejectedResult',
+  'IteratorYieldResult',
+  'IteratorReturnResult',
+])
+
+/**
  * How `JSON.stringify` writes a built-in by its own fields, as it writes what `toJSON` returned:
  * boxed primitives as primitives, other built-ins have no own enumerable data.
  * Also through a mapped type, like `Readonly<Date>`.
+ *
+ * `'members'` for a library interface without a global of its name (`Iterable<T>`, `ArrayLike<T>`,
+ * `Body`), whose values are other values written by their members (an array, a string), or instances
+ * of runtime classes, whose getters are not written (a `Response` as `{}`).
  */
-export function getBuiltinFields(types: TypeQueries, type: Type): JsonSchema | undefined {
-  // a library interface without a global of its name (`Iterable<T>`, `ArrayLike<T>`,
-  // `PromiseFulfilledResult<T>`) describes other values, written by their members
-  const builtin =
-    ((type.getSymbol()?.flags ?? 0) & SymbolFlags.Value
-      ? getDeclaredBuiltinName(types, type)
-      : undefined) ?? getMappedBuiltinName(types, type)
+export function getBuiltinFields(
+  types: TypeQueries,
+  type: Type,
+): JsonSchema | 'members' | undefined {
+  const declared = getDeclaredBuiltinName(types, type)
+
+  if (declared !== undefined && !((type.getSymbol()?.flags ?? 0) & SymbolFlags.Value)) {
+    return PLAIN_DATA_INTERFACES.has(declared) ? undefined : 'members'
+  }
+
+  const builtin = declared ?? getMappedBuiltinName(types, type)
 
   if (builtin === undefined) {
     return undefined

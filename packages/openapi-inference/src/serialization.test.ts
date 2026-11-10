@@ -296,6 +296,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['toArrayLikes', undefined],
     ['toObjects', undefined],
     ['toSettled', undefined],
+    ['toInstances', undefined],
     ['readonlyDeepLink', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
@@ -2529,6 +2530,23 @@ describe('generated schemas match serialized outputs', async () => {
         properties: { status: { type: 'string', const: 'fulfilled' }, value: { type: 'number' } },
         required: ['status', 'value'],
       })
+    })
+
+    it('writes what toJSON returns of a library interface of runtime classes as any object', () => {
+      const schemas = spec.components?.schemas as any
+
+      // the getters of a `Response` or a stream are not written, `{}`
+      for (const name of [
+        'ToView',
+        'ToBody',
+        'ToTransform',
+        'ToReader',
+        'ToPair',
+        'ToSetBrand',
+        'ToBodyBrand',
+      ]) {
+        expect(schemas[name]).toEqual({ type: 'object', description: expect.any(String) })
+      }
     })
 
     it('cuts a cycle through an expanding view under a deep mapped type of a library', () => {
