@@ -71,7 +71,15 @@ import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
 import { roundThirtyEightJSDoc } from '../tests/fixtures/app/src/round38'
 import { roundThirtyNine, roundThirtyNineInputs } from '../tests/fixtures/app/src/round39'
 import { roundFortyFour } from '../tests/fixtures/app/src/round44'
-import { FunctionHolder, roundFortySixInputs, StampHolder } from '../tests/fixtures/app/src/round46'
+import {
+  FunctionHolder,
+  jsonFn,
+  JsonFnForms,
+  JsonFnHolder,
+  MaybeStampHolder,
+  roundFortySixInputs,
+  StampHolder,
+} from '../tests/fixtures/app/src/round46'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2750,6 +2758,17 @@ describe('openAPIGenerator', () => {
         ['functionHolder', new FunctionHolder()],
         // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
         ['functionHolder', { ...new FunctionHolder() }],
+        ['maybeStampHolder', new MaybeStampHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['maybeStampHolder', { ...new MaybeStampHolder() }],
+        ['jsonFnHolder', new JsonFnHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['jsonFnHolder', { ...new JsonFnHolder() }],
+        ['jsonFnForms', new JsonFnForms()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['jsonFnForms', { ...new JsonFnForms() }],
+        ['jsonFnViews', { added: jsonFn(), fn: jsonFn(), view: jsonFn(), addedView: jsonFn() }],
+        ['jsonFnViews', { added: jsonFn(), fn: jsonFn(), view: { name: 'n' }, addedView: {} }],
       ] as const) {
         const validate = ajv.compile(body(`/${name}`))
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))

@@ -837,7 +837,11 @@ export class TypeToJsonSchemaConverter {
 
     const converted = this.convertToJSONResults(toJSONResults)
 
-    if (this.mode === 'stringify') {
+    // a `toJSON` that may be missing (`toJSON?(): number`, `Partial<Stamp>`) leaves the written value
+    if (
+      this.mode === 'stringify' &&
+      !owners.some((owner) => hasOptionalToJSON(this.types, owner))
+    ) {
       return anyOfDeduped(converted)
     }
 
@@ -871,7 +875,8 @@ export class TypeToJsonSchemaConverter {
 
     if (this.input && !sentInstance) {
       plain = true
-      ignoreToJSON = true
+      // the serializer leaves a function to `JSON.stringify`, which calls its `toJSON`
+      ignoreToJSON ||= !isFunction(this.types, type)
     }
 
     const referenceKind = this.types.getReferenceKind(type)
@@ -957,8 +962,9 @@ export class TypeToJsonSchemaConverter {
 
     // a view of a function (`DeepReadonly<(() => number) & { toJSON(): string }>`) may hold the
     // function, which `JSON.stringify` writes by its `toJSON`, or a plain object of its fields
+    // (also one a client sends, which the serializer leaves to `JSON.stringify`)
     const viewedFunction =
-      ownToJSON.length || ignoreToJSON ? undefined : getViewedFunction(this.types, type)
+      ownToJSON.length || options.ignoreToJSON ? undefined : getViewedFunction(this.types, type)
     const viewedResults =
       viewedFunction && viewedFunction !== type
         ? getToJSONResultTypes(this.types, viewedFunction, true).filter(

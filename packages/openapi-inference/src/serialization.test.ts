@@ -310,6 +310,10 @@ describe('generated schemas match serialized outputs', async () => {
     ['plainStampHolder', undefined],
     ['plainStamps', undefined],
     ['functionHolder', undefined],
+    ['maybeStampHolder', undefined],
+    ['readonlyMaybeStampHolder', undefined],
+    ['jsonFnHolder', undefined],
+    ['jsonFnForms', undefined],
     ['plainFunctions', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
