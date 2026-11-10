@@ -309,10 +309,11 @@ export function isAnyRecord(types: TypeQueries, type: Type): boolean {
  * Whether a mapped type may hold the function it is a view of, which JSON drops unless it has a
  * `toJSON` (`Readonly<() => void>`, `cb` of `DeepReadonly<{ cb: () => void }>`, see
  * `getViewedFunction`), and so may an interface over one whose `toJSON` may be missing
- * (`interface V extends Readonly<Function> { toJSON?(): string }`).
+ * (`interface V extends Readonly<Function> { toJSON?(): string }`), also through views of it
+ * (`Readonly<V>`, `Readonly<Readonly<V>>`).
  */
 function isFunctionView(types: TypeQueries, type: Type): boolean {
-  if (getViewBases(type).some((view) => getViewedFunction(types, view) !== undefined)) {
+  if (isInterfaceOverFunctionView(types, type)) {
     return (
       getToJSONResultTypes(types, type, true).every((result) => isDroppedResult(types, result)) ||
       hasOptionalToJSON(types, type)
@@ -327,6 +328,18 @@ function isFunctionView(types: TypeQueries, type: Type): boolean {
       isNonSerializable(types, viewed) ||
       hasOptionalToJSON(types, viewed))
   )
+}
+
+/**
+ * Whether a type is an interface over a view of a function
+ * (`interface V extends Readonly<Function> {}`), or a view of one (`Readonly<V>`).
+ */
+function isInterfaceOverFunctionView(types: TypeQueries, type: Type): boolean {
+  const source = types.getMappedSource(type)
+
+  return source
+    ? isInterfaceOverFunctionView(types, source)
+    : getViewBases(type).some((view) => getViewedFunction(types, view) !== undefined)
 }
 
 /**

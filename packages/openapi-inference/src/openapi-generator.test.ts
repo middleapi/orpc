@@ -172,6 +172,11 @@ import {
   roundSixtyTwoRootHolderInRoot,
   roundSixtyTwoRootInRootHolder,
 } from '../tests/fixtures/app/src/round62'
+import {
+  roundSixtyThree,
+  roundSixtyThreeInputs,
+  viewedFnHolder,
+} from '../tests/fixtures/app/src/round63'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3556,5 +3561,49 @@ describe('openAPIGenerator', () => {
         )
       },
     )
+  })
+
+  describe('round sixty-three', () => {
+    it('leaves functions typed by views of interfaces over a view of Function optional', async () => {
+      const spec = await generator.generate(roundSixtyThree, {
+        source: { file: fixture('round63.ts'), export: 'roundSixtyThree' },
+      })
+
+      // only a `toJSON` that may be missing drops the function, also through views of views
+      const schemas = spec.components?.schemas as any
+      expect(schemas.ViewedFnHolder.required).toEqual(['json', 'jsonDeep'])
+      expect(schemas.ViewedFnClassHolder.required).toEqual(['json'])
+    })
+
+    it('leaves them optional in inputs', async () => {
+      const spec = await generator.generate(roundSixtyThreeInputs, {
+        source: { file: fixture('round63.ts'), export: 'roundSixtyThreeInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)['/viewedFnHolder'].post.requestBody.content['application/json']
+              .schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        ),
+      )
+
+      // what a client holding these values sends
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(viewedFnHolder()).json),
+      )
+      expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
+      expect(schemas.ViewedFnHolder.required).toEqual(['json', 'jsonDeep'])
+    })
   })
 })
