@@ -337,7 +337,7 @@ describe('generated schemas match serialized outputs', async () => {
         ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
       ),
     )
-    const json = await response!.json()
+    const json: any = await response!.json()
 
     expect(json.defined).toBe(true)
     expect(validate(json) ? [] : validate.errors).toEqual([])
