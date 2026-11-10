@@ -120,6 +120,12 @@ import {
   roundFiftyFourInputs,
   zonedError,
 } from '../tests/fixtures/app/src/round54'
+import {
+  booleanViews,
+  labeledViews,
+  plainLabeledViews,
+  roundFiftyFiveInputs,
+} from '../tests/fixtures/app/src/round55'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -3042,6 +3048,42 @@ describe('openAPIGenerator', () => {
         expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
       }
       expect((spec.components?.schemas as any).ZonedError.anyOf[0].required).toEqual(['zone'])
+    })
+  })
+
+  describe('round fifty-five', () => {
+    it('documents inputs of errors toJSON returns a view of a set or a map of, and plain views of a boolean', async () => {
+      const spec = await generator.generate(roundFiftyFiveInputs, {
+        source: { file: fixture('round55.ts'), export: 'roundFiftyFiveInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // `JSON.stringify` does not write the `size` of a set or a map, a plain object may
+      for (const [name, value] of [
+        ['labeledViews', labeledViews()],
+        ['labeledViews', plainLabeledViews()],
+        // the serializer walks a plain object of a view of `Boolean`
+        ['booleanViews', booleanViews()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
     })
   })
 })

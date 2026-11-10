@@ -351,6 +351,11 @@ describe('generated schemas match serialized outputs', async () => {
     ['zonedError', undefined],
     ['zonedErrorHolder', undefined],
     ['labeledOwners', undefined],
+    ['labeledViewOwner', undefined],
+    ['labeledViews', undefined],
+    ['plainLabeledViews', undefined],
+    ['booleanViews', undefined],
+    ['booleanViewRoot', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -372,6 +377,22 @@ describe('generated schemas match serialized outputs', async () => {
     expect(schemas.ErrorViewMix.properties.picked.anyOf[0]).toEqual({ type: 'string' })
     expect(deref(responseSchema('/numberViewJson'))).toEqual({
       anyOf: [{ type: 'string' }, { type: 'object' }],
+    })
+  })
+
+  it('leaves the members a view copies from a set or a map out of what toJSON returns, and documents plain views of a boolean', () => {
+    const schemas = spec.components?.schemas as any
+
+    // an instance does not write the `size` getter, a plain object may
+    expect(schemas.LabeledViewOwner).toEqual({
+      type: 'object',
+      properties: { label: { type: 'string' }, size: { type: 'number' } },
+      required: ['label'],
+    })
+    expect(schemas.LabeledViews.properties.sizedMap.required).toEqual(['label'])
+    // a plain object of `Pick<Boolean, 'valueOf'>` is walked by the serializer
+    expect(schemas.BooleanViews.properties.relay).toEqual({
+      anyOf: [{ type: 'boolean' }, { type: 'object' }],
     })
   })
 

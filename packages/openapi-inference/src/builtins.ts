@@ -737,6 +737,14 @@ function getLeaf(name: string, stringify: boolean): Builtin | undefined {
 }
 
 /**
+ * Whether a type is the interface of a boxed primitive (`Boolean`, `Number`), whose few members a
+ * plain object easily has, as for a view of the primitive.
+ */
+export function isBoxedPrimitive(types: TypeQueries, type: Type): boolean {
+  return BOXED_PRIMITIVES[getDeclaredBuiltinName(types, type) ?? ''] !== undefined
+}
+
+/**
  * `String` and the other boxed types also describe primitives (`const s: String = 'a'`),
  * and boxed values serialize like them.
  */

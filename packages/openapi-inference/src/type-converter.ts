@@ -30,6 +30,7 @@ import {
   hasBuiltinForm,
   hasToJSONOf,
   isBoxedBigInt,
+  isBoxedPrimitive,
   isTypedArray,
 } from './builtins'
 import type { DefNameRecord } from './components'
@@ -1228,7 +1229,9 @@ export class TypeToJsonSchemaConverter {
         !this.isOptional(propertyType) &&
         !this.mayDropThroughToJSON(propertyType, fieldsMode !== 'serializer') &&
         // an instance does not write a getter
-        (!instanceProperties || instanceProperties.has(property))
+        (!instanceProperties || instanceProperties.has(property)) &&
+        // nor what a view copies from a built-in (`size` of `interface Tags extends Readonly<Set<string>>`)
+        !(ownFields && !plain && isBuiltinMember(this.types, property))
       ) {
         required.push(property.name)
       }
@@ -1837,8 +1840,8 @@ export class TypeToJsonSchemaConverter {
   /**
    * Whether a mapped view of a built-in or class may hold a plain object: it makes members
    * optional (`Partial<Date>`) or leaves some out (`Pick<URL, 'href'>`), also in an intersection,
-   * and any view of a primitive, whose few members a plain object easily has
-   * (`{ valueOf: () => true }` of `Omit<boolean, 'k'>`).
+   * and any view of a primitive or of its interface, whose few members a plain object easily has
+   * (`{ valueOf: () => true }` of `Omit<boolean, 'k'>` or `Pick<Boolean, 'valueOf'>`).
    */
   private mayHoldPlainObject(type: Type): boolean {
     if (type.isIntersectionType()) {
@@ -1868,6 +1871,11 @@ export class TypeToJsonSchemaConverter {
 
     return (
       this.types.isPrimitiveView(type) ||
+      // also of its interface (`Pick<Boolean, 'valueOf'>`, `Readonly<Number>`), not of a brand
+      // narrowing its members (`number & { valueOf(): 1 }`)
+      (source !== undefined &&
+        isBoxedPrimitive(this.types, source) &&
+        !this.types.getBrandedOwners(type).length) ||
       // the source may hold one (`Readonly<Link>` of `interface Link extends Pick<URL, 'href'>`),
       // also a view in an intersection (`Readonly<Pick<Date, 'getTime'> & { x: string }>`)
       sources.some((s) =>
