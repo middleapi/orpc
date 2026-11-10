@@ -1,6 +1,6 @@
 {
   "name": "@orpc/node",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Node.js plugins for oRPC: static file serving, temporary file uploads, and batch response compression",
   "keywords": [
     "compression",
@@ -47,9 +47,9 @@
   "dependencies": {
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.15.0",
-    "@standard-server/fetch": "~0.15.0",
-    "@standard-server/node": "~0.15.0",
+    "@standard-server/core": "~0.16.0",
+    "@standard-server/fetch": "~0.16.0",
+    "@standard-server/node": "~0.16.0",
     "mime": "^4.1.2"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "@orpc/shared",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Internal utilities shared across oRPC packages",
   "keywords": [
     "orpc"
@@ -39,7 +39,7 @@
     "prepack": "tsdown"
   },
   "dependencies": {
-    "@standard-server/shared": "~0.15.0",
+    "@standard-server/shared": "~0.16.0",
     "type-fest": "^5.10.0"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "@orpc/arktype",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "ArkType integration for oRPC: convert ArkType schemas into JSON Schema for OpenAPI generation",
   "keywords": [
     "arktype",

@@ -1,6 +1,6 @@
 {
   "name": "@orpc/publisher",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, and Upstash adapters",
   "keywords": [
     "event-iterator",
@@ -73,7 +73,7 @@
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.15.0"
+    "@standard-server/core": "~0.16.0"
   },
   "devDependencies": {
     "@upstash/redis": "^1.41.0",

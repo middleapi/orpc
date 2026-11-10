@@ -1,6 +1,6 @@
 {
   "name": "@orpc/bun-playground",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "private": true,
   "type": "module",
   "scripts": {

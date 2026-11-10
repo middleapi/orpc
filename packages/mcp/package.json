@@ -1,6 +1,6 @@
 {
   "name": "@orpc/mcp",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "MCP integration for oRPC: expose procedures as typesafe Model Context Protocol tools",
   "keywords": [
     "agents",
@@ -53,7 +53,7 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.15.0"
+    "@standard-server/core": "~0.16.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.4.0",

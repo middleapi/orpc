@@ -1,6 +1,6 @@
 {
   "name": "@orpc/monorepo",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "private": true,
   "type": "module",
   "scripts": {
@@ -40,10 +40,10 @@
     "@orpc/tanstack-query": "workspace:*",
     "@orpc/valibot": "workspace:*",
     "@orpc/zod": "workspace:*",
-    "@standard-server/core": "~0.15.0",
-    "@standard-server/fetch": "~0.15.0",
-    "@standard-server/peer": "~0.15.0",
-    "@standard-server/shared": "~0.15.0",
+    "@standard-server/core": "~0.16.0",
+    "@standard-server/fetch": "~0.16.0",
+    "@standard-server/peer": "~0.16.0",
+    "@standard-server/shared": "~0.16.0",
     "@tanstack/ai": "^1.0.1",
     "@tanstack/ai-client": "^1.0.1",
     "@testing-library/dom": "^10.4.2",

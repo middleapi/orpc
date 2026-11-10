@@ -1,6 +1,6 @@
 {
   "name": "@orpc/swr",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "SWR integration for oRPC: typesafe React data fetching hooks",
   "keywords": [
     "data-fetching",

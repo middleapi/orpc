@@ -1,6 +1,6 @@
 {
   "name": "@orpc/client",
-  "version": "2.0.0-beta.49",
+  "version": "2.0.0-beta.50",
   "description": "Consume oRPC and OpenAPI APIs with end-to-end type safety over HTTP, WebSocket, or message ports",
   "keywords": [
     "api",
@@ -78,9 +78,9 @@
   },
   "dependencies": {
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.15.0",
-    "@standard-server/fetch": "~0.15.0",
-    "@standard-server/peer": "~0.15.0"
+    "@standard-server/core": "~0.16.0",
+    "@standard-server/fetch": "~0.16.0",
+    "@standard-server/peer": "~0.16.0"
   },
   "devDependencies": {
     "@types/ws": "^8.18.2",
