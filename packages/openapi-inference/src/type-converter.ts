@@ -18,6 +18,7 @@ import {
 
 import {
   extendsBuiltinClass,
+  extendsBuiltinView,
   getBuiltin,
   getBoxedPrimitiveSchema,
   getBuiltinBaseName,
@@ -1751,7 +1752,13 @@ export class TypeToJsonSchemaConverter {
       return boxed
     }
 
-    if (typedArray || (classType && getBuiltinBaseName(this.types, classType) !== undefined)) {
+    if (
+      typedArray ||
+      (classType &&
+        (getBuiltinBaseName(this.types, classType) !== undefined ||
+          // also through a view of the built-in (`interface Zoned extends Readonly<Date>`)
+          extendsBuiltinView(this.types, classType)))
+    ) {
       return this.convertObject(resolved, { ignoreToJSON: true, ownFields: !typedArray })
     }
 

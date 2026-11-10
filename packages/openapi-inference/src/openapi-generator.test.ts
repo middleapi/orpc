@@ -113,6 +113,13 @@ import {
   roundFiftyThreeInputs,
   taggedError,
 } from '../tests/fixtures/app/src/round53'
+import {
+  errorViewMix,
+  numberViewJson,
+  plainErrorViewMix,
+  roundFiftyFourInputs,
+  zonedError,
+} from '../tests/fixtures/app/src/round54'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -2998,6 +3005,43 @@ describe('openAPIGenerator', () => {
         const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
         expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
       }
+    })
+  })
+
+  describe('round fifty-four', () => {
+    it('documents inputs of views adding toJSON to a view of an error or a boxed number, and of errors toJSON returns a zoned date of', async () => {
+      const spec = await generator.generate(roundFiftyFourInputs, {
+        source: { file: fixture('round54.ts'), export: 'roundFiftyFourInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // the serializer leaves an error or a boxed number to `JSON.stringify`, which calls its `toJSON`
+      for (const [name, value] of [
+        ['errorViewMix', errorViewMix()],
+        ['errorViewMix', plainErrorViewMix()],
+        ['numberViewJson', { n: numberViewJson() }],
+        ['zonedError', { error: zonedError() }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+      expect((spec.components?.schemas as any).ZonedError.anyOf[0].required).toEqual(['zone'])
     })
   })
 })

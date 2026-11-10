@@ -343,12 +343,36 @@ describe('generated schemas match serialized outputs', async () => {
     ['boxedResult', undefined],
     ['instantOwner', undefined],
     ['setResult', undefined],
+    ['errorViewMix', undefined],
+    ['plainErrorViewMix', undefined],
+    ['errorViewMixRoot', undefined],
+    ['numberViewJson', undefined],
+    ['numberViewJsonHolder', undefined],
+    ['zonedError', undefined],
+    ['zonedErrorHolder', undefined],
+    ['labeledOwners', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
     const validate = ajv.compile(responseSchema(`/${name}`))
 
     expect(validate(json) ? [] : validate.errors).toEqual([])
+  })
+
+  it('writes a value toJSON returns of an interface extending a view of a date by its own fields', () => {
+    const schemas = spec.components?.schemas as any
+
+    // `JSON.stringify` does not call the `toJSON` of the date again
+    expect(schemas.ZonedError.anyOf[0]).toEqual({
+      type: 'object',
+      properties: { zone: { type: 'string' } },
+      required: ['zone'],
+    })
+    // the `toJSON` an intersection adds to a view of an error or a boxed number is kept
+    expect(schemas.ErrorViewMix.properties.picked.anyOf[0]).toEqual({ type: 'string' })
+    expect(deref(responseSchema('/numberViewJson'))).toEqual({
+      anyOf: [{ type: 'string' }, { type: 'object' }],
+    })
   })
 
   it('keeps dates intersected with views of a date, and leaves out what toJSON writes as nothing', () => {

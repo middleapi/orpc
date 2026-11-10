@@ -302,9 +302,17 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
   const viewed = members.length === 1 ? members[0] : undefined
   const viewedMember =
     members.find((m) => getDeclaredBuiltinName(types, m) !== undefined) ??
-    // or with a view of one (`Readonly<Readonly<Set<string>> & { x: string }>`)
+    // or with a view of one (`Readonly<Readonly<Set<string>> & { x: string }>`), not of one
+    // `JSON.stringify` writes by the `toJSON` the others add (`Readonly<Pick<Error, 'message'> & { toJSON(): string }>`)
     (members.length > 1
-      ? members.find((m) => (m as any).objectFlags & ObjectFlags.Mapped)
+      ? members.find(
+          (m) =>
+            (m as any).objectFlags & ObjectFlags.Mapped &&
+            !(
+              getStringifiedForm(types, m) !== undefined &&
+              members.some((other) => other !== m && hasOwnToJSON(types, other))
+            ),
+        )
       : undefined)
   const viewedBuiltin =
     viewedMember &&
@@ -620,6 +628,21 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
   return (
     (base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))) ||
     getViewBases(view).some((viewBase) => isViewOfFieldsBuiltin(types, viewBase))
+  )
+}
+
+/**
+ * Whether an interface extends a view of a built-in the serializer writes itself
+ * (`interface Zoned extends Readonly<Date>`), whose instance `JSON.stringify` writes by its own
+ * fields when `toJSON` returns it, as when extending the built-in (not a view of an error or a
+ * boxed primitive, see `getBuiltinFields`).
+ */
+export function extendsBuiltinView(types: TypeQueries, type: Type): boolean {
+  return getViewBases(type).some(
+    (view) =>
+      !isTypedArray(types, view) &&
+      getStringifiedForm(types, view) === undefined &&
+      getMappedBuiltin(types, view, true) !== undefined,
   )
 }
 
