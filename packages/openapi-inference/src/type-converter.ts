@@ -54,6 +54,7 @@ import {
   isLooseIntersection,
   isDropped,
   isDroppedResult,
+  isEffectValue,
   isInstanceOrPlain,
   mayBePlainObject,
   isFunction,
@@ -906,6 +907,10 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertObject(type: Type, options: ObjectForm = {}): JsonSchema {
+    if (isEffectValue(this.types, type)) {
+      return {}
+    }
+
     let { plain = false } = options
     const { ignoreToJSON = false, ownFields = false } = options
     // a client sends a value of a class type (or of a view of one, `Readonly<User>`) as an instance,

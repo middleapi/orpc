@@ -69,7 +69,7 @@ export function getDataProperties(
       // quoted keys starting with `__` are escaped with another `_`
       !p.escapedName.startsWith('__@') &&
       !p.escapedName.startsWith('__#') &&
-      !isArkTypeBrand(types, p) &&
+      !isLibraryKey(types, p) &&
       (!isClassAccessor(p) || (getters && Boolean(p.flags & SymbolFlags.GetAccessor))) &&
       // mapped types keep methods (`DeepPartial<Account>`) and class accessors (`Readonly<C>`)
       // as properties, still functions or on the prototype
@@ -86,14 +86,42 @@ export function getDataProperties(
 }
 
 /**
- * Whether a property is the key ArkType brands a type with (`' brand'` of `Brand<T, 'Id'>`, which
- * `.brand('Id')` and `'string#Id'` give), only in types: no value holds it.
+ * Whether a property is a key of a package that no value holds as data: the key ArkType brands
+ * a type with (`' brand'` of `Brand<T, 'Id'>`, which `.brand('Id')` and `'string#Id'` give), and
+ * Effect's keys, which stand for symbols: its brand (`'~effect/Brand'` of `Brand.Brand<'Id'>`),
+ * the type ids of its prototypes (`'~effect/Option'`), and what it adds to `Error`.
  */
-function isArkTypeBrand(types: TypeQueries, property: TSSymbol): boolean {
+function isLibraryKey(types: TypeQueries, property: TSSymbol): boolean {
   return (
-    property.name === ' brand' &&
+    (property.name === ' brand' || property.name.startsWith('~effect/')) &&
+    isDeclaredByPackage(types, property)
+  )
+}
+
+function isDeclaredByPackage(types: TypeQueries, property: TSSymbol): boolean {
+  return (
     property.declarations.length > 0 &&
     property.declarations.every((d) => types.getSourceKind(d.path) === 'external')
+  )
+}
+
+/**
+ * Whether a type is of an Effect data type (`Option`, `Redacted`, `Chunk`), requiring its type id
+ * (`'~effect/Option'`): its values are made from a prototype with the `toJSON` of `Inspectable`,
+ * which `JSON.stringify` writes, as any value, also where the interface does not declare it
+ * (`Redacted`). A brand is only in types (`{ id: string } & Brand.Brand<'Id'>` is a plain object).
+ */
+export function isEffectValue(types: TypeQueries, type: Type): boolean {
+  return types.memo('effectValue', type.id, () =>
+    types
+      .getProperties(type)
+      .some(
+        (p) =>
+          p.name.startsWith('~effect/') &&
+          p.name !== '~effect/Brand' &&
+          !(p.flags & SymbolFlags.Optional) &&
+          isDeclaredByPackage(types, p),
+      ),
   )
 }
 

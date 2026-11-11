@@ -2,6 +2,7 @@ import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
+import { Redacted } from 'effect'
 
 import {
   longDeepChain,
@@ -11,6 +12,7 @@ import {
 } from '../tests/fixtures/app/src/deep-view-chains'
 import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings'
 import { BrandedUser } from '../tests/fixtures/app/src/round73'
+import { BrandedOwner } from '../tests/fixtures/app/src/round75'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -426,13 +428,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['brandedUser', undefined],
     ['brandedUsers', undefined],
     ['readonlyBrandedUser', undefined],
-    ['partialTileSet', undefined],
-    ['partialTileMap', undefined],
-    ['partialTiles', undefined],
-    ['sized', undefined],
-    ['sizedHolder', undefined],
-    ['numberRecord', undefined],
-    ['numberRecords', undefined],
+    ['brandedAccount', undefined],
+    ['brandedOwner', undefined],
+    ['redacted', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -3036,27 +3034,64 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round seventy-four', () => {
-    it('documents the arrays a Set or a Map is written as where it satisfies an object type by its members', () => {
-      const schemas = spec.components?.schemas as any
+  describe('round seventy-five', () => {
+    const handler = new OpenAPIHandler(router)
+    let sent: unknown
+    const link = new OpenAPILink(router, {
+      origin: 'http://localhost',
+      url: '/',
+      fetch: async (request, init) => {
+        const handled = new Request(request, init)
+        sent = await handled.clone().json()
+        return (await handler.handle(handled)).response!
+      },
+    })
+    const requestSchema = (path: string): any =>
+      JSON.parse(
+        JSON.stringify(
+          (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+        ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+      )
 
-      expect(schemas.Sized.anyOf).toEqual([
-        { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
-        expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
-        expect.objectContaining({ type: 'object', required: ['size'] }),
-      ])
-      // `JSON.stringify` writes them as `{}`
-      expect(schemas.SizedJson).toEqual({ type: 'object', description: expect.any(String) })
-      expect(schemas.SizedHolder.properties.sized).toEqual({
-        $ref: '#/components/schemas/SizedJson',
+    it('leaves out the key Effect brands an object type with, which no value holds', async () => {
+      expect((spec.components?.schemas as any).BrandedOwner).toEqual({
+        type: 'object',
+        properties: { handle: { type: 'string' } },
+        required: ['handle'],
       })
+      expect(responseSchema('/brandedAccount').properties.account).toEqual({
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      })
+      // nor the keys Effect adds to `Error`
+      expect(Object.keys((spec.components?.schemas as any).CodedError.properties)).toEqual([
+        'code',
+        'name',
+        'message',
+        'stack',
+        'cause',
+      ])
+
+      // what a client holding the branded value sends
+      await expect(
+        link.call(['brandedOwnerInput'], BrandedOwner({ handle: 'o' }), { context: {} }),
+      ).resolves.toBe(1)
+      const validate = ajv.compile(requestSchema('/brandedOwnerInput'))
+      expect(validate(sent) ? [] : validate.errors).toEqual([])
     })
 
-    it('constrains only the numeric keys of a number index', () => {
-      expect(deref(responseSchema('/numberRecord')).anyOf[1]).toEqual({
-        type: 'object',
-        patternProperties: numberKeys({ $ref: 'spec#/$defs/TileLeaf' }),
-      })
+    it('documents an Effect Redacted, written by the toJSON of its prototype, as any value', async () => {
+      expect(responseSchema('/redacted').properties.secret).toEqual({})
+      expect(serialize(await call(router.redactedRoot, undefined))).toBe('<redacted>')
+      // `@orpc/openapi` documents no content for any value
+      expect((spec.paths as any)['/redactedRoot'].post.responses['200'].content).toEqual({})
+
+      await expect(
+        link.call(['redactedInput'], { secret: Redacted.make('s') }, { context: {} }),
+      ).resolves.toBe(1)
+      const validate = ajv.compile(requestSchema('/redactedInput'))
+      expect(validate(sent) ? [] : validate.errors).toEqual([])
     })
   })
 })

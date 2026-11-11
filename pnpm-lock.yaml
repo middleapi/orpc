@@ -948,6 +948,9 @@ importers:
       arktype:
         specifier: ^2.2.9
         version: 2.2.9
+      effect:
+        specifier: ^4.1.2
+        version: 4.1.2
       type-fest:
         specifier: ^5.10.0
         version: 5.10.0
