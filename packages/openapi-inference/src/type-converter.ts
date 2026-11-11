@@ -1,5 +1,6 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn } from '@orpc/shared'
+import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
   Program,
@@ -117,7 +118,7 @@ export interface TypeToJsonSchemaConverterOptions {
   /**
    * Which named types become `$defs` (and so OpenAPI components).
    *
-   * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives and aliases the compiler does not keep, like `type PartialUser = Partial<User>`) declared outside `node_modules` and the default library.
+   * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives) declared outside `node_modules` and the default library. An object type without a name of its own, like a model a library computes, is named after the alias without type parameters it is declared with (`type User = InferSelectModel<typeof users>`, `type PartialUser = Partial<User>`).
    * - `recursive`: only types that reference themselves, which can not be inlined. Every other type is inlined at each use, so models shared across many levels can make the document much larger.
    *
    * @default 'named'
@@ -746,6 +747,20 @@ export class TypeToJsonSchemaConverter {
         def.stable = cuts === this.expansion.cuts
       }
       return { $ref: toRef(def.name) }
+    }
+
+    // a model whose type lost the project alias it is declared with, like the row type of a library
+    // (`type User = InferSelectModel<typeof users>`), is written once too, named after the alias
+    const lostAlias =
+      this.defsMode === 'named' && enteredAt === undefined ? this.getLostAlias(type) : undefined
+
+    // an object written by its fields, not by the forms of a built-in it is a view of
+    if (lostAlias && typeof schema === 'object' && schema.type === 'object') {
+      const created = this.defs.create(key, lostAlias.name)
+      created.schema = this.annotate(schema, lostAlias)
+      created.stable = cuts === this.expansion.cuts
+      this.defs.reclaimName(created, lostAlias.name)
+      return { $ref: toRef(this.defs.share(created, lostAlias.name).name) }
     }
 
     // with `defs: 'recursive'`, a model or a view of a class referring to a def being converted
@@ -2443,6 +2458,39 @@ export class TypeToJsonSchemaConverter {
     }
 
     return name
+  }
+
+  /**
+   * The project alias the type of a model lost (see `TypeQueries.getLostAlias`): of an object with
+   * properties, not an array, a class, a view of one or of a function, or a built-in, nor an object
+   * or type literal of the project (`ReturnType<() => { ok: true }>`, a member of a union), which
+   * is written where it is declared.
+   */
+  private getLostAlias(type: Type): TSSymbol | undefined {
+    const alias = this.types.getLostAlias(type)
+
+    if (
+      !alias ||
+      !(type.flags & TypeFlags.Object) ||
+      this.types.getReferenceKind(type) !== undefined ||
+      !this.types.getProperties(type).length ||
+      getClassType(this.types, type) !== undefined ||
+      getViewedFunction(this.types, type) !== undefined
+    ) {
+      return undefined
+    }
+
+    const symbol = type.getSymbol()
+    const declaration = symbol?.declarations[0]
+    const kind = declaration && this.types.getSourceKind(declaration.path)
+    const literal =
+      declaration?.kind === SyntaxKind.TypeLiteral ||
+      declaration?.kind === SyntaxKind.ObjectLiteralExpression
+
+    return (literal && kind === 'project') ||
+      ((symbol?.flags ?? 0) & (SymbolFlags.Interface | SymbolFlags.Class) && kind === 'default')
+      ? undefined
+      : alias
   }
 
   /**

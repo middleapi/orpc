@@ -225,6 +225,7 @@ import {
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
+import { router as libraryAliasesRouter } from '../tests/fixtures/library-aliases/src/router'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
 import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
 import { bodyNames, mixedNames, queryNames } from '../tests/fixtures/runtime/src/parameter-names'
@@ -1239,11 +1240,9 @@ describe('openAPIGenerator', () => {
           const schema = procedure.includes('input')
             ? operation.requestBody.content['application/json'].schema
             : operation.responses['200'].content['application/json'].schema
-          // cut after a few levels
-          expect([name, JSON.stringify(deref(schema))]).toEqual([
-            name,
-            expect.stringMatching(/\{\}/),
-          ])
+          // cut after a few levels, in the component of `Aliased` (`Expanding<AliasCycle>`)
+          const cut = name === 'aliased' ? schemas.Aliased : deref(schema)
+          expect([name, JSON.stringify(cut)]).toEqual([name, expect.stringMatching(/\{\}/)])
         }
         // a cycle through models holding each other in object literals, cut as early as others
         for (const name of [
@@ -4947,5 +4946,85 @@ describe('openAPIGenerator', () => {
         expect((spec.components?.schemas as any).AnyJSON.anyOf[0]).toEqual({})
       },
     )
+  })
+
+  describe('project aliases of library models', () => {
+    const file = new URL('../tests/fixtures/library-aliases/src/router.ts', import.meta.url)
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+    const response = (spec: any, path: string) =>
+      spec.paths[path].post.responses['200'].content['application/json'].schema
+    const user = {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        name: { type: 'string' },
+        bio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+      },
+      required: ['id', 'name', 'bio'],
+    }
+
+    it('names a model after the alias of the project its type lost, wherever it is written', async () => {
+      const spec = await generator.generate(libraryAliasesRouter, { source: { file } })
+      const schemas = spec.components?.schemas as any
+
+      // one component of a type two aliases name, after the first one; the others as before
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'Account',
+        'Kept',
+        'Paginated_with-id-title',
+        'Post',
+        'PostWithAuthor',
+        'Profile',
+        'Settings',
+        'User',
+      ])
+      expect(schemas.User).toEqual({ ...user, description: 'A registered user' })
+      expect(schemas.Post).toEqual({
+        type: 'object',
+        properties: { id: { type: 'number' }, title: { type: 'string' } },
+        required: ['id', 'title'],
+      })
+      expect(schemas.Account).toEqual({
+        type: 'object',
+        properties: { id: { type: 'number' }, handle: { type: 'string' } },
+        required: ['id', 'handle'],
+      })
+
+      // return annotations
+      expect(response(spec, '/users')).toEqual({ type: 'array', items: ref('User') })
+      expect(response(spec, '/user')).toEqual(ref('User'))
+      expect(response(spec, '/accounts')).toEqual({ type: 'array', items: ref('Account') })
+      expect(response(spec, '/kept')).toEqual({ type: 'array', items: ref('Kept') })
+      // type arguments
+      expect(response(spec, '/posts')).toEqual(ref('Paginated_with-id-title'))
+      expect(schemas['Paginated_with-id-title'].properties.items).toEqual({
+        type: 'array',
+        items: ref('Post'),
+      })
+      // property annotations
+      expect(schemas.PostWithAuthor.properties).toEqual({
+        post: ref('Post'),
+        author: ref('User'),
+        reviewer: { anyOf: [ref('User'), { type: 'null' }] },
+      })
+      expect(response(spec, '/profile').properties).toEqual({
+        profile: ref('Profile'),
+        settings: ref('Settings'),
+      })
+      // input types
+      expect(
+        (spec.paths as any)['/createUser'].post.requestBody.content['application/json'].schema,
+      ).toEqual(ref('User'))
+    })
+
+    it('makes no def of it with defs: recursive', async () => {
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(
+        libraryAliasesRouter,
+        { source: { file } },
+      )
+
+      expect(spec.components?.schemas).toBeUndefined()
+      expect(response(spec, '/users')).toEqual({ type: 'array', items: user })
+    })
   })
 })

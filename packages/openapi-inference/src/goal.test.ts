@@ -202,10 +202,14 @@ describe('goal', async () => {
     // template literals, type-fest, key remapping and conditional types
     expect(showcase.event).toEqual({ type: 'string', enum: ['onClick', 'onHover'] })
     expect(showcase.slug.pattern).toMatch(/^\^user-/)
-    expect(showcase.patch.required).toBeUndefined()
-    expect(showcase.patch.properties.theme.required).toBeUndefined()
-    expect(showcase.frozen.properties.theme.required).toEqual(['color', 'dark'])
-    expect(showcase.flat.required).toEqual(['a', 'b'])
+    // aliases of type-fest's types, which the types lost, name their components
+    expect(showcase.patch).toEqual({ $ref: '#/components/schemas/SettingsPatch' })
+    expect(showcase.frozen).toEqual({ $ref: '#/components/schemas/FrozenSettings' })
+    expect(showcase.flat).toEqual({ $ref: '#/components/schemas/Flat' })
+    expect(component('SettingsPatch').required).toBeUndefined()
+    expect(component('SettingsPatch').properties.theme.required).toBeUndefined()
+    expect(component('FrozenSettings').properties.theme.required).toEqual(['color', 'dark'])
+    expect(component('Flat').required).toEqual(['a', 'b'])
     expect(component('Getters_with-version-label').required).toEqual(['getLabel', 'getVersion'])
     expect(showcase.unwrapped).toEqual({ type: 'number' })
 

@@ -97,9 +97,12 @@ export class TypeQueries {
   /** The outermost pair assumed kept in the check of the current pair */
   private assumedDepth = Number.POSITIVE_INFINITY
 
+  /** The project aliases of the types the compiler does not keep them for, see `getLostAlias` */
+  private lostAliases: Map<number, TSSymbol> | undefined
+
   constructor(
     readonly checker: Checker,
-    program: Program,
+    private readonly program: Program,
   ) {
     this.getSourceKind = createSourceKindChecker(program)
   }
@@ -1111,6 +1114,64 @@ export class TypeQueries {
 
   getJSDoc(symbol: TSSymbol): JSDoc | undefined {
     return this.memo('jsdoc', symbol.id, () => getJSDoc(this.checker, symbol, this.getSourceKind))
+  }
+
+  /**
+   * The type alias declared in the project, without type parameters, whose type the compiler does
+   * not keep it for (`type User = InferSelectModel<typeof users>`, `type Row = Partial<Base>`),
+   * so the type keeps only the alias of the library (or none): the first one declared of a type.
+   * Only top-level and namespace declarations are read, once.
+   */
+  getLostAlias(type: Type): TSSymbol | undefined {
+    this.lostAliases ??= this.collectLostAliases()
+    return this.lostAliases.get(type.id)
+  }
+
+  private collectLostAliases(): Map<number, TSSymbol> {
+    const names: any[] = []
+    const collect = (statements: readonly any[]): void => {
+      for (const statement of statements) {
+        if (statement.kind === SyntaxKind.TypeAliasDeclaration) {
+          if (!statement.typeParameters?.length) {
+            names.push(statement.name)
+          }
+        } else if (statement.kind === SyntaxKind.ModuleDeclaration) {
+          // `namespace A.B {}` nests the declaration of `B` as the body of `A`
+          let body = statement.body
+          while (body?.kind === SyntaxKind.ModuleDeclaration) {
+            body = body.body
+          }
+          collect(body?.statements ?? [])
+        }
+      }
+    }
+
+    for (const fileName of this.program.getSourceFileNames()) {
+      // libraries are not loaded, the project's files may still be linked into `node_modules`
+      const file = fileName.includes('/node_modules/')
+        ? undefined
+        : this.program.getSourceFile(fileName)
+      if (file && this.getSourceKind(file.path) === 'project') {
+        collect(file.statements)
+      }
+    }
+
+    const aliases = new Map<number, TSSymbol>()
+    if (!names.length) {
+      return aliases
+    }
+
+    const symbols = this.checker.getSymbolAtLocation(names)
+    const types = this.checker.getTypeAtLocation(names)
+    for (const [i, symbol] of symbols.entries()) {
+      const type = types[i]
+      // an alias the compiler keeps names the type by itself
+      if (symbol && type && type.getAliasSymbol()?.id !== symbol.id && !aliases.has(type.id)) {
+        aliases.set(type.id, symbol)
+      }
+    }
+
+    return aliases
   }
 
   /**

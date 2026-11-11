@@ -557,7 +557,15 @@ describe('typeToJsonSchemaConverter', () => {
       false,
     ])
     expect(convert('PartialUser')).toEqual([
-      { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' } } },
+      {
+        $ref: '#/$defs/PartialUser',
+        $defs: {
+          PartialUser: {
+            type: 'object',
+            properties: { id: { type: 'string' }, name: { type: 'string' } },
+          },
+        },
+      },
       false,
     ])
     expect(convert('PickUser')).toEqual([
@@ -583,14 +591,24 @@ describe('typeToJsonSchemaConverter', () => {
       false,
     ])
     expect(convert('RequiredUser')).toEqual([
-      { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+      {
+        $ref: '#/$defs/RequiredUser',
+        $defs: {
+          RequiredUser: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+        },
+      },
       false,
     ])
     expect(convert('ReadonlyUser')).toEqual([
       {
-        type: 'object',
-        properties: { id: { type: 'string' }, name: { type: 'string' } },
-        required: ['id', 'name'],
+        $ref: '#/$defs/ReadonlyUser',
+        $defs: {
+          ReadonlyUser: {
+            type: 'object',
+            properties: { id: { type: 'string' }, name: { type: 'string' } },
+            required: ['id', 'name'],
+          },
+        },
       },
       false,
     ])
@@ -647,29 +665,49 @@ describe('typeToJsonSchemaConverter', () => {
   it('type-fest', () => {
     expect(convert('Simplified')).toEqual([
       {
-        type: 'object',
-        properties: { a: { type: 'string' }, b: { type: 'number' } },
-        required: ['a', 'b'],
+        $ref: '#/$defs/Simplified',
+        $defs: {
+          Simplified: {
+            type: 'object',
+            properties: { a: { type: 'string' }, b: { type: 'number' } },
+            required: ['a', 'b'],
+          },
+        },
       },
       false,
     ])
     expect(convert('DeepPartial')).toEqual([
       {
-        type: 'object',
-        properties: { a: { type: 'object', properties: { b: { type: 'string' } } } },
+        $ref: '#/$defs/DeepPartial',
+        $defs: {
+          DeepPartial: {
+            type: 'object',
+            properties: { a: { type: 'object', properties: { b: { type: 'string' } } } },
+          },
+        },
       },
       false,
     ])
     expect(convert('SetOpt')).toEqual([
       {
-        type: 'object',
-        properties: { a: { type: 'string' }, b: { type: 'number' } },
-        required: ['a'],
+        $ref: '#/$defs/SetOpt',
+        $defs: {
+          SetOpt: {
+            type: 'object',
+            properties: { a: { type: 'string' }, b: { type: 'number' } },
+            required: ['a'],
+          },
+        },
       },
       false,
     ])
     expect(convert('Excepted')).toEqual([
-      { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+      {
+        $ref: '#/$defs/Excepted',
+        $defs: {
+          Excepted: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        },
+      },
       false,
     ])
   })
@@ -985,7 +1023,15 @@ describe('typeToJsonSchemaConverter', () => {
         false,
       ])
       expect(convertComplex('PartialRoleRecord')).toEqual([
-        { type: 'object', properties: { admin: { type: 'number' }, member: { type: 'number' } } },
+        {
+          $ref: '#/$defs/PartialRoleRecord',
+          $defs: {
+            PartialRoleRecord: {
+              type: 'object',
+              properties: { admin: { type: 'number' }, member: { type: 'number' } },
+            },
+          },
+        },
         false,
       ])
       expect(convertComplex('Keys')).toEqual([
@@ -997,38 +1043,53 @@ describe('typeToJsonSchemaConverter', () => {
     it('type-fest deep utilities', () => {
       expect(convertComplex('Camel')).toEqual([
         {
-          type: 'object',
-          properties: {
-            nestedObj: {
+          $ref: '#/$defs/Camel',
+          $defs: {
+            Camel: {
               type: 'object',
-              properties: { firstValue: { type: 'number' } },
-              required: ['firstValue'],
+              properties: {
+                nestedObj: {
+                  type: 'object',
+                  properties: { firstValue: { type: 'number' } },
+                  required: ['firstValue'],
+                },
+                userName: { type: 'string' },
+              },
+              required: ['nestedObj', 'userName'],
             },
-            userName: { type: 'string' },
           },
-          required: ['nestedObj', 'userName'],
         },
         false,
       ])
       expect(convertComplex('Jsonified')).toEqual([
         {
-          type: 'object',
-          properties: { date: { type: 'string' }, n: { type: 'number' } },
-          required: ['date', 'n'],
+          $ref: '#/$defs/Jsonified',
+          $defs: {
+            Jsonified: {
+              type: 'object',
+              properties: { date: { type: 'string' }, n: { type: 'number' } },
+              required: ['date', 'n'],
+            },
+          },
         },
         false,
       ])
       expect(convertComplex('DeepRO')).toEqual([
         {
-          type: 'object',
-          properties: {
-            a: {
+          $ref: '#/$defs/DeepRO',
+          $defs: {
+            DeepRO: {
               type: 'object',
-              properties: { b: { type: 'array', items: { type: 'string' } } },
-              required: ['b'],
+              properties: {
+                a: {
+                  type: 'object',
+                  properties: { b: { type: 'array', items: { type: 'string' } } },
+                  required: ['b'],
+                },
+              },
+              required: ['a'],
             },
           },
-          required: ['a'],
         },
         false,
       ])
@@ -1051,7 +1112,12 @@ describe('typeToJsonSchemaConverter', () => {
         false,
       ])
       expect(convertComplex('Writ')).toEqual([
-        { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+        {
+          $ref: '#/$defs/Writ',
+          $defs: {
+            Writ: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          },
+        },
         false,
       ])
     })
@@ -1479,31 +1545,36 @@ describe('typeToJsonSchemaConverter', () => {
       ])
       expect(convertR6('PartialLookAlikes')).toEqual([
         {
-          type: 'object',
-          properties: {
-            params: {
+          $ref: '#/$defs/PartialLookAlikes',
+          $defs: {
+            PartialLookAlikes: {
               type: 'object',
               properties: {
-                size: {
-                  type: 'number',
-                  description:
-                    'The **`size`** read-only property of the URLSearchParams interface indicates the total number of search parameter entries.\n\n[MDN Reference](https://developer.mozilla.org/docs/Web/API/URLSearchParams/size)',
+                params: {
+                  type: 'object',
+                  properties: {
+                    size: {
+                      type: 'number',
+                      description:
+                        'The **`size`** read-only property of the URLSearchParams interface indicates the total number of search parameter entries.\n\n[MDN Reference](https://developer.mozilla.org/docs/Web/API/URLSearchParams/size)',
+                    },
+                  },
+                },
+                account: { type: 'object', properties: { id: { type: 'string' } } },
+                // a view of the interface, whose optional members may hold a plain object
+                map: {
+                  anyOf: [
+                    {
+                      'type': 'array',
+                      'items': { type: 'array', prefixItems: [{}, {}], maxItems: 2, minItems: 2 },
+                      'x-native-type': 'map',
+                    },
+                    // a `Set` has a `size` too
+                    { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+                    { type: 'object', properties: { size: { type: 'number' } } },
+                  ],
                 },
               },
-            },
-            account: { type: 'object', properties: { id: { type: 'string' } } },
-            // a view of the interface, whose optional members may hold a plain object
-            map: {
-              anyOf: [
-                {
-                  'type': 'array',
-                  'items': { type: 'array', prefixItems: [{}, {}], maxItems: 2, minItems: 2 },
-                  'x-native-type': 'map',
-                },
-                // a `Set` has a `size` too
-                { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
-                { type: 'object', properties: { size: { type: 'number' } } },
-              ],
             },
           },
         },
@@ -1765,33 +1836,39 @@ describe('typeToJsonSchemaConverter', () => {
       // values are the built-ins or, all members being optional, plain objects
       const [partial] = convertR5('PartialPost') as [any, boolean]
       const plainObject = expect.objectContaining({ type: 'object' })
+      // a def named after the alias, which the type lost
       expect(partial).toEqual({
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-          createdAt: {
-            anyOf: [
-              { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
-              plainObject,
-            ],
-          },
-          // or a `Map` having the `size` of a `Set`, and the other way around
-          tags: {
-            anyOf: [
-              { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
-              expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
-              plainObject,
-            ],
-          },
-          link: {
-            anyOf: [{ 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }, plainObject],
-          },
-          counts: {
-            anyOf: [
-              expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
-              { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
-              plainObject,
-            ],
+        $ref: '#/$defs/PartialPost',
+        $defs: {
+          PartialPost: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              createdAt: {
+                anyOf: [
+                  { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+                  plainObject,
+                ],
+              },
+              // or a `Map` having the `size` of a `Set`, and the other way around
+              tags: {
+                anyOf: [
+                  { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+                  expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+                  plainObject,
+                ],
+              },
+              link: {
+                anyOf: [{ 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }, plainObject],
+              },
+              counts: {
+                anyOf: [
+                  expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+                  { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+                  plainObject,
+                ],
+              },
+            },
           },
         },
       })

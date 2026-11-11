@@ -327,7 +327,7 @@ Inferred schemas come from the input type for inputs, the output type for output
 
 Inputs and outputs are documented in their [serialized](/docs/openapi/serializer) form. Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}`. Views of a class, like `Readonly<User>`, and class types in inputs can be an instance or a plain object, so both forms are documented.
 
-Types declared in your project become components named after them, like `User` or `Page_User` for `Page<User>`, and unions of them told apart by a string literal property, like `kind`, get a `discriminator`. Pass `defs: 'recursive'` to the constructor to make components only for recursive types.
+Types declared in your project become components named after them, like `User` or `Page_User` for `Page<User>`, and unions of them told apart by a string literal property, like `kind`, get a `discriminator`. A model a library computes is named after the alias you declare it with, like `User` for `type User = typeof users.$inferSelect`. Pass `defs: 'recursive'` to the constructor to make components only for recursive types.
 
 ### JSDoc
 
