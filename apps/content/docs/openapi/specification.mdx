@@ -372,5 +372,5 @@ try {
 - Types carry no validation rules. Add them with [JSDoc tags](#jsdoc) or keep a converter schema.
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
-- `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out.
+- `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out, and inputs or outputs holding the type of `Infinity` (type-fest's `PositiveInfinity`) are documented as any value.
 - Generation throws on types the compiler cannot resolve, like an import with a missing path alias.

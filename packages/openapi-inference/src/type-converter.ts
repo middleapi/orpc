@@ -1317,7 +1317,8 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * The arrays and strings an object type of their members (`length`, a number index) holds.
+   * The arrays and strings an object type of their members (`length`, a number index) holds, and
+   * the tuples one of indexes holds.
    */
   private convertStructuralForms(type: Type, properties: readonly TSSymbol[]): JsonSchema[] {
     // neither has a string index
@@ -1360,6 +1361,34 @@ export class TypeToJsonSchemaConverter {
       this.checker.isTypeAssignableTo(this.checker.getStringType(), type)
     ) {
       forms.push({ type: 'string' })
+    }
+
+    // a tuple satisfies an object type of the indexes from 0 (`TupleToObject<[string, number]>`)
+    if (
+      properties.length &&
+      properties.every(
+        (p) => /^(?:0|[1-9]\d*)$/u.test(p.name) && Number(p.name) < properties.length,
+      )
+    ) {
+      const elementTypes = this.types.getSymbolTypes(properties)
+      const prefixItems: JsonSchema[] = []
+      let minItems = 0
+
+      properties.forEach((property, i) => {
+        const index = Number(property.name)
+        prefixItems[index] = this.visitElement(elementTypes[i])
+        if (!(property.flags & SymbolFlags.Optional)) {
+          minItems = Math.max(minItems, index + 1)
+        }
+      })
+
+      const rest = getNumberIndexType(this.types, type)
+      forms.push({
+        type: 'array',
+        prefixItems,
+        ...(minItems ? { minItems } : {}),
+        ...(rest ? { items: this.visitElement(rest) } : {}),
+      })
     }
 
     return forms

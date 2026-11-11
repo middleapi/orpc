@@ -423,7 +423,8 @@ export class OpenAPIGenerator {
      * the procedure type, `undefined` when it has none. Schemas the stock converters document (as
      * any value, when their conversion throws) keep that result (`undefined`) when the type can not
      * be read, like the type of a procedure typed `any`, see {@link inferWhenReadable}, or when
-     * `keepsStock` rejects what is inferred.
+     * `keepsStock` rejects what is inferred. Any slot keeps it when the compiler can not send one
+     * of its types, see {@link isUnsendableTypeError}.
      */
     const inferSlot = <T>(
       schemas: AnySchema[],
@@ -432,17 +433,25 @@ export class OpenAPIGenerator {
       infer: (type: Type) => T,
       keepsStock?: (inferred: T) => boolean,
     ): T | undefined => {
-      if (
-        schemas.length &&
-        schemas.every((s) => ctx.stockConverters.some((c) => c.condition(s, direction)))
-      ) {
-        const inferred = inferWhenReadable(ctx, resolved, getType, infer)
-        return inferred !== undefined && keepsStock?.(inferred) ? undefined : inferred
-      }
+      try {
+        if (
+          schemas.length &&
+          schemas.every((s) => ctx.stockConverters.some((c) => c.condition(s, direction)))
+        ) {
+          const inferred = inferWhenReadable(ctx, resolved, getType, infer)
+          return inferred !== undefined && keepsStock?.(inferred) ? undefined : inferred
+        }
 
-      assertProcedureType(ctx, resolved)
-      const type = getType(resolved.type)
-      return type && infer(type)
+        assertProcedureType(ctx, resolved)
+        const type = getType(resolved.type)
+        return type && infer(type)
+      } catch (error) {
+        if (isUnsendableTypeError(error)) {
+          return undefined
+        }
+
+        throw error
+      }
     }
 
     /**
@@ -622,6 +631,14 @@ function inferWhenReadable<T>(
 
     throw e
   }
+}
+
+/**
+ * The compiler fails to send a type JSON can not write, the literal of `Infinity` (type-fest's
+ * `PositiveInfinity`) or of `-Infinity`, also among the types of a request.
+ */
+function isUnsendableTypeError(error: unknown): boolean {
+  return error instanceof Error && /unsupported value: [+-]Inf\b/u.test(error.message)
 }
 
 /**

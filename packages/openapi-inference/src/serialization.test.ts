@@ -415,6 +415,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['looseUnionKeyNums', undefined],
     ['looseNestedHolder', undefined],
     ['looseJsonDicts', undefined],
+    ['indexedObject', undefined],
+    ['indexedTuple', undefined],
+    ['indexedDate', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2950,6 +2953,34 @@ describe('generated schemas match serialized outputs', async () => {
     expect(names).toContain('CycleBJson')
     expect((spec.components?.schemas as any).CycleBJson.properties.tags).toEqual({ type: 'object' })
     expect((spec.components?.schemas as any).CycleB.properties.tags['x-native-type']).toBe('set')
+  })
+
+  describe('round seventy-one', () => {
+    it('documents inputs and outputs holding the literal of Infinity, which the compiler can not send, as any value', async () => {
+      for (const name of ['limits', 'infinite']) {
+        // `Infinity` is sent as `null`
+        expect(serialize(await call((router as any)[name], undefined))).not.toBeUndefined()
+        expect((spec.paths as any)[`/${name}`].post.responses['200'].content).toEqual({})
+      }
+      expect((spec.paths as any)['/limitsInput'].post.requestBody).toBeUndefined()
+    })
+
+    it('documents object types of indexes as the object or the tuple satisfying them', () => {
+      expect(deref(responseSchema('/indexedTuple'))).toEqual({
+        anyOf: [
+          {
+            type: 'array',
+            prefixItems: [
+              { $ref: 'spec#/$defs/Point' },
+              { type: 'number' },
+              { anyOf: [{ type: 'string' }, { type: 'null' }] },
+            ],
+            minItems: 2,
+          },
+          expect.objectContaining({ type: 'object', required: ['0', '1'] }),
+        ],
+      })
+    })
   })
 })
 
