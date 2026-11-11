@@ -583,13 +583,18 @@ function withoutUnwrittenFields(schema: JsonSchema): JsonSchema {
     return schema
   }
 
-  // they are never required
-  const { properties, ...rest } = schema
+  const { properties, required, ...rest } = schema
   const kept = Object.entries(properties).filter(([, property]) => !isNeverSchema(property))
+  if (kept.length === Object.keys(properties).length) {
+    return schema
+  }
 
-  return kept.length === Object.keys(properties).length
-    ? schema
-    : { ...rest, ...(kept.length ? { properties: Object.fromEntries(kept) } : {}) }
+  const stillRequired = required?.filter((name) => kept.some(([kept]) => kept === name))
+  return {
+    ...rest,
+    ...(kept.length ? { properties: Object.fromEntries(kept) } : {}),
+    ...(stillRequired?.length ? { required: stillRequired } : {}),
+  }
 }
 
 /**

@@ -1274,12 +1274,11 @@ export class TypeQueries {
       }
 
       this.aliasSymbols.add(alias.id)
-      const node = alias.declarations[0]?.resolve() as any
-      if (
-        node?.kind === SyntaxKind.TypeAliasDeclaration &&
-        !node.typeParameters?.length &&
-        LOSING_ALIAS_KINDS.has(node.type.kind)
-      ) {
+      // a value of the same name, like a schema, can be declared first
+      const node = alias.declarations
+        .map((declaration) => declaration.resolve() as any)
+        .find((node) => node?.kind === SyntaxKind.TypeAliasDeclaration)
+      if (node && !node.typeParameters?.length && LOSING_ALIAS_KINDS.has(node.type.kind)) {
         aliases.push(alias)
         aliasNames.push(node.name)
       }

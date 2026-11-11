@@ -58,7 +58,7 @@ describe('generated schemas match serialized outputs', async () => {
 
   const deref = (schema: any): any =>
     schema?.$ref
-      ? deref((spec.components?.schemas as any)[schema.$ref.replace('#/components/schemas/', '')])
+      ? deref((spec.components?.schemas as any)[schema.$ref.replace(/^.*\//, '')])
       : schema
 
   const serialize = (value: unknown) =>
@@ -3044,6 +3044,7 @@ describe('generated schemas match serialized outputs', async () => {
   describe('round seventy-three', () => {
     it('leaves out the key ArkType brands an object type with, which no value holds', async () => {
       expect(deref(responseSchema('/brandedUser'))).toEqual({
+        description: 'An ArkType brand of an object, a key only its type has',
         type: 'object',
         properties: {
           id: { type: 'string' },
@@ -3129,6 +3130,10 @@ describe('generated schemas match serialized outputs', async () => {
         required: ['handle'],
       })
       expect(responseSchema('/brandedAccount').properties.account).toEqual({
+        $ref: 'spec#/$defs/BrandedAccount',
+      })
+      expect((spec.components?.schemas as any).BrandedAccount).toEqual({
+        description: 'An Effect brand of an object, a key only its type has',
         type: 'object',
         properties: { id: { type: 'string' } },
         required: ['id'],
