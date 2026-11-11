@@ -104,6 +104,15 @@ export declare class Stamp {
   toJSON(): string
 }
 
+/** A `toJSON` returning a conditional type left unresolved, which may hold the class again */
+export class Looping {
+  a = 1
+  toJSON<K>(): K extends string ? Looping : number
+  toJSON(): unknown {
+    return 1
+  }
+}
+
 /** Outputs the serialization oracle runs */
 export const roundEighty = {
   // no row is sent as no body, written as `null`
@@ -112,6 +121,9 @@ export const roundEighty = {
   ),
   // a value without its optional file is sent as JSON
   optionalBlob: os.handler((): { rows: number[]; blob?: Blob } => ({ rows: [1] })),
+  looping: os.handler(() => ({ looping: new Looping() })),
+  // written by the overload a call with the key or without arguments resolves to
+  doc: os.handler(() => new Doc({ name: 'a' })),
 }
 
 export const roundEightyTypes = {
@@ -128,7 +140,6 @@ export const roundEightyTypes = {
   where: os.input(type<Where>()).handler(() => 1),
   node: os.input(type<Node>()).handler(() => 1),
   findArgs: os.input(type<FindArgs>()).handler(() => 1),
-  doc: os.handler(() => new Doc({ name: 'a' })),
   hydrated: os.handler((): Hydrated<{ name: string }> => null!),
   saveUser: os.input(type<DeepPartial<User>>()).handler(() => 1),
   savePost: os.input(type<DeepPartial<Post>>()).handler(() => 1),

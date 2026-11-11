@@ -1994,10 +1994,10 @@ export class TypeToJsonSchemaConverter {
    * `plainForm` also documents the plain object a view of a built-in may hold.
    */
   private convertToJSONResult(type: Type, plainForm = true): JsonSchema {
+    // the value of a type parameter, or of a conditional type left unresolved (`Require_id<T>`),
+    // is one its constraint holds, still written by its own fields
     const resolved =
-      type.flags & TypeFlags.TypeParameter
-        ? (this.checker.getBaseConstraintOfType(type) ?? type)
-        : type
+      type.flags & INSTANTIABLE_FLAGS ? (this.checker.getBaseConstraintOfType(type) ?? type) : type
 
     // each member of `Date | string` or `this | null` is serialized once, by its own fields
     if (resolved.isUnionType()) {

@@ -4615,6 +4615,22 @@ describe('openAPIGenerator', () => {
       },
     )
 
+    it('writes a toJSON by the overload JSON.stringify calls, and its unresolved results by their constraints', async () => {
+      const schemas = (await generate()).components?.schemas as any
+
+      // not the overloads whose `this` the value does not satisfy, or that need an argument
+      expect(schemas.Doc).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, _id: { type: 'string' } },
+        required: ['name', '_id'],
+      })
+      // the class a conditional result may hold is written by its fields, not by `toJSON` again
+      expect(schemas.Looping.anyOf).toEqual([
+        { type: 'number' },
+        { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+      ])
+    })
+
     it('documents a value whose files are optional as JSON too', async () => {
       const spec = await generate()
 

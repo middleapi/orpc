@@ -1,5 +1,5 @@
 import { SyntaxKind } from 'typescript/unstable/ast'
-import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
+import type { Signature, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import {
@@ -509,7 +509,7 @@ export function getToJSONResultTypes(
     const results = new Map<number, Type>()
 
     for (const member of getToJSONMembers(types, type)) {
-      for (const result of getMethodResultTypes(types, member)) {
+      for (const result of getMethodResultTypes(types, member, type)) {
         results.set(result.id, result)
       }
     }
@@ -536,23 +536,91 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
 }
 
 /**
- * What a function returns when `JSON.stringify` calls it: of each signature of a function type
- * (an overload taking the key may be the one that answers), of the function a view of it may hold
- * (`Readonly<() => R>`), or anything (`Function`, and `any`, `unknown`, `object`, `{}`, or `Object`,
- * which may hold one).
+ * What a function returns when `JSON.stringify` calls it on a value of `owner`, with the key: of
+ * the overload this call resolves to, and of the one a call without arguments resolves to (an
+ * implementation may ignore the key, `toJSON(options?)`), leaving out overloads whose `this` the
+ * value does not satisfy. Of each function of an intersection (`Date & { toJSON(): number }`, of
+ * `Object.assign`), and of the function a view of one may hold (`Readonly<() => R>`), or anything
+ * (`Function`, and `any`, `unknown`, `object`, `{}`, or `Object`, which may hold one).
  */
-function getMethodResultTypes(types: TypeQueries, member: Type): readonly Type[] {
-  return types.memo('methodResults', member.id, () => {
+function getMethodResultTypes(types: TypeQueries, member: Type, owner: Type): readonly Type[] {
+  return getMethodOverloads(types, member).flatMap((overloads) => {
+    const callable = overloads.filter(
+      (o) => o.thisType === undefined || types.checker.isTypeAssignableTo(owner, o.thisType),
+    )
+    const withKey = callable.find((o) => o.withKey)
+    const withoutArguments = callable.find((o) => o.withoutArguments)
+    const called = callable.filter((o) => o === withKey || o === withoutArguments)
+
+    return (called.length ? called : callable.length ? callable : overloads).flatMap(
+      (o) => o.results,
+    )
+  })
+}
+
+interface MethodOverload {
+  results: readonly Type[]
+  /** The type `this` must satisfy */
+  thisType: Type | undefined
+  /** Whether a call with the key may resolve to it */
+  withKey: boolean
+  /** Whether a call without arguments may resolve to it */
+  withoutArguments: boolean
+}
+
+/**
+ * The overloads of a function, of each function of an intersection.
+ */
+function getMethodOverloads(types: TypeQueries, member: Type): readonly MethodOverload[][] {
+  return types.memo('methodOverloads', member.id, () => {
+    const { checker } = types
+    const any = [
+      [
+        {
+          results: [checker.getAnyType()],
+          thisType: undefined,
+          withKey: true,
+          withoutArguments: true,
+        },
+      ],
+    ]
+
     if (member.flags & (TypeFlags.Any | TypeFlags.Unknown) || mayHoldFunction(types, member)) {
-      return [types.checker.getAnyType()]
+      return any
     }
 
     const method = getViewedFunction(types, member) ?? member
-    const results = types.checker
-      .getSignaturesOfType(method, SignatureKind.Call)
-      .flatMap((signature) => types.checker.getReturnTypeOfSignature(signature) ?? [])
+    const functions = method.isIntersectionType() ? types.getMembers(method) : [method]
+    const accepts = (signature: Signature, index: number, argument: Type) => {
+      const type = checker.getParameterType(signature, index)
+      const constraint = type && (checker.getBaseConstraintOfType(type) ?? type)
+      return constraint === undefined || checker.isTypeAssignableTo(argument, constraint)
+    }
 
-    return results.length || !isFunction(types, method) ? results : [types.checker.getAnyType()]
+    const overloads = functions
+      .map((f) =>
+        checker.getSignaturesOfType(f, SignatureKind.Call).map((signature): MethodOverload => {
+          const thisParameter = signature.getThisParameter()
+          const count = signature.getParameters().length
+          // a parameter accepting `undefined` may be left out, and so may a rest parameter
+          const optionalFrom = (start: number) =>
+            Array.from({ length: count - start }, (_, i) => start + i).every(
+              (i) =>
+                (signature.hasRestParameter && i === count - 1) ||
+                accepts(signature, i, checker.getUndefinedType()),
+            )
+
+          return {
+            results: [checker.getReturnTypeOfSignature(signature) ?? []].flat(),
+            thisType: thisParameter && types.getSymbolTypes([thisParameter])[0],
+            withKey: count > 0 && accepts(signature, 0, checker.getStringType()) && optionalFrom(1),
+            withoutArguments: optionalFrom(0),
+          }
+        }),
+      )
+      .filter((o) => o.length)
+
+    return overloads.length || !isFunction(types, method) ? overloads : any
   })
 }
 
