@@ -95,6 +95,8 @@ export class DefNames {
   readonly numbered = new Map<string, string>()
   /** Names of a type in a mode, with the name of the type without it (`PointJson` of `Point`) */
   readonly modes = new Map<string, string>()
+  /** Names of the forms of types as parameters (`HolderParam` of `Holder`), see `toParameterKey` */
+  readonly parameters = new Set<string>()
   /** How many registries have a def of each name */
   private readonly holders = new Map<string, number>()
 
@@ -131,6 +133,7 @@ export class DefNames {
 
     this.used.delete(name)
     this.modes.delete(name)
+    this.parameters.delete(name)
     if (key !== undefined && this.byKey.get(key) === name) {
       this.byKey.delete(key)
     }
@@ -199,6 +202,9 @@ export class DefRegistry {
       if (base !== preferredName) {
         this.names.modes.set(name, preferredName)
       }
+      if (base !== modeName) {
+        this.names.parameters.add(name)
+      }
     }
 
     const def: Def = { name, key }
@@ -242,6 +248,9 @@ export class DefRegistry {
     }
     if (modeName !== preferredName) {
       this.names.modes.set(name, preferredName)
+    }
+    if (name !== modeName) {
+      this.names.parameters.add(name)
     }
   }
 

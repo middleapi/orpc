@@ -32,6 +32,7 @@ import {
   getStringifiedForm,
   getTypedArrayViewBases,
   getViewBases,
+  getViewParts,
   getViewSources,
   hasBuiltinForm,
   hasToJSONOf,
@@ -179,14 +180,26 @@ export interface TypeToJsonSchemaConvertOptions {
   bodyProperty?: boolean | undefined
 
   /**
-   * Describe the values of the root's properties (`true`), or of these root properties (like
-   * `params` and `query` of a detailed input), as parameters a client sends in the URL, with
-   * bracket notation (`?a[b]=...`): typed arrays, `RegExp`, and other values the serializer
+   * Describe the values of the root's properties (`true`), or of some of them (like `params` and
+   * `query` of a detailed input, see `ParameterFields`), as parameters a client sends in the URL,
+   * with bracket notation (`?a[b]=...`): typed arrays, `RegExp`, and other values the serializer
    * leaves as they are, are sent as `String(value)`.
    *
    * @default false
    */
-  parameters?: boolean | readonly string[] | undefined
+  parameters?: boolean | ParameterFields | undefined
+}
+
+/**
+ * The fields of an object holding parameters (see `TypeToJsonSchemaConvertOptions.parameters`):
+ * all of them but `except`, or only those of `only`, each one whole (`true`) or by its own fields.
+ * The fields of a plain object only, else none of them.
+ */
+export interface ParameterFields {
+  /** The fields holding parameters, the others do not */
+  readonly only?: Readonly<Record<string, true | ParameterFields>> | undefined
+  /** The fields not sent with bracket notation, like those of a query style (`'json'`) */
+  readonly except?: readonly string[] | undefined
 }
 
 export interface AsyncIteratorTypes {
@@ -280,8 +293,10 @@ export class TypeToJsonSchemaConverter {
   private mode: ConversionMode = 'serializer'
   /** Whether the value being converted is a parameter, see `TypeToJsonSchemaConvertOptions.parameters` */
   private parameters = false
-  /** The root whose properties of these names hold parameters, see `visitRoot` */
-  private parameterRoot: { type: Type; properties: readonly string[] } | undefined
+  /** The object whose fields hold parameters, see `ParameterFields` */
+  private parameterRoot: { type: Type; fields: ParameterFields } | undefined
+  /** The fields holding parameters of the plain object visited at this depth, see `visitType` */
+  private pendingFields: { depth: number; fields: ParameterFields } | undefined
 
   constructor(
     private readonly checker: Checker,
@@ -347,8 +362,13 @@ export class TypeToJsonSchemaConverter {
       // the root of a detailed input or output with a body sent as is
       const bodyProperty = options.bodyProperty === true && this.holdsBodyProperty(t)
 
-      if (typeof parameters !== 'boolean' && this.isObjectType(t)) {
+      if (typeof parameters !== 'boolean' && parameters.only && this.isObjectType(t)) {
         return this.withParameterRoot(t, parameters, () => this.convertObject(t, { bodyProperty }))
+      }
+
+      // all fields but some, of a plain object (see `visitType`)
+      if (typeof parameters !== 'boolean' && !bodyProperty) {
+        return this.withPendingFields(0, parameters, () => this.visit(t))
       }
 
       if (bodyProperty) {
@@ -535,6 +555,28 @@ export class TypeToJsonSchemaConverter {
     const flattened = this.types.getFlattenedView(type)
     if (flattened.id !== type.id) {
       return this.visit(flattened)
+    }
+
+    // a plain object some fields of which hold parameters is written in place, as its def would
+    // differ from that of the type, as would that of any other type holding it
+    const pending = this.pendingFields
+    if (pending?.depth === this.expansion.path.length) {
+      this.pendingFields = undefined
+      try {
+        if (this.isPlainFieldsObject(type)) {
+          return this.withParameterRoot(type, pending.fields, () => this.convertObject(type))
+        }
+
+        // `X | undefined` is `X`
+        const defined = type.isUnionType()
+          ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
+          : []
+        return defined.length === 1
+          ? this.withPendingFields(pending.depth, pending.fields, () => this.visit(defined[0]!))
+          : this.visitType(type)
+      } finally {
+        this.pendingFields = pending
+      }
     }
 
     // the bracket notation of a parameter sends it as `String(value)`
@@ -1390,11 +1432,13 @@ export class TypeToJsonSchemaConverter {
       let propertySchema: JsonSchema
       this.expansion.path.push(property)
       try {
+        const selected = this.getParameterSelection(type, property.name)
         propertySchema =
-          this.parameterRoot?.type.id === type.id &&
-          this.parameterRoot.properties.includes(property.name)
+          selected === true
             ? this.withParameters(convertProperty)
-            : convertProperty()
+            : typeof selected === 'object'
+              ? this.withPendingFields(this.expansion.path.length, selected, convertProperty)
+              : convertProperty()
       } catch (error) {
         if (error instanceof TypeScriptTypeResolutionError) {
           error.addDeclarations(property)
@@ -2389,14 +2433,68 @@ export class TypeToJsonSchemaConverter {
    * Converts a root whose properties of these names hold parameters, like `query` of a detailed
    * input, and the others not, like its `body`.
    */
-  private withParameterRoot<T>(type: Type, properties: readonly string[], fn: () => T): T {
+  private withParameterRoot<T>(type: Type, fields: ParameterFields, fn: () => T): T {
     const previous = this.parameterRoot
-    this.parameterRoot = { type, properties }
+    this.parameterRoot = { type, fields }
     try {
       return fn()
     } finally {
       this.parameterRoot = previous
     }
+  }
+
+  /**
+   * Converts a value whose plain object, at this depth, has fields holding parameters.
+   */
+  private withPendingFields<T>(depth: number, fields: ParameterFields, fn: () => T): T {
+    const previous = this.pendingFields
+    this.pendingFields = { depth, fields }
+    try {
+      return fn()
+    } finally {
+      this.pendingFields = previous
+    }
+  }
+
+  /**
+   * Whether a field of an object holds parameters (`true`), some of its own fields do, or none
+   * (`undefined`), see `ParameterFields`.
+   */
+  private getParameterSelection(type: Type, name: string): true | ParameterFields | undefined {
+    const root = this.parameterRoot
+
+    if (root?.type.id !== type.id) {
+      return undefined
+    }
+
+    if (root.fields.only) {
+      return Object.hasOwn(root.fields.only, name) ? root.fields.only[name] : undefined
+    }
+
+    return root.fields.except?.includes(name) ? undefined : true
+  }
+
+  /**
+   * Whether a type is a plain object of the project or an anonymous one, written by its fields,
+   * not an array, a built-in, a class or a view of one, which may be sent otherwise.
+   */
+  private isPlainFieldsObject(type: Type): boolean {
+    if (!(type.flags & TypeFlags.Object) || this.types.getReferenceKind(type) !== undefined) {
+      return false
+    }
+
+    const symbol = getNamedSymbol(type)
+
+    return (
+      (symbol === undefined || this.types.getSymbolSourceKind(symbol) === 'project') &&
+      !((type.getSymbol()?.flags ?? 0) & SymbolFlags.Class) &&
+      getClassType(this.types, type) === undefined &&
+      !extendsBuiltinClass(this.types, type) &&
+      !isTypedArray(this.types, type) &&
+      !isSentAsString(this.types, type) &&
+      !getViewBases(type).length &&
+      getViewParts(this.types, type) === undefined
+    )
   }
 
   /**

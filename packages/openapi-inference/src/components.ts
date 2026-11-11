@@ -13,6 +13,11 @@ export interface DefNameRecord {
   readonly numbered: ReadonlyMap<string, string>
   /** Names of a type in a mode, with the name of the type without it (`PointJson` of `Point`) */
   readonly modes?: ReadonlyMap<string, string> | undefined
+  /**
+   * Names of the forms of types as parameters (`HolderParam` of `Holder`), which yield to a type
+   * of that name (a declared `HolderParam`)
+   */
+  readonly parameters?: ReadonlySet<string> | undefined
 }
 
 export interface MergeEquivalentComponentsOptions {
@@ -128,17 +133,57 @@ export function mergeEquivalentComponents(
     }
   }
 
-  const remaining = Object.keys(schemas).filter((name) => !merged.has(name))
   const renamed = new Map<string, string>()
-  const taken = new Set([...remaining, ...reserved])
+  // the component holding each name, by its own name
+  const holders = new Map(
+    Object.keys(schemas)
+      .filter((name) => !merged.has(name))
+      .map((name) => [name, name]),
+  )
+  const taken = (name: string) => holders.has(name) || reserved.has(name)
+  const move = (name: string, to: string) => {
+    const from = renamed.get(name) ?? name
+    if (holders.get(from) === name) {
+      holders.delete(from)
+    }
+    holders.set(to, name)
+    renamed.set(name, to)
+  }
   const renamable = rename ? candidates.filter((n) => !merged.has(n) && names.numbered.has(n)) : []
-
   // oxlint-disable-next-line unicorn/no-array-sort -- sorts a copy
-  for (const name of renamable.sort(preference)) {
-    const base = names.numbered.get(name)!
-    if (!taken.has(base)) {
-      taken.add(base)
-      renamed.set(name, base)
+  renamable.sort(preference)
+
+  // a name freed by a component renamed in turn may be taken by another one
+  for (let moved = true; moved;) {
+    moved = false
+
+    for (const name of renamable) {
+      const base = names.numbered.get(name)!
+
+      if ((renamed.get(name) ?? name) === base) {
+        continue
+      }
+
+      if (!taken(base)) {
+        move(name, base)
+        moved = true
+        continue
+      }
+
+      // the form of a type as a parameter, by its own name still, yields it to a type of that name,
+      // and takes its type's name when free, else a numbered one
+      const holder = holders.get(base)
+      if (holder !== name && names.parameters?.has(holder!) && !renamed.has(holder!)) {
+        holders.delete(base)
+        move(name, base)
+        let to = names.numbered.get(holder!) ?? base
+        const separator = /\d$/u.test(base) ? '_' : ''
+        for (let i = 2; taken(to); i++) {
+          to = `${base}${separator}${i}`
+        }
+        move(holder!, to)
+        moved = true
+      }
     }
   }
 

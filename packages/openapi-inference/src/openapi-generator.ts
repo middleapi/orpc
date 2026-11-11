@@ -48,6 +48,7 @@ import { RouterTypeResolver } from './router-type'
 import { withoutDescribedSchemas, withRequiredFrom } from './schema-subtraction'
 import type {
   AsyncIteratorTypes,
+  ParameterFields,
   TypeToJsonSchemaConverterOptions,
   TypeToJsonSchemaConvertOptions,
 } from './type-converter'
@@ -417,10 +418,9 @@ export class OpenAPIGenerator {
         // only a whole input sent as the request body, not in the query string of a GET request
         body: !parametersOnly && !pathParameters.length,
         bodyProperty: inputDetailed && !bodiless,
-        // what a client sends in the URL, all of a compact input without a body
-        parameters: inputDetailed
-          ? ['params', 'query']
-          : bodiless || (pathParameters.length > 0 && pathParameters),
+        // what a client sends in the URL with bracket notation, all of a compact input without a
+        // body, but the values of a style, which are sent in their serialized forms
+        parameters: getParameterFields(meta, inputDetailed, bodiless, pathParameters),
         // a client sends a promise as is, written as `{}`
         awaited: false,
       },
@@ -599,6 +599,52 @@ export class OpenAPIGenerator {
       meta: withJSDocMeta(ctx, def.meta, resolved.symbol),
     })
   }
+}
+
+/**
+ * The names of the parameters of a style, not the bracket notation.
+ */
+function getStyledNames(styles: Readonly<Record<string, unknown>> | undefined): string[] {
+  return Object.entries(styles ?? {}).flatMap(([name, style]) =>
+    style === undefined ? [] : [name],
+  )
+}
+
+/**
+ * The fields of an object holding parameters, all of them but these.
+ */
+function getFieldsExcept(except: string[]): true | ParameterFields {
+  return except.length === 0 || { except }
+}
+
+/**
+ * The fields of an input a client sends in the URL with bracket notation (see
+ * `TypeToJsonSchemaConvertOptions.parameters`): those of the query string and the path, but the
+ * ones of a style (`queryStyles`, `paramsStyles`), whose values are sent in their serialized forms.
+ */
+function getParameterFields(
+  meta: OpenAPIMeta | undefined,
+  inputDetailed: boolean,
+  bodiless: boolean,
+  pathParameters: readonly string[],
+): boolean | ParameterFields {
+  const queryStyled = getStyledNames(meta?.queryStyles)
+  const paramsStyled = getStyledNames(meta?.paramsStyles).filter((name) =>
+    pathParameters.includes(name),
+  )
+
+  if (inputDetailed) {
+    return {
+      only: { params: getFieldsExcept(paramsStyled), query: getFieldsExcept(queryStyled) },
+    }
+  }
+
+  if (bodiless) {
+    return getFieldsExcept([...new Set([...queryStyled, ...paramsStyled])])
+  }
+
+  const sent = pathParameters.filter((name) => !paramsStyled.includes(name))
+  return sent.length > 0 && { only: Object.fromEntries(sent.map((name) => [name, true])) }
 }
 
 /**

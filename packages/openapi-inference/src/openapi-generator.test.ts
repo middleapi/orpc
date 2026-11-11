@@ -214,6 +214,7 @@ import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
 import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
+import { bodyNames, mixedNames, queryNames } from '../tests/fixtures/runtime/src/parameter-names'
 import { parameterValues } from '../tests/fixtures/runtime/src/parameter-values'
 import { router as outsideRouter } from '../tests/fixtures/solution-outside/router'
 import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
@@ -4273,7 +4274,16 @@ describe('openAPIGenerator', () => {
       const parameter = (path: string, method: string, name: string) =>
         paths[path][method].parameters.find((p: any) => p.name === name)
 
-      for (const name of ['bytes', 'buffer', 'floats', 'pattern', 'raw', 'view', 'either']) {
+      for (const name of [
+        'bytes',
+        'buffer',
+        'floats',
+        'pattern',
+        'raw',
+        'view',
+        'either',
+        'frozen',
+      ]) {
         expect(parameter('/search', 'get', name), name).toEqual(
           expect.objectContaining({ in: 'query', schema: string, required: true }),
         )
@@ -4337,6 +4347,7 @@ describe('openAPIGenerator', () => {
             nested: { pattern: /a/, count: 1 },
             attachment,
             at: new Date(0),
+            frozen: /a/,
           },
         ],
         ['upload', attachment],
@@ -4395,6 +4406,140 @@ describe('openAPIGenerator', () => {
           expect(validateBody(body) ? [] : [name, body, validateBody.errors]).toEqual([])
         }
       }
+    })
+
+    it('keeps the serialized forms of values of a query or path style, which a client sends', async () => {
+      const spec = await generator.generate(parameterValues, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/parameter-values.ts', import.meta.url),
+          export: 'parameterValues',
+        },
+      })
+      const paths = spec.paths as any
+      const schemas = spec.components?.schemas as any
+      const string = { type: 'string' }
+      const parameter = (path: string, method: string, name: string) =>
+        paths[path][method].parameters.find((p: any) => p.name === name)
+      const styled = '/styled/{pairs}/{patterns}'
+
+      expect(parameter(styled, 'get', 'json').content['application/json'].schema).not.toEqual(
+        string,
+      )
+      expect(parameter(styled, 'get', 'jsonPattern').content['application/json'].schema).toEqual({})
+      expect(parameter(styled, 'get', 'comma').schema).not.toEqual(string)
+      expect(parameter(styled, 'get', 'array').schema).toEqual({})
+      // the bracket notation, also of a style reset to it
+      expect(parameter(styled, 'get', 'plain').schema).toEqual(string)
+      expect(parameter(styled, 'get', 'reset').schema).toEqual(string)
+      expect(parameter(styled, 'get', 'patterns').schema).toEqual({})
+      expect(parameter('/styled-detailed/{pairs}', 'get', 'pattern').schema).toEqual(string)
+      expect(parameter('/styled-path/{pairs}/{pattern}', 'put', 'pattern').schema).toEqual(string)
+      expect(parameter('/styled-path/{pairs}/{pattern}', 'put', 'pairs').schema).not.toEqual(string)
+
+      // the values the handler decodes match the documented parameters
+      const ajv = new Ajv2020({ strict: false, allErrors: true, coerceTypes: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const toAjv = (schema: unknown) =>
+        JSON.parse(JSON.stringify(schema).replaceAll('#/components/schemas/', 'spec#/$defs/'))
+      let decoded: any
+      const handler = new OpenAPIHandler(parameterValues, {
+        clientInterceptors: [
+          ({ input, next }) => {
+            decoded = input
+            return next()
+          },
+        ],
+      })
+      const link = new OpenAPILink(parameterValues, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) =>
+          (await handler.handle(new Request(request, init))).response!,
+      })
+      const bytes = new Uint8Array([1, 2])
+
+      for (const [name, input, fields] of [
+        [
+          'styled',
+          {
+            pairs: bytes,
+            patterns: /a/,
+            json: bytes,
+            jsonPattern: /a/,
+            jsonList: [bytes],
+            jsonHolder: { bytes, pattern: /a/ },
+            comma: bytes,
+            space: bytes,
+            pipe: bytes,
+            array: /a/,
+            commaArray: /a/,
+            pipeArray: /a/,
+            reset: bytes,
+            plain: bytes,
+          },
+          (value: any) => value,
+        ],
+        [
+          'styledDetailed',
+          { params: { pairs: bytes }, query: { json: [bytes], pattern: /a/ } },
+          (value: any) => ({ ...value.params, ...value.query }),
+        ],
+        ['styledPath', { pairs: bytes, pattern: /a/, data: bytes }, (value: any) => value],
+      ] as const) {
+        await expect(link.call([name], input as any, { context: {} })).resolves.toBe(1)
+
+        const operation = Object.values(paths)
+          .flatMap((item: any) => Object.values(item))
+          .find((o: any) => o.operationId === name) as any
+        const values = fields(decoded)
+
+        for (const p of operation.parameters) {
+          const schema = p.schema ?? p.content['application/json'].schema
+          const validate = ajv.compile(toAjv(schema))
+          expect(validate(values[p.name]) ? [] : [name, p.name, values[p.name]]).toEqual([])
+        }
+      }
+    })
+
+    it('names the query forms of models apart from the models named like them', async () => {
+      const generate = async (router: any, exported: string) => {
+        const spec = await generator.generate(router, {
+          source: {
+            file: new URL('../tests/fixtures/runtime/src/parameter-names.ts', import.meta.url),
+            export: exported,
+          },
+        })
+        return spec.components?.schemas as any
+      }
+      const holderQuery = {
+        type: 'object',
+        properties: { bytes: { type: 'string' } },
+        required: ['bytes'],
+      }
+      const named = expect.objectContaining({ properties: { other: { type: 'boolean' } } })
+
+      const queries = await generate(queryNames, 'queryNames')
+      expect(Object.keys(queries).toSorted()).toEqual(['Holder', 'HolderParam'])
+      expect(queries.HolderParam).toEqual(named)
+      expect(queries.Holder).toEqual(expect.objectContaining(holderQuery))
+
+      const bodies = await generate(bodyNames, 'bodyNames')
+      expect(Object.keys(bodies).toSorted()).toEqual(['Holder', 'HolderParam', 'HolderParam2'])
+      expect(bodies.HolderParam).toEqual(named)
+      expect(bodies.HolderParam2).toEqual(expect.objectContaining(holderQuery))
+      expect(bodies.Holder.properties.bytes).not.toEqual({ type: 'string' })
+
+      const mixed = await generate(mixedNames, 'mixedNames')
+      expect(Object.keys(mixed).toSorted()).toEqual(['Holder', 'HolderParam'])
+      expect(mixed.HolderParam).toEqual(named)
+      expect(mixed.Holder).toEqual(expect.objectContaining(holderQuery))
     })
   })
 })

@@ -632,15 +632,33 @@ function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
 /**
  * Whether the bracket notation of a parameter (`?a[b]=...`) sends a value of this type as
  * `String(value)`: a typed array (also Node's `Buffer`), or an instance the serializer leaves to
- * `JSON.stringify` (`RegExp`, `ArrayBuffer`, `Promise`), but a boxed primitive, which is sent as
- * its primitive, and an `Error`, which is sent as the plain object it may be, like a class.
+ * `JSON.stringify` (`RegExp`, `ArrayBuffer`, `Promise`), also through a view keeping all of its
+ * members (`Readonly<RegExp>`), but a boxed primitive, which is sent as its primitive, and an
+ * `Error`, which is sent as the plain object it may be, like a class.
  */
-export function isSentAsString(types: TypeQueries, type: Type): boolean {
-  return (
+export function isSentAsString(types: TypeQueries, type: Type, depth = 0): boolean {
+  if (
     (isTypedArray(types, type) && !getTypedArrayViewBases(types, type).length) ||
     (isStringifiedBuiltin(types, type) &&
       !isBoxedPrimitive(types, type) &&
       !extendsError(types, type))
+  ) {
+    return true
+  }
+
+  if (!((type as any).objectFlags & ObjectFlags.Mapped) || depth > 16) {
+    return false
+  }
+
+  const [source, ...others] = types.getMappedSourceMembers(type)
+  const properties = types.getProperties(type)
+
+  return (
+    source !== undefined &&
+    !others.length &&
+    isSentAsString(types, source, depth + 1) &&
+    properties.length === types.getProperties(source).length &&
+    !properties.some((p) => p.flags & SymbolFlags.Optional)
   )
 }
 
