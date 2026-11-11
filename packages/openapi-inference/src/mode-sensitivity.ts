@@ -4,6 +4,7 @@ import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 import {
   getBuiltinBaseName,
   getDeclaredBuiltinName,
+  getIndexInfos,
   getNumberIndexType,
   getSatisfyingCollections,
   getToJSON,
@@ -330,7 +331,7 @@ export class ModeSensitivity {
 
     return (
       dataTypes.some((t) => t !== undefined && isSensitive(t)) ||
-      types.checker.getIndexInfosOfType(type).some((info) => isSensitive(info.valueType))
+      getIndexInfos(types, type).some((info) => isSensitive(info.valueType))
     )
   }
 }

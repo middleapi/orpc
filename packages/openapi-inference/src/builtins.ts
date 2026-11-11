@@ -1,6 +1,6 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { stringifyJSON } from '@orpc/shared'
-import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
+import type { IndexInfo, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import { bigintSchema, getLeafBuiltinSchema } from './schema-utils'
@@ -324,7 +324,7 @@ function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | unde
   // also an interface extending a view of one (`interface Sized extends Pick<Uint8Array, 'length'>`)
   return base !== undefined
     ? TYPED_ARRAYS.has(base) || undefined
-    : getViewBases(source!).filter((view) => isTypedArray(types, view))
+    : getViewBases(types, source!).filter((view) => isTypedArray(types, view))
 }
 
 /**
@@ -448,7 +448,7 @@ function extendsProjectClass(types: TypeQueries, type: Type, visited: Set<number
   }
   visited.add(target.id)
 
-  return (target.getBaseTypes() ?? []).some((base) => {
+  return getBaseTypes(types, target).some((base) => {
     const symbol = base.getSymbol()
     return (
       symbol !== undefined &&
@@ -474,7 +474,7 @@ function getBuiltinSubclass(
   if (base === undefined) {
     // an interface extending a view of a built-in (`interface Link extends Pick<URL, 'href'>`)
     // holds the built-in or a plain object
-    for (const view of getViewBases(type)) {
+    for (const view of getViewBases(types, type)) {
       // a typed array is written by its index keys and the fields the interface adds, and an
       // error (`interface AppError extends Readonly<Error>`) by its fields, as when extending one
       if (isTypedArray(types, view) || isViewOfFieldsBuiltin(types, view)) {
@@ -616,7 +616,7 @@ export function getStringifiedForm(
  */
 export function getViewSources(types: TypeQueries, type: Type): readonly Type[] {
   return types.memo('viewSources', type.id, () =>
-    getSourcesOfViews(types, [type, ...getViewBases(type)], 0),
+    getSourcesOfViews(types, [type, ...getViewBases(types, type)], 0),
   )
 }
 
@@ -628,7 +628,7 @@ function getSourcesOfViews(types: TypeQueries, views: readonly Type[], depth: nu
           .getMappedSourceMembers(view)
           .flatMap((source) => [
             source,
-            ...getSourcesOfViews(types, getViewBases(source), depth + 1),
+            ...getSourcesOfViews(types, getViewBases(types, source), depth + 1),
           ]),
       )
 }
@@ -637,9 +637,26 @@ function getSourcesOfViews(types: TypeQueries, views: readonly Type[], depth: nu
  * The value type of the number index signature of a type, like the items of an array.
  */
 export function getNumberIndexType(types: TypeQueries, type: Type): Type | undefined {
-  return types.checker
-    .getIndexInfosOfType(type)
-    .find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+  return getIndexInfos(types, type).find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+}
+
+/**
+ * The index signatures of a type, asked of the compiler once.
+ */
+export function getIndexInfos(types: TypeQueries, type: Type): readonly IndexInfo[] {
+  return types.memo('indexInfos', type.id, () => types.checker.getIndexInfosOfType(type))
+}
+
+/**
+ * The base types of a class or an interface, also of a reference to a generic one, asked of the
+ * compiler once.
+ */
+export function getBaseTypes(types: TypeQueries, type: Type): readonly Type[] {
+  return types.memo(
+    'baseTypes',
+    type.id,
+    () => (type.isTypeReference() ? type.getTarget() : type).getBaseTypes() ?? [],
+  )
 }
 
 /**
@@ -654,8 +671,7 @@ export function getBuiltinBaseName(types: TypeQueries, type: Type): string | und
  * applied to it (`class Tags extends Tagged(Set<string>)`, whose base is an intersection with it).
  */
 function getBuiltinBase(types: TypeQueries, type: Type, depth = 0): TSSymbol | undefined {
-  const target = type.isTypeReference() ? type.getTarget() : type
-  const bases = (target.getBaseTypes() ?? []).flatMap((base) =>
+  const bases = getBaseTypes(types, type).flatMap((base) =>
     base.isIntersectionType() ? types.getMembers(base) : [base],
   )
 
@@ -685,17 +701,21 @@ function getBuiltinBase(types: TypeQueries, type: Type, depth = 0): TSSymbol | u
  * The mapped types an interface extends, also through other interfaces
  * (`interface Link extends Pick<URL, 'href'>`).
  */
-export function getViewBases(type: Type, depth = 0): Type[] {
+export function getViewBases(types: TypeQueries, type: Type): readonly Type[] {
+  return types.memo('viewBases', type.id, () => collectViewBases(types, type, 0))
+}
+
+function collectViewBases(types: TypeQueries, type: Type, depth: number): Type[] {
   const symbol = type.getSymbol()
 
   if (!symbol || !(symbol.flags & SymbolFlags.Interface) || depth > 16) {
     return []
   }
 
-  const target = type.isTypeReference() ? type.getTarget() : type
-
-  return (target.getBaseTypes() ?? []).flatMap((base) =>
-    (base as any).objectFlags & ObjectFlags.Mapped ? [base] : getViewBases(base, depth + 1),
+  return getBaseTypes(types, type).flatMap((base) =>
+    (base as any).objectFlags & ObjectFlags.Mapped
+      ? [base]
+      : collectViewBases(types, base, depth + 1),
   )
 }
 
@@ -721,7 +741,7 @@ export function extendsBuiltinClass(types: TypeQueries, view: Type): boolean {
   const base = getBuiltinBase(types, view)
   return (
     (base !== undefined && Boolean(base.flags & (SymbolFlags.Class | SymbolFlags.Variable))) ||
-    getViewBases(view).some((viewBase) => isViewOfFieldsBuiltin(types, viewBase))
+    getViewBases(types, view).some((viewBase) => isViewOfFieldsBuiltin(types, viewBase))
   )
 }
 
@@ -768,7 +788,7 @@ const ERROR: ReadonlySet<string> = new Set(['Error'])
  */
 export function extendsError(types: TypeQueries, type: Type): boolean {
   return types.memo('extendsError', type.id, (): boolean =>
-    [type, ...getSourcesOfViews(types, getViewBases(type), 0)].some((source) =>
+    [type, ...getSourcesOfViews(types, getViewBases(types, type), 0)].some((source) =>
       isOrExtendsBuiltin(types, source, ERROR),
     ),
   )
@@ -781,7 +801,7 @@ export function extendsError(types: TypeQueries, type: Type): boolean {
  * boxed primitive, see `getBuiltinFields`).
  */
 export function extendsBuiltinView(types: TypeQueries, type: Type): boolean {
-  return getViewBases(type).some(
+  return getViewBases(types, type).some(
     (view) =>
       !isTypedArray(types, view) &&
       getStringifiedForm(types, view) === undefined &&
@@ -865,7 +885,7 @@ export function hasToJSONOf(types: TypeQueries, type: Type, builtin: Type): bool
  * (`interface ROnum extends Readonly<Number> { toJSON(): string }`), which an instance has.
  */
 export function addsOwnToJSON(types: TypeQueries, type: Type): boolean {
-  return getViewBases(type).length > 0 && hasOwnToJSON(types, type)
+  return getViewBases(types, type).length > 0 && hasOwnToJSON(types, type)
 }
 
 function hasOwnToJSON(types: TypeQueries, type: Type): boolean {

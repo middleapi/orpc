@@ -25,6 +25,7 @@ import {
   getBuiltinBaseName,
   getBuiltinFields,
   getExtendedPrimitiveSchema,
+  getIndexInfos,
   getNodeBuffer,
   getNumberIndexType,
   getSatisfyingCollections,
@@ -1130,14 +1131,15 @@ export class TypeToJsonSchemaConverter {
       // interface extending a view of one with its own `toJSON` (`interface Msg extends Pick<Error,
       // 'message'> { toJSON(): string }`), which adds it like an intersection, unless its `toJSON`
       // returned it, which `JSON.stringify` does not call again
-      const views = getViewBases(type)
+      const views = getViewBases(this.types, type)
       const sources = getViewSources(this.types, type)
       // the built-in itself, not an interface over a view of it (`Readonly<ROnum>` of `interface
       // ROnum extends Readonly<Number> { toJSON(): string }`), whose `toJSON` is added
       const viewed = ignoreToJSON
         ? undefined
-        : (sources.find((m) => hasBuiltinForm(this.types, m) && !getViewBases(m).length) ??
-          sources.find((m) => hasBuiltinForm(this.types, m)))
+        : (sources.find(
+            (m) => hasBuiltinForm(this.types, m) && !getViewBases(this.types, m).length,
+          ) ?? sources.find((m) => hasBuiltinForm(this.types, m)))
       return viewed
         ? this.withBuiltinToJSON(type, views.length ? [type, ...sources] : sources, viewed, builtin)
         : this.withPlainForm(type, builtin)
@@ -1250,10 +1252,7 @@ export class TypeToJsonSchemaConverter {
       const converted = this.convertToJSONResults(toJSONResults)
       // a function, not a plain object of an interface extending `Function`, which has no call
       // signature (`interface JsonFn extends Function { toJSON(): string }`)
-      const callable =
-        isFunction(this.types, type) &&
-        (this.checker.getSignaturesOfType(type, SignatureKind.Call).length > 0 ||
-          this.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0)
+      const callable = isFunction(this.types, type) && this.types.isCallable(type)
 
       const mayLackToJSON =
         sourceResults.some((results) => !results.length) ||
@@ -1329,7 +1328,7 @@ export class TypeToJsonSchemaConverter {
     if (
       (properties.every((p) => p.flags & SymbolFlags.Method || p.escapedName.startsWith('__@')) &&
         !isObjectLiteral(type) &&
-        !this.checker.getIndexInfosOfType(type).length &&
+        !getIndexInfos(this.types, type).length &&
         !this.checker.getSignaturesOfType(type, SignatureKind.Construct).length &&
         ![type, ...getClassTypes(this.types, type)].some(
           (c) => getExtendedPrimitiveSchema(this.types, c) !== undefined,
@@ -1535,11 +1534,7 @@ export class TypeToJsonSchemaConverter {
    */
   private convertStructuralForms(type: Type, properties: readonly TSSymbol[]): JsonSchema[] {
     // neither has a string index
-    if (
-      this.checker
-        .getIndexInfosOfType(type)
-        .some((info) => !(info.keyType.flags & TypeFlags.Number))
-    ) {
+    if (getIndexInfos(this.types, type).some((info) => !(info.keyType.flags & TypeFlags.Number))) {
       return []
     }
 
@@ -1664,7 +1659,7 @@ export class TypeToJsonSchemaConverter {
       return serializable ? this.convertMembers(serializable, convertValue) : convertValue(value)
     }
 
-    const keys = this.checker.getIndexInfosOfType(type).map((info) => ({
+    const keys = getIndexInfos(this.types, type).map((info) => ({
       info,
       key: getIndexKeyType(this.types, info.keyType),
     }))
@@ -2178,7 +2173,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     // an interface extending a view of a built-in (`interface Link extends Pick<URL, 'href'>`)
-    const views = getViewBases(type)
+    const views = getViewBases(this.types, type)
     if (views.length) {
       return views.some((view) => this.mayHoldPlainObject(view))
     }
@@ -2209,7 +2204,7 @@ export class TypeToJsonSchemaConverter {
       // also a view in an intersection (`Readonly<Pick<Date, 'getTime'> & { x: string }>`)
       sources.some((s) =>
         [
-          ...getViewBases(s),
+          ...getViewBases(this.types, s),
           ...(s.isIntersectionType()
             ? this.types.getMembers(s).filter((m) => (m as any).objectFlags & ObjectFlags.Mapped)
             : []),
@@ -2492,7 +2487,7 @@ export class TypeToJsonSchemaConverter {
       !extendsBuiltinClass(this.types, type) &&
       !isTypedArray(this.types, type) &&
       !isSentAsString(this.types, type) &&
-      !getViewBases(type).length &&
+      !getViewBases(this.types, type).length &&
       getViewParts(this.types, type) === undefined
     )
   }

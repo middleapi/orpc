@@ -5,8 +5,10 @@ import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/u
 import {
   extendsBuiltinClass,
   extendsError,
+  getBaseTypes,
   getBuiltin,
   getBuiltinBaseName,
+  getIndexInfos,
   getToJSON,
   getViewBases,
   isBuiltinSymbol,
@@ -171,9 +173,8 @@ export function isBuiltinMember(types: TypeQueries, property: TSSymbol, isError 
           ? types.checker.getSymbolAtLocation(owner.name)
           : undefined
       const declared = symbol && types.checker.getDeclaredTypeOfSymbol(symbol)
-      const target = declared?.isTypeReference() ? declared.getTarget() : declared
 
-      return (target?.getBaseTypes() ?? []).some((base) => {
+      return (declared ? getBaseTypes(types, declared) : []).some((base) => {
         const inherited = types.checker.getPropertyOfType(base, property.name)
         return (
           inherited !== undefined &&
@@ -307,7 +308,7 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
 
   return (
     !types.getProperties(type).length &&
-    (!types.checker.getIndexInfosOfType(type).length || isAnyRecord(types, type)) &&
+    (!getIndexInfos(types, type).length || isAnyRecord(types, type)) &&
     !types.isCallable(type) &&
     mayBePlainObject(types, type)
   )
@@ -333,7 +334,7 @@ export function isLooseIntersection(types: TypeQueries, type: Type): boolean {
         loose.includes(m) ||
         (m.flags & TypeFlags.Object &&
           !types.isCallable(m) &&
-          !types.checker.getIndexInfosOfType(m).length &&
+          !getIndexInfos(types, m).length &&
           types.getProperties(m).every((p) => p.flags & SymbolFlags.Optional)),
     )
   )
@@ -349,7 +350,7 @@ export function isAnyRecord(types: TypeQueries, type: Type): boolean {
     return false
   }
 
-  const infos = types.checker.getIndexInfosOfType(type)
+  const infos = getIndexInfos(types, type)
   return (
     infos.length > 0 &&
     infos.every(
@@ -389,7 +390,7 @@ function isFunctionView(types: TypeQueries, type: Type): boolean {
  */
 function isInterfaceOverFunctionView(types: TypeQueries, type: Type): boolean {
   const source = types.getMappedSource(type) ?? type
-  return getViewBases(source).some((view) => getViewedFunction(types, view) !== undefined)
+  return getViewBases(types, source).some((view) => getViewedFunction(types, view) !== undefined)
 }
 
 /**
@@ -416,7 +417,7 @@ export function getViewedFunction(types: TypeQueries, type: Type): Type | undefi
         type.getAliasTypeArguments().some((a) => a.flags & INSTANTIABLE_FLAGS)
       ) &&
       !types.getProperties(type).length &&
-      !types.checker.getIndexInfosOfType(type).length
+      !getIndexInfos(types, type).length
       ? type
       : undefined
   })
@@ -489,30 +490,32 @@ export function getToJSONResultTypes(
     return []
   }
 
-  // the serializer walks arrays and plain objects, also with a brand
-  // (`string[] & { toJSON(): undefined }`), `JSON.stringify` calls their `toJSON`
-  if (!stringify) {
-    const members = type.isIntersectionType() ? types.getMembers(type) : [type]
+  return types.memo(stringify ? 'stringifiedToJSON' : 'serializedToJSON', type.id, () => {
+    // the serializer walks arrays and plain objects, also with a brand
+    // (`string[] & { toJSON(): undefined }`), `JSON.stringify` calls their `toJSON`
+    if (!stringify) {
+      const members = type.isIntersectionType() ? types.getMembers(type) : [type]
 
-    if (
-      members.some((m) => types.getReferenceKind(m) !== undefined) ||
-      members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m))
-    ) {
-      return []
+      if (
+        members.some((m) => types.getReferenceKind(m) !== undefined) ||
+        members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m))
+      ) {
+        return []
+      }
     }
-  }
 
-  // `Partial<Money>` maps the method to an optional property, the instance still has it, and
-  // `OrFrozen<Money>` to the method or a view of it (`(() => R) | Readonly<() => R>`)
-  const results = new Map<number, Type>()
+    // `Partial<Money>` maps the method to an optional property, the instance still has it, and
+    // `OrFrozen<Money>` to the method or a view of it (`(() => R) | Readonly<() => R>`)
+    const results = new Map<number, Type>()
 
-  for (const member of getToJSONMembers(types, type)) {
-    for (const result of getMethodResultTypes(types, member)) {
-      results.set(result.id, result)
+    for (const member of getToJSONMembers(types, type)) {
+      for (const result of getMethodResultTypes(types, member)) {
+        results.set(result.id, result)
+      }
     }
-  }
 
-  return [...results.values()]
+    return [...results.values()]
+  })
 }
 
 /**
@@ -528,7 +531,7 @@ export function getWrittenToJSONResultTypes(types: TypeQueries, type: Type): rea
  */
 function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
   const toJSON = getOwnToJSON(types, type)
-  const method = toJSON && types.checker.getTypeOfSymbol(toJSON)
+  const [method] = toJSON ? types.getSymbolTypes([toJSON]) : []
   return method ? types.getUnionMembers(method) : []
 }
 
@@ -627,9 +630,7 @@ function collectClassTypes(
   // members, plain objects), also through another interface, a view (`Pick<C, K>`),
   // or an intersection (`C & { x: string }`)
   if (symbol && symbol.flags & SymbolFlags.Interface) {
-    const target = type.isTypeReference() ? type.getTarget() : type
-
-    for (const base of target.getBaseTypes() ?? []) {
+    for (const base of getBaseTypes(types, type)) {
       collectClassTypes(types, base, found, visited)
     }
     return
@@ -730,8 +731,7 @@ function createsInterface(types: TypeQueries, type: Type, name: string, depth = 
     return next(types.getTypeArguments(type)[0])
   }
 
-  const target = type.isTypeReference() ? type.getTarget() : type
-  return (target.getBaseTypes() ?? []).some(next)
+  return getBaseTypes(types, type).some(next)
 }
 
 /**
