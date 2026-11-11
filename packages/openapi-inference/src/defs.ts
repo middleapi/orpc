@@ -41,6 +41,11 @@ function getParameterSuffix(key: number): string {
   return Math.abs(key) >= PARAMETER_KEY_OFFSET ? 'Param' : ''
 }
 
+/** The def name of a type in the mode of a key, as a parameter (`PointJsonParam` of `Point`) */
+function getBaseName(key: number, preferredName: string): string {
+  return `${preferredName}${getModeSuffix(key)}${getParameterSuffix(key)}`
+}
+
 /** The conversion key of a value not sent as a parameter */
 function withoutParameterKey(key: number): number {
   return key <= -PARAMETER_KEY_OFFSET
@@ -184,8 +189,7 @@ export class DefRegistry {
     let name = this.names.byKey.get(key)
 
     if (name === undefined || taken(name)) {
-      const modeName = `${preferredName}${getModeSuffix(key)}`
-      const base = `${modeName}${getParameterSuffix(key)}`
+      const base = getBaseName(key, preferredName)
       const unavailable = (candidate: string) => taken(candidate) || this.names.used.has(candidate)
       // `Page_1` and `Page_12` must not collide as `Page_12`
       const separator = /\d$/u.test(base) ? '_' : ''
@@ -194,17 +198,7 @@ export class DefRegistry {
         name = `${base}${separator}${i}`
       }
 
-      this.names.byKey.set(key, name)
-      this.names.used.add(name)
-      if (name !== modeName) {
-        this.names.numbered.set(name, modeName)
-      }
-      if (base !== preferredName) {
-        this.names.modes.set(name, preferredName)
-      }
-      if (base !== modeName) {
-        this.names.parameters.add(name)
-      }
+      this.give(key, name, preferredName)
     }
 
     const def: Def = { name, key }
@@ -220,9 +214,7 @@ export class DefRegistry {
    * (a type next to a cut expansion, converted again), instead of a numbered one.
    */
   reclaimName(def: Def, preferredName: string): void {
-    const modeName = `${preferredName}${getModeSuffix(def.key)}`
-    const name = `${modeName}${getParameterSuffix(def.key)}`
-
+    const name = getBaseName(def.key, preferredName)
     const reserved = this.reservedNames.get(name)
 
     if (
@@ -230,7 +222,7 @@ export class DefRegistry {
       def.schema === undefined ||
       reserved === undefined ||
       this.defsByName.has(name) ||
-      this.stringify(reserved) !== this.stringify(def.schema) ||
+      stringifyJSON(reserved) !== stringifyJSON(def.schema) ||
       this.isReferenced(def)
     ) {
       return
@@ -241,15 +233,23 @@ export class DefRegistry {
     def.name = name
     this.defsByName.set(name, def)
     this.names.hold(name)
-    this.names.byKey.set(def.key, name)
+    this.give(def.key, name, preferredName)
+  }
+
+  /**
+   * Gives a type the name of its def, recording what it was named after (see `DefNames`).
+   */
+  private give(key: number, name: string, preferredName: string): void {
+    const modeName = `${preferredName}${getModeSuffix(key)}`
+    this.names.byKey.set(key, name)
     this.names.used.add(name)
     if (name !== modeName) {
       this.names.numbered.set(name, modeName)
     }
-    if (modeName !== preferredName) {
+    if (getBaseName(key, preferredName) !== preferredName) {
       this.names.modes.set(name, preferredName)
     }
-    if (name !== modeName) {
+    if (getParameterSuffix(key)) {
       this.names.parameters.add(name)
     }
   }
@@ -287,7 +287,7 @@ export class DefRegistry {
    * has it (see `mergeEquivalentComponents`).
    */
   share(def: Def, group: string): Def {
-    const signature = `${group}:${this.stringify(def.schema!)}`
+    const signature = `${group}:${stringifyJSON(def.schema)}`
     const existing = this.shared.get(signature)
 
     if (
@@ -474,13 +474,6 @@ export class DefRegistry {
     return typeof root === 'object' && root.anyOf
       ? { ...root, anyOf: root.anyOf.map(withPartial) }
       : withPartial(root)
-  }
-
-  /**
-   * The JSON of a def's schema.
-   */
-  stringify(schema: JsonSchema): string {
-    return stringifyJSON(schema)!
   }
 
   /**
