@@ -16,13 +16,15 @@ export interface ResolvedRouterType {
  * and lazy routers without resolving oRPC's own types by name.
  */
 export class RouterTypeResolver {
-  private readonly properties = new Map<string, Type | undefined>()
+  private readonly types: TypeQueries
 
   constructor(
     private readonly checker: Checker,
-    private readonly program: Program,
+    program: Program,
     private readonly root: ResolvedRouterType,
-  ) {}
+  ) {
+    this.types = new TypeQueries(checker, program)
+  }
 
   /**
    * Resolves the type at a router path, unwrapping lazy routers on the way.
@@ -31,11 +33,11 @@ export class RouterTypeResolver {
     let current: ResolvedRouterType = { ...this.root, type: this.unlazy(this.root.type) }
 
     for (const segment of path) {
-      const symbol = this.checker.getPropertyOfType(current.type, segment)
+      const symbol = this.types.getProperty(current.type, segment)
 
       // routers typed with an index signature, like `Record<string, typeof procedure>`
       const type = symbol
-        ? this.checker.getTypeOfSymbol(symbol)
+        ? this.types.getSymbolTypes([symbol])[0]
         : this.checker
             .getIndexInfosOfType(current.type)
             .find((info) => info.keyType.flags & TypeFlags.String)?.valueType
@@ -63,16 +65,11 @@ export class RouterTypeResolver {
    * is told apart from an export that is no router at all.
    */
   holdsProcedure(): boolean {
-    const types = new TypeQueries(this.checker, this.program)
-    return this.holdsProcedureIn(this.root.type, types, new ExpansionGuard(types), new Set())
+    return this.holdsProcedureIn(this.root.type, new ExpansionGuard(this.types), new Set())
   }
 
-  private holdsProcedureIn(
-    type: Type,
-    types: TypeQueries,
-    expansion: ExpansionGuard,
-    seen: Set<number>,
-  ): boolean {
+  private holdsProcedureIn(type: Type, expansion: ExpansionGuard, seen: Set<number>): boolean {
+    const types = this.types
     const current = this.unlazy(this.stripNullish(type))
 
     if (seen.has(current.id)) {
@@ -89,10 +86,10 @@ export class RouterTypeResolver {
     if (current.flags & TypeFlags.UnionOrIntersection) {
       return types
         .getMembers(current)
-        .some((member) => this.holdsProcedureIn(member, types, expansion, seen))
+        .some((member) => this.holdsProcedureIn(member, expansion, seen))
     }
 
-    if (!this.canBeRouter(current, types)) {
+    if (!this.canBeRouter(current)) {
       return false
     }
 
@@ -105,11 +102,11 @@ export class RouterTypeResolver {
             .getPropertyTypes(current)
             .some(
               (property) =>
-                property !== undefined && this.holdsProcedureIn(property, types, expansion, seen),
+                property !== undefined && this.holdsProcedureIn(property, expansion, seen),
             ) ||
           this.checker
             .getIndexInfosOfType(current)
-            .some((info) => this.holdsProcedureIn(info.valueType, types, expansion, seen)),
+            .some((info) => this.holdsProcedureIn(info.valueType, expansion, seen)),
       ) ?? false
     )
   }
@@ -120,8 +117,8 @@ export class RouterTypeResolver {
    * primitive, array or default library type (`Record<K, T>` and the other mapped types aside),
    * whose members hold no procedure.
    */
-  private canBeRouter(type: Type, types: TypeQueries): boolean {
-    if (!(type.flags & TypeFlags.Object) || types.getReferenceKind(type)) {
+  private canBeRouter(type: Type): boolean {
+    if (!(type.flags & TypeFlags.Object) || this.types.getReferenceKind(type)) {
       return false
     }
 
@@ -130,7 +127,7 @@ export class RouterTypeResolver {
     return (
       !symbol ||
       !!((type as any).objectFlags & ObjectFlags.Mapped) ||
-      types.getSymbolSourceKind(symbol) !== 'default'
+      this.types.getSymbolSourceKind(symbol) !== 'default'
     )
   }
 
@@ -167,32 +164,20 @@ export class RouterTypeResolver {
   ): Type | undefined {
     const types = this.getProperty(this.getProperty(schema, '~standard'), 'types')
     // the input/output type itself is kept as is, including `null` and `undefined`
-    const symbol = types && this.checker.getPropertyOfType(types, direction)
-    return symbol && this.checker.getTypeOfSymbol(symbol)
+    return types && this.getPropertyType(types, direction)
   }
 
   /**
    * Gets the non-nullable type of a property, so optional properties can be followed.
    */
   private getProperty(type: Type | undefined, name: string): Type | undefined {
-    if (!type) {
-      return undefined
-    }
-
-    const key = `${type.id}:${name}`
-
-    if (!this.properties.has(key)) {
-      this.properties.set(key, this.getPropertyUncached(type, name))
-    }
-
-    return this.properties.get(key)
+    const propertyType = type && this.getPropertyType(type, name)
+    return propertyType && this.stripNullish(propertyType)
   }
 
-  private getPropertyUncached(type: Type, name: string): Type | undefined {
-    const symbol = this.checker.getPropertyOfType(type, name)
-    const propertyType = symbol && this.checker.getTypeOfSymbol(symbol)
-
-    return propertyType && this.stripNullish(propertyType)
+  private getPropertyType(type: Type, name: string): Type | undefined {
+    const symbol = this.types.getProperty(type, name)
+    return symbol && this.types.getSymbolTypes([symbol])[0]
   }
 
   private stripNullish(type: Type): Type {
@@ -208,7 +193,7 @@ export class RouterTypeResolver {
     }
 
     // `Procedure | undefined` needs no compiler request
-    return concrete.length === 1 ? concrete[0]! : (this.checker.getNonNullableType(type) ?? type)
+    return concrete.length === 1 ? concrete[0]! : this.types.getNonNullable(type)
   }
 
   private unlazy(type: Type): Type {

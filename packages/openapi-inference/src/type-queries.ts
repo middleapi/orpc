@@ -540,7 +540,7 @@ export class TypeQueries {
     return this.memo(`property:${name}`, type.id, () => this.checker.getPropertyOfType(type, name))
   }
 
-  private getNonNullable(type: Type): Type {
+  getNonNullable(type: Type): Type {
     // only a union, `null`, `undefined`, or a generic type may hold them
     if (!(type.flags & (TypeFlags.UnionOrIntersection | NULLISH_FLAGS | INSTANTIABLE_FLAGS))) {
       return type
