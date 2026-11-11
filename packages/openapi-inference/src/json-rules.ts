@@ -106,23 +106,41 @@ function isDeclaredByPackage(types: TypeQueries, property: TSSymbol): boolean {
 }
 
 /**
- * Whether a type is of an Effect data type (`Option`, `Redacted`, `Chunk`), requiring its type id
- * (`'~effect/Option'`): its values are made from a prototype with the `toJSON` of `Inspectable`,
- * which `JSON.stringify` writes, as any value, also where the interface does not declare it
- * (`Redacted`). A brand is only in types (`{ id: string } & Brand.Brand<'Id'>` is a plain object).
+ * Whether a type is of an Effect data type (`Option`, `Redacted`, `Chunk`), holding the type id
+ * its interface requires (`'~effect/Option'`), also in a partial view: its values are made from
+ * a prototype with the `toJSON` of `Inspectable`, which `JSON.stringify` writes, as any value,
+ * also where the interface does not declare it (`Redacted`). Brands are only in types, and the
+ * methods of `Equal` and `Hash` are dropped from plain objects (`{ id: string } & Hash.Hash`).
  */
 export function isEffectValue(types: TypeQueries, type: Type): boolean {
-  return types.memo('effectValue', type.id, () =>
-    types
-      .getProperties(type)
-      .some(
-        (p) =>
-          p.name.startsWith('~effect/') &&
-          p.name !== '~effect/Brand' &&
-          !(p.flags & SymbolFlags.Optional) &&
-          isDeclaredByPackage(types, p),
-      ),
-  )
+  return types.memo('effectValue', type.id, () => {
+    const ids = types.getProperties(type).filter(
+      (p) =>
+        p.name.startsWith('~effect/') &&
+        p.name !== '~effect/Brand' &&
+        isDeclaredByPackage(types, p) &&
+        // declared required, not as a method: markers (`'~effect/Runtime/errorReported'` of
+        // `Error`) are optional, `'~effect/Hash'` is a method
+        p.declarations.every(
+          (d) =>
+            d.kind === SyntaxKind.PropertySignature &&
+            (d.resolve() as any)?.postfixToken?.kind !== SyntaxKind.QuestionToken,
+        ),
+    )
+
+    return (
+      ids.length > 0 &&
+      types
+        .getSymbolTypes(ids)
+        .some(
+          (t) =>
+            t !== undefined &&
+            types
+              .getUnionMembers(t)
+              .some((m) => !(m.flags & UNDEFINED_FLAGS) && !isFunction(types, m)),
+        )
+    )
+  })
 }
 
 /**

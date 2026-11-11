@@ -12,7 +12,12 @@ import {
 } from '../tests/fixtures/app/src/deep-view-chains'
 import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings'
 import { BrandedUser } from '../tests/fixtures/app/src/round73'
-import { BrandedOwner } from '../tests/fixtures/app/src/round75'
+import {
+  BrandedOwner,
+  comparedAmount,
+  hashedRecord,
+  secretConfig,
+} from '../tests/fixtures/app/src/round75'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -428,9 +433,21 @@ describe('generated schemas match serialized outputs', async () => {
     ['brandedUser', undefined],
     ['brandedUsers', undefined],
     ['readonlyBrandedUser', undefined],
+    ['partialTileSet', undefined],
+    ['partialTileMap', undefined],
+    ['partialTiles', undefined],
+    ['sized', undefined],
+    ['sizedHolder', undefined],
+    ['numberRecord', undefined],
+    ['numberRecords', undefined],
     ['brandedAccount', undefined],
     ['brandedOwner', undefined],
     ['redacted', undefined],
+    ['hashedRecord', undefined],
+    ['partialHashedRecord', undefined],
+    ['comparedAmount', undefined],
+    ['partialRedacted', undefined],
+    ['partialDeepConfig', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -3034,6 +3051,30 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
+  describe('round seventy-four', () => {
+    it('documents the arrays a Set or a Map is written as where it satisfies an object type by its members', () => {
+      const schemas = spec.components?.schemas as any
+
+      expect(schemas.Sized.anyOf).toEqual([
+        { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+        expect.objectContaining({ type: 'object', required: ['size'] }),
+      ])
+      // `JSON.stringify` writes them as `{}`
+      expect(schemas.SizedJson).toEqual({ type: 'object', description: expect.any(String) })
+      expect(schemas.SizedHolder.properties.sized).toEqual({
+        $ref: '#/components/schemas/SizedJson',
+      })
+    })
+
+    it('constrains only the numeric keys of a number index', () => {
+      expect(deref(responseSchema('/numberRecord')).anyOf[1]).toEqual({
+        type: 'object',
+        patternProperties: numberKeys({ $ref: 'spec#/$defs/TileLeaf' }),
+      })
+    })
+  })
+
   describe('round seventy-five', () => {
     const handler = new OpenAPIHandler(router)
     let sent: unknown
@@ -3092,6 +3133,50 @@ describe('generated schemas match serialized outputs', async () => {
       ).resolves.toBe(1)
       const validate = ajv.compile(requestSchema('/redactedInput'))
       expect(validate(sent) ? [] : validate.errors).toEqual([])
+    })
+
+    it('documents plain objects implementing Hash or Equal of Effect by their fields', async () => {
+      const schemas = spec.components?.schemas as any
+      expect(schemas.HashedRecord).toEqual({
+        type: 'object',
+        properties: { recordKey: { type: 'string' } },
+        required: ['recordKey'],
+      })
+      expect(responseSchema('/partialHashedRecord')).toEqual({
+        type: 'object',
+        properties: { recordKey: { type: 'string' } },
+      })
+      expect(schemas.ComparedAmount).toEqual({
+        type: 'object',
+        properties: { comparedCents: { type: 'number' } },
+        required: ['comparedCents'],
+      })
+      expect(requestSchema('/comparedAmountInput')).toEqual({ $ref: 'spec#/$defs/ComparedAmount' })
+
+      for (const [path, value] of [
+        ['hashedRecordInput', hashedRecord()],
+        ['comparedAmountInput', comparedAmount()],
+      ] as const) {
+        await expect(link.call([path], value, { context: {} })).resolves.toBe(1)
+        const validate = ajv.compile(requestSchema(`/${path}`))
+        expect(validate(sent) ? [] : validate.errors).toEqual([])
+      }
+    })
+
+    it('documents partial views of Effect data types as any value', async () => {
+      expect(responseSchema('/partialRedacted').properties.r).toEqual({})
+      expect(responseSchema('/partialDeepConfig').properties.key).toEqual({})
+      expect(responseSchema('/partialDeepConfig').properties.opt).toEqual({})
+      expect(responseSchema('/partialDeepConfig').properties.n).toEqual({ type: 'number' })
+
+      for (const [path, value] of [
+        ['partialRedactedInput', { r: Redacted.make('s') }],
+        ['partialDeepConfigInput', secretConfig()],
+      ] as const) {
+        await expect(link.call([path], value, { context: {} })).resolves.toBe(1)
+        const validate = ajv.compile(requestSchema(`/${path}`))
+        expect(validate(sent) ? [] : validate.errors).toEqual([])
+      }
     })
   })
 })
