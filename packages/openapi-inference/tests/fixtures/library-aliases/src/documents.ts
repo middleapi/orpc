@@ -1,5 +1,5 @@
 import { os } from '@orpc/server'
-import type { InferDocument, Schema } from 'fake-orm'
+import type { DecimalLike, InferDocument, Schema } from 'fake-orm'
 
 declare const noteSchema: Schema<{ title: string }>
 
@@ -12,4 +12,11 @@ export const documents = {
   held: os.handler((): { note: Note } => ({
     note: { title: 't', createdAt: new Date(), updatedAt: new Date() },
   })),
+}
+
+// an interface keeps its own name
+export type Amount = DecimalLike
+
+export const named = {
+  amount: os.handler((): Amount => ({ digits: [1], exponent: 0 })),
 }

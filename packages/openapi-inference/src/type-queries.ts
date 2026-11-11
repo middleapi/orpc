@@ -1143,11 +1143,11 @@ export class TypeQueries {
   }
 
   /**
-   * The type alias of the project without type parameters a type is declared with, when the
-   * compiler does not keep it for the type (`type User = InferSelectModel<typeof users>`,
-   * `type Row = Partial<Base>`), which keeps only the alias of the library (or none): of the
-   * aliases the files read by `readAliases` declare or import, the first one (see `preferAlias`) of the type,
-   * or of a type of the same shape (see `getShape`), which the compiler instantiates anew where
+   * The type alias of the project without type parameters an object type without a name of its
+   * own (not an interface or a class) is declared with, when the compiler does not keep it for the
+   * type (`type User = InferSelectModel<typeof users>`, `type Row = Partial<Base>`), which keeps
+   * only the alias of the library (or none): of the aliases the files read by `readAliases` declare
+   * or import, the first one (see `preferAlias`) of the type, or of a type of the same shape (see `getShape`), which the compiler instantiates anew where
    * it infers or awaits it (`Promise<User[]>`, `type<User>()`).
    */
   getLostAlias(type: Type): TSSymbol | undefined {
@@ -1300,11 +1300,13 @@ export class TypeQueries {
     const types = this.checker.getTypeAtLocation(aliasNames)
     for (const [i, alias] of aliases.entries()) {
       const type = types[i]
-      // an alias the compiler keeps names the type by itself
+      // an alias the compiler keeps names the type by itself, and so does an interface or a class
+      // (of a library, or a built-in)
       if (
         type &&
         type.flags & (TypeFlags.Object | TypeFlags.Intersection) &&
-        type.getAliasSymbol()?.id !== alias.id
+        type.getAliasSymbol()?.id !== alias.id &&
+        !((type.getSymbol()?.flags ?? 0) & (SymbolFlags.Interface | SymbolFlags.Class))
       ) {
         this.addLostAlias(type, alias)
       }

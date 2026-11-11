@@ -225,7 +225,10 @@ import {
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
-import { documents as libraryDocuments } from '../tests/fixtures/library-aliases/src/documents'
+import {
+  documents as libraryDocuments,
+  named as libraryNamed,
+} from '../tests/fixtures/library-aliases/src/documents'
 import {
   aliases,
   aliasesReversed,
@@ -5118,6 +5121,25 @@ describe('openAPIGenerator', () => {
       expect(response(spec, '/note')).toEqual(ref('Note'))
       expect(response(spec, '/notes')).toEqual({ type: 'array', items: ref('Note') })
       expect(response(spec, '/held').properties.note).toEqual(ref('Note'))
+    })
+
+    it('names no interface of a library after an alias', async () => {
+      const spec = await generator.generate(libraryNamed, {
+        source: {
+          file: new URL('../tests/fixtures/library-aliases/src/documents.ts', import.meta.url),
+          export: 'named',
+        },
+      })
+
+      expect(spec.components?.schemas).toBeUndefined()
+      expect(response(spec, '/amount')).toEqual({
+        type: 'object',
+        properties: {
+          digits: { type: 'array', items: { type: 'number' } },
+          exponent: { type: 'number' },
+        },
+        required: ['digits', 'exponent'],
+      })
     })
 
     it('makes no def of it with defs: recursive', async () => {

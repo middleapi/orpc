@@ -2492,35 +2492,28 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * The project alias the type of a model lost (see `TypeQueries.getLostAlias`): of an object with
-   * properties, not an array, a class, a view of one or of a function, or a built-in, nor an object
-   * or type literal of the project (`ReturnType<() => { ok: true }>`, a member of a union), which
-   * is written where it is declared.
+   * properties, not an array, a view of a class or of a function, nor an object or type literal of
+   * the project (`ReturnType<() => { ok: true }>`, a member of a union), which is written where it
+   * is declared. Only such types are looked up, so an alias read later names a type converted
+   * before only when it would have named it (see `takeLateAliases`).
    */
   private getLostAlias(type: Type): TSSymbol | undefined {
-    const alias = this.types.getLostAlias(type)
+    const declaration = type.getSymbol()?.declarations[0]
 
     if (
-      !alias ||
       !(type.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
+      ((declaration?.kind === SyntaxKind.TypeLiteral ||
+        declaration?.kind === SyntaxKind.ObjectLiteralExpression) &&
+        this.types.getSourceKind(declaration.path) === 'project') ||
       this.types.getReferenceKind(type) !== undefined ||
       !this.types.getProperties(type).length ||
-      getClassType(this.types, type) !== undefined ||
-      getViewedFunction(this.types, type) !== undefined
+      getViewedFunction(this.types, type) !== undefined ||
+      getClassType(this.types, type) !== undefined
     ) {
       return undefined
     }
 
-    const symbol = type.getSymbol()
-    const declaration = symbol?.declarations[0]
-    const kind = declaration && this.types.getSourceKind(declaration.path)
-    const literal =
-      declaration?.kind === SyntaxKind.TypeLiteral ||
-      declaration?.kind === SyntaxKind.ObjectLiteralExpression
-
-    return (literal && kind === 'project') ||
-      ((symbol?.flags ?? 0) & (SymbolFlags.Interface | SymbolFlags.Class) && kind === 'default')
-      ? undefined
-      : alias
+    return this.types.getLostAlias(type)
   }
 
   /**
