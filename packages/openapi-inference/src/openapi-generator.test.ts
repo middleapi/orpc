@@ -215,7 +215,11 @@ import {
   roundEightyParameters,
   roundEightyTypes,
 } from '../tests/fixtures/app/src/round80'
-import { roundEightyOneNames, roundEightyOneNamesReversed } from '../tests/fixtures/app/src/round81'
+import {
+  roundEightyOneBodies,
+  roundEightyOneNames,
+  roundEightyOneNamesReversed,
+} from '../tests/fixtures/app/src/round81'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4844,7 +4848,7 @@ describe('openAPIGenerator', () => {
     })
   })
   describe('round eighty-one', () => {
-    const routers = { roundEightyOneNames, roundEightyOneNamesReversed }
+    const routers = { roundEightyOneNames, roundEightyOneNamesReversed, roundEightyOneBodies }
     const generate = (exported: keyof typeof routers, version: '3.1.1' | '3.0.4' = '3.1.1') =>
       new OpenAPIGenerator().generate(routers[exported], {
         source: { file: fixture('round81.ts'), export: exported },
@@ -4877,6 +4881,34 @@ describe('openAPIGenerator', () => {
         expect(response(spec, '/aggregates')).toEqual({
           $ref: '#/components/schemas/Page_with-avg-sum',
         })
+      },
+    )
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'documents an output that may be left out and admits null already as it is, in %s',
+      async (version) => {
+        const spec = await generate('roundEightyOneBodies', version)
+        const content = (path: string) =>
+          (spec.paths as any)[path].post.responses['200'].content['application/json']
+
+        expect(content('/nullOrUndefined')).toEqual({
+          schema:
+            version === '3.0.4'
+              ? { type: 'string', enum: [null], nullable: true }
+              : { type: 'null' },
+        })
+        expect(content('/maybeNull')).toEqual({
+          schema:
+            version === '3.0.4'
+              ? { type: 'string', nullable: true }
+              : { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        })
+        // a union with `{}`, through its def
+        expect(content('/anyJSON')).toEqual({ schema: { $ref: '#/components/schemas/AnyJSON' } })
+        expect(content('/maybeAnyJSON')).toEqual({
+          schema: { $ref: '#/components/schemas/AnyJSON' },
+        })
+        expect((spec.components?.schemas as any).AnyJSON.anyOf[0]).toEqual({})
       },
     )
   })

@@ -18,7 +18,6 @@ import type {
 import {
   extractJsonObjectSchemaEntries,
   isStandardSchemaOptional,
-  isUnconstrainedSchema,
   StandardJsonSchemaConverter,
 } from '@orpc/json-schema'
 import type {
@@ -47,7 +46,7 @@ import { openTypeScriptProject } from './project'
 import type { ResolvedRouterType } from './router-type'
 import { RouterTypeResolver } from './router-type'
 import { withoutDescribedSchemas, withRequiredFrom } from './schema-subtraction'
-import { withNull } from './schema-utils'
+import { admitsNull, withNull } from './schema-utils'
 import type {
   AsyncIteratorTypes,
   ParameterFields,
@@ -632,10 +631,11 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
 
 /**
  * A response body that may be left out, which the serializer writes as `null`: no body (`void`)
- * stays any value, see `toBodyContent` of `@orpc/openapi`.
+ * stays any value, see `toBodyContent` of `@orpc/openapi`, and a schema admitting `null` already
+ * (`null | undefined`, or a union with `{}`) stays as it is.
  */
 function withNullBody(schema: JsonSchema): JsonSchema {
-  if (typeof schema !== 'object' || isUnconstrainedSchema(schema)) {
+  if (typeof schema !== 'object' || admitsNull(schema, schema.$defs)) {
     return schema
   }
 

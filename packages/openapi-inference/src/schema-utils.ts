@@ -3,6 +3,7 @@ import {
   decodeJsonPointerSegment,
   encodeJsonPointerSegment,
   getJsonSchemaKeywordKind,
+  isUnconstrainedSchema,
   JsonSchemaFormat,
   JsonSchemaXNativeType,
   visitJsonSchemaRefs,
@@ -258,6 +259,39 @@ export function withNull(schema: JsonSchema): JsonSchema {
   }
 
   return { anyOf: [schema, { type: 'null' }] }
+}
+
+/**
+ * Whether a schema admits `null`, also through refs to the defs given: a union with a branch
+ * admitting it, like `{}`, does. Constraints it does not look into, like `allOf`, count as not.
+ */
+export function admitsNull(
+  schema: JsonSchema,
+  $defs: Readonly<Record<string, JsonSchema>> | undefined,
+  resolved: ReadonlySet<string> = new Set(),
+): boolean {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  const { type, const: constant, enum: values, anyOf, $ref, ...rest } = schema
+  const name =
+    $ref?.startsWith(DEFS_REF_PREFIX) &&
+    decodeJsonPointerSegment($ref.slice(DEFS_REF_PREFIX.length))
+
+  return (
+    isUnconstrainedSchema(rest) &&
+    (type === undefined || type === 'null' || (Array.isArray(type) && type.includes('null'))) &&
+    (constant === undefined || constant === null) &&
+    (values === undefined || values.includes(null)) &&
+    (anyOf === undefined || anyOf.some((s) => admitsNull(s, $defs, resolved))) &&
+    ($ref === undefined ||
+      (!!name &&
+        !resolved.has(name) &&
+        $defs !== undefined &&
+        Object.hasOwn($defs, name) &&
+        admitsNull($defs[name]!, $defs, new Set(resolved).add(name))))
+  )
 }
 
 /**

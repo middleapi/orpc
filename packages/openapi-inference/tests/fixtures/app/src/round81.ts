@@ -29,3 +29,17 @@ export const roundEightyOneNamesReversed = {
   invoices: os.handler((): Page<{ number: string }> => page),
   aggregates: os.handler((): Page<{ _avg: number; _sum: number }> => page),
 }
+
+/** A class whose `toJSON` is typed `object`, which may write any value */
+export class AnyJSON {
+  a = 1
+  toJSON: object = () => ({ q: 1 })
+}
+
+/** Outputs that may be left out, which admit `null` already */
+export const roundEightyOneBodies = {
+  nullOrUndefined: os.handler((): null | undefined => null),
+  maybeNull: os.handler((): string | null | undefined => null),
+  anyJSON: os.handler((): AnyJSON => new AnyJSON()),
+  maybeAnyJSON: os.handler((): AnyJSON | undefined => new AnyJSON()),
+}
