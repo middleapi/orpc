@@ -1407,6 +1407,15 @@ export class TypeToJsonSchemaConverter {
       const property = dataProperties[i]!
       const propertyType = propertyTypes[i]
 
+      // a key always `undefined` (`[P]?: never` of an exclusive or) is never written
+      if (
+        propertyType &&
+        this.types.getUnionMembers(propertyType).every((m) => m.flags & UNDEFINED_FLAGS)
+      ) {
+        setOwn(schema.properties, property.name, { not: {} })
+        continue
+      }
+
       // functions, symbols, and always `undefined` values are dropped by JSON serialization,
       // also when `toJSON` returns them
       if (

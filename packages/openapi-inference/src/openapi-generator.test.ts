@@ -4716,6 +4716,26 @@ describe('openAPIGenerator', () => {
           { not: { type: 'object' } },
         ],
       })
+      // the keys of the other member of an exclusive or are never written
+      const notObject = { not: { type: 'object' } }
+      expect(
+        (spec.paths as any)['/optionalXor'].post.requestBody.content['application/json'].schema,
+      ).toEqual({
+        anyOf: [
+          {
+            anyOf: [
+              { type: 'object', properties: { a: { not: {} }, b: { type: 'number' } } },
+              notObject,
+            ],
+          },
+          {
+            anyOf: [
+              { type: 'object', properties: { a: { type: 'string' }, b: { not: {} } } },
+              notObject,
+            ],
+          },
+        ],
+      })
       // of a declared type, by its def
       expect(
         (spec.paths as any)['/weakNode'].post.requestBody.content['application/json'].schema,

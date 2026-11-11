@@ -126,6 +126,8 @@ describe('typeToJsonSchemaConverter', () => {
               'ro': { type: 'boolean' },
               'quoted-key': { type: 'string' },
               'unknownValue': {},
+              // never written
+              'alwaysUndefined': { not: {} },
             },
             required: ['required', 'orNull', 'ro', 'quoted-key', '0'],
           },
@@ -1030,11 +1032,20 @@ describe('typeToJsonSchemaConverter', () => {
         },
         false,
       ])
+      // the keys of the other members are never written
       expect(convertComplex('ExactlyOne')).toEqual([
         {
           anyOf: [
-            { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
-            { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+            {
+              type: 'object',
+              properties: { a: { type: 'string' }, b: { not: {} } },
+              required: ['a'],
+            },
+            {
+              type: 'object',
+              properties: { a: { not: {} }, b: { type: 'number' } },
+              required: ['b'],
+            },
           ],
         },
         false,
