@@ -65,6 +65,20 @@ import {
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
+/**
+ * Whether the `spec` object of a procedure gives its operation whole, which takes nothing from the types.
+ */
+function isGivenWhole(contract: AnyProcedureContract): boolean {
+  const spec = getOpenAPIMeta(contract)?.spec
+  return spec !== undefined && typeof spec !== 'function'
+}
+
+/**
+ * How many times the procedures are converted again, at most, once the files of their properties
+ * read while converting named types converted before (see `TypeToJsonSchemaConverter.takeLateAliases`)
+ */
+const MAX_ALIAS_PASSES = 2
+
 type InferredJsonSchema = [jsonSchema: JsonSchema, optional: boolean]
 
 /**
@@ -278,6 +292,14 @@ export class OpenAPIGenerator {
       }
 
       inferred = await this.inferRouter(ctx, router, filter)
+
+      // a type converted before a file naming it by an alias it lost was read is converted again
+      // with every alias read, so the names do not depend on the order of procedures (the files of
+      // the properties are read as the conversions reach them)
+      for (let i = 0; i < MAX_ALIAS_PASSES && ctx.converters.output.takeLateAliases(); i++) {
+        ctx.converters = { input: converter('input'), output: converter('output') }
+        inferred = await this.inferRouter(ctx, router, filter)
+      }
     } finally {
       project.close()
     }
@@ -327,11 +349,18 @@ export class OpenAPIGenerator {
       }
     }
 
+    const procedures: { contract: AnyProcedureContract; path: readonly string[] }[] = []
+    await walkProcedureContractsAsync(router, (contract, path) => {
+      if (value(filter, contract, path) !== false) {
+        procedures.push({ contract, path: [...path] })
+      }
+    })
+
     // the aliases the files of the procedures declare or import name the models the conversions
-    // reach (see `TypeToJsonSchemaConverter.readAliases`), read first, so that the names do not
-    // depend on the order of procedures
-    await walkProcedureContractsAsync(router, (_, path) => {
-      const symbol = ctx.resolver.resolve(path)?.symbol
+    // reach (see `TypeToJsonSchemaConverter.readAliases`), read first, so that a conversion seldom
+    // reaches a type before the alias naming it (see `generate`)
+    for (const { contract, path } of procedures) {
+      const symbol = !isGivenWhole(contract) ? ctx.resolver.resolve(path)?.symbol : undefined
       if (symbol) {
         ctx.converters.output.readAliases([
           ...symbol.declarations,
@@ -339,18 +368,13 @@ export class OpenAPIGenerator {
           ...(getImplementedSymbol(ctx.checker, symbol)?.declarations ?? []),
         ])
       }
-    })
+    }
 
-    await walkProcedureContractsAsync(router, (contract, path) => {
-      if (value(filter, contract, path) === false) {
-        return
-      }
-
+    for (const { contract, path } of procedures) {
       // an operation the `spec` object gives whole takes nothing from the types
-      const spec = getOpenAPIMeta(contract)?.spec
-      if (spec !== undefined && typeof spec !== 'function') {
+      if (isGivenWhole(contract)) {
         place(path, contract)
-        return
+        continue
       }
 
       walked++
@@ -382,7 +406,7 @@ export class OpenAPIGenerator {
 
         errors.push(`Procedure at ${path.length ? path.join('.') : '(root)'}: ${e.message}`)
       }
-    })
+    }
 
     // no procedure is in the export's type: it is not a router, unlike a router of other paths
     if (walked && !found && !ctx.resolver.holdsProcedure()) {

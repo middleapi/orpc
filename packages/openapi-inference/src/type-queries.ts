@@ -114,6 +114,13 @@ export class TypeQueries {
 
   /** The project aliases of the types the compiler does not keep them for, see `getLostAlias` */
   private readonly lostAliases = new Map<number, TSSymbol>()
+  /** The types of `lostAliases`, by the bucket of their shape (see `getShapeBucket`) */
+  private readonly lostAliasTypes = new Map<number, Type[]>()
+  /** The types `getLostAlias` was asked about, by the bucket of their shape */
+  private readonly askedTypes = new Map<number, Type[]>()
+  private readonly askedIds = new Set<number>()
+  /** Whether an alias read named a type `getLostAlias` had been asked about, see `takeLateAliases` */
+  private lateAliases = false
   /** The files `readAliases` read */
   private readonly aliasFiles = new Set<string>()
   /** The aliases `readAliases` found in them */
@@ -1139,10 +1146,83 @@ export class TypeQueries {
    * The type alias of the project without type parameters a type is declared with, when the
    * compiler does not keep it for the type (`type User = InferSelectModel<typeof users>`,
    * `type Row = Partial<Base>`), which keeps only the alias of the library (or none): of the
-   * aliases the files read by `readAliases` declare or import, the first one of the type.
+   * aliases the files read by `readAliases` declare or import, the first one (see `preferAlias`) of the type,
+   * or of a type of the same shape (see `getShape`), which the compiler instantiates anew where
+   * it infers or awaits it (`Promise<User[]>`, `type<User>()`).
    */
   getLostAlias(type: Type): TSSymbol | undefined {
-    return this.lostAliases.get(type.id)
+    const bucket = getShapeBucket(type)
+
+    if (!this.askedIds.has(type.id)) {
+      this.askedIds.add(type.id)
+      addToBucket(this.askedTypes, bucket, type)
+    }
+
+    const alias = this.lostAliases.get(type.id)
+    const candidates = this.lostAliasTypes.get(bucket)
+
+    if (alias || !candidates) {
+      return alias
+    }
+
+    const shape = this.getShape(type)
+    let found: TSSymbol | undefined
+    for (const candidate of candidates) {
+      if (this.getShape(candidate) === shape) {
+        found = preferAlias(found, this.lostAliases.get(candidate.id)!)
+      }
+    }
+    return found
+  }
+
+  /**
+   * Whether an alias read since the last call names a type `getLostAlias` was asked about before,
+   * so a conversion wrote it without the alias, or with another one.
+   */
+  takeLateAliases(): boolean {
+    const late = this.lateAliases
+    this.lateAliases = false
+    return late
+  }
+
+  /**
+   * The properties of a type, with whether they are optional and the ids of their types, which
+   * tell apart the instantiations of one library type of the same alias (`Simplify<...>` of
+   * drizzle) from those of other ones.
+   */
+  private getShape(type: Type): string {
+    return this.memo('shape', type.id, () => {
+      const types = this.getPropertyTypes(type)
+      return this.getProperties(type)
+        .map((p, i) => `${p.name}\0${p.flags & SymbolFlags.Optional}\0${types[i]?.id}`)
+        .join('\0')
+    })
+  }
+
+  /**
+   * Records the alias of a type, and whether a conversion may have written the type without it.
+   */
+  private addLostAlias(type: Type, alias: TSSymbol): void {
+    const existing = this.lostAliases.get(type.id)
+    const preferred = preferAlias(existing, alias)
+
+    if (preferred === existing) {
+      return
+    }
+
+    const bucket = getShapeBucket(type)
+    this.lostAliases.set(type.id, preferred)
+    if (!existing) {
+      addToBucket(this.lostAliasTypes, bucket, type)
+    }
+
+    if (
+      !this.lateAliases &&
+      (this.askedIds.has(type.id) ||
+        this.askedTypes.get(bucket)?.some((t) => this.getShape(t) === this.getShape(type)))
+    ) {
+      this.lateAliases = true
+    }
   }
 
   /**
@@ -1221,8 +1301,12 @@ export class TypeQueries {
     for (const [i, alias] of aliases.entries()) {
       const type = types[i]
       // an alias the compiler keeps names the type by itself
-      if (type && type.getAliasSymbol()?.id !== alias.id && !this.lostAliases.has(type.id)) {
-        this.lostAliases.set(type.id, alias)
+      if (
+        type &&
+        type.flags & (TypeFlags.Object | TypeFlags.Intersection) &&
+        type.getAliasSymbol()?.id !== alias.id
+      ) {
+        this.addLostAlias(type, alias)
       }
     }
   }
@@ -1269,6 +1353,40 @@ export class TypeQueries {
       return type ? { alias, type, typeArguments } : undefined
     })
   }
+}
+
+/**
+ * The bucket of the types of the same shape (see `TypeQueries.getShape`) a type can be: its
+ * symbol, like the mapped type of a library alias, or none, of an intersection.
+ */
+function getShapeBucket(type: Type): number {
+  return type.getSymbol()?.id ?? -1
+}
+
+function addToBucket(buckets: Map<number, Type[]>, bucket: number, type: Type): void {
+  const types = buckets.get(bucket)
+  if (types) {
+    types.push(type)
+  } else {
+    buckets.set(bucket, [type])
+  }
+}
+
+/**
+ * Of two aliases of a type, the one of the first file by path, else the first one it declares, so
+ * the one chosen does not depend on the order the files are read in.
+ */
+function preferAlias(a: TSSymbol | undefined, b: TSSymbol): TSSymbol {
+  const declarationA = a?.declarations[0]
+  const declarationB = b.declarations[0]
+
+  return !a ||
+    (declarationA &&
+      declarationB &&
+      (declarationB.path < declarationA.path ||
+        (declarationB.path === declarationA.path && declarationB.index < declarationA.index)))
+    ? b
+    : a
 }
 
 /** Whether comparing a value with its source may nest deeper: a union or a mapped type */

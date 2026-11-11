@@ -225,6 +225,15 @@ import {
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
+import { documents as libraryDocuments } from '../tests/fixtures/library-aliases/src/documents'
+import {
+  aliases,
+  aliasesReversed,
+  collision,
+  collisionReversed,
+  heldFirst,
+  heldLast,
+} from '../tests/fixtures/library-aliases/src/orders'
 import { router as libraryAliasesRouter } from '../tests/fixtures/library-aliases/src/router'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
 import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
@@ -5031,6 +5040,84 @@ describe('openAPIGenerator', () => {
       expect(
         (spec.paths as any)['/createUser'].post.requestBody.content['application/json'].schema,
       ).toEqual(ref('User'))
+    })
+
+    it('keeps the name of a declared type, whichever procedure comes first', async () => {
+      const source = new URL('../tests/fixtures/library-aliases/src/orders.ts', import.meta.url)
+
+      for (const [exported, router] of Object.entries({ collision, collisionReversed })) {
+        const spec = await generator.generate(router, {
+          source: { file: source, export: exported },
+        })
+        const schemas = spec.components?.schemas as any
+
+        expect(Object.keys(schemas).toSorted()).toEqual(['User', 'User2'])
+        expect(schemas.User).toEqual({
+          type: 'object',
+          properties: { id: { type: 'string' }, email: { type: 'string' } },
+          required: ['id', 'email'],
+          description: 'The user of the API',
+        })
+        expect(schemas.User2).toEqual({
+          type: 'object',
+          properties: { id: { type: 'number' }, handle: { type: 'string' } },
+          required: ['id', 'handle'],
+        })
+        expect(response(spec, '/api')).toEqual({ type: 'array', items: ref('User') })
+        expect(response(spec, '/rows')).toEqual({ type: 'array', items: ref('User2') })
+        // also where the compiler awaits or infers the type, which it instantiates anew
+        expect(response(spec, '/rowsAsync')).toEqual({ type: 'array', items: ref('User2') })
+        expect(
+          (spec.paths as any)['/createRow'].post.requestBody.content['application/json'].schema,
+        ).toEqual(ref('User2'))
+      }
+    })
+
+    it('names a type the same, whichever procedure reaches it first', async () => {
+      const source = new URL('../tests/fixtures/library-aliases/src/orders.ts', import.meta.url)
+      const generate = (exported: string, router: Parameters<typeof generator.generate>[0]) =>
+        generator.generate(router, { source: { file: source, export: exported } })
+
+      // the file of `Holder.team` is read once a conversion reaches it, after `direct`
+      for (const [exported, router] of Object.entries({ heldLast, heldFirst })) {
+        const spec = await generate(exported, router)
+        const schemas = spec.components?.schemas as any
+
+        expect(Object.keys(schemas).toSorted()).toEqual(['Holder', 'Team'])
+        expect(response(spec, '/direct')).toEqual({ type: 'array', items: ref('Team') })
+        expect(schemas.Holder.properties.team).toEqual(ref('Team'))
+      }
+
+      // two aliases of one type: the one of the first file by path
+      for (const [exported, router] of Object.entries({ aliases, aliasesReversed })) {
+        const spec = await generate(exported, router)
+
+        expect(Object.keys(spec.components?.schemas ?? {})).toEqual(['Squad'])
+        expect(response(spec, '/teams')).toEqual({ type: 'array', items: ref('Squad') })
+        expect(response(spec, '/squads')).toEqual({ type: 'array', items: ref('Squad') })
+      }
+    })
+
+    it('names an intersection, like a document with timestamps', async () => {
+      const spec = await generator.generate(libraryDocuments, {
+        source: {
+          file: new URL('../tests/fixtures/library-aliases/src/documents.ts', import.meta.url),
+          export: 'documents',
+        },
+      })
+      const schemas = spec.components?.schemas as any
+      const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+
+      expect(schemas).toEqual({
+        Note: {
+          type: 'object',
+          properties: { title: { type: 'string' }, createdAt: date, updatedAt: date },
+          required: ['title', 'createdAt', 'updatedAt'],
+        },
+      })
+      expect(response(spec, '/note')).toEqual(ref('Note'))
+      expect(response(spec, '/notes')).toEqual({ type: 'array', items: ref('Note') })
+      expect(response(spec, '/held').properties.note).toEqual(ref('Note'))
     })
 
     it('makes no def of it with defs: recursive', async () => {

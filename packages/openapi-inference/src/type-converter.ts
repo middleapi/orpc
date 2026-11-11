@@ -119,7 +119,7 @@ export interface TypeToJsonSchemaConverterOptions {
   /**
    * Which named types become `$defs` (and so OpenAPI components).
    *
-   * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives) declared outside `node_modules` and the default library. An object type without a name of its own, like a model a library computes, is named after the alias without type parameters it is declared with (`type User = InferSelectModel<typeof users>`, `type PartialUser = Partial<User>`), when the file of a property or procedure holding it declares or imports the alias.
+   * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives) declared outside `node_modules` and the default library. An object type without a name of its own, like a model a library computes, is named after the alias without type parameters it is declared with (`type User = InferSelectModel<typeof users>`, `type PartialUser = Partial<User>`), when the file of a property or procedure holding it declares or imports the alias. A declared type of the same name keeps it (the model is then `User2`).
    * - `recursive`: only types that reference themselves, which can not be inlined. Every other type is inlined at each use, so models shared across many levels can make the document much larger.
    *
    * @default 'named'
@@ -463,6 +463,20 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
+   * Whether the aliases read while converting (see `readAliases`) name types a conversion of this
+   * program wrote before they were read, since the last call. When they do, the converters of
+   * this program created afterwards give def names anew, as the first ones did, so converting
+   * again with them names each type the same, whichever procedure reaches it first.
+   */
+  takeLateAliases(): boolean {
+    const late = this.types.takeLateAliases()
+    if (late) {
+      SHARED.get(this.checker)!.names = new DefNames()
+    }
+    return late
+  }
+
+  /**
    * The def names the conversions of this program gave (see `mergeEquivalentComponents`).
    */
   getDefNames(): DefNameRecord {
@@ -771,7 +785,9 @@ export class TypeToJsonSchemaConverter {
       created.schema = this.annotate(schema, lostAlias)
       created.stable = cuts === this.expansion.cuts
       this.defs.reclaimName(created, lostAlias.name)
-      return { $ref: toRef(this.defs.share(created, lostAlias.name).name) }
+      const shared = this.defs.share(created, lostAlias.name)
+      this.names.aliased.add(shared.name)
+      return { $ref: toRef(shared.name) }
     }
 
     // with `defs: 'recursive'`, a model or a view of a class referring to a def being converted
@@ -2485,7 +2501,7 @@ export class TypeToJsonSchemaConverter {
 
     if (
       !alias ||
-      !(type.flags & TypeFlags.Object) ||
+      !(type.flags & (TypeFlags.Object | TypeFlags.Intersection)) ||
       this.types.getReferenceKind(type) !== undefined ||
       !this.types.getProperties(type).length ||
       getClassType(this.types, type) !== undefined ||

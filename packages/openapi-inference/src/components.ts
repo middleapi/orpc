@@ -18,6 +18,11 @@ export interface DefNameRecord {
    * of that name (a declared `HolderParam`)
    */
   readonly parameters?: ReadonlySet<string> | undefined
+  /**
+   * Names of defs named after a project alias their type lost, which yield to a def of another
+   * type numbered after that name (a declared `User` given `User2`)
+   */
+  readonly aliased?: ReadonlySet<string> | undefined
 }
 
 export interface MergeEquivalentComponentsOptions {
@@ -170,9 +175,15 @@ export function mergeEquivalentComponents(
       }
 
       // the form of a type as a parameter, by its own name still, yields it to a type of that name,
-      // and takes its type's name when free, else a numbered one
+      // and takes its type's name when free, else a numbered one, and so does a def named after an
+      // alias its type lost, to a def of a declared type, whichever was given the name first
       const holder = holders.get(base)
-      if (holder !== name && names.parameters?.has(holder!) && !renamed.has(holder!)) {
+      if (
+        holder !== name &&
+        (names.parameters?.has(holder!) ||
+          (names.aliased?.has(holder!) && !names.aliased.has(name))) &&
+        !renamed.has(holder!)
+      ) {
         holders.delete(base)
         move(name, base)
         let to = names.numbered.get(holder!) ?? base

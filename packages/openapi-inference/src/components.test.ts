@@ -96,4 +96,38 @@ describe('mergeEquivalentComponents', () => {
       OtherJson: point,
     })
   })
+
+  it('gives the name of a def named after an alias its type lost to a declared type numbered after it', () => {
+    const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+    const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
+    const document = {
+      components: { schemas: { User: row, User2: user } },
+      paths: { '/rows': { items: { $ref: ref('User') } }, '/users': { $ref: ref('User2') } },
+    }
+
+    mergeEquivalentComponents(document, {
+      used: new Set(['User', 'User2']),
+      numbered: new Map([['User2', 'User']]),
+      aliased: new Set(['User']),
+    })
+
+    expect(document).toEqual({
+      components: { schemas: { User: user, User2: row } },
+      paths: { '/rows': { items: { $ref: ref('User2') } }, '/users': { $ref: ref('User') } },
+    })
+  })
+
+  it('keeps the name of a declared type a def named after an alias was numbered after', () => {
+    const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+    const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
+    const document = { components: { schemas: { User: user, User2: row } } }
+
+    mergeEquivalentComponents(document, {
+      used: new Set(['User', 'User2']),
+      numbered: new Map([['User2', 'User']]),
+      aliased: new Set(['User2']),
+    })
+
+    expect(document.components.schemas).toEqual({ User: user, User2: row })
+  })
 })

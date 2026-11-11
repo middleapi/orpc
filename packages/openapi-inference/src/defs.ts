@@ -109,6 +109,11 @@ export class DefNames {
   readonly modes = new Map<string, string>()
   /** Names of the forms of types as parameters (`HolderParam` of `Holder`), see `toParameterKey` */
   readonly parameters = new Set<string>()
+  /**
+   * Names of defs named after a project alias their type lost (see `TypeQueries.getLostAlias`),
+   * which yield to the defs of declared types (see `mergeEquivalentComponents`)
+   */
+  readonly aliased = new Set<string>()
   /** How many registries have a def of each name */
   private readonly holders = new Map<string, number>()
 
@@ -148,6 +153,7 @@ export class DefNames {
     this.numbered.delete(name)
     this.modes.delete(name)
     this.parameters.delete(name)
+    this.aliased.delete(name)
     if (key !== undefined && this.byKey.get(key) === name) {
       this.byKey.delete(key)
     }
