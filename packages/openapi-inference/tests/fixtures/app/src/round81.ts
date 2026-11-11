@@ -30,6 +30,12 @@ export const roundEightyOneNamesReversed = {
   aggregates: os.handler((): Page<{ _avg: number; _sum: number }> => page),
 }
 
+/** Instantiations over intersections of object literals, named by their keys */
+export const roundEightyOneIntersections = {
+  merged: os.handler((): Page<{ id: number } & { title: string }> => page),
+  mergedRows: os.handler((): Page<({ id: number } & { title: string })[]> => page),
+}
+
 /** A class whose `toJSON` is typed `object`, which may write any value */
 export class AnyJSON {
   a = 1

@@ -98,6 +98,15 @@ function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: num
     return (keys && printKeys(types, type)) || printed
   }
 
+  // an intersection of object literals, by its keys
+  if (
+    keys &&
+    type.isIntersectionType() &&
+    types.getMembers(type).every((m) => printType(types, m) === '{}')
+  ) {
+    return printKeys(types, type) || printed
+  }
+
   if (depth >= WRITTEN_ARGUMENTS_DEPTH) {
     return printed
   }

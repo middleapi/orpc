@@ -217,6 +217,7 @@ import {
 } from '../tests/fixtures/app/src/round80'
 import {
   roundEightyOneBodies,
+  roundEightyOneIntersections,
   roundEightyOneNames,
   roundEightyOneNamesReversed,
 } from '../tests/fixtures/app/src/round81'
@@ -4848,7 +4849,12 @@ describe('openAPIGenerator', () => {
     })
   })
   describe('round eighty-one', () => {
-    const routers = { roundEightyOneNames, roundEightyOneNamesReversed, roundEightyOneBodies }
+    const routers = {
+      roundEightyOneNames,
+      roundEightyOneNamesReversed,
+      roundEightyOneIntersections,
+      roundEightyOneBodies,
+    }
     const generate = (exported: keyof typeof routers, version: '3.1.1' | '3.0.4' = '3.1.1') =>
       new OpenAPIGenerator().generate(routers[exported], {
         source: { file: fixture('round81.ts'), export: exported },
@@ -4883,6 +4889,17 @@ describe('openAPIGenerator', () => {
         })
       },
     )
+
+    it('names instantiations over intersections of object literals by their keys', async () => {
+      const spec = await generate('roundEightyOneIntersections')
+
+      expect(response(spec, '/merged')).toEqual({
+        $ref: '#/components/schemas/Page_with-id-title',
+      })
+      expect(response(spec, '/mergedRows')).toEqual({
+        $ref: '#/components/schemas/Page_with-id-titleArray',
+      })
+    })
 
     it.each(['3.1.1', '3.0.4'] as const)(
       'documents an output that may be left out and admits null already as it is, in %s',
