@@ -191,8 +191,7 @@ describe('typeToJsonSchemaConverter', () => {
         $defs: {
           PrefixedDict: {
             type: 'object',
-            propertyNames: { type: 'string', pattern: '^x-[\\s\\S]*$' },
-            additionalProperties: { type: 'string' },
+            patternProperties: { '^x-[\\s\\S]*$': { type: 'string' } },
           },
         },
       },
@@ -1391,7 +1390,8 @@ describe('typeToJsonSchemaConverter', () => {
       ])
     })
 
-    it('template literal keys keep their value type in every OpenAPI version', () => {
+    // a template literal index checks only the keys it matches, an object literal type may hold others
+    it('template literal keys constrain only the keys they match', () => {
       expect(convertR6('TemplateKeys')).toEqual([
         {
           $ref: '#/$defs/TemplateKeys',
@@ -1401,8 +1401,7 @@ describe('typeToJsonSchemaConverter', () => {
               properties: {
                 headers: {
                   type: 'object',
-                  propertyNames: { type: 'string', pattern: '^x-[\\s\\S]*$' },
-                  additionalProperties: { type: 'string' },
+                  patternProperties: { '^x-[\\s\\S]*$': { type: 'string' } },
                 },
                 big: { type: 'object', additionalProperties: { type: 'number' } },
                 mixed: {

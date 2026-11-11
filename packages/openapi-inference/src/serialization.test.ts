@@ -67,6 +67,8 @@ describe('generated schemas match serialized outputs', async () => {
   const eitherSet = { anyOf: [setArray, { type: 'object' }] }
   // the keys a number index checks, other keys of an object literal type are not
   const numberKeys = (schema: object) => ({ '^(?:0|-?[1-9]\\d{0,14})$': schema })
+  // a typed array, written by its index keys
+  const typedArray = { type: 'object', additionalProperties: { type: 'number' } }
 
   it.each([
     ['post', undefined],
@@ -448,6 +450,12 @@ describe('generated schemas match serialized outputs', async () => {
     ['comparedAmount', undefined],
     ['partialRedacted', undefined],
     ['partialDeepConfig', undefined],
+    ['typedArrayLike', undefined],
+    ['floatArrayLike', undefined],
+    ['typedArrayLikes', undefined],
+    ['arrayLikeHolder', undefined],
+    ['templateRecord', undefined],
+    ['templateRecords', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1359,8 +1367,6 @@ describe('generated schemas match serialized outputs', async () => {
     })
 
     it('converts deep mapped types over built-ins as the built-in', () => {
-      const typedArray = { type: 'object', additionalProperties: { type: 'number' } }
-
       expect(schemas().DeepRO_RegExp).toEqual({ description: 'Read-only all the way down' })
       expect(schemas().DeepRO_Uint8Array_ArrayBufferLike).toEqual({
         ...typedArray,
@@ -2294,11 +2300,12 @@ describe('generated schemas match serialized outputs', async () => {
           },
         ],
       }
-      // an array has a length too
+      // an array and a typed array have a length too
       const picked = {
         anyOf: [
           { type: 'string' },
           { type: 'array', items: {} },
+          typedArray,
           { type: 'object', properties: { length }, required: ['length'] },
         ],
       }
@@ -2513,6 +2520,7 @@ describe('generated schemas match serialized outputs', async () => {
       const arrayLike = {
         anyOf: [
           { type: 'array', items: { type: 'number' } },
+          typedArray,
           {
             type: 'object',
             properties: { length: { type: 'number' } },
@@ -2624,6 +2632,7 @@ describe('generated schemas match serialized outputs', async () => {
         anyOf: [
           { type: 'array', items: {} },
           text,
+          typedArray,
           {
             type: 'object',
             properties: { length: { type: 'number' }, extra: text },

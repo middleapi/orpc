@@ -152,23 +152,53 @@ export function hasBuiltinForm(types: TypeQueries, type: Type): boolean {
  * properties only (`size` of `Partial<Shape>`).
  */
 export function getSatisfyingCollections(types: TypeQueries, type: Type): readonly Type[] {
-  return types.memo('satisfyingCollections', type.id, () => {
-    const properties = types.getProperties(type)
-    const weak = properties.every((p) => p.flags & SymbolFlags.Optional)
+  return types.memo('satisfyingCollections', type.id, () =>
+    getSatisfyingPrototypes(types, type, ['Set', 'Map']),
+  )
+}
 
-    return (['Set', 'Map'] as const).flatMap((name) => {
-      const members = types.getGlobalType(name)
-      const collection = types.getPrototypeType(name)
-      if (!members || !collection) {
-        return []
-      }
+/**
+ * The typed arrays satisfying an object type by their members (`ArrayLike<number>`), written by
+ * their index keys, `{ "0": 1 }`, which the fields of a type of optional properties only hold.
+ * A bigint one writes `{}` or throws, which the form of a number one holds.
+ */
+export function getSatisfyingTypedArrays(types: TypeQueries, type: Type): readonly Type[] {
+  return types.memo('satisfyingTypedArrays', type.id, () => {
+    if (types.getProperties(type).every((p) => p.flags & SymbolFlags.Optional)) {
+      return []
+    }
 
-      const names = new Set(types.getProperties(members).map((p) => p.name))
-      const ofMembers = weak
-        ? properties.some((p) => names.has(p.name))
-        : properties.every((p) => p.flags & SymbolFlags.Optional || names.has(p.name))
-      return ofMembers && types.checker.isTypeAssignableTo(collection, type) ? [collection] : []
-    })
+    const numeric = getSatisfyingPrototypes(
+      types,
+      type,
+      [...TYPED_ARRAYS].filter((name) => !name.startsWith('Big')),
+    )
+    return numeric.length
+      ? numeric
+      : getSatisfyingPrototypes(types, type, ['BigInt64Array', 'BigUint64Array'])
+  })
+}
+
+function getSatisfyingPrototypes(
+  types: TypeQueries,
+  type: Type,
+  names: readonly string[],
+): readonly Type[] {
+  const properties = types.getProperties(type)
+  const weak = properties.every((p) => p.flags & SymbolFlags.Optional)
+
+  return names.flatMap((name) => {
+    const members = types.getGlobalType(name)
+    const prototype = types.getPrototypeType(name)
+    if (!members || !prototype) {
+      return []
+    }
+
+    const memberNames = new Set(types.getProperties(members).map((p) => p.name))
+    const ofMembers = weak
+      ? properties.some((p) => memberNames.has(p.name))
+      : properties.every((p) => p.flags & SymbolFlags.Optional || memberNames.has(p.name))
+    return ofMembers && types.checker.isTypeAssignableTo(prototype, type) ? [prototype] : []
   })
 }
 

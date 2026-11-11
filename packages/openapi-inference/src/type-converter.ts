@@ -26,6 +26,7 @@ import {
   getExtendedPrimitiveSchema,
   getNumberIndexType,
   getSatisfyingCollections,
+  getSatisfyingTypedArrays,
   getStringifiedForm,
   getTypedArrayViewBases,
   getViewBases,
@@ -1313,9 +1314,10 @@ export class TypeToJsonSchemaConverter {
       delete (schema as ObjectJsonSchema).properties
     }
 
-    // an array-like view may also hold a plain object, and an array, a string, a `Set`, or a
-    // `Map` may satisfy an object type by its members (`ArrayLike<number>`, `{ size?: number }`):
-    // forms written in place of the fields, which an input split into parameters is not read by
+    // an array-like view may also hold a plain object, and an array, a string, a `Set`, a `Map`,
+    // or a typed array may satisfy an object type by its members (`ArrayLike<number>`,
+    // `{ size?: number }`): forms written in place of the fields, which an input split into
+    // parameters is not read by
     const forms = arrayLike
       ? [arrayLike.schema]
       : classType || typedArray
@@ -1333,8 +1335,8 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * The arrays and strings an object type of their members (`length`, a number index) holds, the
-   * sets and maps one of theirs (`size`), and the tuples one of indexes holds.
+   * The arrays, strings, and typed arrays an object type of their members (`length`, a number
+   * index) holds, the sets and maps one of theirs (`size`), and the tuples one of indexes holds.
    */
   private convertStructuralForms(type: Type, properties: readonly TSSymbol[]): JsonSchema[] {
     // neither has a string index
@@ -1379,7 +1381,10 @@ export class TypeToJsonSchemaConverter {
       forms.push({ type: 'string' })
     }
 
-    for (const collection of getSatisfyingCollections(this.types, type)) {
+    for (const collection of [
+      ...getSatisfyingCollections(this.types, type),
+      ...getSatisfyingTypedArrays(this.types, type),
+    ]) {
       forms.push(this.visit(collection))
     }
 
@@ -1476,28 +1481,18 @@ export class TypeToJsonSchemaConverter {
 
     if (anyKey) {
       schema.additionalProperties = convertEntry(anyKey.info.valueType)
-    } else if (
-      patternKeys.length === 1 &&
-      !(patternKeys[0]!.key!.flags & TypeFlags.Number) &&
-      !Object.keys(schema.properties).length
-    ) {
-      // like zod records with template literal keys, which keeps the value type in OpenAPI 3.0
-      schema.propertyNames = {
-        type: 'string',
-        pattern: `^${toPattern(this.types, patternKeys[0]!.key!)}$`,
-      }
-      schema.additionalProperties = convertEntry(patternKeys[0]!.info.valueType)
-    } else {
-      // a number index checks only numeric keys, which an object literal type (`{ mode: string }`)
-      // may hold others besides
-      for (const { info, key } of patternKeys) {
-        schema.patternProperties ??= {}
-        setOwn(
-          schema.patternProperties,
-          key!.flags & TypeFlags.Number ? NUMBER_KEY_PATTERN : `^${toPattern(this.types, key!)}$`,
-          convertEntry(info.valueType),
-        )
-      }
+      return
+    }
+
+    // a number or template literal index checks only the keys it matches, which an object literal
+    // type (`{ mode: string }`) may hold others besides
+    for (const { info, key } of patternKeys) {
+      schema.patternProperties ??= {}
+      setOwn(
+        schema.patternProperties,
+        key!.flags & TypeFlags.Number ? NUMBER_KEY_PATTERN : `^${toPattern(this.types, key!)}$`,
+        convertEntry(info.valueType),
+      )
     }
   }
 

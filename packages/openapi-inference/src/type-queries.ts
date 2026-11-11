@@ -1097,9 +1097,10 @@ export class TypeQueries {
   }
 
   /**
-   * The type of `Array.prototype` (`any[]`), `Set.prototype` (`Set<any>`), or `Map.prototype`.
+   * The type of a global's prototype, like `Array.prototype` (`any[]`) or `Set.prototype`
+   * (`Set<any>`).
    */
-  getPrototypeType(name: 'Array' | 'Set' | 'Map'): Type | undefined {
+  getPrototypeType(name: string): Type | undefined {
     const key = `${name}.prototype`
     if (!this.globalTypes.has(key)) {
       const constructor = this.checker.resolveName(name, SymbolFlags.Value)

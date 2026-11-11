@@ -204,6 +204,7 @@ import {
 import { roundSeventy } from '../tests/fixtures/app/src/round70'
 import type { Tile } from '../tests/fixtures/app/src/round74'
 import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
+import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -1630,16 +1631,17 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  it('keeps the value type of template literal keys in OpenAPI 3.0', async () => {
+  it('leaves template literal keys open in OpenAPI 3.0', async () => {
     const spec = await generator.generate(headersRouter, {
       source: { file: fixture('headers.ts') },
       version: '3.0.4',
     })
 
+    // OpenAPI 3.0 has no `patternProperties`, and other keys may be there
     expect(
       (spec.paths?.['/headers']?.post?.responses?.['200'] as any).content['application/json'].schema
-        .properties.headers.additionalProperties,
-    ).toEqual({ type: 'string' })
+        .properties.headers,
+    ).toEqual({ type: 'object', additionalProperties: true })
   })
 
   describe('round eleven', () => {
@@ -4079,6 +4081,52 @@ describe('openAPIGenerator', () => {
           ['/numberRecord', { 0: { value: 1 }, ...settings }, true],
           // OpenAPI 3.0 has no `patternProperties`, so leaves the keys open
           ['/numberRecord', { 0: { value: 'x' } }, version === '3.0.4'],
+        ] as const) {
+          expect([path, value, ajv.validate(body(path), sent(value))]).toEqual([path, value, valid])
+        }
+      },
+    )
+  })
+
+  describe('round seventy-six', () => {
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents typed arrays satisfying an object type, and other keys of a template literal index, in %s',
+      async (version) => {
+        const spec = await generator.generate(roundSeventySixInputs, {
+          source: { file: fixture('round76.ts'), export: 'roundSeventySixInputs' },
+          version,
+        })
+        const ajv = new Ajv2020({ strict: false, allErrors: true })
+        ajv.addSchema(
+          JSON.parse(
+            JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+              '#/components/schemas/',
+              'spec#/$defs/',
+            ),
+          ),
+        )
+        const body = (path: string) =>
+          JSON.parse(
+            JSON.stringify(
+              (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+            ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+          )
+        // what a client sends
+        const serializer = new OpenAPIJsonSerializer()
+        const sent = (value: unknown) =>
+          JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        const settings = { mode: 'fast' }
+
+        for (const [path, value, valid] of [
+          ['/arrayLike', new Uint8Array([1]), true],
+          ['/arrayLike', new Float64Array([0.5, 2]), true],
+          ['/arrayLike', [1], true],
+          ['/arrayLike', { length: 1, 0: 1 }, true],
+          ['/arrayLike', { 0: 'x' }, false],
+          ['/templateRecord', settings, true],
+          ['/templateRecord', { 'id-a': { value: 1 }, ...settings }, true],
+          // OpenAPI 3.0 has no `patternProperties`, so leaves the keys open
+          ['/templateRecord', { 'id-a': { value: 'x' } }, version === '3.0.4'],
         ] as const) {
           expect([path, value, ajv.validate(body(path), sent(value))]).toEqual([path, value, valid])
         }
