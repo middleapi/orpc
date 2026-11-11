@@ -90,6 +90,7 @@ import {
   withNull,
   writtenForm,
 } from './schema-utils'
+import type { PropertyAnnotation } from './type-queries'
 import {
   getNamedSymbol,
   INSTANTIABLE_FLAGS,
@@ -1530,7 +1531,7 @@ export class TypeToJsonSchemaConverter {
       if (isTrivialSchema(propertySchema) || isLiteralSchema(propertySchema)) {
         propertySchema = this.annotate(
           propertySchema,
-          this.getAnnotationAlias(property, propertyType),
+          this.getAnnotation(property, propertyType)?.alias,
         )
       }
 
@@ -2480,11 +2481,8 @@ export class TypeToJsonSchemaConverter {
 
     const { path } = this.expansion
     for (let i = path.length - 1; i >= 0; i--) {
-      const annotation = this.types.getAnnotation(path[i]!)
-      const annotated =
-        annotation &&
-        this.hasSameMembers(annotation.type, type, NULLISH_FLAGS) &&
-        getAnnotatedDefName(this.types, annotation)
+      const annotation = this.getAnnotation(path[i]!, type)
+      const annotated = annotation && getAnnotatedDefName(this.types, annotation)
       if (annotated) {
         return annotated
       }
@@ -2674,19 +2672,17 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * The project type alias a property's type annotation names (`count?: Count | null`),
-   * when the property still has that type, but for `null` and `undefined`: a mapped type like
+   * The project type alias a property's type annotation names (`count?: Count | null`), with its
+   * type, when the property still has that type, but for `null` and `undefined`: a mapped type like
    * `{ [K in keyof T]: boolean }` keeps the source declaration but not its type.
    */
-  private getAnnotationAlias(property: TSSymbol, type: Type): TSSymbol | undefined {
+  private getAnnotation(property: TSSymbol, type: Type): PropertyAnnotation | undefined {
     const annotation = this.types.getAnnotation(property)
 
-    if (!annotation) {
-      return undefined
-    }
-
     // `Count | null`, not `Count | string`, whose other members the alias does not describe
-    return this.hasSameMembers(annotation.type, type, NULLISH_FLAGS) ? annotation.alias : undefined
+    return annotation && this.hasSameMembers(annotation.type, type, NULLISH_FLAGS)
+      ? annotation
+      : undefined
   }
 
   /**
