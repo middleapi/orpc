@@ -400,8 +400,10 @@ export class OpenAPIGenerator {
     // the stock generator splits these into parts, where a def of the whole would be unused
     const inputDetailed = meta?.inputStructure === 'detailed'
     const outputDetailed = meta?.outputStructure === 'detailed'
+    // a client sends no request body with these
+    const bodiless = meta?.method === 'GET' || meta?.method === 'HEAD'
     // the stock generator reads only parameters from these inputs, the fields of an object
-    const parametersOnly = inputDetailed || meta?.method === 'GET' || meta?.method === 'HEAD'
+    const parametersOnly = inputDetailed || bodiless
     const pathParameters = `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{')
     const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
       input: {
@@ -410,7 +412,7 @@ export class OpenAPIGenerator {
         partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
         // only a whole input sent as the request body, not in the query string of a GET request
         body: !parametersOnly && !pathParameters,
-        bodyProperty: inputDetailed,
+        bodyProperty: inputDetailed && !bodiless,
         // a client sends a promise as is, written as `{}`
         awaited: false,
       },

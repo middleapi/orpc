@@ -170,8 +170,8 @@ export interface TypeToJsonSchemaConvertOptions {
   body?: boolean | undefined
 
   /**
-   * Describe the `body` property of the root as a whole body (see `body`), like that of a detailed
-   * input or output.
+   * Describe the `body` property of the root (or of each root union member) as a whole body (see
+   * `body`), like that of a detailed input or output.
    *
    * @default false
    */
@@ -319,8 +319,12 @@ export class TypeToJsonSchemaConverter {
     const { sent, others } = options.body
       ? splitBodies(this.types, serializable)
       : { sent: [], others: serializable }
-    // a single value is visited whole, so a union keeps its def
-    const values = sent.length ? others : filtered ? serializable : members
+    // a single value is visited whole, so a union keeps its def, unless a member is converted
+    // with a body sent as is (`{ body: FormData } | { body: Json }` of a detailed one)
+    const split =
+      sent.length > 0 ||
+      (options.bodyProperty === true && serializable.some((t) => this.holdsBodyProperty(t)))
+    const values = split ? others : filtered ? serializable : members
     // the root of a detailed input or output with a body sent as is
     const visitRoot = (t: Type) =>
       options.bodyProperty && this.holdsBodyProperty(t)
@@ -797,7 +801,8 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * A typed array (`Uint8Array`, `Readonly<Uint8Array>`), whose value may be a Node `Buffer`,
-   * written by its own `toJSON` (`{ type: 'Buffer', data: [1] }`).
+   * written by its own `toJSON` (`{ type: 'Buffer', data: [1] }`), not by fields a client sends
+   * as parameters.
    */
   private withBufferForm(type: Type, schema: JsonSchema): JsonSchema {
     const node = getNodeBuffer(this.types)
@@ -805,7 +810,7 @@ export class TypeToJsonSchemaConverter {
     return node &&
       isTypedArray(this.types, type) &&
       this.checker.isTypeAssignableTo(node.buffer, type)
-      ? anyOfDeduped([schema, ...node.written.map((written) => this.visit(written))])
+      ? anyOfDeduped([schema, ...node.written.map((written) => writtenForm(this.visit(written)))])
       : schema
   }
 

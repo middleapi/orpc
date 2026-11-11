@@ -206,10 +206,12 @@ import type { Tile } from '../tests/fixtures/app/src/round74'
 import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
 import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
 import { roundSeventyEight } from '../tests/fixtures/app/src/round78'
+import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
+import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
 import { router as outsideRouter } from '../tests/fixtures/solution-outside/router'
 import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -4189,5 +4191,68 @@ describe('openAPIGenerator', () => {
         expect(spec.components?.schemas ?? {}).toEqual({})
       },
     )
+  })
+
+  describe('round seventy-nine', () => {
+    it('documents no request body of a detailed GET or HEAD input, which sends none', async () => {
+      const spec = await generator.generate(roundSeventyNine, {
+        source: { file: fixture('round79.ts'), export: 'roundSeventyNine' },
+      })
+      const paths = spec.paths as any
+
+      for (const operation of [paths['/detailedFormGet'].get, paths['/detailedFormHead'].head]) {
+        expect(JSON.stringify(operation)).not.toMatch(/multipart|contentMediaType/u)
+        expect(operation.parameters).toEqual([expect.objectContaining({ in: 'query', name: 'a' })])
+      }
+    })
+
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents the body built-in of a member of a detailed union root as binary data, in %s',
+      async (version) => {
+        const spec = await generator.generate(roundSeventyNine, {
+          source: { file: fixture('round79.ts'), export: 'roundSeventyNine' },
+          version,
+        })
+        const paths = spec.paths as any
+        const content = {
+          'application/json': {
+            schema: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          },
+          'multipart/form-data': {
+            schema:
+              version === '3.0.4'
+                ? { type: 'string', format: 'binary' }
+                : { type: 'string', contentMediaType: 'multipart/form-data' },
+          },
+        }
+
+        expect(paths['/unionDetailedBody'].post.responses['200'].content).toEqual(content)
+        expect(paths['/unionDetailedInput'].post.requestBody).toEqual({ required: true, content })
+      },
+    )
+
+    it('documents a typed array input of a GET request by no parameters, not by the Buffer form', async () => {
+      const spec = await generator.generate(bufferQueries, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/buffer-queries.ts', import.meta.url),
+          export: 'bufferQueries',
+        },
+      })
+      const paths = spec.paths as any
+      const buffer = {
+        type: 'object',
+        properties: {
+          type: { type: 'string', const: 'Buffer' },
+          data: { type: 'array', items: { type: 'number' } },
+        },
+        required: ['type', 'data'],
+      }
+
+      expect(paths['/root'].get.parameters).toBeUndefined()
+      // a request body may be a Buffer, written by its `toJSON`
+      expect(
+        paths['/post'].post.requestBody.content['application/json'].schema.anyOf,
+      ).toContainEqual(buffer)
+    })
   })
 })
