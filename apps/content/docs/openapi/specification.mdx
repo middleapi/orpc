@@ -323,9 +323,9 @@ Every other option works as in `OpenAPIGenerator`.
 
 ### How Types Are Documented
 
-Inferred schemas come from the input type for inputs, the output type for outputs and error `data`, and the handler's return type when there is no `.output`. Handlers returning async iterators are documented as [event streams](/docs/async-iterator-object). A `ReadableStream`, `FormData`, or `URLSearchParams` sent as the whole request or response body, also as the `body` of a detailed one, is documented as binary data of its media type. Contract procedures take their types from the contract, so add `.output` there.
+Inferred schemas come from the input type for inputs, the output type for outputs and error `data`, and the handler's return type when there is no `.output`. Handlers returning async iterators are documented as [event streams](/docs/async-iterator-object), and a `ReadableStream`, `FormData`, or `URLSearchParams` body as its media type. Contract procedures take their types from the contract, so add `.output` there.
 
-Inputs and outputs are documented in their [serialized](/docs/openapi/serializer) form, where a typed array may also be a Node `Buffer`, written by its `toJSON`, and URL parameters without a style hold typed arrays and `RegExp` as strings. Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}` and `bigint` fields cannot be sent. Views of a class, like `Readonly<User>`, and class types in inputs can be an instance or a plain object, so both forms are documented, or only the fields in parameters.
+Inputs and outputs are documented in their [serialized](/docs/openapi/serializer) form. Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}`. Views of a class, like `Readonly<User>`, and class types in inputs can be an instance or a plain object, so both forms are documented.
 
 Types declared in your project become components named after them, like `User` or `Page_User` for `Page<User>`, and unions of them told apart by a string literal property, like `kind`, get a `discriminator`. Pass `defs: 'recursive'` to the constructor to make components only for recursive types.
 
@@ -373,6 +373,5 @@ try {
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
 - In OpenAPI 3.0, the values of number and template literal keys, like in `Record<number, User>`, are left open.
-- `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out. Types holding `Infinity`, like type-fest's `PositiveInfinity`, are documented as any value.
-- Effect data types, like `Option` and `Redacted`, are written by their untyped `toJSON`, so they are documented as any value.
+- `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out.
 - Generation throws on types the compiler cannot resolve, like an import with a missing path alias.
