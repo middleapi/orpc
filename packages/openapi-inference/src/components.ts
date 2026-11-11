@@ -67,16 +67,15 @@ export function mergeEquivalentComponents(
 
   for (const name of candidates) {
     const refs: string[] = []
-    const shape = stringifyJSON(
-      mapRefs(schemas[name], (target) => {
-        if (!isCandidate.has(target)) {
-          return target
-        }
-        refs.push(target)
-        return ''
-      }),
-    )
-    shapes.set(name, { shape: shape ?? '', refs })
+    const copy = structuredClone(schemas[name])
+    rewriteRefs(copy, (target) => {
+      if (!isCandidate.has(target)) {
+        return target
+      }
+      refs.push(target)
+      return ''
+    })
+    shapes.set(name, { shape: stringifyJSON(copy) ?? '', refs })
   }
 
   // classes of equivalent components: of the same name but its number, of the same shape,
@@ -209,50 +208,6 @@ export function mergeEquivalentComponents(
   rewriteRefs(document, resolve)
 }
 
-/**
- * A copy of a value with the names of the components it refers to mapped.
- */
-function mapRefs(value: unknown, map: (name: string) => string): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => mapRefs(item, map))
-  }
-
-  if (typeof value !== 'object' || value === null) {
-    return value
-  }
-
-  const copy: Record<string, unknown> = {}
-
-  for (const [key, child] of Object.entries(value)) {
-    setOwn(
-      copy,
-      key,
-      key === '$ref' && isComponentRef(child)
-        ? COMPONENTS_REF_PREFIX +
-            map(decodeJsonPointerSegment(child.slice(COMPONENTS_REF_PREFIX.length)))
-        : mapRefs(child, map),
-    )
-  }
-
-  // the refs of a discriminator's mapping, the same as those of its `oneOf`
-  const mapping = getDiscriminatorMapping(copy)
-  if (mapping) {
-    for (const name of Object.keys(mapping)) {
-      const ref = mapping[name]
-      if (isComponentRef(ref)) {
-        setOwn(
-          mapping,
-          name,
-          COMPONENTS_REF_PREFIX +
-            map(decodeJsonPointerSegment(ref.slice(COMPONENTS_REF_PREFIX.length))),
-        )
-      }
-    }
-  }
-
-  return copy
-}
-
 function isComponentRef(value: unknown): value is string {
   return typeof value === 'string' && value.startsWith(COMPONENTS_REF_PREFIX)
 }
@@ -269,6 +224,9 @@ function getDiscriminatorMapping(
     : undefined
 }
 
+/**
+ * Maps the names of the components a value refers to, in place, also in discriminator mappings.
+ */
 function rewriteRefs(value: unknown, resolve: (name: string) => string): void {
   if (Array.isArray(value)) {
     for (const item of value) {
