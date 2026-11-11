@@ -55,7 +55,9 @@
   "devDependencies": {
     "@orpc/zod": "workspace:*",
     "ajv": "^8.20.0",
+    "arktype": "^2.2.9",
     "type-fest": "^5.10.0",
+    "valibot": "^1.5.0",
     "zod": "^4.6.7"
   }
 }

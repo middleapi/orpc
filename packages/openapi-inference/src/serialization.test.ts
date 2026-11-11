@@ -1,5 +1,5 @@
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
-import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
@@ -10,6 +10,7 @@ import {
   shortDeepChain,
 } from '../tests/fixtures/app/src/deep-view-chains'
 import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings'
+import { BrandedUser } from '../tests/fixtures/app/src/round73'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -420,6 +421,9 @@ describe('generated schemas match serialized outputs', async () => {
     ['indexedDate', undefined],
     ['keyedEntry', undefined],
     ['keyedEntries', undefined],
+    ['brandedUser', undefined],
+    ['brandedUsers', undefined],
+    ['readonlyBrandedUser', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -2982,6 +2986,44 @@ describe('generated schemas match serialized outputs', async () => {
           expect.objectContaining({ type: 'object', required: ['0', '1'] }),
         ],
       })
+    })
+  })
+
+  describe('round seventy-three', () => {
+    it('leaves out the key ArkType brands an object type with, which no value holds', async () => {
+      expect(deref(responseSchema('/brandedUser'))).toEqual({
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          joinedAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+        },
+        required: ['id', 'joinedAt'],
+      })
+
+      // what a client holding the branded value sends
+      const handler = new OpenAPIHandler(router)
+      let sent: unknown
+      const link = new OpenAPILink(router, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent = await handled.clone().json()
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const user = BrandedUser.assert({ id: 'u', joinedAt: new Date(0) })
+
+      await expect(link.call(['brandedUserInput'], user, { context: {} })).resolves.toBe(1)
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)['/brandedUserInput'].post.requestBody.content['application/json']
+              .schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        ),
+      )
+      expect(validate(sent) ? [] : validate.errors).toEqual([])
     })
   })
 })

@@ -69,6 +69,7 @@ export function getDataProperties(
       // quoted keys starting with `__` are escaped with another `_`
       !p.escapedName.startsWith('__@') &&
       !p.escapedName.startsWith('__#') &&
+      !isArkTypeBrand(types, p) &&
       (!isClassAccessor(p) || (getters && Boolean(p.flags & SymbolFlags.GetAccessor))) &&
       // mapped types keep methods (`DeepPartial<Account>`) and class accessors (`Readonly<C>`)
       // as properties, still functions or on the prototype
@@ -81,6 +82,18 @@ export function getDataProperties(
       ) &&
       // members inherited from a built-in class (`Error#message`, `Readable#readable`) are not own enumerable data
       !(isClassInstance && isBuiltinMember(types, p, isError)),
+  )
+}
+
+/**
+ * Whether a property is the key ArkType brands a type with (`' brand'` of `Brand<T, 'Id'>`, which
+ * `.brand('Id')` and `'string#Id'` give), only in types: no value holds it.
+ */
+function isArkTypeBrand(types: TypeQueries, property: TSSymbol): boolean {
+  return (
+    property.name === ' brand' &&
+    property.declarations.length > 0 &&
+    property.declarations.every((d) => types.getSourceKind(d.path) === 'external')
   )
 }
 
