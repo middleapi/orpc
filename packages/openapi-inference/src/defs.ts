@@ -137,6 +137,8 @@ export class DefNames {
     }
 
     this.used.delete(name)
+    // a type later given the name (a declared `User2` after a second `User`) is not numbered
+    this.numbered.delete(name)
     this.modes.delete(name)
     this.parameters.delete(name)
     if (key !== undefined && this.byKey.get(key) === name) {
