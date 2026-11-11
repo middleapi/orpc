@@ -18,6 +18,7 @@ import type {
 import {
   extractJsonObjectSchemaEntries,
   isStandardSchemaOptional,
+  isUnconstrainedSchema,
   StandardJsonSchemaConverter,
 } from '@orpc/json-schema'
 import type {
@@ -46,6 +47,7 @@ import { openTypeScriptProject } from './project'
 import type { ResolvedRouterType } from './router-type'
 import { RouterTypeResolver } from './router-type'
 import { withoutDescribedSchemas, withRequiredFrom } from './schema-subtraction'
+import { withNull } from './schema-utils'
 import type {
   AsyncIteratorTypes,
   ParameterFields,
@@ -466,6 +468,7 @@ export class OpenAPIGenerator {
           parts: AnySchema[],
           partTypes: (Type | readonly Type[] | undefined)[],
           options?: TypeToJsonSchemaConvertOptions,
+          body?: boolean,
         ): AnySchema[] => {
           if (parts.length && parts.every(supported)) {
             return parts
@@ -500,7 +503,14 @@ export class OpenAPIGenerator {
             ...kept.map((k) => k.schema),
             ...inferred.flatMap(([jsonSchema, optional]) => {
               const rest = withoutDescribedSchemas(jsonSchema, described)
-              return rest === undefined ? [] : [inferredSchema([rest, optional])]
+              return rest === undefined
+                ? []
+                : [
+                    inferredSchema([
+                      body && optional && !kept.length ? withNullBody(rest) : rest,
+                      optional,
+                    ]),
+                  ]
             }),
           ]
         }
@@ -523,7 +533,13 @@ export class OpenAPIGenerator {
           )
         }
 
-        return complete(schemas ?? [], [type], inline[direction])
+        // a compact output may be left out (`T | undefined`), which is sent as no body
+        return complete(
+          schemas ?? [],
+          [type],
+          inline[direction],
+          direction === 'output' && !inline.output.inlineRoot,
+        )
       }
 
       return (
@@ -610,6 +626,20 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
   }
 
   return { inline, parametersOnly }
+}
+
+/**
+ * A response body that may be left out, which the serializer writes as `null`: no body (`void`)
+ * stays any value, see `toBodyContent` of `@orpc/openapi`.
+ */
+function withNullBody(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object' || isUnconstrainedSchema(schema)) {
+    return schema
+  }
+
+  const { $defs, ...rest } = schema
+  const nullable = withNull(rest)
+  return $defs && typeof nullable === 'object' ? { ...nullable, $defs } : nullable
 }
 
 /**

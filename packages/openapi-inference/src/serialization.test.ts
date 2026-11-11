@@ -459,6 +459,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['templateRecord', undefined],
     ['templateRecords', undefined],
     ['heldBodies', undefined],
+    ['missingRow', undefined],
+    ['optionalBlob', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -1485,7 +1487,8 @@ describe('generated schemas match serialized outputs', async () => {
         },
         required: ['list'],
       })
-      expect(schemaOf('maybeFunctionJSONRoot')).toEqual(result)
+      // at the root, a function without a `toJSON` is sent as no body
+      expect(schemaOf('maybeFunctionJSONRoot')).toEqual({ anyOf: [result, { type: 'null' }] })
     })
 
     it('writes an interface over a view of a typed array as bytes or a plain object', () => {

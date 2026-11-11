@@ -209,6 +209,7 @@ import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
 import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
 import { roundSeventyEight, roundSeventyEightViews } from '../tests/fixtures/app/src/round78'
 import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
+import { roundEighty, roundEightyTypes } from '../tests/fixtures/app/src/round80'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -437,8 +438,11 @@ describe('openAPIGenerator', () => {
         },
       },
     })
+    // `Todo | undefined`, where no todo is sent as no body
     expect((spec.paths?.['/todo/get']?.post?.responses?.['200'] as any).content).toEqual({
-      'application/json': { schema: { $ref: '#/components/schemas/Todo' } },
+      'application/json': {
+        schema: { anyOf: [{ $ref: '#/components/schemas/Todo' }, { type: 'null' }] },
+      },
     })
     expect((spec.paths?.['/todo/list']?.post?.responses?.['200'] as any).content).toEqual({
       'application/json': {
@@ -2003,8 +2007,9 @@ describe('openAPIGenerator', () => {
       // like a plain function or `undefined`
       expect(response('/tagged')).toEqual({ description: 'OK', content: {} })
       expect(response('/callable')).toEqual({ description: 'OK', content: {} })
+      // a function is sent as no body
       expect(response('/taggedOrNumber').content['application/json'].schema).toEqual({
-        type: 'number',
+        anyOf: [{ type: 'number' }, { type: 'null' }],
       })
       expect(spec.components?.schemas ?? {}).toEqual({})
     })
@@ -4581,6 +4586,41 @@ describe('openAPIGenerator', () => {
       expect(Object.keys(mixed).toSorted()).toEqual(['Holder', 'HolderParam'])
       expect(mixed.HolderParam).toEqual(named)
       expect(mixed.Holder).toEqual(expect.objectContaining(holderQuery))
+    })
+  })
+
+  describe('round eighty', () => {
+    const generate = (
+      version: '3.1.1' | '3.0.4' = '3.1.1',
+      defs?: 'recursive',
+      exported: 'roundEighty' | 'roundEightyTypes' = 'roundEighty',
+    ) =>
+      new OpenAPIGenerator({ defs }).generate(
+        exported === 'roundEighty' ? roundEighty : roundEightyTypes,
+        { source: { file: fixture('round80.ts'), export: exported }, version },
+      )
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'documents an output that may be left out as also null, in %s',
+      async (version) => {
+        const spec = await generate(version)
+        const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+
+        expect((spec.paths as any)['/missingRow'].post.responses['200'].content).toEqual({
+          'application/json': {
+            schema:
+              version === '3.0.4' ? { ...row, nullable: true } : { anyOf: [row, { type: 'null' }] },
+          },
+        })
+      },
+    )
+
+    it('documents a value whose files are optional as JSON too', async () => {
+      const spec = await generate()
+
+      expect(
+        Object.keys((spec.paths as any)['/optionalBlob'].post.responses['200'].content),
+      ).toEqual(['multipart/form-data', 'application/json'])
     })
   })
 })
