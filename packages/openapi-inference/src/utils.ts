@@ -299,8 +299,7 @@ export function createTypeScriptProject(
         )
       }
 
-      const symbol =
-        exported.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported
+      const symbol = resolveAlias(checker, exported)
 
       // classes and enums are both, their declared type is the instance/member type
       const type =
