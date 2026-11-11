@@ -5,6 +5,7 @@ import {
   getBuiltinBaseName,
   getDeclaredBuiltinName,
   getNumberIndexType,
+  getSatisfyingCollections,
   getToJSON,
   getViewParts,
   hasBigIntToJSON,
@@ -270,8 +271,11 @@ export class ModeSensitivity {
     // the serializer skips `toJSON` of plain objects, `JSON.stringify` calls it. An object literal
     // is a plain object, a declared object type (`interface Point { toJSON(): string }`) may be
     // one, so the serializer writes what `toJSON` returns or its fields, the `either` mode too.
+    // A `Set` or a `Map` satisfying an object type (`Partial<Shape>`) is written as `{}` by
+    // `JSON.stringify`.
     return (
       (hasToJSON && (this.mode === 'stringify' || isObjectLiteral(type))) ||
+      getSatisfyingCollections(types, type).length > 0 ||
       this.computeFields(type, isSensitive)
     )
   }

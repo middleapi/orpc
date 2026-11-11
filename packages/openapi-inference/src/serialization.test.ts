@@ -58,6 +58,8 @@ describe('generated schemas match serialized outputs', async () => {
   const setArray = expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' })
   // a `Set` in a view: of a plain object the serializer walks, or of an instance `JSON.stringify` writes
   const eitherSet = { anyOf: [setArray, { type: 'object' }] }
+  // the keys a number index checks, other keys of an object literal type are not
+  const numberKeys = (schema: object) => ({ '^(?:0|-?[1-9]\\d{0,14})$': schema })
 
   it.each([
     ['post', undefined],
@@ -424,6 +426,13 @@ describe('generated schemas match serialized outputs', async () => {
     ['brandedUser', undefined],
     ['brandedUsers', undefined],
     ['readonlyBrandedUser', undefined],
+    ['partialTileSet', undefined],
+    ['partialTileMap', undefined],
+    ['partialTiles', undefined],
+    ['sized', undefined],
+    ['sizedHolder', undefined],
+    ['numberRecord', undefined],
+    ['numberRecords', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -975,7 +984,7 @@ describe('generated schemas match serialized outputs', async () => {
     expect(schemas['Partial-Readonly-GammaRows'].anyOf[1]).toMatchObject({
       type: 'object',
       properties: { label: { type: 'string' } },
-      additionalProperties: { $ref: '#/components/schemas/Gamma' },
+      patternProperties: numberKeys({ $ref: '#/components/schemas/Gamma' }),
     })
     // `JSON.stringify` writes a `Set` and a `Map` as `{}`, also through a view
     expect(schemas.HoldsBuiltinViews.properties.set).toEqual({ type: 'object' })
@@ -1183,7 +1192,7 @@ describe('generated schemas match serialized outputs', async () => {
                 length: expect.objectContaining({ type: 'number' }),
                 __brand: { type: 'string', const: 'AccountId' },
               },
-              additionalProperties: { type: 'string' },
+              patternProperties: numberKeys({ type: 'string' }),
             },
           ],
         },
@@ -1963,7 +1972,7 @@ describe('generated schemas match serialized outputs', async () => {
               extra: { type: 'string' },
               length: { type: 'number', const: 2 },
             },
-            additionalProperties: tupleIndex,
+            patternProperties: numberKeys(tupleIndex),
           },
         ],
       }
@@ -1987,7 +1996,7 @@ describe('generated schemas match serialized outputs', async () => {
             length: expect.objectContaining({ type: 'number' }),
             x: { type: 'string' },
           },
-          additionalProperties: { type: 'number' },
+          patternProperties: numberKeys({ type: 'number' }),
         },
       ])
       expect(properties.rest.anyOf[1]).toEqual({
@@ -1997,7 +2006,7 @@ describe('generated schemas match serialized outputs', async () => {
           extra: { type: 'string' },
           length: { type: 'number' },
         },
-        additionalProperties: tupleIndex,
+        patternProperties: numberKeys(tupleIndex),
       })
     })
 
@@ -2095,7 +2104,7 @@ describe('generated schemas match serialized outputs', async () => {
             extra: { type: 'string' },
           },
           required: ['length'],
-          additionalProperties: { type: 'string' },
+          patternProperties: numberKeys({ type: 'string' }),
         },
       ])
       expect(schemas().OrNull.anyOf[0]).toEqual({ type: 'array', items: nullable('string') })
@@ -2146,7 +2155,7 @@ describe('generated schemas match serialized outputs', async () => {
               type: 'object',
               properties: { length: expect.objectContaining({ type: 'number' }) },
               required: ['length'],
-              additionalProperties: { type: 'string' },
+              patternProperties: numberKeys({ type: 'string' }),
             },
           ],
         },
@@ -2157,7 +2166,7 @@ describe('generated schemas match serialized outputs', async () => {
           anyOf: [
             { type: 'string' },
             { type: 'array', items: { type: 'string' } },
-            { type: 'object', additionalProperties: { type: 'string' } },
+            { type: 'object', patternProperties: numberKeys({ type: 'string' }) },
           ],
         },
       })
@@ -2176,7 +2185,7 @@ describe('generated schemas match serialized outputs', async () => {
                 length: expect.objectContaining({ type: 'number', const: 8 }),
                 extra: { type: 'string' },
               },
-              additionalProperties: { type: 'string' },
+              patternProperties: numberKeys({ type: 'string' }),
             },
           ],
         },
@@ -2266,7 +2275,7 @@ describe('generated schemas match serialized outputs', async () => {
             type: 'object',
             properties: { length },
             required: ['length'],
-            additionalProperties: { type: 'string' },
+            patternProperties: numberKeys({ type: 'string' }),
           },
         ],
       }
@@ -2296,7 +2305,7 @@ describe('generated schemas match serialized outputs', async () => {
           {
             type: 'object',
             properties: { length, __brand: { type: 'string', const: 'BrandedId' } },
-            additionalProperties: { type: 'string' },
+            patternProperties: numberKeys({ type: 'string' }),
           },
         ],
       }
@@ -2368,7 +2377,7 @@ describe('generated schemas match serialized outputs', async () => {
       type: 'object',
       properties: { length: expect.objectContaining({ type: 'number' }) },
       required: ['length'],
-      additionalProperties: strings,
+      patternProperties: numberKeys(strings),
     }
 
     it('cuts a cycle through a conditional deep mapped type where it expands again', () => {
@@ -2410,7 +2419,7 @@ describe('generated schemas match serialized outputs', async () => {
         flag: { anyOf: [{ type: 'boolean' }, { type: 'object' }] },
       })
 
-      const anyKeys = { type: 'object', additionalProperties: strings }
+      const anyKeys = { type: 'object', patternProperties: numberKeys(strings) }
       expect(schemaOf('brandedLiteralViews').properties).toEqual({
         literal: { anyOf: [strings, stringObject] },
         extended: {
@@ -2445,13 +2454,13 @@ describe('generated schemas match serialized outputs', async () => {
         list: {
           anyOf: [
             { type: 'array', items: strings },
-            { type: 'object', additionalProperties: strings },
+            { type: 'object', patternProperties: numberKeys(strings) },
           ],
         },
         readonly: {
           anyOf: [
             { type: 'array', items: strings },
-            { type: 'object', additionalProperties: strings },
+            { type: 'object', patternProperties: numberKeys(strings) },
           ],
         },
         tuple: {
@@ -2493,7 +2502,7 @@ describe('generated schemas match serialized outputs', async () => {
             type: 'object',
             properties: { length: { type: 'number' } },
             required: ['length'],
-            additionalProperties: { type: 'number' },
+            patternProperties: numberKeys({ type: 'number' }),
           },
         ],
       }
@@ -2509,7 +2518,7 @@ describe('generated schemas match serialized outputs', async () => {
           anyOf: [
             { type: 'array', items: strings },
             strings,
-            { type: 'object', additionalProperties: strings },
+            { type: 'object', patternProperties: numberKeys(strings) },
           ],
         },
         indexed: {
@@ -2517,7 +2526,7 @@ describe('generated schemas match serialized outputs', async () => {
             { type: 'array', items: { $ref: '#/components/schemas/IndexedItem' } },
             {
               type: 'object',
-              additionalProperties: { $ref: '#/components/schemas/IndexedItem' },
+              patternProperties: numberKeys({ $ref: '#/components/schemas/IndexedItem' }),
             },
           ],
         },
@@ -3024,6 +3033,30 @@ describe('generated schemas match serialized outputs', async () => {
         ),
       )
       expect(validate(sent) ? [] : validate.errors).toEqual([])
+    })
+  })
+
+  describe('round seventy-four', () => {
+    it('documents the arrays a Set or a Map is written as where it satisfies an object type by its members', () => {
+      const schemas = spec.components?.schemas as any
+
+      expect(schemas.Sized.anyOf).toEqual([
+        { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+        expect.objectContaining({ type: 'object', required: ['size'] }),
+      ])
+      // `JSON.stringify` writes them as `{}`
+      expect(schemas.SizedJson).toEqual({ type: 'object', description: expect.any(String) })
+      expect(schemas.SizedHolder.properties.sized).toEqual({
+        $ref: '#/components/schemas/SizedJson',
+      })
+    })
+
+    it('constrains only the numeric keys of a number index', () => {
+      expect(deref(responseSchema('/numberRecord')).anyOf[1]).toEqual({
+        type: 'object',
+        patternProperties: numberKeys({ $ref: 'spec#/$defs/TileLeaf' }),
+      })
     })
   })
 })

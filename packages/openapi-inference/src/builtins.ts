@@ -147,6 +147,32 @@ export function hasBuiltinForm(types: TypeQueries, type: Type): boolean {
 }
 
 /**
+ * `Set<any>` and `Map<any, any>`, if they satisfy an object type by their members, written as
+ * arrays of items or entries: with every required property, or sharing one of a type of optional
+ * properties only (`size` of `Partial<Shape>`).
+ */
+export function getSatisfyingCollections(types: TypeQueries, type: Type): readonly Type[] {
+  return types.memo('satisfyingCollections', type.id, () => {
+    const properties = types.getProperties(type)
+    const weak = properties.every((p) => p.flags & SymbolFlags.Optional)
+
+    return (['Set', 'Map'] as const).flatMap((name) => {
+      const members = types.getGlobalType(name)
+      const collection = types.getPrototypeType(name)
+      if (!members || !collection) {
+        return []
+      }
+
+      const names = new Set(types.getProperties(members).map((p) => p.name))
+      const ofMembers = weak
+        ? properties.some((p) => names.has(p.name))
+        : properties.every((p) => p.flags & SymbolFlags.Optional || names.has(p.name))
+      return ofMembers && types.checker.isTypeAssignableTo(collection, type) ? [collection] : []
+    })
+  })
+}
+
+/**
  * Whether the serializer and `JSON.stringify` write a built-in differently, like `Set`, `Map`,
  * `Blob`, or a built-in subclass with its own `toJSON`, which only `JSON.stringify` calls.
  */

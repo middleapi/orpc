@@ -372,5 +372,6 @@ try {
 - Types carry no validation rules. Add them with [JSDoc tags](#jsdoc) or keep a converter schema.
 - A comment on a primitive alias, like `type UserId = string`, only applies to properties typed with that alias.
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
+- In OpenAPI 3.0, the values of number keys, like in `Record<number, User>`, are left open.
 - `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out. Types holding `Infinity`, like type-fest's `PositiveInfinity`, are documented as any value.
 - Generation throws on types the compiler cannot resolve, like an import with a missing path alias.

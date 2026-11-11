@@ -202,6 +202,8 @@ import {
   roundSixtyNineRegistered,
 } from '../tests/fixtures/app/src/round69'
 import { roundSeventy } from '../tests/fixtures/app/src/round70'
+import type { Tile } from '../tests/fixtures/app/src/round74'
+import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4035,5 +4037,52 @@ describe('openAPIGenerator', () => {
         ['query', 'to'],
       ])
     })
+  })
+
+  describe('round seventy-four', () => {
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents inputs a Set or a Map satisfies by its members, and other keys of a number index, in %s',
+      async (version) => {
+        const spec = await generator.generate(roundSeventyFourInputs, {
+          source: { file: fixture('round74.ts'), export: 'roundSeventyFourInputs' },
+          version,
+        })
+        const ajv = new Ajv2020({ strict: false, allErrors: true })
+        ajv.addSchema(
+          JSON.parse(
+            JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+              '#/components/schemas/',
+              'spec#/$defs/',
+            ),
+          ),
+        )
+        const body = (path: string) =>
+          JSON.parse(
+            JSON.stringify(
+              (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+            ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+          )
+        // what a client sends
+        const serializer = new OpenAPIJsonSerializer()
+        const sent = (value: unknown) =>
+          JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        const settings = { mode: 'fast' }
+
+        for (const [path, value, valid] of [
+          ['/partialTile', new Set([1]), true],
+          ['/partialTile', new Map([['a', 1]]), true],
+          ['/partialTile', { kind: 'square', size: 1 } satisfies Partial<Tile>, true],
+          ['/sized', new Set(['a']), true],
+          ['/sized', new Map([['a', 1]]), true],
+          ['/sized', {}, false],
+          ['/numberRecord', settings, true],
+          ['/numberRecord', { 0: { value: 1 }, ...settings }, true],
+          // OpenAPI 3.0 has no `patternProperties`, so leaves the keys open
+          ['/numberRecord', { 0: { value: 'x' } }, version === '3.0.4'],
+        ] as const) {
+          expect([path, value, ajv.validate(body(path), sent(value))]).toEqual([path, value, valid])
+        }
+      },
+    )
   })
 })

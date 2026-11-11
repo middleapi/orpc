@@ -1097,6 +1097,21 @@ export class TypeQueries {
   }
 
   /**
+   * The type of `Array.prototype` (`any[]`), `Set.prototype` (`Set<any>`), or `Map.prototype`.
+   */
+  getPrototypeType(name: 'Array' | 'Set' | 'Map'): Type | undefined {
+    const key = `${name}.prototype`
+    if (!this.globalTypes.has(key)) {
+      const constructor = this.checker.resolveName(name, SymbolFlags.Value)
+      const constructorType = constructor && this.checker.getTypeOfSymbol(constructor)
+      const prototype = constructorType && this.getProperty(constructorType, 'prototype')
+      this.globalTypes.set(key, prototype && this.checker.getTypeOfSymbol(prototype))
+    }
+
+    return this.globalTypes.get(key)
+  }
+
+  /**
    * The type of an enum with one member is that member's literal type.
    */
   getSingleMemberEnum(type: Type): TSSymbol | undefined {

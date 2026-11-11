@@ -9,6 +9,8 @@ describe('typeToJsonSchemaConverter', () => {
   let converter: TypeToJsonSchemaConverter
 
   const convert = (name: string) => converter.convert(project.getExportType(name).type)
+  // the keys a number index checks
+  const numberKeys = (schema: object) => ({ '^(?:0|-?[1-9]\\d{0,14})$': schema })
 
   beforeAll(() => {
     project = openTypeScriptProject({ file: FIXTURE })
@@ -176,7 +178,7 @@ describe('typeToJsonSchemaConverter', () => {
             anyOf: [
               { type: 'array', items: { type: 'string' } },
               { type: 'string' },
-              { type: 'object', additionalProperties: { type: 'string' } },
+              { type: 'object', patternProperties: numberKeys({ type: 'string' }) },
             ],
           },
         },
@@ -931,7 +933,8 @@ describe('typeToJsonSchemaConverter', () => {
     })
 
     it('records keyed by numbers, and objects requiring one of their keys', () => {
-      // a JSON key is a string, so a numeric key is left unconstrained
+      // a JSON key is a string, so a numeric key is left unconstrained, and an object literal
+      // type may hold other keys, which the number index does not check
       expect(convertComplex('NumberKeys')).toEqual([
         {
           $ref: '#/$defs/NumberKeys',
@@ -940,7 +943,7 @@ describe('typeToJsonSchemaConverter', () => {
               anyOf: [
                 { type: 'array', items: { type: 'string' } },
                 { type: 'string' },
-                { type: 'object', additionalProperties: { type: 'string' } },
+                { type: 'object', patternProperties: numberKeys({ type: 'string' }) },
               ],
             },
           },
@@ -1487,6 +1490,8 @@ describe('typeToJsonSchemaConverter', () => {
                   'items': { type: 'array', prefixItems: [{}, {}], maxItems: 2, minItems: 2 },
                   'x-native-type': 'map',
                 },
+                // a `Set` has a `size` too
+                { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
                 { type: 'object', properties: { size: { type: 'number' } } },
               ],
             },
@@ -1734,8 +1739,13 @@ describe('typeToJsonSchemaConverter', () => {
               plainObject,
             ],
           },
+          // or a `Map` having the `size` of a `Set`, and the other way around
           tags: {
-            anyOf: [{ 'type': 'array', 'items': {}, 'x-native-type': 'set' }, plainObject],
+            anyOf: [
+              { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+              expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+              plainObject,
+            ],
           },
           link: {
             anyOf: [{ 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }, plainObject],
@@ -1743,6 +1753,7 @@ describe('typeToJsonSchemaConverter', () => {
           counts: {
             anyOf: [
               expect.objectContaining({ 'type': 'array', 'x-native-type': 'map' }),
+              { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
               plainObject,
             ],
           },

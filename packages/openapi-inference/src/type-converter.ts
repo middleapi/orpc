@@ -25,6 +25,7 @@ import {
   getBuiltinFields,
   getExtendedPrimitiveSchema,
   getNumberIndexType,
+  getSatisfyingCollections,
   getStringifiedForm,
   getTypedArrayViewBases,
   getViewBases,
@@ -207,7 +208,6 @@ export class TypeToJsonSchemaConverter {
   private voidType: Type | undefined
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
-  private anyArrayType: Type | null | undefined
   /** Def schemas with their unions written as discriminated ones, see `withDiscriminators` */
   private readonly discriminated = new WeakMap<object, JsonSchema>()
 
@@ -1284,7 +1284,10 @@ export class TypeToJsonSchemaConverter {
 
     this.convertIndexSignatures(type, schema, convertValue)
 
+    // an instance holds no keys besides its fields and indexes, so these keep the value type in
+    // OpenAPI 3.0
     if (typedArray) {
+      delete schema.patternProperties
       schema.additionalProperties ??= { type: 'number' }
     }
 
@@ -1305,20 +1308,28 @@ export class TypeToJsonSchemaConverter {
       delete (schema as ObjectJsonSchema).properties
     }
 
-    // an array-like view may also hold a plain object, and an array or a string may satisfy
-    // an object type by its members (`ArrayLike<number>`, `{ filter?: object }`): forms written
-    // in place of the fields, which an input split into parameters is not read by
+    // an array-like view may also hold a plain object, and an array, a string, a `Set`, or a
+    // `Map` may satisfy an object type by its members (`ArrayLike<number>`, `{ size?: number }`):
+    // forms written in place of the fields, which an input split into parameters is not read by
     const forms = arrayLike
       ? [arrayLike.schema]
       : classType || typedArray
         ? []
         : this.convertStructuralForms(type, properties)
-    return forms.length ? anyOfDeduped([...forms.map(writtenForm), schema]) : schema
+    if (!forms.length) {
+      return schema
+    }
+
+    // `JSON.stringify` writes a `Set` or a `Map` as `{}`, which also covers the fields
+    const withForms = anyOfDeduped([...forms.map(writtenForm), schema])
+    return typeof withForms === 'object' && withForms.anyOf?.some((s) => isPlain(s, 'object'))
+      ? withAnyObject(withForms)
+      : withForms
   }
 
   /**
-   * The arrays and strings an object type of their members (`length`, a number index) holds, and
-   * the tuples one of indexes holds.
+   * The arrays and strings an object type of their members (`length`, a number index) holds, the
+   * sets and maps one of theirs (`size`), and the tuples one of indexes holds.
    */
   private convertStructuralForms(type: Type, properties: readonly TSSymbol[]): JsonSchema[] {
     // neither has a string index
@@ -1348,7 +1359,7 @@ export class TypeToJsonSchemaConverter {
       )
     }
 
-    const anyArray = isTypeOfMembers('Array') ? this.getAnyArrayType() : undefined
+    const anyArray = isTypeOfMembers('Array') ? this.types.getPrototypeType('Array') : undefined
     if (anyArray && this.checker.isTypeAssignableTo(anyArray, type)) {
       forms.push({
         type: 'array',
@@ -1361,6 +1372,10 @@ export class TypeToJsonSchemaConverter {
       this.checker.isTypeAssignableTo(this.checker.getStringType(), type)
     ) {
       forms.push({ type: 'string' })
+    }
+
+    for (const collection of getSatisfyingCollections(this.types, type)) {
+      forms.push(this.visit(collection))
     }
 
     // a tuple satisfies an object type of the indexes from 0 (`TupleToObject<[string, number]>`),
@@ -1430,21 +1445,7 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * `any[]`, the type of `Array.prototype`.
-   */
-  private getAnyArrayType(): Type | undefined {
-    if (this.anyArrayType === undefined) {
-      const constructor = this.checker.resolveName('Array', SymbolFlags.Value)
-      const constructorType = constructor && this.checker.getTypeOfSymbol(constructor)
-      const prototype = constructorType && this.types.getProperty(constructorType, 'prototype')
-      this.anyArrayType = (prototype && this.checker.getTypeOfSymbol(prototype)) ?? null
-    }
-
-    return this.anyArrayType ?? undefined
-  }
-
-  /**
-   * A string (or number) index covers every key, narrower template literal keys add nothing.
+   * A string index covers every key, narrower number and template literal keys add nothing.
    * Branded keys (`Record<UserId, User>`) are keys of their primitive or template.
    */
   private convertIndexSignatures(
@@ -1462,16 +1463,19 @@ export class TypeToJsonSchemaConverter {
       info,
       key: getIndexKeyType(this.types, info.keyType),
     }))
-    const anyKey =
-      keys.find(({ key }) => key && key.flags & TypeFlags.String) ??
-      keys.find(({ key }) => key && key.flags & TypeFlags.Number)
+    const anyKey = keys.find(({ key }) => key && key.flags & TypeFlags.String)
     const patternKeys = keys.filter(
-      ({ key }) => key && key.flags & (TypeFlags.TemplateLiteral | TypeFlags.StringMapping),
+      ({ key }) =>
+        key && key.flags & (TypeFlags.Number | TypeFlags.TemplateLiteral | TypeFlags.StringMapping),
     )
 
     if (anyKey) {
       schema.additionalProperties = convertEntry(anyKey.info.valueType)
-    } else if (patternKeys.length === 1 && !Object.keys(schema.properties).length) {
+    } else if (
+      patternKeys.length === 1 &&
+      !(patternKeys[0]!.key!.flags & TypeFlags.Number) &&
+      !Object.keys(schema.properties).length
+    ) {
       // like zod records with template literal keys, which keeps the value type in OpenAPI 3.0
       schema.propertyNames = {
         type: 'string',
@@ -1479,11 +1483,13 @@ export class TypeToJsonSchemaConverter {
       }
       schema.additionalProperties = convertEntry(patternKeys[0]!.info.valueType)
     } else {
+      // a number index checks only numeric keys, which an object literal type (`{ mode: string }`)
+      // may hold others besides
       for (const { info, key } of patternKeys) {
         schema.patternProperties ??= {}
         setOwn(
           schema.patternProperties,
-          `^${toPattern(this.types, key!)}$`,
+          key!.flags & TypeFlags.Number ? NUMBER_KEY_PATTERN : `^${toPattern(this.types, key!)}$`,
           convertEntry(info.valueType),
         )
       }
@@ -2376,6 +2382,12 @@ function getIndexKeyType(types: TypeQueries, key: Type): Type | undefined {
     ? types.getMembers(key).find((member) => member.flags & keyFlags)
     : undefined
 }
+
+/**
+ * Keys a number index checks: of the numbers `String(n)` writes (`'1'`, not `'01'`), here only
+ * integers of up to 15 digits, which it writes in full.
+ */
+const NUMBER_KEY_PATTERN = '^(?:0|-?[1-9]\\d{0,14})$'
 
 /**
  * The regular expression of the strings a template literal (or its parts) accepts.
