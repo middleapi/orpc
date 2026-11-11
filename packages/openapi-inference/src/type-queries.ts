@@ -9,6 +9,7 @@ import type {
 } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
+import { getIndexInfos } from './builtins'
 import { argumentsGrow, getDeclarationId, MAX_GROWTH, MAX_NESTING } from './expansion'
 import type { JSDoc, SourceKind } from './utils'
 import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils'
@@ -523,15 +524,13 @@ export class TypeQueries {
    * Whether each index signature of a type is one of the source, with its value kept.
    */
   private keepsIndexes(type: Type, source: Type): boolean {
-    const sourceInfos = this.checker.getIndexInfosOfType(source)
+    const sourceInfos = getIndexInfos(this, source)
 
-    return this.checker
-      .getIndexInfosOfType(type)
-      .every((info) =>
-        sourceInfos.some(
-          (s) => s.keyType.id === info.keyType.id && this.keepsValue(info.valueType, s.valueType),
-        ),
-      )
+    return getIndexInfos(this, type).every((info) =>
+      sourceInfos.some(
+        (s) => s.keyType.id === info.keyType.id && this.keepsValue(info.valueType, s.valueType),
+      ),
+    )
   }
 
   /**

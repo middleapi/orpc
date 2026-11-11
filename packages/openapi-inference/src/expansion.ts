@@ -1,6 +1,7 @@
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 
+import { getIndexInfos } from './builtins'
 import type { TypeQueries } from './type-queries'
 
 /** Nested instantiations of one declaration, like `Maybe<A>` inside `Maybe<B>` */
@@ -350,9 +351,9 @@ export class ExpansionGuard {
 
     // the values of index signatures, which the path does not name
     if (
-      this.types.checker
-        .getIndexInfosOfType(type)
-        .some((info) => this.reaches(info.valueType, declaration, depth - 1, seen, along))
+      getIndexInfos(this.types, type).some((info) =>
+        this.reaches(info.valueType, declaration, depth - 1, seen, along),
+      )
     ) {
       return true
     }
@@ -378,7 +379,7 @@ export class ExpansionGuard {
       property !== undefined && this.types.getSymbolSourceKind(property) !== 'default'
 
     return name === undefined
-      ? this.types.checker.getIndexInfosOfType(type).length === 0 &&
+      ? getIndexInfos(this.types, type).length === 0 &&
           this.types.getProperties(type).some(declares)
       : declares(this.types.getProperty(type, name))
   }
@@ -538,7 +539,7 @@ export class ExpansionGuard {
   private getKeys(type: Type): string | undefined {
     return this.types.memo('expansionKeys', type.id, () => {
       const properties = this.types.getProperties(type)
-      const indexes = this.types.checker.getIndexInfosOfType(type)
+      const indexes = getIndexInfos(this.types, type)
       return properties.length || indexes.length
         ? [
             ...properties.map((p) => {
@@ -557,7 +558,7 @@ export class ExpansionGuard {
   private getValues(type: Type): readonly (Type | undefined)[] {
     return this.types.memo('expansionValues', type.id, () => [
       ...this.types.getPropertyTypes(type),
-      ...this.types.checker.getIndexInfosOfType(type).map((info) => info.valueType),
+      ...getIndexInfos(this.types, type).map((info) => info.valueType),
     ])
   }
 }
