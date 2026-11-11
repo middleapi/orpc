@@ -3299,6 +3299,70 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('aliases of library models', () => {
+    const record = {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        title: { type: 'string' },
+        authorId: { type: 'number' },
+      },
+      required: ['id', 'title', 'authorId'],
+    }
+
+    it('names a model after the alias the file of a property holding it imports', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/library-aliases/src/feed.ts', import.meta.url),
+      })
+
+      try {
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+
+        expect(converter.convert(project.getExportType('Feed').type)).toEqual([
+          {
+            $ref: '#/$defs/Feed',
+            $defs: {
+              Feed: {
+                type: 'object',
+                properties: {
+                  latest: { anyOf: [{ $ref: '#/$defs/PostRecord' }, { type: 'null' }] },
+                },
+                required: ['latest'],
+              },
+              PostRecord: record,
+            },
+          },
+          false,
+        ])
+      } finally {
+        project.close()
+      }
+    })
+
+    it('names a model after an alias of the files read before', () => {
+      const project = openTypeScriptProject({
+        file: new URL('../tests/fixtures/library-aliases/src/models.ts', import.meta.url),
+      })
+
+      try {
+        const exported = project.getExportType('PostRecord')
+
+        // the library declares its fields, no file read declares or imports the alias
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        expect(converter.convert(exported.type)).toEqual([record, false])
+
+        const reading = new TypeToJsonSchemaConverter(project.checker, project.program)
+        reading.readAliases(exported.symbol.declarations)
+        expect(reading.convert(exported.type)).toEqual([
+          { $ref: '#/$defs/PostRecord', $defs: { PostRecord: record } },
+          false,
+        ])
+      } finally {
+        project.close()
+      }
+    })
+  })
+
   describe('round twenty-nine', () => {
     it('makes a view of a function optional, at the root too', () => {
       const project = openTypeScriptProject({

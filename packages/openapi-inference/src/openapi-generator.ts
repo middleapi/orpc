@@ -327,6 +327,20 @@ export class OpenAPIGenerator {
       }
     }
 
+    // the aliases the files of the procedures declare or import name the models the conversions
+    // reach (see `TypeToJsonSchemaConverter.readAliases`), read first, so that the names do not
+    // depend on the order of procedures
+    await walkProcedureContractsAsync(router, (_, path) => {
+      const symbol = ctx.resolver.resolve(path)?.symbol
+      if (symbol) {
+        ctx.converters.output.readAliases([
+          ...symbol.declarations,
+          ...(getAssignedSymbol(ctx.checker, symbol)?.declarations ?? []),
+          ...(getImplementedSymbol(ctx.checker, symbol)?.declarations ?? []),
+        ])
+      }
+    })
+
     await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(filter, contract, path) === false) {
         return

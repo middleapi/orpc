@@ -4970,9 +4970,11 @@ describe('openAPIGenerator', () => {
       // one component of a type two aliases name, after the first one; the others as before
       expect(Object.keys(schemas).toSorted()).toEqual([
         'Account',
+        'Feed',
         'Kept',
         'Paginated_with-id-title',
         'Post',
+        'PostRecord',
         'PostWithAuthor',
         'Profile',
         'Settings',
@@ -4995,6 +4997,20 @@ describe('openAPIGenerator', () => {
       expect(response(spec, '/user')).toEqual(ref('User'))
       expect(response(spec, '/accounts')).toEqual({ type: 'array', items: ref('Account') })
       expect(response(spec, '/kept')).toEqual({ type: 'array', items: ref('Kept') })
+      // an alias the router file imports, of a type whose fields the library declares
+      expect(response(spec, '/postRecords')).toEqual({ type: 'array', items: ref('PostRecord') })
+      expect(schemas.PostRecord).toEqual({
+        type: 'object',
+        properties: {
+          id: { type: 'number' },
+          title: { type: 'string' },
+          authorId: { type: 'number' },
+        },
+        required: ['id', 'title', 'authorId'],
+      })
+      expect(schemas.Feed.properties.latest).toEqual({
+        anyOf: [ref('PostRecord'), { type: 'null' }],
+      })
       // type arguments
       expect(response(spec, '/posts')).toEqual(ref('Paginated_with-id-title'))
       expect(schemas['Paginated_with-id-title'].properties.items).toEqual({

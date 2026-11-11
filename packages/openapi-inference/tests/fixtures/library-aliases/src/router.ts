@@ -1,6 +1,9 @@
 import { os, type } from '@orpc/server'
 import type { Column, InferSelectModel, Selectable, Table } from 'fake-orm'
 
+import type { Feed } from './feed'
+import type { PostRecord } from './models'
+
 declare const users: Table<{
   id: Column<number>
   name: Column<string>
@@ -45,6 +48,9 @@ export interface PostWithAuthor {
 }
 
 export const router = {
+  // first, before a file importing the alias is read: an alias another file declares, of a type
+  // whose fields the library declares
+  postRecords: os.handler((): PostRecord[] => []),
   users: os.handler(async (): Promise<User[]> => []),
   user: os.handler(async (): Promise<UserRow> => ({ id: 1, name: 'a', bio: null })),
   posts: os.handler((): Paginated<Post> => ({ items: [], total: 0 })),
@@ -60,4 +66,6 @@ export const router = {
     settings: { theme: 'dark', compact: false },
   })),
   kept: os.handler((): Kept[] => []),
+  // a property of another file, which imports the alias
+  feed: os.handler((): Feed => ({ latest: null })),
 }

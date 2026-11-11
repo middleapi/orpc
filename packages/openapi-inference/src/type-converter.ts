@@ -3,6 +3,7 @@ import { setOwn } from '@orpc/shared'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
+  NodeHandle,
   Program,
   Symbol as TSSymbol,
   TemplateLiteralType,
@@ -118,7 +119,7 @@ export interface TypeToJsonSchemaConverterOptions {
   /**
    * Which named types become `$defs` (and so OpenAPI components).
    *
-   * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives) declared outside `node_modules` and the default library. An object type without a name of its own, like a model a library computes, is named after the alias without type parameters it is declared with (`type User = InferSelectModel<typeof users>`, `type PartialUser = Partial<User>`).
+   * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives) declared outside `node_modules` and the default library. An object type without a name of its own, like a model a library computes, is named after the alias without type parameters it is declared with (`type User = InferSelectModel<typeof users>`, `type PartialUser = Partial<User>`), when the file of a property or procedure holding it declares or imports the alias.
    * - `recursive`: only types that reference themselves, which can not be inlined. Every other type is inlined at each use, so models shared across many levels can make the document much larger.
    *
    * @default 'named'
@@ -449,6 +450,16 @@ export class TypeToJsonSchemaConverter {
     }
 
     return [{ ...(typeof schema === 'object' ? schema : { not: {} }), $defs }, optional]
+  }
+
+  /**
+   * Reads the type aliases the files of these declarations declare or import, like the files of
+   * a router's procedures, which name the models whose types lost them when the conversions reach
+   * them (see `TypeToJsonSchemaConverterOptions.defs`). The files of the properties of the types
+   * converted are read as they are reached.
+   */
+  readAliases(declarations: readonly NodeHandle[]): void {
+    this.types.readAliases(declarations)
   }
 
   /**
@@ -1462,6 +1473,9 @@ export class TypeToJsonSchemaConverter {
               ),
             )
           : undefined
+
+      // the aliases its declaration may refer to, which name the models its type holds
+      this.types.readAliases(property.declarations)
 
       const convertProperty = () =>
         body?.sent.length

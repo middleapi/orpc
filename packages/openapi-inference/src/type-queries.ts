@@ -1,6 +1,7 @@
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
   Checker,
+  NodeHandle,
   Program,
   Symbol as TSSymbol,
   Type,
@@ -35,6 +36,20 @@ const PRIMITIVE_INTERFACES = new Set(['String', 'Number', 'Boolean', 'BigInt', '
 
 const NAMEABLE_SYMBOL_FLAGS =
   SymbolFlags.Interface | SymbolFlags.Class | SymbolFlags.Enum | SymbolFlags.TypeAlias
+
+/**
+ * The kinds of the types an alias is declared with that the compiler may not keep it for: a
+ * reference to another type (`InferSelectModel<typeof users>`), a type query, an indexed access, or
+ * a conditional type, not a type literal, a mapped type, a union, or an intersection, which it keeps
+ * it for, nor a primitive, a function, an array, or a tuple.
+ */
+const LOSING_ALIAS_KINDS: ReadonlySet<SyntaxKind> = new Set([
+  SyntaxKind.TypeReference,
+  SyntaxKind.TypeQuery,
+  SyntaxKind.IndexedAccessType,
+  SyntaxKind.ConditionalType,
+  SyntaxKind.ImportType,
+])
 
 /**
  * The project type alias a property's type annotation names, with the type it has there.
@@ -98,11 +113,15 @@ export class TypeQueries {
   private assumedDepth = Number.POSITIVE_INFINITY
 
   /** The project aliases of the types the compiler does not keep them for, see `getLostAlias` */
-  private lostAliases: Map<number, TSSymbol> | undefined
+  private readonly lostAliases = new Map<number, TSSymbol>()
+  /** The files `readAliases` read */
+  private readonly aliasFiles = new Set<string>()
+  /** The aliases `readAliases` found in them */
+  private readonly aliasSymbols = new Set<number>()
 
   constructor(
     readonly checker: Checker,
-    private readonly program: Program,
+    program: Program,
   ) {
     this.getSourceKind = createSourceKindChecker(program)
   }
@@ -1117,24 +1136,32 @@ export class TypeQueries {
   }
 
   /**
-   * The type alias declared in the project, without type parameters, whose type the compiler does
-   * not keep it for (`type User = InferSelectModel<typeof users>`, `type Row = Partial<Base>`),
-   * so the type keeps only the alias of the library (or none): the first one declared of a type.
-   * Only top-level and namespace declarations are read, once.
+   * The type alias of the project without type parameters a type is declared with, when the
+   * compiler does not keep it for the type (`type User = InferSelectModel<typeof users>`,
+   * `type Row = Partial<Base>`), which keeps only the alias of the library (or none): of the
+   * aliases the files read by `readAliases` declare or import, the first one of the type.
    */
   getLostAlias(type: Type): TSSymbol | undefined {
-    this.lostAliases ??= this.collectLostAliases()
     return this.lostAliases.get(type.id)
   }
 
-  private collectLostAliases(): Map<number, TSSymbol> {
+  /**
+   * Reads the type aliases the project files of these declarations may write references to,
+   * those they declare (at the top level or in namespaces) and those they import by name, for
+   * `getLostAlias`. Each file is read once.
+   */
+  readAliases(declarations: readonly NodeHandle[]): void {
     const names: any[] = []
     const collect = (statements: readonly any[]): void => {
       for (const statement of statements) {
         if (statement.kind === SyntaxKind.TypeAliasDeclaration) {
-          if (!statement.typeParameters?.length) {
-            names.push(statement.name)
-          }
+          names.push(statement.name)
+        } else if (statement.kind === SyntaxKind.ImportDeclaration) {
+          const clause = statement.importClause
+          names.push(
+            ...(clause?.name ? [clause.name] : []),
+            ...((clause?.namedBindings?.elements ?? []) as any[]).map((element) => element.name),
+          )
         } else if (statement.kind === SyntaxKind.ModuleDeclaration) {
           // `namespace A.B {}` nests the declaration of `B` as the body of `A`
           let body = statement.body
@@ -1146,32 +1173,58 @@ export class TypeQueries {
       }
     }
 
-    for (const fileName of this.program.getSourceFileNames()) {
-      // libraries are not loaded, the project's files may still be linked into `node_modules`
-      const file = fileName.includes('/node_modules/')
-        ? undefined
-        : this.program.getSourceFile(fileName)
-      if (file && this.getSourceKind(file.path) === 'project') {
-        collect(file.statements)
+    for (const declaration of declarations) {
+      if (
+        !this.aliasFiles.has(declaration.path) &&
+        this.getSourceKind(declaration.path) === 'project'
+      ) {
+        this.aliasFiles.add(declaration.path)
+        collect(declaration.resolve()?.getSourceFile().statements ?? [])
       }
     }
 
-    const aliases = new Map<number, TSSymbol>()
     if (!names.length) {
-      return aliases
+      return
     }
 
-    const symbols = this.checker.getSymbolAtLocation(names)
-    const types = this.checker.getTypeAtLocation(names)
-    for (const [i, symbol] of symbols.entries()) {
+    const aliases: TSSymbol[] = []
+    const aliasNames: any[] = []
+    for (const symbol of this.checker.getSymbolAtLocation(names)) {
+      const alias = symbol && resolveAlias(this.checker, symbol)
+
+      if (
+        !alias ||
+        !(alias.flags & SymbolFlags.TypeAlias) ||
+        this.aliasSymbols.has(alias.id) ||
+        this.getSymbolSourceKind(alias) !== 'project'
+      ) {
+        continue
+      }
+
+      this.aliasSymbols.add(alias.id)
+      const node = alias.declarations[0]?.resolve() as any
+      if (
+        node?.kind === SyntaxKind.TypeAliasDeclaration &&
+        !node.typeParameters?.length &&
+        LOSING_ALIAS_KINDS.has(node.type.kind)
+      ) {
+        aliases.push(alias)
+        aliasNames.push(node.name)
+      }
+    }
+
+    if (!aliases.length) {
+      return
+    }
+
+    const types = this.checker.getTypeAtLocation(aliasNames)
+    for (const [i, alias] of aliases.entries()) {
       const type = types[i]
       // an alias the compiler keeps names the type by itself
-      if (symbol && type && type.getAliasSymbol()?.id !== symbol.id && !aliases.has(type.id)) {
-        aliases.set(type.id, symbol)
+      if (type && type.getAliasSymbol()?.id !== alias.id && !this.lostAliases.has(type.id)) {
+        this.lostAliases.set(type.id, alias)
       }
     }
-
-    return aliases
   }
 
   /**
