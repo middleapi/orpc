@@ -637,6 +637,10 @@ describe('generated schemas match serialized outputs', async () => {
       undefineds: { type: 'array', items: { type: 'null' } },
     })
     expect(schemas.HoldsDropJSON.required).toEqual(['y'])
+    // an instance of the class intersected with fields is written by its `toJSON`, as nothing
+    expect(schemas.HoldsDropJSON.properties).toEqual({
+      y: { type: 'array', items: { type: 'null' } },
+    })
     expect(schemas.HoldsBrandedJSON.properties).toEqual({
       k: { type: 'string' },
       ks: { type: 'array', items: { type: 'string' } },

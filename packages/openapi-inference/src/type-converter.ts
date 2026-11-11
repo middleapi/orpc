@@ -1408,20 +1408,11 @@ export class TypeToJsonSchemaConverter {
       const propertyType = propertyTypes[i]
 
       // functions, symbols, and always `undefined` values are dropped by JSON serialization,
-      // also when `toJSON` returns them (in either mode, when the serializer calls it too)
-      const serialized =
-        (!this.input || fieldsMode === 'stringify') && propertyType
-          ? getToJSONResultTypes(this.types, propertyType, fieldsMode === 'stringify')
-          : []
+      // also when `toJSON` returns them
       if (
         !propertyType ||
         isDropped(this.types, propertyType) ||
-        (serialized.length &&
-          serialized.every((result) => isDroppedResult(this.types, result)) &&
-          // unless the value may be written without calling `toJSON`: the method is optional,
-          // or the serializer may walk it as a plain object (`interface Point { toJSON(): undefined }`)
-          !hasOptionalToJSON(this.types, propertyType) &&
-          (fieldsMode === 'stringify' || !mayBePlainObject(this.types, propertyType)))
+        this.isDroppedThroughToJSON(propertyType, fieldsMode === 'stringify')
       ) {
         continue
       }
@@ -1985,9 +1976,13 @@ export class TypeToJsonSchemaConverter {
       return withNullBranch(this.convertUnion(serializable), true)
     }
 
+    // `JSON.stringify` writes an item whose `toJSON` returns `undefined` (or a function) as `null`
+    if (this.isDroppedThroughToJSON(type, this.mode === 'stringify')) {
+      return { type: 'null' }
+    }
+
     const schema = this.visit(type)
 
-    // `JSON.stringify` writes an item whose `toJSON` returns `undefined` (or a function) as `null`
     if (this.mayDropThroughToJSON(type, this.mode !== 'serializer')) {
       return withNull(schema)
     }
@@ -2339,6 +2334,23 @@ export class TypeToJsonSchemaConverter {
    * Inputs follow outputs: an instance of a class implementing an interface sends what its
    * `toJSON` returns (`interface Point { toJSON(): undefined }`).
    */
+  /**
+   * Whether a value is always written as nothing by its `toJSON` (in either mode, when the
+   * serializer calls it too), unless it may be written without calling it: the method is
+   * optional, or the serializer may walk it as a plain object (`interface Point { toJSON(): undefined }`).
+   */
+  private isDroppedThroughToJSON(type: Type, stringify: boolean): boolean {
+    const results =
+      !this.input || stringify ? getToJSONResultTypes(this.types, type, stringify) : []
+
+    return (
+      results.length > 0 &&
+      results.every((result) => isDroppedResult(this.types, result)) &&
+      !hasOptionalToJSON(this.types, type) &&
+      (stringify || !mayBePlainObject(this.types, type))
+    )
+  }
+
   private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
     return this.types.getUnionMembers(type).some((member) => {
       // a function without its optional `toJSON` is dropped, also by a client sending it
