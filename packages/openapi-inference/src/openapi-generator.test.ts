@@ -4206,6 +4206,7 @@ describe('openAPIGenerator', () => {
 
       for (const operation of [paths['/detailedFormGet'].get, paths['/detailedFormHead'].head]) {
         expect(JSON.stringify(operation)).not.toMatch(/multipart|contentMediaType/u)
+        expect(operation.requestBody).toBeUndefined()
         expect(operation.parameters).toEqual([expect.objectContaining({ in: 'query', name: 'a' })])
       }
     })
