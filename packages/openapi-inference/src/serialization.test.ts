@@ -1448,7 +1448,7 @@ describe('generated schemas match serialized outputs', async () => {
       ])
       const dates = schemas().DeepRO_OptionalDates.properties
       expect(dates.a).toEqual(dates.b)
-      expect(names.filter((name) => /^DeepRO_x\d*$/u.test(name))).toEqual(['DeepRO_x'])
+      expect(names.filter((name) => /^DeepRO_with-x\d*$/u.test(name))).toEqual(['DeepRO_with-x'])
       // no def is only a reference to another one
       for (const name of names) {
         expect(Object.keys(schemas()[name])).not.toEqual(['$ref'])

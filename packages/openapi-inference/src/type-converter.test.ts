@@ -861,20 +861,20 @@ describe('typeToJsonSchemaConverter', () => {
         {
           $ref: '#/$defs/DeepGeneric',
           $defs: {
-            DeepGeneric: {
+            'DeepGeneric': {
               anyOf: [
                 {
                   type: 'object',
                   properties: {
                     ok: { type: 'boolean', const: true },
-                    value: { type: 'array', items: { $ref: '#/$defs/Result_id_Error' } },
+                    value: { type: 'array', items: { $ref: '#/$defs/Result_with-id_Error' } },
                   },
                   required: ['ok', 'value'],
                 },
                 RESULT_ERROR,
               ],
             },
-            Result_id_Error: {
+            'Result_with-id_Error': {
               anyOf: [
                 {
                   type: 'object',
@@ -1931,15 +1931,15 @@ describe('typeToJsonSchemaConverter', () => {
         {
           $ref: '#/$defs/StringThread',
           $defs: {
-            StringThread: {
+            'StringThread': {
               type: 'object',
               properties: {
                 item: { type: 'string' },
-                replies: { type: 'array', items: { $ref: '#/$defs/Thread_parent' } },
+                replies: { type: 'array', items: { $ref: '#/$defs/Thread_with-parent' } },
               },
               required: ['item', 'replies'],
             },
-            Thread_parent: {
+            'Thread_with-parent': {
               type: 'object',
               properties: {
                 item: {
@@ -1947,11 +1947,11 @@ describe('typeToJsonSchemaConverter', () => {
                   properties: { parent: { type: 'string' } },
                   required: ['parent'],
                 },
-                replies: { type: 'array', items: { $ref: '#/$defs/Thread_parent2' } },
+                replies: { type: 'array', items: { $ref: '#/$defs/Thread_with-parent2' } },
               },
               required: ['item', 'replies'],
             },
-            Thread_parent2: {
+            'Thread_with-parent2': {
               type: 'object',
               properties: {
                 item: {
@@ -1965,11 +1965,11 @@ describe('typeToJsonSchemaConverter', () => {
                   },
                   required: ['parent'],
                 },
-                replies: { type: 'array', items: { $ref: '#/$defs/Thread_parent3' } },
+                replies: { type: 'array', items: { $ref: '#/$defs/Thread_with-parent3' } },
               },
               required: ['item', 'replies'],
             },
-            Thread_parent3: {
+            'Thread_with-parent3': {
               type: 'object',
               properties: {
                 item: {
@@ -2452,15 +2452,33 @@ describe('typeToJsonSchemaConverter', () => {
       ])
       expect(convertR2('PartialConfig')).toEqual([
         {
-          $ref: '#/$defs/DeepPartial_a',
+          $ref: '#/$defs/DeepPartial_with-a',
           $defs: {
-            DeepPartial_a: { type: 'object', properties: { a: { $ref: '#/$defs/DeepPartial_b' } } },
-            DeepPartial_b: { type: 'object', properties: { b: { $ref: '#/$defs/DeepPartial_c' } } },
-            DeepPartial_c: { type: 'object', properties: { c: { $ref: '#/$defs/DeepPartial_d' } } },
-            DeepPartial_d: { type: 'object', properties: { d: { $ref: '#/$defs/DeepPartial_e' } } },
-            DeepPartial_e: { type: 'object', properties: { e: { $ref: '#/$defs/DeepPartial_f' } } },
-            DeepPartial_f: { type: 'object', properties: { f: { $ref: '#/$defs/DeepPartial_g' } } },
-            DeepPartial_g: { type: 'object', properties: { g: { type: 'string' } } },
+            'DeepPartial_with-a': {
+              type: 'object',
+              properties: { a: { $ref: '#/$defs/DeepPartial_with-b' } },
+            },
+            'DeepPartial_with-b': {
+              type: 'object',
+              properties: { b: { $ref: '#/$defs/DeepPartial_with-c' } },
+            },
+            'DeepPartial_with-c': {
+              type: 'object',
+              properties: { c: { $ref: '#/$defs/DeepPartial_with-d' } },
+            },
+            'DeepPartial_with-d': {
+              type: 'object',
+              properties: { d: { $ref: '#/$defs/DeepPartial_with-e' } },
+            },
+            'DeepPartial_with-e': {
+              type: 'object',
+              properties: { e: { $ref: '#/$defs/DeepPartial_with-f' } },
+            },
+            'DeepPartial_with-f': {
+              type: 'object',
+              properties: { f: { $ref: '#/$defs/DeepPartial_with-g' } },
+            },
+            'DeepPartial_with-g': { type: 'object', properties: { g: { type: 'string' } } },
           },
         },
         false,

@@ -6,7 +6,7 @@ import type { PropertyAnnotation, TypeQueries } from './type-queries'
 /**
  * The def name of a named type: its symbol's name, or for an instantiated generic its printed
  * type (`Page<User>` -> `Page_User`), with the keys of object literal arguments
- * (`Page<{ id: number; title: string }>` -> `Page_id_title`).
+ * (`Page<{ id: number; title: string }>` -> `Page_with-id-title`).
  */
 export function getDefName(types: TypeQueries, type: Type, symbol: TSSymbol): string {
   const symbolName = getSymbolName(symbol)
@@ -61,7 +61,7 @@ function getWrittenTypeArguments(
  * The printed type, with only the type arguments written (see `getWrittenTypeArguments`), also of
  * the generics in its arguments (`Box<Box<string>>` of `Box<T = string>` is written `Box<Box>`),
  * and with `keys`, object literal arguments printed by their first keys, also as array items
- * (`Result<{ id: number }[]>` is written `Result<id[]>`).
+ * (`Result<{ id: number }[]>` is written `Result<with-id[]>`, see `printKeys`).
  */
 function printWritten(
   types: TypeQueries,
@@ -95,15 +95,7 @@ function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: num
   const printed = printType(types, type)
 
   if (printed === '{}') {
-    return (
-      (keys &&
-        types
-          .getProperties(type)
-          .slice(0, OBJECT_LITERAL_KEYS)
-          .map((p) => p.name)
-          .join(', ')) ||
-      printed
-    )
+    return (keys && printKeys(types, type)) || printed
   }
 
   if (depth >= WRITTEN_ARGUMENTS_DEPTH) {
@@ -127,6 +119,29 @@ function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: num
 
 /** How many keys of an object literal argument name an instantiation */
 const OBJECT_LITERAL_KEYS = 3
+
+/**
+ * Stands for the `-` of the key part of a name in the printed type, which never holds it (it
+ * escapes control characters), so `toDefName` keeps it while it replaces the others.
+ */
+const KEY_SEPARATOR = '\0'
+
+/**
+ * An object literal argument by its first keys, after `with-` (`with-id-title`), which keeps the
+ * names it gives apart from those of type arguments (`Page<{ number: string }>` is
+ * `Page_with-number`, `Page<number>` is `Page_number`): names from printed types have no `-`, and
+ * names of views (see `getViewDefName`) write `-` in place of `_`. Keys are written with letters,
+ * digits and inner underscores only (`_avg` as `avg`).
+ */
+function printKeys(types: TypeQueries, type: Type): string {
+  const keys = types
+    .getProperties(type)
+    .map((p) => p.name.replace(/\W+/gu, '_').replace(/^_+|_+$/gu, ''))
+    .filter(Boolean)
+    .slice(0, OBJECT_LITERAL_KEYS)
+
+  return keys.length ? ['with', ...keys].join(KEY_SEPARATOR) : ''
+}
 
 /**
  * The def name of a type without a usable name, like a recursive anonymous type.
@@ -225,7 +240,8 @@ function toDefName(printed: string): string | undefined {
     text
       .replace(/\[\]/gu, 'Array')
       .replace(/-(?=\d)/gu, 'neg')
-      .replace(/[^\w$.]+/gu, '_')
-      .replace(/^_+|_+$/gu, '') || undefined
+      .replace(/[^\w$.\0]+/gu, '_')
+      .replace(/^_+|_+$/gu, '')
+      .replaceAll(KEY_SEPARATOR, '-') || undefined
   )
 }

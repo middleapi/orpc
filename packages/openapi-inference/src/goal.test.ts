@@ -206,7 +206,7 @@ describe('goal', async () => {
     expect(showcase.patch.properties.theme.required).toBeUndefined()
     expect(showcase.frozen.properties.theme.required).toEqual(['color', 'dark'])
     expect(showcase.flat.required).toEqual(['a', 'b'])
-    expect(component('Getters_version_label').required).toEqual(['getLabel', 'getVersion'])
+    expect(component('Getters_with-version-label').required).toEqual(['getLabel', 'getVersion'])
     expect(showcase.unwrapped).toEqual({ type: 'number' })
 
     // built-ins, and classes as JSON.stringify writes them

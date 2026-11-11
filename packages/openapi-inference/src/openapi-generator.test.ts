@@ -215,6 +215,7 @@ import {
   roundEightyParameters,
   roundEightyTypes,
 } from '../tests/fixtures/app/src/round80'
+import { roundEightyOneNames, roundEightyOneNamesReversed } from '../tests/fixtures/app/src/round81'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4625,7 +4626,7 @@ describe('openAPIGenerator', () => {
       const schemas = (await generate()).components?.schemas as any
 
       // not the overloads whose `this` the value does not satisfy, or that need an argument
-      expect(schemas.Doc_name).toEqual({
+      expect(schemas['Doc_with-name']).toEqual({
         type: 'object',
         properties: { name: { type: 'string' }, _id: { type: 'string' } },
         required: ['name', '_id'],
@@ -4652,7 +4653,7 @@ describe('openAPIGenerator', () => {
     it('writes an intersection with a class whose toJSON it calls as an instance', async () => {
       const schemas = (await generate()).components?.schemas as any
 
-      expect(schemas.Hydrated_name).toEqual({
+      expect(schemas['Hydrated_with-name']).toEqual({
         type: 'object',
         properties: { name: { type: 'string' }, key: { type: 'string' } },
         required: ['name', 'key'],
@@ -4677,8 +4678,10 @@ describe('openAPIGenerator', () => {
       // an instantiation over object literals by their keys
       const response = (path: string) =>
         paths[path].post.responses['200'].content['application/json'].schema
-      expect(response('/posts')).toEqual({ $ref: '#/components/schemas/Paginated_id_title' })
-      expect(response('/accounts')).toEqual({ $ref: '#/components/schemas/Paginated_id_handle' })
+      expect(response('/posts')).toEqual({ $ref: '#/components/schemas/Paginated_with-id-title' })
+      expect(response('/accounts')).toEqual({
+        $ref: '#/components/schemas/Paginated_with-id-handle',
+      })
       // `Node & object` is `Node`, and a cycle through what `XOR<Filter, Where>` distributes to
       // is named after it
       expect(schemas.Node.properties.next).toEqual({ $ref: '#/components/schemas/Node' })
@@ -4827,17 +4830,54 @@ describe('openAPIGenerator', () => {
         'Box_Box',
         'Box_Box_number',
         'Box_number',
-        'Paginated_Result_id',
-        'Paginated_idArray',
-        'Result_id',
-        'Result_nameArray',
+        'Paginated_Result_with-id',
+        'Paginated_with-idArray',
+        'Result_with-id',
+        'Result_with-nameArray',
       ])
-      expect(response('/rows')).toEqual({ $ref: '#/components/schemas/Paginated_idArray' })
-      expect(response('/results')).toEqual({ $ref: '#/components/schemas/Result_nameArray' })
-      expect(response('/pages')).toEqual({ $ref: '#/components/schemas/Paginated_Result_id' })
+      expect(response('/rows')).toEqual({ $ref: '#/components/schemas/Paginated_with-idArray' })
+      expect(response('/results')).toEqual({ $ref: '#/components/schemas/Result_with-nameArray' })
+      expect(response('/pages')).toEqual({ $ref: '#/components/schemas/Paginated_Result_with-id' })
       // a type argument left to its default is not named, also in another one
       expect(response('/box')).toEqual({ $ref: '#/components/schemas/Box_Box' })
       expect(response('/boxes')).toEqual({ $ref: '#/components/schemas/Box_Box_number' })
     })
+  })
+  describe('round eighty-one', () => {
+    const routers = { roundEightyOneNames, roundEightyOneNamesReversed }
+    const generate = (exported: keyof typeof routers, version: '3.1.1' | '3.0.4' = '3.1.1') =>
+      new OpenAPIGenerator().generate(routers[exported], {
+        source: { file: fixture('round81.ts'), export: exported },
+        version,
+      })
+    const response = (spec: { paths?: unknown }, path: string) =>
+      (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
+
+    it.each(['roundEightyOneNames', 'roundEightyOneNamesReversed'] as const)(
+      'names instantiations over object literals apart from those over named types, in %s',
+      async (exported) => {
+        const spec = await generate(exported)
+
+        expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+          'Invoice',
+          'Page_Invoice',
+          'Page_number',
+          'Page_with-Invoice',
+          'Page_with-avg-sum',
+          'Page_with-number',
+        ])
+        expect(response(spec, '/counts')).toEqual({ $ref: '#/components/schemas/Page_number' })
+        expect(response(spec, '/named')).toEqual({ $ref: '#/components/schemas/Page_Invoice' })
+        expect(response(spec, '/invoices')).toEqual({
+          $ref: '#/components/schemas/Page_with-number',
+        })
+        expect(response(spec, '/byInvoice')).toEqual({
+          $ref: '#/components/schemas/Page_with-Invoice',
+        })
+        expect(response(spec, '/aggregates')).toEqual({
+          $ref: '#/components/schemas/Page_with-avg-sum',
+        })
+      },
+    )
   })
 })
