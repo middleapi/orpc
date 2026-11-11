@@ -928,12 +928,15 @@ export class TypeQueries {
     // alias over one (`Record<T | 'extra', true>`), unlike their instantiations and mapped types
     // over other keys (`{ [K in string]: number }`)
     if ((type as any).objectFlags & ObjectFlags.Mapped) {
-      const declaration = type.getSymbol()?.declarations[0]?.resolve() as any
+      const symbol = type.getSymbol()
+      const declaration = symbol?.declarations[0]?.resolve() as any
       const constraint = declaration?.typeParameter?.constraint
+      // its instantiations share the declaration
+      const declared =
+        constraint &&
+        this.memo('declaredType', symbol.id, () => this.checker.getTypeAtLocation(declaration))
       const keys =
-        constraint && this.checker.getTypeAtLocation(declaration)?.id === type.id
-          ? this.checker.getTypeFromTypeNode(constraint)
-          : undefined
+        declared?.id === type.id ? this.checker.getTypeFromTypeNode(constraint) : undefined
       return (
         (keys !== undefined && this.involvesTypeParameter(keys, depth)) ||
         type.getAliasTypeArguments().some((argument) => this.involvesTypeParameter(argument, depth))
@@ -1308,13 +1311,15 @@ export class TypeQueries {
    * with its instantiated type (`Maybe<string>` rather than `T | null`).
    */
   getAnnotation(property: TSSymbol): PropertyAnnotation | undefined {
-    return this.memo('annotation', property.id, (): PropertyAnnotation | undefined => {
-      const declaration = property.declarations[0]
+    const declaration = property.declarations[0]
 
-      if (!declaration || this.getSourceKind(declaration.path) !== 'project') {
-        return undefined
-      }
+    if (!declaration || this.getSourceKind(declaration.path) !== 'project') {
+      return undefined
+    }
 
+    // the instantiations of a property share its declaration
+    const id = `${declaration.path}:${declaration.index}`
+    return this.memo('annotation', id, (): PropertyAnnotation | undefined => {
       let typeNode = (declaration.resolve() as any)?.type
 
       // `count?: Count | null`
