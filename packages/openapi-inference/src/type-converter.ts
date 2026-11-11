@@ -114,7 +114,7 @@ export interface TypeToJsonSchemaConverterOptions {
    * Which named types become `$defs` (and so OpenAPI components).
    *
    * - `named`: interfaces, classes, enums, and type aliases (other than aliases of primitives and aliases the compiler does not keep, like `type PartialUser = Partial<User>`) declared outside `node_modules` and the default library.
-   * - `recursive`: only types that reference themselves, which can not be inlined.
+   * - `recursive`: only types that reference themselves, which can not be inlined. Every other type is inlined at each use, so models shared across many levels can make the document much larger.
    *
    * @default 'named'
    */
