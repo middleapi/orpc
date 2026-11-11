@@ -37,12 +37,13 @@ import {
   hasToJSONOf,
   isBoxedBigInt,
   isBoxedPrimitive,
+  isSentAsString,
   isTypedArray,
 } from './builtins'
 import type { DefNameRecord } from './components'
 import { getDefName, getFallbackDefName, getViewDefName } from './def-names'
 import type { ConversionMode } from './defs'
-import { DefNames, DefRegistry, toModeKey } from './defs'
+import { DefNames, DefRegistry, toModeKey, toParameterKey } from './defs'
 import { ExpansionGuard } from './expansion'
 import {
   getClassType,
@@ -176,6 +177,16 @@ export interface TypeToJsonSchemaConvertOptions {
    * @default false
    */
   bodyProperty?: boolean | undefined
+
+  /**
+   * Describe the values of the root's properties (`true`), or of these root properties (like
+   * `params` and `query` of a detailed input), as parameters a client sends in the URL, with
+   * bracket notation (`?a[b]=...`): typed arrays, `RegExp`, and other values the serializer
+   * leaves as they are, are sent as `String(value)`.
+   *
+   * @default false
+   */
+  parameters?: boolean | readonly string[] | undefined
 }
 
 export interface AsyncIteratorTypes {
@@ -267,6 +278,10 @@ export class TypeToJsonSchemaConverter {
    *   either form, field by field, so views along a chain of views are written once each.
    */
   private mode: ConversionMode = 'serializer'
+  /** Whether the value being converted is a parameter, see `TypeToJsonSchemaConvertOptions.parameters` */
+  private parameters = false
+  /** The root whose properties of these names hold parameters, see `visitRoot` */
+  private parameterRoot: { type: Type; properties: readonly string[] } | undefined
 
   constructor(
     private readonly checker: Checker,
@@ -319,17 +334,32 @@ export class TypeToJsonSchemaConverter {
     const { sent, others } = options.body
       ? splitBodies(this.types, serializable)
       : { sent: [], others: serializable }
+    const { parameters = false } = options
     // a single value is visited whole, so a union keeps its def, unless a member is converted
-    // with a body sent as is (`{ body: FormData } | { body: Json }` of a detailed one)
+    // with a body sent as is (`{ body: FormData } | { body: Json }` of a detailed one), or with
+    // properties holding parameters
     const split =
       sent.length > 0 ||
+      typeof parameters !== 'boolean' ||
       (options.bodyProperty === true && serializable.some((t) => this.holdsBodyProperty(t)))
     const values = split ? others : filtered ? serializable : members
-    // the root of a detailed input or output with a body sent as is
-    const visitRoot = (t: Type) =>
-      options.bodyProperty && this.holdsBodyProperty(t)
-        ? this.convertObject(t, { bodyProperty: true })
+    const visitRoot = (t: Type): JsonSchema => {
+      // the root of a detailed input or output with a body sent as is
+      const bodyProperty = options.bodyProperty === true && this.holdsBodyProperty(t)
+
+      if (typeof parameters !== 'boolean' && this.isObjectType(t)) {
+        return this.withParameterRoot(t, parameters, () => this.convertObject(t, { bodyProperty }))
+      }
+
+      if (bodyProperty) {
+        return this.convertObject(t, { bodyProperty })
+      }
+
+      // the root is no parameter, the parameters are its fields
+      return parameters === true && !isSentAsString(this.types, t)
+        ? this.withParameters(() => this.visit(t))
         : this.visit(t)
+    }
 
     const cuts = this.expansion.cuts
     this.expansion.reset()
@@ -505,6 +535,11 @@ export class TypeToJsonSchemaConverter {
     const flattened = this.types.getFlattenedView(type)
     if (flattened.id !== type.id) {
       return this.visit(flattened)
+    }
+
+    // the bracket notation of a parameter sends it as `String(value)`
+    if (this.parameters && isSentAsString(this.types, type)) {
+      return { type: 'string' }
     }
 
     const key = this.key(type)
@@ -1342,10 +1377,8 @@ export class TypeToJsonSchemaConverter {
             )
           : undefined
 
-      let propertySchema: JsonSchema
-      this.expansion.path.push(property)
-      try {
-        propertySchema = body?.sent.length
+      const convertProperty = () =>
+        body?.sent.length
           ? anyOfDeduped([
               ...body.sent,
               ...(body.others.length ? [this.convertMembers(body.others, convertValue)] : []),
@@ -1353,6 +1386,15 @@ export class TypeToJsonSchemaConverter {
           : serializable
             ? this.convertMembers(serializable, convertValue)
             : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
+
+      let propertySchema: JsonSchema
+      this.expansion.path.push(property)
+      try {
+        propertySchema =
+          this.parameterRoot?.type.id === type.id &&
+          this.parameterRoot.properties.includes(property.name)
+            ? this.withParameters(convertProperty)
+            : convertProperty()
       } catch (error) {
         if (error instanceof TypeScriptTypeResolutionError) {
           error.addDeclarations(property)
@@ -2315,6 +2357,11 @@ export class TypeToJsonSchemaConverter {
    * Keys of conversion results, which differ between the modes.
    */
   private key(type: Type): number {
+    const key = this.getModeKey(type)
+    return this.parameters ? toParameterKey(key) : key
+  }
+
+  private getModeKey(type: Type): number {
     if (this.mode === 'serializer') {
       return type.id
     }
@@ -2323,6 +2370,42 @@ export class TypeToJsonSchemaConverter {
     const sensitivity =
       this.mode === 'stringify' ? this.stringifySensitivity : this.eitherSensitivity
     return sensitivity.isSensitive(type) ? toModeKey(type.id, this.mode) : type.id
+  }
+
+  /**
+   * Converts a parameter, see `TypeToJsonSchemaConvertOptions.parameters`.
+   */
+  private withParameters<T>(fn: () => T): T {
+    const previous = this.parameters
+    this.parameters = true
+    try {
+      return fn()
+    } finally {
+      this.parameters = previous
+    }
+  }
+
+  /**
+   * Converts a root whose properties of these names hold parameters, like `query` of a detailed
+   * input, and the others not, like its `body`.
+   */
+  private withParameterRoot<T>(type: Type, properties: readonly string[], fn: () => T): T {
+    const previous = this.parameterRoot
+    this.parameterRoot = { type, properties }
+    try {
+      return fn()
+    } finally {
+      this.parameterRoot = previous
+    }
+  }
+
+  /**
+   * Whether a root is converted as an object, by its properties, not a branded primitive.
+   */
+  private isObjectType(type: Type): boolean {
+    return type.isIntersectionType()
+      ? !this.types.getMembers(type).some((m) => m.flags & PRIMITIVE_FLAGS)
+      : Boolean(type.flags & TypeFlags.Object)
   }
 
   private withMode<T>(mode: ConversionMode, fn: () => T): T {

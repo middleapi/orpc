@@ -29,6 +29,7 @@ import type {
 } from '@orpc/openapi'
 import {
   OpenAPIGenerator as BaseOpenAPIGenerator,
+  getDynamicPathParams,
   getOpenAPIMeta,
   OpenAPIGeneratorError,
 } from '@orpc/openapi'
@@ -404,15 +405,22 @@ export class OpenAPIGenerator {
     const bodiless = meta?.method === 'GET' || meta?.method === 'HEAD'
     // the stock generator reads only parameters from these inputs, the fields of an object
     const parametersOnly = inputDetailed || bodiless
-    const pathParameters = `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{')
+    const pathParameters =
+      getDynamicPathParams(`${meta?.prefix ?? ''}${meta?.path ?? ''}` as `/${string}`)?.map(
+        (p) => p.parameterName,
+      ) ?? []
     const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
       input: {
-        inlineRoot: parametersOnly || pathParameters,
+        inlineRoot: parametersOnly || pathParameters.length > 0,
         inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
         partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
         // only a whole input sent as the request body, not in the query string of a GET request
-        body: !parametersOnly && !pathParameters,
+        body: !parametersOnly && !pathParameters.length,
         bodyProperty: inputDetailed && !bodiless,
+        // what a client sends in the URL, all of a compact input without a body
+        parameters: inputDetailed
+          ? ['params', 'query']
+          : bodiless || (pathParameters.length > 0 && pathParameters),
         // a client sends a promise as is, written as `{}`
         awaited: false,
       },

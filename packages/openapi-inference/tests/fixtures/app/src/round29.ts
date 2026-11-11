@@ -278,12 +278,9 @@ export const roundTwentyNineInputs = {
   params: os.input(type<{ p: URLSearchParams }>()).handler(() => 1),
 }
 
-/** Two declared types of one name, the second one numbered */
+/** Two declared types of one name, the second one numbered, the first one's def inlined */
 export const roundTwentyNineComponents = {
-  first: os
-    .route({ method: 'GET' })
-    .input(type<FirstItem>())
-    .handler(() => 1),
+  first: os.route({ outputStructure: 'detailed' }).handler((): FirstItem => ({ id: 'x' })),
   second: os.handler(async (): Promise<{ i: SecondItem }> => ({ i: { name: 'x' } })),
 }
 

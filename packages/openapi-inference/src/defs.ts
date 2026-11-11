@@ -21,17 +21,52 @@ export function toModeKey(id: number, mode: Exclude<ConversionMode, 'serializer'
   return mode === 'stringify' ? -id : id + EITHER_KEY_OFFSET
 }
 
+/** Keys of values sent as parameters come after the keys of the modes, see `toParameterKey` */
+const PARAMETER_KEY_OFFSET = 2 ** 42
+
+/**
+ * The conversion key of a value sent as a parameter (in the query string or the path), which the
+ * bracket notation sends without the serializer's forms of some built-ins.
+ */
+export function toParameterKey(key: number): number {
+  return key < 0 ? key - PARAMETER_KEY_OFFSET : key + PARAMETER_KEY_OFFSET
+}
+
+/**
+ * The suffix of the def name of a parameter (see `toParameterKey`), after the one of its mode, so
+ * its def does not take the name of the def of the value as a body. A def of it is named without
+ * it when no other def has that name (see `mergeEquivalentComponents`).
+ */
+function getParameterSuffix(key: number): string {
+  return Math.abs(key) >= PARAMETER_KEY_OFFSET ? 'Param' : ''
+}
+
+/** The conversion key of a value not sent as a parameter */
+function withoutParameterKey(key: number): number {
+  return key <= -PARAMETER_KEY_OFFSET
+    ? key + PARAMETER_KEY_OFFSET
+    : key >= PARAMETER_KEY_OFFSET
+      ? key - PARAMETER_KEY_OFFSET
+      : key
+}
+
 /**
  * The suffix of the def name of a type in the mode of a key, so names do not depend on which
  * mode was converted first: `Json` under `JSON.stringify`, `Any` for either one.
  */
 function getModeSuffix(key: number): string {
-  return key < 0 ? 'Json' : key >= EITHER_KEY_OFFSET ? 'Any' : ''
+  const modeKey = withoutParameterKey(key)
+  return modeKey < 0 ? 'Json' : modeKey >= EITHER_KEY_OFFSET ? 'Any' : ''
 }
 
 /** The type id of a conversion key */
 function getTypeId(key: number): number {
-  return key < 0 ? -key : key >= EITHER_KEY_OFFSET ? key - EITHER_KEY_OFFSET : key
+  const modeKey = withoutParameterKey(key)
+  return modeKey < 0
+    ? -modeKey
+    : modeKey >= EITHER_KEY_OFFSET
+      ? modeKey - EITHER_KEY_OFFSET
+      : modeKey
 }
 
 export interface Def {
@@ -146,7 +181,8 @@ export class DefRegistry {
     let name = this.names.byKey.get(key)
 
     if (name === undefined || taken(name)) {
-      const base = `${preferredName}${getModeSuffix(key)}`
+      const modeName = `${preferredName}${getModeSuffix(key)}`
+      const base = `${modeName}${getParameterSuffix(key)}`
       const unavailable = (candidate: string) => taken(candidate) || this.names.used.has(candidate)
       // `Page_1` and `Page_12` must not collide as `Page_12`
       const separator = /\d$/u.test(base) ? '_' : ''
@@ -157,8 +193,8 @@ export class DefRegistry {
 
       this.names.byKey.set(key, name)
       this.names.used.add(name)
-      if (name !== base) {
-        this.names.numbered.set(name, base)
+      if (name !== modeName) {
+        this.names.numbered.set(name, modeName)
       }
       if (base !== preferredName) {
         this.names.modes.set(name, preferredName)
@@ -178,7 +214,8 @@ export class DefRegistry {
    * (a type next to a cut expansion, converted again), instead of a numbered one.
    */
   reclaimName(def: Def, preferredName: string): void {
-    const name = `${preferredName}${getModeSuffix(def.key)}`
+    const modeName = `${preferredName}${getModeSuffix(def.key)}`
+    const name = `${modeName}${getParameterSuffix(def.key)}`
 
     const reserved = this.reservedNames.get(name)
 
@@ -200,7 +237,10 @@ export class DefRegistry {
     this.names.hold(name)
     this.names.byKey.set(def.key, name)
     this.names.used.add(name)
-    if (name !== preferredName) {
+    if (name !== modeName) {
+      this.names.numbered.set(name, modeName)
+    }
+    if (modeName !== preferredName) {
       this.names.modes.set(name, preferredName)
     }
   }

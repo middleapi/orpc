@@ -630,6 +630,21 @@ function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
 }
 
 /**
+ * Whether the bracket notation of a parameter (`?a[b]=...`) sends a value of this type as
+ * `String(value)`: a typed array (also Node's `Buffer`), or an instance the serializer leaves to
+ * `JSON.stringify` (`RegExp`, `ArrayBuffer`, `Promise`), but a boxed primitive, which is sent as
+ * its primitive, and an `Error`, which is sent as the plain object it may be, like a class.
+ */
+export function isSentAsString(types: TypeQueries, type: Type): boolean {
+  return (
+    (isTypedArray(types, type) && !getTypedArrayViewBases(types, type).length) ||
+    (isStringifiedBuiltin(types, type) &&
+      !isBoxedPrimitive(types, type) &&
+      !extendsError(types, type))
+  )
+}
+
+/**
  * Whether a type is a built-in of one of these names, or extends one (`TypeError` is an `Error`).
  */
 function isOrExtendsBuiltin(types: TypeQueries, type: Type, names: ReadonlySet<string>): boolean {

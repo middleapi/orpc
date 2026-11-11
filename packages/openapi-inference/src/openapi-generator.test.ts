@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -6,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   OpenAPIGenerator as BaseOpenAPIGenerator,
+  BracketNotationSerializer,
   openapi,
   OpenAPIGeneratorError,
   OpenAPIJsonSerializer,
@@ -212,6 +214,7 @@ import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
 import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
+import { parameterValues } from '../tests/fixtures/runtime/src/parameter-values'
 import { router as outsideRouter } from '../tests/fixtures/solution-outside/router'
 import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -4253,6 +4256,145 @@ describe('openAPIGenerator', () => {
       expect(
         paths['/post'].post.requestBody.content['application/json'].schema.anyOf,
       ).toContainEqual(buffer)
+    })
+  })
+
+  describe('round eighty', () => {
+    it('documents values a client sends in the URL as strings, as the bracket notation writes them', async () => {
+      const spec = await generator.generate(parameterValues, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/parameter-values.ts', import.meta.url),
+          export: 'parameterValues',
+        },
+      })
+      const paths = spec.paths as any
+      const schemas = spec.components?.schemas as any
+      const string = { type: 'string' }
+      const parameter = (path: string, method: string, name: string) =>
+        paths[path][method].parameters.find((p: any) => p.name === name)
+
+      for (const name of ['bytes', 'buffer', 'floats', 'pattern', 'raw', 'view', 'either']) {
+        expect(parameter('/search', 'get', name), name).toEqual(
+          expect.objectContaining({ in: 'query', schema: string, required: true }),
+        )
+        expect(parameter('/search', 'get', name).style, name).toBeUndefined()
+      }
+      expect(parameter('/search', 'get', 'list').schema).toEqual({ type: 'array', items: string })
+      expect(parameter('/search', 'get', 'nested').schema.properties.pattern).toEqual(string)
+      // the model keeps its form in a request body
+      expect(parameter('/search', 'get', 'attachment').schema).toEqual({
+        $ref: '#/components/schemas/AttachmentParam',
+      })
+      expect(schemas.AttachmentParam.properties.data).toEqual(string)
+      expect(paths['/upload'].post.requestBody.content['application/json'].schema).toEqual({
+        $ref: '#/components/schemas/Attachment',
+      })
+      expect(schemas.Attachment.properties.data.anyOf).toContainEqual({
+        type: 'object',
+        additionalProperties: { type: 'number' },
+      })
+      expect(parameter('/detailed/{id}', 'post', 'id').schema).toEqual(string)
+      expect(parameter('/detailed/{id}', 'post', 'pattern').schema).toEqual(string)
+      expect(parameter('/path/{pattern}', 'put', 'pattern').schema).toEqual(string)
+
+      // what a client sends, which the server accepts, has the documented parameters and body
+      const ajv = new Ajv2020({ strict: false, allErrors: true, coerceTypes: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const toAjv = (schema: unknown) =>
+        JSON.parse(JSON.stringify(schema).replaceAll('#/components/schemas/', 'spec#/$defs/'))
+      const handler = new OpenAPIHandler(parameterValues)
+      const sent: Request[] = []
+      const link = new OpenAPILink(parameterValues, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const attachment = { data: new Uint8Array([1, 2]), size: 2 }
+
+      for (const [name, input] of [
+        [
+          'search',
+          {
+            bytes: new Uint8Array([1, 2]),
+            buffer: Buffer.from('hi'),
+            floats: new Float64Array([1.5]),
+            pattern: /a+/g,
+            raw: new ArrayBuffer(1),
+            view: new DataView(new ArrayBuffer(1)),
+            either: new Uint8Array([1]),
+            list: [new Uint8Array([1])],
+            nested: { pattern: /a/, count: 1 },
+            attachment,
+            at: new Date(0),
+          },
+        ],
+        ['upload', attachment],
+        [
+          'detailed',
+          {
+            params: { id: new Uint8Array([1]) },
+            query: { pattern: /a/, attachment },
+            body: { data: new Uint8Array([1]) },
+          },
+        ],
+        ['path', { pattern: /a/, data: new Uint8Array([1]) }],
+      ] as const) {
+        await expect(link.call([name], input as any, { context: {} })).resolves.toBe(1)
+
+        const request = sent.at(-1)!
+        const url = new URL(request.url)
+        const [template, item] = Object.entries(paths).find(([, i]: any) =>
+          Object.values(i).some((o: any) => o.operationId === name),
+        )! as [string, any]
+        const operation = item[request.method.toLowerCase()]
+        const documented = operation.parameters ?? []
+
+        // a value sent whole is documented as one, a plain object or array by its fields
+        const query = new BracketNotationSerializer().deserialize([...url.searchParams])
+        for (const key of url.searchParams.keys()) {
+          const [field] = new BracketNotationSerializer().parsePath(key)
+          const p = documented.find((p: any) => p.in === 'query' && p.name === field)
+          expect(p?.style, `${name}: ${key}`).toBe(key === field ? undefined : 'deepObject')
+        }
+        // the decoded values match the documented schemas, read as the handler's coercion would
+        const values: Record<string, unknown> = { ...query }
+        const segments = template.split('/')
+        url.pathname.split('/').forEach((segment, i) => {
+          const match = /^\{(.+)\}$/u.exec(segments[i]!)
+          if (match) {
+            values[match[1]!] = decodeURIComponent(segment)
+          }
+        })
+        const validate = ajv.compile(
+          toAjv({
+            type: 'object',
+            properties: Object.fromEntries(
+              documented.filter((p: any) => p.in !== 'header').map((p: any) => [p.name, p.schema]),
+            ),
+            required: documented.filter((p: any) => p.required).map((p: any) => p.name),
+          }),
+        )
+        expect(validate(values) ? [] : [name, values, validate.errors]).toEqual([])
+
+        if (operation.requestBody) {
+          const validateBody = ajv.compile(
+            toAjv(operation.requestBody.content['application/json'].schema),
+          )
+          const body = await request.json()
+          expect(validateBody(body) ? [] : [name, body, validateBody.errors]).toEqual([])
+        }
+      }
     })
   })
 })
