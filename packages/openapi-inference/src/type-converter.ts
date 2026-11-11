@@ -454,19 +454,17 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * Reads the type aliases the files of these declarations declare or import, like the files of
-   * a router's procedures, which name the models whose types lost them when the conversions reach
-   * them (see `TypeToJsonSchemaConverterOptions.defs`). The files of the properties of the types
-   * converted are read as they are reached.
+   * a router's procedures, which name the models whose types lost them (see
+   * `TypeToJsonSchemaConverterOptions.defs`), as do the files of the properties converted.
    */
   readAliases(declarations: readonly NodeHandle[]): void {
     this.types.readAliases(declarations)
   }
 
   /**
-   * Whether the aliases read while converting (see `readAliases`) name types a conversion of this
-   * program wrote before they were read, since the last call. When they do, the converters of
-   * this program created afterwards give def names anew, as the first ones did, so converting
-   * again with them names each type the same, whichever procedure reaches it first.
+   * Whether the aliases read since the last call (see `readAliases`) name types a conversion of
+   * this program wrote before, in which case the converters created afterwards give def names anew,
+   * so converting again names each type the same, whichever procedure reaches it first.
    */
   takeLateAliases(): boolean {
     const late = this.types.takeLateAliases()
@@ -775,12 +773,17 @@ export class TypeToJsonSchemaConverter {
     }
 
     // a model whose type lost the project alias it is declared with, like the row type of a library
-    // (`type User = InferSelectModel<typeof users>`), is written once too, named after the alias
+    // (`type User = InferSelectModel<typeof users>`), is written once too, named after the alias,
+    // when written by its fields, not by the forms of a built-in it is a view of
     const lostAlias =
-      this.defsMode === 'named' && enteredAt === undefined ? this.getLostAlias(type) : undefined
+      this.defsMode === 'named' &&
+      enteredAt === undefined &&
+      typeof schema === 'object' &&
+      schema.type === 'object'
+        ? this.getLostAlias(type)
+        : undefined
 
-    // an object written by its fields, not by the forms of a built-in it is a view of
-    if (lostAlias && typeof schema === 'object' && schema.type === 'object') {
+    if (lostAlias) {
       const created = this.defs.create(key, lostAlias.name)
       created.schema = this.annotate(schema, lostAlias)
       created.stable = cuts === this.expansion.cuts
@@ -2492,10 +2495,9 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * The project alias the type of a model lost (see `TypeQueries.getLostAlias`): of an object with
-   * properties, not an array, a view of a class or of a function, nor an object or type literal of
-   * the project (`ReturnType<() => { ok: true }>`, a member of a union), which is written where it
-   * is declared. Only such types are looked up, so an alias read later names a type converted
-   * before only when it would have named it (see `takeLateAliases`).
+   * properties, not a view of a class or of a function, nor an object or type literal of the
+   * project, which is written where it is declared. Only types it would name are looked up, see
+   * `takeLateAliases`.
    */
   private getLostAlias(type: Type): TSSymbol | undefined {
     const declaration = type.getSymbol()?.declarations[0]
@@ -2505,7 +2507,6 @@ export class TypeToJsonSchemaConverter {
       ((declaration?.kind === SyntaxKind.TypeLiteral ||
         declaration?.kind === SyntaxKind.ObjectLiteralExpression) &&
         this.types.getSourceKind(declaration.path) === 'project') ||
-      this.types.getReferenceKind(type) !== undefined ||
       !this.types.getProperties(type).length ||
       getViewedFunction(this.types, type) !== undefined ||
       getClassType(this.types, type) !== undefined

@@ -20,9 +20,23 @@ export function getDefName(types: TypeQueries, type: Type, symbol: TSSymbol): st
   }
 
   return (
-    toDefName(printWritten(types, type, written)) ??
-    toDefName(printWritten(types, type, written, true)) ??
+    getWrittenDefName(types, type, written) ??
     (internal ? getFallbackDefName(types, type) : symbolName)
+  )
+}
+
+/**
+ * The def name of the printed type with only its written type arguments, else with the keys of
+ * object literal arguments (see `printWritten`).
+ */
+function getWrittenDefName(
+  types: TypeQueries,
+  type: Type,
+  written: readonly Type[],
+): string | undefined {
+  return (
+    toDefName(printWritten(types, type, written)) ??
+    toDefName(printWritten(types, type, written, true))
   )
 }
 
@@ -94,20 +108,17 @@ const WRITTEN_ARGUMENTS_DEPTH = 4
 function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: number): string {
   const printed = printType(types, type)
 
-  if (printed === '{}') {
-    return (keys && printKeys(types, type)) || printed
-  }
-
-  // an intersection of object literals, by its keys
+  // an object literal, also an intersection of them, by its keys
   if (
     keys &&
-    type.isIntersectionType() &&
-    types.getMembers(type).every((m) => printType(types, m) === '{}')
+    (printed === '{}' ||
+      (type.isIntersectionType() &&
+        types.getMembers(type).every((m) => printType(types, m) === '{}')))
   ) {
     return printKeys(types, type) || printed
   }
 
-  if (depth >= WRITTEN_ARGUMENTS_DEPTH) {
+  if (printed === '{}' || depth >= WRITTEN_ARGUMENTS_DEPTH) {
     return printed
   }
 
@@ -129,18 +140,13 @@ function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: num
 /** How many keys of an object literal argument name an instantiation */
 const OBJECT_LITERAL_KEYS = 3
 
-/**
- * Stands for the `-` of the key part of a name in the printed type, which never holds it (it
- * escapes control characters), so `toDefName` keeps it while it replaces the others.
- */
+/** The `-` of the keys in a printed type, which escapes control characters, see `toDefName` */
 const KEY_SEPARATOR = '\0'
 
 /**
- * An object literal argument by its first keys, after `with-` (`with-id-title`), which keeps the
- * names it gives apart from those of type arguments (`Page<{ number: string }>` is
- * `Page_with-number`, `Page<number>` is `Page_number`): names from printed types have no `-`, and
- * names of views (see `getViewDefName`) write `-` in place of `_`. Keys are written with letters,
- * digits and inner underscores only (`_avg` as `avg`).
+ * An object literal argument by its first keys, after `with-` (`Page<{ number: string }>` is
+ * `Page_with-number`, `Page<number>` is `Page_number`): no printed type writes `-`, and views
+ * write it for `_` (see `getViewDefName`). Keys keep letters, digits and inner underscores.
  */
 function printKeys(types: TypeQueries, type: Type): string {
   const keys = types
@@ -168,12 +174,7 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
   ) {
     // an instantiation by its printed type, as a named def (`DeepPartial_User`)
     const written = getWrittenTypeArguments(types, type, symbol)
-    return (
-      (written.length &&
-        (toDefName(printWritten(types, type, written)) ??
-          toDefName(printWritten(types, type, written, true)))) ||
-      name
-    )
+    return (written.length && getWrittenDefName(types, type, written)) || name
   }
 
   const printed = toDefName(printType(types, type))

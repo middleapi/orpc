@@ -73,10 +73,7 @@ function isGivenWhole(contract: AnyProcedureContract): boolean {
   return spec !== undefined && typeof spec !== 'function'
 }
 
-/**
- * How many times the procedures are converted again, at most, once the files of their properties
- * read while converting named types converted before (see `TypeToJsonSchemaConverter.takeLateAliases`)
- */
+/** How many times the procedures are converted again at most, see `generate` */
 const MAX_ALIAS_PASSES = 2
 
 type InferredJsonSchema = [jsonSchema: JsonSchema, optional: boolean]
@@ -293,9 +290,8 @@ export class OpenAPIGenerator {
 
       inferred = await this.inferRouter(ctx, router, filter)
 
-      // a type converted before a file naming it by an alias it lost was read is converted again
-      // with every alias read, so the names do not depend on the order of procedures (the files of
-      // the properties are read as the conversions reach them)
+      // a type converted before the file of a property naming it by an alias it lost was read is
+      // converted again, so names do not depend on the order of procedures
       for (let i = 0; i < MAX_ALIAS_PASSES && ctx.converters.output.takeLateAliases(); i++) {
         ctx.converters = { input: converter('input'), output: converter('output') }
         inferred = await this.inferRouter(ctx, router, filter)
@@ -356,9 +352,8 @@ export class OpenAPIGenerator {
       }
     })
 
-    // the aliases the files of the procedures declare or import name the models the conversions
-    // reach (see `TypeToJsonSchemaConverter.readAliases`), read first, so that a conversion seldom
-    // reaches a type before the alias naming it (see `generate`)
+    // the aliases of the files of the procedures, read first, so that a conversion seldom reaches
+    // a type before the alias naming it (see `generate`)
     for (const { contract, path } of procedures) {
       const symbol = !isGivenWhole(contract) ? ctx.resolver.resolve(path)?.symbol : undefined
       if (symbol) {
@@ -505,7 +500,7 @@ export class OpenAPIGenerator {
           parts: AnySchema[],
           partTypes: (Type | readonly Type[] | undefined)[],
           options?: TypeToJsonSchemaConvertOptions,
-          body?: 'compact' | 'detailed',
+          output = false,
         ): AnySchema[] => {
           if (parts.length && parts.every(supported)) {
             return parts
@@ -544,13 +539,9 @@ export class OpenAPIGenerator {
                 ? []
                 : [
                     inferredSchema([
-                      kept.length
-                        ? rest
-                        : body === 'detailed'
-                          ? withNullBodyProperty(rest)
-                          : body && optional
-                            ? withNullBody(rest)
-                            : rest,
+                      output && !kept.length
+                        ? withNullBody(rest, optional, !!inline.output.inlineRoot)
+                        : rest,
                       optional,
                     ]),
                   ]
@@ -576,14 +567,7 @@ export class OpenAPIGenerator {
           )
         }
 
-        // a compact output may be left out (`T | undefined`), which is sent as no body, and so
-        // may the body of a detailed one (`body?: T`)
-        return complete(
-          schemas ?? [],
-          [type],
-          inline[direction],
-          direction === 'output' ? (inline.output.inlineRoot ? 'detailed' : 'compact') : undefined,
-        )
+        return complete(schemas ?? [], [type], inline[direction], direction === 'output')
       }
 
       return (
@@ -675,54 +659,44 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
 }
 
 /**
- * A response body that may be left out, which the serializer writes as `null`: no body (`void`)
- * stays any value, see `toBodyContent` of `@orpc/openapi`, and a schema admitting `null` already
- * (`null | undefined`, or a union with `{}`) stays as it is.
+ * An output whose body may be left out, which the serializer writes as `null`: a compact one that
+ * may be (`T | undefined`), or a detailed one whose `body` may be (`body?: T`), also of each member
+ * of a union. No body (`void`) stays any value (see `toBodyContent` of `@orpc/openapi`), and so
+ * does a schema admitting `null` already.
  */
 function withNullBody(
   schema: JsonSchema,
-  $defs: Record<string, JsonSchema> | undefined = typeof schema === 'object'
-    ? schema.$defs
-    : undefined,
+  optional: boolean,
+  detailed: boolean,
+  $defs = typeof schema === 'object' ? schema.$defs : undefined,
 ): JsonSchema {
-  if (typeof schema !== 'object' || admitsNull(schema, $defs)) {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  if (detailed) {
+    if (schema.anyOf) {
+      return { ...schema, anyOf: schema.anyOf.map((m) => withNullBody(m, optional, true, $defs)) }
+    }
+
+    const body = schema.properties?.body
+    if (body === undefined) {
+      return schema
+    }
+
+    const nullable = withNullBody(body, !schema.required?.includes('body'), false, $defs)
+    return nullable === body
+      ? schema
+      : { ...schema, properties: { ...schema.properties, body: nullable } }
+  }
+
+  if (!optional || admitsNull(schema, $defs)) {
     return schema
   }
 
   const { $defs: own, ...rest } = schema
   const nullable = withNull(rest)
   return own && typeof nullable === 'object' ? { ...nullable, $defs: own } : nullable
-}
-
-/**
- * A detailed output whose body may be left out (`{ status: 200; body?: T }`), which is sent as
- * the body of a compact output that may be left out is (see `withNullBody`), also of each member
- * of a union.
- */
-function withNullBodyProperty(
-  schema: JsonSchema,
-  $defs: Record<string, JsonSchema> | undefined = typeof schema === 'object'
-    ? schema.$defs
-    : undefined,
-): JsonSchema {
-  if (typeof schema !== 'object') {
-    return schema
-  }
-
-  if (schema.anyOf) {
-    return { ...schema, anyOf: schema.anyOf.map((member) => withNullBodyProperty(member, $defs)) }
-  }
-
-  const body = schema.properties?.body
-
-  if (body === undefined || schema.required?.includes('body')) {
-    return schema
-  }
-
-  const nullable = withNullBody(body, $defs)
-  return nullable === body
-    ? schema
-    : { ...schema, properties: { ...schema.properties, body: nullable } }
 }
 
 /**

@@ -545,7 +545,13 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
  * (`Function`, and `any`, `unknown`, `object`, `{}`, or `Object`, which may hold one).
  */
 function getMethodResultTypes(types: TypeQueries, member: Type, owner: Type): readonly Type[] {
-  return getMethodOverloads(types, member).flatMap((overloads) => {
+  const functions = getMethodOverloads(types, member)
+
+  if (!functions) {
+    return [types.checker.getAnyType()]
+  }
+
+  return functions.flatMap((overloads) => {
     const callable = overloads.filter((o) => satisfiesThis(types, owner, o))
     const withKey = callable.find((o) => o.withKey)
     const withoutArguments = callable.find((o) => o.withoutArguments)
@@ -590,25 +596,17 @@ interface MethodOverload {
 }
 
 /**
- * The overloads of a function, of each function of an intersection.
+ * The overloads of a function, of each function of an intersection, nothing for any function.
  */
-function getMethodOverloads(types: TypeQueries, member: Type): readonly MethodOverload[][] {
+function getMethodOverloads(
+  types: TypeQueries,
+  member: Type,
+): readonly MethodOverload[][] | undefined {
   return types.memo('methodOverloads', member.id, () => {
     const { checker } = types
-    const any: MethodOverload[][] = [
-      [
-        {
-          results: [checker.getAnyType()],
-          thisType: undefined,
-          generic: false,
-          withKey: true,
-          withoutArguments: true,
-        },
-      ],
-    ]
 
     if (member.flags & (TypeFlags.Any | TypeFlags.Unknown) || mayHoldFunction(types, member)) {
-      return any
+      return undefined
     }
 
     const method = getViewedFunction(types, member) ?? member
@@ -643,7 +641,7 @@ function getMethodOverloads(types: TypeQueries, member: Type): readonly MethodOv
       )
       .filter((o) => o.length)
 
-    return overloads.length || !isFunction(types, method) ? overloads : any
+    return overloads.length || !isFunction(types, method) ? overloads : undefined
   })
 }
 
