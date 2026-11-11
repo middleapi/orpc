@@ -397,41 +397,7 @@ export class OpenAPIGenerator {
   ): AnyProcedureContract {
     const def = contract['~orpc']
 
-    const meta = getOpenAPIMeta(contract)
-
-    // the stock generator splits these into parts, where a def of the whole would be unused
-    const inputDetailed = meta?.inputStructure === 'detailed'
-    const outputDetailed = meta?.outputStructure === 'detailed'
-    // a client sends no request body with these
-    const bodiless = meta?.method === 'GET' || meta?.method === 'HEAD'
-    // the stock generator reads only parameters from these inputs, the fields of an object
-    const parametersOnly = inputDetailed || bodiless
-    const pathParameters =
-      getDynamicPathParams(`${meta?.prefix ?? ''}${meta?.path ?? ''}` as `/${string}`)?.map(
-        (p) => p.parameterName,
-      ) ?? []
-    const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
-      input: {
-        inlineRoot: parametersOnly || pathParameters.length > 0,
-        inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
-        partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
-        // only a whole input sent as the request body, not in the query string of a GET request
-        body: !parametersOnly && !pathParameters.length,
-        bodyProperty: inputDetailed && !bodiless,
-        // what a client sends in the URL with bracket notation, all of a compact input without a
-        // body, but the values of a style, which are sent in their serialized forms
-        parameters: getParameterFields(meta, inputDetailed, bodiless, pathParameters),
-        // a client sends a promise as is, written as `{}`
-        awaited: false,
-      },
-      output: {
-        inlineRoot: outputDetailed,
-        inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
-        partialProperties: outputDetailed ? ['headers'] : undefined,
-        body: true,
-        bodyProperty: outputDetailed,
-      },
-    }
+    const { inline, parametersOnly } = getConvertOptions(getOpenAPIMeta(contract))
 
     const isSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
       ctx.schemaConverters.some((c) => c.condition(schema, direction))
@@ -599,6 +565,51 @@ export class OpenAPIGenerator {
       meta: withJSDocMeta(ctx, def.meta, resolved.symbol),
     })
   }
+}
+
+/**
+ * How the input and output of a procedure are converted, as the stock generator documents them.
+ */
+function getConvertOptions(meta: OpenAPIMeta | undefined): {
+  inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions>
+  /** Whether the stock generator reads only parameters from the input, the fields of an object */
+  parametersOnly: boolean
+} {
+  // the stock generator splits these into parts, where a def of the whole would be unused
+  const inputDetailed = meta?.inputStructure === 'detailed'
+  const outputDetailed = meta?.outputStructure === 'detailed'
+  // a client sends no request body with these
+  const bodiless = meta?.method === 'GET' || meta?.method === 'HEAD'
+  // the stock generator reads only parameters from these inputs, the fields of an object
+  const parametersOnly = inputDetailed || bodiless
+  const pathParameters =
+    getDynamicPathParams(`${meta?.prefix ?? ''}${meta?.path ?? ''}` as `/${string}`)?.map(
+      (p) => p.parameterName,
+    ) ?? []
+  const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
+    input: {
+      inlineRoot: parametersOnly || pathParameters.length > 0,
+      inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
+      partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
+      // only a whole input sent as the request body, not in the query string of a GET request
+      body: !parametersOnly && !pathParameters.length,
+      bodyProperty: inputDetailed && !bodiless,
+      // what a client sends in the URL with bracket notation, all of a compact input without a
+      // body, but the values of a style, which are sent in their serialized forms
+      parameters: getParameterFields(meta, inputDetailed, bodiless, pathParameters),
+      // a client sends a promise as is, written as `{}`
+      awaited: false,
+    },
+    output: {
+      inlineRoot: outputDetailed,
+      inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
+      partialProperties: outputDetailed ? ['headers'] : undefined,
+      body: true,
+      bodyProperty: outputDetailed,
+    },
+  }
+
+  return { inline, parametersOnly }
 }
 
 /**
