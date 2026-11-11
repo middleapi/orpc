@@ -1,7 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { stringifyJSON } from '@orpc/shared'
 import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import { bigintSchema, getLeafBuiltinSchema } from './schema-utils'
 import type { TypeQueries } from './type-queries'
@@ -211,18 +211,23 @@ const BODY_MEDIA_TYPES: Record<string, string | undefined> = {
 
 /**
  * The media type oRPC sends a whole body of this type as, when it is a `ReadableStream`, a
- * `FormData`, or `URLSearchParams` (also of a class extending one), which it sends as is, not as
- * JSON (a stream is not an event stream). `view` for a view of one (`Readonly<FormData>`), which
- * may also be a plain object.
+ * `FormData`, or `URLSearchParams` (also of a class or an interface extending one, or of an
+ * intersection with one), which it sends as is, not as JSON (a stream is not an event stream).
+ * `view` for a view of one (`Readonly<FormData>`), which may also be a plain object.
  */
 export function getBodyMediaType(
   types: TypeQueries,
   type: Type,
 ): { mediaType: string; view: boolean } | undefined {
+  if (type.isIntersectionType()) {
+    const bodies = types.getMembers(type).flatMap((m) => getBodyMediaType(types, m) ?? [])
+    return bodies.find((body) => !body.view) ?? bodies[0]
+  }
+
   const of = (source: Type) =>
     BODY_MEDIA_TYPES[
       getDeclaredBuiltinName(types, source) ??
-        ((source.getSymbol()?.flags ?? 0) & SymbolFlags.Class
+        ((source.getSymbol()?.flags ?? 0) & (SymbolFlags.Class | SymbolFlags.Interface)
           ? (getBuiltinBaseName(types, source) ?? '')
           : '')
     ]
@@ -262,6 +267,34 @@ const BINARY = new Set([...TYPED_ARRAYS, 'ArrayBuffer', 'SharedArrayBuffer', 'Da
 export function isTypedArray(types: TypeQueries, type: Type): boolean {
   const kind = getTypedArrayKind(types, type)
   return kind !== undefined && (kind === true || kind.length > 0)
+}
+
+/**
+ * Node's `Buffer`, as `Buffer.alloc` returns it (`Buffer<ArrayBuffer>`), and what its own `toJSON`
+ * returns (`{ type: 'Buffer'; data: number[] }`), which writes it in place of its index keys.
+ * `undefined` without Node's typings.
+ */
+export function getNodeBuffer(
+  types: TypeQueries,
+): { buffer: Type; written: readonly Type[] } | undefined {
+  return types.memo('nodeBuffer', 0, () => {
+    const typeOf = (symbol: TSSymbol | undefined) => symbol && types.checker.getTypeOfSymbol(symbol)
+    const returned = (method: Type | undefined) =>
+      method
+        ? types.checker
+            .getSignaturesOfType(method, SignatureKind.Call)
+            .flatMap((signature) => types.checker.getReturnTypeOfSignature(signature) ?? [])
+        : []
+
+    const constructor = types.checker.resolveName('Buffer', SymbolFlags.Value)
+    const constructorType =
+      constructor && isBuiltinSymbol(types, constructor) ? typeOf(constructor) : undefined
+    const [buffer] = returned(
+      typeOf(constructorType && types.getProperty(constructorType, 'alloc')),
+    )
+    const written = buffer ? returned(typeOf(types.getProperty(buffer, 'toJSON'))) : []
+    return buffer && written.length ? { buffer, written } : undefined
+  })
 }
 
 /**

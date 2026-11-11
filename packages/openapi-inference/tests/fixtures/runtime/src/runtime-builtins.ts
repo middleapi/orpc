@@ -39,6 +39,27 @@ const form = (): FormData => {
   return data
 }
 
+/** Slots of a typed array, whose value may be a Buffer, written by its own `toJSON` */
+export interface BufferSlots {
+  v: Uint8Array
+  exact: Uint8Array<ArrayBuffer>
+  list: Uint8Array[]
+  maybe: Readonly<Uint8Array> | null
+  dict: Record<string, Readonly<Uint8Array>>
+  partial: Partial<Uint8Array>
+  picked: Pick<Uint8Array, 'length'>
+}
+
+const bufferSlots = (): BufferSlots => ({
+  v: Buffer.from('ab'),
+  exact: Buffer.from('ab'),
+  list: [Buffer.from('ab')],
+  maybe: Buffer.from('ab'),
+  dict: { a: Buffer.from('ab') },
+  partial: Buffer.from('ab'),
+  picked: Buffer.from('ab'),
+})
+
 /** An output returning a fresh value, and an input of its type */
 const sample = <T>(schema: ORPCSchema<T, T>, value: () => NoInfer<T>) => ({
   output: os.handler((): T => value()),
@@ -47,6 +68,13 @@ const sample = <T>(schema: ORPCSchema<T, T>, value: () => NoInfer<T>) => ({
 
 export const runtimeBuiltins = {
   Buffer: sample(type<{ v: Buffer }>(), () => ({ v: Buffer.from('ab') })),
+  BufferSlots: sample(type<BufferSlots>(), bufferSlots),
+  BufferRoot: sample(type<Uint8Array>(), () => Buffer.from('ab')),
+  BufferHolder: sample(type<Holder<Uint8Array>>(), () => new Holder<Uint8Array>(Buffer.from('ab'))),
+  BufferHolderView: sample(
+    type<Readonly<Holder<Uint8Array>>>(),
+    () => new Holder<Uint8Array>(Buffer.from('ab')),
+  ),
   Int8Array: sample(type<Int8Array>(), () => Int8Array.of(-128, 127)),
   Uint8Array: sample(type<Uint8Array[]>(), () => [new Uint8Array([1, 2])]),
   Uint8ClampedArray: sample(type<Record<string, Uint8ClampedArray>>(), () => ({

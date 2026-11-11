@@ -2460,7 +2460,20 @@ describe('typeToJsonSchemaConverter', () => {
                 stack: { $ref: '#/$defs/Stack' },
                 error: { $ref: '#/$defs/MyError' },
                 plainError: { type: 'object' },
-                bytes: { type: 'object', additionalProperties: { type: 'number' } },
+                // or a Buffer of the Node typings, written by its own `toJSON`
+                bytes: {
+                  anyOf: [
+                    { type: 'object', additionalProperties: { type: 'number' } },
+                    {
+                      type: 'object',
+                      properties: {
+                        type: { type: 'string', const: 'Buffer' },
+                        data: { type: 'array', items: { type: 'number' } },
+                      },
+                      required: ['type', 'data'],
+                    },
+                  ],
+                },
               },
               required: ['map', 'tags', 'stack', 'error', 'plainError', 'bytes'],
             },

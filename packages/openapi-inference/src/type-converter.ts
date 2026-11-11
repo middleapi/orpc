@@ -25,6 +25,7 @@ import {
   getBuiltinBaseName,
   getBuiltinFields,
   getExtendedPrimitiveSchema,
+  getNodeBuffer,
   getNumberIndexType,
   getSatisfyingCollections,
   getSatisfyingTypedArrays,
@@ -167,6 +168,14 @@ export interface TypeToJsonSchemaConvertOptions {
    * @default false
    */
   body?: boolean | undefined
+
+  /**
+   * Describe the `body` property of the root as a whole body (see `body`), like that of a detailed
+   * input or output.
+   *
+   * @default false
+   */
+  bodyProperty?: boolean | undefined
 }
 
 export interface AsyncIteratorTypes {
@@ -186,9 +195,32 @@ interface ObjectForm {
   plain?: boolean
   /** Converts a built-in subclass by its own fields, as `JSON.stringify` writes what `toJSON` returned */
   ownFields?: boolean
+  /** Converts the `body` property as a whole body (see `TypeToJsonSchemaConvertOptions.body`) */
+  bodyProperty?: boolean
 }
 
 const SHARED = new WeakMap<Checker, { types: TypeQueries; names: DefNames }>()
+
+/**
+ * The binary data of each media type a whole body of these types is sent as, as is, and the
+ * types written otherwise, also a view of a body built-in, which may be a plain object.
+ */
+function splitBodies(
+  types: TypeQueries,
+  members: readonly Type[],
+): { sent: JsonSchema[]; others: Type[] } {
+  const bodies = members.flatMap((t) => {
+    const body = getBodyMediaType(types, t)
+    return body ? [{ type: t, ...body }] : []
+  })
+
+  return {
+    sent: dedupe(
+      bodies.map((b): JsonSchema => ({ type: 'string', contentMediaType: b.mediaType })),
+    ),
+    others: members.filter((t) => !bodies.some((b) => b.type === t && !b.view)),
+  }
+}
 
 const LITERAL_FLAGS = TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral
 
@@ -284,21 +316,16 @@ export class TypeToJsonSchemaConverter {
       // written as nothing, like a function whose `toJSON` is optional, or an instance whose
       // `toJSON` may return `undefined`
       members.some((t) => this.isOptional(t) || this.mayDropThroughToJSON(t, false))
-    // a body sent as is is binary data of its media type, a view of one may also be a plain object
-    const bodies = options.body
-      ? serializable.flatMap((t) => {
-          const body = getBodyMediaType(this.types, t)
-          return body ? [{ type: t, ...body }] : []
-        })
-      : []
-    const sent = dedupe(
-      bodies.map((b): JsonSchema => ({ type: 'string', contentMediaType: b.mediaType })),
-    )
-    const others = bodies.length
-      ? serializable.filter((t) => !bodies.some((b) => b.type === t && !b.view))
-      : serializable
+    const { sent, others } = options.body
+      ? splitBodies(this.types, serializable)
+      : { sent: [], others: serializable }
     // a single value is visited whole, so a union keeps its def
-    const values = bodies.length ? others : filtered ? serializable : members
+    const values = sent.length ? others : filtered ? serializable : members
+    // the root of a detailed input or output with a body sent as is
+    const visitRoot = (t: Type) =>
+      options.bodyProperty && this.holdsBodyProperty(t)
+        ? this.convertObject(t, { bodyProperty: true })
+        : this.visit(t)
 
     const cuts = this.expansion.cuts
     this.expansion.reset()
@@ -309,9 +336,9 @@ export class TypeToJsonSchemaConverter {
     try {
       const written =
         values.length === 1
-          ? [this.visit(values[0]!)]
+          ? [visitRoot(values[0]!)]
           : others.length || !sent.length
-            ? [this.convertMembers(others)]
+            ? [this.convertMembers(others, visitRoot)]
             : []
       const all = [...sent, ...written]
       schema = all.length === 1 ? all[0]! : { anyOf: all }
@@ -734,11 +761,11 @@ export class TypeToJsonSchemaConverter {
     }
 
     if (type.isIntersectionType()) {
-      return this.convertIntersection(type, this.types.getMembers(type))
+      return this.withBufferForm(type, this.convertIntersection(type, this.types.getMembers(type)))
     }
 
     if (flags & TypeFlags.Object) {
-      return this.convertObject(type)
+      return this.withBufferForm(type, this.convertObject(type))
     }
 
     if (flags & INSTANTIABLE_FLAGS) {
@@ -750,6 +777,36 @@ export class TypeToJsonSchemaConverter {
     }
 
     return {}
+  }
+
+  /**
+   * Whether an object type has a `body` property holding a body sent as is (see `splitBodies`).
+   */
+  private holdsBodyProperty(type: Type): boolean {
+    const property =
+      type.flags & TypeFlags.Object || type.isIntersectionType()
+        ? this.types.getProperty(type, 'body')
+        : undefined
+    const [propertyType] = property ? this.types.getSymbolTypes([property]) : []
+
+    return (
+      propertyType !== undefined &&
+      this.types.getUnionMembers(propertyType).some((m) => getBodyMediaType(this.types, m))
+    )
+  }
+
+  /**
+   * A typed array (`Uint8Array`, `Readonly<Uint8Array>`), whose value may be a Node `Buffer`,
+   * written by its own `toJSON` (`{ type: 'Buffer', data: [1] }`).
+   */
+  private withBufferForm(type: Type, schema: JsonSchema): JsonSchema {
+    const node = getNodeBuffer(this.types)
+
+    return node &&
+      isTypedArray(this.types, type) &&
+      this.checker.isTypeAssignableTo(node.buffer, type)
+      ? anyOfDeduped([schema, ...node.written.map((written) => this.visit(written))])
+      : schema
   }
 
   /**
@@ -944,7 +1001,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     let { plain = false } = options
-    const { ignoreToJSON = false, ownFields = false } = options
+    const { ignoreToJSON = false, ownFields = false, bodyProperty = false } = options
     // a client sends a value of a class type (or of a view of one, `Readonly<User>`) as an instance,
     // written without its getters, or as the built-in the class extends
     // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object, and so a value of an
@@ -1269,12 +1326,28 @@ export class TypeToJsonSchemaConverter {
       // `string | (() => void)`: JSON serialization drops the key when it holds a function
       const serializable = this.getSerializableMembers(propertyType)
 
+      // a body sent as is, besides the other values it may hold
+      const body =
+        bodyProperty && property.name === 'body'
+          ? splitBodies(
+              this.types,
+              (serializable ?? this.types.getUnionMembers(propertyType)).filter(
+                (m) => !(m.flags & UNDEFINED_FLAGS),
+              ),
+            )
+          : undefined
+
       let propertySchema: JsonSchema
       this.expansion.path.push(property)
       try {
-        propertySchema = serializable
-          ? this.convertMembers(serializable, convertValue)
-          : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
+        propertySchema = body?.sent.length
+          ? anyOfDeduped([
+              ...body.sent,
+              ...(body.others.length ? [this.convertMembers(body.others, convertValue)] : []),
+            ])
+          : serializable
+            ? this.convertMembers(serializable, convertValue)
+            : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
       } catch (error) {
         if (error instanceof TypeScriptTypeResolutionError) {
           error.addDeclarations(property)

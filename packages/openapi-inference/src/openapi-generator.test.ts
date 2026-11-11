@@ -205,6 +205,7 @@ import { roundSeventy } from '../tests/fixtures/app/src/round70'
 import type { Tile } from '../tests/fixtures/app/src/round74'
 import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
 import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
+import { roundSeventyEight } from '../tests/fixtures/app/src/round78'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4130,6 +4131,62 @@ describe('openAPIGenerator', () => {
         ] as const) {
           expect([path, value, ajv.validate(body(path), sent(value))]).toEqual([path, value, valid])
         }
+      },
+    )
+  })
+
+  describe('round seventy-eight', () => {
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents whole bodies of built-ins through interfaces, intersections, and detailed structures as binary data, in %s',
+      async (version) => {
+        const spec = await generator.generate(roundSeventyEight, {
+          source: { file: fixture('round78.ts'), export: 'roundSeventyEight' },
+          version,
+        })
+        const paths = spec.paths as any
+        const binary = (mediaType: string) => ({
+          [mediaType]: {
+            schema:
+              version === '3.0.4'
+                ? { type: 'string', format: 'binary' }
+                : { type: 'string', contentMediaType: mediaType },
+          },
+        })
+        const form = binary('multipart/form-data')
+        const stream = binary('application/octet-stream')
+        const params = binary('application/x-www-form-urlencoded')
+        const request = (path: string) => paths[path].post.requestBody
+        const response = (path: string) => paths[path].post.responses['200']
+
+        expect(request('/uploadFormInput').content).toEqual(form)
+        expect(request('/taggedFormInput').content).toEqual(form)
+        // not an event stream
+        expect(request('/textStreamInput').content).toEqual(stream)
+        expect(response('/textStreamBody').content).toEqual(stream)
+        expect(response('/uploadFormBody').content).toEqual(form)
+        expect(response('/taggedFormBody').content).toEqual(form)
+        expect(response('/taggedParamsBody').content).toEqual(params)
+
+        expect(request('/detailedFormInput')).toEqual({ required: true, content: form })
+        expect(paths['/detailedFormInput'].post.parameters).toEqual([
+          expect.objectContaining({ in: 'query', name: 'a' }),
+        ])
+        expect(request('/detailedParamsInput')).toEqual({ content: params })
+        expect(response('/detailedFormBody')).toEqual({
+          description: expect.any(String),
+          headers: { 'x-id': { required: true, schema: { type: 'string' } } },
+          content: form,
+        })
+        expect(response('/detailedStreamBody').content).toEqual({
+          'application/json': {
+            schema:
+              version === '3.0.4'
+                ? { type: 'string', enum: [null], nullable: true }
+                : { type: 'null' },
+          },
+          ...stream,
+        })
+        expect(spec.components?.schemas ?? {}).toEqual({})
       },
     )
   })

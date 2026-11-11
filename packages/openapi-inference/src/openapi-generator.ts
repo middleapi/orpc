@@ -410,6 +410,7 @@ export class OpenAPIGenerator {
         partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
         // only a whole input sent as the request body, not in the query string of a GET request
         body: !parametersOnly && !pathParameters,
+        bodyProperty: inputDetailed,
         // a client sends a promise as is, written as `{}`
         awaited: false,
       },
@@ -418,6 +419,7 @@ export class OpenAPIGenerator {
         inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
         partialProperties: outputDetailed ? ['headers'] : undefined,
         body: true,
+        bodyProperty: outputDetailed,
       },
     }
 

@@ -19,6 +19,7 @@ import {
   secretConfig,
 } from '../tests/fixtures/app/src/round75'
 import { roundSeventySevenInputs } from '../tests/fixtures/app/src/round77'
+import { roundSeventyEightInputs } from '../tests/fixtures/app/src/round78'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -3264,6 +3265,70 @@ describe('generated schemas match serialized outputs', async () => {
         'application/octet-stream': {
           schema: { type: 'string', contentMediaType: 'application/octet-stream' },
         },
+      })
+    })
+  })
+
+  describe('round seventy-eight', () => {
+    const handler = new OpenAPIHandler(router)
+    let sent: Request | undefined
+    const link = new OpenAPILink(router, {
+      origin: 'http://localhost',
+      url: '/',
+      fetch: async (request, init) => {
+        sent = new Request(request, init)
+        return (await handler.handle(sent.clone())).response!
+      },
+    })
+    /** Validates a message against the documented content of the media type it is sent as */
+    const expectDocumented = async (content: any, message: Request | Response) => {
+      const mediaType = message.headers.get('content-type')!.split(';')[0]!
+      const schema = content[mediaType]?.schema
+
+      if (mediaType !== 'application/json') {
+        expect(schema).toEqual({ type: 'string', contentMediaType: mediaType })
+        return
+      }
+
+      const validate = ajv.compile(
+        JSON.parse(JSON.stringify(schema).replaceAll('#/components/schemas/', 'spec#/$defs/')),
+      )
+      expect(validate(await message.json()) ? [] : validate.errors).toEqual([])
+    }
+
+    it.each([
+      'uploadFormBody',
+      'taggedFormBody',
+      'textStreamBody',
+      'taggedParamsBody',
+      'detailedFormBody',
+      'detailedStreamBody',
+    ])('documents the output of %s as it is sent', async (name) => {
+      const { response } = await handler.handle(
+        new Request(`http://localhost/${name}`, { method: 'POST' }),
+      )
+
+      expect(response!.status).toBe(200)
+      await expectDocumented(
+        (spec.paths as any)[`/${name}`].post.responses['200'].content,
+        response!,
+      )
+    })
+
+    it.each(Object.entries(roundSeventyEightInputs))(
+      'documents the input a client sends of %s',
+      async (name, value) => {
+        await expect(link.call([name], value(), { context: {} })).resolves.toBe(1)
+        await expectDocumented((spec.paths as any)[`/${name}`].post.requestBody.content, sent!)
+      },
+    )
+
+    it('documents a body built-in through an interface as binary data, not an event stream', () => {
+      expect(
+        Object.keys((spec.paths as any)['/textStreamBody'].post.responses['200'].content),
+      ).toEqual(['application/octet-stream'])
+      expect((spec.paths as any)['/detailedFormBody'].post.responses['200'].headers).toEqual({
+        'x-id': { required: true, schema: { type: 'string' } },
       })
     })
   })
