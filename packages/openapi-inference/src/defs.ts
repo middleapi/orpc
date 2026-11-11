@@ -422,22 +422,8 @@ export class DefRegistry {
     const inlineRef = (member: JsonSchema): JsonSchema =>
       objectMembers(resolve(member) ?? member, resolve)
 
-    const inlineProperties = (member: JsonSchema): JsonSchema => {
-      const inlined = inlineRef(member)
-
-      if (typeof inlined !== 'object' || !inlined.properties || !properties.length) {
-        return inlined
-      }
-
-      const inlinedProperties = { ...inlined.properties }
-      for (const property of properties) {
-        if (inlinedProperties[property] !== undefined) {
-          inlinedProperties[property] = inlineRef(inlinedProperties[property])
-        }
-      }
-
-      return { ...inlined, properties: inlinedProperties }
-    }
+    const inlineProperties = (member: JsonSchema): JsonSchema =>
+      mapProperties(inlineRef(member), properties, inlineRef)
 
     let root = inlineProperties(schema)
 
@@ -456,20 +442,8 @@ export class DefRegistry {
       return root
     }
 
-    const withPartial = (member: JsonSchema): JsonSchema => {
-      if (typeof member !== 'object' || !member.properties) {
-        return member
-      }
-
-      const memberProperties = { ...member.properties }
-      for (const property of partial) {
-        if (memberProperties[property] !== undefined) {
-          memberProperties[property] = withoutRequired(memberProperties[property])
-        }
-      }
-
-      return { ...member, properties: memberProperties }
-    }
+    const withPartial = (member: JsonSchema): JsonSchema =>
+      mapProperties(member, partial, withoutRequired)
 
     return typeof root === 'object' && root.anyOf
       ? { ...root, anyOf: root.anyOf.map(withPartial) }
@@ -516,4 +490,26 @@ export class DefRegistry {
 
     return collected
   }
+}
+
+/**
+ * An object schema with some of its properties mapped, the same schema without any to map.
+ */
+function mapProperties(
+  schema: JsonSchema,
+  names: readonly string[],
+  map: (property: JsonSchema) => JsonSchema,
+): JsonSchema {
+  if (typeof schema !== 'object' || !schema.properties || !names.length) {
+    return schema
+  }
+
+  const properties = { ...schema.properties }
+  for (const name of names) {
+    if (properties[name] !== undefined) {
+      properties[name] = map(properties[name])
+    }
+  }
+
+  return { ...schema, properties }
 }

@@ -314,7 +314,7 @@ function isWrittenForm(schema: JsonSchema): boolean {
  */
 export function objectMembers(
   schema: JsonSchema,
-  resolve: (ref: JsonSchema) => JsonSchema | undefined = () => undefined,
+  resolve: (ref: JsonSchema) => JsonSchema | undefined,
 ): JsonSchema {
   if (typeof schema !== 'object' || !schema.anyOf) {
     return schema
