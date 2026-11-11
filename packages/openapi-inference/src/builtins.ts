@@ -22,18 +22,6 @@ const TYPED_ARRAYS = new Set([
   'BigUint64Array',
 ])
 
-/** Members that identify a built-in through a mapped type over it, most specific first */
-const MAPPED_BUILTIN_FINGERPRINTS: readonly (readonly [string, readonly string[]])[] = [
-  ['Date', ['getTime', 'toISOString', 'getTimezoneOffset']],
-  ['URL', ['href', 'origin', 'searchParams']],
-  ['File', ['name', 'lastModified', 'arrayBuffer', 'slice']],
-  ['Blob', ['size', 'arrayBuffer', 'slice', 'stream']],
-  ['Map', ['get', 'set', 'has', 'delete', 'size']],
-  ['Set', ['add', 'has', 'delete', 'size']],
-  ['ReadonlyMap', ['get', 'has', 'size', 'forEach']],
-  ['ReadonlySet', ['has', 'size', 'forEach']],
-]
-
 /** Typings of runtime built-in modules, whose classes are not data holders */
 const RUNTIME_TYPINGS = /\/node_modules\/(?:@types\/(?:node|bun|deno)|bun-types|undici-types)\//u
 
@@ -256,9 +244,6 @@ export function isModeSensitiveBuiltin(types: TypeQueries, type: Type): boolean 
     : serialized?.kind !== stringified?.kind
 }
 
-/** Binary values, written by their own keys: typed arrays by index, the others as `{}` */
-const BINARY = new Set([...TYPED_ARRAYS, 'ArrayBuffer', 'SharedArrayBuffer', 'DataView'])
-
 /**
  * Whether values of this type are typed arrays, also a subclass (Node's `Buffer`,
  * `class Bytes extends Uint8Array`) or through a mapped type (`Readonly<Uint8Array>`).
@@ -388,7 +373,6 @@ export function getBuiltinFields(
 
   const builtin =
     declared ??
-    getMappedBuiltinName(types, type) ??
     // a view of a global class, like `Readonly<Number>`
     types
       .getMappedSourceMembers(type)
@@ -407,7 +391,8 @@ export function getBuiltinFields(
 
 /**
  * `DeepReadonly<Date>` or `DeepPartial<Set<string>>` maps over the built-in's methods,
- * but the value is still the built-in and serialized like it.
+ * but the value is still the built-in and serialized like it. A mapped type changing the values
+ * (`{ [K in keyof Date]: string }`) has no source, and holds plain objects.
  */
 function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): Builtin | undefined {
   // a view keeping the source's values (`Readonly<Error>`, `Partial<RegExp>`) is still the built-in
@@ -443,81 +428,13 @@ function getMappedBuiltin(types: TypeQueries, type: Type, stringify: boolean): B
   // `interface Link extends Pick<URL, 'href'>`) is the built-in or a plain object, like the interface
   // (one extending a project class is a view of the class)
   const viewedSymbol = viewed?.getSymbol()
-  if (
-    viewed &&
+  return viewed &&
     viewedSymbol &&
     viewedSymbol.flags & SymbolFlags.Interface &&
     !(viewedSymbol.flags & SymbolFlags.Class) &&
     !extendsProjectClass(types, viewed, new Set())
-  ) {
-    const extended = getBuiltin(types, viewed, stringify)
-    if (extended !== undefined) {
-      return extended
-    }
-  }
-
-  const builtin = getMappedBuiltinName(types, type)
-
-  if (builtin === undefined) {
-    return undefined
-  }
-
-  // `DeepReadonly<Set<string>>` still knows its item type, `Readonly<Uint8Array>` is still a typed array
-  // (by its argument: the members already showed it maps over the built-in)
-  const [source] = types.getTypeArguments(type)
-  if (source && source.flags & TypeFlags.Object && source.getSymbol()?.name === builtin) {
-    const precise = getBuiltin(types, source, stringify)
-    if (precise !== undefined) {
-      return precise
-    }
-  }
-
-  if (builtin === 'Set' || builtin === 'ReadonlySet') {
-    return stringify ? emptyObject() : { kind: 'set', items: [] }
-  }
-
-  if (builtin === 'Map' || builtin === 'ReadonlyMap') {
-    return stringify ? emptyObject() : { kind: 'map-entries', entries: [] }
-  }
-
-  return getLeaf(builtin, stringify)
-}
-
-/**
- * The built-in a mapped type maps over, like `Date` for `DeepReadonly<Date>`: a binary one
- * by its source (`Readonly<Uint8Array>`), the others by their members, which keep the built-in's
- * own declarations (`Date#getTime`) and tell `Map` apart from look-alikes like `URLSearchParams`.
- */
-function getMappedBuiltinName(types: TypeQueries, type: Type): string | undefined {
-  if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
-    return undefined
-  }
-
-  const source = types.getMappedSource(type)?.getSymbol()
-  if (source && BINARY.has(source.name) && isBuiltinSymbol(types, source)) {
-    return source.name
-  }
-
-  const properties = types.getProperties(type)
-
-  if (!properties.length || !properties.every((p) => isBuiltinSymbol(types, p))) {
-    return undefined
-  }
-
-  const byName = new Map(properties.map((p) => [p.name, p]))
-
-  return MAPPED_BUILTIN_FINGERPRINTS.find(([name, members]) => {
-    const global = types.getGlobalType(name)
-
-    return (
-      global !== undefined &&
-      members.every((member) => {
-        const own = types.checker.getPropertyOfType(global, member)?.declarations[0]
-        const mapped = byName.get(member)?.declarations[0]
-        return own && mapped && own.path === mapped.path && own.index === mapped.index
-      })
-    )
-  })?.[0]
+    ? getBuiltin(types, viewed, stringify)
+    : undefined
 }
 
 /**

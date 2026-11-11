@@ -34,6 +34,13 @@ export interface NotBuiltins {
   pair: Pair<Set<string>, number>
 }
 
+export type Stringified<T> = { [K in keyof T]: string }
+/** Mapped types changing the values of a built-in's members, whose values are plain objects */
+export interface ValueMappedBuiltins {
+  set: Stringified<Set<number>>
+  map: { [K in keyof Map<string, number>]?: number }
+}
+
 export type ConditionalDeepPartial<T> = T extends object
   ? { [K in keyof T]?: ConditionalDeepPartial<T[K]> }
   : T

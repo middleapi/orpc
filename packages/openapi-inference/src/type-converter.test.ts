@@ -1500,6 +1500,32 @@ describe('typeToJsonSchemaConverter', () => {
       ])
     })
 
+    it('mapped types changing the values of a built-in are plain objects', () => {
+      expect(convertR6('ValueMappedBuiltins')).toEqual([
+        {
+          $ref: '#/$defs/ValueMappedBuiltins',
+          $defs: {
+            ValueMappedBuiltins: {
+              type: 'object',
+              properties: {
+                set: { $ref: '#/$defs/Stringified_Set_number' },
+                map: { type: 'object', properties: { size: { type: 'number' } } },
+              },
+              required: ['set', 'map'],
+              description:
+                "Mapped types changing the values of a built-in's members, whose values are plain objects",
+            },
+            Stringified_Set_number: {
+              type: 'object',
+              properties: { size: { type: 'string' } },
+              required: ['size'],
+            },
+          },
+        },
+        false,
+      ])
+    })
+
     it('names numeric literal arguments without collisions', () => {
       expect(convertR6('NumericPages')).toEqual([
         {
