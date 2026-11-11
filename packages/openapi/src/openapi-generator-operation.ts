@@ -147,10 +147,14 @@ export function buildRequest(
   renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
-  if (parts.bodySchema !== undefined) {
+  const content =
+    parts.bodySchema === undefined ? {} : toBodyContent(ctx, 'input', parts.bodySchema)
+
+  // a body of any value has no media type to document, like an unconstrained compact input
+  if (Object.keys(content).length > 0) {
     operation.requestBody = {
       required: parts.bodyOptional ? undefined : true,
-      content: toBodyContent(ctx, 'input', parts.bodySchema),
+      content,
     }
   }
 }

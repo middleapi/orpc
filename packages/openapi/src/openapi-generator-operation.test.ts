@@ -563,6 +563,28 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    it('documents no request body for a detailed body of any value, which has no media type', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { query: { type: 'object' }, body: {} },
+              required: ['body'],
+            }),
+          ],
+        }),
+        { inputStructure: 'detailed' },
+        undefined,
+      )
+
+      expect(operation.requestBody).toBeUndefined()
+    })
+
     it('maps AsyncIteratorObject inputs to an SSE request body', () => {
       const { ctx, operation } = createContext()
 
