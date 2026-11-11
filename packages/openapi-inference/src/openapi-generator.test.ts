@@ -4631,6 +4631,17 @@ describe('openAPIGenerator', () => {
       ])
     })
 
+    it('writes an intersection with a class whose toJSON it calls as an instance', async () => {
+      const schemas = (await generate()).components?.schemas as any
+
+      expect(schemas.Hydrated).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, key: { type: 'string' } },
+        required: ['name', 'key'],
+      })
+      expect(schemas.Conn).toBeUndefined()
+    })
+
     it('documents a value whose files are optional as JSON too', async () => {
       const spec = await generate()
 

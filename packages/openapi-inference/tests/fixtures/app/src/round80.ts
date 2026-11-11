@@ -59,11 +59,13 @@ export class Conn {
   host = 'h'
   pool: number[] = []
 }
+/** A document class, whose instances hold their fields, written by its `toJSON` */
 export class HDoc<T> {
-  db!: Conn
+  db: Conn = new Conn()
   isNew = true
-  toJSON(): T & { _id: string } {
-    return null!
+  toJSON(): T & { key: string } {
+    const { db: _db, isNew: _isNew, ...fields } = this
+    return { ...(fields as T), key: 'x' }
   }
 }
 export type Hydrated<T> = HDoc<T> & T
@@ -124,6 +126,10 @@ export const roundEighty = {
   looping: os.handler(() => ({ looping: new Looping() })),
   // written by the overload a call with the key or without arguments resolves to
   doc: os.handler(() => new Doc({ name: 'a' })),
+  // an instance, not a plain object of the class's fields
+  hydrated: os.handler((): Hydrated<{ name: string }> =>
+    Object.assign(new HDoc<{ name: string }>(), { name: 'a' }),
+  ),
 }
 
 export const roundEightyTypes = {
@@ -140,7 +146,6 @@ export const roundEightyTypes = {
   where: os.input(type<Where>()).handler(() => 1),
   node: os.input(type<Node>()).handler(() => 1),
   findArgs: os.input(type<FindArgs>()).handler(() => 1),
-  hydrated: os.handler((): Hydrated<{ name: string }> => null!),
   saveUser: os.input(type<DeepPartial<User>>()).handler(() => 1),
   savePost: os.input(type<DeepPartial<Post>>()).handler(() => 1),
   omit: os.input(type<Omit<CUser, 'id'>>()).handler(() => 1),

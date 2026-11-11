@@ -812,7 +812,37 @@ function createsInterface(types: TypeQueries, type: Type, name: string, depth = 
  */
 export function isClassView(types: TypeQueries, type: Type): boolean {
   const classType = getClassType(types, type)
-  return classType !== undefined && classType.id !== type.id && !types.isNominalClass(type)
+  return (
+    classType !== undefined &&
+    classType.id !== type.id &&
+    !types.isNominalClass(type) &&
+    !isWrittenByClassToJSON(types, type)
+  )
+}
+
+/**
+ * Whether a type is an intersection with a class whose `toJSON` it calls (`Doc & T`, a document
+ * type), whose values are instances written by it: a plain object would hold a copy of the class's
+ * method, which the serializer leaves out. One another member adds a `toJSON` to
+ * (`Object.assign(new Doc(), { toJSON })`) may be a plain object holding it.
+ */
+function isWrittenByClassToJSON(types: TypeQueries, type: Type): boolean {
+  if (!type.isIntersectionType()) {
+    return false
+  }
+
+  const toJSON = getOwnToJSON(types, type)
+  const declarations = !toJSON || toJSON.flags & SymbolFlags.Optional ? [] : toJSON.declarations
+
+  return (
+    declarations.length > 0 &&
+    types.getMembers(type).some((m) => {
+      const own = (m.getSymbol()?.flags ?? 0) & SymbolFlags.Class ? getToJSON(types, m) : undefined
+      return declarations.every((d) =>
+        own?.declarations.some((o) => o.path === d.path && o.index === d.index),
+      )
+    })
+  )
 }
 
 /**
