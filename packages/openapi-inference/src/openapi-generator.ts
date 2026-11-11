@@ -467,7 +467,7 @@ export class OpenAPIGenerator {
           parts: AnySchema[],
           partTypes: (Type | readonly Type[] | undefined)[],
           options?: TypeToJsonSchemaConvertOptions,
-          body?: boolean,
+          body?: 'compact' | 'detailed',
         ): AnySchema[] => {
           if (parts.length && parts.every(supported)) {
             return parts
@@ -506,7 +506,13 @@ export class OpenAPIGenerator {
                 ? []
                 : [
                     inferredSchema([
-                      body && optional && !kept.length ? withNullBody(rest) : rest,
+                      kept.length
+                        ? rest
+                        : body === 'detailed'
+                          ? withNullBodyProperty(rest)
+                          : body && optional
+                            ? withNullBody(rest)
+                            : rest,
                       optional,
                     ]),
                   ]
@@ -532,12 +538,13 @@ export class OpenAPIGenerator {
           )
         }
 
-        // a compact output may be left out (`T | undefined`), which is sent as no body
+        // a compact output may be left out (`T | undefined`), which is sent as no body, and so
+        // may the body of a detailed one (`body?: T`)
         return complete(
           schemas ?? [],
           [type],
           inline[direction],
-          direction === 'output' && !inline.output.inlineRoot,
+          direction === 'output' ? (inline.output.inlineRoot ? 'detailed' : 'compact') : undefined,
         )
       }
 
@@ -634,14 +641,50 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
  * stays any value, see `toBodyContent` of `@orpc/openapi`, and a schema admitting `null` already
  * (`null | undefined`, or a union with `{}`) stays as it is.
  */
-function withNullBody(schema: JsonSchema): JsonSchema {
-  if (typeof schema !== 'object' || admitsNull(schema, schema.$defs)) {
+function withNullBody(
+  schema: JsonSchema,
+  $defs: Record<string, JsonSchema> | undefined = typeof schema === 'object'
+    ? schema.$defs
+    : undefined,
+): JsonSchema {
+  if (typeof schema !== 'object' || admitsNull(schema, $defs)) {
     return schema
   }
 
-  const { $defs, ...rest } = schema
+  const { $defs: own, ...rest } = schema
   const nullable = withNull(rest)
-  return $defs && typeof nullable === 'object' ? { ...nullable, $defs } : nullable
+  return own && typeof nullable === 'object' ? { ...nullable, $defs: own } : nullable
+}
+
+/**
+ * A detailed output whose body may be left out (`{ status: 200; body?: T }`), which is sent as
+ * the body of a compact output that may be left out is (see `withNullBody`), also of each member
+ * of a union.
+ */
+function withNullBodyProperty(
+  schema: JsonSchema,
+  $defs: Record<string, JsonSchema> | undefined = typeof schema === 'object'
+    ? schema.$defs
+    : undefined,
+): JsonSchema {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  if (schema.anyOf) {
+    return { ...schema, anyOf: schema.anyOf.map((member) => withNullBodyProperty(member, $defs)) }
+  }
+
+  const body = schema.properties?.body
+
+  if (body === undefined || schema.required?.includes('body')) {
+    return schema
+  }
+
+  const nullable = withNullBody(body, $defs)
+  return nullable === body
+    ? schema
+    : { ...schema, properties: { ...schema.properties, body: nullable } }
 }
 
 /**

@@ -217,6 +217,7 @@ import {
 } from '../tests/fixtures/app/src/round80'
 import {
   roundEightyOneBodies,
+  roundEightyOneDetailed,
   roundEightyOneIntersections,
   roundEightyOneNames,
   roundEightyOneNamesReversed,
@@ -4854,6 +4855,7 @@ describe('openAPIGenerator', () => {
       roundEightyOneNamesReversed,
       roundEightyOneIntersections,
       roundEightyOneBodies,
+      roundEightyOneDetailed,
     }
     const generate = (exported: keyof typeof routers, version: '3.1.1' | '3.0.4' = '3.1.1') =>
       new OpenAPIGenerator().generate(routers[exported], {
@@ -4900,6 +4902,23 @@ describe('openAPIGenerator', () => {
         $ref: '#/components/schemas/Page_with-id-titleArray',
       })
     })
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'documents a detailed output whose body may be left out as also null, in %s',
+      async (version) => {
+        const spec = await generate('roundEightyOneDetailed', version)
+        const content = (path: string, status = '200') =>
+          (spec.paths as any)[path].post.responses[status].content['application/json'].schema
+        const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+        const nullable =
+          version === '3.0.4' ? { ...row, nullable: true } : { anyOf: [row, { type: 'null' }] }
+
+        expect(content('/optionalBody')).toEqual(nullable)
+        expect(content('/requiredBody')).toEqual(row)
+        expect(content('/statuses')).toEqual(row)
+        expect(content('/statuses', '202')).toEqual(nullable)
+      },
+    )
 
     it.each(['3.1.1', '3.0.4'] as const)(
       'documents an output that may be left out and admits null already as it is, in %s',

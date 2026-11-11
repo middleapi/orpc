@@ -1,3 +1,5 @@
+// oxlint-disable-next-line import/no-unassigned-import
+import '@orpc/openapi/extensions/route'
 import { os } from '@orpc/server'
 
 export interface Page<T> {
@@ -48,4 +50,21 @@ export const roundEightyOneBodies = {
   maybeNull: os.handler((): string | null | undefined => null),
   anyJSON: os.handler((): AnyJSON => new AnyJSON()),
   maybeAnyJSON: os.handler((): AnyJSON | undefined => new AnyJSON()),
+}
+
+/** Detailed outputs whose body may be left out, which is sent as no body, as a compact output */
+export const roundEightyOneDetailed = {
+  optionalBody: os
+    .route({ outputStructure: 'detailed' })
+    .handler((): { status: 200; body?: { id: number } } => ({ status: 200 })),
+  requiredBody: os
+    .route({ outputStructure: 'detailed' })
+    .handler((): { status: 200; body: { id: number } } => ({ status: 200, body: { id: 1 } })),
+  statuses: os
+    .route({ outputStructure: 'detailed' })
+    .handler(
+      (): { status: 200; body: { id: number } } | { status: 202; body?: { id: number } } => ({
+        status: 202,
+      }),
+    ),
 }
