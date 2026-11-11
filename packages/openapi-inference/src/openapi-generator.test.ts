@@ -4624,6 +4624,18 @@ describe('openAPIGenerator', () => {
         properties: { name: { type: 'string' }, _id: { type: 'string' } },
         required: ['name', '_id'],
       })
+      // a value carrying the properties of a generic `this` may call that overload
+      expect(schemas.MarkedDoc).toEqual({
+        type: 'object',
+        description: expect.any(String),
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+      })
+      expect(schemas.Populated).toEqual({
+        type: 'object',
+        properties: { populated: {} },
+        required: ['populated'],
+      })
       // the class a conditional result may hold is written by its fields, not by `toJSON` again
       expect(schemas.Looping.anyOf).toEqual([
         { type: 'number' },

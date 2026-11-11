@@ -9,6 +9,7 @@ import {
   getBuiltin,
   getBuiltinBaseName,
   getIndexInfos,
+  getPropertyNames,
   getToJSON,
   getViewBases,
   isBuiltinSymbol,
@@ -545,9 +546,7 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
  */
 function getMethodResultTypes(types: TypeQueries, member: Type, owner: Type): readonly Type[] {
   return getMethodOverloads(types, member).flatMap((overloads) => {
-    const callable = overloads.filter(
-      (o) => o.thisType === undefined || types.checker.isTypeAssignableTo(owner, o.thisType),
-    )
+    const callable = overloads.filter((o) => satisfiesThis(types, owner, o))
     const withKey = callable.find((o) => o.withKey)
     const withoutArguments = callable.find((o) => o.withoutArguments)
     const called = callable.filter((o) => o === withKey || o === withoutArguments)
@@ -558,10 +557,32 @@ function getMethodResultTypes(types: TypeQueries, member: Type, owner: Type): re
   })
 }
 
+/**
+ * Whether a value of `owner` may call an overload, by its `this`. The compiler infers the type
+ * parameters of a generic one from the value (`this: Marker<P>`), so it may when the value has
+ * the properties of `this` (a document type carrying the marker).
+ */
+function satisfiesThis(types: TypeQueries, owner: Type, overload: MethodOverload): boolean {
+  const { thisType } = overload
+
+  if (thisType === undefined) {
+    return true
+  }
+
+  if (!overload.generic) {
+    return types.checker.isTypeAssignableTo(owner, thisType)
+  }
+
+  const names = getPropertyNames(types, owner)
+  return types.getProperties(thisType).every((p) => names.has(p.name))
+}
+
 interface MethodOverload {
   results: readonly Type[]
   /** The type `this` must satisfy */
   thisType: Type | undefined
+  /** Whether it has type parameters */
+  generic: boolean
   /** Whether a call with the key may resolve to it */
   withKey: boolean
   /** Whether a call without arguments may resolve to it */
@@ -574,11 +595,12 @@ interface MethodOverload {
 function getMethodOverloads(types: TypeQueries, member: Type): readonly MethodOverload[][] {
   return types.memo('methodOverloads', member.id, () => {
     const { checker } = types
-    const any = [
+    const any: MethodOverload[][] = [
       [
         {
           results: [checker.getAnyType()],
           thisType: undefined,
+          generic: false,
           withKey: true,
           withoutArguments: true,
         },
@@ -613,6 +635,7 @@ function getMethodOverloads(types: TypeQueries, member: Type): readonly MethodOv
           return {
             results: [checker.getReturnTypeOfSignature(signature) ?? []].flat(),
             thisType: thisParameter && types.getSymbolTypes([thisParameter])[0],
+            generic: signature.getTypeParameters().length > 0,
             withKey: count > 0 && accepts(signature, 0, checker.getStringType()) && optionalFrom(1),
             withoutArguments: optionalFrom(0),
           }

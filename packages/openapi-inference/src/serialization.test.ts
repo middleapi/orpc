@@ -465,6 +465,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['doc', undefined],
     ['hydrated', undefined],
     ['docHolder', undefined],
+    ['markedDoc', undefined],
+    ['populated', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

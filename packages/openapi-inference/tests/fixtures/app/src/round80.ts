@@ -118,6 +118,18 @@ export declare class Stamp {
   toJSON(): string
 }
 
+/** A document whose `toJSON` has an overload for documents carrying a marker, like populated ones */
+export class MarkedDoc {
+  name = 'a'
+  toJSON<P>(this: Marker<P>): { populated: P }
+  toJSON(): { name: string }
+  toJSON(): unknown {
+    const { $m } = this as Partial<Marker<unknown>>
+    return $m === undefined ? { name: this.name } : { populated: $m }
+  }
+}
+export type Populated = MarkedDoc & Marker<{ id: number }>
+
 /** A `toJSON` returning a conditional type left unresolved, which may hold the class again */
 export class Looping {
   a = 1
@@ -143,6 +155,9 @@ export const roundEighty = {
     Object.assign(new HDoc<{ name: string }>(), { name: 'a' }),
   ),
   docHolder: os.handler(() => new DocHolder()),
+  // the overload a value carrying the marker may call, also by the compiler
+  markedDoc: os.handler(() => new MarkedDoc()),
+  populated: os.handler((): Populated => Object.assign(new MarkedDoc(), { $m: { id: 1 } })),
 }
 
 export const roundEightyTypes = {
