@@ -562,18 +562,18 @@ export class TypeToJsonSchemaConverter {
     // differ from that of the type, as would that of any other type holding it
     const pending = this.pendingFields
     if (pending?.depth === this.expansion.path.length) {
+      // `X | undefined` is `X`
+      const defined = type.isUnionType()
+        ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
+        : []
+      if (defined.length === 1) {
+        return this.visit(defined[0]!)
+      }
+
       this.pendingFields = undefined
       try {
-        if (this.isPlainFieldsObject(type)) {
-          return this.withParameterRoot(type, pending.fields, () => this.convertObject(type))
-        }
-
-        // `X | undefined` is `X`
-        const defined = type.isUnionType()
-          ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
-          : []
-        return defined.length === 1
-          ? this.withPendingFields(pending.depth, pending.fields, () => this.visit(defined[0]!))
+        return this.isPlainFieldsObject(type)
+          ? this.withParameterRoot(type, pending.fields, () => this.convertObject(type))
           : this.visitType(type)
       } finally {
         this.pendingFields = pending
@@ -839,11 +839,11 @@ export class TypeToJsonSchemaConverter {
     }
 
     if (type.isUnionType()) {
-      return this.convertNullableUnion(type, this.types.getMembers(type))
+      return this.convertNullableUnion(type)
     }
 
     if (type.isIntersectionType()) {
-      return this.withBufferForm(type, this.convertIntersection(type, this.types.getMembers(type)))
+      return this.withBufferForm(type, this.convertIntersection(type))
     }
 
     if (flags & TypeFlags.Object) {
@@ -896,7 +896,8 @@ export class TypeToJsonSchemaConverter {
    * `undefined` members are left to the caller (optional), `null` adds a `null` branch.
    * The rest is visited as its own type, so a named union keeps its name (`Status | null`).
    */
-  private convertNullableUnion(type: Type, members: readonly Type[]): JsonSchema {
+  private convertNullableUnion(type: Type): JsonSchema {
+    const members = this.types.getMembers(type)
     const concrete = members.filter((m) => !(m.flags & NULLISH_FLAGS))
     const core =
       concrete.length > 1 && concrete.length < members.length
@@ -975,7 +976,8 @@ export class TypeToJsonSchemaConverter {
     return anyOf.length === 1 ? anyOf[0]! : { anyOf }
   }
 
-  private convertIntersection(type: Type, members: readonly Type[]): JsonSchema {
+  private convertIntersection(type: Type): JsonSchema {
+    const members = this.types.getMembers(type)
     // branded primitives, e.g. `string & { __brand: 'UserId' }`
     const primitive = members.find((m) => m.flags & PRIMITIVE_FLAGS)
     if (primitive) {
@@ -1172,7 +1174,7 @@ export class TypeToJsonSchemaConverter {
     // `toJSON` is the type's own (also one an intersection adds, `C & { toJSON(): string }`), or of
     // each class a view leaving it out or mapping it to no method (`LooseDeep<C>`) is over. A
     // `toJSON` returning only `undefined` writes nothing, the caller makes it optional.
-    if (sentForms && !options.ignoreToJSON) {
+    if (sentForms && !ignoreToJSON) {
       const classes = getClassTypes(this.types, type)
       const results = (getToJSONResultTypes(this.types, type, true).length ? [type] : classes)
         .filter(
@@ -1229,7 +1231,7 @@ export class TypeToJsonSchemaConverter {
     // function, which `JSON.stringify` writes by its `toJSON`, or a plain object of its fields
     // (also one a client sends, which the serializer leaves to `JSON.stringify`)
     const viewedFunction =
-      ownToJSON.length || options.ignoreToJSON ? undefined : getViewedFunction(this.types, type)
+      ownToJSON.length || ignoreToJSON ? undefined : getViewedFunction(this.types, type)
     const viewedResults =
       viewedFunction && viewedFunction !== type
         ? getWrittenToJSONResultTypes(this.types, viewedFunction)
@@ -1399,7 +1401,10 @@ export class TypeToJsonSchemaConverter {
         isDropped(this.types, propertyType) ||
         (serialized.length &&
           serialized.every((result) => isDroppedResult(this.types, result)) &&
-          !this.mayLackToJSON(propertyType, fieldsMode))
+          // unless the value may be written without calling `toJSON`: the method is optional,
+          // or the serializer may walk it as a plain object (`interface Point { toJSON(): undefined }`)
+          !hasOptionalToJSON(this.types, propertyType) &&
+          (fieldsMode === 'stringify' || !mayBePlainObject(this.types, propertyType)))
       ) {
         continue
       }
@@ -2319,23 +2324,6 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * Whether a value of this type may be written without calling its `toJSON`: the method is
-   * optional, or the serializer may walk it as a plain object (a declared object type like
-   * `interface Point { toJSON(): string }`, or a view of a class), skipping `toJSON`.
-   */
-  private mayLackToJSON(type: Type, mode: ConversionMode): boolean {
-    if (hasOptionalToJSON(this.types, type)) {
-      return true
-    }
-
-    if (mode === 'stringify') {
-      return false
-    }
-
-    return mayBePlainObject(this.types, type)
-  }
-
-  /**
    * Whether `toJSON` of a value of this type, or of a union member, may return what JSON
    * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
    * Inputs follow outputs: an instance of a class implementing an interface sends what its
@@ -2544,20 +2532,8 @@ export class TypeToJsonSchemaConverter {
       return undefined
     }
 
-    const ids = (t: Type) =>
-      new Set(
-        this.types
-          .getMembers(t)
-          .filter((m) => !(m.flags & UNDEFINED_FLAGS))
-          .map((m) => m.id),
-      )
-    const annotatedIds = ids(annotated)
-    const typeIds = ids(type)
-
     // `status?: Status | 'archived'`, or a mapped type changing the value, is another type
-    return annotatedIds.size === typeIds.size && [...typeIds].every((id) => annotatedIds.has(id))
-      ? annotated
-      : undefined
+    return this.hasSameMembers(annotated, type, UNDEFINED_FLAGS) ? annotated : undefined
   }
 
   /**
@@ -2573,17 +2549,21 @@ export class TypeToJsonSchemaConverter {
     }
 
     // `Count | null`, not `Count | string`, whose other members the alias does not describe
-    const defined = (t: Type) =>
+    return this.hasSameMembers(annotation.type, type, NULLISH_FLAGS) ? annotation.alias : undefined
+  }
+
+  /**
+   * Whether two types have the same union members, but for those of the `ignored` flags.
+   */
+  private hasSameMembers(a: Type, b: Type, ignored: number): boolean {
+    const ids = (t: Type) =>
       this.types
         .getUnionMembers(t)
-        .filter((m) => !(m.flags & NULLISH_FLAGS))
+        .filter((m) => !(m.flags & ignored))
         .map((m) => m.id)
-    const annotated = new Set(defined(annotation.type))
-    const members = defined(type)
-
-    return members.length === annotated.size && members.every((id) => annotated.has(id))
-      ? annotation.alias
-      : undefined
+    const members = new Set(ids(a))
+    const others = ids(b)
+    return others.length === members.size && others.every((id) => members.has(id))
   }
 }
 

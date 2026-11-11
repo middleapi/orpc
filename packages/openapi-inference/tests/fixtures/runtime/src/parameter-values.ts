@@ -112,3 +112,20 @@ export const parameterValues = {
     .input(type<{ pairs: Uint8Array; pattern: RegExp; data: Uint8Array }>())
     .handler(() => 1),
 }
+
+/** Optional inputs whose fields are sent with bracket notation, but for those of a style */
+export const optionalParameterValues = {
+  styled: os
+    .route({ method: 'GET', path: '/styled', queryStyles: { json: 'json' } })
+    .input(type<{ json: Uint8Array; pattern: RegExp } | undefined>())
+    .handler(() => 1),
+  styledDetailed: os
+    .route({
+      method: 'GET',
+      path: '/styled-detailed',
+      inputStructure: 'detailed',
+      queryStyles: { json: 'json' },
+    })
+    .input(type<{ query?: { json: Uint8Array; pattern: RegExp } }>())
+    .handler(() => 1),
+}

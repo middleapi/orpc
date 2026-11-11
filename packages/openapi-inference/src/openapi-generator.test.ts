@@ -215,7 +215,10 @@ import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
 import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
 import { bodyNames, mixedNames, queryNames } from '../tests/fixtures/runtime/src/parameter-names'
-import { parameterValues } from '../tests/fixtures/runtime/src/parameter-values'
+import {
+  optionalParameterValues,
+  parameterValues,
+} from '../tests/fixtures/runtime/src/parameter-values'
 import { router as outsideRouter } from '../tests/fixtures/solution-outside/router'
 import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -4506,6 +4509,28 @@ describe('openAPIGenerator', () => {
           const validate = ajv.compile(toAjv(schema))
           expect(validate(values[p.name]) ? [] : [name, p.name, values[p.name]]).toEqual([])
         }
+      }
+    })
+
+    it('sends the fields of an optional input with bracket notation, but for those of a style', async () => {
+      const spec = await generator.generate(optionalParameterValues, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/parameter-values.ts', import.meta.url),
+          export: 'optionalParameterValues',
+        },
+      })
+      const paths = spec.paths as any
+      const parameters = (path: string) =>
+        Object.fromEntries(paths[path].get.parameters.map((p: any) => [p.name, p]))
+
+      for (const path of ['/styled', '/styled-detailed']) {
+        const { json, pattern } = parameters(path)
+        expect(pattern.schema, path).toEqual({ type: 'string' })
+        // the typed array, as `JSON.stringify` writes it
+        expect(json.content['application/json'].schema.anyOf, path).toContainEqual({
+          type: 'object',
+          additionalProperties: { type: 'number' },
+        })
       }
     })
 
