@@ -81,9 +81,7 @@ interface ProvisionalPair {
 export class TypeQueries {
   readonly getSourceKind: (path: string) => SourceKind
 
-  private readonly globalTypes = new Map<string, Type | undefined>()
-  private readonly memos = new Map<string, Map<number, unknown>>()
-  private readonly ownerTypes = new Map<string, Type | undefined>()
+  private readonly memos = new Map<string, Map<number | string, unknown>>()
   private readonly symbolTypes = new Map<number, Type | undefined>()
 
   /** Pairs of a value and its source found kept or not (see `keepsValue`) */
@@ -110,9 +108,9 @@ export class TypeQueries {
   }
 
   /**
-   * Caches a result by the id of a type or symbol, under a kind of question.
+   * Caches a result by the id of a type or symbol (or a name), under a kind of question.
    */
-  memo<T>(kind: string, id: number, compute: () => T): T {
+  memo<T>(kind: string, id: number | string, compute: () => T): T {
     let cache = this.memos.get(kind)
 
     if (cache === undefined) {
@@ -433,14 +431,19 @@ export class TypeQueries {
     switch (owner.kind) {
       case SyntaxKind.TypeLiteral:
         return literals
-          ? this.getOwnerTypeBy(location, () => this.checker.getTypeAtLocation(owner))
+          ? this.memo('ownerType', location, () => this.checker.getTypeAtLocation(owner))
           : undefined
       case SyntaxKind.ClassDeclaration:
       case SyntaxKind.InterfaceDeclaration:
-        return owner.name ? this.getOwnerType(location, owner.name) : undefined
+        return owner.name
+          ? this.memo('ownerType', location, () => {
+              const symbol = this.checker.getSymbolAtLocation(owner.name)
+              return symbol && this.checker.getDeclaredTypeOfSymbol(symbol)
+            })
+          : undefined
       case SyntaxKind.ClassExpression:
         // the instance type its construct signatures return
-        return this.getOwnerTypeBy(location, () => {
+        return this.memo('ownerType', location, () => {
           const constructor = this.checker.getTypeAtLocation(owner)
           const [signature] = constructor
             ? this.checker.getSignaturesOfType(constructor, SignatureKind.Construct)
@@ -450,17 +453,6 @@ export class TypeQueries {
       default:
         return undefined
     }
-  }
-
-  /**
-   * The type declaring properties at a location, computed once.
-   */
-  private getOwnerTypeBy(location: string, compute: () => Type | undefined): Type | undefined {
-    if (!this.ownerTypes.has(location)) {
-      this.ownerTypes.set(location, compute())
-    }
-
-    return this.ownerTypes.get(location)
   }
 
   /**
@@ -994,16 +986,6 @@ export class TypeQueries {
   }
 
   /**
-   * The declared type of a class or interface, by the location of its declaration.
-   */
-  private getOwnerType(location: string, name: any): Type | undefined {
-    return this.getOwnerTypeBy(location, () => {
-      const symbol = this.checker.getSymbolAtLocation(name)
-      return symbol && this.checker.getDeclaredTypeOfSymbol(symbol)
-    })
-  }
-
-  /**
    * Whether only instances of a class are assignable to it: it has `#private`, `private`,
    * or `protected` members.
    */
@@ -1088,12 +1070,10 @@ export class TypeQueries {
   }
 
   getGlobalType(name: string): Type | undefined {
-    if (!this.globalTypes.has(name)) {
+    return this.memo('globalType', name, () => {
       const symbol = this.checker.resolveName(name, SymbolFlags.Type)
-      this.globalTypes.set(name, symbol && this.checker.getDeclaredTypeOfSymbol(symbol))
-    }
-
-    return this.globalTypes.get(name)
+      return symbol && this.checker.getDeclaredTypeOfSymbol(symbol)
+    })
   }
 
   /**
@@ -1101,15 +1081,12 @@ export class TypeQueries {
    * (`Set<any>`).
    */
   getPrototypeType(name: string): Type | undefined {
-    const key = `${name}.prototype`
-    if (!this.globalTypes.has(key)) {
+    return this.memo('prototypeType', name, () => {
       const constructor = this.checker.resolveName(name, SymbolFlags.Value)
       const constructorType = constructor && this.checker.getTypeOfSymbol(constructor)
       const prototype = constructorType && this.getProperty(constructorType, 'prototype')
-      this.globalTypes.set(key, prototype && this.checker.getTypeOfSymbol(prototype))
-    }
-
-    return this.globalTypes.get(key)
+      return prototype && this.checker.getTypeOfSymbol(prototype)
+    })
   }
 
   /**
