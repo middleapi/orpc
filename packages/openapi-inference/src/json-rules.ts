@@ -539,8 +539,8 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
 /**
  * What a function returns when `JSON.stringify` calls it on a value of `owner`, with the key: of
  * the overload this call resolves to, and of the one a call without arguments resolves to (an
- * implementation may ignore the key, `toJSON(options?)`), leaving out overloads whose `this` the
- * value does not satisfy. Of each function of an intersection (`Date & { toJSON(): number }`, of
+ * implementation may ignore the key, `toJSON(options?)`), else of each overload, leaving out those
+ * whose `this` the value does not satisfy. Of each function of an intersection (`Date & { toJSON(): number }`, of
  * `Object.assign`), and of the function a view of one may hold (`Readonly<() => R>`), or anything
  * (`Function`, and `any`, `unknown`, `object`, `{}`, or `Object`, which may hold one).
  */
