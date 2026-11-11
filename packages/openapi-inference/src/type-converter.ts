@@ -28,6 +28,7 @@ import {
   getIndexInfos,
   getNodeBuffer,
   getNumberIndexType,
+  getPropertyNames,
   getSatisfyingCollections,
   getSatisfyingTypedArrays,
   getStringifiedForm,
@@ -1270,21 +1271,19 @@ export class TypeToJsonSchemaConverter {
         return anyOfDeduped(converted)
       }
 
-      // a function without `toJSON` is written as nothing (the caller makes it optional), not
-      // as its fields
+      // a `toJSON` returning only `undefined` writes nothing, and a function without `toJSON` is
+      // written as nothing too (the caller makes it optional), not as its fields
+      const kept = converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!))
       if (callable) {
-        return anyOfDeduped(
-          converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!)),
-        )
+        return anyOfDeduped(kept)
       }
 
       // without `toJSON`, a value is its own fields, of an instance or (for a view or an interface)
-      // of a plain object. A `toJSON` returning only `undefined` writes nothing, the fields remain.
-      const fields = this.convertObject(type, { ignoreToJSON: true, plain, ownFields })
+      // of a plain object
       return anyOfDeduped([
-        ...converted.filter((_, i) => !isDroppedResult(this.types, toJSONResults[i]!)),
+        ...kept,
         ...this.getPrimitiveWithoutToJSON(type, jsonSources),
-        fields,
+        this.convertObject(type, { ignoreToJSON: true, plain, ownFields }),
       ])
     }
 
@@ -1554,7 +1553,8 @@ export class TypeToJsonSchemaConverter {
         members !== undefined &&
         properties.every(
           (p) =>
-            (p.flags & SymbolFlags.Optional && !weak) || this.getPropertyNames(members).has(p.name),
+            (p.flags & SymbolFlags.Optional && !weak) ||
+            getPropertyNames(this.types, members).has(p.name),
         )
       )
     }
@@ -1623,7 +1623,7 @@ export class TypeToJsonSchemaConverter {
     }
 
     const array = this.types.getGlobalType('Array')
-    const names = array && this.getPropertyNames(array)
+    const names = array && getPropertyNames(this.types, array)
     const types = this.types.getSymbolTypes(properties)
     return properties.every((p, i) => {
       const type = types[i]
@@ -1637,14 +1637,6 @@ export class TypeToJsonSchemaConverter {
           : isDropped(this.types, type))
       )
     })
-  }
-
-  private getPropertyNames(type: Type): ReadonlySet<string> {
-    return this.types.memo(
-      'propertyNames',
-      type.id,
-      () => new Set(this.types.getProperties(type).map((p) => p.name)),
-    )
   }
 
   /**
@@ -2240,7 +2232,7 @@ export class TypeToJsonSchemaConverter {
 
     // by the names of all members, a symbol key (`[Symbol.iterator]`) is not found by its name
     const apparent = this.checker.getApparentType(primitive)
-    const members = apparent && this.getPropertyNames(apparent)
+    const members = apparent && getPropertyNames(this.types, apparent)
     return members && this.types.getProperties(type).every((p) => members.has(p.name))
       ? (this.checker.getBaseTypeOfLiteralType(primitive) ?? branded)
       : branded
@@ -2251,7 +2243,7 @@ export class TypeToJsonSchemaConverter {
       return undefined
     }
 
-    const keys = new Set(this.types.getProperties(type).map((p) => p.name))
+    const keys = getPropertyNames(this.types, type)
     // a mapped type without keys keeps no member (`Record<UserId, User>` maps over its keys)
     if (!keys.size) {
       return undefined
@@ -2266,7 +2258,7 @@ export class TypeToJsonSchemaConverter {
         return false
       }
 
-      const candidateKeys = new Set(this.types.getProperties(candidate).map((p) => p.name))
+      const candidateKeys = getPropertyNames(this.types, candidate)
       return (
         [...keys].every((key) => candidateKeys.has(key)) &&
         this.types.isMappedViewOf(type, candidate)

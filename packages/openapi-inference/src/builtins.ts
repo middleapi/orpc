@@ -182,7 +182,7 @@ function getSatisfyingPrototypes(
       return []
     }
 
-    const memberNames = new Set(types.getProperties(members).map((p) => p.name))
+    const memberNames = getPropertyNames(types, members)
     const ofMembers = weak
       ? properties.some((p) => memberNames.has(p.name))
       : properties.every((p) => p.flags & SymbolFlags.Optional || memberNames.has(p.name))
@@ -638,6 +638,17 @@ function getSourcesOfViews(types: TypeQueries, views: readonly Type[], depth: nu
  */
 export function getNumberIndexType(types: TypeQueries, type: Type): Type | undefined {
   return getIndexInfos(types, type).find((info) => info.keyType.flags & TypeFlags.Number)?.valueType
+}
+
+/**
+ * The names of the properties of a type.
+ */
+export function getPropertyNames(types: TypeQueries, type: Type): ReadonlySet<string> {
+  return types.memo(
+    'propertyNames',
+    type.id,
+    () => new Set(types.getProperties(type).map((p) => p.name)),
+  )
 }
 
 /**
