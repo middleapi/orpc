@@ -663,11 +663,8 @@ export function getIndexInfos(types: TypeQueries, type: Type): readonly IndexInf
  * compiler once.
  */
 export function getBaseTypes(types: TypeQueries, type: Type): readonly Type[] {
-  return types.memo(
-    'baseTypes',
-    type.id,
-    () => (type.isTypeReference() ? type.getTarget() : type).getBaseTypes() ?? [],
-  )
+  const target = type.isTypeReference() ? type.getTarget() : type
+  return types.memo('baseTypes', target.id, () => target.getBaseTypes() ?? [])
 }
 
 /**
