@@ -402,12 +402,14 @@ export class OpenAPIGenerator {
     const outputDetailed = meta?.outputStructure === 'detailed'
     // the stock generator reads only parameters from these inputs, the fields of an object
     const parametersOnly = inputDetailed || meta?.method === 'GET' || meta?.method === 'HEAD'
+    const pathParameters = `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{')
     const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
       input: {
-        inlineRoot: parametersOnly || `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
+        inlineRoot: parametersOnly || pathParameters,
         inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
         partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
-        body: true,
+        // only a whole input sent as the request body, not in the query string of a GET request
+        body: !parametersOnly && !pathParameters,
         // a client sends a promise as is, written as `{}`
         awaited: false,
       },
