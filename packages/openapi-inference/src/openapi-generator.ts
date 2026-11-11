@@ -407,11 +407,15 @@ export class OpenAPIGenerator {
         inlineRoot: parametersOnly || `${meta?.prefix ?? ''}${meta?.path ?? ''}`.includes('{'),
         inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
         partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
+        body: true,
+        // a client sends a promise as is, written as `{}`
+        awaited: false,
       },
       output: {
         inlineRoot: outputDetailed,
         inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
         partialProperties: outputDetailed ? ['headers'] : undefined,
+        body: true,
       },
     }
 

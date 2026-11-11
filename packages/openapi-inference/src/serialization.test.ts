@@ -18,6 +18,7 @@ import {
   hashedRecord,
   secretConfig,
 } from '../tests/fixtures/app/src/round75'
+import { roundSeventySevenInputs } from '../tests/fixtures/app/src/round77'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -456,6 +457,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['arrayLikeHolder', undefined],
     ['templateRecord', undefined],
     ['templateRecords', undefined],
+    ['heldBodies', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)
@@ -3186,6 +3188,83 @@ describe('generated schemas match serialized outputs', async () => {
         const validate = ajv.compile(requestSchema(`/${path}`))
         expect(validate(sent) ? [] : validate.errors).toEqual([])
       }
+    })
+  })
+
+  describe('round seventy-seven', () => {
+    const handler = new OpenAPIHandler(router)
+    let sent: Request | undefined
+    const link = new OpenAPILink(router, {
+      origin: 'http://localhost',
+      url: '/',
+      fetch: async (request, init) => {
+        sent = new Request(request, init)
+        return (await handler.handle(sent.clone())).response!
+      },
+    })
+    // the media type a message is sent as is documented as binary data
+    const sentAs = (content: any, message: Request | Response) => {
+      const mediaType = message.headers.get('content-type')!.split(';')[0]!
+      return content[mediaType]?.schema
+    }
+
+    it.each([
+      ['streamBody', 'application/octet-stream'],
+      ['maybeStreamBody', 'application/octet-stream'],
+      ['uploadBody', 'application/octet-stream'],
+      ['formBody', 'multipart/form-data'],
+      ['readonlyFormBody', 'multipart/form-data'],
+      ['paramsBody', 'application/x-www-form-urlencoded'],
+    ])('documents the body %s is sent as, as is', async (name, mediaType) => {
+      const { response } = await handler.handle(
+        new Request(`http://localhost/${name}`, { method: 'POST' }),
+      )
+      const content = (spec.paths as any)[`/${name}`].post.responses['200'].content
+
+      expect(response!.headers.get('content-type')).toContain(mediaType)
+      expect(sentAs(content, response!)).toEqual({ type: 'string', contentMediaType: mediaType })
+    })
+
+    it.each(Object.entries(roundSeventySevenInputs))(
+      'documents the body a client sends of %s, as is',
+      async (name, value) => {
+        await expect(link.call([name], value(), { context: {} })).resolves.toBe(1)
+        const content = (spec.paths as any)[`/${name}`].post.requestBody.content
+
+        expect(sentAs(content, sent!)).toMatchObject({
+          type: 'string',
+          contentMediaType: expect.any(String),
+        })
+      },
+    )
+
+    it('documents the promise a client sends, not the value it resolves to', async () => {
+      await expect(link.call(['promiseInput'], Promise.resolve(2), { context: {} })).resolves.toBe(
+        1,
+      )
+      const content = (spec.paths as any)['/promiseInput'].post.requestBody.content
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify(content['application/json'].schema).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+
+      expect(validate(await sent!.json()) ? [] : validate.errors).toEqual([])
+      expect(validate(2)).toBe(false)
+    })
+
+    it('leaves out the binary forms where the value is not the whole body', () => {
+      // a `Readonly<FormData>` may also be a plain object
+      expect(responseSchema('/readonlyFormBody')).toEqual({ type: 'object' })
+      expect((spec.paths as any)['/maybeStreamBody'].post.responses['200'].content).toEqual({
+        'application/json': { schema: { type: 'null' } },
+        'application/octet-stream': {
+          schema: { type: 'string', contentMediaType: 'application/octet-stream' },
+        },
+      })
     })
   })
 })

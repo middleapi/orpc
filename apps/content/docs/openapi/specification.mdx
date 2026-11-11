@@ -323,7 +323,7 @@ Every other option works as in `OpenAPIGenerator`.
 
 ### How Types Are Documented
 
-Inferred schemas come from the input type for inputs, the output type for outputs and error `data`, and the handler's return type when there is no `.output`. Handlers returning async iterators are documented as [event streams](/docs/async-iterator-object). Contract procedures take their types from the contract, so add `.output` there.
+Inferred schemas come from the input type for inputs, the output type for outputs and error `data`, and the handler's return type when there is no `.output`. Handlers returning async iterators are documented as [event streams](/docs/async-iterator-object). A `ReadableStream`, `FormData`, or `URLSearchParams` that is the whole input or output is documented as binary data of the media type it is sent as. Contract procedures take their types from the contract, so add `.output` there.
 
 Outputs are documented in their [serialized](/docs/openapi/serializer) form. Class instances are documented as `JSON.stringify` writes them, so their `Set` and `Map` fields become `{}` and `bigint` fields cannot be sent. Views of a class, like `Readonly<User>`, and class types in inputs can be an instance or a plain object, so both forms are documented, or only the fields in parameters.
 
@@ -375,4 +375,5 @@ try {
 - In OpenAPI 3.0, the values of number and template literal keys, like in `Record<number, User>`, are left open.
 - `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out. Types holding `Infinity`, like type-fest's `PositiveInfinity`, are documented as any value.
 - Effect data types, like `Option` and `Redacted`, are written by their untyped `toJSON`, so they are documented as any value.
+- A `ReadableStream`, `FormData`, or `URLSearchParams` as the `body` of a detailed input or output is not documented as binary data.
 - Generation throws on types the compiler cannot resolve, like an import with a missing path alias.

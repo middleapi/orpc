@@ -21,6 +21,7 @@ import {
   extendsBuiltinClass,
   extendsBuiltinView,
   getBuiltin,
+  getBodyMediaType,
   getBuiltinBaseName,
   getBuiltinFields,
   getExtendedPrimitiveSchema,
@@ -152,11 +153,20 @@ export interface TypeToJsonSchemaConvertOptions {
 
   /**
    * Describe the value a `Promise` type resolves to, like a handler's result or a yielded value.
-   * Set `false` for values that are not awaited, like an error's `data`, where a promise is `{}`.
+   * Set `false` for values that are not awaited, like an error's `data` or an input a client sends,
+   * where a promise is `{}`.
    *
    * @default true
    */
   awaited?: boolean | undefined
+
+  /**
+   * Describe the value as a whole request or response body, which oRPC sends as is when it is a
+   * `ReadableStream`, `FormData`, or `URLSearchParams`: as binary data of its media type.
+   *
+   * @default false
+   */
+  body?: boolean | undefined
 }
 
 export interface AsyncIteratorTypes {
@@ -274,8 +284,21 @@ export class TypeToJsonSchemaConverter {
       // written as nothing, like a function whose `toJSON` is optional, or an instance whose
       // `toJSON` may return `undefined`
       members.some((t) => this.isOptional(t) || this.mayDropThroughToJSON(t, false))
+    // a body sent as is is binary data of its media type, a view of one may also be a plain object
+    const bodies = options.body
+      ? serializable.flatMap((t) => {
+          const body = getBodyMediaType(this.types, t)
+          return body ? [{ type: t, ...body }] : []
+        })
+      : []
+    const sent = dedupe(
+      bodies.map((b): JsonSchema => ({ type: 'string', contentMediaType: b.mediaType })),
+    )
+    const others = bodies.length
+      ? serializable.filter((t) => !bodies.some((b) => b.type === t && !b.view))
+      : serializable
     // a single value is visited whole, so a union keeps its def
-    const values = filtered ? serializable : members
+    const values = bodies.length ? others : filtered ? serializable : members
 
     const cuts = this.expansion.cuts
     this.expansion.reset()
@@ -284,7 +307,14 @@ export class TypeToJsonSchemaConverter {
     let $defs: Record<string, JsonSchema>
 
     try {
-      schema = values.length === 1 ? this.visit(values[0]!) : this.convertMembers(serializable)
+      const written =
+        values.length === 1
+          ? [this.visit(values[0]!)]
+          : others.length || !sent.length
+            ? [this.convertMembers(others)]
+            : []
+      const all = [...sent, ...written]
+      schema = all.length === 1 ? all[0]! : { anyOf: all }
 
       if (options.inlineRoot) {
         schema = this.defs.inlineRoot(
@@ -364,7 +394,8 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    if (!(type.flags & TypeFlags.Object)) {
+    // a `ReadableStream` is sent as binary data, not as an event stream
+    if (!(type.flags & TypeFlags.Object) || getBodyMediaType(this.types, type)) {
       return undefined
     }
 

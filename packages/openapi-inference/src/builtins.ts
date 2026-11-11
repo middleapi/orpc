@@ -202,6 +202,42 @@ function getSatisfyingPrototypes(
   })
 }
 
+/** Built-ins oRPC sends as the whole body itself, of these media types */
+const BODY_MEDIA_TYPES: Record<string, string | undefined> = {
+  ReadableStream: 'application/octet-stream',
+  FormData: 'multipart/form-data',
+  URLSearchParams: 'application/x-www-form-urlencoded',
+}
+
+/**
+ * The media type oRPC sends a whole body of this type as, when it is a `ReadableStream`, a
+ * `FormData`, or `URLSearchParams` (also of a class extending one), which it sends as is, not as
+ * JSON (a stream is not an event stream). `view` for a view of one (`Readonly<FormData>`), which
+ * may also be a plain object.
+ */
+export function getBodyMediaType(
+  types: TypeQueries,
+  type: Type,
+): { mediaType: string; view: boolean } | undefined {
+  const of = (source: Type) =>
+    BODY_MEDIA_TYPES[
+      getDeclaredBuiltinName(types, source) ??
+        ((source.getSymbol()?.flags ?? 0) & SymbolFlags.Class
+          ? (getBuiltinBaseName(types, source) ?? '')
+          : '')
+    ]
+
+  const own = of(type)
+  if (own !== undefined) {
+    return { mediaType: own, view: false }
+  }
+
+  const viewed = getViewSources(types, type)
+    .map(of)
+    .find((mediaType) => mediaType !== undefined)
+  return viewed === undefined ? undefined : { mediaType: viewed, view: true }
+}
+
 /**
  * Whether the serializer and `JSON.stringify` write a built-in differently, like `Set`, `Map`,
  * `Blob`, or a built-in subclass with its own `toJSON`, which only `JSON.stringify` calls.
