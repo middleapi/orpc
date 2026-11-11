@@ -42,6 +42,8 @@ const NAMEABLE_SYMBOL_FLAGS =
 export interface PropertyAnnotation {
   alias: TSSymbol
   type: Type
+  /** The type arguments the annotation writes (`Filter` and `Where` of `XOR<Filter, Where>`) */
+  typeArguments: readonly Type[]
 }
 
 /**
@@ -1147,7 +1149,10 @@ export class TypeQueries {
       }
 
       const type = this.checker.getTypeAtLocation(typeNode)
-      return type ? { alias, type } : undefined
+      const typeArguments = ((typeNode.typeArguments ?? []) as any[]).flatMap(
+        (node) => this.checker.getTypeFromTypeNode(node) ?? [],
+      )
+      return type ? { alias, type, typeArguments } : undefined
     })
   }
 }

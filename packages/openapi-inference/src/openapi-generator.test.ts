@@ -4619,7 +4619,7 @@ describe('openAPIGenerator', () => {
       const schemas = (await generate()).components?.schemas as any
 
       // not the overloads whose `this` the value does not satisfy, or that need an argument
-      expect(schemas.Doc).toEqual({
+      expect(schemas.Doc_name).toEqual({
         type: 'object',
         properties: { name: { type: 'string' }, _id: { type: 'string' } },
         required: ['name', '_id'],
@@ -4646,7 +4646,7 @@ describe('openAPIGenerator', () => {
     it('writes an intersection with a class whose toJSON it calls as an instance', async () => {
       const schemas = (await generate()).components?.schemas as any
 
-      expect(schemas.Hydrated).toEqual({
+      expect(schemas.Hydrated_name).toEqual({
         type: 'object',
         properties: { name: { type: 'string' }, key: { type: 'string' } },
         required: ['name', 'key'],
@@ -4658,6 +4658,47 @@ describe('openAPIGenerator', () => {
         required: ['street', 'key'],
       })
       expect(schemas.Conn).toBeUndefined()
+    })
+
+    it('names instantiations by their written type arguments, and types in cycles by the alias written for them', async () => {
+      const spec = await generate('3.1.1', undefined, 'roundEightyTypes')
+      const schemas = spec.components?.schemas as any
+      const paths = spec.paths as any
+      const request = (path: string) => paths[path].post.requestBody.content['application/json']
+
+      // a type argument left to its default is not named
+      expect(request('/findArgs').schema).toEqual({ $ref: '#/components/schemas/FindArgs' })
+      // an instantiation over object literals by their keys
+      const response = (path: string) =>
+        paths[path].post.responses['200'].content['application/json'].schema
+      expect(response('/posts')).toEqual({ $ref: '#/components/schemas/Paginated_id_title' })
+      expect(response('/accounts')).toEqual({ $ref: '#/components/schemas/Paginated_id_handle' })
+      // a cycle through what `XOR<Filter, Where>` distributes to is named after it
+      expect(schemas.Where.properties.author).toEqual({
+        $ref: '#/components/schemas/XOR_Filter_Where',
+      })
+      // the keys of a view name it
+      expect(request('/pickPosts').schema).toEqual({
+        $ref: '#/components/schemas/Pick-CUser-id-posts',
+      })
+    })
+
+    it('names recursive instantiations by their printed types with recursive defs', async () => {
+      const schemas = (await generate('3.1.1', 'recursive', 'roundEightyTypes')).components
+        ?.schemas as any
+
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'CPost',
+        'CUser',
+        'DeepPartial_Post',
+        'DeepPartial_PostArray',
+        'DeepPartial_User',
+        'Post',
+        'Recursive',
+        'User',
+        'Where',
+        'XOR_Filter_Where',
+      ])
     })
 
     it('documents a value whose files are optional as JSON too', async () => {

@@ -178,6 +178,7 @@ export const roundEightyTypes = {
   savePost: os.input(type<DeepPartial<Post>>()).handler(() => 1),
   omit: os.input(type<Omit<CUser, 'id'>>()).handler(() => 1),
   pick: os.input(type<Pick<CUser, 'name' | 'posts'>>()).handler(() => 1),
+  pickPosts: os.input(type<Pick<CUser, 'id' | 'posts'>>()).handler(() => 1),
   svc: os.handler(() => new Svc()),
   nested: os.handler(() => ({ svc: new Svc(), n: 1 })),
   stamp: os.input(type<{ at: Stamp }>()).handler(() => 1),

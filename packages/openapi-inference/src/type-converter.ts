@@ -44,7 +44,7 @@ import {
   isTypedArray,
 } from './builtins'
 import type { DefNameRecord } from './components'
-import { getDefName, getFallbackDefName, getViewDefName } from './def-names'
+import { getAnnotatedDefName, getDefName, getFallbackDefName, getViewDefName } from './def-names'
 import type { ConversionMode } from './defs'
 import { DefNames, DefRegistry, toModeKey, toParameterKey } from './defs'
 import { ExpansionGuard } from './expansion'
@@ -715,7 +715,7 @@ export class TypeToJsonSchemaConverter {
     const enteredAt = this.cycles.enter(type, key)
 
     if (enteredAt === 'closed') {
-      return { $ref: toRef(this.defs.create(key, getFallbackDefName(this.types, type)).name) }
+      return { $ref: toRef(this.defs.create(key, this.getCycleDefName(type)).name) }
     }
 
     const cuts = this.expansion.cuts
@@ -2369,6 +2369,32 @@ export class TypeToJsonSchemaConverter {
     return this.mode === 'stringify' || !this.stringifySensitivity.isSensitive(type)
       ? this.visit(type)
       : this.withMode('stringify', () => this.visit(type))
+  }
+
+  /**
+   * The def name of an anonymous type in a cycle, or of the alias a property being converted
+   * writes it with, which the type lost (see `getAnnotatedDefName`).
+   */
+  private getCycleDefName(type: Type): string {
+    const name = getFallbackDefName(this.types, type)
+
+    if (name !== 'Recursive') {
+      return name
+    }
+
+    const { path } = this.expansion
+    for (let i = path.length - 1; i >= 0; i--) {
+      const annotation = this.types.getAnnotation(path[i]!)
+      const annotated =
+        annotation &&
+        this.hasSameMembers(annotation.type, type, NULLISH_FLAGS) &&
+        getAnnotatedDefName(this.types, annotation)
+      if (annotated) {
+        return annotated
+      }
+    }
+
+    return name
   }
 
   /**

@@ -1064,7 +1064,7 @@ describe('generated schemas match serialized outputs', async () => {
       'ExtendsFrozenTagger',
       'ExtendsPickedTagger',
       'ExtendsTaggerWithX',
-      'PickTagger',
+      'PickTagger_a_tags',
       'PickTagger_tags',
     ]) {
       expect(schemas[name].properties.tags).toEqual(eitherSet)
@@ -1444,7 +1444,7 @@ describe('generated schemas match serialized outputs', async () => {
       ])
       const dates = schemas().DeepRO_OptionalDates.properties
       expect(dates.a).toEqual(dates.b)
-      expect(names.filter((name) => /^DeepRO\d*$/u.test(name))).toEqual(['DeepRO'])
+      expect(names.filter((name) => /^DeepRO_x\d*$/u.test(name))).toEqual(['DeepRO_x'])
       // no def is only a reference to another one
       for (const name of names) {
         expect(Object.keys(schemas()[name])).not.toEqual(['$ref'])
