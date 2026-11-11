@@ -207,7 +207,7 @@ import { roundSeventy } from '../tests/fixtures/app/src/round70'
 import type { Tile } from '../tests/fixtures/app/src/round74'
 import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
 import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
-import { roundSeventyEight } from '../tests/fixtures/app/src/round78'
+import { roundSeventyEight, roundSeventyEightViews } from '../tests/fixtures/app/src/round78'
 import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
@@ -4198,6 +4198,21 @@ describe('openAPIGenerator', () => {
         expect(spec.components?.schemas ?? {}).toEqual({})
       },
     )
+
+    it('documents the body of a detailed output of a view of a class as binary data', async () => {
+      const spec = await generator.generate(roundSeventyEightViews, {
+        source: { file: fixture('round78.ts'), export: 'roundSeventyEightViews' },
+      })
+
+      expect((spec.paths as any)['/detailedViewBody'].post.responses['200']).toEqual({
+        description: expect.any(String),
+        content: {
+          'multipart/form-data': {
+            schema: { type: 'string', contentMediaType: 'multipart/form-data' },
+          },
+        },
+      })
+    })
   })
 
   describe('round seventy-nine', () => {

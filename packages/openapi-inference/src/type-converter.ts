@@ -1158,9 +1158,7 @@ export class TypeToJsonSchemaConverter {
     // the serializer leaves an instance to `JSON.stringify` and walks a plain object,
     // so each value of a view is written by either one
     if (isView && this.mode === 'serializer') {
-      return this.withMode('either', () =>
-        this.convertObject(type, { ignoreToJSON, plain, ownFields }),
-      )
+      return this.withMode('either', () => this.convertObject(type, options))
     }
 
     // in the either mode, a view is an instance or a plain object, field by field

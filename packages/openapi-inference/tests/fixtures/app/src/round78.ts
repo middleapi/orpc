@@ -51,6 +51,18 @@ export const roundSeventyEight = {
     .handler(() => 1),
 }
 
+class FormResponse {
+  status = 200 as const
+  body = form()
+}
+
+// a view of a class holds an instance or a plain object, either one with the body sent as is
+export const roundSeventyEightViews = {
+  detailedViewBody: os
+    .route({ outputStructure: 'detailed' })
+    .handler((): Readonly<FormResponse> => new FormResponse()),
+}
+
 /** The values a client sends of the inputs above */
 export const roundSeventyEightInputs: Record<string, () => unknown> = {
   uploadFormInput: form,
