@@ -893,6 +893,20 @@ describe('openAPIGenerator operation builders', () => {
           $defs: { File: file },
         }),
       ).toEqual(['multipart/form-data'])
+      // nor are the first items of an array, also of a tuple
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { files: { type: 'array', prefixItems: [file], minItems: 1, maxItems: 1 } },
+          required: ['files'],
+        }),
+      ).toEqual(['multipart/form-data'])
+      expect(contentTypes({ type: 'array', items: file, minItems: 1 })).toEqual([
+        'multipart/form-data',
+      ])
+      expect(
+        contentTypes({ type: 'array', prefixItems: [{ type: 'string' }, file], minItems: 1 }),
+      ).toEqual(['multipart/form-data', 'application/json'])
     })
 
     it('reads the content media type of a file body from its $ref target', () => {

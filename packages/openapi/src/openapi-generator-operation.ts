@@ -740,7 +740,8 @@ function toBodyContent(
 
 /**
  * Whether a value of the schema may hold no file, like one whose files are optional: a value is
- * sent as `multipart/form-data` only when it holds a file.
+ * sent as `multipart/form-data` only when it holds a file, which a required key or one of the
+ * first `minItems` items of an array (`[Blob]`) may always hold.
  */
 function mayHoldNoFiles(
   root: JsonSchema,
@@ -761,12 +762,17 @@ function mayHoldNoFiles(
     const target =
       typeof schema.$ref === 'string' ? resolveJsonSchemaLocalPointer(root, schema.$ref) : undefined
     const holdsNoFiles = (s: JsonSchema) => mayHoldNoFiles(root, s, visiting)
+    const minItems = schema.minItems ?? 0
 
     return (
       (target === undefined || holdsNoFiles(target)) &&
       (schema.anyOf === undefined || schema.anyOf.some(holdsNoFiles)) &&
       (schema.oneOf === undefined || schema.oneOf.some(holdsNoFiles)) &&
       (schema.allOf === undefined || schema.allOf.every(holdsNoFiles)) &&
+      (schema.prefixItems ?? []).slice(0, minItems).every(holdsNoFiles) &&
+      (schema.items === undefined ||
+        minItems <= (schema.prefixItems?.length ?? 0) ||
+        holdsNoFiles(schema.items)) &&
       (schema.required ?? []).every((name) => {
         const property = schema.properties?.[name]
         return property === undefined || holdsNoFiles(property)
