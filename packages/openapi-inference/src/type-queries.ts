@@ -934,7 +934,7 @@ export class TypeQueries {
       // its instantiations share the declaration
       const declared =
         constraint &&
-        this.memo('declaredType', symbol.id, () => this.checker.getTypeAtLocation(declaration))
+        this.memo('declaredType', symbol!.id, () => this.checker.getTypeAtLocation(declaration))
       const keys =
         declared?.id === type.id ? this.checker.getTypeFromTypeNode(constraint) : undefined
       return (
