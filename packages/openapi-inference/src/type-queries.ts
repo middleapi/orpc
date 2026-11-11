@@ -1226,16 +1226,22 @@ export class TypeQueries {
    */
   readAliases(declarations: readonly NodeHandle[]): void {
     const names: any[] = []
+    // an import is looked up in the exports of its module, whose specifier is in `names`
+    const imports = new Map<number, [name: any, exported: string]>()
     const collect = (statements: readonly any[]): void => {
       for (const statement of statements) {
         if (statement.kind === SyntaxKind.TypeAliasDeclaration) {
           names.push(statement.name)
         } else if (statement.kind === SyntaxKind.ImportDeclaration) {
           const clause = statement.importClause
-          names.push(
-            ...(clause?.name ? [clause.name] : []),
-            ...((clause?.namedBindings?.elements ?? []) as any[]).map((element) => element.name),
-          )
+          const elements = (clause?.namedBindings?.elements ?? []) as any[]
+          for (const imported of [
+            ...(clause?.name ? [[clause.name, 'default'] as const] : []),
+            ...elements.map((e) => [e.name, (e.propertyName ?? e.name).text] as const),
+          ]) {
+            imports.set(names.length, imported)
+            names.push(statement.moduleSpecifier)
+          }
         } else if (statement.kind === SyntaxKind.ModuleDeclaration) {
           // `namespace A.B {}` nests the declaration of `B` as the body of `A`
           let body = statement.body
@@ -1263,8 +1269,11 @@ export class TypeQueries {
 
     const aliases: TSSymbol[] = []
     const aliasNames: any[] = []
-    for (const symbol of this.checker.getSymbolAtLocation(names)) {
-      const alias = symbol && resolveAlias(this.checker, symbol)
+    for (const [i, symbol] of this.checker.getSymbolAtLocation(names).entries()) {
+      const imported = imports.get(i)
+      const alias = imported
+        ? this.getImportedSymbol(symbol, ...imported)
+        : symbol && resolveAlias(this.checker, symbol)
 
       if (
         !alias ||
@@ -1304,6 +1313,27 @@ export class TypeQueries {
         this.addLostAlias(type, alias)
       }
     }
+  }
+
+  /**
+   * The symbol an import names: an export of its module, resolved only when it is one of another
+   * module (`export { User } from './user'`). The exports of each module are read once.
+   */
+  private getImportedSymbol(
+    module: TSSymbol | undefined,
+    name: any,
+    exported: string,
+  ): TSSymbol | undefined {
+    const exports =
+      module &&
+      this.memo(
+        'moduleExports',
+        module.id,
+        () => new Map(this.checker.getExportsOfModule(module).map((s) => [s.name, s])),
+      )
+    // not one by its name, like the default import of an `export =` module
+    const symbol = exports?.get(exported) ?? this.checker.getSymbolAtLocation(name)
+    return symbol && this.memo('aliased', symbol.id, () => resolveAlias(this.checker, symbol))
   }
 
   /**
