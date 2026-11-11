@@ -418,6 +418,8 @@ describe('generated schemas match serialized outputs', async () => {
     ['indexedObject', undefined],
     ['indexedTuple', undefined],
     ['indexedDate', undefined],
+    ['keyedEntry', undefined],
+    ['keyedEntries', undefined],
   ] as const)('%s', async (name, input) => {
     const output = await call((router as any)[name], input)
     const json = serialize(output)

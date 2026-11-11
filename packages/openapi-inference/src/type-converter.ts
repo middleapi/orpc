@@ -1363,18 +1363,19 @@ export class TypeToJsonSchemaConverter {
       forms.push({ type: 'string' })
     }
 
-    // a tuple satisfies an object type of the indexes from 0 (`TupleToObject<[string, number]>`)
+    // a tuple satisfies an object type of the indexes from 0 (`TupleToObject<[string, number]>`),
+    // also besides members of arrays (`{ [K in keyof Pair & string]: Pair[K] }`)
+    const indexes = properties.filter((p) => /^(?:0|[1-9]\d*)$/u.test(p.name))
     if (
-      properties.length &&
-      properties.every(
-        (p) => /^(?:0|[1-9]\d*)$/u.test(p.name) && Number(p.name) < properties.length,
-      )
+      indexes.length &&
+      indexes.every((p) => Number(p.name) < indexes.length) &&
+      this.holdsArrayMembers(properties.filter((p) => !indexes.includes(p)))
     ) {
-      const elementTypes = this.types.getSymbolTypes(properties)
+      const elementTypes = this.types.getSymbolTypes(indexes)
       const prefixItems: JsonSchema[] = []
       let minItems = 0
 
-      properties.forEach((property, i) => {
+      indexes.forEach((property, i) => {
         const index = Number(property.name)
         prefixItems[index] = this.visitElement(elementTypes[i])
         if (!(property.flags & SymbolFlags.Optional)) {
@@ -1392,6 +1393,32 @@ export class TypeToJsonSchemaConverter {
     }
 
     return forms
+  }
+
+  /**
+   * Whether an array has the properties of an object type by its members: `length` of a number,
+   * others methods JSON drops (`length: 3` and `push` of `{ [K in keyof Pair & string]: Pair[K] }`).
+   */
+  private holdsArrayMembers(properties: readonly TSSymbol[]): boolean {
+    if (!properties.length) {
+      return true
+    }
+
+    const array = this.types.getGlobalType('Array')
+    const names = array && this.getPropertyNames(array)
+    const types = this.types.getSymbolTypes(properties)
+    return properties.every((p, i) => {
+      const type = types[i]
+      return (
+        names?.has(p.name) === true &&
+        type !== undefined &&
+        (p.name === 'length'
+          ? this.types
+              .getUnionMembers(type)
+              .every((m) => m.flags & (TypeFlags.NumberLike | UNDEFINED_FLAGS))
+          : isDropped(this.types, type))
+      )
+    })
   }
 
   private getPropertyNames(type: Type): ReadonlySet<string> {
