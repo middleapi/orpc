@@ -4725,6 +4725,18 @@ describe('openAPIGenerator', () => {
       })
     })
 
+    it('documents an instance of a class of methods only as an object', async () => {
+      const spec = await generate('3.1.1', undefined, 'roundEightyTypes')
+      const schemas = spec.components?.schemas as any
+
+      expect(schemas.Svc).toEqual({ type: 'object' })
+      expect((spec.paths as any)['/svc'].post.responses['200'].content).toEqual({
+        'application/json': { schema: { $ref: '#/components/schemas/Svc' } },
+      })
+      // a client sends what its `toJSON` returns, or a plain object of no fields
+      expect(schemas.Stamp.anyOf).toEqual([{ type: 'string' }, { type: 'object' }])
+    })
+
     it('documents a value whose files are optional as JSON too', async () => {
       const spec = await generate()
 

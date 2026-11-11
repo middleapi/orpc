@@ -1347,7 +1347,14 @@ export class TypeToJsonSchemaConverter {
         )) ||
       isAnyRecord(this.types, type)
     ) {
-      return {}
+      // but an instance of a declared class extending no built-in, which `JSON.stringify` writes
+      // as an object of no fields
+      return properties.length &&
+        (type.getSymbol()?.flags ?? 0) & SymbolFlags.Class &&
+        getClassType(this.types, type)?.id === type.id &&
+        getBuiltinBaseName(this.types, type) === undefined
+        ? { type: 'object' }
+        : {}
     }
 
     // a typed array (`class Bytes extends Uint8Array`, `Partial<Buffer>` without `toJSON`)
