@@ -78,6 +78,7 @@ import {
   dedupe,
   escapeRegExp,
   isLiteralSchema,
+  isNeverSchema,
   isPlain,
   isTrivialSchema,
   mapSchema,
@@ -156,6 +157,12 @@ export interface TypeToJsonSchemaConvertOptions {
    * and `headers` of a detailed input: when one may be missing, so may each of its fields.
    */
   partialProperties?: readonly string[] | undefined
+
+  /**
+   * With `inlineRoot`, the root's fields are sent each on their own, like the query parameters of
+   * an input of a `GET` request.
+   */
+  separateRootFields?: boolean | undefined
 
   /**
    * Describe the value a `Promise` type resolves to, like a handler's result or a yielded value.
@@ -405,6 +412,7 @@ export class TypeToJsonSchemaConverter {
           schema,
           options.inlineProperties ?? [],
           options.partialProperties,
+          options.separateRootFields,
         )
       }
 
@@ -1348,7 +1356,7 @@ export class TypeToJsonSchemaConverter {
       isAnyRecord(this.types, type)
     ) {
       // but an instance of a declared class extending no built-in, which `JSON.stringify` writes
-      // as an object of no fields
+      // as an object of no fields (not one without members, which any value satisfies, like `{}`)
       return properties.length &&
         (type.getSymbol()?.flags ?? 0) & SymbolFlags.Class &&
         getClassType(this.types, type)?.id === type.id &&
@@ -2338,12 +2346,6 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * Whether `toJSON` of a value of this type, or of a union member, may return what JSON
-   * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
-   * Inputs follow outputs: an instance of a class implementing an interface sends what its
-   * `toJSON` returns (`interface Point { toJSON(): undefined }`).
-   */
-  /**
    * Whether a value is always written as nothing by its `toJSON` (in either mode, when the
    * serializer calls it too), unless it may be written without calling it: the method is
    * optional, or the serializer may walk it as a plain object (`interface Point { toJSON(): undefined }`).
@@ -2360,6 +2362,12 @@ export class TypeToJsonSchemaConverter {
     )
   }
 
+  /**
+   * Whether `toJSON` of a value of this type, or of a union member, may return what JSON
+   * leaves out: `undefined`, a function, or a symbol. The key is then dropped, and an item `null`.
+   * Inputs follow outputs: an instance of a class implementing an interface sends what its
+   * `toJSON` returns (`interface Point { toJSON(): undefined }`).
+   */
   private mayDropThroughToJSON(type: Type, stringify: boolean): boolean {
     return this.types.getUnionMembers(type).some((member) => {
       // a function without its optional `toJSON` is dropped, also by a client sending it
@@ -2667,15 +2675,6 @@ function anyOfDeduped(schemas: readonly JsonSchema[]): JsonSchema {
     ),
   )
   return flat.length === 1 ? flat[0]! : { anyOf: flat }
-}
-
-function isNeverSchema(schema: JsonSchema): boolean {
-  return (
-    typeof schema === 'object' &&
-    Object.keys(schema).length === 1 &&
-    typeof schema.not === 'object' &&
-    Object.keys(schema.not).length === 0
-  )
 }
 
 /**

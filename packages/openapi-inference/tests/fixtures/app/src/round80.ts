@@ -1,4 +1,6 @@
 /* oxlint-disable typescript/no-unnecessary-type-parameters -- the library type shapes under test */
+// oxlint-disable-next-line import/no-unassigned-import
+import '@orpc/openapi/extensions/route'
 import { os, type } from '@orpc/server'
 
 const rows: { id: number }[] = []
@@ -187,4 +189,52 @@ export const roundEightyTypes = {
   svc: os.handler(() => new Svc()),
   nested: os.handler(() => ({ svc: new Svc(), n: 1 })),
   stamp: os.input(type<{ at: Stamp }>()).handler(() => 1),
+}
+
+export interface ById {
+  id: string
+  slug?: never
+}
+export interface BySlug {
+  slug: string
+  id?: never
+}
+
+/** Keys never written, of objects whose fields are sent each on its own */
+export const roundEightyParameters = {
+  xorQuery: os
+    .route({ method: 'GET' })
+    .input(type<{ id: string; slug?: never } | { slug: string; id?: never }>())
+    .handler(() => 1),
+  namedXorQuery: os
+    .route({ method: 'GET' })
+    .input(type<ById | BySlug>())
+    .handler(() => 1),
+  styledXorQuery: os
+    .route({ method: 'GET', queryStyles: { id: 'primitive' } })
+    .input(type<ById | BySlug>())
+    .handler(() => 1),
+  xorBody: os.input(type<ById | BySlug>()).handler(() => 1),
+  pathNever: os
+    .route({ method: 'GET', path: '/pathNever/{id}' })
+    .input(type<{ id: string; q?: never; b?: undefined }>())
+    .handler(() => 1),
+  pathBody: os
+    .route({ method: 'POST', path: '/pathBody/{id}' })
+    .input(type<{ id: string; q?: never }>())
+    .handler(() => 1),
+  detailedInput: os
+    .route({ method: 'POST', inputStructure: 'detailed' })
+    .input(
+      type<{
+        query: { a: string; b?: undefined }
+        headers: { 'x-a': string; 'x-b'?: never }
+        body: { c?: never; d: string }
+      }>(),
+    )
+    .handler(() => 1),
+  detailedOutput: os.route({ outputStructure: 'detailed' }).handler(() => ({
+    headers: { 'x-a': 'a' } as { 'x-a': string; 'x-b'?: undefined },
+    body: 1,
+  })),
 }

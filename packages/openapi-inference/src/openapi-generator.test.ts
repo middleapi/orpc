@@ -209,7 +209,11 @@ import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
 import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
 import { roundSeventyEight, roundSeventyEightViews } from '../tests/fixtures/app/src/round78'
 import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
-import { roundEighty, roundEightyTypes } from '../tests/fixtures/app/src/round80'
+import {
+  roundEighty,
+  roundEightyParameters,
+  roundEightyTypes,
+} from '../tests/fixtures/app/src/round80'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4590,15 +4594,16 @@ describe('openAPIGenerator', () => {
   })
 
   describe('round eighty', () => {
+    const routers = { roundEighty, roundEightyTypes, roundEightyParameters }
     const generate = (
       version: '3.1.1' | '3.0.4' = '3.1.1',
       defs?: 'recursive',
-      exported: 'roundEighty' | 'roundEightyTypes' = 'roundEighty',
+      exported: keyof typeof routers = 'roundEighty',
     ) =>
-      new OpenAPIGenerator({ defs }).generate(
-        exported === 'roundEighty' ? roundEighty : roundEightyTypes,
-        { source: { file: fixture('round80.ts'), export: exported }, version },
-      )
+      new OpenAPIGenerator({ defs }).generate(routers[exported], {
+        source: { file: fixture('round80.ts'), export: exported },
+        version,
+      })
 
     it.each(['3.1.1', '3.0.4'] as const)(
       'documents an output that may be left out as also null, in %s',
@@ -4764,5 +4769,51 @@ describe('openAPIGenerator', () => {
         Object.keys((spec.paths as any)['/optionalBlob'].post.responses['200'].content),
       ).toEqual(['multipart/form-data', 'application/json'])
     })
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'leaves keys never written out of parameters and headers, in %s',
+      async (version) => {
+        const spec = await generate(version, undefined, 'roundEightyParameters')
+        const paths = spec.paths as any
+        const query = (name: string) => ({
+          in: 'query',
+          name,
+          schema: { type: 'string' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        })
+
+        // the members of an exclusive or, also named ones, and of a query style, by their keys
+        for (const path of ['/xorQuery', '/namedXorQuery', '/styledXorQuery']) {
+          expect(paths[path].get.parameters).toEqual([query('id'), query('slug')])
+        }
+        expect(paths['/pathNever/{id}'].get.parameters).toEqual([
+          { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+        ])
+        expect(paths['/detailedInput'].post.parameters).toEqual([
+          { ...query('a'), required: true },
+          { in: 'header', name: 'x-a', required: true, schema: { type: 'string' } },
+        ])
+        expect(paths['/detailedOutput'].post.responses['200'].headers).toEqual({
+          'x-a': { required: true, schema: { type: 'string' } },
+        })
+        // a body still holds them, which tell the members of an exclusive or apart
+        expect(paths['/detailedInput'].post.requestBody.content['application/json'].schema).toEqual(
+          {
+            type: 'object',
+            properties: { c: { not: {} }, d: { type: 'string' } },
+            required: ['d'],
+          },
+        )
+        expect(paths['/pathBody/{id}'].post.requestBody.content['application/json'].schema).toEqual(
+          { type: 'object', properties: { q: { not: {} } } },
+        )
+        expect((spec.components?.schemas as any).ById).toEqual({
+          type: 'object',
+          properties: { id: { type: 'string' }, slug: { not: {} } },
+          required: ['id'],
+        })
+      },
+    )
   })
 })

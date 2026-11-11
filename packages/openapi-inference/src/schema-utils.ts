@@ -363,6 +363,18 @@ export function withoutRequired(schema: JsonSchema): JsonSchema {
   return schema.anyOf ? { ...rest, anyOf: schema.anyOf.map(withoutRequired) } : rest
 }
 
+/**
+ * Whether a schema admits no value (`{ not: {} }`).
+ */
+export function isNeverSchema(schema: JsonSchema): boolean {
+  return (
+    typeof schema === 'object' &&
+    Object.keys(schema).length === 1 &&
+    typeof schema.not === 'object' &&
+    Object.keys(schema.not).length === 0
+  )
+}
+
 export function isPlain(schema: JsonSchema, type: string): boolean {
   return typeof schema === 'object' && schema.type === type && Object.keys(schema).length === 1
 }

@@ -607,6 +607,8 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
       inlineRoot: parametersOnly || pathParameters.length > 0,
       inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
       partialProperties: inputDetailed ? ['query', 'headers'] : undefined,
+      // the query parameters of a compact input without a body
+      separateRootFields: bodiless && !inputDetailed,
       // only a whole input sent as the request body, not in the query string of a GET request
       body: !parametersOnly && !pathParameters.length,
       bodyProperty: inputDetailed && !bodiless,

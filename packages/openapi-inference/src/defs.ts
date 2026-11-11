@@ -1,7 +1,14 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
-import { collectDefRefs, fromRef, objectMembers, toRef, withoutRequired } from './schema-utils'
+import {
+  collectDefRefs,
+  fromRef,
+  isNeverSchema,
+  objectMembers,
+  toRef,
+  withoutRequired,
+} from './schema-utils'
 
 /**
  * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class
@@ -406,13 +413,79 @@ export class DefRegistry {
    * Inlines the root def, the defs of a root union, and the defs of `properties` of the root
    * (or of each root union member), unless they are recursive. Their parts are read by their
    * fields, so only the members a client sends the fields of are kept, also of the defs they
-   * refer to. The fields of `partialProperties` are sent each on their own, so when one of
-   * them may be missing, so may each of its fields.
+   * refer to. The fields of `partialProperties` (and of the root, with `separateRoot`) are sent
+   * each on their own, so when one of them may be missing, so may each of its fields, and a field
+   * never written is left out of them, see {@link withoutUnwrittenFields}.
    */
   inlineRoot(
     schema: JsonSchema,
     properties: readonly string[],
     partialProperties: readonly string[] = [],
+    separateRoot = false,
+  ): JsonSchema {
+    const inlined = this.inlineRootDefs(schema, properties, partialProperties)
+
+    if (!separateRoot && !partialProperties.length) {
+      return inlined
+    }
+
+    const separate = (member: JsonSchema): JsonSchema =>
+      mapProperties(
+        separateRoot ? withoutUnwrittenFields(member) : member,
+        partialProperties,
+        (property) => this.mapObjects(property, withoutUnwrittenFields),
+      )
+
+    return this.mapObjects(inlined, separate)
+  }
+
+  /**
+   * Maps the object schemas of a schema, also the members of a union or an intersection and the
+   * defs they refer to, which are inlined when they change.
+   */
+  private mapObjects(
+    schema: JsonSchema,
+    map: (object: JsonSchema) => JsonSchema,
+    followed: ReadonlySet<string> = new Set(),
+  ): JsonSchema {
+    if (typeof schema !== 'object') {
+      return schema
+    }
+
+    const name = fromRef(schema)
+    if (name !== undefined) {
+      const def = this.defsByName.get(name)
+      if (def?.schema === undefined || followed.has(name)) {
+        return schema
+      }
+
+      const mapped = this.mapObjects(def.schema, map, new Set(followed).add(name))
+      return mapped === def.schema ? schema : mapped
+    }
+
+    let result = map(schema)
+    for (const keyword of ['anyOf', 'oneOf', 'allOf'] as const) {
+      if (typeof result !== 'object') {
+        break
+      }
+
+      const members = result[keyword]
+      const mapped = members?.map((m) => this.mapObjects(m, map, followed))
+      if (mapped?.some((m, i) => m !== members![i])) {
+        result = { ...result, [keyword]: mapped }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * The root with its defs inlined, see `inlineRoot`.
+   */
+  private inlineRootDefs(
+    schema: JsonSchema,
+    properties: readonly string[],
+    partialProperties: readonly string[],
   ): JsonSchema {
     const resolve = (member: JsonSchema): JsonSchema | undefined => {
       const name = fromRef(member)
@@ -491,6 +564,34 @@ export class DefRegistry {
     }
 
     return collected
+  }
+}
+
+/**
+ * An object schema without the fields no value of which is written (`{ not: {} }`, like the keys
+ * `[P]?: never` of an exclusive or), for an object whose fields are sent each on their own, as
+ * parameters or headers, none of which could hold them.
+ */
+function withoutUnwrittenFields(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object' || !schema.properties) {
+    return schema
+  }
+
+  const unwritten = Object.keys(schema.properties).filter((name) =>
+    isNeverSchema(schema.properties![name]!),
+  )
+  if (!unwritten.length) {
+    return schema
+  }
+
+  const { properties, required, ...rest } = schema
+  const kept = Object.entries(properties).filter(([name]) => !unwritten.includes(name))
+  const stillRequired = required?.filter((name) => !unwritten.includes(name))
+
+  return {
+    ...rest,
+    ...(kept.length ? { properties: Object.fromEntries(kept) } : {}),
+    ...(stillRequired?.length ? { required: stillRequired } : {}),
   }
 }
 
