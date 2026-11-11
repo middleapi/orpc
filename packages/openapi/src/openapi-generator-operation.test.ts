@@ -2,6 +2,7 @@ import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap } from '@orpc/contract'
 import { asyncIteratorObject, error } from '@orpc/contract'
 import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter } from '@orpc/json-schema'
+import type { JsonSchema } from '@orpc/json-schema'
 
 import { testSchema, testSchemaConverter } from '../tests/__shared__/schema'
 import { OpenAPIComponentRegistry } from './openapi-generator-components'
@@ -834,6 +835,7 @@ describe('openAPIGenerator operation builders', () => {
             testSchema({
               type: 'object',
               properties: { file: { type: 'string', contentEncoding: 'binary' } },
+              required: ['file'],
             }),
           ],
         }),
@@ -847,10 +849,50 @@ describe('openAPIGenerator operation builders', () => {
             schema: {
               type: 'object',
               properties: { file: { type: 'string', contentEncoding: 'binary' } },
+              required: ['file'],
             },
           },
         },
       })
+    })
+
+    it('also uses application/json for bodies whose nested files may be left out', () => {
+      const file = { type: 'string', contentEncoding: 'binary' } as const
+      const contentTypes = (schema: JsonSchema) => {
+        const { ctx, operation } = createContext()
+        buildSuccessResponse(ctx, operation, testDef({ outputs: [testSchema(schema)] }), undefined)
+        return Object.keys((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content!)
+      }
+
+      // a value holding no file is sent as JSON
+      expect(contentTypes({ type: 'object', properties: { file } })).toEqual([
+        'multipart/form-data',
+        'application/json',
+      ])
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { files: { type: 'array', items: file } },
+          required: ['files'],
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { file: { anyOf: [file, { type: 'null' }] } },
+          required: ['file'],
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+      // through refs and compositions, a required file is always sent
+      expect(
+        contentTypes({
+          allOf: [
+            { type: 'object', properties: { file: { $ref: '#/$defs/File' } }, required: ['file'] },
+            { type: 'object', properties: { name: { type: 'string' } } },
+          ],
+          $defs: { File: file },
+        }),
+      ).toEqual(['multipart/form-data'])
     })
 
     it('reads the content media type of a file body from its $ref target', () => {

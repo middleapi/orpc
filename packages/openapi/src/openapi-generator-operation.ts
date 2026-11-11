@@ -16,6 +16,7 @@ import {
   isJsonPrimitiveSchema,
   isUnconstrainedSchema,
   matchArrayableJsonSchema,
+  resolveJsonSchemaLocalPointer,
   resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
@@ -705,17 +706,23 @@ function toBodyContent(
     const restSchema = fileSchemasByMediaType.size
       ? combineJsonSchemasWithComposition('anyOf', rest)
       : schema
-    const hasNestedFiles = containsJsonFileSchema(restSchema)
+    // a value holding no file is sent as JSON, also when its schema has optional files
+    const contentTypes = !containsJsonFileSchema(restSchema)
+      ? ['application/json']
+      : mayHoldNoFiles(restSchema)
+        ? ['multipart/form-data', 'application/json']
+        : ['multipart/form-data']
 
-    const contentType = hasNestedFiles ? 'multipart/form-data' : 'application/json'
-    const fileSchemas = fileSchemasByMediaType.get(contentType)
-    fileSchemasByMediaType.delete(contentType)
+    for (const contentType of contentTypes) {
+      const fileSchemas = fileSchemasByMediaType.get(contentType)
+      fileSchemasByMediaType.delete(contentType)
 
-    content[contentType] = {
-      schema: ctx.registry.toOpenAPISchema(
-        combineJsonSchemasWithComposition('anyOf', [restSchema, ...(fileSchemas ?? [])]),
-        direction,
-      ),
+      content[contentType] = {
+        schema: ctx.registry.toOpenAPISchema(
+          combineJsonSchemasWithComposition('anyOf', [restSchema, ...(fileSchemas ?? [])]),
+          direction,
+        ),
+      }
     }
   }
 
@@ -729,6 +736,45 @@ function toBodyContent(
   }
 
   return content
+}
+
+/**
+ * Whether a value of the schema may hold no file, like one whose files are optional: a value is
+ * sent as `multipart/form-data` only when it holds a file.
+ */
+function mayHoldNoFiles(
+  root: JsonSchema,
+  schema: JsonSchema = root,
+  visiting: Set<object> = new Set(),
+): boolean {
+  if (typeof schema === 'boolean' || visiting.has(schema)) {
+    return true
+  }
+
+  if (isJsonFileSchema(schema)) {
+    return false
+  }
+
+  visiting.add(schema)
+
+  try {
+    const target =
+      typeof schema.$ref === 'string' ? resolveJsonSchemaLocalPointer(root, schema.$ref) : undefined
+    const holdsNoFiles = (s: JsonSchema) => mayHoldNoFiles(root, s, visiting)
+
+    return (
+      (target === undefined || holdsNoFiles(target)) &&
+      (schema.anyOf === undefined || schema.anyOf.some(holdsNoFiles)) &&
+      (schema.oneOf === undefined || schema.oneOf.some(holdsNoFiles)) &&
+      (schema.allOf === undefined || schema.allOf.every(holdsNoFiles)) &&
+      (schema.required ?? []).every((name) => {
+        const property = schema.properties?.[name]
+        return property === undefined || holdsNoFiles(property)
+      })
+    )
+  } finally {
+    visiting.delete(schema)
+  }
 }
 
 function isPrimitive(schema: JsonSchema): boolean {
