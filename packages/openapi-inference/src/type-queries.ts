@@ -1083,9 +1083,9 @@ export class TypeQueries {
   getPrototypeType(name: string): Type | undefined {
     return this.memo('prototypeType', name, () => {
       const constructor = this.checker.resolveName(name, SymbolFlags.Value)
-      const constructorType = constructor && this.checker.getTypeOfSymbol(constructor)
+      const [constructorType] = constructor ? this.getSymbolTypes([constructor]) : []
       const prototype = constructorType && this.getProperty(constructorType, 'prototype')
-      return prototype && this.checker.getTypeOfSymbol(prototype)
+      return prototype && this.getSymbolTypes([prototype])[0]
     })
   }
 
