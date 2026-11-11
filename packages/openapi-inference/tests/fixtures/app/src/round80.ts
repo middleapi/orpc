@@ -33,6 +33,10 @@ export interface Node {
   id: number
   next?: Node & object
 }
+export interface WeakNode {
+  id?: number
+  next?: WeakNode & object
+}
 export interface Defaults {
   result: { id: number }
 }
@@ -173,6 +177,7 @@ export const roundEightyTypes = {
   optionalXor: os.input(type<XOR<OA, OB>>()).handler(() => 1),
   where: os.input(type<Where>()).handler(() => 1),
   node: os.input(type<Node>()).handler(() => 1),
+  weakNode: os.input(type<WeakNode>()).handler(() => 1),
   findArgs: os.input(type<FindArgs>()).handler(() => 1),
   saveUser: os.input(type<DeepPartial<User>>()).handler(() => 1),
   savePost: os.input(type<DeepPartial<Post>>()).handler(() => 1),

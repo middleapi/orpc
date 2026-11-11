@@ -4673,7 +4673,9 @@ describe('openAPIGenerator', () => {
         paths[path].post.responses['200'].content['application/json'].schema
       expect(response('/posts')).toEqual({ $ref: '#/components/schemas/Paginated_id_title' })
       expect(response('/accounts')).toEqual({ $ref: '#/components/schemas/Paginated_id_handle' })
-      // a cycle through what `XOR<Filter, Where>` distributes to is named after it
+      // `Node & object` is `Node`, and a cycle through what `XOR<Filter, Where>` distributes to
+      // is named after it
+      expect(schemas.Node.properties.next).toEqual({ $ref: '#/components/schemas/Node' })
       expect(schemas.Where.properties.author).toEqual({
         $ref: '#/components/schemas/XOR_Filter_Where',
       })
@@ -4693,12 +4695,34 @@ describe('openAPIGenerator', () => {
         'DeepPartial_Post',
         'DeepPartial_PostArray',
         'DeepPartial_User',
+        'Node',
         'Post',
-        'Recursive',
         'User',
+        'WeakNode',
         'Where',
         'XOR_Filter_Where',
       ])
+    })
+
+    it('documents an object of a weak type intersected with object by its fields', async () => {
+      const spec = await generate('3.1.1', undefined, 'roundEightyTypes')
+
+      // a date or an array is also one, written as no object
+      expect(
+        (spec.paths as any)['/objectOnly'].post.requestBody.content['application/json'].schema,
+      ).toEqual({
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' } } },
+          { not: { type: 'object' } },
+        ],
+      })
+      // of a declared type, by its def
+      expect(
+        (spec.paths as any)['/weakNode'].post.requestBody.content['application/json'].schema,
+      ).toEqual({ $ref: '#/components/schemas/WeakNode' })
+      expect((spec.components?.schemas as any).WeakNode.properties.next).toEqual({
+        anyOf: [{ $ref: '#/components/schemas/WeakNode' }, { not: { type: 'object' } }],
+      })
     })
 
     it('documents a value whose files are optional as JSON too', async () => {

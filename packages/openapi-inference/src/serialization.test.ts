@@ -2517,8 +2517,11 @@ describe('generated schemas match serialized outputs', async () => {
       })
     })
 
-    it('writes intersections of a keyless type and optional properties as any value', () => {
-      const extra = { anyOf: [{}, { type: 'object', properties: { extra: strings } }] }
+    it('writes intersections of a keyless type and optional properties as their fields, or as any other value', () => {
+      // an object is one of the type, an array or a date written as no object is one too
+      const extra = {
+        anyOf: [{ type: 'object', properties: { extra: strings } }, { not: { type: 'object' } }],
+      }
 
       // and leaves out the key of a function
       expect(schemaOf('keylessIntersections')).toEqual({

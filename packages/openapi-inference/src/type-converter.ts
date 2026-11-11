@@ -995,6 +995,14 @@ export class TypeToJsonSchemaConverter {
       return this.withPlainForm(type, this.visit(branded))
     }
 
+    // `Node & object` is `Node`, keeping its name: `object` adds only that a value is no primitive,
+    // unless the other member is weak (`object & { extra?: string }`, see below)
+    const loose = isLooseIntersection(this.types, type)
+    const objects = members.filter((m) => !(m.flags & TypeFlags.NonPrimitive))
+    if (objects.length === 1 && objects.length < members.length && !loose) {
+      return this.visit(objects[0]!)
+    }
+
     const arrayLike = members.find((m) => this.types.getReferenceKind(m) !== undefined)
     if (arrayLike) {
       // `JSON.stringify` calls `toJSON` of arrays, the serializer walks them
@@ -1018,9 +1026,13 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    // `object & { extra?: string }` also holds arrays and dates, `{} & { extra?: string }` strings
-    if (isLooseIntersection(this.types, type)) {
-      return anyOfDeduped([{}, this.convertObject(type)])
+    // `object & { extra?: string }` also holds arrays and dates, `{} & { extra?: string }` strings,
+    // but an object written as one is one of the type
+    if (loose) {
+      return anyOfDeduped([
+        objects.length === 1 ? this.visit(objects[0]!) : this.convertObject(type),
+        { not: { type: 'object' } },
+      ])
     }
 
     return this.convertObject(type)
