@@ -719,7 +719,7 @@ describe('generated schemas match serialized outputs', async () => {
       properties: { label: { type: 'string' } },
       required: ['label'],
     })
-    expect(schemas.Box_Uint8Array_ArrayBufferLike.properties.data).toEqual(bytes)
+    expect(schemas.Box_Uint8Array.properties.data).toEqual(bytes)
 
     // a `#private` member allows only instances, `Partial` allows plain objects too
     const views = (spec.paths as any)['/optionalToJSONViews'].post.responses['200'].content[
@@ -1383,11 +1383,11 @@ describe('generated schemas match serialized outputs', async () => {
 
     it('converts deep mapped types over built-ins as the built-in', () => {
       expect(schemas().DeepRO_RegExp).toEqual({ description: 'Read-only all the way down' })
-      expect(schemas().DeepRO_Uint8Array_ArrayBufferLike).toEqual({
+      expect(schemas().DeepRO_Uint8Array).toEqual({
         ...typedArray,
         description: 'Read-only all the way down',
       })
-      expect(schemas().DeepPartialOf_Uint8Array_ArrayBufferLike).toEqual({
+      expect(schemas().DeepPartialOf_Uint8Array).toEqual({
         ...typedArray,
         description: 'Optional all the way down',
       })

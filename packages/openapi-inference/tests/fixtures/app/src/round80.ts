@@ -238,3 +238,20 @@ export const roundEightyParameters = {
     body: 1,
   })),
 }
+
+export interface Box<T = string> {
+  value: T
+}
+export interface Result<T> {
+  ok: boolean
+  data: T
+}
+
+/** Instantiations named by their written type arguments, also nested ones */
+export const roundEightyNames = {
+  rows: os.handler((): Paginated<{ id: number }[]> => ({ items: [], nextCursor: null })),
+  results: os.handler((): Result<{ name: string }[]> => ({ ok: true, data: [] })),
+  pages: os.handler((): Paginated<Result<{ id: number }>> => ({ items: [], nextCursor: null })),
+  box: os.handler((): Box<Box> => ({ value: { value: 'a' } })),
+  boxes: os.handler((): Box<Box<number>> => ({ value: { value: 1 } })),
+}

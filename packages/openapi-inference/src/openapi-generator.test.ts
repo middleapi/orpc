@@ -211,6 +211,7 @@ import { roundSeventyEight, roundSeventyEightViews } from '../tests/fixtures/app
 import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
 import {
   roundEighty,
+  roundEightyNames,
   roundEightyParameters,
   roundEightyTypes,
 } from '../tests/fixtures/app/src/round80'
@@ -4594,7 +4595,7 @@ describe('openAPIGenerator', () => {
   })
 
   describe('round eighty', () => {
-    const routers = { roundEighty, roundEightyTypes, roundEightyParameters }
+    const routers = { roundEighty, roundEightyTypes, roundEightyParameters, roundEightyNames }
     const generate = (
       version: '3.1.1' | '3.0.4' = '3.1.1',
       defs?: 'recursive',
@@ -4815,5 +4816,28 @@ describe('openAPIGenerator', () => {
         })
       },
     )
+
+    it('names instantiations by the written type arguments of nested generics and array items', async () => {
+      const spec = await generate('3.1.1', undefined, 'roundEightyNames')
+      const response = (path: string) =>
+        (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
+
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+        'Box',
+        'Box_Box',
+        'Box_Box_number',
+        'Box_number',
+        'Paginated_Result_id',
+        'Paginated_idArray',
+        'Result_id',
+        'Result_nameArray',
+      ])
+      expect(response('/rows')).toEqual({ $ref: '#/components/schemas/Paginated_idArray' })
+      expect(response('/results')).toEqual({ $ref: '#/components/schemas/Result_nameArray' })
+      expect(response('/pages')).toEqual({ $ref: '#/components/schemas/Paginated_Result_id' })
+      // a type argument left to its default is not named, also in another one
+      expect(response('/box')).toEqual({ $ref: '#/components/schemas/Box_Box' })
+      expect(response('/boxes')).toEqual({ $ref: '#/components/schemas/Box_Box_number' })
+    })
   })
 })

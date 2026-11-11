@@ -58,35 +58,71 @@ function getWrittenTypeArguments(
 }
 
 /**
- * The printed type, with only the type arguments written (see `getWrittenTypeArguments`), and
- * with `keys`, object literal arguments printed by their first keys.
+ * The printed type, with only the type arguments written (see `getWrittenTypeArguments`), also of
+ * the generics in its arguments (`Box<Box<string>>` of `Box<T = string>` is written `Box<Box>`),
+ * and with `keys`, object literal arguments printed by their first keys, also as array items
+ * (`Result<{ id: number }[]>` is written `Result<id[]>`).
  */
 function printWritten(
   types: TypeQueries,
   type: Type,
   written: readonly Type[],
   keys = false,
+  depth = 0,
 ): string {
   const printed = printType(types, type)
+  const args = written.map((t) => printArgument(types, t, keys, depth))
 
-  if (!keys && written.length === types.getTypeArguments(type).length) {
+  if (
+    args.length === types.getTypeArguments(type).length &&
+    args.every((arg, i) => arg === printType(types, written[i]!))
+  ) {
     return printed
   }
 
   const index = printed.indexOf('<')
   const head = index < 0 ? printed : printed.slice(0, index)
-  const print = (t: Type) => {
-    const text = printType(types, t)
-    return keys && text === '{}'
-      ? types
-          .getProperties(t)
+  return args.length ? `${head}<${args.join(', ')}>` : head
+}
+
+/** How deep the type arguments of the generics in type arguments are written */
+const WRITTEN_ARGUMENTS_DEPTH = 4
+
+/**
+ * A type argument as `printWritten` writes it.
+ */
+function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: number): string {
+  const printed = printType(types, type)
+
+  if (printed === '{}') {
+    return (
+      (keys &&
+        types
+          .getProperties(type)
           .slice(0, OBJECT_LITERAL_KEYS)
           .map((p) => p.name)
-          .join(', ') || text
-      : text
+          .join(', ')) ||
+      printed
+    )
   }
 
-  return written.length ? `${head}<${written.map(print).join(', ')}>` : head
+  if (depth >= WRITTEN_ARGUMENTS_DEPTH) {
+    return printed
+  }
+
+  if (types.getReferenceKind(type) === 'array') {
+    const element = types.getReferenceArguments(type)[0]
+    const item = element && printArgument(types, element, keys, depth + 1)
+    // not a union or an intersection, which would need parentheses
+    return item === undefined || item === printType(types, element!) || /[|&]/u.test(item)
+      ? printed
+      : `${printed.startsWith('readonly ') ? 'readonly ' : ''}${item}[]`
+  }
+
+  const symbol = type.getAliasSymbol() ?? type.getSymbol()
+  return symbol && printed.startsWith(`${symbol.name}<`)
+    ? printWritten(types, type, getWrittenTypeArguments(types, type, symbol), keys, depth + 1)
+    : printed
 }
 
 /** How many keys of an object literal argument name an instantiation */
