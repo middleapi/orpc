@@ -4639,6 +4639,12 @@ describe('openAPIGenerator', () => {
         properties: { name: { type: 'string' }, key: { type: 'string' } },
         required: ['name', 'key'],
       })
+      // also under `JSON.stringify`, in what a `toJSON` returns
+      expect(schemas.DocHolder.properties.docs.items).toEqual({
+        type: 'object',
+        properties: { street: { type: 'string' }, key: { type: 'string' } },
+        required: ['street', 'key'],
+      })
       expect(schemas.Conn).toBeUndefined()
     })
 

@@ -62,6 +62,7 @@ import {
   isDropped,
   isDroppedResult,
   isEffectValue,
+  isClassView,
   isInstanceOrPlain,
   mayBePlainObject,
   isFunction,
@@ -1262,7 +1263,7 @@ export class TypeToJsonSchemaConverter {
         (!callable &&
           (this.mode === 'stringify'
             ? // under `JSON.stringify` rules, a view may also hold a plain object without `toJSON`
-              classType !== undefined && classType.id !== type.id
+              isClassView(this.types, type)
             : // the serializer skips `toJSON` of a plain object, which a declared object type
               // (`interface Point { toJSON(): string }`) or a view of a class may be
               classType === undefined || eitherView || plain))

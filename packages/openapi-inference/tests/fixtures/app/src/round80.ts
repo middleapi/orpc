@@ -70,6 +70,18 @@ export class HDoc<T> {
 }
 export type Hydrated<T> = HDoc<T> & T
 
+/** A document class inheriting its `toJSON` */
+export class SubDoc<T> extends HDoc<T> {
+  nested = true
+}
+
+/** A document whose `toJSON` holds documents, which `JSON.stringify` writes by their `toJSON` */
+export class DocHolder {
+  toJSON(): { docs: (SubDoc<{ street: string }> & { street: string })[] } {
+    return { docs: [Object.assign(new SubDoc<{ street: string }>(), { street: 's' })] }
+  }
+}
+
 type DeepPartial<T> =
   | T
   | (T extends Array<infer U>
@@ -130,6 +142,7 @@ export const roundEighty = {
   hydrated: os.handler((): Hydrated<{ name: string }> =>
     Object.assign(new HDoc<{ name: string }>(), { name: 'a' }),
   ),
+  docHolder: os.handler(() => new DocHolder()),
 }
 
 export const roundEightyTypes = {
