@@ -185,7 +185,7 @@ export class RouterTypeResolver {
       return type
     }
 
-    const members = type.getTypes()
+    const members = this.types.getMembers(type)
     const concrete = members.filter((t) => !(t.flags & (TypeFlags.Undefined | TypeFlags.Null)))
 
     if (concrete.length === members.length) {
