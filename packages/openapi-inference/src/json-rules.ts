@@ -175,7 +175,7 @@ export function isBuiltinMember(types: TypeQueries, property: TSSymbol, isError 
       const declared = symbol && types.checker.getDeclaredTypeOfSymbol(symbol)
 
       return (declared ? getBaseTypes(types, declared) : []).some((base) => {
-        const inherited = types.checker.getPropertyOfType(base, property.name)
+        const inherited = types.getProperty(base, property.name)
         return (
           inherited !== undefined &&
           inherited.id !== property.id &&
@@ -542,16 +542,18 @@ function getToJSONMembers(types: TypeQueries, type: Type): readonly Type[] {
  * which may hold one).
  */
 function getMethodResultTypes(types: TypeQueries, member: Type): readonly Type[] {
-  if (member.flags & (TypeFlags.Any | TypeFlags.Unknown) || mayHoldFunction(types, member)) {
-    return [types.checker.getAnyType()]
-  }
+  return types.memo('methodResults', member.id, () => {
+    if (member.flags & (TypeFlags.Any | TypeFlags.Unknown) || mayHoldFunction(types, member)) {
+      return [types.checker.getAnyType()]
+    }
 
-  const method = getViewedFunction(types, member) ?? member
-  const results = types.checker
-    .getSignaturesOfType(method, SignatureKind.Call)
-    .flatMap((signature) => types.checker.getReturnTypeOfSignature(signature) ?? [])
+    const method = getViewedFunction(types, member) ?? member
+    const results = types.checker
+      .getSignaturesOfType(method, SignatureKind.Call)
+      .flatMap((signature) => types.checker.getReturnTypeOfSignature(signature) ?? [])
 
-  return results.length || !isFunction(types, method) ? results : [types.checker.getAnyType()]
+    return results.length || !isFunction(types, method) ? results : [types.checker.getAnyType()]
+  })
 }
 
 /**

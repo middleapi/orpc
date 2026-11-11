@@ -1837,7 +1837,7 @@ export class TypeToJsonSchemaConverter {
     // in index order, `0`, `1`, ...
     const elements = numeric.map((_, i) => numeric.find((p) => p.name === String(i)))
     const ordered = elements.every((e) => e !== undefined) ? (elements as TSSymbol[]) : numeric
-    const [lengthType, ...elementTypes] = this.checker.getTypeOfSymbol([length, ...ordered])
+    const [lengthType, ...elementTypes] = this.types.getSymbolTypes([length, ...ordered])
     // `Partial` makes the length optional, a tuple with optional elements has several
     // (`1 | 2` of `Readonly<[number, string?] & { extra?: string }>`)
     const members = lengthType ? this.types.getUnionMembers(lengthType) : []
@@ -1911,7 +1911,7 @@ export class TypeToJsonSchemaConverter {
       declaration !== undefined &&
       ['Array', 'ReadonlyArray'].some((name) => {
         const global = this.types.getGlobalType(name)
-        const own = global && this.checker.getPropertyOfType(global, property.name)?.declarations
+        const own = global && this.types.getProperty(global, property.name)?.declarations
         return own?.some((d) => d.path === declaration.path && d.index === declaration.index)
       })
     )
