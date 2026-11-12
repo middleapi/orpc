@@ -37,7 +37,16 @@ import {
 import { contract, implemented } from '../tests/fixtures/app/src/contract'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
 import { router as headersRouter } from '../tests/fixtures/app/src/headers'
-import { decomposed, optional, records, spread } from '../tests/fixtures/app/src/round2'
+import {
+  decomposed,
+  disjoint,
+  indexes,
+  optional,
+  other,
+  records,
+  spread,
+  unions,
+} from '../tests/fixtures/app/src/round2'
 import { router as round3Router } from '../tests/fixtures/app/src/round3'
 import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11'
 import { errorData } from '../tests/fixtures/app/src/round11-broken'
@@ -1561,6 +1570,12 @@ describe('openAPIGenerator', () => {
       },
     }
 
+    const B = {
+      'application/json': {
+        schema: { type: 'object', properties: { b: { type: 'string' } }, required: ['b'] },
+      },
+    }
+
     const outputOf = (spec: any, path: string) => spec.paths[path].post.responses['200'].content
 
     it('resolves routers typed with index signatures', async () => {
@@ -1568,6 +1583,36 @@ describe('openAPIGenerator', () => {
         source: { file: fixture('round2.ts'), export: 'records' },
       })
       expect(outputOf(spec, '/planets/a')).toEqual(OK)
+    })
+
+    it('resolves routers typed with number and template literal index signatures', async () => {
+      const spec = await generator.generate(indexes, {
+        source: { file: fixture('round2.ts'), export: 'indexes' },
+      })
+      expect(outputOf(spec, '/versions/v1')).toEqual(OK)
+      expect(outputOf(spec, '/numbers/0')).toEqual(B)
+    })
+
+    it('resolves routers of a union at keys only some members have', async () => {
+      const spec = await generator.generate(unions, {
+        source: { file: fixture('round2.ts'), export: 'unions' },
+      })
+      expect(outputOf(spec, '/ping')).toEqual(OK)
+      expect(outputOf(spec, '/debug')).toEqual(B)
+
+      const disjointSpec = await generator.generate(
+        { ...disjoint, other },
+        {
+          source: { file: fixture('round2.ts'), export: 'disjoint' },
+        },
+      )
+      expect(outputOf(disjointSpec, '/other')).toEqual(B)
+      expect(outputOf(disjointSpec, '/ping')).toEqual(OK)
+      expect(outputOf(disjointSpec, '/shared')).toEqual({
+        'application/json': {
+          schema: { anyOf: [OK['application/json'].schema, B['application/json'].schema] },
+        },
+      })
     })
 
     it('resolves optional procedures and sub-routers', async () => {

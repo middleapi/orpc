@@ -18,6 +18,24 @@ export const optional: { ping: typeof procedure; nested?: { a: typeof procedure 
 
 export const spread = { ping: procedure, ...(dev ? { debug: procedure } : {}) }
 
+const on = Math.random() < 2
+
+export const other = os.handler(() => ({ b: 'x' }))
+
+// of variables, as the members of a union of object literals get the keys of the others
+const base = { ping: procedure }
+const routerA = { ping: procedure, shared: procedure }
+const routerB = { other, shared: other }
+
+export const unions = on ? { ...base, debug: other } : base
+
+export const disjoint = on ? routerA : routerB
+
+export const indexes: {
+  versions: Record<`v${number}`, typeof procedure>
+  numbers: Record<number, typeof other>
+} = { versions: { v1: procedure }, numbers: { 0: other } }
+
 export const notProcedures = { ping: 'not a procedure', nested: { pong: 42 } }
 
 export interface FindQuery {

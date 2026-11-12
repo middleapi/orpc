@@ -2778,7 +2778,7 @@ function withNullBranch(schema: JsonSchema | undefined, hasNull: boolean): JsonS
 /**
  * The key type of an index signature, the primitive or template of a branded key.
  */
-function getIndexKeyType(types: TypeQueries, key: Type): Type | undefined {
+export function getIndexKeyType(types: TypeQueries, key: Type): Type | undefined {
   const keyFlags =
     TypeFlags.String | TypeFlags.Number | TypeFlags.TemplateLiteral | TypeFlags.StringMapping
 
@@ -2802,7 +2802,7 @@ const NUMBER_KEY_PATTERN = '^(?:0|-?[1-9]\\d{0,14})$'
  * The checker folds literal parts (`${null}`, `${true}`) into the texts and distributes
  * unions (`${boolean}`, `${'a' | 'b'}`) over the template, branded literals remain.
  */
-function toPattern(types: TypeQueries, type: Type): string {
+export function toPattern(types: TypeQueries, type: Type): string {
   const flags = type.flags
 
   if (flags & (LITERAL_FLAGS | TypeFlags.BigIntLiteral)) {

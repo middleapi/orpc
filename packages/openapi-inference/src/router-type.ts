@@ -2,6 +2,7 @@ import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unst
 import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import { ExpansionGuard } from './expansion'
+import { getIndexKeyType, toPattern } from './type-converter'
 import { TypeQueries } from './type-queries'
 import { getCallReturnType, getPromisedType } from './utils'
 
@@ -33,24 +34,44 @@ export class RouterTypeResolver {
     let current: ResolvedRouterType = { ...this.root, type: this.unlazy(this.root.type) }
 
     for (const segment of path) {
-      const symbol = this.types.getProperty(current.type, segment)
+      const found = this.resolveSegment(current.type, segment)
 
-      // routers typed with an index signature, like `Record<string, typeof procedure>`
-      const type = symbol
-        ? this.types.getSymbolTypes([symbol])[0]
-        : this.checker
-            .getIndexInfosOfType(current.type)
-            .find((info) => info.keyType.flags & TypeFlags.String)?.valueType
-
-      if (!type) {
+      if (!found) {
         return undefined
       }
 
       // optional sub-routers and procedures, like `...(dev ? { debug } : {})`
-      current = { type: this.unlazy(this.stripNullish(type)), symbol }
+      current = { type: this.unlazy(this.stripNullish(found.type)), symbol: found.symbol }
     }
 
     return current
+  }
+
+  private resolveSegment(type: Type, segment: string): ResolvedRouterType | undefined {
+    const symbol = this.types.getProperty(type, segment)
+
+    if (symbol) {
+      const propertyType = this.types.getSymbolTypes([symbol])[0]
+      return propertyType && { type: propertyType, symbol }
+    }
+
+    // routers of a union, like `isDev ? { ...base, debug } : base`, at a key only some members have
+    if (type.isUnionType()) {
+      const found = this.types
+        .getMembers(type)
+        .map((member) => this.resolveSegment(this.unlazy(member), segment))
+        .filter((member) => member !== undefined)
+
+      return found.every((member) => member.type.id === found[0]?.type.id) ? found[0] : undefined
+    }
+
+    // routers typed with an index signature, like `Record<string, typeof procedure>`
+    const valueType = this.checker.getIndexInfosOfType(type).find((info) => {
+      const key = getIndexKeyType(this.types, info.keyType)
+      return key && new RegExp(`^(?:${toPattern(this.types, key)})$`, 'u').test(segment)
+    })?.valueType
+
+    return valueType && { type: valueType, symbol: undefined }
   }
 
   /**
