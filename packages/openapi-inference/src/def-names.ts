@@ -187,7 +187,12 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
   }
 
   const printed = toDefName(printType(types, type))
-  return printed && printed !== name ? printed : 'Recursive'
+  if (printed && printed !== name) {
+    return printed
+  }
+
+  // a class expression (`class { ... }` a function returns) is no recursive type
+  return symbol && symbol.flags & SymbolFlags.Class ? 'AnonymousClass' : 'Recursive'
 }
 
 /**
@@ -230,15 +235,32 @@ function printType(types: TypeQueries, type: Type): string {
 }
 
 /**
- * The declared name of a symbol, also for default exports (`export default class Account`).
+ * The declared name of a symbol, also for default exports (`export default class Account`), and
+ * of an anonymous one, its file (`export default class {}` of `user-card.ts` is `UserCard`).
  */
 function getSymbolName(symbol: TSSymbol): string {
   if (symbol.name !== 'default') {
     return symbol.name
   }
 
-  const node = symbol.declarations[0]?.resolve() as any
-  return typeof node?.name?.text === 'string' ? node.name.text : symbol.name
+  const declaration = symbol.declarations[0]
+  const node = declaration?.resolve() as any
+
+  if (typeof node?.name?.text === 'string') {
+    return node.name.text
+  }
+
+  // `index.ts` by its directory
+  const [file, directory] = String(declaration?.path ?? '')
+    .split(/[\\/]/u)
+    .reverse()
+    .map((part) => part.replace(/\..*$/u, ''))
+  const fileName = (file === 'index' ? directory : file)
+    ?.split(/[^a-z\d]+/iu)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')
+
+  return fileName && /^[a-z]/iu.test(fileName) ? fileName : symbol.name
 }
 
 /**

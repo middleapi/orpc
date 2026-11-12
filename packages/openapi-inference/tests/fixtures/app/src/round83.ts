@@ -2,6 +2,8 @@
 import '@orpc/openapi/extensions/route'
 import { os, type } from '@orpc/server'
 
+import UserCard from './round83-user-card'
+
 export class Point {
   constructor(
     public x: number,
@@ -79,12 +81,19 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
   ],
 }
 
+const makeCounter = () =>
+  new (class {
+    constructor(public count: number) {}
+  })(1)
+
 interface Tagged<T> {
   tag: T
 }
 
-/** Types named by a printed type argument */
+/** Types named after their file, or by a printed type argument */
 export const roundEightyThreeNames = {
+  card: os.handler((): UserCard => new UserCard('a')),
+  counter: os.handler(() => makeCounter()),
   month: os.handler((): Tagged<'2024-01'> => ({ tag: '2024-01' })),
   below: os.handler((): Tagged<-1> => ({ tag: -1 })),
 }

@@ -5533,12 +5533,14 @@ describe('openAPIGenerator', () => {
   })
 
   describe('round eighty-three', () => {
-    it('names a hyphen in a string literal argument not as a minus sign', async () => {
+    it('names anonymous classes after their file or as classes, and a hyphen of a literal not as a sign', async () => {
       const spec = await generator.generate(roundEightyThreeNames, {
         source: { file: fixture('round83.ts'), export: 'roundEightyThreeNames' },
       })
 
       expect(Object.keys(spec.components?.schemas ?? {}).sort()).toEqual([
+        'AnonymousClass',
+        'Round83UserCard',
         'Tagged_2024_01',
         'Tagged_neg1',
       ])
