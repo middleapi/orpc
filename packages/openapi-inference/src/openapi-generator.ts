@@ -62,6 +62,7 @@ import {
   getAssignedSymbol,
   getImplementedSymbol,
   getJSDoc,
+  getOrCreate,
 } from './utils'
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
@@ -174,11 +175,7 @@ class CachedJsonSchemaConverter implements JsonSchemaConverter {
       return convert()
     }
 
-    let conversions = this.conversions.get(schema)
-    if (!conversions) {
-      this.conversions.set(schema, (conversions = {}))
-    }
-    return (conversions[direction] ??= convert())
+    return (getOrCreate(this.conversions, schema, () => ({}))[direction] ??= convert())
   }
 }
 

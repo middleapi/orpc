@@ -173,6 +173,21 @@ export function getImplementedSymbol(checker: Checker, symbol: TSSymbol): TSSymb
   return undefined
 }
 
+/**
+ * The value of a key of a map, created on first use.
+ */
+export function getOrCreate<K, V>(
+  map: { get(key: K): V | undefined; has(key: K): boolean; set(key: K, value: V): unknown },
+  key: K,
+  create: () => NoInfer<V>,
+): V {
+  if (!map.has(key)) {
+    map.set(key, create())
+  }
+
+  return map.get(key) as V
+}
+
 export function resolveAlias(checker: Checker, symbol: TSSymbol): TSSymbol {
   return symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
 }
@@ -182,6 +197,13 @@ export function resolveAlias(checker: Checker, symbol: TSSymbol): TSSymbol {
  */
 export function isTypeReference(type: Type): boolean {
   return Boolean(type.flags & TypeFlags.Object && (type as any).objectFlags & ObjectFlags.Reference)
+}
+
+/**
+ * Whether a type is a mapped type (`Readonly<T>`, `{ [K in keyof T]: T[K] }`), checked locally.
+ */
+export function isMappedType(type: Type): boolean {
+  return Boolean((type as any).objectFlags & ObjectFlags.Mapped)
 }
 
 /**

@@ -8,12 +8,19 @@ import type {
   Type,
   TypeReference,
 } from 'typescript/unstable/sync'
-import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import { SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import { getIndexInfos } from './builtins'
 import { argumentsGrow, getDeclarationId, MAX_GROWTH, MAX_NESTING } from './expansion'
 import type { JSDoc, SourceKind } from './utils'
-import { createSourceKindChecker, getJSDoc, isTypeReference, resolveAlias } from './utils'
+import {
+  createSourceKindChecker,
+  getJSDoc,
+  getOrCreate,
+  isMappedType,
+  isTypeReference,
+  resolveAlias,
+} from './utils'
 
 export const UNDEFINED_FLAGS = TypeFlags.Undefined | TypeFlags.Void
 
@@ -178,18 +185,11 @@ export class TypeQueries {
    * Caches a result by the id of a type or symbol (or a name), under a kind of question.
    */
   memo<T>(kind: string, id: number | string, compute: () => T): T {
-    let cache = this.memos.get(kind)
-
-    if (cache === undefined) {
-      cache = new Map()
-      this.memos.set(kind, cache)
-    }
-
-    if (!cache.has(id)) {
-      cache.set(id, compute())
-    }
-
-    return cache.get(id) as T
+    return getOrCreate(
+      getOrCreate(this.memos, kind, () => new Map()),
+      id,
+      compute,
+    ) as T
   }
 
   /**
@@ -205,7 +205,7 @@ export class TypeQueries {
   }
 
   private getDirectMappedSource(type: Type): Type | undefined {
-    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+    if (!isMappedType(type)) {
       return undefined
     }
 
@@ -235,7 +235,7 @@ export class TypeQueries {
    * (`Readonly<Omit<boolean, 'k'>>`), not of a branded primitive.
    */
   isPrimitiveView(type: Type): boolean {
-    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+    if (!isMappedType(type)) {
       return false
     }
 
@@ -298,7 +298,7 @@ export class TypeQueries {
    * brand of `DeepReadonly<number & { __brand: 'Id' }>`), when it keeps their values.
    */
   getMappedSourceMembers(type: Type): readonly Type[] {
-    if (!((type as any).objectFlags & ObjectFlags.Mapped)) {
+    if (!isMappedType(type)) {
       return []
     }
 
@@ -306,7 +306,7 @@ export class TypeQueries {
       const source = this.getMappedSource(type)
       const innermost = source ?? type
 
-      if ((innermost as any).objectFlags & ObjectFlags.Mapped) {
+      if (isMappedType(innermost)) {
         const owners = this.getKeptOwners(innermost)
         if (owners) {
           return owners
@@ -528,7 +528,7 @@ export class TypeQueries {
   isMappedViewOf(type: Type, source: Type): boolean {
     return (
       Boolean(source.flags & (TypeFlags.Object | TypeFlags.Intersection)) &&
-      Boolean((type as any).objectFlags & ObjectFlags.Mapped) &&
+      isMappedType(type) &&
       this.keepsValue(type, source)
     )
   }
@@ -736,7 +736,7 @@ export class TypeQueries {
    * of its values needs to be compared with the source's.
    */
   private isIdentityViewOf(value: Type, source: Type): boolean {
-    if (!((value as any).objectFlags & ObjectFlags.Mapped) || source.flags & INSTANTIABLE_FLAGS) {
+    if (!isMappedType(value) || source.flags & INSTANTIABLE_FLAGS) {
       return false
     }
 
@@ -757,15 +757,11 @@ export class TypeQueries {
   getFlattenedView(type: Type): Type {
     let current = type
 
-    while ((current as any).objectFlags & ObjectFlags.Mapped) {
+    while (isMappedType(current)) {
       const alias = current.getAliasSymbol()
       const [argument] = alias ? current.getAliasTypeArguments() : []
 
-      if (
-        !argument ||
-        argument.getAliasSymbol()?.id !== alias!.id ||
-        !((argument as any).objectFlags & ObjectFlags.Mapped)
-      ) {
+      if (!argument || argument.getAliasSymbol()?.id !== alias!.id || !isMappedType(argument)) {
         break
       }
 
@@ -924,7 +920,7 @@ export class TypeQueries {
       return value.isIntersectionType() && this.checker.isTypeAssignableTo(source, value)
     }
 
-    if ((value as any).objectFlags & ObjectFlags.Mapped) {
+    if (isMappedType(value)) {
       // a mapped type over a generic type keeps its values only as the alias over it, found above
       // (`Readonly<Box<T>>`), not as one over an instantiation (`DeepPartial<Nest<number[]>>` of
       // `Nest<T[]>`, nested in the declared class a conditional type's mapped type is read as)
@@ -965,7 +961,7 @@ export class TypeQueries {
     // `` { [K in `b-${T}`]: true } ``, `{ [K in T | 'extra']: true }`) as it is declared, or by an
     // alias over one (`Record<T | 'extra', true>`), unlike their instantiations and mapped types
     // over other keys (`{ [K in string]: number }`)
-    if ((type as any).objectFlags & ObjectFlags.Mapped) {
+    if (isMappedType(type)) {
       const symbol = type.getSymbol()
       const declaration = symbol?.declarations[0]?.resolve() as any
       const constraint = declaration?.typeParameter?.constraint
@@ -1188,11 +1184,7 @@ export class TypeQueries {
    */
   getLostAlias(type: Type): TSSymbol | undefined {
     const symbol = type.getSymbol()?.id ?? -1
-    let asked = this.askedTypes.get(symbol)
-    if (!asked) {
-      this.askedTypes.set(symbol, (asked = new Map()))
-    }
-    asked.set(type.id, type)
+    getOrCreate(this.askedTypes, symbol, () => new Map()).set(type.id, type)
 
     const aliases = this.lostAliases.get(symbol)
     const own = aliases?.get(type.id)
@@ -1241,10 +1233,7 @@ export class TypeQueries {
    */
   private addLostAlias(type: Type, alias: TSSymbol): void {
     const symbol = type.getSymbol()?.id ?? -1
-    let aliases = this.lostAliases.get(symbol)
-    if (!aliases) {
-      this.lostAliases.set(symbol, (aliases = new Map()))
-    }
+    const aliases = getOrCreate(this.lostAliases, symbol, () => new Map())
 
     const existing = aliases.get(type.id)?.[1]
     const preferred = preferAlias(existing, alias)
@@ -1440,10 +1429,7 @@ function preferAlias(a: TSSymbol | undefined, b: TSSymbol): TSSymbol {
 
 /** Whether comparing a value with its source may nest deeper: a union or a mapped type */
 function nests(type: Type | undefined): boolean {
-  return (
-    type !== undefined &&
-    Boolean(type.flags & TypeFlags.Union || (type as any).objectFlags & ObjectFlags.Mapped)
-  )
+  return type !== undefined && (Boolean(type.flags & TypeFlags.Union) || isMappedType(type))
 }
 
 /** Whether a type node is a type parameter's name, without type arguments */

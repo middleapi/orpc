@@ -1,10 +1,10 @@
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
+import { TypeFlags } from 'typescript/unstable/sync'
 
 import { ExpansionGuard } from './expansion'
 import { getIndexKeyType, toPattern } from './key-patterns'
 import { TypeQueries } from './type-queries'
-import { getCallReturnType, getPromisedType } from './utils'
+import { getCallReturnType, getPromisedType, isMappedType } from './utils'
 
 export interface ResolvedRouterType {
   type: Type
@@ -145,11 +145,7 @@ export class RouterTypeResolver {
 
     const symbol = type.getSymbol()
 
-    return (
-      !symbol ||
-      !!((type as any).objectFlags & ObjectFlags.Mapped) ||
-      this.types.getSymbolSourceKind(symbol) !== 'default'
-    )
+    return !symbol || isMappedType(type) || this.types.getSymbolSourceKind(symbol) !== 'default'
   }
 
   /**
