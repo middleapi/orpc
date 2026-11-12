@@ -106,65 +106,32 @@ export function mergeEquivalentComponents(
   )
   const isCandidate = new Set(candidates)
 
-  // the JSON of each schema, without the names of the candidates it refers to, and those names
-  const shapes = new Map<string, { shape: string; refs: string[] }>()
-
-  for (const name of candidates) {
-    const refs: string[] = []
-    const shape = mapComponentRefs(schemas[name] as JsonSchema, (target) => {
-      if (!isCandidate.has(target)) {
-        return target
-      }
-      refs.push(target)
-      return ''
-    })
-    shapes.set(name, { shape: stringifyJSON(shape) ?? '', refs })
-  }
-
-  // classes of equivalent components: of the same name but its number, of the same shape,
-  // referring to equivalent ones in turn, refined until they no longer split
-  let classes = new Map(
+  // components of the same name but its number, of the same JSON without the names of the
+  // candidates they refer to, referring to equivalent ones in turn
+  const refs = new Map<string, string[]>()
+  const shapes = new Map(
     candidates.map((name) => {
+      const targets: string[] = []
+      const shape = mapComponentRefs(schemas[name] as JsonSchema, (target) => {
+        if (!isCandidate.has(target)) {
+          return target
+        }
+        targets.push(target)
+        return ''
+      })
+      refs.set(name, targets)
       const def = defName(name)
       return [
         name,
         [
           names.modes?.get(def) ?? names.numbered.get(def) ?? def,
           directed.get(name)?.sibling ? directed.get(name)!.direction : '',
-          shapes.get(name)!.shape,
+          stringifyJSON(shape),
         ].join('\u0000'),
       ]
     }),
   )
-
-  for (let count = 0; ;) {
-    const ids = new Map<string, number>()
-    const next = new Map<string, string>()
-
-    for (const name of candidates) {
-      const key = [classes.get(name), ...shapes.get(name)!.refs.map((r) => classes.get(r))].join(
-        '\u0000',
-      )
-      let id = ids.get(key)
-      if (id === undefined) {
-        id = ids.size
-        ids.set(key, id)
-      }
-      next.set(name, String(id))
-    }
-
-    classes = next
-    if (ids.size === count) {
-      break
-    }
-    count = ids.size
-  }
-
-  const members = new Map<string, string[]>()
-  for (const name of candidates) {
-    const id = classes.get(name)!
-    members.set(id, [...(members.get(id) ?? []), name])
-  }
+  const groups = getEquivalenceClasses(shapes, refs)
 
   // the name not numbered, else the lowest numbered one
   const preference = (a: string, b: string) =>
@@ -183,7 +150,7 @@ export function mergeEquivalentComponents(
 
   const merged = new Map<string, string>()
 
-  for (const group of members.values()) {
+  for (const group of groups) {
     // oxlint-disable-next-line unicorn/no-array-sort -- sorts a copy
     const [kept, ...others] = [...group].sort(preference)
     // a component of `base` equal to them, of the name they were numbered after (`Role` of the
@@ -312,6 +279,42 @@ export function mergeEquivalentComponents(
     ...others
   } = document
   rewriteSchemaRefs([components, others], resolve)
+}
+
+/**
+ * The classes of names of the same shape that refer to names of the same classes in turn, refined
+ * from the classes of their shapes until they no longer split.
+ */
+function getEquivalenceClasses(
+  shapes: ReadonlyMap<string, string>,
+  refs: ReadonlyMap<string, readonly string[]>,
+): string[][] {
+  let classes: ReadonlyMap<string, string> = shapes
+
+  for (let count = 0; ;) {
+    const ids = new Map<string, string>()
+    const next = new Map<string, string>()
+
+    for (const [name, id] of classes) {
+      const key = [id, ...refs.get(name)!.map((r) => classes.get(r))].join('\u0000')
+      if (!ids.has(key)) {
+        ids.set(key, String(ids.size))
+      }
+      next.set(name, ids.get(key)!)
+    }
+
+    classes = next
+    if (ids.size === count) {
+      break
+    }
+    count = ids.size
+  }
+
+  const members = new Map<string, string[]>()
+  for (const [name, id] of classes) {
+    members.set(id, [...(members.get(id) ?? []), name])
+  }
+  return [...members.values()]
 }
 
 /**
