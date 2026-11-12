@@ -190,6 +190,13 @@ export class DefRegistry {
   }
 
   /**
+   * The schema of a def by its name, `undefined` while it is converted.
+   */
+  getSchema(name: string): JsonSchema | undefined {
+    return this.defsByName.get(name)?.schema
+  }
+
+  /**
    * Whether the def of the type is being converted, so its schema is not final yet.
    */
   isConverting(key: number): boolean {

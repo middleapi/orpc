@@ -86,6 +86,7 @@ import {
   isPlain,
   isTrivialSchema,
   mapSchema,
+  maySendNothing,
   setSchema,
   toRef,
   withDiscriminators,
@@ -1547,9 +1548,9 @@ export class TypeToJsonSchemaConverter {
             : convertValue(this.getNullableAliasType(property, propertyType) ?? propertyType)
 
       let propertySchema: JsonSchema
+      const selected = this.getParameterSelection(type, property.name)
       this.expansion.path.push(property)
       try {
-        const selected = this.getParameterSelection(type, property.name)
         propertySchema =
           selected === true
             ? this.withParameters(convertProperty)
@@ -1587,6 +1588,11 @@ export class TypeToJsonSchemaConverter {
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
         !this.mayDropThroughToJSON(propertyType, fieldsMode !== 'serializer') &&
+        // bracket notation sends nothing for `null`, and an empty array or object
+        !(
+          (this.parameters || selected === true) &&
+          maySendNothing(propertySchema, (name) => this.defs.getSchema(name))
+        ) &&
         // an instance does not write a getter
         (!instanceProperties || instanceProperties.has(property)) &&
         // nor what a view copies from a built-in (`size` of `interface Tags extends Readonly<Set<string>>`)
