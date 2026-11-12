@@ -82,13 +82,20 @@ export function mergeEquivalentComponents(
 
   // a def whose name (or the one `componentName` gave it) a component of `base` has is given one of
   // a direction by the stock generator (`RoleInput`), which the other direction reuses: it is
-  // merged as a def of that name, and takes a numbered name instead (`Role2`)
-  const directed = new Map<string, { def: string; base: string }>()
+  // merged as a def of that name, and takes a numbered name instead (`Role2`); a def described
+  // otherwise in the other direction is given one too (`NodeInput` of `Node`), a sibling merged as
+  // one of the def in that direction, which follows the name of the def's component
+  const directed = new Map<
+    string,
+    { def: string; base: string; direction: string; sibling: boolean }
+  >()
   for (const name of Object.keys(schemas)) {
-    const base = /^(.+)(?:Input|Output)$/u.exec(name)?.[1]
-    const def = base && reserved.has(base) ? (rename ? base : defNames?.get(base)) : undefined
+    const [, base, direction] = /^(.+)(Input|Output)$/u.exec(name) ?? []
+    const sibling = !!base && !reserved.has(base) && Object.hasOwn(schemas, base)
+    const def =
+      base && (sibling || reserved.has(base)) ? (rename ? base : defNames?.get(base)) : undefined
     if (def && names.used.has(def) && !(rename ? names.used.has(name) : defNames?.has(name))) {
-      directed.set(name, { def, base: base! })
+      directed.set(name, { def, base: base!, direction: direction!, sibling })
     }
   }
 
@@ -123,7 +130,11 @@ export function mergeEquivalentComponents(
       const def = defName(name)
       return [
         name,
-        `${names.modes?.get(def) ?? names.numbered.get(def) ?? def}\u0000${shapes.get(name)!.shape}`,
+        [
+          names.modes?.get(def) ?? names.numbered.get(def) ?? def,
+          directed.get(name)?.sibling ? directed.get(name)!.direction : '',
+          shapes.get(name)!.shape,
+        ].join('\u0000'),
       ]
     }),
   )
@@ -237,20 +248,33 @@ export function mergeEquivalentComponents(
     }
   }
 
-  for (const [name, { base }] of directed) {
+  const resolve = (name: string) => {
+    const kept = merged.get(name) ?? name
+    return renamed.get(kept) ?? kept
+  }
+
+  const siblings = [...directed].filter(([name, { sibling }]) => sibling && !merged.has(name))
+  for (const [name] of siblings) {
+    holders.delete(name)
+  }
+  for (const [name, { base, direction }] of siblings) {
+    const to = `${resolve(base)}${direction}`
+    if (to !== name && (!taken(to) || taken(name))) {
+      move(name, free(to))
+    } else {
+      holders.set(name, name)
+    }
+  }
+
+  for (const [name, { base, sibling }] of directed) {
     const opposite = `${base}${name.endsWith('Input') ? 'Output' : 'Input'}`
-    if (!merged.has(name) && !taken(opposite)) {
+    if (!sibling && !merged.has(name) && !taken(opposite)) {
       move(name, free(base))
     }
   }
 
   if (!merged.size && !renamed.size) {
     return
-  }
-
-  const resolve = (name: string) => {
-    const kept = merged.get(name) ?? name
-    return renamed.get(kept) ?? kept
   }
 
   const entries = Object.entries(schemas)

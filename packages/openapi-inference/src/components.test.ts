@@ -57,6 +57,68 @@ describe('mergeEquivalentComponents', () => {
     })
   })
 
+  it('merges and renames the components the stock generator gave a def in a direction with it', () => {
+    const node = (self: string) => ({
+      type: 'object',
+      properties: { s: { type: 'string' }, next: { $ref: ref(self) } },
+    })
+    const nodeInput = (self: string) => ({
+      type: 'object',
+      properties: { s: { type: 'object' }, next: { $ref: ref(self) } },
+    })
+    const document = {
+      components: {
+        schemas: {
+          Node: node('Node'),
+          Node2: node('Node2'),
+          NodeInput: nodeInput('NodeInput'),
+          Node2Input: nodeInput('Node2Input'),
+        },
+      },
+      paths: { '/in': { $ref: ref('Node2Input') } },
+    }
+
+    mergeEquivalentComponents(document, {
+      used: new Set(['Node', 'Node2']),
+      numbered: new Map([['Node2', 'Node']]),
+    })
+
+    expect(document).toEqual({
+      components: { schemas: { Node: node('Node'), NodeInput: nodeInput('NodeInput') } },
+      paths: { '/in': { $ref: ref('NodeInput') } },
+    })
+
+    // a def renamed takes its sibling along
+    const row = { type: 'object', properties: { id: { type: 'number' } } }
+    const renamed = {
+      components: {
+        schemas: {
+          User: row,
+          User2: { ...row, description: 'declared' },
+          User2Input: nodeInput('User2Input'),
+        },
+      },
+      paths: { '/in': { $ref: ref('User2Input') } },
+    }
+
+    mergeEquivalentComponents(renamed, {
+      used: new Set(['User', 'User2']),
+      numbered: new Map([['User2', 'User']]),
+      aliased: new Set(['User']),
+    })
+
+    expect(renamed).toEqual({
+      components: {
+        schemas: {
+          User2: row,
+          User: { ...row, description: 'declared' },
+          UserInput: nodeInput('UserInput'),
+        },
+      },
+      paths: { '/in': { $ref: ref('UserInput') } },
+    })
+  })
+
   it('merges the components of a type in two modes described the same, by the shorter name', () => {
     const point = { type: 'object', properties: { x: { type: 'number' } }, required: ['x'] }
     const document = {
