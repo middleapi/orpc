@@ -374,4 +374,5 @@ try {
 - Generics that expand forever, like `type Expand<T> = { next: Expand<T[]> }`, are cut to `{}` after a few levels.
 - In OpenAPI 3.0, the values of number and template literal keys, like in `Record<number, User>`, are left open.
 - `NaN`, `Infinity`, and invalid dates are sent as `null`, which the schemas leave out.
+- Inferred schemas follow the serializer's default handlers. [Custom handlers](/docs/openapi/serializer#custom-serializers), like a `Date` written as a number, are not reflected.
 - Generation throws on types the compiler cannot resolve, like an import with a missing path alias.
