@@ -107,7 +107,27 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
   const api = new API({ cwd: path.dirname(tsconfig ?? file) })
 
   try {
-    let snapshot = api.updateSnapshot(
+    /** The project of the first tsconfig that includes the file */
+    const findIncluding = (
+      candidates: Iterable<string>,
+      onExcluded?: (candidate: string, program: Program | undefined) => void,
+    ) => {
+      for (const candidate of candidates) {
+        const candidateProject = api
+          .updateSnapshot({ openProjects: [candidate] })
+          .getProject(candidate)
+
+        if (candidateProject?.program.getSourceFile(file)) {
+          return candidateProject
+        }
+
+        onExcluded?.(candidate, candidateProject?.program)
+      }
+
+      return undefined
+    }
+
+    const snapshot = api.updateSnapshot(
       tsconfig ? { openProjects: [tsconfig] } : { openFiles: [file] },
     )
 
@@ -118,22 +138,13 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     // else the first that includes it
     if (tsconfig && project && !project.rootFiles.length && !project.program.getSourceFile(file)) {
       const references = getReferencedTsconfigs(tsconfig)
-      snapshot = api.updateSnapshot({ openProjects: [tsconfig], openFiles: [file] })
-      let referenced = snapshot.getDefaultProjectForFile(file)
-
-      if (!referenced || !references.has(path.resolve(referenced.configFileName))) {
-        referenced = undefined
-
-        for (const candidate of references) {
-          snapshot = api.updateSnapshot({ openProjects: [candidate] })
-          const candidateProject = snapshot.getProject(candidate)
-
-          if (candidateProject?.program.getSourceFile(file)) {
-            referenced = candidateProject
-            break
-          }
-        }
-      }
+      const picked = api
+        .updateSnapshot({ openProjects: [tsconfig], openFiles: [file] })
+        .getDefaultProjectForFile(file)
+      const referenced =
+        picked && references.has(path.resolve(picked.configFileName))
+          ? picked
+          : findIncluding(references)
 
       if (referenced?.program.getSourceFile(file)) {
         project = referenced
@@ -147,22 +158,12 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     // the nearest tsconfig.json may not include the file (e.g. `include: ["src"]` for a script),
     // look further up for one that does before settling for default compiler options
     if (!tsconfig && project && isInferred(project.configFileName)) {
-      for (const candidate of findAncestorTsconfigs(path.dirname(file))) {
-        snapshot = api.updateSnapshot({ openProjects: [candidate] })
-        const candidateProject = snapshot.getProject(candidate)
-
-        if (candidateProject?.program.getSourceFile(file)) {
-          project = candidateProject
-          break
-        }
-
-        if (candidate === nearest) {
-          skipped = [
-            `"${candidate}" does not include "${file}".`,
-            ...getConfigErrors(candidateProject?.program),
-          ]
-        }
-      }
+      project =
+        findIncluding(findAncestorTsconfigs(path.dirname(file)), (candidate, program) => {
+          if (candidate === nearest) {
+            skipped = [`"${candidate}" does not include "${file}".`, ...getConfigErrors(program)]
+          }
+        }) ?? project
     }
 
     if (!project) {
