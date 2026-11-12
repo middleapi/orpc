@@ -179,13 +179,31 @@ export function mergeEquivalentComponents(
     defName(a).length - defName(b).length ||
     (a < b ? -1 : a > b ? 1 : 0)
 
+  // the name of the component `componentName` gave a def, or would give it
+  const componentNames = new Map([...(defNames ?? [])].map(([name, def]) => [def, name]))
+  const nameOf = (def: string | undefined, schema: unknown) =>
+    def === undefined || !componentName
+      ? def
+      : (componentNames.get(def) ?? toValidComponentName(componentName(def, schema as JsonSchema)))
+  // of the def a numbered one was numbered after
+  const baseOf = (name: string) => nameOf(names.numbered.get(defName(name)), schemas[name])
+
   const merged = new Map<string, string>()
 
   for (const group of members.values()) {
     // oxlint-disable-next-line unicorn/no-array-sort -- sorts a copy
     const [kept, ...others] = [...group].sort(preference)
-    for (const name of others) {
-      merged.set(name, kept!)
+    // a component of `base` equal to them, of the name they were numbered after (`Role` of the
+    // parameter form `RoleParam`), as the stock generator reuses one of the name it is given
+    const base = baseOf(kept!)
+    const into =
+      base !== undefined &&
+      reserved.has(base) &&
+      stringifyJSON(schemas[base]) === stringifyJSON(schemas[kept!])
+        ? base
+        : undefined
+    for (const name of into ? group : others) {
+      merged.set(name, into ?? kept!)
     }
   }
 
@@ -212,16 +230,6 @@ export function mergeEquivalentComponents(
     }
     holders.set(to, name)
     renamed.set(name, to)
-  }
-  // the name of the component of the def a numbered one was numbered after, which `componentName`
-  // gave it, or would give it
-  const componentNames = new Map([...(defNames ?? [])].map(([name, def]) => [def, name]))
-  const baseOf = (name: string) => {
-    const base = names.numbered.get(defName(name))
-    return base === undefined || !componentName
-      ? base
-      : (componentNames.get(base) ??
-          toValidComponentName(componentName(base, schemas[name] as JsonSchema)))
   }
   const renamable = candidates.filter(
     (n) => !merged.has(n) && !directed.has(n) && names.numbered.has(defName(n)),

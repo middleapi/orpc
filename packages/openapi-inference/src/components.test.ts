@@ -234,6 +234,39 @@ describe('mergeEquivalentComponents', () => {
     })
   })
 
+  it('merges a component into the equal one of base of the name it was numbered after', () => {
+    const role = { type: 'string', enum: ['admin', 'member'] }
+    const item = { type: 'object', properties: { id: { type: 'number' } } }
+    const document = {
+      components: { schemas: { Role: role, RoleParam: role, Item: item, Item2: item } },
+      paths: {
+        '/list': { schema: { $ref: ref('RoleParam') } },
+        '/item': { schema: { $ref: ref('Item2') } },
+      },
+    }
+
+    mergeEquivalentComponents(
+      document,
+      {
+        used: new Set(['RoleParam', 'Item', 'Item2']),
+        numbered: new Map([
+          ['RoleParam', 'Role'],
+          ['Item2', 'Item'],
+        ]),
+        parameters: new Set(['RoleParam']),
+      },
+      { reserved: new Set(['Role', 'Item']) },
+    )
+
+    expect(document).toEqual({
+      components: { schemas: { Role: role, Item: item } },
+      paths: {
+        '/list': { schema: { $ref: ref('Role') } },
+        '/item': { schema: { $ref: ref('Item') } },
+      },
+    })
+  })
+
   it('gives the name of a def named after an alias its type lost to a declared type numbered after it', () => {
     const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
     const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
