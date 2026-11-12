@@ -5173,6 +5173,18 @@ describe('openAPIGenerator', () => {
           explode: true,
         },
       ])
+
+      // array values are sent in bracket notation, which no parameter style describes
+      await expect(
+        link.call(['arrays'], { query: { a: 'x', b: ['1', '2'] } }, { context: {} }),
+      ).resolves.toBe(2)
+      expect(new URL(sent!.url).search).toBe('?a=x&b%5B0%5D=1&b%5B1%5D=2')
+      expect(spec.paths['/arrays'].get.parameters).toBeUndefined()
+      await expect(link.call(['compactArrays'], { t: ['a', 'b'] }, { context: {} })).resolves.toBe(
+        1,
+      )
+      expect(new URL(sent!.url).search).toBe('?t%5B0%5D=a&t%5B1%5D=b')
+      expect(spec.paths['/compactArrays'].get.parameters).toBeUndefined()
     })
   })
 

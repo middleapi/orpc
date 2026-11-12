@@ -195,4 +195,12 @@ export const roundEightyTwoRequests = {
     .route({ method: 'GET', path: '/record', inputStructure: 'detailed' })
     .input(type<{ query: Record<string, string> }>())
     .handler(({ input }) => Object.keys(input.query).length),
+  arrays: os
+    .route({ method: 'GET', path: '/arrays', inputStructure: 'detailed' })
+    .input(type<{ query: Record<string, string | string[]> }>())
+    .handler(({ input }) => Object.keys(input.query).length),
+  compactArrays: os
+    .route({ method: 'GET', path: '/compactArrays' })
+    .input(type<Record<string, string[]>>())
+    .handler(({ input }) => Object.keys(input).length),
 }

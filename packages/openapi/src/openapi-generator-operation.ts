@@ -347,12 +347,12 @@ function renderQueryParameters(
     operation.parameters.push(parameter)
   }
 
-  // the other keys of a free-form query, like those of a record, as an object of form style,
-  // unless no value is allowed for them (`false`, `{ not: {} }`)
+  // the other keys of a free-form query, like those of a record, as an object of form style, when
+  // their values are primitives: an array or an object value is sent in bracket notation
+  // (`b[0]=1`), which no style of a parameter describes
   if (
     additionalProperties !== undefined &&
-    additionalProperties !== false &&
-    stringifyJSON(additionalProperties) !== '{"not":{}}' &&
+    flattenJsonUnionSchema(additionalProperties).every(isPrimitive) &&
     !queryEntries?.some(([name]) => name === 'query')
   ) {
     const { properties: _, ...schema } = combineJsonObjectSchemaEntries([], additionalProperties)
