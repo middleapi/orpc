@@ -396,6 +396,72 @@ describe('openAPIGenerator operation builders', () => {
       expect(operation.requestBody).toBeUndefined()
     })
 
+    it('documents no request body when every field is a path param', () => {
+      const { ctx, operation } = createContext()
+      const path = '/planets/{id}' as const
+      const input = (extra: object) =>
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { id: { type: 'string' } },
+              required: ['id'],
+              ...extra,
+            }),
+          ],
+        })
+
+      buildRequest(
+        ctx,
+        operation,
+        input({}),
+        { method: 'DELETE', path },
+        getDynamicPathParams(path),
+      )
+      expect(operation.requestBody).toBeUndefined()
+
+      // other keys may still be sent
+      const other = createContext()
+      buildRequest(
+        other.ctx,
+        other.operation,
+        input({ additionalProperties: { type: 'number' } }),
+        { method: 'DELETE', path },
+        getDynamicPathParams(path),
+      )
+      expect(other.operation.requestBody).toEqual({
+        content: {
+          'application/json': {
+            schema: { type: 'object', properties: {}, additionalProperties: { type: 'number' } },
+          },
+        },
+      })
+    })
+
+    it('does not use deepObject for query params of any value, most often sent as primitives', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { minPrice: {}, described: { description: 'a price' } },
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).style)).toEqual([
+        undefined,
+        undefined,
+      ])
+    })
+
     it('does not use deepObject for query params whose $ref resolves to a primitive', () => {
       const { ctx, operation } = createContext()
 

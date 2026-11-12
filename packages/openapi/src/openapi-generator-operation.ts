@@ -181,15 +181,17 @@ function extractCompactRequestParts(
   const restEntries = entries?.filter(([name]) => !dynamicParams?.includes(name))
 
   const hasBody = !isBodylessMethod(method)
+  const additionalProperties = dynamicParams?.length
+    ? extractJsonObjectSchemaAdditionalProperties(schema)
+    : undefined
   const bodySchema = !hasBody
     ? undefined
     : !dynamicParams?.length
       ? schema
-      : restEntries
-        ? combineJsonObjectSchemaEntries(
-            restEntries,
-            extractJsonObjectSchemaAdditionalProperties(schema),
-          )
+      : // a client sends no body when every field is a path param
+        restEntries?.length ||
+          (additionalProperties !== undefined && additionalProperties !== false)
+        ? combineJsonObjectSchemaEntries(restEntries ?? [], additionalProperties)
         : undefined
 
   return {
@@ -314,7 +316,8 @@ function renderQueryParameters(
       delete parameter.schema
       delete parameter.allowReserved
     } else if (style === undefined) {
-      if (!flattenJsonUnionSchema(schema).every(isPrimitive)) {
+      // a value of any type is most often a primitive, like the input of `z.coerce.number()`
+      if (!isUnconstrainedSchema(schema) && !flattenJsonUnionSchema(schema).every(isPrimitive)) {
         const arrayable = matchArrayableJsonSchema(schema)
 
         if (!arrayable || !flattenJsonUnionSchema(arrayable[0]).every(isPrimitive)) {
