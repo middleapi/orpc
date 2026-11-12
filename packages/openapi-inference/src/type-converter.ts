@@ -794,13 +794,12 @@ export class TypeToJsonSchemaConverter {
 
     // a model whose type lost the project alias it is declared with, like the row type of a library
     // (`type User = InferSelectModel<typeof users>`), is written once too, named after the alias,
-    // when written by its fields, not by the forms of a built-in it is a view of, and so is a union
-    // of literals (`type Role = (typeof ROLES)[number]`)
+    // when written by its fields, not by the forms of a built-in it is a view of
     const lostAlias =
       this.defsMode === 'named' &&
       enteredAt === undefined &&
       typeof schema === 'object' &&
-      (schema.type === 'object' || this.types.isLiteralUnion(type))
+      schema.type === 'object'
         ? this.getLostAlias(type)
         : undefined
 
@@ -2518,10 +2517,6 @@ export class TypeToJsonSchemaConverter {
    * `takeLateAliases`.
    */
   private getLostAlias(type: Type): TSSymbol | undefined {
-    if (this.types.isLiteralUnion(type)) {
-      return this.types.getLostAlias(type)
-    }
-
     const declaration = type.getSymbol()?.declarations[0]
 
     if (

@@ -225,13 +225,13 @@ import {
 import {
   roundEightyTwoConverted,
   roundEightyTwoDeepViews,
-  roundEightyTwoLiterals,
   roundEightyTwoNames,
   roundEightyTwoRequests,
   roundEightyTwoRoles,
   roundEightyTwoSameLiterals,
   roundEightyTwoUnresolved,
 } from '../tests/fixtures/app/src/round82'
+import { roundEightyTwoInterned } from '../tests/fixtures/app/src/round82-interned'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4988,7 +4988,6 @@ describe('openAPIGenerator', () => {
     const routers = {
       roundEightyTwoConverted,
       roundEightyTwoDeepViews,
-      roundEightyTwoLiterals,
       roundEightyTwoNames,
       roundEightyTwoRequests,
       roundEightyTwoRoles,
@@ -5005,8 +5004,8 @@ describe('openAPIGenerator', () => {
         ...generateOptions,
       }) as Promise<any>
     const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
-    const response = (spec: any, path: string) =>
-      spec.paths[path].post.responses['200'].content['application/json'].schema
+    const response = (spec: any, path: string, method = 'post') =>
+      spec.paths[path][method].responses['200'].content['application/json'].schema
 
     it('names instantiations over models by the aliases their types lost', async () => {
       const spec = await generate('roundEightyTwoNames')
@@ -5042,28 +5041,6 @@ describe('openAPIGenerator', () => {
       },
     )
 
-    it('names unions of literals by the aliases they lost, like those of other literal unions', async () => {
-      const spec = await generate('roundEightyTwoLiterals')
-      const schemas = spec.components.schemas
-
-      expect(response(spec, '/settings').properties).toEqual({
-        mode: ref('Mode'),
-        sw: ref('Switch'),
-        level: ref('Level'),
-        next: ref('Switch'),
-      })
-      expect(schemas.Switch).toEqual({ type: 'string', enum: ['off', 'on'] })
-      expect(schemas.Member.properties.role).toEqual(ref('TeamRole'))
-      expect(response(spec, '/inPlace')).toEqual(ref('Switch'))
-      expect(Object.keys(schemas).toSorted()).toEqual([
-        'Level',
-        'Member',
-        'Mode',
-        'Switch',
-        'TeamRole',
-      ])
-    })
-
     it('names no union of literals after one of the aliases of other items it is interned for', async () => {
       const spec = await generate('roundEightyTwoSameLiterals')
       const schemas = spec.components.schemas
@@ -5072,8 +5049,7 @@ describe('openAPIGenerator', () => {
       expect(schemas.User.properties.status).toEqual(statuses)
       expect(schemas.Project.properties.state).toEqual(statuses)
       expect(spec.paths['/projects'].get.parameters[0].schema).toEqual(statuses)
-      // an alias of the alias names the same union
-      expect(schemas.Issue.properties.kind).toEqual(ref('Kind'))
+      expect(schemas.Issue.properties.kind).toEqual({ type: 'string', enum: ['bug', 'task'] })
       // also when the other alias is read once the union was converted
       const states = { type: 'string', enum: ['closed', 'open'] }
       expect(schemas.Account.properties.status).toEqual(states)
@@ -5081,11 +5057,27 @@ describe('openAPIGenerator', () => {
       expect(Object.keys(schemas).toSorted()).toEqual([
         'Account',
         'Issue',
-        'Kind',
         'Project',
         'User',
         'Workspace',
       ])
+    })
+
+    it('names no union of literals after an alias of a model of another file', async () => {
+      const spec: any = await new OpenAPIGenerator().generate(roundEightyTwoInterned, {
+        source: { file: fixture('round82-interned.ts'), export: 'roundEightyTwoInterned' },
+      })
+      const statuses = { type: 'string', enum: ['active', 'inactive'] }
+
+      expect(Object.keys(spec.components.schemas)).toEqual(['User'])
+      expect(spec.components.schemas.User.properties.status).toEqual(statuses)
+      expect(response(spec, '/project').properties.state).toEqual(statuses)
+      expect(response(spec, '/rows/{id}', 'get').properties.state).toEqual(statuses)
+      expect(spec.paths['/filter'].get.parameters.map((p: any) => p.schema)).toEqual([
+        statuses,
+        { type: 'string', enum: ['no', 'yes'] },
+      ])
+      expect(spec.paths['/status'].get.parameters[0].schema).toEqual(statuses)
     })
 
     it.each([undefined, 'Acme.'])(

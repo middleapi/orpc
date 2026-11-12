@@ -82,29 +82,6 @@ export const roundEightyTwoDeepViews = {
   readonlyComment: os.handler((): ReadonlyDeep<Comment> => ({ id: 'a', replies: [] })),
 }
 
-const MODES = ['on', 'off'] as const
-type Switch = (typeof MODES)[number]
-type Mode = 'fast' | 'slow'
-export const Level = { Low: 'low', High: 'high' } as const
-export type Level = (typeof Level)[keyof typeof Level]
-const ROLES = ['owner', 'member', 'guest'] as const
-type TeamRole = (typeof ROLES)[number]
-interface Member {
-  role: TeamRole
-}
-
-/** Aliases of unions of literals, also of the items of an `as const` array */
-export const roundEightyTwoLiterals = {
-  settings: os.handler((): { mode: Mode; sw: Switch; level: Level; next?: Switch } => ({
-    mode: 'fast',
-    sw: 'on',
-    level: 'low',
-  })),
-  member: os.handler((): Member => ({ role: 'owner' })),
-  // the same union written in place keeps the alias, as for object models
-  inPlace: os.handler((): 'on' | 'off' => 'on'),
-}
-
 const USER_STATUSES = ['active', 'inactive'] as const
 type UserStatus = (typeof USER_STATUSES)[number]
 const PROJECT_STATES = ['active', 'inactive'] as const
@@ -129,7 +106,6 @@ export const roundEightyTwoSameLiterals = {
     .route({ method: 'GET', path: '/projects' })
     .input(type<{ state?: Project['state'] }>())
     .handler((): Project[] => []),
-  // an alias of another alias is that alias
   issue: os.handler((): Issue => ({ kind: 'bug' })),
   // the aliases of models of other files, read as their fields are converted
   account: os.handler((): UserAccount => ({ status: 'open' })),
