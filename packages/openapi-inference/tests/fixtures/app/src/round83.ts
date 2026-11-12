@@ -78,3 +78,13 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
     { tags: ['a'], filter: { a: 'a' }, s: new Set([1]), t: [], n: 1 },
   ],
 }
+
+interface Tagged<T> {
+  tag: T
+}
+
+/** Types named by a printed type argument */
+export const roundEightyThreeNames = {
+  month: os.handler((): Tagged<'2024-01'> => ({ tag: '2024-01' })),
+  below: os.handler((): Tagged<-1> => ({ tag: -1 })),
+}

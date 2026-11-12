@@ -258,7 +258,8 @@ function toDefName(printed: string): string | undefined {
   return (
     text
       .replace(/\[\]/gu, 'Array')
-      .replace(/-(?=\d)/gu, 'neg')
+      // a minus sign, not a hyphen in a string literal (`Tagged<"2024-01">`)
+      .replace(/(?<![\w"])-(?=\d)/gu, 'neg')
       .replace(/[^\w$.\0]+/gu, '_')
       .replace(/^_+|_+$/gu, '')
       .replaceAll(KEY_SEPARATOR, '-') || undefined

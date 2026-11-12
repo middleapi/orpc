@@ -243,6 +243,7 @@ import {
   roundEightyTwoUnresolved,
 } from '../tests/fixtures/app/src/round82'
 import { roundEightyTwoInterned } from '../tests/fixtures/app/src/round82-interned'
+import { roundEightyThreeNames } from '../tests/fixtures/app/src/round83'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -5528,6 +5529,19 @@ describe('openAPIGenerator', () => {
 
       expect(spec.components?.schemas).toBeUndefined()
       expect(response(spec, '/users')).toEqual({ type: 'array', items: user })
+    })
+  })
+
+  describe('round eighty-three', () => {
+    it('names a hyphen in a string literal argument not as a minus sign', async () => {
+      const spec = await generator.generate(roundEightyThreeNames, {
+        source: { file: fixture('round83.ts'), export: 'roundEightyThreeNames' },
+      })
+
+      expect(Object.keys(spec.components?.schemas ?? {}).sort()).toEqual([
+        'Tagged_2024_01',
+        'Tagged_neg1',
+      ])
     })
   })
 })
