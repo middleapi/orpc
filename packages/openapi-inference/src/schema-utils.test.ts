@@ -1,4 +1,4 @@
-import { maySendNothing } from './schema-utils'
+import { maySendNothing, mayWriteNoHeader } from './schema-utils'
 
 describe('maySendNothing', () => {
   const defs: Record<string, any> = {
@@ -25,5 +25,37 @@ describe('maySendNothing', () => {
     // a cycle back to a def is written as the def is, by its other fields
     expect(sendsNothing({ $ref: '#/$defs/Loop' })).toBe(false)
     expect(sendsNothing({ not: {} })).toBe(false)
+  })
+})
+
+describe('mayWriteNoHeader', () => {
+  const defs: Record<string, any> = {
+    Nullable: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    Name: { type: 'string' },
+    Loop: { $ref: '#/$defs/Loop' },
+  }
+  const writesNoHeader = (schema: any) => mayWriteNoHeader(schema, (name) => defs[name])
+
+  it('holds for null, and arrays that may be empty or hold only null, also through refs', () => {
+    expect(writesNoHeader({ $ref: '#/$defs/Nullable' })).toBe(true)
+    expect(writesNoHeader({ type: 'array', items: { type: 'string' } })).toBe(true)
+    expect(writesNoHeader({ type: 'array', items: defs.Nullable, minItems: 1 })).toBe(true)
+    expect(writesNoHeader({ enum: ['a', null] })).toBe(true)
+    expect(writesNoHeader({ const: [null] })).toBe(true)
+    expect(writesNoHeader({ const: [] })).toBe(true)
+    expect(writesNoHeader({ allOf: [{}, { type: ['string', 'null'] }] })).toBe(true)
+  })
+
+  it('does not hold for values written on a line', () => {
+    expect(writesNoHeader({ $ref: '#/$defs/Name' })).toBe(false)
+    expect(writesNoHeader({ $ref: '#/$defs/Loop' })).toBe(false)
+    expect(writesNoHeader({ $ref: '#/components/schemas/Name' })).toBe(false)
+    expect(writesNoHeader({ type: 'object', properties: {} })).toBe(false)
+    expect(writesNoHeader({ type: 'array', items: { type: 'string' }, minItems: 1 })).toBe(false)
+    // a `Set` is written on one line, empty or not
+    expect(writesNoHeader({ 'type': 'array', 'items': {}, 'x-native-type': 'set' })).toBe(false)
+    expect(writesNoHeader({ const: 'a' })).toBe(false)
+    expect(writesNoHeader({ allOf: [{ type: 'null' }, { type: 'string' }] })).toBe(false)
+    expect(writesNoHeader({ not: {} })).toBe(false)
   })
 })
