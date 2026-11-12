@@ -1336,9 +1336,11 @@ export class TypeToJsonSchemaConverter {
     const stringifyRules = this.mode !== 'serializer'
     const ownToJSON = ignoreToJSON ? [] : getToJSONResultTypes(this.types, type, stringifyRules)
 
-    // a view of a function (`DeepReadonly<(() => number) & { toJSON(): string }>`) may hold the
-    // function, which `JSON.stringify` writes by its `toJSON`, or a plain object of its fields
-    // (also one a client sends, which the serializer leaves to `JSON.stringify`)
+    // a view of a function leaving its `toJSON` out (`Omit<(() => number) & { toJSON(): string },
+    // 'toJSON'>`) may hold the function, which `JSON.stringify` writes by its `toJSON`, or a plain
+    // object of its fields (also one a client sends, which the serializer leaves to
+    // `JSON.stringify`). A conditional view (`DeepReadonly<F>`) keeps no trace of the function, the
+    // compiler maps its call signature to `{}`.
     const viewedFunction =
       ownToJSON.length || ignoreToJSON ? undefined : getViewedFunction(this.types, type)
     const viewedResults =

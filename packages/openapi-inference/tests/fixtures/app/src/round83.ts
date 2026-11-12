@@ -66,6 +66,12 @@ class KeyedJSON {
   }
 }
 
+/** A function written by its `toJSON`, which a view leaving it out may still hold */
+type LabeledFunction = (() => number) & { toJSON(): string; label: string }
+
+const labeledFunction = (): LabeledFunction =>
+  Object.assign(() => 1, { toJSON: () => 'json', label: 'l' })
+
 const query = (path: `/${string}`) => os.route({ method: 'GET', path })
 
 export interface SelfQuery {
@@ -86,6 +92,10 @@ export const roundEightyThree = {
   })),
   keyedRoot: os.handler(() => new KeyedJSON()),
   keyedNested: os.handler(() => ({ a: new KeyedJSON() })),
+  viewedFunction: os.handler((): { f: Omit<LabeledFunction, 'toJSON'> } => ({
+    f: labeledFunction(),
+  })),
+  viewedFunctionInput: os.input(type<{ f: Omit<LabeledFunction, 'toJSON'> }>()).handler(() => 1),
   patched: os.handler(() => patched()),
   patchedNested: os.handler(() => ({ m: patched() })),
   patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
@@ -112,6 +122,7 @@ export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[]
   'genericToJSON',
   'keyedRoot',
   'keyedNested',
+  'viewedFunction',
 ]
 
 /** The inputs a client sends to each procedure of `roundEightyThree` taking one */
@@ -121,6 +132,7 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
     { p: { x: 1, y: 2 }, m: { cents: 5 }, e: { name: 'E', message: 'm' }, list: [{ x: 1, y: 2 }] },
   ],
   patchedInput: () => [{ m: patched() }],
+  viewedFunctionInput: () => [{ f: labeledFunction() }, { f: { label: 'l' } }],
   nullQuery: () => [
     { a: null, b: { c: null, d: [null, 'x'] } },
     { a: 'a', b: { c: 1, d: ['x'] } },
