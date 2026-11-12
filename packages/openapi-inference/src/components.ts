@@ -56,14 +56,29 @@ export interface MergeEquivalentComponentsOptions {
  */
 export function mergeEquivalentComponents(
   document: any,
-  names: DefNameRecord,
-  { reserved = new Set(), defNames, rename = true }: MergeEquivalentComponentsOptions = {},
+  defNameRecord: DefNameRecord,
+  {
+    reserved = new Set(),
+    defNames: givenDefNames,
+    rename = true,
+  }: MergeEquivalentComponentsOptions = {},
 ): void {
   const schemas: Record<string, unknown> | undefined = document?.components?.schemas
 
   if (!schemas) {
     return
   }
+
+  // the stock generator keys components by valid names (`_Role` of `$Role`)
+  const names = toValidDefNameRecord(defNameRecord)
+  const defNames =
+    givenDefNames &&
+    new Map(
+      [...givenDefNames].map(([name, def]) => [
+        toValidComponentName(name),
+        toValidComponentName(def),
+      ]),
+    )
 
   // a def whose name (or the one `componentName` gave it) a component of `base` has is given one of
   // a direction by the stock generator (`RoleInput`), which the other direction reuses: it is
@@ -249,6 +264,31 @@ export function mergeEquivalentComponents(
   }
 
   rewriteRefs(document, resolve)
+}
+
+/**
+ * Replaces characters OpenAPI does not allow in component keys with `_`, as the stock generator does.
+ */
+function toValidComponentName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/gu, '_') || '_'
+}
+
+function toValidDefNameRecord(record: DefNameRecord): DefNameRecord {
+  const toSet = (names: ReadonlySet<string> | undefined) =>
+    names && new Set([...names].map(toValidComponentName))
+  const toMap = (names: ReadonlyMap<string, string> | undefined) =>
+    names &&
+    new Map(
+      [...names].map(([name, base]) => [toValidComponentName(name), toValidComponentName(base)]),
+    )
+
+  return {
+    used: toSet(record.used)!,
+    numbered: toMap(record.numbered)!,
+    modes: toMap(record.modes),
+    parameters: toSet(record.parameters),
+    aliased: toSet(record.aliased),
+  }
 }
 
 function isComponentRef(value: unknown): value is string {

@@ -97,6 +97,46 @@ describe('mergeEquivalentComponents', () => {
     })
   })
 
+  it('merges the components of defs whose names the stock generator made valid', () => {
+    const role = { type: 'string', enum: ['admin', 'member'] }
+    const names = {
+      used: new Set(['$RoleParam', '$Role']),
+      numbered: new Map([['$RoleParam', '$Role']]),
+      modes: new Map([['$RoleParam', '$Role']]),
+      parameters: new Set(['$RoleParam']),
+    }
+    const plain = {
+      components: { schemas: { _RoleParam: role, _Role: role } },
+      paths: { '/list': { $ref: ref('_RoleParam') } },
+    }
+
+    mergeEquivalentComponents(plain, names)
+
+    expect(plain).toEqual({
+      components: { schemas: { _Role: role } },
+      paths: { '/list': { $ref: ref('_Role') } },
+    })
+
+    // `componentName` returned `Acme $RoleParam` and `Acme $Role`
+    const renamed = {
+      components: { schemas: { Acme__RoleParam: role, Acme__Role: role } },
+      paths: { '/list': { $ref: ref('Acme__RoleParam') } },
+    }
+
+    mergeEquivalentComponents(renamed, names, {
+      defNames: new Map([
+        ['Acme $RoleParam', '$RoleParam'],
+        ['Acme $Role', '$Role'],
+      ]),
+      rename: false,
+    })
+
+    expect(renamed).toEqual({
+      components: { schemas: { Acme__Role: role } },
+      paths: { '/list': { $ref: ref('Acme__Role') } },
+    })
+  })
+
   it('gives the name of a def named after an alias its type lost to a declared type numbered after it', () => {
     const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
     const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
