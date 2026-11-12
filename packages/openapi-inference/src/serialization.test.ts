@@ -1,4 +1,4 @@
-import { OpenAPIJsonSerializer } from '@orpc/openapi'
+import { BracketNotationSerializer, OpenAPIJsonSerializer } from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
@@ -21,6 +21,7 @@ import {
 import { roundSeventySevenInputs } from '../tests/fixtures/app/src/round77'
 import { roundSeventyEightInputs } from '../tests/fixtures/app/src/round78'
 import { roundEightyTwoDetailed, roundEightyTwoStreams } from '../tests/fixtures/app/src/round82'
+import { roundEightyThree, roundEightyThreeInputs } from '../tests/fixtures/app/src/round83'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -3613,4 +3614,99 @@ describe('round eighty-two', async () => {
       expect(validate({ event: 'close', data: null })).toBe(false)
     })
   })
+})
+
+/**
+ * Sends the inputs of a client and writes the outputs of real handlers, and validates them against
+ * the documented parameters, bodies and responses.
+ */
+describe('documented values match what is sent and written', async () => {
+  const spec = await new OpenAPIGenerator().generate(roundEightyThree, {
+    source: {
+      file: new URL('../tests/fixtures/app/src/round83.ts', import.meta.url),
+      export: 'roundEightyThree',
+    },
+  })
+  const operations = Object.entries(spec.paths as any).flatMap(([path, item]: [string, any]) =>
+    Object.values(item).map((operation: any) => ({ path, operation })),
+  )
+  const operationOf = (name: string) => operations.find((o) => o.operation.operationId === name)!
+  const toAjv = (schema: unknown) =>
+    JSON.parse(JSON.stringify(schema).replaceAll('#/components/schemas/', 'spec#/$defs/'))
+  const ajvOf = (coerceTypes: boolean | 'array') => {
+    const ajv = new Ajv2020({ strict: false, allErrors: true, coerceTypes })
+    ajv.addSchema(toAjv({ $id: 'spec', $defs: spec.components?.schemas ?? {} }))
+    return ajv
+  }
+  // parameters are strings, read as the documented types
+  const parameterAjv = ajvOf('array')
+  const bodyAjv = ajvOf(false)
+
+  const handler = new OpenAPIHandler(roundEightyThree)
+  let sent: Request | undefined
+  const link = new OpenAPILink(roundEightyThree, {
+    origin: 'http://localhost',
+    url: '/',
+    fetch: async (request, init) => {
+      sent = new Request(request, init)
+      return (await handler.handle(sent.clone())).response!
+    },
+  })
+
+  /** The problems of a request against its documented operation */
+  const validateRequest = async (request: Request, path: string, operation: any) => {
+    const url = new URL(request.url)
+    const documented: any[] = operation.parameters ?? []
+    // a hole of an array (an item sent as nothing) is compared as the `null` JSON writes
+    const values: Record<string, unknown> = JSON.parse(
+      JSON.stringify(new BracketNotationSerializer().deserialize([...url.searchParams]) ?? {}),
+    )
+    const problems: unknown[] = Object.keys(values)
+      .filter((name) => !documented.some((p) => p.in === 'query' && p.name === name))
+      .map((name) => `undocumented query ${name}`)
+
+    const segments = path.split('/')
+    url.pathname.split('/').forEach((segment, i) => {
+      const name = /^\{(.+)\}$/u.exec(segments[i] ?? '')?.[1]
+      if (name) {
+        values[name] = decodeURIComponent(segment)
+      }
+    })
+
+    const validateParameters = parameterAjv.compile(
+      toAjv({
+        type: 'object',
+        properties: Object.fromEntries(documented.map((p) => [p.name, p.schema])),
+        required: documented.filter((p) => p.required).map((p) => p.name),
+      }),
+    )
+    if (!validateParameters(values)) {
+      problems.push({ values, errors: validateParameters.errors })
+    }
+
+    if (request.method !== 'GET' && request.headers.get('content-type') === 'application/json') {
+      const validateBody = bodyAjv.compile(
+        toAjv(operation.requestBody.content['application/json'].schema),
+      )
+      const body = await request.clone().json()
+      if (!validateBody(body)) {
+        problems.push({ body, errors: validateBody.errors })
+      }
+    }
+
+    return problems
+  }
+
+  it.each(Object.entries(roundEightyThreeInputs))(
+    'documents the inputs a client sends to %s',
+    async (name, values) => {
+      const { path, operation } = operationOf(name)
+
+      for (const value of values()) {
+        sent = undefined
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+        expect(await validateRequest(sent!, path, operation)).toEqual([])
+      }
+    },
+  )
 })

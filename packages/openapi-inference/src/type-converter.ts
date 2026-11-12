@@ -22,6 +22,7 @@ import {
   addsOwnToJSON,
   extendsBuiltinClass,
   extendsBuiltinView,
+  extendsError,
   getBuiltin,
   getBodyMediaType,
   getBuiltinBaseName,
@@ -42,6 +43,7 @@ import {
   hasToJSONOf,
   isBoxedBigInt,
   isBoxedPrimitive,
+  isLeftAsIs,
   isSentAsString,
   isTypedArray,
 } from './builtins'
@@ -313,6 +315,8 @@ export class TypeToJsonSchemaConverter {
   private mode: ConversionMode = 'serializer'
   /** Whether the value being converted is a parameter, see `TypeToJsonSchemaConvertOptions.parameters` */
   private parameters = false
+  /** The depth of the object holding the parameters, its fields (the root, or `query`) */
+  private parametersDepth = 0
   /** The object whose fields hold parameters, see `ParameterFields` */
   private parameterRoot: { type: Type; fields: ParameterFields } | undefined
   /** The fields holding parameters of the plain object visited at this depth, see `visitType` */
@@ -1183,6 +1187,22 @@ export class TypeToJsonSchemaConverter {
         ? (getClassType(this.types, type) ??
           (extendsBuiltinClass(this.types, type) ? type : undefined))
         : undefined
+    // the bracket notation of a parameter sends an instance the serializer leaves as it is as
+    // `String(value)` (what `toString` of the class returns, `Error: x`), and a plain object by its
+    // fields, unless the class has private members, which no plain object satisfies (the fields
+    // of the object holding the parameters are the parameters)
+    if (
+      this.parameters &&
+      this.expansion.path.length > this.parametersDepth &&
+      (sentClass || (this.input && !plain && !ownFields && extendsError(this.types, type))) &&
+      isLeftAsIs(this.types, [type, ...getClassTypes(this.types, type)])
+    ) {
+      const instance: JsonSchema = { type: 'string' }
+      return this.types.isNominalClass(type)
+        ? instance
+        : anyOfDeduped([instance, this.convertObject(type, { ...options, plain: true })])
+    }
+
     // under `JSON.stringify` (inside an instance), and for a class with private members, which
     // no plain object satisfies, a client sends what an instance writes, as the server does
     const sentInstance =
@@ -2558,11 +2578,14 @@ export class TypeToJsonSchemaConverter {
    */
   private withParameters<T>(fn: () => T): T {
     const previous = this.parameters
+    const previousDepth = this.parametersDepth
     this.parameters = true
+    this.parametersDepth = this.expansion.path.length
     try {
       return fn()
     } finally {
       this.parameters = previous
+      this.parametersDepth = previousDepth
     }
   }
 

@@ -547,11 +547,23 @@ function isStringifiedBuiltin(types: TypeQueries, type: Type): boolean {
 }
 
 /**
+ * Whether the serializer leaves an instance of these classes as it is, which the bracket notation
+ * of a parameter sends as `String(value)`: of a class extending no built-in, or one the serializer
+ * leaves to `JSON.stringify` (`Error`), not one it writes otherwise (`Date`, `Set`).
+ */
+export function isLeftAsIs(types: TypeQueries, classes: readonly Type[]): boolean {
+  return classes.every((c) => {
+    const name = getDeclaredBuiltinName(types, c) ?? getBuiltinBaseName(types, c)
+    return name === undefined || STRINGIFIED_BUILTINS.has(name)
+  })
+}
+
+/**
  * Whether the bracket notation of a parameter (`?a[b]=...`) sends a value of this type as
  * `String(value)`: a typed array (also Node's `Buffer`), or an instance the serializer leaves to
  * `JSON.stringify` (`RegExp`, `ArrayBuffer`, `Promise`), also through a view keeping all of its
  * members (`Readonly<RegExp>`), but a boxed primitive, which is sent as its primitive, and an
- * `Error`, which is sent as the plain object it may be, like a class.
+ * `Error`, which may also be a plain object, like a class (see `isLeftAsIs`).
  */
 export function isSentAsString(types: TypeQueries, type: Type, depth = 0): boolean {
   if (
