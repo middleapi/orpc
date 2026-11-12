@@ -1162,9 +1162,12 @@ export class TypeQueries {
       return own?.[1]
     }
 
+    // the property types of the candidates, requested together
+    const candidates = [...aliases.values()]
+    this.getSymbolTypes(candidates.flatMap(([candidate]) => this.getProperties(candidate)))
     const shape = this.getShape(type)
     let found: TSSymbol | undefined
-    for (const [candidate, alias] of aliases.values()) {
+    for (const [candidate, alias] of candidates) {
       if (this.getShape(candidate) === shape) {
         found = preferAlias(found, alias)
       }
