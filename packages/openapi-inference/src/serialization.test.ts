@@ -3680,12 +3680,33 @@ describe('documented values match what is sent and written', async () => {
     const validateParameters = parameterAjv.compile(
       toAjv({
         type: 'object',
-        properties: Object.fromEntries(documented.map((p) => [p.name, p.schema])),
-        required: documented.filter((p) => p.required).map((p) => p.name),
+        properties: Object.fromEntries(
+          documented.filter((p) => p.in !== 'header').map((p) => [p.name, p.schema]),
+        ),
+        required: documented.filter((p) => p.in !== 'header' && p.required).map((p) => p.name),
       }),
     )
     if (!validateParameters(values)) {
       problems.push({ values, errors: validateParameters.errors })
+    }
+
+    // the documented headers, of those sent
+    const headers = documented.filter((p) => p.in === 'header')
+    const headerValues = Object.fromEntries(
+      headers.flatMap((p) => {
+        const value = request.headers.get(p.name)
+        return value === null ? [] : [[p.name, value]]
+      }),
+    )
+    const validateHeaders = parameterAjv.compile(
+      toAjv({
+        type: 'object',
+        properties: Object.fromEntries(headers.map((p) => [p.name, p.schema])),
+        required: headers.filter((p) => p.required).map((p) => p.name),
+      }),
+    )
+    if (!validateHeaders(headerValues)) {
+      problems.push({ headers: headerValues, errors: validateHeaders.errors })
     }
 
     if (request.method !== 'GET' && request.headers.get('content-type') === 'application/json') {

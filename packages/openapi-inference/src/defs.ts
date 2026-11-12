@@ -458,7 +458,7 @@ export class DefRegistry {
    * Maps the object schemas of a schema, also the members of a union or an intersection and the
    * defs they refer to, which are inlined when they change.
    */
-  private mapObjects(
+  mapObjects(
     schema: JsonSchema,
     map: (object: JsonSchema) => JsonSchema,
     followed: ReadonlySet<string> = new Set(),

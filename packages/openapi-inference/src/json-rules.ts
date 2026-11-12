@@ -493,14 +493,28 @@ export function getToJSONResultTypes(
   }
 
   return types.memo(stringify ? 'stringifiedToJSON' : 'serializedToJSON', type.id, () => {
+    // a view of the method whose function is found nowhere (`{}` of
+    // `DeepReadonly<(() => number) & { toJSON(): string }>`, not over a class or a built-in,
+    // whose `toJSON` is read instead) may be called on the function or instance it keeps no trace
+    // of, and return anything
+    let unknownMethod: boolean | undefined
+    const hasUnknownMethod = () =>
+      (unknownMethod ??=
+        // of the properties the type is converted by, read once
+        types.getProperties(type).some((p) => p.name === 'toJSON') &&
+        getToJSONMembers(types, type).some((m) => getViewedFunction(types, m)?.id === m.id) &&
+        getClassType(types, type) === undefined &&
+        getBuiltin(types, type, stringify) === undefined)
+
     // the serializer walks arrays and plain objects, also with a brand
     // (`string[] & { toJSON(): undefined }`), `JSON.stringify` calls their `toJSON`
     if (!stringify) {
       const members = type.isIntersectionType() ? types.getMembers(type) : [type]
 
       if (
-        members.some((m) => types.getReferenceKind(m) !== undefined) ||
-        members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m))
+        (members.some((m) => types.getReferenceKind(m) !== undefined) ||
+          members.every((m) => !(m.flags & TypeFlags.Object) || isObjectLiteral(m))) &&
+        !hasUnknownMethod()
       ) {
         return []
       }
@@ -516,7 +530,9 @@ export function getToJSONResultTypes(
       }
     }
 
-    return [...results.values()]
+    return results.size || !hasUnknownMethod()
+      ? [...results.values()]
+      : [types.checker.getAnyType()]
   })
 }
 

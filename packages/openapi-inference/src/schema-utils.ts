@@ -447,6 +447,64 @@ export function maySendNothing(
 }
 
 /**
+ * Whether a header of a value of a schema may be left out: `null`, or an array (a header of many
+ * lines) that may be empty or hold only `null`, of which no line is written. Of a def `resolve`
+ * gives no schema of, the value is written as its other members are.
+ */
+export function mayWriteNoHeader(
+  schema: JsonSchema,
+  resolve: (name: string) => JsonSchema | undefined,
+  seen: ReadonlySet<string> = new Set(),
+): boolean {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  const next = (member: JsonSchema | undefined) => mayWriteNoHeader(member ?? {}, resolve, seen)
+
+  if (typeof schema.$ref === 'string') {
+    const name = schema.$ref.startsWith(DEFS_REF_PREFIX)
+      ? decodeJsonPointerSegment(schema.$ref.slice(DEFS_REF_PREFIX.length))
+      : undefined
+    const target = name === undefined || seen.has(name) ? undefined : resolve(name)
+    return target !== undefined && mayWriteNoHeader(target, resolve, new Set([...seen, name!]))
+  }
+
+  if (schema.allOf && !schema.allOf.every(next)) {
+    return false
+  }
+
+  if (schema.anyOf || schema.oneOf) {
+    return [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])].some(next)
+  }
+
+  if (schema.const !== undefined || schema.enum) {
+    return [...(schema.enum ?? []), ...(schema.const === undefined ? [] : [schema.const])].some(
+      (value) => value === null || (Array.isArray(value) && value.every((v) => v === null)),
+    )
+  }
+
+  if (schema.not !== undefined) {
+    return false
+  }
+
+  const types = schema.type === undefined ? undefined : [schema.type].flat()
+  const minItems = schema.minItems ?? 0
+  const prefixItems = Array.isArray(schema.prefixItems) ? schema.prefixItems : []
+
+  return (
+    types === undefined ||
+    types.includes('null') ||
+    // a `Set` is written on one line, empty or not
+    (types.includes('array') &&
+      schema['x-native-type'] === undefined &&
+      Array.from({ length: minItems }, (_, i) =>
+        i < prefixItems.length ? prefixItems[i] : schema.items,
+      ).every((item) => admitsNull((item as JsonSchema | undefined) ?? {}, undefined)))
+  )
+}
+
+/**
  * An object schema, or a union of them, without required properties.
  */
 export function withoutRequired(schema: JsonSchema): JsonSchema {

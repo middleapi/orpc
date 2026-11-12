@@ -726,6 +726,11 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
       // what a client sends in the URL with bracket notation, all of a compact input without a
       // body, but the values of a style, which are sent in their serialized forms
       parameters: getParameterFields(meta, inputDetailed, bodiless, pathParameters),
+      // which a client always sends, an empty one fails
+      pathParameters: pathParameters.length
+        ? { names: pathParameters, property: inputDetailed ? 'params' : undefined }
+        : undefined,
+      headersProperty: inputDetailed ? 'headers' : undefined,
       // a client sends a promise as is, written as `{}`
       awaited: false,
     },

@@ -72,6 +72,9 @@ class KeyedJSON {
 /** A function written by its `toJSON`, which a view leaving it out may still hold */
 type LabeledFunction = (() => number) & { toJSON(): string; label: string }
 
+/** A conditional view, which maps the function and its `toJSON` to `{}` */
+type DeepReadonly<T> = T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T
+
 const labeledFunction = (): LabeledFunction =>
   Object.assign(() => 1, { toJSON: () => 'json', label: 'l' })
 
@@ -80,6 +83,12 @@ const query = (path: `/${string}`) => os.route({ method: 'GET', path })
 export interface SelfQuery {
   a: string
   self?: SelfQuery
+}
+
+/** Sent in the path by one procedure, and in the query by another */
+export interface PathFilter {
+  id: string | null
+  tags: string[]
 }
 
 /** Procedures documented as the values they are sent or written as */
@@ -96,6 +105,9 @@ export const roundEightyThree = {
   keyedRoot: os.handler(() => new KeyedJSON()),
   keyedNested: os.handler(() => ({ a: new KeyedJSON() })),
   viewedFunction: os.handler((): { f: Omit<LabeledFunction, 'toJSON'> } => ({
+    f: labeledFunction(),
+  })),
+  deepViewedFunction: os.handler((): { f: DeepReadonly<LabeledFunction> } => ({
     f: labeledFunction(),
   })),
   viewedFunctionInput: os.input(type<{ f: Omit<LabeledFunction, 'toJSON'> }>()).handler(() => 1),
@@ -121,6 +133,30 @@ export const roundEightyThree = {
   emptyQuery: query('/empty-query')
     .input(type<{ tags: string[]; filter: { a?: string }; s: Set<number>; t: []; n: number }>())
     .handler(() => 1),
+  // a client sends a path parameter whole, and refuses an empty one, so it stays required
+  nullPath: query('/null-path/{id}')
+    .input(type<{ id: string | null; tags: string[] }>())
+    .handler(() => 1),
+  arrayPath: os
+    .route({ method: 'POST', path: '/array-path/{tags}' })
+    .input(type<{ tags: string[]; x: number }>())
+    .handler(() => 1),
+  detailedPath: os
+    .route({ method: 'GET', path: '/detailed-path/{id}', inputStructure: 'detailed' })
+    .input(type<{ params: { id: number | null }; query: { tags: string[] } }>())
+    .handler(() => 1),
+  // the parameter form of a type, documented first in the query
+  filterQuery: query('/filter-query')
+    .input(type<{ f: PathFilter }>())
+    .handler(() => 1),
+  filterPath: query('/filter-path/{id}')
+    .input(type<PathFilter>())
+    .handler(() => 1),
+  // a client sends no header for `null`, and for an array of no line
+  emptyHeaders: os
+    .route({ method: 'GET', path: '/empty-headers', inputStructure: 'detailed' })
+    .input(type<{ headers: { 'x-tags': string[]; 'x-n': string | null; 'x-s': string } }>())
+    .handler(() => 1),
 }
 
 /** The procedures of `roundEightyThree` taking no input, whose outputs are written */
@@ -132,6 +168,7 @@ export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[]
   'keyedRoot',
   'keyedNested',
   'viewedFunction',
+  'deepViewedFunction',
   'pickLength',
   'gapIndexes',
 ]
@@ -152,6 +189,19 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
   emptyQuery: () => [
     { tags: [], filter: {}, s: new Set(), t: [], n: 1 },
     { tags: ['a'], filter: { a: 'a' }, s: new Set([1]), t: [], n: 1 },
+  ],
+  nullPath: () => [
+    { id: 'a', tags: [] },
+    { id: 'a', tags: ['b'] },
+  ],
+  arrayPath: () => [{ tags: ['a', 'b'], x: 1 }],
+  detailedPath: () => [{ params: { id: 1 }, query: { tags: [] } }],
+  filterQuery: () => [{ f: { id: null, tags: [] } }],
+  filterPath: () => [{ id: 'a', tags: [] }],
+  emptyHeaders: () => [
+    { headers: { 'x-tags': [], 'x-n': null, 'x-s': 's' } },
+    { headers: { 'x-tags': [null], 'x-n': 'n', 'x-s': 's' } },
+    { headers: { 'x-tags': ['a', 'b'], 'x-n': 'n', 'x-s': 's' } },
   ],
 }
 

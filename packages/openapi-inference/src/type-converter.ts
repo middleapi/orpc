@@ -87,6 +87,7 @@ import {
   isTrivialSchema,
   mapSchema,
   maySendNothing,
+  mayWriteNoHeader,
   setSchema,
   toRef,
   withDiscriminators,
@@ -211,6 +212,26 @@ export interface TypeToJsonSchemaConvertOptions {
    * @default false
    */
   parameters?: boolean | ParameterFields | undefined
+
+  /**
+   * The fields of the root, or of its `property` (`params` of a detailed input), a client sends in
+   * the path. It sends them whole, and an empty one fails, so they stay as required as their types
+   * are, also when bracket notation would send nothing for them (see `parameters`).
+   */
+  pathParameters?: PathParameters | undefined
+
+  /**
+   * The root property holding the headers a client sends (`headers` of a detailed input), which
+   * leaves out a header it writes as nothing: `null`, or an array of no line.
+   */
+  headersProperty?: string | undefined
+}
+
+/** The fields sent in the path, see `TypeToJsonSchemaConvertOptions.pathParameters` */
+export interface PathParameters {
+  readonly names: readonly string[]
+  /** The root property holding them, the root itself by default */
+  readonly property?: string | undefined
 }
 
 /**
@@ -297,6 +318,11 @@ export class TypeToJsonSchemaConverter {
   private voidType: Type | undefined
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
+  /**
+   * The fields of objects, by their `properties`, documented as optional only because bracket
+   * notation may send nothing for them, see `withPathFieldsRequired`
+   */
+  private readonly sentAsNothing = new WeakMap<object, readonly string[]>()
   /** Def schemas with their unions written as discriminated ones, see `withDiscriminators` */
   private readonly discriminated = new WeakMap<object, JsonSchema>()
 
@@ -381,7 +407,7 @@ export class TypeToJsonSchemaConverter {
       typeof parameters !== 'boolean' ||
       (options.bodyProperty === true && serializable.some((t) => this.holdsBodyProperty(t)))
     const values = split ? others : filtered ? serializable : members
-    const visitRoot = (t: Type): JsonSchema => {
+    const convertRoot = (t: Type): JsonSchema => {
       // the root of a detailed input or output with a body sent as is
       const bodyProperty = options.bodyProperty === true && this.holdsBodyProperty(t)
 
@@ -407,6 +433,16 @@ export class TypeToJsonSchemaConverter {
       }
 
       return this.visit(t)
+    }
+    const { pathParameters, headersProperty } = options
+    const visitRoot = (t: Type): JsonSchema => {
+      let root = convertRoot(t)
+      if (pathParameters?.names.length) {
+        root = this.withPathFieldsRequired(root, pathParameters)
+      }
+      return headersProperty === undefined
+        ? root
+        : this.withUnsentHeadersOptional(root, headersProperty)
     }
 
     const cuts = this.expansion.cuts
@@ -1496,6 +1532,7 @@ export class TypeToJsonSchemaConverter {
       properties: {},
     }
     const required: string[] = []
+    const sentAsNothing: string[] = []
 
     const propertyTypes = this.types.getSymbolTypes(dataProperties)
 
@@ -1590,22 +1627,29 @@ export class TypeToJsonSchemaConverter {
         !(property.flags & SymbolFlags.Optional) &&
         !this.isOptional(propertyType) &&
         !this.mayDropThroughToJSON(propertyType, fieldsMode !== 'serializer') &&
-        // bracket notation sends nothing for `null`, and an empty array or object
-        !(
-          (this.parameters || selected === true) &&
-          maySendNothing(propertySchema, (name) => this.defs.getSchema(name))
-        ) &&
         // an instance does not write a getter
         (!instanceProperties || instanceProperties.has(property)) &&
         // nor what a view copies from a built-in (`size` of `interface Tags extends Readonly<Set<string>>`)
         !(ownFields && !plain && isBuiltinMember(this.types, property))
       ) {
-        required.push(property.name)
+        // bracket notation sends nothing for `null`, and an empty array or object
+        if (
+          (this.parameters || selected === true) &&
+          maySendNothing(propertySchema, (name) => this.defs.getSchema(name))
+        ) {
+          sentAsNothing.push(property.name)
+        } else {
+          required.push(property.name)
+        }
       }
     }
 
     if (required.length) {
       schema.required = required
+    }
+
+    if (sentAsNothing.length) {
+      this.sentAsNothing.set(schema.properties, sentAsNothing)
     }
 
     this.convertIndexSignatures(type, schema, convertValue)
@@ -2602,6 +2646,87 @@ export class TypeToJsonSchemaConverter {
       this.parameters = previous
       this.parametersDepth = previousDepth
     }
+  }
+
+  /**
+   * A root whose path parameters are required as their types require them, which bracket notation
+   * would send as nothing (see `sentAsNothing`), with the objects and defs holding them written in
+   * place when they change.
+   */
+  private withPathFieldsRequired(schema: JsonSchema, path: PathParameters): JsonSchema {
+    const requireFields = (object: JsonSchema): JsonSchema => {
+      const restored =
+        typeof object === 'object' && object.properties
+          ? this.sentAsNothing.get(object.properties)?.filter((name) => path.names.includes(name))
+          : undefined
+
+      if (typeof object !== 'object' || !restored?.length) {
+        return object
+      }
+
+      const required = new Set([...(object.required ?? []), ...restored])
+      return {
+        ...object,
+        required: [
+          ...Object.keys(object.properties!).filter((name) => required.has(name)),
+          ...(object.required ?? []).filter((name) => !Object.hasOwn(object.properties!, name)),
+        ],
+      }
+    }
+
+    return this.mapPropertyObjects(schema, path.property, requireFields)
+  }
+
+  /**
+   * A root with the headers a client may leave out (see `mayWriteNoHeader`) not required.
+   */
+  private withUnsentHeadersOptional(schema: JsonSchema, property: string): JsonSchema {
+    const resolve = (name: string) => this.defs.getSchema(name)
+    return this.mapPropertyObjects(schema, property, (object) => {
+      const required =
+        typeof object === 'object' && object.required
+          ? object.required.filter(
+              (name) => !mayWriteNoHeader(object.properties?.[name] ?? {}, resolve),
+            )
+          : undefined
+
+      if (
+        typeof object !== 'object' ||
+        required === undefined ||
+        required.length === object.required!.length
+      ) {
+        return object
+      }
+
+      const { required: _, ...rest } = object
+      return required.length ? { ...rest, required } : rest
+    })
+  }
+
+  /**
+   * Maps the object schemas of a root (see `DefRegistry.mapObjects`), or those of its `property`.
+   */
+  private mapPropertyObjects(
+    schema: JsonSchema,
+    property: string | undefined,
+    map: (object: JsonSchema) => JsonSchema,
+  ): JsonSchema {
+    if (property === undefined) {
+      return this.defs.mapObjects(schema, map)
+    }
+
+    return this.defs.mapObjects(schema, (object) => {
+      const value = typeof object === 'object' ? object.properties?.[property] : undefined
+      const mapped = value === undefined ? value : this.defs.mapObjects(value, map)
+
+      if (typeof object !== 'object' || mapped === value) {
+        return object
+      }
+
+      const properties = { ...object.properties }
+      setOwn(properties, property, mapped)
+      return { ...object, properties }
+    })
   }
 
   /**
