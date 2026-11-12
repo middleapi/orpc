@@ -75,7 +75,7 @@ describe('mergeEquivalentComponents', () => {
           Node2Input: nodeInput('Node2Input'),
         },
       },
-      paths: { '/in': { $ref: ref('Node2Input') } },
+      paths: { '/in': { schema: { $ref: ref('Node2Input') } } },
     }
 
     mergeEquivalentComponents(document, {
@@ -85,7 +85,7 @@ describe('mergeEquivalentComponents', () => {
 
     expect(document).toEqual({
       components: { schemas: { Node: node('Node'), NodeInput: nodeInput('NodeInput') } },
-      paths: { '/in': { $ref: ref('NodeInput') } },
+      paths: { '/in': { schema: { $ref: ref('NodeInput') } } },
     })
 
     // a def renamed takes its sibling along
@@ -98,7 +98,7 @@ describe('mergeEquivalentComponents', () => {
           User2Input: nodeInput('User2Input'),
         },
       },
-      paths: { '/in': { $ref: ref('User2Input') } },
+      paths: { '/in': { schema: { $ref: ref('User2Input') } } },
     }
 
     mergeEquivalentComponents(renamed, {
@@ -115,7 +115,42 @@ describe('mergeEquivalentComponents', () => {
           UserInput: nodeInput('UserInput'),
         },
       },
-      paths: { '/in': { $ref: ref('UserInput') } },
+      paths: { '/in': { schema: { $ref: ref('UserInput') } } },
+    })
+  })
+
+  it('leaves refs in data as they are written', () => {
+    const role = { type: 'string', enum: ['admin'] }
+    const stored = {
+      type: 'object',
+      properties: { schema: { examples: [{ $ref: ref('RoleParam') }] } },
+    }
+    const document = {
+      components: { schemas: { RoleParam: role, Stored: stored } },
+      paths: {
+        '/list': {
+          schema: { $ref: ref('RoleParam') },
+          example: { $ref: ref('RoleParam') },
+          examples: { a: { value: { $ref: ref('RoleParam') } } },
+        },
+      },
+    }
+
+    mergeEquivalentComponents(document, {
+      used: new Set(['RoleParam', 'Stored']),
+      numbered: new Map([['RoleParam', 'Role']]),
+      parameters: new Set(['RoleParam']),
+    })
+
+    expect(document).toEqual({
+      components: { schemas: { Role: role, Stored: stored } },
+      paths: {
+        '/list': {
+          schema: { $ref: ref('Role') },
+          example: { $ref: ref('RoleParam') },
+          examples: { a: { value: { $ref: ref('RoleParam') } } },
+        },
+      },
     })
   })
 
@@ -169,20 +204,20 @@ describe('mergeEquivalentComponents', () => {
     }
     const plain = {
       components: { schemas: { _RoleParam: role, _Role: role } },
-      paths: { '/list': { $ref: ref('_RoleParam') } },
+      paths: { '/list': { schema: { $ref: ref('_RoleParam') } } },
     }
 
     mergeEquivalentComponents(plain, names)
 
     expect(plain).toEqual({
       components: { schemas: { _Role: role } },
-      paths: { '/list': { $ref: ref('_Role') } },
+      paths: { '/list': { schema: { $ref: ref('_Role') } } },
     })
 
     // `componentName` returned `Acme $RoleParam` and `Acme $Role`
     const renamed = {
       components: { schemas: { Acme__RoleParam: role, Acme__Role: role } },
-      paths: { '/list': { $ref: ref('Acme__RoleParam') } },
+      paths: { '/list': { schema: { $ref: ref('Acme__RoleParam') } } },
     }
 
     mergeEquivalentComponents(renamed, names, {
@@ -195,7 +230,7 @@ describe('mergeEquivalentComponents', () => {
 
     expect(renamed).toEqual({
       components: { schemas: { Acme__Role: role } },
-      paths: { '/list': { $ref: ref('Acme__Role') } },
+      paths: { '/list': { schema: { $ref: ref('Acme__Role') } } },
     })
   })
 
@@ -204,7 +239,10 @@ describe('mergeEquivalentComponents', () => {
     const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
     const document = {
       components: { schemas: { User: row, User2: user } },
-      paths: { '/rows': { items: { $ref: ref('User') } }, '/users': { $ref: ref('User2') } },
+      paths: {
+        '/rows': { schema: { items: { $ref: ref('User') } } },
+        '/users': { schema: { $ref: ref('User2') } },
+      },
     }
 
     mergeEquivalentComponents(document, {
@@ -215,7 +253,10 @@ describe('mergeEquivalentComponents', () => {
 
     expect(document).toEqual({
       components: { schemas: { User: user, User2: row } },
-      paths: { '/rows': { items: { $ref: ref('User2') } }, '/users': { $ref: ref('User') } },
+      paths: {
+        '/rows': { schema: { items: { $ref: ref('User2') } } },
+        '/users': { schema: { $ref: ref('User') } },
+      },
     })
   })
 
@@ -226,7 +267,10 @@ describe('mergeEquivalentComponents', () => {
     // the stock generator gives the def `User` a name of its direction, as `base` has `User`
     const document = {
       components: { schemas: { User: base, UserOutput: row, User2: user } },
-      paths: { '/legacy': { $ref: ref('User') }, '/rows': { items: { $ref: ref('UserOutput') } } },
+      paths: {
+        '/legacy': { schema: { $ref: ref('User') } },
+        '/rows': { schema: { items: { $ref: ref('UserOutput') } } },
+      },
     }
 
     mergeEquivalentComponents(
@@ -241,7 +285,10 @@ describe('mergeEquivalentComponents', () => {
 
     expect(document).toEqual({
       components: { schemas: { User: base, User3: row, User2: user } },
-      paths: { '/legacy': { $ref: ref('User') }, '/rows': { items: { $ref: ref('User3') } } },
+      paths: {
+        '/legacy': { schema: { $ref: ref('User') } },
+        '/rows': { schema: { items: { $ref: ref('User3') } } },
+      },
     })
   })
 

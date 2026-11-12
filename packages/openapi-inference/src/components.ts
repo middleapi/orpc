@@ -1,4 +1,9 @@
-import { decodeJsonPointerSegment, encodeJsonPointerSegment } from '@orpc/json-schema'
+import type { JsonSchema } from '@orpc/json-schema'
+import {
+  decodeJsonPointerSegment,
+  encodeJsonPointerSegment,
+  mapJsonSchemaRefs,
+} from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
@@ -112,15 +117,14 @@ export function mergeEquivalentComponents(
 
   for (const name of candidates) {
     const refs: string[] = []
-    const copy = structuredClone(schemas[name])
-    rewriteRefs(copy, (target) => {
+    const shape = mapComponentRefs(schemas[name] as JsonSchema, (target) => {
       if (!isCandidate.has(target)) {
         return target
       }
       refs.push(target)
       return ''
     })
-    shapes.set(name, { shape: stringifyJSON(copy) ?? '', refs })
+    shapes.set(name, { shape: stringifyJSON(shape) ?? '', refs })
   }
 
   // classes of equivalent components: of the same name but its number, of the same shape,
@@ -283,11 +287,16 @@ export function mergeEquivalentComponents(
   }
   for (const [name, schema] of entries) {
     if (!merged.has(name)) {
-      setOwn(schemas, resolve(name), schema)
+      setOwn(schemas, resolve(name), mapComponentRefs(schema as JsonSchema, resolve))
     }
   }
 
-  rewriteRefs(document, resolve)
+  // the other schemas of the document, in the objects it shares with these copies
+  const {
+    components: { schemas: _, ...components },
+    ...others
+  } = document
+  rewriteSchemaRefs([components, others], resolve)
 }
 
 /**
@@ -315,62 +324,36 @@ function toValidDefNameRecord(record: DefNameRecord): DefNameRecord {
   }
 }
 
-function isComponentRef(value: unknown): value is string {
-  return typeof value === 'string' && value.startsWith(COMPONENTS_REF_PREFIX)
-}
+/**
+ * A schema whose refs to components are mapped by the names of the components, also in
+ * discriminator mappings, not in data (`examples`, `default`, `const`).
+ */
+function mapComponentRefs(schema: JsonSchema, resolve: (name: string) => string): JsonSchema {
+  return mapJsonSchemaRefs(schema, (ref) => {
+    if (!ref.startsWith(COMPONENTS_REF_PREFIX)) {
+      return ref
+    }
 
-function getDiscriminatorMapping(
-  schema: Record<string, unknown>,
-): Record<string, unknown> | undefined {
-  const discriminator = schema.discriminator as { mapping?: unknown } | undefined
-  return typeof discriminator === 'object' &&
-    discriminator !== null &&
-    typeof discriminator.mapping === 'object' &&
-    discriminator.mapping !== null
-    ? (discriminator.mapping as Record<string, unknown>)
-    : undefined
+    const name = decodeJsonPointerSegment(ref.slice(COMPONENTS_REF_PREFIX.length))
+    const resolved = resolve(name)
+    return resolved === name ? ref : COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(resolved)
+  })
 }
 
 /**
- * Maps the names of the components a value refers to, in place, also in discriminator mappings.
+ * Maps the refs to components of the schemas a part of a document holds, in place: of parameters,
+ * headers, and media types, not in examples or extensions.
  */
-function rewriteRefs(value: unknown, resolve: (name: string) => string): void {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      rewriteRefs(item, resolve)
-    }
-    return
-  }
-
+function rewriteSchemaRefs(value: unknown, resolve: (name: string) => string): void {
   if (typeof value !== 'object' || value === null) {
     return
   }
 
-  const object = value as Record<string, unknown>
-
-  const rewrite = (holder: Record<string, unknown>, key: string) => {
-    const ref = holder[key]
-    if (isComponentRef(ref)) {
-      const name = decodeJsonPointerSegment(ref.slice(COMPONENTS_REF_PREFIX.length))
-      const resolved = resolve(name)
-      if (resolved !== name) {
-        holder[key] = COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(resolved)
-      }
-    }
-  }
-
-  for (const key of Object.keys(object)) {
-    if (key === '$ref' && isComponentRef(object[key])) {
-      rewrite(object, key)
-    } else {
-      rewriteRefs(object[key], resolve)
-    }
-  }
-
-  const mapping = getDiscriminatorMapping(object)
-  if (mapping) {
-    for (const name of Object.keys(mapping)) {
-      rewrite(mapping, name)
+  for (const [key, item] of Object.entries(value)) {
+    if (key === 'schema' || key === 'itemSchema') {
+      setOwn(value, key, mapComponentRefs(item as JsonSchema, resolve))
+    } else if (key !== 'example' && key !== 'examples' && !key.startsWith('x-')) {
+      rewriteSchemaRefs(item, resolve)
     }
   }
 }
