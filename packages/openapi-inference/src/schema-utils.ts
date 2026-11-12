@@ -20,19 +20,23 @@ export function toRef(name: string): string {
 }
 
 /**
+ * The def name of a ref to a local def.
+ */
+function toDefName(ref: string): string | undefined {
+  return ref.startsWith(DEFS_REF_PREFIX)
+    ? decodeJsonPointerSegment(ref.slice(DEFS_REF_PREFIX.length))
+    : undefined
+}
+
+/**
  * The def name of a schema that is only a `$ref` to a local def.
  */
 export function fromRef(schema: JsonSchema): string | undefined {
-  if (
-    typeof schema !== 'object' ||
-    typeof schema.$ref !== 'string' ||
-    Object.keys(schema).length !== 1 ||
-    !schema.$ref.startsWith(DEFS_REF_PREFIX)
-  ) {
-    return undefined
-  }
-
-  return decodeJsonPointerSegment(schema.$ref.slice(DEFS_REF_PREFIX.length))
+  return typeof schema === 'object' &&
+    typeof schema.$ref === 'string' &&
+    Object.keys(schema).length === 1
+    ? toDefName(schema.$ref)
+    : undefined
 }
 
 /**
@@ -275,9 +279,7 @@ export function admitsNull(
   }
 
   const { type, const: constant, enum: values, anyOf, $ref, ...rest } = schema
-  const name =
-    $ref?.startsWith(DEFS_REF_PREFIX) &&
-    decodeJsonPointerSegment($ref.slice(DEFS_REF_PREFIX.length))
+  const name = $ref === undefined ? undefined : toDefName($ref)
 
   return (
     isUnconstrainedSchema(rest) &&
@@ -393,56 +395,18 @@ export function objectMembers(
 export function maySendNothing(
   schema: JsonSchema,
   resolve: (name: string) => JsonSchema | undefined,
-  seen: ReadonlySet<string> = new Set(),
 ): boolean {
-  if (typeof schema !== 'object') {
-    return schema
-  }
-
-  const next = (member: JsonSchema | undefined) => maySendNothing(member ?? {}, resolve, seen)
-
-  if (typeof schema.$ref === 'string') {
-    const name = schema.$ref.startsWith(DEFS_REF_PREFIX)
-      ? decodeJsonPointerSegment(schema.$ref.slice(DEFS_REF_PREFIX.length))
-      : undefined
-    const target = name === undefined || seen.has(name) ? undefined : resolve(name)
-    return target !== undefined && maySendNothing(target, resolve, new Set([...seen, name!]))
-  }
-
-  if (schema.allOf && !schema.allOf.every(next)) {
-    return false
-  }
-
-  if (schema.anyOf || schema.oneOf) {
-    return [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])].some(next)
-  }
-
-  if (schema.const !== undefined || schema.enum) {
-    return [...(schema.enum ?? []), ...(schema.const === undefined ? [] : [schema.const])].some(
-      (value) =>
-        value === null ||
-        (Array.isArray(value) && !value.length) ||
-        (typeof value === 'object' && !Object.keys(value).length),
-    )
-  }
-
-  if (schema.not !== undefined) {
-    return false
-  }
-
-  const types = schema.type === undefined ? undefined : [schema.type].flat()
-  const minItems = schema.minItems ?? 0
-  const prefixItems = Array.isArray(schema.prefixItems) ? schema.prefixItems : []
-
-  return (
-    types === undefined ||
-    types.includes('null') ||
-    (types.includes('array') &&
-      Array.from({ length: minItems }, (_, i) =>
-        i < prefixItems.length ? prefixItems[i] : schema.items,
-      ).every((item) => next(item as JsonSchema | undefined))) ||
-    (types.includes('object') &&
-      (schema.required ?? []).every((key) => next(schema.properties?.[key])))
+  return mayWriteNothing(
+    schema,
+    resolve,
+    (value) =>
+      value === null ||
+      (Array.isArray(value) && !value.length) ||
+      (typeof value === 'object' && !Object.keys(value).length),
+    (object, types, next) =>
+      (types.includes('array') && getRequiredItems(object).every(next)) ||
+      (types.includes('object') &&
+        (object.required ?? []).every((key) => next(object.properties?.[key]))),
   )
 }
 
@@ -454,20 +418,49 @@ export function maySendNothing(
 export function mayWriteNoHeader(
   schema: JsonSchema,
   resolve: (name: string) => JsonSchema | undefined,
+): boolean {
+  return mayWriteNothing(
+    schema,
+    resolve,
+    (value) => value === null || (Array.isArray(value) && value.every((v) => v === null)),
+    (object, types) =>
+      // a `Set` is written on one line, empty or not
+      types.includes('array') &&
+      object['x-native-type'] === undefined &&
+      getRequiredItems(object).every((item) => admitsNull(item ?? {}, undefined)),
+  )
+}
+
+/**
+ * Whether a value of a schema may be written as nothing, also through refs, `allOf`, and unions:
+ * a value `isNothing` holds for, `null`, any value of a schema without `type`, or of a schema
+ * of these types that `ofTypes` holds for, given `next` to ask of a subschema.
+ */
+function mayWriteNothing(
+  schema: JsonSchema,
+  resolve: (name: string) => JsonSchema | undefined,
+  isNothing: (value: unknown) => boolean,
+  ofTypes: (
+    schema: ObjectJsonSchema,
+    types: readonly string[],
+    next: (member: JsonSchema | undefined) => boolean,
+  ) => boolean,
   seen: ReadonlySet<string> = new Set(),
 ): boolean {
   if (typeof schema !== 'object') {
     return schema
   }
 
-  const next = (member: JsonSchema | undefined) => mayWriteNoHeader(member ?? {}, resolve, seen)
+  const next = (member: JsonSchema | undefined) =>
+    mayWriteNothing(member ?? {}, resolve, isNothing, ofTypes, seen)
 
   if (typeof schema.$ref === 'string') {
-    const name = schema.$ref.startsWith(DEFS_REF_PREFIX)
-      ? decodeJsonPointerSegment(schema.$ref.slice(DEFS_REF_PREFIX.length))
-      : undefined
+    const name = toDefName(schema.$ref)
     const target = name === undefined || seen.has(name) ? undefined : resolve(name)
-    return target !== undefined && mayWriteNoHeader(target, resolve, new Set([...seen, name!]))
+    return (
+      target !== undefined &&
+      mayWriteNothing(target, resolve, isNothing, ofTypes, new Set([...seen, name!]))
+    )
   }
 
   if (schema.allOf && !schema.allOf.every(next)) {
@@ -480,7 +473,7 @@ export function mayWriteNoHeader(
 
   if (schema.const !== undefined || schema.enum) {
     return [...(schema.enum ?? []), ...(schema.const === undefined ? [] : [schema.const])].some(
-      (value) => value === null || (Array.isArray(value) && value.every((v) => v === null)),
+      isNothing,
     )
   }
 
@@ -488,19 +481,17 @@ export function mayWriteNoHeader(
     return false
   }
 
-  const types = schema.type === undefined ? undefined : [schema.type].flat()
-  const minItems = schema.minItems ?? 0
-  const prefixItems = Array.isArray(schema.prefixItems) ? schema.prefixItems : []
+  const types: string[] | undefined = schema.type === undefined ? undefined : [schema.type].flat()
+  return types === undefined || types.includes('null') || ofTypes(schema, types, next)
+}
 
-  return (
-    types === undefined ||
-    types.includes('null') ||
-    // a `Set` is written on one line, empty or not
-    (types.includes('array') &&
-      schema['x-native-type'] === undefined &&
-      Array.from({ length: minItems }, (_, i) =>
-        i < prefixItems.length ? prefixItems[i] : schema.items,
-      ).every((item) => admitsNull((item as JsonSchema | undefined) ?? {}, undefined)))
+/**
+ * The schemas of the items an array of a schema has at least (`minItems`).
+ */
+function getRequiredItems(schema: ObjectJsonSchema): (JsonSchema | undefined)[] {
+  const prefixItems = Array.isArray(schema.prefixItems) ? schema.prefixItems : []
+  return Array.from({ length: schema.minItems ?? 0 }, (_, i) =>
+    i < prefixItems.length ? prefixItems[i] : (schema.items as JsonSchema | undefined),
   )
 }
 
