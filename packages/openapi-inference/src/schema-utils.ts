@@ -409,6 +409,10 @@ export function maySendNothing(
     return target !== undefined && maySendNothing(target, resolve, new Set([...seen, name!]))
   }
 
+  if (schema.allOf && !schema.allOf.every(next)) {
+    return false
+  }
+
   if (schema.anyOf || schema.oneOf) {
     return [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])].some(next)
   }
