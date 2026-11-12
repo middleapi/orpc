@@ -1,9 +1,12 @@
+import type { AnyNestedClient } from '@orpc/client'
 import type { Schema } from '@orpc/contract'
 import * as z from 'zod'
 
 import { os } from './builder'
+import type { Lazyable } from './lazy'
 import type { ProcedureClient } from './procedure-client'
 import type { RouterClient } from './router-client'
+import { createRouterClient } from './router-client'
 
 const errorMap = {
   BASE: {
@@ -58,11 +61,49 @@ describe('RouterClient', () => {
     >()
   })
 
+  it('unwraps lazy at any depth', () => {
+    const lazyRouter = {
+      ping: os.lazy(() => Promise.resolve({ default: router.ping })),
+      nested: os.lazy(() => Promise.resolve({ default: { lazy: router.lazy } })),
+    }
+    const client = {} as RouterClient<typeof lazyRouter>
+
+    expectTypeOf(client.ping).toEqualTypeOf<
+      ProcedureClient<object, typeof schema1, typeof schema2, object>
+    >()
+
+    expectTypeOf(client.nested.lazy.peng).toEqualTypeOf<
+      ProcedureClient<object, typeof schema1, Schema<string>, object>
+    >()
+  })
+
+  it('supports a key that is either lazy or not', () => {
+    type LazyableRouter = {
+      ping: Lazyable<typeof router.ping>
+      nested: Lazyable<typeof router.nested>
+    }
+    const client = {} as RouterClient<LazyableRouter>
+
+    expectTypeOf(client.ping).toEqualTypeOf<
+      ProcedureClient<object, typeof schema1, typeof schema2, object>
+    >()
+
+    expectTypeOf(client.nested.pong).toEqualTypeOf<
+      ProcedureClient<object, typeof schema3, typeof schema2, typeof errorMap>
+    >()
+  })
+
   it('support single procedure', () => {
     type P = RouterClient<(typeof router)['ping'], { cache?: boolean }>
 
     expectTypeOf<P>().toEqualTypeOf<
       ProcedureClient<{ cache?: boolean }, typeof schema1, typeof schema2, object>
     >()
+  })
+})
+
+describe('createRouterClient', () => {
+  it('accepts an untyped router', () => {
+    const _client: AnyNestedClient = createRouterClient({} as any, {})
   })
 })

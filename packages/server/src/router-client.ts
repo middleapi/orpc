@@ -6,6 +6,7 @@ import { resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 
 import type { Lazyable } from './lazy'
 import { Lazy } from './lazy'
+import type { ProcedureDefinition } from './procedure'
 import { Procedure } from './procedure'
 import type { ProcedureClient, ProcedureClientOptions } from './procedure-client'
 import { createProcedureClient } from './procedure-client'
@@ -19,14 +20,18 @@ import { getRouter } from './router-utils'
  *
  * @see {@link https://orpc.dev/docs/client/client-side#creating-a-client | Client-Side Clients - Creating a Client}
  */
-export type RouterClient<TRouter extends AnyRouter, TClientContext extends ClientContext = object> =
-  TRouter extends Procedure<any, any, infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
-    ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
-    : {
-        [K in keyof TRouter]: TRouter[K] extends Lazyable<infer U extends AnyRouter>
-          ? RouterClient<U, TClientContext>
-          : never
-      }
+export type RouterClient<
+  TRouter extends AnyRouter,
+  TClientContext extends ClientContext = object,
+> = RouterClientInner<TRouter, TClientContext>
+
+export type RouterClientInner<T, TClientContext extends ClientContext> = T extends {
+  '~orpc': ProcedureDefinition<any, any, infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
+}
+  ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
+  : T extends Lazy<infer U extends AnyRouter>
+    ? RouterClientInner<U, TClientContext>
+    : { [K in keyof T as K]: RouterClientInner<T[K], TClientContext> }
 
 /**
  * Creates a server-side client that calls the router's procedures directly,
