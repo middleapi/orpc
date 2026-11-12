@@ -205,9 +205,7 @@ function extractCompactRequestParts(
   return {
     paramsEntries,
     queryEntries: isBodylessMethod(method) ? restEntries : undefined,
-    queryAdditionalProperties: isBodylessMethod(method)
-      ? extractJsonObjectSchemaAdditionalProperties(schema)
-      : undefined,
+    queryAdditionalProperties: isBodylessMethod(method) ? extractFreeFormQuery(schema) : undefined,
     headersEntries: undefined,
     bodySchema,
     bodyOptional: !dynamicParams?.length
@@ -231,13 +229,28 @@ function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
   return {
     paramsEntries: extractJsonObjectSchemaEntries(section('params')?.[1] ?? false),
     queryEntries: extractJsonObjectSchemaEntries(section('query')?.[1] ?? false),
-    queryAdditionalProperties: extractJsonObjectSchemaAdditionalProperties(
-      section('query')?.[1] ?? false,
-    ),
+    queryAdditionalProperties: extractFreeFormQuery(section('query')?.[1] ?? false),
     headersEntries: extractJsonObjectSchemaEntries(section('headers')?.[1] ?? false),
     bodySchema: section('body')?.[1],
     bodyOptional: section('body')?.[2],
   }
+}
+
+/**
+ * The schema of the keys of a query other than its properties, like those of a record, unless it
+ * constrains them in ways an object parameter of them would lose (`propertyNames`)
+ */
+function extractFreeFormQuery(schema: JsonSchema): JsonSchema | undefined {
+  const resolved = resolveJsonSchemaRootLocalRef(schema)
+  const constrained =
+    typeof resolved === 'object' &&
+    (resolved.propertyNames !== undefined ||
+      resolved.patternProperties !== undefined ||
+      resolved.minProperties !== undefined ||
+      resolved.maxProperties !== undefined ||
+      resolved.required?.some((name) => !Object.hasOwn(resolved.properties ?? {}, name)))
+
+  return constrained ? undefined : extractJsonObjectSchemaAdditionalProperties(schema)
 }
 
 function renderPathParameters(

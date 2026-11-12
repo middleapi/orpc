@@ -212,4 +212,9 @@ export const roundEightyTwoRequests = {
     .route({ method: 'GET', path: '/compactArrays' })
     .input(type<Record<string, string[]>>())
     .handler(({ input }) => Object.keys(input).length),
+  // only the keys `x` and `y`, which an object parameter of form style would lose
+  enumRecord: os
+    .route({ method: 'GET', path: '/enumRecord' })
+    .input(z.record(z.enum(['x', 'y']), z.string()))
+    .handler(({ input }) => Object.keys(input).length),
 }

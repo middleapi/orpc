@@ -5225,6 +5225,7 @@ describe('openAPIGenerator', () => {
       )
       expect(new URL(sent!.url).search).toBe('?t%5B0%5D=a&t%5B1%5D=b')
       expect(spec.paths['/compactArrays'].get.parameters).toBeUndefined()
+      expect(spec.paths['/enumRecord'].get.parameters).toBeUndefined()
     })
   })
 

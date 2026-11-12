@@ -510,6 +510,38 @@ describe('openAPIGenerator operation builders', () => {
       ])
     })
 
+    it.each<[Record<string, unknown>]>([
+      // `z.record(z.enum(['x', 'y']), z.string())`
+      [{ propertyNames: { type: 'string', enum: ['x', 'y'] }, required: ['x', 'y'] }],
+      [{ required: ['a', 'b'] }],
+      [{ patternProperties: { '^x-': { type: 'string' } } }],
+      [{ minProperties: 1 }],
+      [{ maxProperties: 3 }],
+    ])('documents no free-form query keys constrained by %j', (constraints) => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { a: { type: 'string' } },
+              additionalProperties: { type: 'string' },
+              ...constraints,
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).name)).toEqual([
+        'a',
+      ])
+    })
+
     it('does not use deepObject for query params whose $ref resolves to a primitive', () => {
       const { ctx, operation } = createContext()
 
