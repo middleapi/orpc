@@ -193,9 +193,9 @@ function extractCompactRequestParts(
     ? undefined
     : !dynamicParams?.length
       ? schema
-      : // a client sends no body when every field is a path param
-        restEntries?.length ||
-          (additionalProperties !== undefined && additionalProperties !== false)
+      : // a client sends no body when every field is a path param and the input has no other keys,
+        // which an input without `additionalProperties` may have (`v.looseObject`, arktype objects)
+        restEntries?.length || additionalProperties !== false
         ? combineJsonObjectSchemaEntries(restEntries ?? [], additionalProperties)
         : undefined
 

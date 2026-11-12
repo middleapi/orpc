@@ -5231,7 +5231,12 @@ describe('openAPIGenerator', () => {
 
       await expect(link.call(['remove'], { id: 'a' }, { context: {} })).resolves.toBe(1)
       expect(await sent!.text()).toBe('')
-      expect(spec.paths['/items/{id}'].delete.requestBody).toBeUndefined()
+      // but the other keys an object type allows in a body, which is optional
+      await expect(link.call(['remove'], { id: 'a', b: 'x' }, { context: {} })).resolves.toBe(1)
+      expect(await sent!.text()).toBe('{"b":"x"}')
+      expect(spec.paths['/items/{id}'].delete.requestBody).toEqual({
+        content: { 'application/json': { schema: { type: 'object', properties: {} } } },
+      })
 
       // the keys of a free-form query, as an object of form style
       await expect(

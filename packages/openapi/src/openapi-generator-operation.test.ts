@@ -396,40 +396,44 @@ describe('openAPIGenerator operation builders', () => {
       expect(operation.requestBody).toBeUndefined()
     })
 
-    it('documents no request body when every field is a path param', () => {
-      const { ctx, operation } = createContext()
+    it('documents no request body when every field is a path param and no other key is allowed', () => {
       const path = '/planets/{id}' as const
-      const input = (extra: object) =>
-        testDef({
-          inputs: [
-            testSchema({
-              type: 'object',
-              properties: { id: { type: 'string' } },
-              required: ['id'],
-              ...extra,
-            }),
-          ],
-        })
+      const build = (extra: object) => {
+        const { ctx, operation } = createContext()
+        buildRequest(
+          ctx,
+          operation,
+          testDef({
+            inputs: [
+              testSchema({
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+                ...extra,
+              }),
+            ],
+          }),
+          { method: 'DELETE', path },
+          getDynamicPathParams(path),
+        )
+        return operation.requestBody
+      }
 
-      buildRequest(
-        ctx,
-        operation,
-        input({}),
-        { method: 'DELETE', path },
-        getDynamicPathParams(path),
-      )
-      expect(operation.requestBody).toBeUndefined()
+      expect(build({ additionalProperties: false })).toBeUndefined()
 
-      // other keys may still be sent
-      const other = createContext()
-      buildRequest(
-        other.ctx,
-        other.operation,
-        input({ additionalProperties: { type: 'number' } }),
-        { method: 'DELETE', path },
-        getDynamicPathParams(path),
-      )
-      expect(other.operation.requestBody).toEqual({
+      // other keys may still be sent, which `v.looseObject` and arktype objects keep without
+      // writing `additionalProperties`
+      expect(build({})).toEqual({
+        content: { 'application/json': { schema: { type: 'object', properties: {} } } },
+      })
+      expect(build({ additionalProperties: true })).toEqual({
+        content: {
+          'application/json': {
+            schema: { type: 'object', properties: {}, additionalProperties: true },
+          },
+        },
+      })
+      expect(build({ additionalProperties: { type: 'number' } })).toEqual({
         content: {
           'application/json': {
             schema: { type: 'object', properties: {}, additionalProperties: { type: 'number' } },
@@ -572,6 +576,30 @@ describe('openAPIGenerator operation builders', () => {
 
       expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).name)).toEqual([
         'a',
+      ])
+    })
+
+    it('documents no free-form query keys beside a field named like their parameter', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { query: { type: 'string' } },
+              additionalProperties: { type: 'string' },
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters).toEqual([
+        expect.objectContaining({ in: 'query', name: 'query', schema: { type: 'string' } }),
       ])
     })
 
@@ -1268,6 +1296,46 @@ describe('openAPIGenerator operation builders', () => {
         'x-opt': { schema: { type: 'string' } },
       })
       expect(responses['202']?.headers).toBeUndefined()
+    })
+
+    it('requires no header of a status one of whose members has no headers', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(
+        ctx,
+        operation,
+        testDef({
+          outputs: [
+            testSchema({
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    status: { const: 200 },
+                    headers: {
+                      type: 'object',
+                      properties: { etag: { type: 'string' } },
+                      required: ['etag'],
+                    },
+                    body: { type: 'string' },
+                  },
+                  required: ['status', 'headers', 'body'],
+                },
+                {
+                  type: 'object',
+                  properties: { status: { const: 200 }, body: { type: 'string' } },
+                  required: ['status', 'body'],
+                },
+              ],
+            }),
+          ],
+        }),
+        { outputStructure: 'detailed' },
+      )
+
+      expect((operation.responses as any)['200'].headers).toEqual({
+        etag: { schema: { type: 'string' } },
+      })
     })
 
     it('documents a detailed body once when members of a status share it', () => {
