@@ -5,6 +5,8 @@ import type { PartialDeep, ReadonlyDeep } from 'type-fest'
 import * as z from 'zod'
 
 import type { Box } from './round82-lib'
+import type { Workspace } from './round82-project'
+import type { Account as UserAccount } from './round82-user'
 
 export interface Page<T> {
   items: T[]
@@ -101,6 +103,37 @@ export const roundEightyTwoLiterals = {
   member: os.handler((): Member => ({ role: 'owner' })),
   // the same union written in place keeps the alias, as for object models
   inPlace: os.handler((): 'on' | 'off' => 'on'),
+}
+
+const USER_STATUSES = ['active', 'inactive'] as const
+type UserStatus = (typeof USER_STATUSES)[number]
+const PROJECT_STATES = ['active', 'inactive'] as const
+type ProjectState = (typeof PROJECT_STATES)[number]
+const KINDS = ['task', 'bug'] as const
+type Kind = (typeof KINDS)[number]
+type IssueKind = Kind
+interface User {
+  status: UserStatus
+}
+interface Project {
+  state: ProjectState
+}
+interface Issue {
+  kind: IssueKind
+}
+
+/** Aliases of the items of `as const` arrays with the same items, which the compiler interns */
+export const roundEightyTwoSameLiterals = {
+  user: os.handler((): User => ({ status: 'active' })),
+  projects: os
+    .route({ method: 'GET', path: '/projects' })
+    .input(type<{ state?: Project['state'] }>())
+    .handler((): Project[] => []),
+  // an alias of another alias is that alias
+  issue: os.handler((): Issue => ({ kind: 'bug' })),
+  // the aliases of models of other files, read as their fields are converted
+  account: os.handler((): UserAccount => ({ status: 'open' })),
+  workspace: os.handler((): Workspace => ({ state: 'open' })),
 }
 
 type Role = 'admin' | 'member'

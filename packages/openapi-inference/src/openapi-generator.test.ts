@@ -229,6 +229,7 @@ import {
   roundEightyTwoNames,
   roundEightyTwoRequests,
   roundEightyTwoRoles,
+  roundEightyTwoSameLiterals,
   roundEightyTwoUnresolved,
 } from '../tests/fixtures/app/src/round82'
 import { router } from '../tests/fixtures/app/src/router'
@@ -4991,6 +4992,7 @@ describe('openAPIGenerator', () => {
       roundEightyTwoNames,
       roundEightyTwoRequests,
       roundEightyTwoRoles,
+      roundEightyTwoSameLiterals,
       roundEightyTwoUnresolved,
     }
     const generate = (
@@ -5059,6 +5061,30 @@ describe('openAPIGenerator', () => {
         'Mode',
         'Switch',
         'TeamRole',
+      ])
+    })
+
+    it('names no union of literals after one of the aliases of other items it is interned for', async () => {
+      const spec = await generate('roundEightyTwoSameLiterals')
+      const schemas = spec.components.schemas
+      const statuses = { type: 'string', enum: ['active', 'inactive'] }
+
+      expect(schemas.User.properties.status).toEqual(statuses)
+      expect(schemas.Project.properties.state).toEqual(statuses)
+      expect(spec.paths['/projects'].get.parameters[0].schema).toEqual(statuses)
+      // an alias of the alias names the same union
+      expect(schemas.Issue.properties.kind).toEqual(ref('Kind'))
+      // also when the other alias is read once the union was converted
+      const states = { type: 'string', enum: ['closed', 'open'] }
+      expect(schemas.Account.properties.status).toEqual(states)
+      expect(schemas.Workspace.properties.state).toEqual(states)
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'Account',
+        'Issue',
+        'Kind',
+        'Project',
+        'User',
+        'Workspace',
       ])
     })
 

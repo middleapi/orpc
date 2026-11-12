@@ -119,6 +119,12 @@ export class TypeQueries {
   private readonly askedTypes = new Map<number, Map<number, Type>>()
   /** Whether an alias read named a type `getLostAlias` had been asked about, see `takeLateAliases` */
   private lateAliases = false
+  /**
+   * The aliases of literal unions not written as references to another alias, by the ids of the
+   * unions, and the unions two of them were read for (see `getLostAlias`)
+   */
+  private readonly unionAliases = new Map<number, TSSymbol>()
+  private readonly ambiguousUnions = new Set<number>()
   /** The files `readAliases` read */
   private readonly aliasFiles = new Set<string>()
   /** The aliases `readAliases` found in them */
@@ -1146,7 +1152,9 @@ export class TypeQueries {
    * own is declared with, which the compiler does not keep for it (`type User = InferSelectModel<typeof users>`),
    * of those of the files `readAliases` read: of the type, else the first one (see `preferAlias`)
    * of a type of the same shape, which the compiler instantiates anew where it infers or awaits it
-   * (`Promise<User[]>`).
+   * (`Promise<User[]>`). A union of literals is one type for all aliases of the same members
+   * (`(typeof USER_STATUSES)[number]` and `(typeof PROJECT_STATES)[number]`), so two of them name
+   * it by neither.
    */
   getLostAlias(type: Type): TSSymbol | undefined {
     const symbol = this.getAliasBucket(type)
@@ -1158,6 +1166,10 @@ export class TypeQueries {
 
     const aliases = this.lostAliases.get(symbol)
     const own = aliases?.get(type.id)
+    if (this.ambiguousUnions.has(type.id)) {
+      return undefined
+    }
+
     // a union of literals is one type wherever it is written
     if (!aliases || own || type.isUnionType()) {
       return own?.[1]
@@ -1219,8 +1231,20 @@ export class TypeQueries {
   /**
    * Records the alias of a type, and whether a conversion may have written the type without it.
    */
-  private addLostAlias(type: Type, alias: TSSymbol): void {
+  private addLostAlias(type: Type, alias: TSSymbol, reference: boolean): void {
     const symbol = this.getAliasBucket(type)
+
+    // an alias of an alias (`type IssueKind = Kind`) is that alias
+    if (type.isUnionType() && !reference) {
+      const other = this.unionAliases.get(type.id)
+      if (!other) {
+        this.unionAliases.set(type.id, alias)
+      } else if (other.id !== alias.id && !this.ambiguousUnions.has(type.id)) {
+        this.ambiguousUnions.add(type.id)
+        this.lateAliases ||= !!this.askedTypes.get(symbol)?.has(type.id)
+      }
+    }
+
     let aliases = this.lostAliases.get(symbol)
     if (!aliases) {
       this.lostAliases.set(symbol, (aliases = new Map()))
@@ -1291,6 +1315,7 @@ export class TypeQueries {
 
     const aliases: TSSymbol[] = []
     const aliasNames: any[] = []
+    const references = new Set<number>()
     for (const [i, symbol] of this.checker.getSymbolAtLocation(names).entries()) {
       const imported = imports.get(i)
       const alias = imported
@@ -1314,6 +1339,9 @@ export class TypeQueries {
       if (node && !node.typeParameters?.length && LOSING_ALIAS_KINDS.has(node.type.kind)) {
         aliases.push(alias)
         aliasNames.push(node.name)
+        if (node.type.kind === SyntaxKind.TypeReference && !node.type.typeArguments?.length) {
+          references.add(alias.id)
+        }
       }
     }
 
@@ -1332,7 +1360,7 @@ export class TypeQueries {
         type.getAliasSymbol()?.id !== alias.id &&
         !((type.getSymbol()?.flags ?? 0) & (SymbolFlags.Interface | SymbolFlags.Class))
       ) {
-        this.addLostAlias(type, alias)
+        this.addLostAlias(type, alias, references.has(alias.id))
       }
     }
   }
