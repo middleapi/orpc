@@ -214,10 +214,7 @@ export function getBodyMediaType(
 
   const of = (source: Type) =>
     BODY_MEDIA_TYPES[
-      getDeclaredBuiltinName(types, source) ??
-        ((source.getSymbol()?.flags ?? 0) & (SymbolFlags.Class | SymbolFlags.Interface)
-          ? (getBuiltinBaseName(types, source) ?? '')
-          : '')
+      getDeclaredBuiltinName(types, source) ?? getExtendedBuiltinName(types, source) ?? ''
     ]
 
   const own = of(type)
@@ -304,9 +301,8 @@ function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | unde
     return kinds.includes(true) ? true : kinds.flatMap((kind) => (Array.isArray(kind) ? kind : []))
   }
 
-  const source = members[0]
-
-  const symbol = source?.getSymbol()
+  const source = members[0]!
+  const symbol = source.getSymbol()
 
   if (!symbol) {
     return undefined
@@ -316,15 +312,12 @@ function getTypedArrayKind(types: TypeQueries, type: Type): true | Type[] | unde
     return true
   }
 
-  const base =
-    symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
-      ? getBuiltinBaseName(types, source!)
-      : undefined
+  const base = getExtendedBuiltinName(types, source)
 
   // also an interface extending a view of one (`interface Sized extends Pick<Uint8Array, 'length'>`)
   return base !== undefined
     ? TYPED_ARRAYS.has(base) || undefined
-    : getViewBases(types, source!).filter((view) => isTypedArray(types, view))
+    : getViewBases(types, source).filter((view) => isTypedArray(types, view))
 }
 
 /**
@@ -687,6 +680,15 @@ export function getBuiltinBaseName(types: TypeQueries, type: Type): string | und
 }
 
 /**
+ * The name of the default library class a class or an interface extends.
+ */
+function getExtendedBuiltinName(types: TypeQueries, type: Type): string | undefined {
+  return (type.getSymbol()?.flags ?? 0) & (SymbolFlags.Class | SymbolFlags.Interface)
+    ? getBuiltinBaseName(types, type)
+    : undefined
+}
+
+/**
  * The default library class a class extends, also through other classes, and through a mixin
  * applied to it (`class Tags extends Tagged(Set<string>)`, whose base is an intersection with it).
  */
@@ -780,12 +782,7 @@ export function getExtendedPrimitiveSchema(types: TypeQueries, view: Type): Json
       .find((schema) => schema !== undefined)
   }
 
-  const symbol = view.getSymbol()
-  const base =
-    symbol !== undefined && symbol.flags & (SymbolFlags.Class | SymbolFlags.Interface)
-      ? getBuiltinBaseName(types, view)
-      : undefined
-  return base === undefined ? undefined : BOXED_PRIMITIVES[base]?.(true)
+  return BOXED_PRIMITIVES[getExtendedBuiltinName(types, view) ?? '']?.(true)
 }
 
 /**
