@@ -243,7 +243,7 @@ import {
   roundEightyTwoUnresolved,
 } from '../tests/fixtures/app/src/round82'
 import { roundEightyTwoInterned } from '../tests/fixtures/app/src/round82-interned'
-import { roundEightyThreeNames } from '../tests/fixtures/app/src/round83'
+import { roundEightyThreeNames, roundEightyThreeRoles } from '../tests/fixtures/app/src/round83'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -5610,5 +5610,24 @@ describe('openAPIGenerator', () => {
         'Tagged_neg1',
       ])
     })
+
+    it.each([
+      ['no componentName', undefined, 'Role'],
+      ['the default componentName', (name: string) => name, 'Role'],
+      ['a prefix', (name: string) => `Acme.${name}`, 'Acme.Role'],
+    ] as const)(
+      'names the parameter form of a type after the type with %s',
+      async (_, componentName, name) => {
+        const spec = await generator.generate(roundEightyThreeRoles, {
+          source: { file: fixture('round83.ts'), export: 'roundEightyThreeRoles' },
+          componentName,
+        })
+
+        expect(Object.keys(spec.components?.schemas ?? {})).toEqual([name])
+        expect((spec.paths as any)['/roles'].get.parameters[0].schema).toEqual({
+          $ref: `#/components/schemas/${name}`,
+        })
+      },
+    )
   })
 })

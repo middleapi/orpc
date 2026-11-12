@@ -41,12 +41,12 @@ export interface MergeEquivalentComponentsOptions {
    */
   defNames?: ReadonlyMap<string, string> | undefined
   /**
-   * Whether a numbered name may take the name it was numbered after, not when `componentName`
-   * chose the names.
+   * The name of the component of a def, which `componentName` chose (with `defNames`), for the name
+   * a numbered one takes (`Acme.Role` of `Acme.RoleParam`).
    *
-   * @default true
+   * @default defName => defName
    */
-  rename?: boolean | undefined
+  componentName?: ((defName: string, schema: JsonSchema) => string) | undefined
 }
 
 /**
@@ -65,7 +65,7 @@ export function mergeEquivalentComponents(
   {
     reserved = new Set(),
     defNames: givenDefNames,
-    rename = true,
+    componentName,
   }: MergeEquivalentComponentsOptions = {},
 ): void {
   const schemas: Record<string, unknown> | undefined = document?.components?.schemas
@@ -76,6 +76,7 @@ export function mergeEquivalentComponents(
 
   // the stock generator keys components by valid names (`_Role` of `$Role`)
   const names = toValidDefNameRecord(defNameRecord)
+  const rename = !componentName
   const defNames =
     givenDefNames &&
     new Map(
@@ -212,7 +213,19 @@ export function mergeEquivalentComponents(
     holders.set(to, name)
     renamed.set(name, to)
   }
-  const renamable = rename ? candidates.filter((n) => !merged.has(n) && names.numbered.has(n)) : []
+  // the name of the component of the def a numbered one was numbered after, which `componentName`
+  // gave it, or would give it
+  const componentNames = new Map([...(defNames ?? [])].map(([name, def]) => [def, name]))
+  const baseOf = (name: string) => {
+    const base = names.numbered.get(defName(name))
+    return base === undefined || !componentName
+      ? base
+      : (componentNames.get(base) ??
+          toValidComponentName(componentName(base, schemas[name] as JsonSchema)))
+  }
+  const renamable = candidates.filter(
+    (n) => !merged.has(n) && !directed.has(n) && names.numbered.has(defName(n)),
+  )
   // oxlint-disable-next-line unicorn/no-array-sort -- sorts a copy
   renamable.sort(preference)
 
@@ -221,7 +234,7 @@ export function mergeEquivalentComponents(
     moved = false
 
     for (const name of renamable) {
-      const base = names.numbered.get(name)!
+      const base = baseOf(name)!
 
       if ((renamed.get(name) ?? name) === base) {
         continue
@@ -238,15 +251,16 @@ export function mergeEquivalentComponents(
       // alias its type lost, to a def of a declared type, whichever was given the name first
       const holder = holders.get(base)
       if (
+        holder !== undefined &&
         holder !== name &&
-        !reserved.has(holder!) &&
-        (names.parameters?.has(holder!) ||
-          (names.aliased?.has(holder!) && !names.aliased.has(name))) &&
-        !renamed.has(holder!)
+        !reserved.has(holder) &&
+        (names.parameters?.has(defName(holder)) ||
+          (names.aliased?.has(defName(holder)) && !names.aliased.has(defName(name)))) &&
+        !renamed.has(holder)
       ) {
         holders.delete(base)
         move(name, base)
-        move(holder!, free(base, names.numbered.get(holder!)))
+        move(holder, free(base, baseOf(holder)))
         moved = true
       }
     }

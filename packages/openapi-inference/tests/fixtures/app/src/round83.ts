@@ -97,3 +97,12 @@ export const roundEightyThreeNames = {
   month: os.handler((): Tagged<'2024-01'> => ({ tag: '2024-01' })),
   below: os.handler((): Tagged<-1> => ({ tag: -1 })),
 }
+
+export type Role = 'admin' | 'member'
+
+/** A type only a query holds, whose component is named after it */
+export const roundEightyThreeRoles = {
+  list: query('/roles')
+    .input(type<{ role?: Role }>())
+    .handler(() => 1),
+}

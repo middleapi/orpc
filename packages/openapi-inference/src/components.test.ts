@@ -225,7 +225,7 @@ describe('mergeEquivalentComponents', () => {
         ['Acme $RoleParam', '$RoleParam'],
         ['Acme $Role', '$Role'],
       ]),
-      rename: false,
+      componentName: (name) => `Acme ${name}`,
     })
 
     expect(renamed).toEqual({

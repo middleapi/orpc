@@ -388,8 +388,8 @@ export class OpenAPIGenerator {
       project.close()
     }
 
-    // the components of `base` stay as they are, and the names `componentName` chose are merged as
-    // defs of their def names
+    // the components of `base` stay as they are, the names `componentName` chose are merged as defs
+    // of their def names, and a numbered one takes the name it gives the def it was numbered after
     const reserved = new Set(Object.keys(options.base?.components?.schemas ?? {}))
     const defNames = new Map<string, string>()
     const generator = new BaseOpenAPIGenerator({
@@ -409,7 +409,7 @@ export class OpenAPIGenerator {
     mergeEquivalentComponents(document, ctx.converters.output.getDefNames(), {
       reserved,
       defNames,
-      rename: !componentName,
+      componentName,
     })
     return document
   }
