@@ -872,7 +872,8 @@ export class TypeToJsonSchemaConverter {
   private convertType(type: Type): JsonSchema {
     const flags = type.flags
 
-    if (flags & (TypeFlags.Any | TypeFlags.Unknown | UNDEFINED_FLAGS)) {
+    // `object` is also an array, a `Date` (a string), or a function
+    if (flags & (TypeFlags.Any | TypeFlags.Unknown | UNDEFINED_FLAGS | TypeFlags.NonPrimitive)) {
       return {}
     }
 
@@ -925,7 +926,7 @@ export class TypeToJsonSchemaConverter {
       return stringified ? anyOfDeduped([serialized, stringified]) : serialized
     }
 
-    if (flags & TypeFlags.String) {
+    if (flags & (TypeFlags.String | TypeFlags.StringMapping)) {
       return { type: 'string' }
     }
 
@@ -936,15 +937,6 @@ export class TypeToJsonSchemaConverter {
 
     if (flags & TypeFlags.TemplateLiteral) {
       return { type: 'string', pattern: `^${toPattern(this.types, type)}$` }
-    }
-
-    if (flags & TypeFlags.StringMapping) {
-      return { type: 'string' }
-    }
-
-    // `object` is also an array, a `Date` (a string), or a function
-    if (flags & TypeFlags.NonPrimitive) {
-      return {}
     }
 
     if (type.isUnionType()) {
