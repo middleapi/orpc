@@ -2584,13 +2584,10 @@ export class TypeToJsonSchemaConverter {
    */
   private key(type: Type): number {
     // a type converted the same way as under the serializer shares its result, and so its def
-    const sensitivity =
-      this.mode === 'serializer'
-        ? undefined
-        : this.mode === 'stringify'
-          ? this.stringifySensitivity
-          : this.eitherSensitivity
-    const key = sensitivity?.isSensitive(type) ? toModeKey(type.id, this.mode) : type.id
+    const mode = this.mode
+    const sensitivity = mode === 'stringify' ? this.stringifySensitivity : this.eitherSensitivity
+    const key =
+      mode !== 'serializer' && sensitivity.isSensitive(type) ? toModeKey(type.id, mode) : type.id
     return this.parameters ? toParameterKey(key) : key
   }
 
