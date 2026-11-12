@@ -17,7 +17,6 @@ import type {
 } from '@orpc/json-schema'
 import {
   extractJsonObjectSchemaEntries,
-  isStandardSchemaOptional,
   isUnconstrainedSchema,
   StandardJsonSchemaConverter,
 } from '@orpc/json-schema'
@@ -119,88 +118,12 @@ class InferredJsonSchemaConverter implements JsonSchemaConverter {
   }
 }
 
-type StandardJsonSchemaConversion = { jsonSchema: JsonSchema } | { error: unknown }
-
-/**
- * The conversions of Standard JSON Schemas in one generation, which reads each schema as it is
- * then: a later generation picks up later changes, like metadata added to a Zod registry.
- */
-type StandardJsonSchemaConversions = WeakMap<
-  AnySchema,
-  Partial<Record<JsonSchemaConverterDirection, StandardJsonSchemaConversion>>
->
-
-/**
- * Converts a Standard JSON Schema once per direction, caching the result (or the thrown error),
- * since both deciding whether it converts and converting it need the conversion.
- */
-function convertStandardJsonSchema(
-  cache: StandardJsonSchemaConversions,
-  schema: AnySchema,
-  direction: JsonSchemaConverterDirection,
-): StandardJsonSchemaConversion {
-  let conversions = cache.get(schema)
-  if (!conversions) {
-    conversions = {}
-    cache.set(schema, conversions)
-  }
-
-  if (!conversions[direction]) {
-    try {
-      conversions[direction] = {
-        jsonSchema: (schema['~standard'] as any).jsonSchema[direction]({ target: 'draft-2020-12' }),
-      }
-    } catch (error) {
-      conversions[direction] = { error }
-    }
-  }
-
-  return conversions[direction]
-}
-
-/**
- * Converts Standard JSON Schemas like {@link StandardJsonSchemaConverter}, reusing each conversion.
- */
-class CachedStandardJsonSchemaConverter extends StandardJsonSchemaConverter {
-  constructor(protected readonly cache: StandardJsonSchemaConversions) {
-    super()
-  }
-
-  override convert(
-    schema: AnySchema | undefined,
-    direction: JsonSchemaConverterDirection,
-  ): [jsonSchema: JsonSchema, optional: boolean] {
-    const conversion = convertStandardJsonSchema(this.cache, schema!, direction)
-
-    return 'error' in conversion
-      ? [{}, true]
-      : [conversion.jsonSchema, isStandardSchemaOptional(schema!, direction)]
-  }
-}
-
-/**
- * Converts the Standard JSON Schemas it can: one that throws (like a Zod date, which JSON Schema
- * can not represent) or converts to any value is inferred from its type, instead of documented as
- * any value.
- */
-class ConvertibleStandardJsonSchemaConverter extends CachedStandardJsonSchemaConverter {
-  override condition(
-    schema: AnySchema | undefined,
-    direction: JsonSchemaConverterDirection,
-  ): boolean {
-    if (!super.condition(schema, direction)) {
-      return false
-    }
-
-    const conversion = convertStandardJsonSchema(this.cache, schema!, direction)
-    return 'jsonSchema' in conversion && !isUnconstrainedSchema(conversion.jsonSchema)
-  }
-}
-
 type Conversion = { result: [jsonSchema: JsonSchema, optional: boolean] } | { error: unknown }
 
 /**
- * Converts as a converter of the options, once per schema and direction in one generation.
+ * Converts as a converter of the options (or the Standard JSON Schema converter the stock generator
+ * ends with), once per schema and direction in one generation: a later generation reads each schema
+ * as it is then, picking up later changes like metadata added to a Zod registry.
  */
 class CachedJsonSchemaConverter implements JsonSchemaConverter {
   private readonly conversions = new WeakMap<
@@ -216,8 +139,8 @@ class CachedJsonSchemaConverter implements JsonSchemaConverter {
 
   /**
    * Whether it converts a schema its condition holds for to a schema: one it throws on (like Zod's
-   * transforms, with `unrepresentable: 'throw'`) or converts to any value (with the default `any`)
-   * is inferred.
+   * transforms, with `unrepresentable: 'throw'`, or a Standard JSON Schema of a Zod date, which
+   * JSON Schema can not represent) or converts to any value (with the default `any`) is inferred.
    */
   converts(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): boolean {
     const conversion = this.getConversion(schema, direction)
@@ -276,7 +199,7 @@ interface InferenceContext {
    * The converters `OpenAPIGenerator` of `@orpc/openapi` uses, documenting a Standard JSON Schema
    * whose conversion throws as any value
    */
-  stockConverters: JsonSchemaConverter[]
+  stockConverters: CachedJsonSchemaConverter[]
   getSourceKind: (path: string) => SourceKind
   describeConfig: () => readonly string[]
 }
@@ -328,10 +251,14 @@ export class OpenAPIGenerator {
   ): Promise<OpenAPIDocument<TVersion>> {
     const project = openTypeScriptProject(source)
     // shared by deciding which schemas convert and by converting them, for this generation only
-    const conversions: StandardJsonSchemaConversions = new WeakMap()
-    const converters = toArray(this.options.converters).map((c) => new CachedJsonSchemaConverter(c))
-    const stockConverters = [...converters, new CachedStandardJsonSchemaConverter(conversions)]
-    const standard = new ConvertibleStandardJsonSchemaConverter(conversions)
+    const stockConverters = [
+      ...toArray(this.options.converters),
+      new StandardJsonSchemaConverter(),
+    ].map((c) => new CachedJsonSchemaConverter(c))
+    const findConverter = (
+      schema: AnySchema | undefined,
+      direction: JsonSchemaConverterDirection,
+    ) => stockConverters.find((c) => c.condition(schema, direction))
 
     let inferred: RouterContract
     let ctx: InferenceContext
@@ -353,15 +280,10 @@ export class OpenAPIGenerator {
         resolver: new RouterTypeResolver(project.checker, project.program, exported),
         converters: { input: converter('input'), output: converter('output') },
         schemaConverter: {
-          condition: (schema, direction) => {
-            const c = converters.find((c) => c.condition(schema, direction))
-            return c ? c.converts(schema, direction) : standard.condition(schema, direction)
-          },
+          condition: (schema, direction) =>
+            findConverter(schema, direction)?.converts(schema, direction) ?? false,
           convert: (schema, direction) =>
-            (converters.find((c) => c.condition(schema, direction)) ?? standard).convert(
-              schema,
-              direction,
-            ),
+            findConverter(schema, direction)!.convert(schema, direction),
         },
         stockConverters,
         getSourceKind: createSourceKindChecker(project.program),
