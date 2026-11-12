@@ -5603,7 +5603,7 @@ describe('openAPIGenerator', () => {
         source: { file: fixture('round83.ts'), export: 'roundEightyThreeNames' },
       })
 
-      expect(Object.keys(spec.components?.schemas ?? {}).sort()).toEqual([
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
         'AnonymousClass',
         'Round83UserCard',
         'Tagged_2024_01',

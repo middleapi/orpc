@@ -328,21 +328,28 @@ function toValidComponentName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/gu, '_') || '_'
 }
 
-function toValidDefNameRecord(record: DefNameRecord): DefNameRecord {
-  const toSet = (names: ReadonlySet<string> | undefined) =>
-    names && new Set([...names].map(toValidComponentName))
-  const toMap = (names: ReadonlyMap<string, string> | undefined) =>
+function toValidSet(names: ReadonlySet<string> | undefined): ReadonlySet<string> | undefined {
+  return names && new Set([...names].map(toValidComponentName))
+}
+
+function toValidMap(
+  names: ReadonlyMap<string, string> | undefined,
+): ReadonlyMap<string, string> | undefined {
+  return (
     names &&
     new Map(
       [...names].map(([name, base]) => [toValidComponentName(name), toValidComponentName(base)]),
     )
+  )
+}
 
+function toValidDefNameRecord(record: DefNameRecord): DefNameRecord {
   return {
-    used: toSet(record.used)!,
-    numbered: toMap(record.numbered)!,
-    modes: toMap(record.modes),
-    parameters: toSet(record.parameters),
-    aliased: toSet(record.aliased),
+    used: toValidSet(record.used)!,
+    numbered: toValidMap(record.numbered)!,
+    modes: toValidMap(record.modes),
+    parameters: toValidSet(record.parameters),
+    aliased: toValidSet(record.aliased),
   }
 }
 

@@ -251,10 +251,11 @@ function getSymbolName(symbol: TSSymbol): string {
   }
 
   // `index.ts` by its directory
-  const [file, directory] = String(declaration?.path ?? '')
+  const parts = String(declaration?.path ?? '')
     .split(/[\\/]/u)
-    .reverse()
     .map((part) => part.replace(/\..*$/u, ''))
+  const file = parts[parts.length - 1]
+  const directory = parts[parts.length - 2]
   const fileName = (file === 'index' ? directory : file)
     ?.split(/[^a-z\d]+/iu)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

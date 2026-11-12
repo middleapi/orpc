@@ -40,18 +40,21 @@ const patched = (): Priced & MaybeNumberJSON => Object.assign(new Priced(), {} a
 class AnyJSON {
   name = 'x'
 
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- what is written
   toJSON<T>(): T {
     return undefined as T
   }
 }
 
 class WrappedJSON {
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- what is written
   toJSON<T>(): { value: T } {
     return { value: undefined as T }
   }
 }
 
 class StringJSON {
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- what is written
   toJSON<T extends string = 'a'>(): T {
     return 'a' as T
   }
@@ -103,7 +106,9 @@ export const roundEightyThree = {
   patched: os.handler(() => patched()),
   patchedNested: os.handler(() => ({ m: patched() })),
   patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
-  partialToJSON: os.handler((): Priced & Partial<{ toJSON(): number }> => new Priced()),
+  partialToJSON: os.handler((): Priced & Partial<{ toJSON(): number }> =>
+    Object.assign(new Priced(), {} as Partial<{ toJSON(): number }>),
+  ),
   // bracket notation sends nothing for `null`, and for empty arrays, objects, and sets
   nullQuery: query('/null-query')
     .input(type<{ a: string | null; b: { c: number | null; d: (string | null)[] } }>())
