@@ -178,14 +178,8 @@ export class ExpansionGuard {
       return 0
     }
 
-    let seen = this.instantiations.get(declaration)
-
-    if (!seen) {
-      seen = new Set()
-      this.instantiations.set(declaration, seen)
-    }
-
-    seen.add(type.id)
+    const seen = this.instantiations.get(declaration) ?? new Set<number>()
+    this.instantiations.set(declaration, seen.add(type.id))
 
     if (
       stack.length >= MAX_NESTING ||

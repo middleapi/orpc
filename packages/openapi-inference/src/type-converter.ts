@@ -316,6 +316,7 @@ export class TypeToJsonSchemaConverter {
   /** Non-null cores of named nullable unions, back to the union (`Json` without `null` -> `Json`) */
   private readonly nullableCores = new Map<number, Type>()
   private voidType: Type | undefined
+  private stringType: Type | undefined
   /** Interfaces over views of typed arrays being converted as one of the values they may hold */
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
   /**
@@ -651,12 +652,9 @@ export class TypeToJsonSchemaConverter {
     // differ from that of the type, as would that of any other type holding it
     const pending = this.pendingFields
     if (pending?.depth === this.expansion.path.length) {
-      // `X | undefined` is `X`
-      const defined = type.isUnionType()
-        ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
-        : []
-      if (defined.length === 1) {
-        return this.visit(defined[0]!)
+      const defined = this.getSoleDefinedMember(type)
+      if (defined) {
+        return this.visit(defined)
       }
 
       this.pendingFields = undefined
@@ -697,11 +695,9 @@ export class TypeToJsonSchemaConverter {
 
     // `X | undefined` is `X`, the caller makes it optional, also when an alias distributes over
     // it (`DeepPartial<X | undefined>` is `DeepPartial<X> | undefined`), which keeps one def for `X`
-    if (type.isUnionType()) {
-      const defined = this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
-      if (defined.length === 1) {
-        return this.visit(defined[0]!)
-      }
+    const defined = this.getSoleDefinedMember(type)
+    if (defined) {
+      return this.visit(defined)
     }
 
     const singleMemberEnum = this.types.getSingleMemberEnum(type)
@@ -713,6 +709,16 @@ export class TypeToJsonSchemaConverter {
     return (
       this.expansion.expand(type, () => this.visitStructured(type, key, singleMemberEnum)) ?? {}
     )
+  }
+
+  /**
+   * `X` of a union `X | undefined`.
+   */
+  private getSoleDefinedMember(type: Type): Type | undefined {
+    const defined = type.isUnionType()
+      ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
+      : []
+    return defined.length === 1 ? defined[0] : undefined
   }
 
   private visitStructured(
@@ -1015,12 +1021,12 @@ export class TypeToJsonSchemaConverter {
   private convertNullableUnion(type: Type): JsonSchema {
     const members = this.types.getMembers(type)
     const concrete = members.filter((m) => !(m.flags & NULLISH_FLAGS))
+    // without `strictNullChecks` the checker returns the union itself
     const core =
       concrete.length > 1 && concrete.length < members.length
-        ? this.checker.getNonNullableType(type)
+        ? this.types.getNonNullable(type)
         : undefined
 
-    // without `strictNullChecks` the checker returns the union itself
     if (core && core.id !== type.id && !(core.flags & TypeFlags.Never)) {
       const hasNull = members.some((m) => m.flags & TypeFlags.Null)
 
@@ -1743,7 +1749,7 @@ export class TypeToJsonSchemaConverter {
 
     if (
       isTypeOfMembers('String') &&
-      this.checker.isTypeAssignableTo(this.checker.getStringType(), type)
+      this.checker.isTypeAssignableTo((this.stringType ??= this.checker.getStringType()), type)
     ) {
       forms.push({ type: 'string' })
     }
@@ -2617,19 +2623,15 @@ export class TypeToJsonSchemaConverter {
    * Keys of conversion results, which differ between the modes.
    */
   private key(type: Type): number {
-    const key = this.getModeKey(type)
-    return this.parameters ? toParameterKey(key) : key
-  }
-
-  private getModeKey(type: Type): number {
-    if (this.mode === 'serializer') {
-      return type.id
-    }
-
     // a type converted the same way as under the serializer shares its result, and so its def
     const sensitivity =
-      this.mode === 'stringify' ? this.stringifySensitivity : this.eitherSensitivity
-    return sensitivity.isSensitive(type) ? toModeKey(type.id, this.mode) : type.id
+      this.mode === 'serializer'
+        ? undefined
+        : this.mode === 'stringify'
+          ? this.stringifySensitivity
+          : this.eitherSensitivity
+    const key = sensitivity?.isSensitive(type) ? toModeKey(type.id, this.mode) : type.id
+    return this.parameters ? toParameterKey(key) : key
   }
 
   /**
