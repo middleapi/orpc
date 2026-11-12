@@ -1149,7 +1149,7 @@ export class TypeQueries {
    * (`Promise<User[]>`).
    */
   getLostAlias(type: Type): TSSymbol | undefined {
-    const symbol = type.getSymbol()?.id ?? -1
+    const symbol = this.getAliasBucket(type)
     let asked = this.askedTypes.get(symbol)
     if (!asked) {
       this.askedTypes.set(symbol, (asked = new Map()))
@@ -1158,7 +1158,8 @@ export class TypeQueries {
 
     const aliases = this.lostAliases.get(symbol)
     const own = aliases?.get(type.id)
-    if (!aliases || own) {
+    // a union of literals is one type wherever it is written
+    if (!aliases || own || type.isUnionType()) {
       return own?.[1]
     }
 
@@ -1183,6 +1184,26 @@ export class TypeQueries {
   }
 
   /**
+   * Whether a type is a union of string or number literals, like `(typeof ROLES)[number]`, which
+   * may lose its alias too.
+   */
+  isLiteralUnion(type: Type): boolean {
+    return (
+      type.isUnionType() &&
+      this.getMembers(type).every(
+        (m) => m.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral),
+      )
+    )
+  }
+
+  /**
+   * The lost aliases of types are kept by the symbols of the types, those of literal unions apart.
+   */
+  private getAliasBucket(type: Type): number {
+    return type.isUnionType() ? -2 : (type.getSymbol()?.id ?? -1)
+  }
+
+  /**
    * The properties of a type, with whether they are optional and the ids of their types, which
    * tell apart the instantiations of one library type (`Simplify<...>` of drizzle), of one symbol.
    */
@@ -1199,7 +1220,7 @@ export class TypeQueries {
    * Records the alias of a type, and whether a conversion may have written the type without it.
    */
   private addLostAlias(type: Type, alias: TSSymbol): void {
-    const symbol = type.getSymbol()?.id ?? -1
+    const symbol = this.getAliasBucket(type)
     let aliases = this.lostAliases.get(symbol)
     if (!aliases) {
       this.lostAliases.set(symbol, (aliases = new Map()))
@@ -1216,7 +1237,8 @@ export class TypeQueries {
     this.lateAliases ||=
       !!asked &&
       (asked.has(type.id) ||
-        [...asked.values()].some((t) => this.getShape(t) === this.getShape(type)))
+        (!type.isUnionType() &&
+          [...asked.values()].some((t) => this.getShape(t) === this.getShape(type))))
   }
 
   /**
@@ -1306,7 +1328,7 @@ export class TypeQueries {
       // (of a library, or a built-in)
       if (
         type &&
-        type.flags & (TypeFlags.Object | TypeFlags.Intersection) &&
+        (type.flags & (TypeFlags.Object | TypeFlags.Intersection) || this.isLiteralUnion(type)) &&
         type.getAliasSymbol()?.id !== alias.id &&
         !((type.getSymbol()?.flags ?? 0) & (SymbolFlags.Interface | SymbolFlags.Class))
       ) {

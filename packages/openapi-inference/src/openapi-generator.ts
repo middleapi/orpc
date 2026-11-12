@@ -18,6 +18,7 @@ import type {
 import {
   extractJsonObjectSchemaEntries,
   isStandardSchemaOptional,
+  isUnconstrainedSchema,
   StandardJsonSchemaConverter,
 } from '@orpc/json-schema'
 import type {
@@ -37,6 +38,7 @@ import type { AnyRouter } from '@orpc/server'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { SourceFile } from 'typescript/unstable/ast'
+import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { DiagnosticCategory, TypeFlags } from 'typescript/unstable/sync'
 
@@ -175,17 +177,97 @@ class CachedStandardJsonSchemaConverter extends StandardJsonSchemaConverter {
 
 /**
  * Converts the Standard JSON Schemas it can: one that throws (like a Zod date, which JSON Schema
- * can not represent) is inferred from its type, instead of documented as any value.
+ * can not represent) or converts to any value is inferred from its type, instead of documented as
+ * any value.
  */
 class ConvertibleStandardJsonSchemaConverter extends CachedStandardJsonSchemaConverter {
   override condition(
     schema: AnySchema | undefined,
     direction: JsonSchemaConverterDirection,
   ): boolean {
-    return (
-      super.condition(schema, direction) &&
-      !('error' in convertStandardJsonSchema(this.cache, schema!, direction))
-    )
+    if (!super.condition(schema, direction)) {
+      return false
+    }
+
+    const conversion = convertStandardJsonSchema(this.cache, schema!, direction)
+    return 'jsonSchema' in conversion && !isUnconstrainedSchema(conversion.jsonSchema)
+  }
+}
+
+type Conversion = { result: [jsonSchema: JsonSchema, optional: boolean] } | { error: unknown }
+
+/**
+ * Converts as a converter of the options, once per schema and direction in one generation.
+ */
+class CachedJsonSchemaConverter implements JsonSchemaConverter {
+  private readonly conversions = new WeakMap<
+    AnySchema,
+    Partial<Record<JsonSchemaConverterDirection, Conversion>>
+  >()
+
+  constructor(private readonly converter: JsonSchemaConverter) {}
+
+  condition(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): boolean {
+    return this.converter.condition(schema, direction)
+  }
+
+  convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
+    const conversion = this.getConversion(schema, direction)
+    if ('error' in conversion) {
+      throw conversion.error
+    }
+    return conversion.result
+  }
+
+  getConversion(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): Conversion {
+    const convert = (): Conversion => {
+      try {
+        return { result: this.converter.convert(schema, direction) }
+      } catch (error) {
+        return { error }
+      }
+    }
+
+    if (schema === undefined) {
+      return convert()
+    }
+
+    let conversions = this.conversions.get(schema)
+    if (!conversions) {
+      this.conversions.set(schema, (conversions = {}))
+    }
+    return (conversions[direction] ??= convert())
+  }
+}
+
+/**
+ * Converts what a converter of the options converts to a schema: one it throws on (like Zod's
+ * transforms, with `unrepresentable: 'throw'`) or converts to any value (with the default `any`)
+ * is inferred from its type.
+ */
+class ConvertibleJsonSchemaConverter implements JsonSchemaConverter {
+  constructor(private readonly converter: CachedJsonSchemaConverter) {}
+
+  condition(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): boolean {
+    if (!this.converter.condition(schema, direction)) {
+      return false
+    }
+
+    const conversion = this.converter.getConversion(schema, direction)
+    return 'result' in conversion && !isUnconstrainedSchema(conversion.result[0])
+  }
+
+  convert(
+    schema: AnySchema | undefined,
+    direction: JsonSchemaConverterDirection,
+  ): [jsonSchema: JsonSchema, optional: boolean] {
+    return this.converter.convert(schema, direction)
   }
 }
 
@@ -255,10 +337,8 @@ export class OpenAPIGenerator {
     const project = openTypeScriptProject(source)
     // shared by deciding which schemas convert and by converting them, for this generation only
     const conversions: StandardJsonSchemaConversions = new WeakMap()
-    const stockConverters = [
-      ...toArray(this.options.converters),
-      new CachedStandardJsonSchemaConverter(conversions),
-    ]
+    const converters = toArray(this.options.converters).map((c) => new CachedJsonSchemaConverter(c))
+    const stockConverters = [...converters, new CachedStandardJsonSchemaConverter(conversions)]
 
     let inferred: RouterContract
     let ctx: InferenceContext
@@ -280,7 +360,7 @@ export class OpenAPIGenerator {
         resolver: new RouterTypeResolver(project.checker, project.program, exported),
         converters: { input: converter('input'), output: converter('output') },
         schemaConverters: [
-          ...toArray(this.options.converters),
+          ...converters.map((c) => new ConvertibleJsonSchemaConverter(c)),
           new ConvertibleStandardJsonSchemaConverter(conversions),
         ],
         stockConverters,
@@ -300,8 +380,9 @@ export class OpenAPIGenerator {
       project.close()
     }
 
-    // the components of `base`, and the names `componentName` chose, stay as they are
+    // the components of `base` stay as they are, and so do the names `componentName` chose
     const reserved = new Set(Object.keys(options.base?.components?.schemas ?? {}))
+    const defNames = new Map<string, string>()
     const generator = new BaseOpenAPIGenerator({
       ...this.options,
       converters: [new InferredJsonSchemaConverter(), ...stockConverters],
@@ -312,14 +393,13 @@ export class OpenAPIGenerator {
         componentName &&
         ((defName, schema) => {
           const name = componentName(defName, schema)
-          if (name !== defName) {
-            reserved.add(name)
-          }
+          defNames.set(name, defName)
           return name
         }),
     })
     mergeEquivalentComponents(document, ctx.converters.output.getDefNames(), {
       reserved,
+      defNames,
       rename: !componentName,
     })
     return document
@@ -837,13 +917,66 @@ function getCompilerErrors(
     }
   }
 
-  return [...files]
-    .flatMap((file) => [
-      ...ctx.program.getSyntacticDiagnostics(file),
-      ...ctx.program.getSemanticDiagnostics(file),
-    ])
-    .filter((d) => d.category === DiagnosticCategory.Error)
-    .map((d) => formatDiagnostic(ctx.program, d))
+  return [
+    ...[...files]
+      .flatMap((file) => [
+        ...ctx.program.getSyntacticDiagnostics(file),
+        ...ctx.program.getSemanticDiagnostics(file),
+      ])
+      .filter((d) => d.category === DiagnosticCategory.Error)
+      .map((d) => formatDiagnostic(ctx.program, d)),
+    ...getUnresolvedModules(ctx, error.files),
+  ]
+}
+
+/**
+ * The modules the declaration files the conversion went through import and the compiler does not
+ * find, which it reports nowhere under `skipLibCheck`, like a dependency of a built package that
+ * is not installed where it runs (`import("@standard-server/shared").AsyncIteratorClass<...>`).
+ */
+function getUnresolvedModules(ctx: InferenceContext, files: Iterable<string>): string[] {
+  const specifiers: any[] = []
+  const visit = (node: any): undefined => {
+    const specifier =
+      node.kind === SyntaxKind.ImportDeclaration || node.kind === SyntaxKind.ExportDeclaration
+        ? node.moduleSpecifier
+        : node.kind === SyntaxKind.ImportType
+          ? node.argument?.literal
+          : node.kind === SyntaxKind.ExternalModuleReference
+            ? node.expression
+            : undefined
+
+    if (specifier?.kind === SyntaxKind.StringLiteral) {
+      specifiers.push(specifier)
+    }
+
+    node.forEachChild(visit)
+    return undefined
+  }
+
+  for (const file of files) {
+    const sourceFile = /\.d\.[cm]?ts$/u.test(file) ? ctx.program.getSourceFile(file) : undefined
+    if (sourceFile) {
+      visit(sourceFile)
+    }
+  }
+
+  if (!specifiers.length) {
+    return []
+  }
+
+  return ctx.checker.getSymbolAtLocation(specifiers).flatMap((symbol, i) => {
+    if (symbol) {
+      return []
+    }
+
+    const specifier = specifiers[i]
+    const sourceFile = specifier.getSourceFile()
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(specifier.pos)
+    return [
+      `${sourceFile.fileName}:${line + 1}:${character + 1} - Cannot find module "${specifier.text}", which this declaration file imports.`,
+    ]
+  })
 }
 
 /**

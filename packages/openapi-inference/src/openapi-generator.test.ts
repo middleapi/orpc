@@ -222,6 +222,15 @@ import {
   roundEightyOneNames,
   roundEightyOneNamesReversed,
 } from '../tests/fixtures/app/src/round81'
+import {
+  roundEightyTwoConverted,
+  roundEightyTwoDeepViews,
+  roundEightyTwoLiterals,
+  roundEightyTwoNames,
+  roundEightyTwoRequests,
+  roundEightyTwoRoles,
+  roundEightyTwoUnresolved,
+} from '../tests/fixtures/app/src/round82'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -4962,6 +4971,190 @@ describe('openAPIGenerator', () => {
     )
   })
 
+  describe('round eighty-two', () => {
+    const routers = {
+      roundEightyTwoConverted,
+      roundEightyTwoDeepViews,
+      roundEightyTwoLiterals,
+      roundEightyTwoNames,
+      roundEightyTwoRequests,
+      roundEightyTwoRoles,
+      roundEightyTwoUnresolved,
+    }
+    const generate = (
+      exported: keyof typeof routers,
+      options: { defs?: 'named' | 'recursive'; converters?: any[] } = {},
+      generateOptions: Record<string, unknown> = {},
+    ) =>
+      new OpenAPIGenerator(options).generate(routers[exported], {
+        source: { file: fixture('round82.ts'), export: exported },
+        ...generateOptions,
+      }) as Promise<any>
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+    const response = (spec: any, path: string) =>
+      spec.paths[path].post.responses['200'].content['application/json'].schema
+
+    it('names instantiations over models by the aliases their types lost', async () => {
+      const spec = await generate('roundEightyTwoNames')
+
+      expect(Object.keys(spec.components.schemas).toSorted()).toEqual([
+        'ApiResponse_Page_PublicUser',
+        'Page_Item',
+        'Page_Pick_Product_id',
+        'Page_Product',
+        'Page_PublicUser',
+        'Page_Summary',
+        'Page_with-id-title-done',
+        'Product',
+      ])
+      expect(response(spec, '/items')).toEqual(ref('Page_Item'))
+      expect(response(spec, '/products')).toEqual(ref('Page_Product'))
+      expect(response(spec, '/picked')).toEqual(ref('Page_Pick_Product_id'))
+      expect(response(spec, '/publicUsers')).toEqual(ref('ApiResponse_Page_PublicUser'))
+      expect(response(spec, '/summaries')).toEqual(ref('Page_Summary'))
+    })
+
+    it.each(['named', 'recursive'] as const)(
+      'names deep views of recursive models by their arguments, or the alias they lost, with defs %s',
+      async (defs) => {
+        const spec = await generate('roundEightyTwoDeepViews', { defs })
+        const body = (path: string) =>
+          spec.paths[path].post.requestBody.content['application/json'].schema
+
+        expect(body('/comment')).toEqual(ref('PartialObjectDeep_Comment'))
+        expect(body('/menuItem')).toEqual(ref('PartialObjectDeep_MenuItem'))
+        expect(body('/personPatch')).toEqual(ref('PersonPatch'))
+        expect(response(spec, '/readonlyComment')).toEqual(ref('ReadonlyObjectDeep_Comment'))
+      },
+    )
+
+    it('names unions of literals by the aliases they lost, like those of other literal unions', async () => {
+      const spec = await generate('roundEightyTwoLiterals')
+      const schemas = spec.components.schemas
+
+      expect(response(spec, '/settings').properties).toEqual({
+        mode: ref('Mode'),
+        sw: ref('Switch'),
+        level: ref('Level'),
+        next: ref('Switch'),
+      })
+      expect(schemas.Switch).toEqual({ type: 'string', enum: ['off', 'on'] })
+      expect(schemas.Member.properties.role).toEqual(ref('TeamRole'))
+      expect(response(spec, '/inPlace')).toEqual(ref('Switch'))
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'Level',
+        'Member',
+        'Mode',
+        'Switch',
+        'TeamRole',
+      ])
+    })
+
+    it.each([undefined, 'Acme.'])(
+      'documents a type as a parameter, a body and a response once, with the prefix %s',
+      async (prefix) => {
+        const spec = await generate(
+          'roundEightyTwoRoles',
+          {},
+          prefix ? { componentName: (name: string) => `${prefix}${name}` } : {},
+        )
+        const role = ref(`${prefix ?? ''}Role`)
+
+        expect(Object.keys(spec.components.schemas).toSorted()).toEqual(
+          ['Account', 'Role'].map((name) => `${prefix ?? ''}${name}`),
+        )
+        expect(spec.paths['/list'].get.parameters[0].schema).toEqual(role)
+        expect(spec.paths['/list'].get.responses['200'].content['application/json'].schema).toEqual(
+          { type: 'array', items: role },
+        )
+        expect(
+          spec.paths['/create'].post.requestBody.content['application/json'].schema.properties.role,
+        ).toEqual(role)
+      },
+    )
+
+    it('numbers a type named after a component of base, in both directions', async () => {
+      const base = {
+        components: { schemas: { Role: { type: 'string' }, Account: { type: 'object' } } },
+      }
+      const spec = await generate('roundEightyTwoRoles', {}, { base })
+
+      expect(Object.keys(spec.components.schemas).toSorted()).toEqual([
+        'Account',
+        'Account2',
+        'Role',
+        'Role2',
+      ])
+      expect(spec.components.schemas.Role).toEqual({ type: 'string' })
+      expect(spec.paths['/list'].get.parameters[0].schema).toEqual(ref('Role2'))
+      expect(spec.paths['/list'].get.responses['200'].content['application/json'].schema).toEqual({
+        type: 'array',
+        items: ref('Role2'),
+      })
+      expect(spec.paths['/account'].post.requestBody.content['application/json'].schema).toEqual(
+        ref('Account2'),
+      )
+      expect(response(spec, '/account')).toEqual(ref('Account2'))
+    })
+
+    it.each(['any', 'throw'] as const)(
+      'infers the outputs a converter documents as any value or throws on, with unrepresentable %s',
+      async (unrepresentable) => {
+        const spec = await generate('roundEightyTwoConverted', {
+          converters: [new ZodToJsonSchemaConverter({ unrepresentable })],
+        })
+        const ajv = new Ajv2020({ strict: false })
+
+        expect(response(spec, '/transformed')).toEqual({
+          type: 'object',
+          properties: { slug: { type: 'string' }, n: { type: 'number' } },
+          required: ['slug', 'n'],
+        })
+        // the schemas it converts are kept
+        expect(response(spec, '/kept').properties.slug).toEqual({ type: 'string', minLength: 1 })
+        // and so is any value, of a value typed `unknown`
+        expect(spec.paths['/unknown'].post.responses['200'].content).toEqual({})
+
+        for (const name of ['transformed', 'kept'] as const) {
+          const output = await call(roundEightyTwoConverted[name], undefined)
+          expect(ajv.validate(response(spec, `/${name}`), output) ? [] : ajv.errors).toEqual([])
+        }
+      },
+    )
+
+    it('names a module a declaration file imports and the compiler does not find', async () => {
+      await expect(generate('roundEightyTwoUnresolved')).rejects.toThrow(
+        /round82-lib\.d\.ts:4:\d+ - Cannot find module "@acme\/not-installed", which this declaration file imports\./,
+      )
+    })
+
+    it('documents the requests a client sends without a body or a deep object', async () => {
+      const spec = await generate('roundEightyTwoRequests')
+      const handler = new OpenAPIHandler(roundEightyTwoRequests)
+      let sent: Request | undefined
+      const link = new OpenAPILink(roundEightyTwoRequests, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          sent = new Request(request, init)
+          return (await handler.handle(sent.clone())).response!
+        },
+      })
+
+      await expect(link.call(['coerced'], { minPrice: 1 }, { context: {} })).resolves.toBe(1)
+      expect(new URL(sent!.url).search).toBe('?minPrice=1')
+      // a value of any type is sent whole, unlike an array
+      expect(spec.paths['/coerced'].get.parameters).toEqual([
+        expect.not.objectContaining({ style: 'deepObject' }),
+        expect.objectContaining({ name: 'tags', style: 'deepObject' }),
+      ])
+
+      await expect(link.call(['remove'], { id: 'a' }, { context: {} })).resolves.toBe(1)
+      expect(await sent!.text()).toBe('')
+      expect(spec.paths['/items/{id}'].delete.requestBody).toBeUndefined()
+    })
+  })
+
   describe('project aliases of library models', () => {
     const file = new URL('../tests/fixtures/library-aliases/src/router.ts', import.meta.url)
     const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
@@ -4986,7 +5179,7 @@ describe('openAPIGenerator', () => {
         'Account',
         'Feed',
         'Kept',
-        'Paginated_with-id-title',
+        'Paginated_Post',
         'Post',
         'PostRecord',
         'PostWithAuthor',
@@ -5025,9 +5218,9 @@ describe('openAPIGenerator', () => {
       expect(schemas.Feed.properties.latest).toEqual({
         anyOf: [ref('PostRecord'), { type: 'null' }],
       })
-      // type arguments
-      expect(response(spec, '/posts')).toEqual(ref('Paginated_with-id-title'))
-      expect(schemas['Paginated_with-id-title'].properties.items).toEqual({
+      // type arguments, by the alias their type lost
+      expect(response(spec, '/posts')).toEqual(ref('Paginated_Post'))
+      expect(schemas.Paginated_Post.properties.items).toEqual({
         type: 'array',
         items: ref('Post'),
       })

@@ -27,10 +27,14 @@ export interface DefNameRecord {
 
 export interface MergeEquivalentComponentsOptions {
   /**
-   * Components the conversion did not name, like those of `base` or names `componentName` chose,
-   * which are neither merged nor renamed.
+   * Components the conversion did not name, like those of `base`, which are neither merged nor
+   * renamed.
    */
   reserved?: ReadonlySet<string> | undefined
+  /**
+   * The def names of components given other names, by `componentName`
+   */
+  defNames?: ReadonlyMap<string, string> | undefined
   /**
    * Whether a numbered name may take the name it was numbered after, not when `componentName`
    * chose the names.
@@ -53,7 +57,7 @@ export interface MergeEquivalentComponentsOptions {
 export function mergeEquivalentComponents(
   document: any,
   names: DefNameRecord,
-  { reserved = new Set(), rename = true }: MergeEquivalentComponentsOptions = {},
+  { reserved = new Set(), defNames, rename = true }: MergeEquivalentComponentsOptions = {},
 ): void {
   const schemas: Record<string, unknown> | undefined = document?.components?.schemas
 
@@ -61,9 +65,22 @@ export function mergeEquivalentComponents(
     return
   }
 
+  // a def whose name a component of `base` has is given one of a direction by the stock generator
+  // (`RoleInput`), which the other direction reuses: it is merged as a def of that name, and takes
+  // a numbered name instead (`Role2`)
+  const directed = new Map<string, string>()
+  for (const name of rename ? Object.keys(schemas) : []) {
+    const [, def] = /^(.+)(?:Input|Output)$/u.exec(name) ?? []
+    if (def !== undefined && reserved.has(def) && names.used.has(def) && !names.used.has(name)) {
+      directed.set(name, def)
+    }
+  }
+
+  const defName = (name: string) => defNames?.get(name) ?? directed.get(name) ?? name
+
   // only the components of the conversion's own defs
   const candidates = Object.keys(schemas).filter(
-    (name) => names.used.has(name) && !reserved.has(name),
+    (name) => names.used.has(defName(name)) && !reserved.has(name),
   )
   const isCandidate = new Set(candidates)
 
@@ -86,10 +103,13 @@ export function mergeEquivalentComponents(
   // classes of equivalent components: of the same name but its number, of the same shape,
   // referring to equivalent ones in turn, refined until they no longer split
   let classes = new Map(
-    candidates.map((name) => [
-      name,
-      `${names.modes?.get(name) ?? names.numbered.get(name) ?? name}\u0000${shapes.get(name)!.shape}`,
-    ]),
+    candidates.map((name) => {
+      const def = defName(name)
+      return [
+        name,
+        `${names.modes?.get(def) ?? names.numbered.get(def) ?? def}\u0000${shapes.get(name)!.shape}`,
+      ]
+    }),
   )
 
   for (let count = 0; ;) {
@@ -123,8 +143,8 @@ export function mergeEquivalentComponents(
 
   // the name not numbered, else the lowest numbered one
   const preference = (a: string, b: string) =>
-    Number(names.numbered.has(a)) - Number(names.numbered.has(b)) ||
-    a.length - b.length ||
+    Number(names.numbered.has(defName(a))) - Number(names.numbered.has(defName(b))) ||
+    defName(a).length - defName(b).length ||
     (a < b ? -1 : a > b ? 1 : 0)
 
   const merged = new Map<string, string>()
@@ -195,6 +215,20 @@ export function mergeEquivalentComponents(
         moved = true
       }
     }
+  }
+
+  for (const [name, def] of directed) {
+    const opposite = `${def}${name.endsWith('Input') ? 'Output' : 'Input'}`
+    if (merged.has(name) || taken(opposite)) {
+      continue
+    }
+
+    const separator = /\d$/u.test(def) ? '_' : ''
+    let to = `${def}${separator}2`
+    for (let i = 3; taken(to); i++) {
+      to = `${def}${separator}${i}`
+    }
+    move(name, to)
   }
 
   if (!merged.size && !renamed.size) {
