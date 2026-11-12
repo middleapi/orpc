@@ -18,6 +18,22 @@ export class Cents {
   }
 }
 
+/** Written as what its `toJSON` returns */
+export class Priced {
+  amount = 1
+
+  toJSON(): string {
+    return '1 USD'
+  }
+}
+
+interface MaybeNumberJSON {
+  toJSON?: () => number
+}
+
+/** An instance whose own `toJSON` may be missing, which leaves the class's one called */
+const patched = (): Priced & MaybeNumberJSON => Object.assign(new Priced(), {} as MaybeNumberJSON)
+
 const query = (path: `/${string}`) => os.route({ method: 'GET', path })
 
 /** Procedures documented as the values they are sent or written as */
@@ -26,6 +42,10 @@ export const roundEightyThree = {
   classQuery: query('/class-query')
     .input(type<{ p: Point; m: Cents; e?: Error; list?: Point[] }>())
     .handler(() => 1),
+  patched: os.handler(() => patched()),
+  patchedNested: os.handler(() => ({ m: patched() })),
+  patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
+  partialToJSON: os.handler((): Priced & Partial<{ toJSON(): number }> => new Priced()),
   // bracket notation sends nothing for `null`, and for empty arrays, objects, and sets
   nullQuery: query('/null-query')
     .input(type<{ a: string | null; b: { c: number | null; d: (string | null)[] } }>())
@@ -35,12 +55,20 @@ export const roundEightyThree = {
     .handler(() => 1),
 }
 
+/** The procedures of `roundEightyThree` taking no input, whose outputs are written */
+export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[] = [
+  'patched',
+  'patchedNested',
+  'partialToJSON',
+]
+
 /** The inputs a client sends to each procedure of `roundEightyThree` taking one */
 export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
   classQuery: () => [
     { p: new Point(1, 2), m: new Cents(5), e: new Error('x'), list: [new Point(1, 2)] },
     { p: { x: 1, y: 2 }, m: { cents: 5 }, e: { name: 'E', message: 'm' }, list: [{ x: 1, y: 2 }] },
   ],
+  patchedInput: () => [{ m: patched() }],
   nullQuery: () => [
     { a: null, b: { c: null, d: [null, 'x'] } },
     { a: 'a', b: { c: 1, d: ['x'] } },

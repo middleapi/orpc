@@ -647,15 +647,17 @@ function getMethodOverloads(
 
 /**
  * The `toJSON` a value of this type calls: of `C & { toJSON: () => R }`
- * (`Object.assign(new C(), { toJSON })`), the own one, which shadows the class's method.
+ * (`Object.assign(new C(), { toJSON })`), the own one, which shadows the class's method, unless
+ * it may be missing (`C & { toJSON?: () => R }`), as the class's one is called then.
  */
 function getOwnToJSON(types: TypeQueries, type: Type): TSSymbol | undefined {
   if (type.isIntersectionType()) {
     const owners = types.getMembers(type).filter((m) => getToJSON(types, m) !== undefined)
     const own = owners.filter((m) => getClassType(types, m) === undefined)
+    const toJSON = owners.length > 1 && own.length === 1 ? getToJSON(types, own[0]!) : undefined
 
-    if (owners.length > 1 && own.length === 1) {
-      return getToJSON(types, own[0]!)
+    if (toJSON && !(toJSON.flags & SymbolFlags.Optional)) {
+      return toJSON
     }
   }
 

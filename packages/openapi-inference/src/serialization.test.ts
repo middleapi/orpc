@@ -21,7 +21,11 @@ import {
 import { roundSeventySevenInputs } from '../tests/fixtures/app/src/round77'
 import { roundSeventyEightInputs } from '../tests/fixtures/app/src/round78'
 import { roundEightyTwoDetailed, roundEightyTwoStreams } from '../tests/fixtures/app/src/round82'
-import { roundEightyThree, roundEightyThreeInputs } from '../tests/fixtures/app/src/round83'
+import {
+  roundEightyThree,
+  roundEightyThreeInputs,
+  roundEightyThreeOutputs,
+} from '../tests/fixtures/app/src/round83'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -3696,6 +3700,18 @@ describe('documented values match what is sent and written', async () => {
 
     return problems
   }
+
+  it.each(roundEightyThreeOutputs)('documents the output of %s as it is written', async (name) => {
+    const output = await call(roundEightyThree[name] as any, undefined)
+    const json = JSON.parse(
+      JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json) ?? 'null',
+    )
+    const validate = bodyAjv.compile(
+      toAjv(operationOf(name).operation.responses['200'].content['application/json'].schema),
+    )
+
+    expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
+  })
 
   it.each(Object.entries(roundEightyThreeInputs))(
     'documents the inputs a client sends to %s',
