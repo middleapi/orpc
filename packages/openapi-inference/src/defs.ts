@@ -40,45 +40,27 @@ export function toParameterKey(key: number): number {
 }
 
 /**
- * The suffix of the def name of a parameter (see `toParameterKey`), after the one of its mode, so
- * its def does not take the name of the def of the value as a body. A def of it is named without
- * it when no other def has that name (see `mergeEquivalentComponents`).
+ * The type id of a conversion key, and the suffixes of the def names of its type in its mode, so
+ * names do not depend on which mode was converted first (`Json` under `JSON.stringify`, `Any` for
+ * either one), and as a parameter, so its def does not take the name of the def of the value as a
+ * body (`Param`, which it drops when no other def has that name, see `mergeEquivalentComponents`).
  */
-function getParameterSuffix(key: number): string {
-  return Math.abs(key) >= PARAMETER_KEY_OFFSET ? 'Param' : ''
+function parseKey(key: number): { id: number; modeSuffix: string; parameterSuffix: string } {
+  const parameter = Math.abs(key) >= PARAMETER_KEY_OFFSET
+  const modeKey = parameter ? key - Math.sign(key) * PARAMETER_KEY_OFFSET : key
+  const parameterSuffix = parameter ? 'Param' : ''
+
+  return modeKey < 0
+    ? { id: -modeKey, modeSuffix: 'Json', parameterSuffix }
+    : modeKey >= EITHER_KEY_OFFSET
+      ? { id: modeKey - EITHER_KEY_OFFSET, modeSuffix: 'Any', parameterSuffix }
+      : { id: modeKey, modeSuffix: '', parameterSuffix }
 }
 
 /** The def name of a type in the mode of a key, as a parameter (`PointJsonParam` of `Point`) */
 function getBaseName(key: number, preferredName: string): string {
-  return `${preferredName}${getModeSuffix(key)}${getParameterSuffix(key)}`
-}
-
-/** The conversion key of a value not sent as a parameter */
-function withoutParameterKey(key: number): number {
-  return key <= -PARAMETER_KEY_OFFSET
-    ? key + PARAMETER_KEY_OFFSET
-    : key >= PARAMETER_KEY_OFFSET
-      ? key - PARAMETER_KEY_OFFSET
-      : key
-}
-
-/**
- * The suffix of the def name of a type in the mode of a key, so names do not depend on which
- * mode was converted first: `Json` under `JSON.stringify`, `Any` for either one.
- */
-function getModeSuffix(key: number): string {
-  const modeKey = withoutParameterKey(key)
-  return modeKey < 0 ? 'Json' : modeKey >= EITHER_KEY_OFFSET ? 'Any' : ''
-}
-
-/** The type id of a conversion key */
-function getTypeId(key: number): number {
-  const modeKey = withoutParameterKey(key)
-  return modeKey < 0
-    ? -modeKey
-    : modeKey >= EITHER_KEY_OFFSET
-      ? modeKey - EITHER_KEY_OFFSET
-      : modeKey
+  const { modeSuffix, parameterSuffix } = parseKey(key)
+  return `${preferredName}${modeSuffix}${parameterSuffix}`
 }
 
 export interface Def {
@@ -141,9 +123,7 @@ export class DefNames {
    * the registry of outputs shares the def of another mode of, which the one of inputs names the
    * same), also for the type it named.
    */
-  release(name: string, key?: number): void {
-    this.unhold(name)
-
+  release({ name, key }: Def): void {
     if (this.holders.has(name)) {
       return
     }
@@ -154,7 +134,7 @@ export class DefNames {
     this.modes.delete(name)
     this.parameters.delete(name)
     this.aliased.delete(name)
-    if (key !== undefined && this.byKey.get(key) === name) {
+    if (this.byKey.get(key) === name) {
       this.byKey.delete(key)
     }
   }
@@ -224,9 +204,7 @@ export class DefRegistry {
     }
 
     const def: Def = { name, key }
-    this.defs.set(key, def)
-    this.defsByName.set(name, def)
-    this.names.hold(name)
+    this.add(def)
     this.createdDefs.push(def)
     return def
   }
@@ -250,11 +228,10 @@ export class DefRegistry {
       return
     }
 
-    this.defsByName.delete(def.name)
-    this.names.release(def.name)
+    this.remove(def)
+    this.names.release(def)
     def.name = name
-    this.defsByName.set(name, def)
-    this.names.hold(name)
+    this.add(def)
     this.give(def.key, name, preferredName)
   }
 
@@ -262,16 +239,17 @@ export class DefRegistry {
    * Gives a type the name of its def, recording what it was named after (see `DefNames`).
    */
   private give(key: number, name: string, preferredName: string): void {
-    const modeName = `${preferredName}${getModeSuffix(key)}`
+    const { modeSuffix, parameterSuffix } = parseKey(key)
+    const modeName = `${preferredName}${modeSuffix}`
     this.names.byKey.set(key, name)
     this.names.used.add(name)
     if (name !== modeName) {
       this.names.numbered.set(name, modeName)
     }
-    if (getBaseName(key, preferredName) !== preferredName) {
+    if (modeSuffix || parameterSuffix) {
       this.names.modes.set(name, preferredName)
     }
-    if (getParameterSuffix(key)) {
+    if (parameterSuffix) {
       this.names.parameters.add(name)
     }
   }
@@ -294,10 +272,8 @@ export class DefRegistry {
       return false
     }
 
-    this.defs.delete(def.key)
-    this.defsByName.delete(def.name)
-    this.names.release(def.name, def.key)
-    this.setAnonymous(def.key, schema, def.stable)
+    this.inline(def, schema)
+    this.names.release(def)
     return true
   }
 
@@ -319,7 +295,10 @@ export class DefRegistry {
       this.replaceIfUnreferenced(def, { $ref: toRef(existing.name) })
     ) {
       const preferred = this.names.numbered.get(existing.name) ?? existing.name
-      if (getTypeId(def.key) === getTypeId(existing.key) && def.name.length < preferred.length) {
+      if (
+        parseKey(def.key).id === parseKey(existing.key).id &&
+        def.name.length < preferred.length
+      ) {
         this.names.numbered.set(existing.name, def.name)
       }
       return existing
@@ -346,10 +325,10 @@ export class DefRegistry {
    * describes is then in a cycle with.
    */
   refersToConverting(schema: JsonSchema): boolean {
-    return [...this.collectDeps(collectDefRefs(schema))].some((name) => {
-      const def = this.defsByName.get(name)
-      return def !== undefined && def.schema === undefined
-    })
+    // the defs collected all exist
+    return [...this.collectDeps(collectDefRefs(schema))].some(
+      (name) => this.defsByName.get(name)!.schema === undefined,
+    )
   }
 
   setAnonymous(key: number, schema: JsonSchema, stable = true): void {
@@ -539,6 +518,12 @@ export class DefRegistry {
     return typeof root === 'object' && root.anyOf
       ? { ...root, anyOf: root.anyOf.map(withPartial) }
       : withPartial(root)
+  }
+
+  private add(def: Def): void {
+    this.defs.set(def.key, def)
+    this.defsByName.set(def.name, def)
+    this.names.hold(def.name)
   }
 
   /**
