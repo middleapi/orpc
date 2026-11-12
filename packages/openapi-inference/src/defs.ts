@@ -162,6 +162,8 @@ export class DefRegistry {
   /** Anonymous results the conversion added, with whether they are stable (see `Def.stable`) */
   private createdAnonymous: { key: number; stable: boolean }[] = []
 
+  constructor(private readonly names: DefNames) {}
+
   get(key: number): Def | undefined {
     return this.defs.get(key)
   }
@@ -184,8 +186,6 @@ export class DefRegistry {
     const def = this.defs.get(key)
     return def !== undefined && def.schema === undefined
   }
-
-  constructor(private readonly names: DefNames) {}
 
   create(key: number, preferredName: string): Def {
     const taken = (name: string) => this.defsByName.has(name) || this.reservedNames.has(name)

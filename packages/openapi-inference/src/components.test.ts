@@ -1,4 +1,4 @@
-import { mergeEquivalentComponents } from './components'
+import { getFreeName, mergeEquivalentComponents } from './components'
 
 describe('mergeEquivalentComponents', () => {
   const ref = (name: string) => `#/components/schemas/${name}`
@@ -337,5 +337,21 @@ describe('mergeEquivalentComponents', () => {
     })
 
     expect(document.components.schemas).toEqual({ User: user, User2: row })
+  })
+})
+
+describe('getFreeName', () => {
+  const taken = new Set(['Page', 'Page2', 'Page_1', 'Page_1_2'])
+  const isTaken = (name: string) => taken.has(name)
+
+  it('numbers a taken name, after an underscore when it ends with a digit', () => {
+    expect(getFreeName('Free', isTaken)).toBe('Free')
+    expect(getFreeName('Page', isTaken)).toBe('Page3')
+    expect(getFreeName('Page_1', isTaken)).toBe('Page_1_3')
+  })
+
+  it('starts from the given name', () => {
+    expect(getFreeName('Page', isTaken, 'PageInput')).toBe('PageInput')
+    expect(getFreeName('Page', isTaken, 'Page2')).toBe('Page3')
   })
 })
