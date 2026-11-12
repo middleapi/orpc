@@ -477,6 +477,37 @@ describe('openAPIGenerator operation builders', () => {
       },
     )
 
+    it('documents the free-form keys of a query whose names are only strings', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            // `z.record(z.string(), z.string())`
+            testSchema({
+              type: 'object',
+              propertyNames: { type: 'string' },
+              additionalProperties: { type: 'string' },
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters).toEqual([
+        {
+          in: 'query',
+          name: 'query',
+          schema: { type: 'object', additionalProperties: { type: 'string' } },
+          style: 'form',
+          explode: true,
+        },
+      ])
+    })
+
     it.each<[JsonSchema]>([
       [false],
       [{ not: {} }],
@@ -513,6 +544,8 @@ describe('openAPIGenerator operation builders', () => {
     it.each<[Record<string, unknown>]>([
       // `z.record(z.enum(['x', 'y']), z.string())`
       [{ propertyNames: { type: 'string', enum: ['x', 'y'] }, required: ['x', 'y'] }],
+      [{ propertyNames: { type: 'string', minLength: 1 } }],
+      [{ propertyNames: { pattern: '^x-' } }],
       [{ required: ['a', 'b'] }],
       [{ patternProperties: { '^x-': { type: 'string' } } }],
       [{ minProperties: 1 }],

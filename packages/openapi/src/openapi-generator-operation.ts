@@ -357,7 +357,7 @@ function renderFreeFormQueryParameter(
     !flattenJsonUnionSchema(additionalProperties).every(isPrimitive) ||
     queryEntries?.some(([name]) => name === 'query') ||
     (typeof query === 'object' &&
-      (query.propertyNames !== undefined ||
+      (constrainsKeys(query.propertyNames) ||
         query.patternProperties !== undefined ||
         query.minProperties !== undefined ||
         query.maxProperties !== undefined ||
@@ -375,6 +375,21 @@ function renderFreeFormQueryParameter(
     style: 'form',
     explode: true,
   })
+}
+
+/**
+ * Whether a schema of the keys of an object constrains them, which one saying only that they are
+ * strings (like those Zod writes for its records) does not.
+ */
+function constrainsKeys(propertyNames: JsonSchema | undefined): boolean {
+  return (
+    propertyNames !== undefined &&
+    !(
+      typeof propertyNames === 'object' &&
+      propertyNames.type === 'string' &&
+      Object.keys(propertyNames).length === 1
+    )
+  )
 }
 
 function renderHeaderParameters(
