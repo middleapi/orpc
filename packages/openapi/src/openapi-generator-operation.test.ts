@@ -477,7 +477,7 @@ describe('openAPIGenerator operation builders', () => {
       },
     )
 
-    it.each([
+    it.each<[JsonSchema]>([
       [false],
       [{ not: {} }],
       // sent in bracket notation (`b[0]=1`), which a form object does not describe

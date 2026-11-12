@@ -70,10 +70,11 @@ export function mergeEquivalentComponents(
   // merged as a def of that name, and takes a numbered name instead (`Role2`)
   const directed = new Map<string, { def: string; base: string }>()
   for (const name of Object.keys(schemas)) {
-    const [, base] = /^(.+)(?:Input|Output)$/u.exec(name) ?? []
+    const base = /^(.+)(?:Input|Output)$/u.exec(name)?.[1]
     const def =
       base === undefined || !reserved.has(base) ? undefined : rename ? base : defNames?.get(base)
     if (
+      base !== undefined &&
       def !== undefined &&
       names.used.has(def) &&
       !(rename ? names.used.has(name) : defNames?.has(name))
