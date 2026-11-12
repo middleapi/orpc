@@ -1,5 +1,5 @@
 import { SyntaxKind } from 'typescript/unstable/ast'
-import type { Signature, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
+import type { Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import {
@@ -631,45 +631,54 @@ function getMethodOverloads(
 
     const method = getViewedFunction(types, member) ?? member
     const functions = method.isIntersectionType() ? types.getMembers(method) : [method]
-    const accepts = (signature: Signature, index: number, argument: Type) => {
-      const type = checker.getParameterType(signature, index)
-      const constraint = type && (checker.getBaseConstraintOfType(type) ?? type)
-      return constraint === undefined || checker.isTypeAssignableTo(argument, constraint)
-    }
-
-    // the keys an overload takes, of a key `JSON.stringify` passes
-    const getKeys = (signature: Signature) => {
-      const string = checker.getStringType()
-      if (accepts(signature, 0, string)) {
-        return 'all'
-      }
-
-      const type = checker.getParameterType(signature, 0)
-      const constraint = type && (checker.getBaseConstraintOfType(type) ?? type)
-      return constraint && checker.isTypeAssignableTo(constraint, string) ? 'some' : undefined
-    }
 
     const overloads = functions
       .map((f) =>
         checker.getSignaturesOfType(f, SignatureKind.Call).map((signature): MethodOverload => {
           const thisParameter = signature.getThisParameter()
           const count = signature.getParameters().length
+          // asked once, the first parameter's by both checks below
+          const constraints = new Map<number, Type | undefined>()
+          const getConstraint = (index: number) => {
+            if (!constraints.has(index)) {
+              const type = checker.getParameterType(signature, index)
+              constraints.set(index, type && (checker.getBaseConstraintOfType(type) ?? type))
+            }
+            return constraints.get(index)
+          }
+          const accepts = (index: number, argument: Type) => {
+            const constraint = getConstraint(index)
+            return constraint === undefined || checker.isTypeAssignableTo(argument, constraint)
+          }
           // a parameter accepting `undefined` may be left out, and so may a rest parameter
-          const optionalFrom = (start: number) =>
-            Array.from({ length: count - start }, (_, i) => start + i).every(
-              (i) =>
-                (signature.hasRestParameter && i === count - 1) ||
-                accepts(signature, i, checker.getUndefinedType()),
-            )
+          const isOptional = (index: number) =>
+            (signature.hasRestParameter && index === count - 1) ||
+            accepts(index, checker.getUndefinedType())
+          // the keys an overload takes, of a key `JSON.stringify` passes
+          const getKeys = () => {
+            const string = checker.getStringType()
+            return accepts(0, string)
+              ? 'all'
+              : checker.isTypeAssignableTo(getConstraint(0)!, string)
+                ? 'some'
+                : undefined
+          }
 
           types.addUninferredTypeParameters(signature)
 
+          const results = [checker.getReturnTypeOfSignature(signature) ?? []].flat()
+          const thisType = thisParameter && types.getSymbolTypes([thisParameter])[0]
+          const generic = signature.getTypeParameters().length > 0
+          // the parameters after the key
+          const keyOnly =
+            count > 0 && Array.from({ length: count - 1 }, (_, i) => i + 1).every(isOptional)
+
           return {
-            results: [checker.getReturnTypeOfSignature(signature) ?? []].flat(),
-            thisType: thisParameter && types.getSymbolTypes([thisParameter])[0],
-            generic: signature.getTypeParameters().length > 0,
-            withKey: !count || !optionalFrom(1) ? undefined : getKeys(signature),
-            withoutArguments: optionalFrom(0),
+            results,
+            thisType,
+            generic,
+            withKey: keyOnly ? getKeys() : undefined,
+            withoutArguments: !count || (keyOnly && isOptional(0)),
           }
         }),
       )
