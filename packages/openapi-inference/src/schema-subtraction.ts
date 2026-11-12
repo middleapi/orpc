@@ -77,9 +77,7 @@ function withoutDescribed(
   const required = schema.required?.filter(
     (name) => !removed.has(name) || !described.required?.includes(name),
   )
-  const rest: ObjectJsonSchema = { ...schema }
-  delete rest.properties
-  delete rest.required
+  const { properties: _, required: __, ...rest } = schema
 
   return {
     ...rest,
