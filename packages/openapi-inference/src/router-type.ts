@@ -78,7 +78,7 @@ export class RouterTypeResolver {
    * Whether the type is a procedure or contract, which carries a `~orpc` definition.
    */
   isProcedure(type: Type): boolean {
-    return this.getProperty(type, '~orpc') !== undefined
+    return this.getPath(type, ['~orpc']) !== undefined
   }
 
   /**
@@ -156,26 +156,15 @@ export class RouterTypeResolver {
    * The input or output type of a procedure, read from its `~orpc` definition.
    */
   getSchemaType(procedure: Type, direction: 'input' | 'output'): Type | undefined {
-    const schema = this.getProperty(
-      this.getProperty(
-        this.getProperty(procedure, '~orpc'),
-        direction === 'input' ? '__TInputSchema' : '__TOutputSchema',
-      ),
-      'type',
-    )
-
-    return this.getStandardSchemaType(schema, direction)
+    const schema = direction === 'input' ? '__TInputSchema' : '__TOutputSchema'
+    return this.getStandardSchemaType(this.getPath(procedure, ['~orpc', schema, 'type']), direction)
   }
 
   /**
    * The output type of an error's `data` schema.
    */
   getErrorDataType(procedure: Type, code: string): Type | undefined {
-    const data = this.getProperty(
-      this.getProperty(this.getProperty(this.getProperty(procedure, '~orpc'), 'errorMap'), code),
-      'data',
-    )
-
+    const data = this.getPath(procedure, ['~orpc', 'errorMap', code, 'data'])
     return this.getStandardSchemaType(data, 'output')
   }
 
@@ -183,17 +172,19 @@ export class RouterTypeResolver {
     schema: Type | undefined,
     direction: 'input' | 'output',
   ): Type | undefined {
-    const types = this.getProperty(this.getProperty(schema, '~standard'), 'types')
+    const types = this.getPath(schema, ['~standard', 'types'])
     // the input/output type itself is kept as is, including `null` and `undefined`
     return types && this.getPropertyType(types, direction)
   }
 
   /**
-   * Gets the non-nullable type of a property, so optional properties can be followed.
+   * Follows properties by their non-nullable types, so optional properties can be followed.
    */
-  private getProperty(type: Type | undefined, name: string): Type | undefined {
-    const propertyType = type && this.getPropertyType(type, name)
-    return propertyType && this.stripNullish(propertyType)
+  private getPath(type: Type | undefined, names: readonly string[]): Type | undefined {
+    return names.reduce<Type | undefined>((current, name) => {
+      const propertyType = current && this.getPropertyType(current, name)
+      return propertyType && this.stripNullish(propertyType)
+    }, type)
   }
 
   private getPropertyType(type: Type, name: string): Type | undefined {
@@ -222,7 +213,7 @@ export class RouterTypeResolver {
   }
 
   private load(type: Type): Type {
-    const loader = this.getProperty(this.getProperty(type, '~orpc'), 'loader')
+    const loader = this.getPath(type, ['~orpc', 'loader'])
 
     if (!loader) {
       return type
@@ -230,7 +221,7 @@ export class RouterTypeResolver {
 
     const promise = getCallReturnType(this.checker, loader)
     const resolved = promise && getPromisedType(this.checker, promise)
-    const loaded = resolved ? this.getProperty(resolved, 'default') : undefined
+    const loaded = this.getPath(resolved, ['default'])
 
     return loaded ? this.unlazy(loaded) : type
   }
