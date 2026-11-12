@@ -38,6 +38,11 @@ const patched = (): Priced & MaybeNumberJSON => Object.assign(new Priced(), {} a
 
 const query = (path: `/${string}`) => os.route({ method: 'GET', path })
 
+export interface SelfQuery {
+  a: string
+  self?: SelfQuery
+}
+
 /** Procedures documented as the values they are sent or written as */
 export const roundEightyThree = {
   // class instances in a query are sent as `String(value)`, plain objects by their fields
@@ -51,6 +56,11 @@ export const roundEightyThree = {
   // bracket notation sends nothing for `null`, and for empty arrays, objects, and sets
   nullQuery: query('/null-query')
     .input(type<{ a: string | null; b: { c: number | null; d: (string | null)[] } }>())
+    .handler(() => 1),
+  // the fields of a query that may be missing, of a recursive type too
+  recursiveQuery: os
+    .route({ method: 'GET', path: '/recursive-query', inputStructure: 'detailed' })
+    .input(type<{ query?: SelfQuery }>())
     .handler(() => 1),
   emptyQuery: query('/empty-query')
     .input(type<{ tags: string[]; filter: { a?: string }; s: Set<number>; t: []; n: number }>())
@@ -75,6 +85,7 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
     { a: null, b: { c: null, d: [null, 'x'] } },
     { a: 'a', b: { c: 1, d: ['x'] } },
   ],
+  recursiveQuery: () => [{}, { query: { a: 'a', self: { a: 'b' } } }],
   emptyQuery: () => [
     { tags: [], filter: {}, s: new Set(), t: [], n: 1 },
     { tags: ['a'], filter: { a: 'a' }, s: new Set([1]), t: [], n: 1 },

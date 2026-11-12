@@ -532,8 +532,9 @@ export class DefRegistry {
       return root
     }
 
+    // also of a def not inlined, a recursive one (`interface Q { a: string; self?: Q }`)
     const withPartial = (member: JsonSchema): JsonSchema =>
-      mapProperties(member, partial, withoutRequired)
+      mapProperties(member, partial, (property) => this.mapObjects(property, withoutRequired))
 
     return typeof root === 'object' && root.anyOf
       ? { ...root, anyOf: root.anyOf.map(withPartial) }

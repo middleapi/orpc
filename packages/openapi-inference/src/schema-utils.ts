@@ -446,7 +446,7 @@ export function maySendNothing(
  * An object schema, or a union of them, without required properties.
  */
 export function withoutRequired(schema: JsonSchema): JsonSchema {
-  if (typeof schema !== 'object') {
+  if (typeof schema !== 'object' || (!schema.required && !schema.anyOf)) {
     return schema
   }
 
