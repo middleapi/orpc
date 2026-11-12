@@ -16,7 +16,7 @@ import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { call, os, Procedure } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { Ajv2020 } from 'ajv/dist/2020.js'
-import { Program } from 'typescript/unstable/sync'
+import { Checker, Program } from 'typescript/unstable/sync'
 import * as z from 'zod'
 
 import { canGenerateWithin, generateWithin } from '../tests/bounded-generate'
@@ -41,6 +41,7 @@ import {
   decomposed,
   disjoint,
   indexes,
+  lazyRouter,
   optional,
   other,
   records,
@@ -1613,6 +1614,30 @@ describe('openAPIGenerator', () => {
           schema: { anyOf: [OK['application/json'].schema, B['application/json'].schema] },
         },
       })
+    })
+
+    it('loads a lazy router once for the types of its procedures', async () => {
+      const calls = new Map<string, number>()
+      const getReturnTypeOfSignature = Checker.prototype.getReturnTypeOfSignature
+      const spy = vi
+        .spyOn(Checker.prototype, 'getReturnTypeOfSignature')
+        .mockImplementation(function (this: Checker, signature) {
+          calls.set(String(signature.id), (calls.get(String(signature.id)) ?? 0) + 1)
+          return getReturnTypeOfSignature.call(this, signature)
+        })
+
+      try {
+        const spec = await generator.generate(lazyRouter, {
+          source: { file: fixture('round2.ts'), export: 'lazyRouter' },
+        })
+        expect(outputOf(spec, '/api/ping')).toEqual(OK)
+        expect(outputOf(spec, '/api/nested/pong')).toEqual(OK)
+        expect(outputOf(spec, '/api/nested/other')).toEqual(B)
+      } finally {
+        spy.mockRestore()
+      }
+
+      expect([...calls.values()].every((count) => count === 1)).toBe(true)
     })
 
     it('resolves optional procedures and sub-routers', async () => {

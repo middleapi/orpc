@@ -36,6 +36,12 @@ export const indexes: {
   numbers: Record<number, typeof other>
 } = { versions: { v1: procedure }, numbers: { 0: other } }
 
+export const lazyRouter = {
+  api: os.lazy(async () => ({
+    default: { ping: procedure, nested: { pong: procedure, other } },
+  })),
+}
+
 export const notProcedures = { ping: 'not a procedure', nested: { pong: 42 } }
 
 export interface FindQuery {

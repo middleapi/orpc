@@ -218,6 +218,10 @@ export class RouterTypeResolver {
   }
 
   private unlazy(type: Type): Type {
+    return this.types.memo('unlazy', type.id, () => this.load(type))
+  }
+
+  private load(type: Type): Type {
     const loader = this.getProperty(this.getProperty(type, '~orpc'), 'loader')
 
     if (!loader) {
