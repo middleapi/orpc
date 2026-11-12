@@ -184,7 +184,11 @@ function extractCompactRequestParts(
   const restEntries = entries?.filter(([name]) => !dynamicParams?.includes(name))
 
   const hasBody = !isBodylessMethod(method)
-  const additionalProperties = extractJsonObjectSchemaAdditionalProperties(schema)
+  // read only for a body without the path params, since it visits the whole schema
+  const additionalProperties =
+    hasBody && dynamicParams?.length
+      ? extractJsonObjectSchemaAdditionalProperties(schema)
+      : undefined
   const bodySchema = !hasBody
     ? undefined
     : !dynamicParams?.length
