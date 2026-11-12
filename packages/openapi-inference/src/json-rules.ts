@@ -554,9 +554,12 @@ function getMethodResultTypes(types: TypeQueries, member: Type, owner: Type): re
 
   return functions.flatMap((overloads) => {
     const callable = overloads.filter((o) => satisfiesThis(types, owner, o))
-    const withKey = callable.find((o) => o.withKey)
+    // of a key some strings are (`toJSON(key: '')`, which the root's `''` calls), up to the first
+    // overload of any key
+    const all = callable.findIndex((o) => o.withKey === 'all')
+    const withKey = callable.filter((o, i) => o.withKey && (all < 0 || i <= all))
     const withoutArguments = callable.find((o) => o.withoutArguments)
-    const called = callable.filter((o) => o === withKey || o === withoutArguments)
+    const called = callable.filter((o) => withKey.includes(o) || o === withoutArguments)
 
     return (called.length ? called : callable.length ? callable : overloads).flatMap(
       (o) => o.results,
@@ -590,8 +593,8 @@ interface MethodOverload {
   thisType: Type | undefined
   /** Whether it has type parameters */
   generic: boolean
-  /** Whether a call with the key may resolve to it */
-  withKey: boolean
+  /** Whether a call with the key may resolve to it, of any key or only of some (`key: ''`) */
+  withKey: 'all' | 'some' | undefined
   /** Whether a call without arguments may resolve to it */
   withoutArguments: boolean
 }
@@ -618,6 +621,18 @@ function getMethodOverloads(
       return constraint === undefined || checker.isTypeAssignableTo(argument, constraint)
     }
 
+    // the keys an overload takes, of a key `JSON.stringify` passes
+    const getKeys = (signature: Signature) => {
+      const string = checker.getStringType()
+      if (accepts(signature, 0, string)) {
+        return 'all'
+      }
+
+      const type = checker.getParameterType(signature, 0)
+      const constraint = type && (checker.getBaseConstraintOfType(type) ?? type)
+      return constraint && checker.isTypeAssignableTo(constraint, string) ? 'some' : undefined
+    }
+
     const overloads = functions
       .map((f) =>
         checker.getSignaturesOfType(f, SignatureKind.Call).map((signature): MethodOverload => {
@@ -637,7 +652,7 @@ function getMethodOverloads(
             results: [checker.getReturnTypeOfSignature(signature) ?? []].flat(),
             thisType: thisParameter && types.getSymbolTypes([thisParameter])[0],
             generic: signature.getTypeParameters().length > 0,
-            withKey: count > 0 && accepts(signature, 0, checker.getStringType()) && optionalFrom(1),
+            withKey: !count || !optionalFrom(1) ? undefined : getKeys(signature),
             withoutArguments: optionalFrom(0),
           }
         }),

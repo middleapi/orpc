@@ -57,6 +57,15 @@ class StringJSON {
   }
 }
 
+/** `JSON.stringify` calls `toJSON` with the key, `''` at the root */
+class KeyedJSON {
+  toJSON(key: ''): { root: true }
+  toJSON(key: string): string
+  toJSON(key: string): unknown {
+    return key === '' ? { root: true } : key
+  }
+}
+
 const query = (path: `/${string}`) => os.route({ method: 'GET', path })
 
 export interface SelfQuery {
@@ -75,6 +84,8 @@ export const roundEightyThree = {
     wrapped: new WrappedJSON(),
     string: new StringJSON(),
   })),
+  keyedRoot: os.handler(() => new KeyedJSON()),
+  keyedNested: os.handler(() => ({ a: new KeyedJSON() })),
   patched: os.handler(() => patched()),
   patchedNested: os.handler(() => ({ m: patched() })),
   patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
@@ -99,6 +110,8 @@ export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[]
   'patchedNested',
   'partialToJSON',
   'genericToJSON',
+  'keyedRoot',
+  'keyedNested',
 ]
 
 /** The inputs a client sends to each procedure of `roundEightyThree` taking one */
