@@ -267,8 +267,11 @@ interface InferenceContext {
   source: TypeScriptExport & { name: string }
   resolver: RouterTypeResolver
   converters: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverter>
-  /** The converters of schemas kept as they are, the rest is inferred from types */
-  schemaConverters: JsonSchemaConverter[]
+  /**
+   * Converts the schemas kept as they are, those the converter the stock generator uses (the first
+   * whose condition holds) converts to a schema, the rest is inferred from types
+   */
+  schemaConverter: JsonSchemaConverter
   /**
    * The converters `OpenAPIGenerator` of `@orpc/openapi` uses, documenting a Standard JSON Schema
    * whose conversion throws as any value
@@ -328,6 +331,7 @@ export class OpenAPIGenerator {
     const conversions: StandardJsonSchemaConversions = new WeakMap()
     const converters = toArray(this.options.converters).map((c) => new CachedJsonSchemaConverter(c))
     const stockConverters = [...converters, new CachedStandardJsonSchemaConverter(conversions)]
+    const standard = new ConvertibleStandardJsonSchemaConverter(conversions)
 
     let inferred: RouterContract
     let ctx: InferenceContext
@@ -348,13 +352,17 @@ export class OpenAPIGenerator {
         source: exported,
         resolver: new RouterTypeResolver(project.checker, project.program, exported),
         converters: { input: converter('input'), output: converter('output') },
-        schemaConverters: [
-          ...converters.map((c) => ({
-            condition: c.converts.bind(c),
-            convert: c.convert.bind(c),
-          })),
-          new ConvertibleStandardJsonSchemaConverter(conversions),
-        ],
+        schemaConverter: {
+          condition: (schema, direction) => {
+            const c = converters.find((c) => c.condition(schema, direction))
+            return c ? c.converts(schema, direction) : standard.condition(schema, direction)
+          },
+          convert: (schema, direction) =>
+            (converters.find((c) => c.condition(schema, direction)) ?? standard).convert(
+              schema,
+              direction,
+            ),
+        },
         stockConverters,
         getSourceKind: createSourceKindChecker(project.program),
         describeConfig: () => project.describeConfig(),
@@ -507,7 +515,7 @@ export class OpenAPIGenerator {
     const { inline, parametersOnly } = getConvertOptions(getOpenAPIMeta(contract))
 
     const isSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
-      ctx.schemaConverters.some((c) => c.condition(schema, direction))
+      ctx.schemaConverter.condition(schema, direction)
 
     /**
      * Infers a slot (an input, an output or error data) from its type, which `getType` reads from
@@ -585,9 +593,7 @@ export class OpenAPIGenerator {
 
           // the kept schemas, also requiring the keys the type requires
           const kept = parts.filter(supported).map((schema) => {
-            const [jsonSchema, optional] = ctx.schemaConverters
-              .find((c) => c.condition(schema, direction))!
-              .convert(schema, direction)
+            const [jsonSchema, optional] = ctx.schemaConverter.convert(schema, direction)
             // a recursive schema (`$ref: '#'`) shares its levels, so the inferred part keeps them
             const required = /"\$ref":"#(?:\/properties\/[^"]*)?"/u.test(stringifyJSON(jsonSchema)!)
               ? jsonSchema

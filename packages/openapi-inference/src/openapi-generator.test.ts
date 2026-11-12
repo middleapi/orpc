@@ -225,6 +225,7 @@ import {
 import {
   roundEightyTwoConverted,
   roundEightyTwoDeepViews,
+  roundEightyTwoFirstConverter,
   roundEightyTwoNames,
   roundEightyTwoRequests,
   roundEightyTwoRoles,
@@ -4988,6 +4989,7 @@ describe('openAPIGenerator', () => {
     const routers = {
       roundEightyTwoConverted,
       roundEightyTwoDeepViews,
+      roundEightyTwoFirstConverter,
       roundEightyTwoNames,
       roundEightyTwoRequests,
       roundEightyTwoRoles,
@@ -5173,6 +5175,38 @@ describe('openAPIGenerator', () => {
         ] as const) {
           expect(ajv.validate(response(spec, `/${name}`), output) ? [] : ajv.errors).toEqual([])
         }
+      },
+    )
+
+    it.each([
+      [
+        'throws on',
+        () => {
+          throw new Error('converter failed')
+        },
+      ],
+      ['documents as any value', () => [{}, false]],
+    ])(
+      'infers the schemas the first converter whose condition holds %s, though a later one converts them',
+      async (_, convert) => {
+        const spec = await generate('roundEightyTwoFirstConverter', {
+          converters: [
+            { condition: (schema: any) => schema?.description === 'first', convert },
+            new ZodToJsonSchemaConverter(),
+          ],
+        })
+
+        expect(response(spec, '/output')).toEqual({ type: 'string' })
+        expect(spec.paths['/input'].post.requestBody.content['application/json'].schema).toEqual({
+          type: 'object',
+          properties: { a: { type: 'string' } },
+          required: ['a'],
+        })
+        expect(spec.components.schemas.Bad.properties.data).toEqual({
+          type: 'object',
+          properties: { reason: { type: 'string' } },
+          required: ['reason'],
+        })
       },
     )
 

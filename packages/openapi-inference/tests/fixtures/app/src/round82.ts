@@ -136,6 +136,17 @@ export const roundEightyTwoConverted = {
   unknown: os.output(z.unknown()).handler((): unknown => 1),
 }
 
+/** Schemas described `first`, which a converter before Zod's claims */
+export const roundEightyTwoFirstConverter = {
+  output: os.output(z.string().describe('first')).handler(() => 's'),
+  input: os
+    .input(z.object({ a: z.string() }).describe('first'))
+    .handler(({ input }) => input.a.length),
+  error: os
+    .errors({ BAD: { data: z.object({ reason: z.string() }).describe('first') } })
+    .handler(() => 1),
+}
+
 /** A model of a declaration file importing a module that is not installed */
 export const roundEightyTwoUnresolved = {
   box: os.handler((): Box => ({ label: 'b', inner: {} as never })),
