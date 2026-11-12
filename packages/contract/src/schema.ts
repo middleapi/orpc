@@ -15,21 +15,29 @@ export type AnySchema = Schema<any>
 
 export type SchemaIssue = StandardSchemaV1.Issue
 
+// `InferSchemaInput` and `InferSchemaOutput` read `types` by indexed access, as the spec's own
+// `InferInput`/`InferOutput` do, instead of `T extends StandardSchemaV1<infer U, any>`.
+// Schema libraries ship their own copy of the interface, so the conditional compared the
+// whole interface structurally for every schema.
+// `0 extends 1 & T` keeps `unknown` for an `any` schema.
+
 /**
  * Infers the input type of a schema.
  *
  * @see {@link https://orpc.dev/docs/metadata | Metadata}
  */
-export type InferSchemaInput<T extends AnySchema> =
-  T extends StandardSchemaV1<infer UInput, any> ? UInput : never
+export type InferSchemaInput<T extends AnySchema> = 0 extends 1 & T
+  ? unknown
+  : NonNullable<T['~standard']['types']>['input']
 
 /**
  * Infers the output type of a schema.
  *
  * @see {@link https://orpc.dev/docs/metadata | Metadata}
  */
-export type InferSchemaOutput<T extends AnySchema> =
-  T extends StandardSchemaV1<any, infer UOutput> ? UOutput : never
+export type InferSchemaOutput<T extends AnySchema> = 0 extends 1 & T
+  ? unknown
+  : NonNullable<T['~standard']['types']>['output']
 
 export type MergedSchema<T extends AnySchema, U extends AnySchema> =
   T extends Schema<infer TInput, infer TOutput>
