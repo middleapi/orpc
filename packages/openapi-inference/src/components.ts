@@ -209,6 +209,7 @@ export function mergeEquivalentComponents(
       const holder = holders.get(base)
       if (
         holder !== name &&
+        !reserved.has(holder!) &&
         (names.parameters?.has(holder!) ||
           (names.aliased?.has(holder!) && !names.aliased.has(name))) &&
         !renamed.has(holder!)

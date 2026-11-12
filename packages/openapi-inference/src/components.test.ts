@@ -117,6 +117,32 @@ describe('mergeEquivalentComponents', () => {
     })
   })
 
+  it('keeps the name of a component of base a def named after an alias has', () => {
+    const base = { type: 'string', description: 'user-defined' }
+    const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+    const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
+    // the stock generator gives the def `User` a name of its direction, as `base` has `User`
+    const document = {
+      components: { schemas: { User: base, UserOutput: row, User2: user } },
+      paths: { '/legacy': { $ref: ref('User') }, '/rows': { items: { $ref: ref('UserOutput') } } },
+    }
+
+    mergeEquivalentComponents(
+      document,
+      {
+        used: new Set(['User', 'User2']),
+        numbered: new Map([['User2', 'User']]),
+        aliased: new Set(['User']),
+      },
+      { reserved: new Set(['User']) },
+    )
+
+    expect(document).toEqual({
+      components: { schemas: { User: base, User3: row, User2: user } },
+      paths: { '/legacy': { $ref: ref('User') }, '/rows': { items: { $ref: ref('User3') } } },
+    })
+  })
+
   it('keeps the name of a declared type a def named after an alias was numbered after', () => {
     const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
     const user = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
