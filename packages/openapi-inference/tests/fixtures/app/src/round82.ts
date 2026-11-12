@@ -195,4 +195,8 @@ export const roundEightyTwoRequests = {
     .route({ method: 'DELETE', path: '/items/{id}' })
     .input(type<{ id: string }>())
     .handler(() => 1),
+  record: os
+    .route({ method: 'GET', path: '/record', inputStructure: 'detailed' })
+    .input(type<{ query: Record<string, string> }>())
+    .handler(({ input }) => Object.keys(input.query).length),
 }

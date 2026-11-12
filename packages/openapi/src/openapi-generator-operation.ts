@@ -98,6 +98,8 @@ export function toOpenAPIPath(
 interface RequestParts {
   paramsEntries: JsonObjectSchemaEntry[] | undefined
   queryEntries: JsonObjectSchemaEntry[] | undefined
+  /** The schema of the query keys other than those of `queryEntries`, like those of a record */
+  queryAdditionalProperties?: JsonSchema | undefined
   headersEntries: JsonObjectSchemaEntry[] | undefined
   bodySchema: JsonSchema | undefined
   bodyOptional: boolean | undefined
@@ -146,7 +148,13 @@ export function buildRequest(
       : extractDetailedRequestParts(schema)
 
   renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
-  renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
+  renderQueryParameters(
+    ctx,
+    operation,
+    parts.queryEntries,
+    meta?.queryStyles,
+    parts.queryAdditionalProperties,
+  )
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
   const content =
@@ -197,6 +205,9 @@ function extractCompactRequestParts(
   return {
     paramsEntries,
     queryEntries: isBodylessMethod(method) ? restEntries : undefined,
+    queryAdditionalProperties: isBodylessMethod(method)
+      ? extractJsonObjectSchemaAdditionalProperties(schema)
+      : undefined,
     headersEntries: undefined,
     bodySchema,
     bodyOptional: !dynamicParams?.length
@@ -220,6 +231,9 @@ function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
   return {
     paramsEntries: extractJsonObjectSchemaEntries(section('params')?.[1] ?? false),
     queryEntries: extractJsonObjectSchemaEntries(section('query')?.[1] ?? false),
+    queryAdditionalProperties: extractJsonObjectSchemaAdditionalProperties(
+      section('query')?.[1] ?? false,
+    ),
     headersEntries: extractJsonObjectSchemaEntries(section('headers')?.[1] ?? false),
     bodySchema: section('body')?.[1],
     bodyOptional: section('body')?.[2],
@@ -288,6 +302,7 @@ function renderQueryParameters(
   operation: OpenAPIV3_2.OperationObject,
   queryEntries: JsonObjectSchemaEntry[] | undefined,
   queryStyles: OpenAPIMeta['queryStyles'],
+  additionalProperties: JsonSchema | undefined,
 ): void {
   for (const [name, schema, optional] of queryEntries ?? []) {
     const style = queryStyles?.[name]
@@ -331,6 +346,25 @@ function renderQueryParameters(
 
     operation.parameters ??= []
     operation.parameters.push(parameter)
+  }
+
+  // the other keys of a free-form query, like those of a record, as an object of form style,
+  // unless no value is allowed for them (`false`, `{ not: {} }`)
+  if (
+    additionalProperties !== undefined &&
+    additionalProperties !== false &&
+    stringifyJSON(additionalProperties) !== '{"not":{}}' &&
+    !queryEntries?.some(([name]) => name === 'query')
+  ) {
+    const { properties: _, ...schema } = combineJsonObjectSchemaEntries([], additionalProperties)
+    operation.parameters ??= []
+    operation.parameters.push({
+      in: 'query',
+      name: 'query',
+      schema: ctx.registry.toOpenAPISchema(schema, 'input'),
+      style: 'form',
+      explode: true,
+    })
   }
 }
 

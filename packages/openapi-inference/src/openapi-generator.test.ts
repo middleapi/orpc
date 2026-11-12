@@ -5152,6 +5152,21 @@ describe('openAPIGenerator', () => {
       await expect(link.call(['remove'], { id: 'a' }, { context: {} })).resolves.toBe(1)
       expect(await sent!.text()).toBe('')
       expect(spec.paths['/items/{id}'].delete.requestBody).toBeUndefined()
+
+      // the keys of a free-form query, as an object of form style
+      await expect(
+        link.call(['record'], { query: { a: 'x', b: 'y' } }, { context: {} }),
+      ).resolves.toBe(2)
+      expect(new URL(sent!.url).search).toBe('?a=x&b=y')
+      expect(spec.paths['/record'].get.parameters).toEqual([
+        {
+          in: 'query',
+          name: 'query',
+          schema: { type: 'object', additionalProperties: { type: 'string' } },
+          style: 'form',
+          explode: true,
+        },
+      ])
     })
   })
 

@@ -438,6 +438,72 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    it.each([
+      [
+        'compact',
+        {
+          type: 'object',
+          properties: { a: { type: 'string' } },
+          additionalProperties: { type: 'number' },
+        },
+      ],
+      [
+        'detailed',
+        {
+          type: 'object',
+          properties: { query: { type: 'object', additionalProperties: { type: 'number' } } },
+        },
+      ],
+    ] as const)(
+      'documents the free-form keys of a %s query as an object of form style',
+      (inputStructure, input) => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(
+          ctx,
+          operation,
+          testDef({ inputs: [testSchema(input)] }),
+          { method: 'GET', inputStructure },
+          undefined,
+        )
+
+        expect(operation.parameters?.at(-1)).toEqual({
+          in: 'query',
+          name: 'query',
+          schema: { type: 'object', additionalProperties: { type: 'number' } },
+          style: 'form',
+          explode: true,
+        })
+      },
+    )
+
+    it.each([[false], [{ not: {} }]])(
+      'documents no free-form query keys of %s',
+      (additionalProperties) => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(
+          ctx,
+          operation,
+          testDef({
+            inputs: [
+              testSchema({
+                type: 'object',
+                properties: { a: { type: 'string' } },
+                additionalProperties,
+              }),
+            ],
+          }),
+          { method: 'GET' },
+          undefined,
+        )
+
+        expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).name)).toEqual([
+          'a',
+        ])
+      },
+    )
+
     it('does not use deepObject for query params of any value, most often sent as primitives', () => {
       const { ctx, operation } = createContext()
 
