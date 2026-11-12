@@ -1639,13 +1639,19 @@ export class TypeToJsonSchemaConverter {
 
     // an array-like view may also hold a plain object, and an array, a string, a `Set`, a `Map`,
     // or a typed array may satisfy an object type by its members (`ArrayLike<number>`,
-    // `{ size?: number }`): forms written in place of the fields, which an input split into
-    // parameters is not read by
-    const forms = arrayLike
-      ? [arrayLike.schema]
-      : classType || typedArray
+    // `{ size?: number }`, also `Pick<string[], 'length'>`, besides the arrays it views): forms
+    // written in place of the fields, which an input split into parameters is not read by
+    const structural =
+      classType || typedArray
         ? []
-        : this.convertStructuralForms(type, properties)
+        : this.convertStructuralForms(type, properties).filter(
+            (form) =>
+              !arrayLike ||
+              typeof form !== 'object' ||
+              form.type !== 'array' ||
+              form['x-native-type'] !== undefined,
+          )
+    const forms = arrayLike ? [arrayLike.schema, ...structural] : structural
     if (!forms.length) {
       return schema
     }

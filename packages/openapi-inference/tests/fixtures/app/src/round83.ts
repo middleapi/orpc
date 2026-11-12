@@ -96,6 +96,7 @@ export const roundEightyThree = {
     f: labeledFunction(),
   })),
   viewedFunctionInput: os.input(type<{ f: Omit<LabeledFunction, 'toJSON'> }>()).handler(() => 1),
+  pickLength: os.handler((): Pick<string[], 'length'> => 'abc'),
   patched: os.handler(() => patched()),
   patchedNested: os.handler(() => ({ m: patched() })),
   patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
@@ -123,6 +124,7 @@ export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[]
   'keyedRoot',
   'keyedNested',
   'viewedFunction',
+  'pickLength',
 ]
 
 /** The inputs a client sends to each procedure of `roundEightyThree` taking one */
