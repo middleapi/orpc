@@ -648,15 +648,19 @@ export class TypeToJsonSchemaConverter {
       return this.visit(flattened)
     }
 
+    // `X | undefined` is `X`, the caller makes it optional, also when an alias distributes over
+    // it (`DeepPartial<X | undefined>` is `DeepPartial<X> | undefined`), which keeps one def for `X`
+    const defined = type.isUnionType()
+      ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
+      : []
+    if (defined.length === 1) {
+      return this.visit(defined[0]!)
+    }
+
     // a plain object some fields of which hold parameters is written in place, as its def would
     // differ from that of the type, as would that of any other type holding it
     const pending = this.pendingFields
     if (pending?.depth === this.expansion.path.length) {
-      const defined = this.getSoleDefinedMember(type)
-      if (defined) {
-        return this.visit(defined)
-      }
-
       this.pendingFields = undefined
       try {
         return this.isPlainFieldsObject(type)
@@ -693,13 +697,6 @@ export class TypeToJsonSchemaConverter {
       )
     }
 
-    // `X | undefined` is `X`, the caller makes it optional, also when an alias distributes over
-    // it (`DeepPartial<X | undefined>` is `DeepPartial<X> | undefined`), which keeps one def for `X`
-    const defined = this.getSoleDefinedMember(type)
-    if (defined) {
-      return this.visit(defined)
-    }
-
     const singleMemberEnum = this.types.getSingleMemberEnum(type)
 
     if (!(type.flags & (TypeFlags.Object | TypeFlags.UnionOrIntersection)) && !singleMemberEnum) {
@@ -709,16 +706,6 @@ export class TypeToJsonSchemaConverter {
     return (
       this.expansion.expand(type, () => this.visitStructured(type, key, singleMemberEnum)) ?? {}
     )
-  }
-
-  /**
-   * `X` of a union `X | undefined`.
-   */
-  private getSoleDefinedMember(type: Type): Type | undefined {
-    const defined = type.isUnionType()
-      ? this.types.getMembers(type).filter((m) => !(m.flags & UNDEFINED_FLAGS))
-      : []
-    return defined.length === 1 ? defined[0] : undefined
   }
 
   private visitStructured(

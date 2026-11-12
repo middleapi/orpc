@@ -231,7 +231,6 @@ export class ModeSensitivity {
     // the class, or an interface extending a built-in (`interface Tags extends Set<string>`)
     const declared =
       classType ?? (symbol && symbol.flags & SymbolFlags.Interface ? type : undefined)
-    const extended = declared && getBuiltinBaseName(types, declared)
 
     // the serializer converts a view in the `either` mode, also an interface extending a built-in
     // class (`interface AppError extends Error`), unless it is a built-in
@@ -250,6 +249,7 @@ export class ModeSensitivity {
     }
 
     // `class Rows extends Array<Set<string>>` is an array of its items
+    const extended = declared && getBuiltinBaseName(types, declared)
     if (extended === 'Array' || extended === 'ReadonlyArray') {
       const item = getNumberIndexType(types, type)
       return item !== undefined && isSensitive(item)
