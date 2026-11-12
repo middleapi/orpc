@@ -31,7 +31,11 @@ type RouterClientInner<T, TClientContext extends ClientContext> = T extends {
   ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
   : T extends Lazy<infer U extends AnyRouter>
     ? RouterClientInner<U, TClientContext>
-    : { [K in keyof T as K]: RouterClientInner<T[K], TClientContext> }
+    : {
+        [K in keyof T]: T[K] extends Lazyable<AnyRouter>
+          ? RouterClientInner<T[K], TClientContext>
+          : never
+      }
 
 /**
  * Creates a server-side client that calls the router's procedures directly,

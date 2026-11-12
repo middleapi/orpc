@@ -93,6 +93,12 @@ describe('RouterClient', () => {
     >()
   })
 
+  it('maps an optional key to never', () => {
+    type OptionalRouter = { ping?: typeof router.ping }
+
+    expectTypeOf<RouterClient<OptionalRouter>>().toEqualTypeOf<{ ping?: never }>()
+  })
+
   it('support single procedure', () => {
     type P = RouterClient<(typeof router)['ping'], { cache?: boolean }>
 
