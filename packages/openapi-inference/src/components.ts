@@ -65,18 +65,24 @@ export function mergeEquivalentComponents(
     return
   }
 
-  // a def whose name a component of `base` has is given one of a direction by the stock generator
-  // (`RoleInput`), which the other direction reuses: it is merged as a def of that name, and takes
-  // a numbered name instead (`Role2`)
-  const directed = new Map<string, string>()
-  for (const name of rename ? Object.keys(schemas) : []) {
-    const [, def] = /^(.+)(?:Input|Output)$/u.exec(name) ?? []
-    if (def !== undefined && reserved.has(def) && names.used.has(def) && !names.used.has(name)) {
-      directed.set(name, def)
+  // a def whose name (or the one `componentName` gave it) a component of `base` has is given one of
+  // a direction by the stock generator (`RoleInput`), which the other direction reuses: it is
+  // merged as a def of that name, and takes a numbered name instead (`Role2`)
+  const directed = new Map<string, { def: string; base: string }>()
+  for (const name of Object.keys(schemas)) {
+    const [, base] = /^(.+)(?:Input|Output)$/u.exec(name) ?? []
+    const def =
+      base === undefined || !reserved.has(base) ? undefined : rename ? base : defNames?.get(base)
+    if (
+      def !== undefined &&
+      names.used.has(def) &&
+      !(rename ? names.used.has(name) : defNames?.has(name))
+    ) {
+      directed.set(name, { def, base })
     }
   }
 
-  const defName = (name: string) => defNames?.get(name) ?? directed.get(name) ?? name
+  const defName = (name: string) => defNames?.get(name) ?? directed.get(name)?.def ?? name
 
   // only the components of the conversion's own defs
   const candidates = Object.keys(schemas).filter(
@@ -217,16 +223,16 @@ export function mergeEquivalentComponents(
     }
   }
 
-  for (const [name, def] of directed) {
-    const opposite = `${def}${name.endsWith('Input') ? 'Output' : 'Input'}`
+  for (const [name, { base }] of directed) {
+    const opposite = `${base}${name.endsWith('Input') ? 'Output' : 'Input'}`
     if (merged.has(name) || taken(opposite)) {
       continue
     }
 
-    const separator = /\d$/u.test(def) ? '_' : ''
-    let to = `${def}${separator}2`
+    const separator = /\d$/u.test(base) ? '_' : ''
+    let to = `${base}${separator}2`
     for (let i = 3; taken(to); i++) {
-      to = `${def}${separator}${i}`
+      to = `${base}${separator}${i}`
     }
     move(name, to)
   }

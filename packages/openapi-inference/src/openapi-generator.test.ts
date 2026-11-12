@@ -5111,29 +5111,51 @@ describe('openAPIGenerator', () => {
       },
     )
 
-    it('numbers a type named after a component of base, in both directions', async () => {
-      const base = {
-        components: { schemas: { Role: { type: 'string' }, Account: { type: 'object' } } },
-      }
-      const spec = await generate('roundEightyTwoRoles', {}, { base })
+    it.each(['', 'X.'])(
+      'numbers a type named after a component of base, in both directions, with the prefix %j',
+      async (prefix) => {
+        const base = {
+          components: {
+            schemas: {
+              [`${prefix}Role`]: { type: 'string' },
+              [`${prefix}Account`]: { type: 'object' },
+              // the names without the prefix are not those of the types
+              Role: { type: 'string' },
+            },
+          },
+        }
+        const spec = await generate(
+          'roundEightyTwoRoles',
+          {},
+          { base, componentName: prefix ? (name: string) => `${prefix}${name}` : undefined },
+        )
+        const named = (name: string) => `${prefix}${name}`
 
-      expect(Object.keys(spec.components.schemas).toSorted()).toEqual([
-        'Account',
-        'Account2',
-        'Role',
-        'Role2',
-      ])
-      expect(spec.components.schemas.Role).toEqual({ type: 'string' })
-      expect(spec.paths['/list'].get.parameters[0].schema).toEqual(ref('Role2'))
-      expect(spec.paths['/list'].get.responses['200'].content['application/json'].schema).toEqual({
-        type: 'array',
-        items: ref('Role2'),
-      })
-      expect(spec.paths['/account'].post.requestBody.content['application/json'].schema).toEqual(
-        ref('Account2'),
-      )
-      expect(response(spec, '/account')).toEqual(ref('Account2'))
-    })
+        expect(Object.keys(spec.components.schemas).toSorted()).toEqual(
+          [
+            ...new Set([
+              named('Account'),
+              named('Account2'),
+              named('Role'),
+              named('Role2'),
+              'Role',
+            ]),
+          ].toSorted(),
+        )
+        expect(spec.components.schemas[named('Role')]).toEqual({ type: 'string' })
+        expect(spec.paths['/list'].get.parameters[0].schema).toEqual(ref(named('Role2')))
+        expect(spec.paths['/list'].get.responses['200'].content['application/json'].schema).toEqual(
+          { type: 'array', items: ref(named('Role2')) },
+        )
+        expect(
+          spec.paths['/create'].post.requestBody.content['application/json'].schema.properties.role,
+        ).toEqual(ref(named('Role2')))
+        expect(spec.paths['/account'].post.requestBody.content['application/json'].schema).toEqual(
+          ref(named('Account2')),
+        )
+        expect(response(spec, '/account')).toEqual(ref(named('Account2')))
+      },
+    )
 
     it.each(['any', 'throw'] as const)(
       'infers the outputs a converter documents as any value or throws on, with unrepresentable %s',
