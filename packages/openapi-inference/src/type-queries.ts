@@ -1317,22 +1317,20 @@ export class TypeQueries {
 
   /**
    * The symbol an import names: an export of its module, resolved only when it is one of another
-   * module (`export { User } from './user'`). The exports of each module are read once.
+   * module (`export { User } from './user'`). Each name of a module is looked up once.
    */
   private getImportedSymbol(
     module: TSSymbol | undefined,
     name: any,
     exported: string,
   ): TSSymbol | undefined {
-    const exports =
+    const member =
       module &&
-      this.memo(
-        'moduleExports',
-        module.id,
-        () => new Map(this.checker.getExportsOfModule(module).map((s) => [s.name, s])),
+      this.memo('moduleExport', `${module.id}\0${exported}`, () =>
+        this.checker.getMemberInModuleExports(module, exported),
       )
     // not one by its name, like the default import of an `export =` module
-    const symbol = exports?.get(exported) ?? this.checker.getSymbolAtLocation(name)
+    const symbol = member ?? this.checker.getSymbolAtLocation(name)
     return symbol && this.memo('aliased', symbol.id, () => resolveAlias(this.checker, symbol))
   }
 
