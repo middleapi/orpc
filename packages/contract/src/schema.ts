@@ -15,12 +15,6 @@ export type AnySchema = Schema<any>
 
 export type SchemaIssue = StandardSchemaV1.Issue
 
-// `InferSchemaInput` and `InferSchemaOutput` read `types` by indexed access, as the spec's own
-// `InferInput`/`InferOutput` do, instead of `T extends StandardSchemaV1<infer U, any>`.
-// Schema libraries ship their own copy of the interface, so the conditional compared the
-// whole interface structurally for every schema.
-// `0 extends 1 & T` keeps `unknown` for an `any` schema.
-
 /**
  * Infers the input type of a schema.
  *

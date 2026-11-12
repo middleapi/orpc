@@ -14,6 +14,13 @@ const valibotSchema = v.object({
   ),
 })
 const arktypeSchema = arktypeType({ value: 'string' })
+const untypedSchema = {
+  '~standard': {
+    version: 1 as const,
+    vendor: 'custom',
+    validate: (value: unknown) => ({ value: value as string }),
+  },
+}
 
 type UnionSchema = Schema<{ a: number }, { a: string }> | Schema<{ b: number }, { b: string }>
 
@@ -42,6 +49,7 @@ it('InferSchemaInput', () => {
   expectTypeOf<InferSchemaInput<UnionSchema>>().toEqualTypeOf<{ a: number } | { b: number }>()
   expectTypeOf<InferSchemaInput<AnySchema>>().toBeAny()
   expectTypeOf<InferSchemaInput<any>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaInput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
 })
 
 it('InferSchemaOutput', () => {
@@ -52,6 +60,7 @@ it('InferSchemaOutput', () => {
   expectTypeOf<InferSchemaOutput<UnionSchema>>().toEqualTypeOf<{ a: string } | { b: string }>()
   expectTypeOf<InferSchemaOutput<AnySchema>>().toBeAny()
   expectTypeOf<InferSchemaOutput<any>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaOutput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
 })
 
 describe('MergedSchema', () => {
