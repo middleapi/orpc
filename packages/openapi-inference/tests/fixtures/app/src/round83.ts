@@ -97,6 +97,9 @@ export const roundEightyThree = {
   })),
   viewedFunctionInput: os.input(type<{ f: Omit<LabeledFunction, 'toJSON'> }>()).handler(() => 1),
   pickLength: os.handler((): Pick<string[], 'length'> => 'abc'),
+  gapIndexes: os.handler(
+    (): { 0: string; 2: string } => ['a', 'b', 'c'] as [string, string, string],
+  ),
   patched: os.handler(() => patched()),
   patchedNested: os.handler(() => ({ m: patched() })),
   patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
@@ -125,6 +128,7 @@ export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[]
   'keyedNested',
   'viewedFunction',
   'pickLength',
+  'gapIndexes',
 ]
 
 /** The inputs a client sends to each procedure of `roundEightyThree` taking one */

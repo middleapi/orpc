@@ -1716,10 +1716,11 @@ export class TypeToJsonSchemaConverter {
 
     // a tuple satisfies an object type of the indexes from 0 (`TupleToObject<[string, number]>`),
     // also besides members of arrays (`{ [K in keyof Pair & string]: Pair[K] }`)
+    // with gaps of any value (`{ 0: string; 2: string }`), but not as far apart as status codes
     const indexes = properties.filter((p) => /^(?:0|[1-9]\d*)$/u.test(p.name))
     if (
       indexes.length &&
-      indexes.every((p) => Number(p.name) < indexes.length) &&
+      indexes.every((p) => Number(p.name) < indexes.length * 2) &&
       this.holdsArrayMembers(properties.filter((p) => !indexes.includes(p)))
     ) {
       const elementTypes = this.types.getSymbolTypes(indexes)
@@ -1737,7 +1738,7 @@ export class TypeToJsonSchemaConverter {
       const rest = getNumberIndexType(this.types, type)
       forms.push({
         type: 'array',
-        prefixItems,
+        prefixItems: Array.from(prefixItems, (item) => item ?? {}),
         ...(minItems ? { minItems } : {}),
         ...(rest ? { items: this.visitElement(rest) } : {}),
       })
