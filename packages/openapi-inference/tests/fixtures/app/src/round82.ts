@@ -187,10 +187,6 @@ export const roundEightyTwoStreams = {
 
 /** Requests a client sends without the parts these fields would be in */
 export const roundEightyTwoRequests = {
-  coerced: os
-    .route({ method: 'GET', path: '/coerced' })
-    .input(type<{ minPrice?: unknown; tags?: string[] }>())
-    .handler(() => 1),
   remove: os
     .route({ method: 'DELETE', path: '/items/{id}' })
     .input(type<{ id: string }>())

@@ -331,8 +331,7 @@ function renderQueryParameters(
       delete parameter.schema
       delete parameter.allowReserved
     } else if (style === undefined) {
-      // a value of any type is most often a primitive, like the input of `z.coerce.number()`
-      if (!isUnconstrainedSchema(schema) && !flattenJsonUnionSchema(schema).every(isPrimitive)) {
+      if (!flattenJsonUnionSchema(schema).every(isPrimitive)) {
         const arrayable = matchArrayableJsonSchema(schema)
 
         if (!arrayable || !flattenJsonUnionSchema(arrayable[0]).every(isPrimitive)) {

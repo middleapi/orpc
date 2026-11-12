@@ -504,30 +504,6 @@ describe('openAPIGenerator operation builders', () => {
       },
     )
 
-    it('does not use deepObject for query params of any value, most often sent as primitives', () => {
-      const { ctx, operation } = createContext()
-
-      buildRequest(
-        ctx,
-        operation,
-        testDef({
-          inputs: [
-            testSchema({
-              type: 'object',
-              properties: { minPrice: {}, described: { description: 'a price' } },
-            }),
-          ],
-        }),
-        { method: 'GET' },
-        undefined,
-      )
-
-      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).style)).toEqual([
-        undefined,
-        undefined,
-      ])
-    })
-
     it('does not use deepObject for query params whose $ref resolves to a primitive', () => {
       const { ctx, operation } = createContext()
 
