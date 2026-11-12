@@ -1099,12 +1099,13 @@ export class TypeToJsonSchemaConverter {
   }
 
   private convertIntersection(type: Type): JsonSchema {
-    const members = this.types.getMembers(type)
     // branded primitives, e.g. `string & { __brand: 'UserId' }`
-    const primitive = members.find((m) => m.flags & PRIMITIVE_FLAGS)
+    const primitive = getBrandedBase(this.types, type)
     if (primitive) {
       return this.visit(primitive)
     }
+
+    const members = this.types.getMembers(type)
 
     // also through a view of one (`Readonly<UserId> & { extra?: string }`), which may also hold
     // a plain object (`Partial<UserId> & { extra?: string }`)
@@ -1225,11 +1226,11 @@ export class TypeToJsonSchemaConverter {
     // written without its getters, or as the built-in the class extends
     // (`Pick<class Stamp extends Date, 'label'>`), or as a plain object, and so a value of an
     // interface extending a built-in class (`interface AppError extends Error`), as for outputs
-    const sentClass =
-      this.input && !plain && !ownFields
-        ? (getClassType(this.types, type) ??
-          (extendsBuiltinClass(this.types, type) ? type : undefined))
-        : undefined
+    const sent = this.input && !plain && !ownFields
+    const sentClass = sent
+      ? (getClassType(this.types, type) ??
+        (extendsBuiltinClass(this.types, type) ? type : undefined))
+      : undefined
     // the bracket notation of a parameter sends an instance the serializer leaves as it is as
     // `String(value)` (what `toString` of the class returns, `Error: x`), and a plain object by its
     // fields, unless the class has private members, which no plain object satisfies (the fields
@@ -1237,7 +1238,7 @@ export class TypeToJsonSchemaConverter {
     if (
       this.parameters &&
       this.expansion.path.length > this.parametersDepth &&
-      (sentClass || (this.input && !plain && !ownFields && extendsError(this.types, type))) &&
+      (sentClass || (sent && extendsError(this.types, type))) &&
       isLeftAsIs(this.types, [type, ...getClassTypes(this.types, type)])
     ) {
       const instance: JsonSchema = { type: 'string' }
@@ -2243,12 +2244,11 @@ export class TypeToJsonSchemaConverter {
     // a branded value is serialized as its base: the primitive of `string & { __brand: 'Id' }`,
     // the items of `number[] & { ... }`, or the own fields of `Date & { ... }`
     if (resolved.isIntersectionType()) {
-      const members = this.types.getMembers(resolved)
-
-      if (members.some((m) => m.flags & PRIMITIVE_FLAGS)) {
+      if (getBrandedBase(this.types, resolved)) {
         return this.visit(resolved)
       }
 
+      const members = this.types.getMembers(resolved)
       const base = members.find(
         (m) =>
           this.types.getReferenceKind(m) !== undefined ||
@@ -2408,8 +2408,7 @@ export class TypeToJsonSchemaConverter {
    */
   private getMappedBrandedPrimitive(type: Type): Type | undefined {
     const branded = this.findMappedBrandedPrimitive(type)
-    const primitive =
-      branded && this.types.getMembers(branded).find((m) => m.flags & PRIMITIVE_FLAGS)
+    const primitive = branded && getBrandedBase(this.types, branded)
 
     if (!primitive || !(primitive.flags & (LITERAL_FLAGS | TypeFlags.TemplateLiteral))) {
       return branded
@@ -2436,10 +2435,7 @@ export class TypeToJsonSchemaConverter {
 
     const source = this.types.getMappedSource(type)
     const isViewed = (candidate: Type) => {
-      if (
-        !candidate.isIntersectionType() ||
-        !this.types.getMembers(candidate).some((m) => m.flags & PRIMITIVE_FLAGS)
-      ) {
+      if (!getBrandedBase(this.types, candidate)) {
         return false
       }
 
@@ -2804,7 +2800,7 @@ export class TypeToJsonSchemaConverter {
    */
   private isObjectType(type: Type): boolean {
     return type.isIntersectionType()
-      ? !this.types.getMembers(type).some((m) => m.flags & PRIMITIVE_FLAGS)
+      ? !getBrandedBase(this.types, type)
       : Boolean(type.flags & TypeFlags.Object)
   }
 
@@ -2891,11 +2887,16 @@ export class TypeToJsonSchemaConverter {
 function isPrimitive(types: TypeQueries, type: Type): boolean {
   return types
     .getUnionMembers(type)
-    .every(
-      (m) =>
-        m.flags & PRIMITIVE_FLAGS ||
-        (m.isIntersectionType() && types.getMembers(m).some((p) => p.flags & PRIMITIVE_FLAGS)),
-    )
+    .every((m) => m.flags & PRIMITIVE_FLAGS || getBrandedBase(types, m))
+}
+
+/**
+ * The primitive of a branded one, `string` of `string & { __brand: 'Id' }`.
+ */
+function getBrandedBase(types: TypeQueries, type: Type): Type | undefined {
+  return type.isIntersectionType()
+    ? types.getMembers(type).find((m) => m.flags & PRIMITIVE_FLAGS)
+    : undefined
 }
 
 /**
