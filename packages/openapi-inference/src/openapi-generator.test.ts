@@ -4311,6 +4311,18 @@ describe('openAPIGenerator', () => {
       }
 
       expect(paths['/root'].get.parameters).toBeUndefined()
+      // the client sends it as a string without a name, which no parameter describes
+      let sent: Request | undefined
+      const link = new OpenAPILink(bufferQueries, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          sent = new Request(request, init)
+          return new Response('1', { headers: { 'content-type': 'application/json' } })
+        },
+      })
+      await link.call(['root'], new Uint8Array([1, 2]), { context: {} })
+      expect(new URL(sent!.url).search).toBe('?=1%2C2')
       // a request body may be a Buffer, written by its `toJSON`
       expect(
         paths['/post'].post.requestBody.content['application/json'].schema.anyOf,

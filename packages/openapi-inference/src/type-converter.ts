@@ -395,10 +395,15 @@ export class TypeToJsonSchemaConverter {
         return this.convertObject(t, { bodyProperty })
       }
 
-      // the root is no parameter, the parameters are its fields
-      return parameters === true && !isSentAsString(this.types, t)
-        ? this.withParameters(() => this.visit(t))
-        : this.visit(t)
+      // the root is no parameter, the parameters are its fields, and a root sent as a string
+      // without a name (a typed array) is sent by none
+      if (parameters === true) {
+        return isSentAsString(this.types, t)
+          ? { type: 'object' }
+          : this.withParameters(() => this.visit(t))
+      }
+
+      return this.visit(t)
     }
 
     const cuts = this.expansion.cuts
