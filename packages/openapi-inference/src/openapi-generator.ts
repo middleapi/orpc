@@ -317,7 +317,8 @@ export interface TypeScriptRouterSource extends TypeScriptProjectOptions {
  * that no converter can produce from the router's TypeScript types,
  * so procedures without `.output` (or with type-only schemas) are fully documented.
  *
- * Schemas supported by `converters` are converted as usual, everything else falls back to type inference.
+ * Schemas supported by `converters` are converted as usual, everything else (also a schema a converter
+ * throws on or documents as any value) falls back to type inference.
  * JSDoc comments of procedures fill `summary`, `description`, `deprecated`, and (from `@returns`) `successDescription`
  * when the `openapi` metadata (`openapi(...)` or `.route`) does not set them, and `@tags` adds tags.
  *
