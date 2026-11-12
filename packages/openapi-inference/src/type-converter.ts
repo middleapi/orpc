@@ -547,12 +547,14 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * Whether the value can be `undefined`, i.e. omitted.
+   * Whether the value can be `undefined`, i.e. omitted, also of a type parameter of a method
+   * nothing infers (see `TypeQueries.isUninferredTypeParameter`).
    */
   isOptional(type: Type): boolean {
     return Boolean(
       type.flags & (UNDEFINED_FLAGS | TypeFlags.Any | TypeFlags.Unknown) ||
-      this.types.hasMember(type, UNDEFINED_FLAGS),
+      this.types.hasMember(type, UNDEFINED_FLAGS) ||
+      this.types.isUninferredTypeParameter(type),
     )
   }
 

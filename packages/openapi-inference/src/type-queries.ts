@@ -3,6 +3,7 @@ import type {
   Checker,
   NodeHandle,
   Program,
+  Signature,
   Symbol as TSSymbol,
   Type,
   TypeReference,
@@ -123,12 +124,49 @@ export class TypeQueries {
   private readonly aliasFiles = new Set<string>()
   /** The aliases `readAliases` found in them */
   private readonly aliasSymbols = new Set<number>()
+  /** See `isUninferredTypeParameter` */
+  private readonly uninferredTypeParameters = new Set<number>()
 
   constructor(
     readonly checker: Checker,
     program: Program,
   ) {
     this.getSourceKind = createSourceKindChecker(program)
+  }
+
+  /**
+   * Records the type parameters of a method its calls infer from nothing, as `JSON.stringify` calls
+   * `toJSON<T>(): T` with no type argument: one with no `this` parameter, typing no parameter.
+   */
+  addUninferredTypeParameters(signature: Signature): void {
+    if (signature.getThisParameter()) {
+      return
+    }
+
+    const count = signature.getParameters().length
+    const parameterTypes = new Set(
+      Array.from({ length: count }, (_, i) => this.checker.getParameterType(signature, i)?.id),
+    )
+
+    for (const parameter of signature.getTypeParameters()) {
+      const constraint = this.checker.getBaseConstraintOfType(parameter)
+      if (
+        !parameterTypes.has(parameter.id) &&
+        (!constraint ||
+          constraint.id === parameter.id ||
+          constraint.flags & (TypeFlags.Unknown | TypeFlags.Any))
+      ) {
+        this.uninferredTypeParameters.add(parameter.id)
+      }
+    }
+  }
+
+  /**
+   * Whether a type is a type parameter of a method its calls infer from nothing, and nothing
+   * constrains, which a call instantiates with `unknown` (see `addUninferredTypeParameters`).
+   */
+  isUninferredTypeParameter(type: Type): boolean {
+    return this.uninferredTypeParameters.has(type.id)
   }
 
   getSymbolSourceKind(symbol: TSSymbol): SourceKind {

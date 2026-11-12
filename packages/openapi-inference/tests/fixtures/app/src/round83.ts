@@ -36,6 +36,27 @@ interface MaybeNumberJSON {
 /** An instance whose own `toJSON` may be missing, which leaves the class's one called */
 const patched = (): Priced & MaybeNumberJSON => Object.assign(new Priced(), {} as MaybeNumberJSON)
 
+/** `JSON.stringify` calls `toJSON` with no type argument, which may return anything */
+class AnyJSON {
+  name = 'x'
+
+  toJSON<T>(): T {
+    return undefined as T
+  }
+}
+
+class WrappedJSON {
+  toJSON<T>(): { value: T } {
+    return { value: undefined as T }
+  }
+}
+
+class StringJSON {
+  toJSON<T extends string = 'a'>(): T {
+    return 'a' as T
+  }
+}
+
 const query = (path: `/${string}`) => os.route({ method: 'GET', path })
 
 export interface SelfQuery {
@@ -49,6 +70,11 @@ export const roundEightyThree = {
   classQuery: query('/class-query')
     .input(type<{ p: Point; m: Cents; e?: Error; list?: Point[] }>())
     .handler(() => 1),
+  genericToJSON: os.handler(() => ({
+    any: new AnyJSON(),
+    wrapped: new WrappedJSON(),
+    string: new StringJSON(),
+  })),
   patched: os.handler(() => patched()),
   patchedNested: os.handler(() => ({ m: patched() })),
   patchedInput: os.input(type<{ m: Priced & MaybeNumberJSON }>()).handler(() => 1),
@@ -72,6 +98,7 @@ export const roundEightyThreeOutputs: readonly (keyof typeof roundEightyThree)[]
   'patched',
   'patchedNested',
   'partialToJSON',
+  'genericToJSON',
 ]
 
 /** The inputs a client sends to each procedure of `roundEightyThree` taking one */

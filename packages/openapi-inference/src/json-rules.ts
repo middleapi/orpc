@@ -631,6 +631,8 @@ function getMethodOverloads(
                 accepts(signature, i, checker.getUndefinedType()),
             )
 
+          types.addUninferredTypeParameters(signature)
+
           return {
             results: [checker.getReturnTypeOfSignature(signature) ?? []].flat(),
             thisType: thisParameter && types.getSymbolTypes([thisParameter])[0],
