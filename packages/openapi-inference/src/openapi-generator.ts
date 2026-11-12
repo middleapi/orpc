@@ -66,20 +66,18 @@ import {
 
 const INFERRED_JSON_SCHEMA_SYMBOL = Symbol('ORPC_TYPESCRIPT_INFERRED_JSON_SCHEMA')
 
-/**
- * Whether the `spec` object of a procedure gives its operation whole, which takes nothing from the types.
- */
-function isGivenWhole(contract: AnyProcedureContract): boolean {
-  const spec = getOpenAPIMeta(contract)?.spec
-  return spec !== undefined && typeof spec !== 'function'
-}
-
 type InferredJsonSchema = [jsonSchema: JsonSchema, optional: boolean]
 
 /** A procedure the router holds, which the `filter` keeps */
 interface WalkedProcedure {
   contract: AnyProcedureContract
   path: readonly string[]
+  /** Whether the `spec` object gives its operation whole, which takes nothing from the types */
+  whole: boolean
+  resolved?: ResolvedRouterType | undefined
+  /** The variable assigned to its property (`{ ping }`), and the contract property it implements */
+  assigned?: TSSymbol | undefined
+  implemented?: TSSymbol | undefined
 }
 
 /**
@@ -293,7 +291,7 @@ export class OpenAPIGenerator {
       const procedures: WalkedProcedure[] = []
       await walkProcedureContractsAsync(router, (contract, path) => {
         if (value(filter, contract, path) !== false) {
-          procedures.push({ contract, path: [...path] })
+          procedures.push(walkProcedure(ctx, contract, [...path]))
         }
       })
 
@@ -355,32 +353,17 @@ export class OpenAPIGenerator {
       }
     }
 
-    // the aliases of the files of the procedures, read first, so that a conversion seldom reaches
-    // a type before the alias naming it (see `generate`)
-    for (const { contract, path } of procedures) {
-      const symbol = !isGivenWhole(contract) ? ctx.resolver.resolve(path)?.symbol : undefined
-      if (symbol) {
-        ctx.converters.output.readAliases([
-          ...symbol.declarations,
-          ...(getAssignedSymbol(ctx.checker, symbol)?.declarations ?? []),
-          ...(getImplementedSymbol(ctx.checker, symbol)?.declarations ?? []),
-        ])
-      }
-    }
+    for (const procedure of procedures) {
+      const { contract, path, resolved } = procedure
 
-    for (const { contract, path } of procedures) {
-      // an operation the `spec` object gives whole takes nothing from the types
-      if (isGivenWhole(contract)) {
+      if (procedure.whole) {
         place(path, contract)
         continue
       }
 
       walked++
-      let resolved: ResolvedRouterType | undefined
 
       try {
-        resolved = ctx.resolver.resolve(path)
-
         if (!resolved) {
           throw new OpenAPIGeneratorError(
             `its type was not found in the router type, make sure "source" points to the type of this router.`,
@@ -389,7 +372,7 @@ export class OpenAPIGenerator {
 
         found++
 
-        place(path, this.inferProcedure(ctx, contract, resolved))
+        place(path, this.inferProcedure(ctx, procedure, resolved))
       } catch (e) {
         if (!(e instanceof OpenAPIGeneratorError || e instanceof TypeScriptTypeResolutionError)) {
           throw e
@@ -397,7 +380,7 @@ export class OpenAPIGenerator {
         // the compiler knows why a type is unresolved: a missing module, an undeclared name, ...
         if (e instanceof TypeScriptTypeResolutionError) {
           diagnostics ??= new Set(ctx.describeConfig())
-          for (const diagnostic of getCompilerErrors(ctx, resolved, e)) {
+          for (const diagnostic of getCompilerErrors(ctx, procedure, e)) {
             diagnostics.add(diagnostic)
           }
         }
@@ -429,9 +412,10 @@ export class OpenAPIGenerator {
 
   private inferProcedure(
     ctx: InferenceContext,
-    contract: AnyProcedureContract,
+    procedure: WalkedProcedure,
     resolved: ResolvedRouterType,
   ): AnyProcedureContract {
+    const { contract } = procedure
     const def = contract['~orpc']
 
     const { inline, parametersOnly } = getConvertOptions(getOpenAPIMeta(contract))
@@ -611,9 +595,43 @@ export class OpenAPIGenerator {
       inputSchemas: inferSchemas(def.inputSchemas, 'input'),
       outputSchemas: inferSchemas(def.outputSchemas, 'output'),
       errorMap,
-      meta: withJSDocMeta(ctx, def.meta, resolved.symbol),
+      meta: withJSDocMeta(ctx, def.meta, procedure),
     })
   }
+}
+
+/**
+ * Resolves the type of a procedure, unless the `spec` object gives its operation whole, and reads
+ * the aliases of the files declaring it first, so that a conversion seldom reaches a type before
+ * the alias naming it (see `generate`).
+ */
+function walkProcedure(
+  ctx: InferenceContext,
+  contract: AnyProcedureContract,
+  path: readonly string[],
+): WalkedProcedure {
+  const spec = getOpenAPIMeta(contract)?.spec
+
+  if (spec !== undefined && typeof spec !== 'function') {
+    return { contract, path, whole: true }
+  }
+
+  const resolved = ctx.resolver.resolve(path)
+  const symbol = resolved?.symbol
+
+  if (!symbol) {
+    return { contract, path, whole: false, resolved }
+  }
+
+  const assigned = getAssignedSymbol(ctx.checker, symbol)
+  const implemented = getImplementedSymbol(ctx.checker, symbol)
+  ctx.converters.output.readAliases([
+    ...symbol.declarations,
+    ...(assigned?.declarations ?? []),
+    ...(implemented?.declarations ?? []),
+  ])
+
+  return { contract, path, whole: false, resolved, assigned, implemented }
 }
 
 /**
@@ -823,15 +841,12 @@ function isUnsendableTypeError(error: unknown): boolean {
  */
 function getCompilerErrors(
   ctx: InferenceContext,
-  resolved: ResolvedRouterType | undefined,
+  { resolved, assigned }: WalkedProcedure,
   error: TypeScriptTypeResolutionError,
 ): string[] {
   const files = new Set<string>([ctx.sourceFile.fileName])
 
-  for (const symbol of [
-    resolved?.symbol,
-    resolved?.symbol && getAssignedSymbol(ctx.checker, resolved.symbol),
-  ]) {
+  for (const symbol of [resolved?.symbol, assigned]) {
     for (const declaration of symbol?.declarations ?? []) {
       files.add(declaration.path)
     }
@@ -933,24 +948,20 @@ function hasReturn(types: readonly Type[]): boolean {
  * the first line is the `summary`, the rest the `description`,
  * `@summary`, `@description`, `@deprecated` override them, `@returns` is the `successDescription`, and `@tags` adds tags.
  */
-function withJSDocMeta(ctx: InferenceContext, meta: Meta, symbol: TSSymbol | undefined): Meta {
-  if (!symbol) {
-    return meta
-  }
-
-  const read = (other: TSSymbol | undefined) =>
-    other && getJSDoc(ctx.checker, other, ctx.getSourceKind)
-
-  let jsdoc = read(symbol)
+function withJSDocMeta(
+  ctx: InferenceContext,
+  meta: Meta,
+  { resolved, assigned, implemented }: WalkedProcedure,
+): Meta {
+  const read = (symbol: TSSymbol | undefined) =>
+    symbol && getJSDoc(ctx.checker, symbol, ctx.getSourceKind)
 
   // the variable assigned to the property (`{ ping }`), or the contract either implements
-  if (!jsdoc) {
-    const assigned = getAssignedSymbol(ctx.checker, symbol)
-    jsdoc =
-      read(assigned) ??
-      read(getImplementedSymbol(ctx.checker, symbol)) ??
-      read(assigned && getImplementedSymbol(ctx.checker, assigned))
-  }
+  const jsdoc =
+    read(resolved?.symbol) ??
+    read(assigned) ??
+    read(implemented) ??
+    read(assigned && getImplementedSymbol(ctx.checker, assigned))
 
   if (!jsdoc) {
     return meta
