@@ -98,8 +98,8 @@ export function toOpenAPIPath(
 interface RequestParts {
   paramsEntries: JsonObjectSchemaEntry[] | undefined
   queryEntries: JsonObjectSchemaEntry[] | undefined
-  /** The schema of the query keys other than those of `queryEntries`, like those of a record */
-  queryAdditionalProperties?: JsonSchema | undefined
+  /** The schema of the query, whose keys other than those of `queryEntries` are free-form */
+  querySchema?: JsonSchema | undefined
   headersEntries: JsonObjectSchemaEntry[] | undefined
   bodySchema: JsonSchema | undefined
   bodyOptional: boolean | undefined
@@ -148,13 +148,8 @@ export function buildRequest(
       : extractDetailedRequestParts(schema)
 
   renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
-  renderQueryParameters(
-    ctx,
-    operation,
-    parts.queryEntries,
-    meta?.queryStyles,
-    parts.queryAdditionalProperties,
-  )
+  renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
+  renderFreeFormQueryParameter(ctx, operation, parts)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
   const content =
@@ -189,9 +184,7 @@ function extractCompactRequestParts(
   const restEntries = entries?.filter(([name]) => !dynamicParams?.includes(name))
 
   const hasBody = !isBodylessMethod(method)
-  const additionalProperties = dynamicParams?.length
-    ? extractJsonObjectSchemaAdditionalProperties(schema)
-    : undefined
+  const additionalProperties = extractJsonObjectSchemaAdditionalProperties(schema)
   const bodySchema = !hasBody
     ? undefined
     : !dynamicParams?.length
@@ -205,7 +198,7 @@ function extractCompactRequestParts(
   return {
     paramsEntries,
     queryEntries: isBodylessMethod(method) ? restEntries : undefined,
-    queryAdditionalProperties: isBodylessMethod(method) ? extractFreeFormQuery(schema) : undefined,
+    querySchema: isBodylessMethod(method) ? schema : undefined,
     headersEntries: undefined,
     bodySchema,
     bodyOptional: !dynamicParams?.length
@@ -229,28 +222,11 @@ function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
   return {
     paramsEntries: extractJsonObjectSchemaEntries(section('params')?.[1] ?? false),
     queryEntries: extractJsonObjectSchemaEntries(section('query')?.[1] ?? false),
-    queryAdditionalProperties: extractFreeFormQuery(section('query')?.[1] ?? false),
+    querySchema: section('query')?.[1],
     headersEntries: extractJsonObjectSchemaEntries(section('headers')?.[1] ?? false),
     bodySchema: section('body')?.[1],
     bodyOptional: section('body')?.[2],
   }
-}
-
-/**
- * The schema of the keys of a query other than its properties, like those of a record, unless it
- * constrains them in ways an object parameter of them would lose (`propertyNames`)
- */
-function extractFreeFormQuery(schema: JsonSchema): JsonSchema | undefined {
-  const resolved = resolveJsonSchemaRootLocalRef(schema)
-  const constrained =
-    typeof resolved === 'object' &&
-    (resolved.propertyNames !== undefined ||
-      resolved.patternProperties !== undefined ||
-      resolved.minProperties !== undefined ||
-      resolved.maxProperties !== undefined ||
-      resolved.required?.some((name) => !Object.hasOwn(resolved.properties ?? {}, name)))
-
-  return constrained ? undefined : extractJsonObjectSchemaAdditionalProperties(schema)
 }
 
 function renderPathParameters(
@@ -315,7 +291,6 @@ function renderQueryParameters(
   operation: OpenAPIV3_2.OperationObject,
   queryEntries: JsonObjectSchemaEntry[] | undefined,
   queryStyles: OpenAPIMeta['queryStyles'],
-  additionalProperties: JsonSchema | undefined,
 ): void {
   for (const [name, schema, optional] of queryEntries ?? []) {
     const style = queryStyles?.[name]
@@ -359,25 +334,47 @@ function renderQueryParameters(
     operation.parameters ??= []
     operation.parameters.push(parameter)
   }
+}
 
-  // the other keys of a free-form query, like those of a record, as an object of form style, when
-  // their values are primitives: an array or an object value is sent in bracket notation
-  // (`b[0]=1`), which no style of a parameter describes
-  if (
-    additionalProperties !== undefined &&
-    flattenJsonUnionSchema(additionalProperties).every(isPrimitive) &&
-    !queryEntries?.some(([name]) => name === 'query')
-  ) {
-    const { properties: _, ...schema } = combineJsonObjectSchemaEntries([], additionalProperties)
-    operation.parameters ??= []
-    operation.parameters.push({
-      in: 'query',
-      name: 'query',
-      schema: ctx.registry.toOpenAPISchema(schema, 'input'),
-      style: 'form',
-      explode: true,
-    })
+/**
+ * The keys of a query other than its fields, like those of a record, as an object of form style,
+ * unless their values are not primitives, which are sent in bracket notation (`b[0]=1`) no style
+ * describes, or the query constrains them in ways the parameter would lose (`propertyNames`).
+ */
+function renderFreeFormQueryParameter(
+  ctx: OpenAPIOperationContext,
+  operation: OpenAPIV3_2.OperationObject,
+  { querySchema, queryEntries }: RequestParts,
+): void {
+  if (querySchema === undefined) {
+    return
   }
+
+  const query = resolveJsonSchemaRootLocalRef(querySchema)
+  const additionalProperties = extractJsonObjectSchemaAdditionalProperties(querySchema)
+  if (
+    additionalProperties === undefined ||
+    !flattenJsonUnionSchema(additionalProperties).every(isPrimitive) ||
+    queryEntries?.some(([name]) => name === 'query') ||
+    (typeof query === 'object' &&
+      (query.propertyNames !== undefined ||
+        query.patternProperties !== undefined ||
+        query.minProperties !== undefined ||
+        query.maxProperties !== undefined ||
+        query.required?.some((name) => !Object.hasOwn(query.properties ?? {}, name))))
+  ) {
+    return
+  }
+
+  const { properties: _, ...schema } = combineJsonObjectSchemaEntries([], additionalProperties)
+  operation.parameters ??= []
+  operation.parameters.push({
+    in: 'query',
+    name: 'query',
+    schema: ctx.registry.toOpenAPISchema(schema, 'input'),
+    style: 'form',
+    explode: true,
+  })
 }
 
 function renderHeaderParameters(

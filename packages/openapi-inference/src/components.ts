@@ -71,15 +71,9 @@ export function mergeEquivalentComponents(
   const directed = new Map<string, { def: string; base: string }>()
   for (const name of Object.keys(schemas)) {
     const base = /^(.+)(?:Input|Output)$/u.exec(name)?.[1]
-    const def =
-      base === undefined || !reserved.has(base) ? undefined : rename ? base : defNames?.get(base)
-    if (
-      base !== undefined &&
-      def !== undefined &&
-      names.used.has(def) &&
-      !(rename ? names.used.has(name) : defNames?.has(name))
-    ) {
-      directed.set(name, { def, base })
+    const def = base && reserved.has(base) ? (rename ? base : defNames?.get(base)) : undefined
+    if (def && names.used.has(def) && !(rename ? names.used.has(name) : defNames?.has(name))) {
+      directed.set(name, { def, base: base! })
     }
   }
 
@@ -172,6 +166,14 @@ export function mergeEquivalentComponents(
       .map((name) => [name, name]),
   )
   const taken = (name: string) => holders.has(name) || reserved.has(name)
+  // the first name of `base` and a number from `to` on, that no component holds
+  const free = (base: string, to = base) => {
+    const separator = /\d$/u.test(base) ? '_' : ''
+    for (let i = 2; taken(to); i++) {
+      to = `${base}${separator}${i}`
+    }
+    return to
+  }
   const move = (name: string, to: string) => {
     const from = renamed.get(name) ?? name
     if (holders.get(from) === name) {
@@ -213,12 +215,7 @@ export function mergeEquivalentComponents(
       ) {
         holders.delete(base)
         move(name, base)
-        let to = names.numbered.get(holder!) ?? base
-        const separator = /\d$/u.test(base) ? '_' : ''
-        for (let i = 2; taken(to); i++) {
-          to = `${base}${separator}${i}`
-        }
-        move(holder!, to)
+        move(holder!, free(base, names.numbered.get(holder!)))
         moved = true
       }
     }
@@ -226,16 +223,9 @@ export function mergeEquivalentComponents(
 
   for (const [name, { base }] of directed) {
     const opposite = `${base}${name.endsWith('Input') ? 'Output' : 'Input'}`
-    if (merged.has(name) || taken(opposite)) {
-      continue
+    if (!merged.has(name) && !taken(opposite)) {
+      move(name, free(base))
     }
-
-    const separator = /\d$/u.test(base) ? '_' : ''
-    let to = `${base}${separator}2`
-    for (let i = 3; taken(to); i++) {
-      to = `${base}${separator}${i}`
-    }
-    move(name, to)
   }
 
   if (!merged.size && !renamed.size) {

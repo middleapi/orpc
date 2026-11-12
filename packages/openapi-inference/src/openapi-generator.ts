@@ -211,6 +211,19 @@ class CachedJsonSchemaConverter implements JsonSchemaConverter {
     return this.converter.condition(schema, direction)
   }
 
+  /**
+   * Whether it converts a schema to a schema: one it throws on (like Zod's transforms, with
+   * `unrepresentable: 'throw'`) or converts to any value (with the default `any`) is inferred.
+   */
+  converts(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): boolean {
+    if (!this.condition(schema, direction)) {
+      return false
+    }
+
+    const conversion = this.getConversion(schema, direction)
+    return 'result' in conversion && !isUnconstrainedSchema(conversion.result[0])
+  }
+
   convert(
     schema: AnySchema | undefined,
     direction: JsonSchemaConverterDirection,
@@ -222,7 +235,7 @@ class CachedJsonSchemaConverter implements JsonSchemaConverter {
     return conversion.result
   }
 
-  getConversion(
+  private getConversion(
     schema: AnySchema | undefined,
     direction: JsonSchemaConverterDirection,
   ): Conversion {
@@ -243,31 +256,6 @@ class CachedJsonSchemaConverter implements JsonSchemaConverter {
       this.conversions.set(schema, (conversions = {}))
     }
     return (conversions[direction] ??= convert())
-  }
-}
-
-/**
- * Converts what a converter of the options converts to a schema: one it throws on (like Zod's
- * transforms, with `unrepresentable: 'throw'`) or converts to any value (with the default `any`)
- * is inferred from its type.
- */
-class ConvertibleJsonSchemaConverter implements JsonSchemaConverter {
-  constructor(private readonly converter: CachedJsonSchemaConverter) {}
-
-  condition(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): boolean {
-    if (!this.converter.condition(schema, direction)) {
-      return false
-    }
-
-    const conversion = this.converter.getConversion(schema, direction)
-    return 'result' in conversion && !isUnconstrainedSchema(conversion.result[0])
-  }
-
-  convert(
-    schema: AnySchema | undefined,
-    direction: JsonSchemaConverterDirection,
-  ): [jsonSchema: JsonSchema, optional: boolean] {
-    return this.converter.convert(schema, direction)
   }
 }
 
@@ -361,7 +349,10 @@ export class OpenAPIGenerator {
         resolver: new RouterTypeResolver(project.checker, project.program, exported),
         converters: { input: converter('input'), output: converter('output') },
         schemaConverters: [
-          ...converters.map((c) => new ConvertibleJsonSchemaConverter(c)),
+          ...converters.map((c) => ({
+            condition: c.converts.bind(c),
+            convert: c.convert.bind(c),
+          })),
           new ConvertibleStandardJsonSchemaConverter(conversions),
         ],
         stockConverters,
@@ -381,7 +372,8 @@ export class OpenAPIGenerator {
       project.close()
     }
 
-    // the components of `base` stay as they are, and so do the names `componentName` chose
+    // the components of `base` stay as they are, and the names `componentName` chose are merged as
+    // defs of their def names
     const reserved = new Set(Object.keys(options.base?.components?.schemas ?? {}))
     const defNames = new Map<string, string>()
     const generator = new BaseOpenAPIGenerator({
@@ -918,16 +910,14 @@ function getCompilerErrors(
     }
   }
 
-  return [
-    ...[...files]
-      .flatMap((file) => [
-        ...ctx.program.getSyntacticDiagnostics(file),
-        ...ctx.program.getSemanticDiagnostics(file),
-      ])
-      .filter((d) => d.category === DiagnosticCategory.Error)
-      .map((d) => formatDiagnostic(ctx.program, d)),
-    ...getUnresolvedModules(ctx, error.files),
-  ]
+  return [...files]
+    .flatMap((file) => [
+      ...ctx.program.getSyntacticDiagnostics(file),
+      ...ctx.program.getSemanticDiagnostics(file),
+    ])
+    .filter((d) => d.category === DiagnosticCategory.Error)
+    .map((d) => formatDiagnostic(ctx.program, d))
+    .concat(getUnresolvedModules(ctx, error.files))
 }
 
 /**
@@ -938,15 +928,9 @@ function getCompilerErrors(
 function getUnresolvedModules(ctx: InferenceContext, files: Iterable<string>): string[] {
   const specifiers: any[] = []
   const visit = (node: any): undefined => {
+    // of an import or export declaration, or an import type
     const specifier =
-      node.kind === SyntaxKind.ImportDeclaration || node.kind === SyntaxKind.ExportDeclaration
-        ? node.moduleSpecifier
-        : node.kind === SyntaxKind.ImportType
-          ? node.argument?.literal
-          : node.kind === SyntaxKind.ExternalModuleReference
-            ? node.expression
-            : undefined
-
+      node.kind === SyntaxKind.ImportType ? node.argument?.literal : node.moduleSpecifier
     if (specifier?.kind === SyntaxKind.StringLiteral) {
       specifiers.push(specifier)
     }

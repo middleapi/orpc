@@ -107,19 +107,17 @@ const WRITTEN_ARGUMENTS_DEPTH = 4
  */
 function printArgument(types: TypeQueries, type: Type, keys: boolean, depth: number): string {
   const printed = printType(types, type)
-  const literal =
-    printed === '{}' ||
-    (type.isIntersectionType() && types.getMembers(type).every((m) => printType(types, m) === '{}'))
 
   // an object literal, also an intersection of them, by the project alias it lost, like
   // `type Item = ReturnType<typeof toItem>` (see `TypeQueries.getLostAlias`), else by its keys
-  const alias = literal && types.getProperties(type).length ? types.getLostAlias(type) : undefined
-  if (alias) {
-    return getSymbolName(alias)
-  }
-
-  if (keys && literal) {
-    return printKeys(types, type) || printed
+  if (
+    printed === '{}' ||
+    (type.isIntersectionType() && types.getMembers(type).every((m) => printType(types, m) === '{}'))
+  ) {
+    const alias = types.getProperties(type).length ? types.getLostAlias(type) : undefined
+    if (alias || keys) {
+      return alias ? getSymbolName(alias) : printKeys(types, type) || printed
+    }
   }
 
   if (printed === '{}' || depth >= WRITTEN_ARGUMENTS_DEPTH) {
@@ -177,8 +175,7 @@ export function getFallbackDefName(types: TypeQueries, type: Type): string {
     types.getSymbolSourceKind(symbol) !== 'default'
   ) {
     // an instantiation by its printed type, as a named def (`DeepPartial_User`), without the
-    // options a library passes on as object literals (`PartialObjectDeep<User, { ... }>` of
-    // type-fest is `PartialObjectDeep_User`)
+    // options a library passes on as object literals (`PartialObjectDeep_User` of type-fest)
     const written = getWrittenTypeArguments(types, type, symbol)
     const named = written.filter(
       (t) =>
