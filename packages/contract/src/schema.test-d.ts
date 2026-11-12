@@ -7,6 +7,22 @@ import type { AnySchema, InferSchemaInput, InferSchemaOutput, MergedSchema, Sche
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
 const outputSchema = z.object({ output: z.string().transform((s) => Number(s)) })
+const valibotSchema = v.object({
+  value: v.pipe(
+    v.string(),
+    v.transform((s) => Number(s)),
+  ),
+})
+const arktypeSchema = arktypeType({ value: 'string' })
+const untypedSchema = {
+  '~standard': {
+    version: 1 as const,
+    vendor: 'custom',
+    validate: (value: unknown) => ({ value: value as string }),
+  },
+}
+
+type UnionSchema = Schema<{ a: number }, { a: string }> | Schema<{ b: number }, { b: string }>
 
 describe('Schema', () => {
   it('supports any standard schema', () => {
@@ -28,11 +44,23 @@ describe('Schema', () => {
 it('InferSchemaInput', () => {
   expectTypeOf<InferSchemaInput<typeof inputSchema>>().toEqualTypeOf<{ input: number }>()
   expectTypeOf<InferSchemaInput<typeof outputSchema>>().toEqualTypeOf<{ output: string }>()
+  expectTypeOf<InferSchemaInput<typeof valibotSchema>>().toEqualTypeOf<{ value: string }>()
+  expectTypeOf<InferSchemaInput<typeof arktypeSchema>>().toEqualTypeOf<{ value: string }>()
+  expectTypeOf<InferSchemaInput<UnionSchema>>().toEqualTypeOf<{ a: number } | { b: number }>()
+  expectTypeOf<InferSchemaInput<AnySchema>>().toBeAny()
+  expectTypeOf<InferSchemaInput<any>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaInput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
 })
 
 it('InferSchemaOutput', () => {
   expectTypeOf<InferSchemaOutput<typeof inputSchema>>().toEqualTypeOf<{ input: string }>()
   expectTypeOf<InferSchemaOutput<typeof outputSchema>>().toEqualTypeOf<{ output: number }>()
+  expectTypeOf<InferSchemaOutput<typeof valibotSchema>>().toEqualTypeOf<{ value: number }>()
+  expectTypeOf<InferSchemaOutput<typeof arktypeSchema>>().toEqualTypeOf<{ value: string }>()
+  expectTypeOf<InferSchemaOutput<UnionSchema>>().toEqualTypeOf<{ a: string } | { b: string }>()
+  expectTypeOf<InferSchemaOutput<AnySchema>>().toBeAny()
+  expectTypeOf<InferSchemaOutput<any>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaOutput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
 })
 
 describe('MergedSchema', () => {
