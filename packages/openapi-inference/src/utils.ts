@@ -12,7 +12,13 @@ import type {
   Symbol as TSSymbol,
   Type,
 } from 'typescript/unstable/sync'
-import { ObjectFlags, SignatureKind, SymbolFlags, TypeFlags } from 'typescript/unstable/sync'
+import {
+  DiagnosticCategory,
+  ObjectFlags,
+  SignatureKind,
+  SymbolFlags,
+  TypeFlags,
+} from 'typescript/unstable/sync'
 
 import type { TypeScriptProject } from './project'
 
@@ -307,8 +313,21 @@ export function createTypeScriptProject(
           ? checker.getDeclaredTypeOfSymbol(symbol)
           : checker.getTypeOfSymbol(symbol)
 
+      // the compiler knows why: a missing module, or a tsconfig "paths" alias it does not map
       if (!type || type.isErrorType()) {
-        throw new Error(`[TypeScript] Could not resolve the type of "${name}" in "${file}".`)
+        const errors = [
+          ...describeConfig(),
+          ...[
+            ...program.getSyntacticDiagnostics(sourceFile.fileName),
+            ...program.getSemanticDiagnostics(sourceFile.fileName),
+          ]
+            .filter((d) => d.category === DiagnosticCategory.Error)
+            .map((d) => formatDiagnostic(program, d)),
+        ]
+
+        throw new Error(
+          `[TypeScript] Could not resolve the type of "${name}" in "${file}". Check its import, and the tsconfig "paths" for aliases like "@/".\n\nCompiler errors:${errors.map((e) => `\n  ${e}`).join('')}`,
+        )
       }
 
       return { type, symbol }

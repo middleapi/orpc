@@ -920,6 +920,31 @@ describe('openAPIGenerator', () => {
       )
     })
 
+    it('shows the errors of the router file when the type of its export can not be resolved', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import type { appRouter } from '@/server/router'\nexport type Router = typeof appRouter\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { m: procedure },
+            { source: { file: file('src/router.ts'), export: 'Router' } },
+          ),
+        ),
+      ).toBe(
+        [
+          `[TypeScript] Could not resolve the type of "Router" in "${file('src/router.ts')}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/router.ts')}:1:32 - error TS2307: Cannot find module '@/server/router' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
     it('shows the errors of the files declaring the types that lead to an unresolved one', async () => {
       const file = project({
         'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
