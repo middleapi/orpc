@@ -2,7 +2,7 @@ import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unst
 import { ObjectFlags, TypeFlags } from 'typescript/unstable/sync'
 
 import { ExpansionGuard } from './expansion'
-import { getIndexKeyType, toPattern } from './type-converter'
+import { getIndexKeyType, toPattern } from './key-patterns'
 import { TypeQueries } from './type-queries'
 import { getCallReturnType, getPromisedType } from './utils'
 
