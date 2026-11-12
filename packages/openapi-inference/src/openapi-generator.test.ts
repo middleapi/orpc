@@ -248,6 +248,11 @@ import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
 import {
+  crewsHeldFirst,
+  crewsHeldLast,
+  crewsLazy,
+} from '../tests/fixtures/library-aliases/src/crews'
+import {
   documents as libraryDocuments,
   named as libraryNamed,
 } from '../tests/fixtures/library-aliases/src/documents'
@@ -5478,6 +5483,41 @@ describe('openAPIGenerator', () => {
         expect(response(spec, '/teams')).toEqual({ type: 'array', items: ref('Squad') })
         expect(response(spec, '/squads')).toEqual({ type: 'array', items: ref('Squad') })
       }
+    })
+
+    it('names a type by an alias only a later procedure reaches, walking the router once', async () => {
+      const source = new URL('../tests/fixtures/library-aliases/src/crews.ts', import.meta.url)
+      let loads = 0
+      const lazy = {
+        ...crewsLazy,
+        direct: os.lazy(async () => {
+          loads++
+          return { default: crewsHeldLast.direct }
+        }),
+      }
+
+      for (const [exported, router] of Object.entries({
+        crewsHeldLast,
+        crewsHeldFirst,
+        crewsLazy: lazy,
+      })) {
+        const filtered: string[] = []
+        const spec = await generator.generate(router, {
+          source: { file: source, export: exported },
+          filter: (_, path) => {
+            filtered.push(path.join('.'))
+            return true
+          },
+        })
+        const schemas = spec.components?.schemas as any
+
+        expect(Object.keys(schemas).toSorted()).toEqual(['Crew', 'CrewHolder'])
+        expect(response(spec, '/direct')).toEqual({ type: 'array', items: ref('Crew') })
+        expect(schemas.CrewHolder.properties.crew).toEqual(ref('Crew'))
+        expect(filtered.toSorted()).toEqual(['direct', 'held'])
+      }
+
+      expect(loads).toBe(1)
     })
 
     it('names an intersection, like a document with timestamps', async () => {

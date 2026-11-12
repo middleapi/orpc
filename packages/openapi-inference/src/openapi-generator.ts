@@ -75,10 +75,13 @@ function isGivenWhole(contract: AnyProcedureContract): boolean {
   return spec !== undefined && typeof spec !== 'function'
 }
 
-/** How many times the procedures are converted again at most, see `generate` */
-const MAX_ALIAS_PASSES = 2
-
 type InferredJsonSchema = [jsonSchema: JsonSchema, optional: boolean]
+
+/** A procedure the router holds, which the `filter` keeps */
+interface WalkedProcedure {
+  contract: AnyProcedureContract
+  path: readonly string[]
+}
 
 /**
  * A schema carrying a JSON schema inferred from TypeScript types,
@@ -365,13 +368,21 @@ export class OpenAPIGenerator {
         describeConfig: () => project.describeConfig(),
       }
 
-      inferred = await this.inferRouter(ctx, router, filter)
+      const procedures: WalkedProcedure[] = []
+      await walkProcedureContractsAsync(router, (contract, path) => {
+        if (value(filter, contract, path) !== false) {
+          procedures.push({ contract, path: [...path] })
+        }
+      })
+
+      inferred = this.inferRouter(ctx, procedures)
 
       // a type converted before the file of a property naming it by an alias it lost was read is
-      // converted again, so names do not depend on the order of procedures
-      for (let i = 0; i < MAX_ALIAS_PASSES && ctx.converters.output.takeLateAliases(); i++) {
+      // converted again, so names do not depend on the order of procedures. That reads no file
+      // the first conversion did not, so no alias is read late again.
+      if (ctx.converters.output.takeLateAliases()) {
         ctx.converters = { input: converter('input'), output: converter('output') }
-        inferred = await this.inferRouter(ctx, router, filter)
+        inferred = this.inferRouter(ctx, procedures)
       }
     } finally {
       project.close()
@@ -403,11 +414,10 @@ export class OpenAPIGenerator {
     return document
   }
 
-  private async inferRouter(
+  private inferRouter(
     ctx: InferenceContext,
-    router: RouterContract | AnyRouter,
-    filter: BaseOpenAPIGeneratorGenerateOptions<OpenAPIVersion>['filter'],
-  ): Promise<RouterContract> {
+    procedures: readonly WalkedProcedure[],
+  ): RouterContract {
     let inferred: RouterContract = {}
     const errors: string[] = []
     // printed once, many unresolved procedures share the errors of the router file
@@ -422,13 +432,6 @@ export class OpenAPIGenerator {
         setAtPath(inferred, path, procedure)
       }
     }
-
-    const procedures: { contract: AnyProcedureContract; path: readonly string[] }[] = []
-    await walkProcedureContractsAsync(router, (contract, path) => {
-      if (value(filter, contract, path) !== false) {
-        procedures.push({ contract, path: [...path] })
-      }
-    })
 
     // the aliases of the files of the procedures, read first, so that a conversion seldom reaches
     // a type before the alias naming it (see `generate`)
