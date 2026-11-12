@@ -175,14 +175,6 @@ export function mergeEquivalentComponents(
       .map((name) => [name, name]),
   )
   const taken = (name: string) => holders.has(name) || reserved.has(name)
-  // the first name of `base` and a number from `to` on, that no component holds
-  const free = (base: string, to = base) => {
-    const separator = /\d$/u.test(base) ? '_' : ''
-    for (let i = 2; taken(to); i++) {
-      to = `${base}${separator}${i}`
-    }
-    return to
-  }
   const move = (name: string, to: string) => {
     const from = renamed.get(name) ?? name
     if (holders.get(from) === name) {
@@ -228,7 +220,7 @@ export function mergeEquivalentComponents(
       ) {
         holders.delete(base)
         move(name, base)
-        move(holder, free(base, baseOf(holder)))
+        move(holder, getFreeName(base, taken, baseOf(holder)))
         moved = true
       }
     }
@@ -246,7 +238,7 @@ export function mergeEquivalentComponents(
   for (const [name, { base, direction }] of siblings) {
     const to = `${resolve(base)}${direction}`
     if (to !== name && (!taken(to) || taken(name))) {
-      move(name, free(to))
+      move(name, getFreeName(to, taken))
     } else {
       holders.set(name, name)
     }
@@ -255,7 +247,7 @@ export function mergeEquivalentComponents(
   for (const [name, { base, sibling }] of directed) {
     const opposite = `${base}${name.endsWith('Input') ? 'Output' : 'Input'}`
     if (!sibling && !merged.has(name) && !taken(opposite)) {
-      move(name, free(base))
+      move(name, getFreeName(base, taken))
     }
   }
 
@@ -279,6 +271,23 @@ export function mergeEquivalentComponents(
     ...others
   } = document
   rewriteSchemaRefs([components, others], resolve)
+}
+
+/**
+ * The first of `first` and the names numbered after `base` (`Page2`, `Page_1_2` of `Page_1`, so it
+ * does not collide with `Page_12`) that is not taken.
+ */
+export function getFreeName(
+  base: string,
+  taken: (name: string) => boolean,
+  first: string = base,
+): string {
+  const separator = /\d$/u.test(base) ? '_' : ''
+  let name = first
+  for (let i = 2; taken(name); i++) {
+    name = `${base}${separator}${i}`
+  }
+  return name
 }
 
 /**

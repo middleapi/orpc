@@ -1,6 +1,7 @@
 import type { JsonSchema } from '@orpc/json-schema'
 import { setOwn, stringifyJSON } from '@orpc/shared'
 
+import { getFreeName } from './components'
 import {
   collectDefRefs,
   fromRef,
@@ -191,15 +192,10 @@ export class DefRegistry {
     let name = this.names.byKey.get(key)
 
     if (name === undefined || taken(name)) {
-      const base = getBaseName(key, preferredName)
-      const unavailable = (candidate: string) => taken(candidate) || this.names.used.has(candidate)
-      // `Page_1` and `Page_12` must not collide as `Page_12`
-      const separator = /\d$/u.test(base) ? '_' : ''
-      name = base
-      for (let i = 2; unavailable(name); i++) {
-        name = `${base}${separator}${i}`
-      }
-
+      name = getFreeName(
+        getBaseName(key, preferredName),
+        (candidate) => taken(candidate) || this.names.used.has(candidate),
+      )
       this.give(key, name, preferredName)
     }
 
