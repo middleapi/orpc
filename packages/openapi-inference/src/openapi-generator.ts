@@ -42,7 +42,7 @@ import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unst
 import { DiagnosticCategory, TypeFlags } from 'typescript/unstable/sync'
 
 import { mergeEquivalentComponents } from './components'
-import type { TypeScriptExport, TypeScriptProjectOptions } from './project'
+import type { TypeScriptProjectOptions } from './project'
 import { openTypeScriptProject } from './project'
 import type { ResolvedRouterType } from './router-type'
 import { RouterTypeResolver } from './router-type'
@@ -95,24 +95,26 @@ function inferredSchema(inferred: InferredJsonSchema): AnySchema {
   }
 }
 
+function getInferred(schema: AnySchema | undefined): InferredJsonSchema | undefined {
+  return (schema?.['~standard'] as any)?.[INFERRED_JSON_SCHEMA_SYMBOL]
+}
+
 /**
  * Whether a schema inferred from a type documents an object (a schema a converter supports is
  * documented as the stock generator documents it).
  */
 function isInferredObject(schema: AnySchema): boolean {
-  const inferred: InferredJsonSchema | undefined = (schema['~standard'] as any)[
-    INFERRED_JSON_SCHEMA_SYMBOL
-  ]
+  const inferred = getInferred(schema)
   return inferred === undefined || extractJsonObjectSchemaEntries(inferred[0]) !== undefined
 }
 
 class InferredJsonSchemaConverter implements JsonSchemaConverter {
   condition(schema: AnySchema | undefined): boolean {
-    return schema !== undefined && INFERRED_JSON_SCHEMA_SYMBOL in schema['~standard']
+    return getInferred(schema) !== undefined
   }
 
   convert(schema: AnySchema | undefined): [jsonSchema: JsonSchema, optional: boolean] {
-    return (schema!['~standard'] as any)[INFERRED_JSON_SCHEMA_SYMBOL]
+    return getInferred(schema)!
   }
 }
 
@@ -184,8 +186,6 @@ interface InferenceContext {
   checker: Checker
   program: Program
   sourceFile: SourceFile
-  /** The export `source` names, and its name */
-  source: TypeScriptExport & { name: string }
   resolver: RouterTypeResolver
   converters: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverter>
   /**
@@ -263,7 +263,7 @@ export class OpenAPIGenerator {
 
     try {
       const name = source.export ?? 'router'
-      const exported = { ...project.getExportType(name), name }
+      const exported = project.getExportType(name)
       const converter = (direction: JsonSchemaConverterDirection) =>
         new TypeToJsonSchemaConverter(project.checker, project.program, {
           ...this.options,
@@ -274,7 +274,6 @@ export class OpenAPIGenerator {
         checker: project.checker,
         program: project.program,
         sourceFile: project.sourceFile,
-        source: exported,
         resolver: new RouterTypeResolver(project.checker, project.program, exported),
         converters: { input: converter('input'), output: converter('output') },
         schemaConverter: {
@@ -294,6 +293,14 @@ export class OpenAPIGenerator {
           procedures.push(walkProcedure(ctx, contract, [...path]))
         }
       })
+
+      // no procedure is in the export's type: it is not a router, unlike a router of other paths
+      const typed = procedures.filter((p) => !p.whole)
+      if (typed.length && typed.every((p) => !p.resolved) && !ctx.resolver.holdsProcedure()) {
+        throw new OpenAPIGeneratorError(
+          `[OpenAPIGenerator] The export "${name}" of "${project.sourceFile.fileName}" has type "${project.checker.typeToString(exported.type)}", which is not a router, procedure or contract.`,
+        )
+      }
 
       inferred = this.inferRouter(ctx, procedures)
 
@@ -342,8 +349,6 @@ export class OpenAPIGenerator {
     const errors: string[] = []
     // printed once, many unresolved procedures share the errors of the router file
     let diagnostics: Set<string> | undefined
-    let walked = 0
-    let found = 0
 
     const place = (path: readonly string[], procedure: AnyProcedureContract) => {
       if (path.length === 0) {
@@ -361,16 +366,12 @@ export class OpenAPIGenerator {
         continue
       }
 
-      walked++
-
       try {
         if (!resolved) {
           throw new OpenAPIGeneratorError(
             `its type was not found in the router type, make sure "source" points to the type of this router.`,
           )
         }
-
-        found++
 
         place(path, this.inferProcedure(ctx, procedure, resolved))
       } catch (e) {
@@ -387,13 +388,6 @@ export class OpenAPIGenerator {
 
         errors.push(`Procedure at ${path.length ? path.join('.') : '(root)'}: ${e.message}`)
       }
-    }
-
-    // no procedure is in the export's type: it is not a router, unlike a router of other paths
-    if (walked && !found && !ctx.resolver.holdsProcedure()) {
-      throw new OpenAPIGeneratorError(
-        `[OpenAPIGenerator] The export "${ctx.source.name}" of "${ctx.sourceFile.fileName}" has type "${ctx.checker.typeToString(ctx.source.type)}", which is not a router, procedure or contract.`,
-      )
     }
 
     if (errors.length) {
