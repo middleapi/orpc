@@ -5115,8 +5115,10 @@ describe('openAPIGenerator', () => {
         // and so is any value, of a value typed `unknown`
         expect(spec.paths['/unknown'].post.responses['200'].content).toEqual({})
 
-        for (const name of ['transformed', 'kept'] as const) {
-          const output = await call(roundEightyTwoConverted[name], undefined)
+        for (const [name, output] of [
+          ['transformed', await call(roundEightyTwoConverted.transformed, undefined)],
+          ['kept', await call(roundEightyTwoConverted.kept, undefined)],
+        ] as const) {
           expect(ajv.validate(response(spec, `/${name}`), output) ? [] : ajv.errors).toEqual([])
         }
       },

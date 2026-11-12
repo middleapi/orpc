@@ -1170,7 +1170,7 @@ describe('openAPIGenerator operation builders', () => {
 
     it('requires the headers every detailed member of a status sends', () => {
       const { ctx, operation } = createContext()
-      const headers = (required: string[]) => ({
+      const headers = (required: string[]): JsonSchema => ({
         type: 'object',
         properties: { 'x-id': { type: 'string' }, 'x-opt': { type: 'string' } },
         required,
@@ -1210,16 +1210,17 @@ describe('openAPIGenerator operation builders', () => {
         { outputStructure: 'detailed' },
       )
 
-      expect(operation.responses?.['201']?.headers).toEqual({
+      const responses = operation.responses as Record<string, OpenAPIV3_2.ResponseObject>
+      expect(responses['201']?.headers).toEqual({
         'x-id': { required: true, schema: { type: 'string' } },
         'x-opt': { schema: { type: 'string' } },
       })
       // a member whose headers may be left out sends none
-      expect(operation.responses?.['200']?.headers).toEqual({
+      expect(responses['200']?.headers).toEqual({
         'x-id': { schema: { type: 'string' } },
         'x-opt': { schema: { type: 'string' } },
       })
-      expect(operation.responses?.['202']?.headers).toBeUndefined()
+      expect(responses['202']?.headers).toBeUndefined()
     })
 
     it('documents a detailed body once when members of a status share it', () => {
@@ -1245,7 +1246,7 @@ describe('openAPIGenerator operation builders', () => {
         { outputStructure: 'detailed' },
       )
 
-      expect(operation.responses?.['200']?.content).toEqual({
+      expect((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content).toEqual({
         'application/json': { schema: { type: 'string' } },
       })
     })
