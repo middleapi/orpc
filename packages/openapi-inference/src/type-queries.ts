@@ -1227,7 +1227,7 @@ export class TypeQueries {
   readAliases(declarations: readonly NodeHandle[]): void {
     const names: any[] = []
     // an import is looked up in the exports of its module, whose specifier is in `names`
-    const imports = new Map<number, [name: any, exported: string]>()
+    const imports = new Map<number, readonly [name: any, exported: string]>()
     const collect = (statements: readonly any[]): void => {
       for (const statement of statements) {
         if (statement.kind === SyntaxKind.TypeAliasDeclaration) {
