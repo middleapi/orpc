@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import { ensureJsonSchemaObject } from '@orpc/json-schema'
 import { setOwn } from '@orpc/shared'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type {
@@ -468,7 +469,7 @@ export class TypeToJsonSchemaConverter {
       return [schema, optional]
     }
 
-    return [{ ...(typeof schema === 'object' ? schema : { not: {} }), $defs }, optional]
+    return [{ ...ensureJsonSchemaObject(schema), $defs }, optional]
   }
 
   /**
@@ -1075,7 +1076,7 @@ export class TypeToJsonSchemaConverter {
 
     // `Node & object` is `Node`, keeping its name: `object` adds only that a value is no primitive,
     // unless the other member is weak (`object & { extra?: string }`, see below)
-    const loose = isLooseIntersection(this.types, type)
+    const loose = isLooseIntersection(this.types, members)
     const objects = members.filter((m) => !(m.flags & TypeFlags.NonPrimitive))
     if (objects.length === 1 && objects.length < members.length && !loose) {
       return this.visit(objects[0]!)

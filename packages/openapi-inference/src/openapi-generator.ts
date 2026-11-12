@@ -212,14 +212,11 @@ class CachedJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   /**
-   * Whether it converts a schema to a schema: one it throws on (like Zod's transforms, with
-   * `unrepresentable: 'throw'`) or converts to any value (with the default `any`) is inferred.
+   * Whether it converts a schema its condition holds for to a schema: one it throws on (like Zod's
+   * transforms, with `unrepresentable: 'throw'`) or converts to any value (with the default `any`)
+   * is inferred.
    */
   converts(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): boolean {
-    if (!this.condition(schema, direction)) {
-      return false
-    }
-
     const conversion = this.getConversion(schema, direction)
     return 'result' in conversion && !isUnconstrainedSchema(conversion.result[0])
   }

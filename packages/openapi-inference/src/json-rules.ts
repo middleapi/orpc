@@ -203,15 +203,21 @@ export function isDropped(types: TypeQueries, type: Type): boolean {
  * calls it, also of a class constructor's static `toJSON`) returning a value it writes.
  */
 export function isNonSerializable(types: TypeQueries, type: Type): boolean {
-  if (
+  return (
+    isSymbol(types, type) ||
+    (isFunction(types, type) && !getWrittenToJSONResultTypes(types, type).length)
+  )
+}
+
+/**
+ * Whether a type is a symbol, also a branded one (`symbol & { __brand: 'Id' }`).
+ */
+function isSymbol(types: TypeQueries, type: Type): boolean {
+  return Boolean(
     type.flags & TypeFlags.ESSymbolLike ||
     (type.isIntersectionType() &&
-      types.getMembers(type).some((m) => m.flags & TypeFlags.ESSymbolLike))
-  ) {
-    return true
-  }
-
-  return isFunction(types, type) && !getWrittenToJSONResultTypes(types, type).length
+      types.getMembers(type).some((m) => m.flags & TypeFlags.ESSymbolLike)),
+  )
 }
 
 /**
@@ -222,7 +228,7 @@ export function isNonSerializable(types: TypeQueries, type: Type): boolean {
 export function isDroppedResult(types: TypeQueries, type: Type): boolean {
   return types
     .getUnionMembers(type)
-    .every((m) => m.flags & UNDEFINED_FLAGS || isFunction(types, m) || isNonSerializable(types, m))
+    .every((m) => m.flags & UNDEFINED_FLAGS || isFunction(types, m) || isSymbol(types, m))
 }
 
 /**
@@ -289,7 +295,7 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
   }
 
   if (type.isIntersectionType()) {
-    return isLooseIntersection(types, type)
+    return isLooseIntersection(types, types.getMembers(type))
   }
 
   if (
@@ -316,16 +322,11 @@ function mayHoldFunction(types: TypeQueries, type: Type): boolean {
 }
 
 /**
- * Whether an intersection holds what a member holding any value does (`object`, `{}`,
- * `Pick<User, never>`): its other members have only optional properties
+ * Whether an intersection of these members holds what a member holding any value does (`object`,
+ * `{}`, `Pick<User, never>`): its other members have only optional properties
  * (`object & { extra?: string }`), which an array, a date, or a function satisfies too.
  */
-export function isLooseIntersection(types: TypeQueries, type: Type): boolean {
-  if (!type.isIntersectionType()) {
-    return false
-  }
-
-  const members = types.getMembers(type)
+export function isLooseIntersection(types: TypeQueries, members: readonly Type[]): boolean {
   const loose = members.filter((m) => mayHoldFunction(types, m))
 
   return (
