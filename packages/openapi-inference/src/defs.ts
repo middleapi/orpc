@@ -419,26 +419,28 @@ export class DefRegistry {
    * Inlines the root def, the defs of a root union, and the defs of `properties` of the root
    * (or of each root union member), unless they are recursive. Their parts are read by their
    * fields, so only the members a client sends the fields of are kept, also of the defs they
-   * refer to. The fields of `partialProperties` (and of the root, with `separateRoot`) are sent
-   * each on their own, so when one of them may be missing, so may each of its fields, and a field
-   * never written is left out of them, see {@link withoutUnwrittenFields}.
+   * refer to. The fields of `separateProperties` (and of the root, with `separateRoot`) are sent
+   * each on their own, so a field never written is left out of them, see
+   * {@link withoutUnwrittenFields}, and when one of `partialProperties` may be missing, so may
+   * each of its fields.
    */
   inlineRoot(
     schema: JsonSchema,
     properties: readonly string[],
     partialProperties: readonly string[] = [],
     separateRoot = false,
+    separateProperties: readonly string[] = partialProperties,
   ): JsonSchema {
     const inlined = this.inlineRootDefs(schema, properties, partialProperties)
 
-    if (!separateRoot && !partialProperties.length) {
+    if (!separateRoot && !separateProperties.length) {
       return inlined
     }
 
     const separate = (member: JsonSchema): JsonSchema =>
       mapProperties(
         separateRoot ? withoutUnwrittenFields(member) : member,
-        partialProperties,
+        separateProperties,
         (property) => this.mapObjects(property, withoutUnwrittenFields),
       )
 

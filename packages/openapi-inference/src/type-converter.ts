@@ -162,6 +162,13 @@ export interface TypeToJsonSchemaConvertOptions {
   partialProperties?: readonly string[] | undefined
 
   /**
+   * With `inlineRoot`, the root properties whose fields are sent each on their own, but required
+   * as the type requires them, like the `headers` of a detailed output, which the stock generator
+   * reads by status. `partialProperties` by default.
+   */
+  separateProperties?: readonly string[] | undefined
+
+  /**
    * With `inlineRoot`, the root's fields are sent each on their own, like the query parameters of
    * an input of a `GET` request.
    */
@@ -416,6 +423,7 @@ export class TypeToJsonSchemaConverter {
           options.inlineProperties ?? [],
           options.partialProperties,
           options.separateRootFields,
+          options.separateProperties,
         )
       }
 

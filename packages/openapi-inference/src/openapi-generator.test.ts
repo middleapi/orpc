@@ -390,7 +390,9 @@ describe('openAPIGenerator', () => {
 
       const plain = (spec.paths?.['/stream/plain']?.post?.responses?.['200'] as any).content
       expect(plain['text/event-stream'].schema.oneOf[0].properties.data).toEqual({ type: 'string' })
-      expect(plain['text/event-stream'].schema.oneOf[1].properties.data).toEqual({})
+      // a generator returning nothing closes without data
+      expect(plain['text/event-stream'].schema.oneOf[1].properties.data).toEqual({ not: {} })
+      expect(plain['text/event-stream'].schema.oneOf[1].required).toEqual(['event'])
     })
 
     it('documents void outputs as empty responses', () => {

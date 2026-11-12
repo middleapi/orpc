@@ -1010,7 +1010,8 @@ describe('openAPIGenerator operation builders', () => {
         201: {
           description: 'created',
           headers: {
-            'x-id': { required: true, schema: { type: 'string' } },
+            // the second 201 member sends no headers
+            'x-id': { schema: { type: 'string' } },
           },
           content: {
             'application/json': {
@@ -1032,6 +1033,88 @@ describe('openAPIGenerator operation builders', () => {
             'x-opt': { schema: { type: 'string' } },
           },
         },
+      })
+    })
+
+    it('requires the headers every detailed member of a status sends', () => {
+      const { ctx, operation } = createContext()
+      const headers = (required: string[]) => ({
+        type: 'object',
+        properties: { 'x-id': { type: 'string' }, 'x-opt': { type: 'string' } },
+        required,
+      })
+
+      buildSuccessResponse(
+        ctx,
+        operation,
+        testDef({
+          outputs: [
+            testSchema({
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: { status: { const: 201 }, headers: headers(['x-id', 'x-opt']) },
+                  required: ['status', 'headers'],
+                },
+                {
+                  type: 'object',
+                  properties: { status: { const: 201 }, headers: headers(['x-id']) },
+                  required: ['status', 'headers'],
+                },
+                {
+                  type: 'object',
+                  properties: { headers: headers(['x-id']) },
+                  required: [],
+                },
+                {
+                  type: 'object',
+                  properties: { status: { const: 202 } },
+                  required: ['status'],
+                },
+              ],
+            }),
+          ],
+        }),
+        { outputStructure: 'detailed' },
+      )
+
+      expect(operation.responses?.['201']?.headers).toEqual({
+        'x-id': { required: true, schema: { type: 'string' } },
+        'x-opt': { schema: { type: 'string' } },
+      })
+      // a member whose headers may be left out sends none
+      expect(operation.responses?.['200']?.headers).toEqual({
+        'x-id': { schema: { type: 'string' } },
+        'x-opt': { schema: { type: 'string' } },
+      })
+      expect(operation.responses?.['202']?.headers).toBeUndefined()
+    })
+
+    it('documents a detailed body once when members of a status share it', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(
+        ctx,
+        operation,
+        testDef({
+          outputs: [
+            testSchema({
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: { headers: { type: 'object' }, body: { type: 'string' } },
+                  required: ['headers', 'body'],
+                },
+                { type: 'object', properties: { body: { type: 'string' } }, required: ['body'] },
+              ],
+            }),
+          ],
+        }),
+        { outputStructure: 'detailed' },
+      )
+
+      expect(operation.responses?.['200']?.content).toEqual({
+        'application/json': { schema: { type: 'string' } },
       })
     })
 

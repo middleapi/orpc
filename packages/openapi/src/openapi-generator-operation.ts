@@ -9,6 +9,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   containsJsonFileSchema,
+  deduplicateJsonSchemas,
   extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
@@ -395,7 +396,7 @@ export function buildSuccessResponse(
       responseObject.content = toBodyContent(
         ctx,
         'output',
-        combineJsonSchemasWithComposition('anyOf', parts.bodies),
+        combineJsonSchemasWithComposition('anyOf', deduplicateJsonSchemas(parts.bodies)),
       )
     }
 
@@ -467,7 +468,8 @@ function extractDetailedResponseParts(
       statuses.set(defaultStatus, undefined)
     }
 
-    const headersSchema = entries.find(([name]) => name === 'headers')?.[1]
+    const [, headersSchema, headersOptional = true] =
+      entries.find(([name]) => name === 'headers') ?? []
     const bodySchema = entries.find(([name]) => name === 'body')?.[1]
 
     for (const [status, description] of statuses) {
@@ -483,6 +485,11 @@ function extractDetailedResponseParts(
 
       if (headersSchema !== undefined) {
         parts.headers.push(headersSchema)
+      }
+
+      // a member that may send no headers sends none of those of its status that others require
+      if (headersOptional) {
+        parts.headers.push({ type: 'object' })
       }
 
       if (bodySchema !== undefined) {

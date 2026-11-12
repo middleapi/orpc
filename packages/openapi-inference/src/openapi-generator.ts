@@ -557,10 +557,14 @@ export class OpenAPIGenerator {
             iterator?.yieldSchemas ?? [],
             iteratorTypes.map((t) => t.yieldTypes),
           )
-          const returns = complete(
-            iterator?.returnSchemas ?? [],
-            iteratorTypes.map((t) => (hasReturn(t.returnTypes) ? t.returnTypes : undefined)),
-          )
+          // iterators returning nothing (`void`) close without data
+          const returns =
+            !iterator?.returnSchemas.length && iteratorTypes.every((t) => !t.returnTypes.length)
+              ? [inferredSchema([{ not: {} }, true])]
+              : complete(
+                  iterator?.returnSchemas ?? [],
+                  iteratorTypes.map((t) => (hasReturn(t.returnTypes) ? t.returnTypes : undefined)),
+                )
 
           return Array.from({ length: Math.max(yields.length, returns.length) }, (_, i) =>
             asyncIteratorObject(yields[i] ?? yields[0]!, returns[i]),
@@ -649,7 +653,10 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
     output: {
       inlineRoot: outputDetailed,
       inlineProperties: outputDetailed ? ['status', 'headers'] : undefined,
-      partialProperties: outputDetailed ? ['headers'] : undefined,
+      // what a member leaves out (`status?: undefined` of a union of object literals) is not sent,
+      // and the stock generator reads which headers each status sends from its members
+      separateRootFields: outputDetailed,
+      separateProperties: outputDetailed ? ['headers'] : undefined,
       body: true,
       bodyProperty: outputDetailed,
     },

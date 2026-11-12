@@ -20,6 +20,7 @@ import {
 } from '../tests/fixtures/app/src/round75'
 import { roundSeventySevenInputs } from '../tests/fixtures/app/src/round77'
 import { roundSeventyEightInputs } from '../tests/fixtures/app/src/round78'
+import { roundEightyTwoDetailed, roundEightyTwoStreams } from '../tests/fixtures/app/src/round82'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -3516,5 +3517,100 @@ describe('rings of deep views of classes', async () => {
     expect(names.filter((name) => name.startsWith('DeepNull_')).toSorted()).toEqual(
       ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((letter) => `DeepNull_NullRing${letter}`),
     )
+  })
+})
+
+/**
+ * Runs detailed outputs and event iterators of round 82 and checks each response against what is
+ * documented for its status: its body, no content for no body, and the headers required.
+ */
+describe('round eighty-two', async () => {
+  const file = new URL('../tests/fixtures/app/src/round82.ts', import.meta.url)
+  const generate = (exported: string, router: any) =>
+    new OpenAPIGenerator().generate(router, { source: { file, export: exported } })
+  const compile = (spec: any, schema: unknown) =>
+    new Ajv2020({ strict: false, allErrors: true }).compile(
+      JSON.parse(
+        JSON.stringify({ $defs: spec.components?.schemas ?? {}, ...(schema as object) }).replaceAll(
+          '#/components/schemas/',
+          '#/$defs/',
+        ),
+      ),
+    )
+
+  describe('detailed outputs', async () => {
+    const spec: any = await generate('roundEightyTwoDetailed', roundEightyTwoDetailed)
+    const handler = new OpenAPIHandler(roundEightyTwoDetailed)
+
+    it.each(
+      Object.keys(roundEightyTwoDetailed).flatMap((name) => [
+        [name, false],
+        [name, true],
+      ]),
+    )('documents the response of %s (explicit: %s) as it is sent', async (name, explicit) => {
+      const { response } = await handler.handle(
+        new Request(`http://localhost/${name}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ explicit }),
+        }),
+      )
+      const documented = spec.paths[`/${name}`].post.responses[String(response!.status)]
+      const text = await response!.text()
+
+      expect(documented).toBeDefined()
+      if (text === '') {
+        expect(documented.content).toBeUndefined()
+      } else {
+        const validate = compile(spec, documented.content['application/json'].schema)
+        expect(validate(JSON.parse(text)) ? [] : validate.errors).toEqual([])
+      }
+      for (const [header, { required }] of Object.entries<any>(documented.headers ?? {})) {
+        if (required) {
+          expect(response!.headers.has(header)).toBe(true)
+        }
+      }
+    })
+
+    it('requires the headers every member of a status sends', () => {
+      expect(spec.paths['/created'].post.responses['201'].headers.location.required).toBe(true)
+      expect(spec.paths['/etag'].post.responses['304'].headers.etag.required).toBe(true)
+      expect(spec.paths['/sameStatus'].post.responses['200'].headers['x-a'].required).toBe(
+        undefined,
+      )
+    })
+  })
+
+  describe('event iterators returning nothing', async () => {
+    const spec: any = await generate('roundEightyTwoStreams', roundEightyTwoStreams)
+
+    it.each(Object.keys(roundEightyTwoStreams))('documents the events of %s', async (name) => {
+      const validate = compile(
+        spec,
+        spec.paths[`/${name}`].post.responses['200'].content['text/event-stream'].schema,
+      )
+      const iterator: AsyncIterator<unknown> = await call(
+        (roundEightyTwoStreams as any)[name],
+        undefined,
+      )
+      const serialize = (value: unknown) =>
+        JSON.parse(JSON.stringify(new OpenAPIJsonSerializer().serializeJson(value).json) ?? 'null')
+
+      for (let result = await iterator.next(); ; result = await iterator.next()) {
+        const event = result.done
+          ? {
+              event: 'close',
+              ...(result.value === undefined ? {} : { data: serialize(result.value) }),
+            }
+          : { event: 'message', data: serialize(result.value) }
+        expect(validate(event) ? [] : validate.errors).toEqual([])
+        if (result.done) {
+          break
+        }
+      }
+
+      // a close event never carries data
+      expect(validate({ event: 'close', data: null })).toBe(false)
+    })
   })
 })
