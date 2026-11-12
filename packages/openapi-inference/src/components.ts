@@ -77,14 +77,7 @@ export function mergeEquivalentComponents(
   // the stock generator keys components by valid names (`_Role` of `$Role`)
   const names = toValidDefNameRecord(defNameRecord)
   const rename = !componentName
-  const defNames =
-    givenDefNames &&
-    new Map(
-      [...givenDefNames].map(([name, def]) => [
-        toValidComponentName(name),
-        toValidComponentName(def),
-      ]),
-    )
+  const defNames = toValidMap(givenDefNames)
 
   // a def whose name (or the one `componentName` gave it) a component of `base` has is given one of
   // a direction by the stock generator (`RoleInput`), which the other direction reuses: it is
