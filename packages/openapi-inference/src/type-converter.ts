@@ -725,17 +725,13 @@ export class TypeToJsonSchemaConverter {
         ? namedSymbol
         : undefined
 
-    // a view of a project class (`Readonly<User>`) is shared by the models referring to it,
-    // so it is written once, like the class
-    const viewName =
-      this.defsMode === 'named' && !projectSymbol ? this.getProjectClassViewName(type) : undefined
-
-    if (
-      this.defsMode === 'named' &&
-      (projectSymbol || viewName) &&
-      !(type.flags & TypeFlags.Boolean)
-    ) {
-      return this.visitNamed(type, key, projectSymbol, viewName)
+    if (this.defsMode === 'named' && !(type.flags & TypeFlags.Boolean)) {
+      // a view of a project class (`Readonly<User>`) is shared by the models referring to it,
+      // so it is written once, like the class
+      const viewName = projectSymbol ? undefined : this.getProjectClassViewName(type)
+      if (projectSymbol || viewName) {
+        return this.visitNamed(type, key, projectSymbol, viewName)
+      }
     }
 
     return this.visitAnonymous(type, key, projectSymbol)
@@ -813,6 +809,8 @@ export class TypeToJsonSchemaConverter {
       this.cycles.leave(key, enteredAt)
     }
 
+    // a cut expansion depends on where the conversion started, so it is not reused
+    const stable = cuts === this.expansion.cuts
     schema = this.annotate(schema, projectSymbol)
 
     // a self reference was found while converting, so the type became a def
@@ -821,7 +819,7 @@ export class TypeToJsonSchemaConverter {
     if (def) {
       if (def.schema === undefined) {
         def.schema = schema
-        def.stable = cuts === this.expansion.cuts
+        def.stable = stable
       }
       return { $ref: toRef(def.name) }
     }
@@ -840,7 +838,7 @@ export class TypeToJsonSchemaConverter {
     if (lostAlias) {
       const created = this.defs.create(key, lostAlias.name)
       created.schema = this.annotate(schema, lostAlias)
-      created.stable = cuts === this.expansion.cuts
+      created.stable = stable
       this.defs.reclaimName(created, lostAlias.name)
       const shared = this.defs.share(created, lostAlias.name)
       this.names.aliased.add(shared.name)
@@ -859,12 +857,12 @@ export class TypeToJsonSchemaConverter {
     if (cycleName !== undefined && this.defs.refersToConverting(schema)) {
       const created = this.defs.create(key, cycleName)
       created.schema = schema
-      created.stable = cuts === this.expansion.cuts
+      created.stable = stable
       return { $ref: toRef(created.name) }
     }
 
     // reuse it for siblings, `{ a: C<N>; b: C<N> }` would otherwise grow exponentially in time
-    if (enteredAt === undefined && cuts === this.expansion.cuts) {
+    if (enteredAt === undefined && stable) {
       this.defs.setAnonymous(key, schema)
     }
 
@@ -913,7 +911,9 @@ export class TypeToJsonSchemaConverter {
       }
 
       // `JSON.stringify` throws on a bigint, unless `BigInt.prototype.toJSON` is polyfilled
-      const toJSONResults = this.getBigIntToJSONResultTypes()
+      // (`declare global { interface BigInt { toJSON(): string } }`)
+      const bigint = this.types.getGlobalType('BigInt')
+      const toJSONResults = bigint ? getToJSONResultTypes(this.types, bigint, true) : []
       const stringified = toJSONResults.length
         ? anyOfDeduped(this.convertToJSONResults(toJSONResults))
         : undefined
@@ -2248,13 +2248,20 @@ export class TypeToJsonSchemaConverter {
       }
     }
 
-    // a returned built-in is written by its own fields, also through `Readonly<Date>`
-    const fields = this.convertBuiltinFields(resolved)
-    return fields === undefined
-      ? this.convertObject(resolved, { ignoreToJSON: true })
-      : plainForm
-        ? this.withPlainResult(resolved, fields)
-        : fields
+    // a returned built-in is written by its own fields, also through `Readonly<Date>`. A library
+    // interface describing other values (`ArrayLike<string>`) is written by its members, or as any
+    // object of an instance of a runtime class implementing it, whose getters are not written
+    // (`Body` of a `Response`).
+    const builtinFields = getBuiltinFields(this.types, resolved)
+    if (builtinFields === undefined) {
+      return this.convertObject(resolved, { ignoreToJSON: true })
+    }
+
+    const fields =
+      builtinFields === 'members'
+        ? withAnyObject(this.convertObject(resolved, { ignoreToJSON: true }))
+        : builtinFields
+    return plainForm ? this.withPlainResult(resolved, fields) : fields
   }
 
   /**
@@ -2268,28 +2275,6 @@ export class TypeToJsonSchemaConverter {
           this.convertObject(type, { ignoreToJSON: true, plain: true, ownFields: true }),
         ])
       : builtin
-  }
-
-  /**
-   * What `JSON.stringify` writes of a returned built-in by its own fields. A library interface
-   * describing other values (`ArrayLike<string>`) is written by its members, or as any object of
-   * an instance of a runtime class implementing it, whose getters are not written (`Body` of a `Response`).
-   */
-  private convertBuiltinFields(type: Type): JsonSchema | undefined {
-    const fields = getBuiltinFields(this.types, type)
-
-    return fields === 'members'
-      ? withAnyObject(this.convertObject(type, { ignoreToJSON: true }))
-      : fields
-  }
-
-  /**
-   * What a polyfilled `BigInt.prototype.toJSON` returns, declared with
-   * `declare global { interface BigInt { toJSON(): string } }`.
-   */
-  private getBigIntToJSONResultTypes(): readonly Type[] {
-    const bigint = this.types.getGlobalType('BigInt')
-    return bigint ? getToJSONResultTypes(this.types, bigint, true) : []
   }
 
   /**
