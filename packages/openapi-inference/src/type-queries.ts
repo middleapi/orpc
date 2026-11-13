@@ -185,11 +185,7 @@ export class TypeQueries {
    * Caches a result by the id of a type or symbol (or a name), under a kind of question.
    */
   memo<T>(kind: string, id: number | string, compute: () => T): T {
-    return getOrCreate(
-      getOrCreate(this.memos, kind, () => new Map()),
-      id,
-      compute,
-    ) as T
+    return getOrCreate(getOrCreate(this.memos, kind, createMap), id, compute) as T
   }
 
   /**
@@ -1166,7 +1162,7 @@ export class TypeQueries {
    */
   getLostAlias(type: Type): TSSymbol | undefined {
     const symbol = type.getSymbol()?.id ?? -1
-    getOrCreate(this.askedTypes, symbol, () => new Map()).set(type.id, type)
+    getOrCreate(this.askedTypes, symbol, createMap).set(type.id, type)
 
     const aliases = this.lostAliases.get(symbol)
     const own = aliases?.get(type.id)
@@ -1215,7 +1211,7 @@ export class TypeQueries {
    */
   private addLostAlias(type: Type, alias: TSSymbol): void {
     const symbol = type.getSymbol()?.id ?? -1
-    const aliases = getOrCreate(this.lostAliases, symbol, () => new Map())
+    const aliases = getOrCreate(this.lostAliases, symbol, createMap)
 
     const existing = aliases.get(type.id)?.[1]
     const preferred = preferAlias(existing, alias)
@@ -1409,6 +1405,10 @@ function preferAlias(a: TSSymbol | undefined, b: TSSymbol): TSSymbol {
         (declarationB.path === declarationA.path && declarationB.index < declarationA.index)))
     ? b
     : a
+}
+
+function createMap<K, V>(): Map<K, V> {
+  return new Map()
 }
 
 /** Types without repeats by their ids, in the order they come first */

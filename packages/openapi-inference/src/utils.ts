@@ -181,11 +181,14 @@ export function getOrCreate<K, V>(
   key: K,
   create: () => NoInfer<V>,
 ): V {
-  if (!map.has(key)) {
-    map.set(key, create())
+  const value = map.get(key)
+  if (value !== undefined || map.has(key)) {
+    return value as V
   }
 
-  return map.get(key) as V
+  const created = create()
+  map.set(key, created)
+  return created
 }
 
 export function resolveAlias(checker: Checker, symbol: TSSymbol): TSSymbol {
