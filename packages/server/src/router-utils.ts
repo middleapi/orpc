@@ -356,7 +356,11 @@ export async function walkProcedureContractsAsync(
 export type UnlaziedRouter<T extends AnyRouter> = T extends AnyProcedure
   ? T
   : {
-      [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? UnlaziedRouter<U> : never
+      [K in keyof T]: T[K] extends AnyRouter
+        ? UnlaziedRouter<T[K]>
+        : T[K] extends Lazyable<infer U extends AnyRouter>
+          ? UnlaziedRouter<U>
+          : never
     }
 
 /**
