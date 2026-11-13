@@ -327,29 +327,26 @@ export class TypeQueries {
    * (`T extends object ? { readonly [K in keyof T]: ... } : T` over `Pick<Id, '__brand'>`).
    */
   getBrandedOwners(type: Type): readonly Type[] {
-    return this.memo('brandedOwners', type.id, (): readonly Type[] => {
-      const owners = new Map<number, Type>()
+    return this.memo('brandedOwners', type.id, (): readonly Type[] =>
+      uniqueTypes(
+        this.getProperties(type).flatMap((p) =>
+          p.declarations.map((declaration) => {
+            const literal = (declaration.resolve() as any)?.parent
+            const intersection =
+              literal?.kind === SyntaxKind.TypeLiteral ? literal.parent : undefined
+            const owner =
+              intersection?.kind === SyntaxKind.IntersectionType
+                ? this.checker.getTypeAtLocation(intersection)
+                : undefined
 
-      for (const p of this.getProperties(type)) {
-        for (const declaration of p.declarations) {
-          const literal = (declaration.resolve() as any)?.parent
-          const intersection = literal?.kind === SyntaxKind.TypeLiteral ? literal.parent : undefined
-          const owner =
-            intersection?.kind === SyntaxKind.IntersectionType
-              ? this.checker.getTypeAtLocation(intersection)
+            return owner?.isIntersectionType() &&
+              this.getMembers(owner).some((m) => m.flags & PRIMITIVE_FLAGS)
+              ? owner
               : undefined
-
-          if (
-            owner?.isIntersectionType() &&
-            this.getMembers(owner).some((m) => m.flags & PRIMITIVE_FLAGS)
-          ) {
-            owners.set(owner.id, owner)
-          }
-        }
-      }
-
-      return [...owners.values()]
-    })
+          }),
+        ),
+      ),
+    )
   }
 
   /**
@@ -422,21 +419,15 @@ export class TypeQueries {
    */
   getPropertyOwners(type: Type): readonly Type[] {
     return this.memo('propertyOwners', type.id, (): readonly Type[] => {
-      const owners = new Map<number, Type>()
-
-      for (const p of this.getProperties(type)) {
-        // also of the other declarations of a property of an intersection (the brand
-        // redeclaring the `length` of `string & { length: 8 }`)
-        for (const declaration of p.declarations) {
-          const ownerType = this.getDeclarationOwner(p, true, declaration)
-          if (ownerType !== undefined) {
-            owners.set(ownerType.id, ownerType)
-          }
-        }
-      }
-
+      // also of the other declarations of a property of an intersection (the brand
+      // redeclaring the `length` of `string & { length: 8 }`)
+      const owners = uniqueTypes(
+        this.getProperties(type).flatMap((p) =>
+          p.declarations.map((declaration) => this.getDeclarationOwner(p, true, declaration)),
+        ),
+      )
       const keys = new Map(
-        [...owners.values()].map((o) => [o, new Set(this.getProperties(o).map((p) => p.name))]),
+        owners.map((o) => [o, new Set(this.getProperties(o).map((p) => p.name))]),
       )
 
       // the most derived of the owners holding the same properties. A brand narrowing members
@@ -1028,17 +1019,8 @@ export class TypeQueries {
       return undefined
     }
 
-    const owners = new Map<number, Type>()
-
-    for (const p of properties) {
-      const owner = this.getDeclarationOwner(p)
-      if (owner) {
-        owners.set(owner.id, owner)
-      }
-    }
-
     // the most derived owner, which has every property
-    for (const candidate of owners.values()) {
+    for (const candidate of uniqueTypes(properties.map((p) => this.getDeclarationOwner(p)))) {
       const keys = new Set(this.getProperties(candidate).map((p) => p.name))
 
       if (properties.every((p) => keys.has(p.name))) {
@@ -1425,6 +1407,11 @@ function preferAlias(a: TSSymbol | undefined, b: TSSymbol): TSSymbol {
         (declarationB.path === declarationA.path && declarationB.index < declarationA.index)))
     ? b
     : a
+}
+
+/** Types without repeats by their ids, in the order they come first */
+function uniqueTypes(types: readonly (Type | undefined)[]): Type[] {
+  return [...new Map(types.flatMap((t) => (t ? [[t.id, t] as const] : []))).values()]
 }
 
 /** Whether comparing a value with its source may nest deeper: a union or a mapped type */
