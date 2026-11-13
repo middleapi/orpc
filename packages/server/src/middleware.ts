@@ -10,8 +10,8 @@ export interface MiddlewareResultValue<TOutContext extends Context, TOutput> {
 }
 
 export type MiddlewareResult<TOutContext extends Context, TOutput> =
-  | MiddlewareResultValue<TOutContext, TOutput>
   | Promise<MiddlewareResultValue<TOutContext, TOutput>>
+  | MiddlewareResultValue<TOutContext, TOutput>
 
 export type MiddlewareNextOptions<TOutContext extends Context> = (object extends TOutContext
   ? { context?: TOutContext | undefined }
