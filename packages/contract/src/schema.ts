@@ -20,18 +20,22 @@ export type SchemaIssue = StandardSchemaV1.Issue
  *
  * @see {@link https://orpc.dev/docs/metadata | Metadata}
  */
-export type InferSchemaInput<T extends AnySchema> = 0 extends 1 & T
-  ? unknown
-  : NonNullable<T['~standard']['types']>['input']
+export type InferSchemaInput<T extends AnySchema> = T extends unknown
+  ? 0 extends 1 & T
+    ? unknown
+    : NonNullable<T['~standard']['types']>['input']
+  : never
 
 /**
  * Infers the output type of a schema.
  *
  * @see {@link https://orpc.dev/docs/metadata | Metadata}
  */
-export type InferSchemaOutput<T extends AnySchema> = 0 extends 1 & T
-  ? unknown
-  : NonNullable<T['~standard']['types']>['output']
+export type InferSchemaOutput<T extends AnySchema> = T extends unknown
+  ? 0 extends 1 & T
+    ? unknown
+    : NonNullable<T['~standard']['types']>['output']
+  : never
 
 export type MergedSchema<T extends AnySchema, U extends AnySchema> =
   T extends Schema<infer TInput, infer TOutput>
