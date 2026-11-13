@@ -179,7 +179,7 @@ export interface SharedRouterImplementerWithMiddlewares<
     router: T,
   ): AugmentedRouterWithMiddlewares<T, TInitialContext, TInjectedContext, object>
 
-  lazy<T extends ContractedRouter<TContract, any>>(
+  lazy<T extends ContractedRouter<TContract, MergedContext<TInitialContext, TInjectedContext>>>(
     loader: () => Promise<{ default: T }>,
   ): Lazy<AugmentedRouterWithMiddlewares<T, TInitialContext, TInjectedContext, object>>
 }
