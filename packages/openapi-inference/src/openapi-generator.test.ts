@@ -1595,6 +1595,23 @@ describe('openAPIGenerator', () => {
     expect(meta('/overridden')).toEqual({ summary: 'Own JSDoc wins', description: undefined })
   })
 
+  it('documents a router that is a single procedure', async () => {
+    const { pong } = await import('../tests/fixtures/app/src/routers/pong')
+    const spec = await generator.generate(pong, {
+      source: { file: fixture('routers/pong.ts'), export: 'pong' },
+    })
+
+    expect(spec.paths?.['/']?.post).toMatchObject({
+      summary: 'Pong',
+      description: 'Answers with pong.',
+      responses: { 200: { content: { 'application/json': { schema: { type: 'string' } } } } },
+    })
+
+    await expect(
+      generator.generate(pong, { source: { file: fixture('shorthand.ts') } }),
+    ).rejects.toThrow(/Procedure at \(root\): its type ".*" is not a procedure or contract/)
+  })
+
   describe('router types', () => {
     const OK = {
       'application/json': {
