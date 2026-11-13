@@ -5,7 +5,6 @@ import type {
   ProcedureContractDefinition,
 } from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
-import type { Promisable } from '@orpc/shared'
 import { getConstructor } from '@orpc/shared'
 
 import type { Context } from './context'
@@ -31,10 +30,13 @@ export interface ProcedureHandler<
   THandlerOutput,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
 > {
+  // `Promise` comes before `PromiseLike` so async handlers are inferred against it
+  // directly instead of structurally against `PromiseLike`, which is much cheaper
+  // to type-check. `PromiseLike` keeps thenables (e.g. query builders) working.
   (
     opts: ProcedureHandlerOptions<TCurrentContext, TInput, TErrorConstructorMap>,
     input: TInput,
-  ): Promisable<THandlerOutput>
+  ): THandlerOutput | Promise<THandlerOutput> | PromiseLike<THandlerOutput>
 }
 
 export interface OrderedMiddleware {

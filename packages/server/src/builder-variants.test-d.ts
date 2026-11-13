@@ -719,6 +719,13 @@ describe('BuilderWithOutput', () => {
         return 'invalid'
       })
     })
+
+    it('accepts a returned thenable', () => {
+      void builder.handler(() => ({}) as PromiseLike<{ schema2: number }>)
+
+      // @ts-expect-error - output is invalid
+      void builder.handler(() => ({}) as PromiseLike<string>)
+    })
   })
 })
 
