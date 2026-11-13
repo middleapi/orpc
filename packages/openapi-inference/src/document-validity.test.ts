@@ -6,12 +6,12 @@ import { Ajv2020 } from 'ajv/dist/2020.js'
 
 import { router as bunRouter } from '../../../playgrounds/bun/src/routers/index'
 import { builtinTypes } from '../tests/fixtures/app/src/builtin-types'
+import { classViews } from '../tests/fixtures/app/src/class-views'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
+import { detailedUnions } from '../tests/fixtures/app/src/detailed-unions'
 import { router as headersRouter } from '../tests/fixtures/app/src/headers'
-import { roundTwentySix } from '../tests/fixtures/app/src/round26'
-import { roundSixtyEight } from '../tests/fixtures/app/src/round68'
-import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
 import { router } from '../tests/fixtures/app/src/router'
+import { splitParameters } from '../tests/fixtures/app/src/standard-schemas'
 import type { OpenAPIGeneratorOptions } from './openapi-generator'
 import { OpenAPIGenerator } from './openapi-generator'
 
@@ -40,9 +40,9 @@ const ROUTERS: [name: string, router: AnyRouter, file: URL, exportName: string][
   ['built-in types', builtinTypes, fixture('builtin-types.ts'), 'builtinTypes'],
   ['detailed', detailedRouter, fixture('detailed.ts'), 'router'],
   ['headers', headersRouter, fixture('headers.ts'), 'router'],
-  ['deep views', roundTwentySix, fixture('round26.ts'), 'roundTwentySix'],
-  ['loose parameters', roundSixtyEight, fixture('round68.ts'), 'roundSixtyEight'],
-  ['detailed bodies', roundSeventyNine, fixture('round79.ts'), 'roundSeventyNine'],
+  ['deep views', classViews, fixture('class-views.ts'), 'classViews'],
+  ['loose parameters', splitParameters, fixture('standard-schemas.ts'), 'splitParameters'],
+  ['detailed bodies', detailedUnions, fixture('detailed-unions.ts'), 'detailedUnions'],
   [
     'bun playground',
     bunRouter,

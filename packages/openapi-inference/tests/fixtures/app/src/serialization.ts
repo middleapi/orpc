@@ -2,48 +2,48 @@ import { os, type } from '@orpc/server'
 import type { FixedLengthArray, Jsonifiable, Tagged } from 'type-fest'
 import * as z from 'zod'
 
-import { roundTwentyFive } from './round25'
-import { roundTwentySix } from './round26'
-import { roundTwentySeven } from './round27'
-import { roundTwentyEight } from './round28'
-import { roundTwentyNine } from './round29'
-import { roundThirty } from './round30'
-import { roundThirtyOne } from './round31'
-import { roundThirtyTwo } from './round32'
-import { roundThirtyThree } from './round33'
-import { roundThirtyFive } from './round35'
-import { roundThirtySix } from './round36'
-import { roundThirtySeven } from './round37'
-import { roundThirtyNine } from './round39'
-import { roundFortyTwo } from './round42'
-import { roundFortyFour } from './round44'
-import { roundFortySix } from './round46'
-import { roundFortySeven } from './round47'
-import { roundFortyEight } from './round48'
-import { roundFifty } from './round50'
-import { roundFiftyOne } from './round51'
-import { roundFiftyTwo } from './round52'
-import { roundFiftyThree } from './round53'
-import { roundFiftyFour } from './round54'
-import { roundFiftyFive } from './round55'
-import { roundFiftySix } from './round56'
-import { roundFiftySeven } from './round57'
-import { roundSixty } from './round60'
-import { roundSixtyOne } from './round61'
-import { roundSixtyThree } from './round63'
-import { roundSixtyFour } from './round64'
-import { roundSixtyFive } from './round65'
-import { roundSixtySix } from './round66'
-import { roundSixtySeven } from './round67'
-import { roundSeventyOne } from './round71'
-import { roundSeventyTwo } from './round72'
-import { roundSeventyThree } from './round73'
-import { roundSeventyFour } from './round74'
-import { roundSeventyFive } from './round75'
-import { roundSeventySix } from './round76'
-import { roundSeventySeven } from './round77'
-import { roundSeventyEight } from './round78'
-import { roundEighty } from './round80'
+import { addedToJson } from './added-tojson'
+import { arktypeBrands } from './arktype-brands'
+import { arrayLikeViews } from './array-like-views'
+import { bodyBuiltins } from './body-builtins'
+import { boxedViews } from './boxed-views'
+import { brandedPrimitiveViews } from './branded-views'
+import { viewsOfBuiltins } from './builtin-views'
+import { classViews } from './class-views'
+import { clientValues } from './client-values'
+import { collectionViews } from './collection-views'
+import { dateViews } from './date-views'
+import { deepPartialBrands } from './deep-partial-brands'
+import { deepMappedViews } from './deep-views'
+import { discriminatedUnions } from './discriminated-unions'
+import { effectBrands } from './effect-brands'
+import { errorSubtypes } from './error-interfaces'
+import { errorToJson } from './error-tojson'
+import { errorViews } from './error-views'
+import { viewedFunctions } from './function-views'
+import { genericBrands } from './generic-brands'
+import { genericCycles } from './generic-cycles'
+import { infinityLimits } from './infinity-limits'
+import { interfaceBodies } from './interface-bodies'
+import { intersectedToJson } from './intersected-tojson'
+import { keyedMappedTypes } from './keyed-mapped-types'
+import { libraryToJson } from './library-tojson'
+import { linkedCycles } from './linked-cycles'
+import { nestedBrands } from './nested-brands'
+import { nestedPages } from './nested-pages'
+import { nonFunctionToJson } from './non-function-tojson'
+import { ormModels } from './orm-models'
+import { ownToJson } from './own-tojson'
+import { primitiveViews } from './primitive-views'
+import { procedureOrder } from './procedure-order'
+import { sizedTypes } from './sized-types'
+import { templateIndexes } from './template-indexes'
+import { toJsonViews } from './tojson-views'
+import { tupleKeys } from './tuple-keys'
+import { undefinedToJson } from './undefined-tojson'
+import { viewIntersections } from './view-intersections'
+import { weakCollections } from './weak-collections'
+import { widenedMappedViews } from './widened-views'
 
 export interface Author {
   id: string
@@ -1019,7 +1019,7 @@ export const router = {
       assignedDate: new ReturnsAssignedDate(),
     }),
   ),
-  roundTwentyThree: os.handler(
+  aliasedViews: os.handler(
     (): {
       assignedJSON: Point & { toJSON: () => number }
       pickedDerived: PickedDerived
@@ -1055,46 +1055,46 @@ export const router = {
       holder: { tags: new Set(['t']), at: new Date(0) },
     }),
   ),
-  ...roundTwentyFive,
-  ...roundTwentySix,
-  ...roundTwentySeven,
-  ...roundTwentyEight,
-  ...roundTwentyNine,
-  ...roundThirty,
-  ...roundThirtyOne,
-  ...roundThirtyTwo,
-  ...roundThirtyThree,
-  ...roundThirtyFive,
-  ...roundThirtySix,
-  ...roundThirtySeven,
-  ...roundThirtyNine,
-  ...roundFortyTwo,
-  ...roundFortyFour,
-  ...roundFortySix,
-  ...roundFortySeven,
-  ...roundFortyEight,
-  ...roundFifty,
-  ...roundFiftyOne,
-  ...roundFiftyTwo,
-  ...roundFiftyThree,
-  ...roundFiftyFour,
-  ...roundFiftyFive,
-  ...roundFiftySix,
-  ...roundFiftySeven,
-  ...roundSixty,
-  ...roundSixtyOne,
-  ...roundSixtyThree,
-  ...roundSixtyFour,
-  ...roundSixtyFive,
-  ...roundSixtySix,
-  ...roundSixtySeven,
-  ...roundSeventyOne,
-  ...roundSeventyTwo,
-  ...roundSeventyThree,
-  ...roundSeventyFour,
-  ...roundSeventyFive,
-  ...roundSeventySix,
-  ...roundSeventySeven,
-  ...roundSeventyEight,
-  ...roundEighty,
+  ...viewsOfBuiltins,
+  ...classViews,
+  ...deepMappedViews,
+  ...viewIntersections,
+  ...widenedMappedViews,
+  ...nonFunctionToJson,
+  ...arrayLikeViews,
+  ...primitiveViews,
+  ...brandedPrimitiveViews,
+  ...clientValues,
+  ...nestedPages,
+  ...genericCycles,
+  ...discriminatedUnions,
+  ...libraryToJson,
+  ...linkedCycles,
+  ...addedToJson,
+  ...undefinedToJson,
+  ...errorToJson,
+  ...dateViews,
+  ...intersectedToJson,
+  ...ownToJson,
+  ...errorSubtypes,
+  ...toJsonViews,
+  ...collectionViews,
+  ...boxedViews,
+  ...errorViews,
+  ...weakCollections,
+  ...procedureOrder,
+  ...viewedFunctions,
+  ...deepPartialBrands,
+  ...keyedMappedTypes,
+  ...genericBrands,
+  ...nestedBrands,
+  ...infinityLimits,
+  ...tupleKeys,
+  ...arktypeBrands,
+  ...sizedTypes,
+  ...effectBrands,
+  ...templateIndexes,
+  ...bodyBuiltins,
+  ...interfaceBodies,
+  ...ormModels,
 }

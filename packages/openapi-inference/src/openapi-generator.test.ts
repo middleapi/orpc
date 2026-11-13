@@ -20,7 +20,25 @@ import { Checker, Program } from 'typescript/unstable/sync'
 import * as z from 'zod'
 
 import { canGenerateWithin, generateWithin } from '../tests/bounded-generate'
+import {
+  FunctionHolder,
+  jsonFn,
+  JsonFnForms,
+  JsonFnHolder,
+  MaybeStampHolder,
+  addedToJsonInputs,
+  StampHolder,
+} from '../tests/fixtures/app/src/added-tojson'
+import { anySubRouter, anyExport, givenLazy, anyLazy } from '../tests/fixtures/app/src/any-routers'
+import { arrayLikeViewsInputs } from '../tests/fixtures/app/src/array-like-views'
+import {
+  boxedViewResults,
+  readonlySets,
+  boxedViewsInputs,
+} from '../tests/fixtures/app/src/boxed-views'
+import { brandedPrimitiveViewsInputs } from '../tests/fixtures/app/src/branded-views'
 import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
+import { StringRows, viewInputs } from '../tests/fixtures/app/src/builtin-views'
 import {
   classInputs,
   Guarded,
@@ -34,9 +52,137 @@ import {
   Stamp,
   Tagged,
 } from '../tests/fixtures/app/src/class-inputs'
+import {
+  callables,
+  FullName,
+  instanceInputs,
+  LabeledStamp,
+} from '../tests/fixtures/app/src/class-views'
+import { clientValuesInputs } from '../tests/fixtures/app/src/client-values'
+import {
+  booleanViews,
+  labeledViews,
+  plainLabeledViews,
+  collectionViewsInputs,
+} from '../tests/fixtures/app/src/collection-views'
 import { contract, implemented } from '../tests/fixtures/app/src/contract'
+import {
+  AddedDateViewHolder,
+  DateViewHolder,
+  dateViewsInputs,
+  UndefPointImpl,
+} from '../tests/fixtures/app/src/date-views'
+import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/deep-views'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
+import { router as detailedStatusesRouter } from '../tests/fixtures/app/src/detailed-statuses'
+import { detailedUnions } from '../tests/fixtures/app/src/detailed-unions'
+import {
+  discriminatedUnions,
+  discriminatedUnionsInputs,
+} from '../tests/fixtures/app/src/discriminated-unions'
+import { emptyPartsInputs } from '../tests/fixtures/app/src/empty-parts'
+import {
+  codedErrors,
+  messageTags,
+  plainTaggedError,
+  relays,
+  errorSubtypesInputs,
+  taggedError,
+} from '../tests/fixtures/app/src/error-interfaces'
+import {
+  JsonPointImpl,
+  labelledBytes,
+  labelledError,
+  errorToJsonInputs,
+} from '../tests/fixtures/app/src/error-tojson'
+import {
+  boxedInterfaces,
+  errorViewJsons,
+  jsonFns,
+  plainBoxedInterfaces,
+  plainErrorViewJsons,
+  errorViewsInputs,
+} from '../tests/fixtures/app/src/error-views'
+import {
+  viewedFunctions,
+  viewedFunctionsInputs,
+  viewedFnHolder,
+} from '../tests/fixtures/app/src/function-views'
+import {
+  brandedLedger,
+  genericBrands,
+  genericBrandsInputs,
+} from '../tests/fixtures/app/src/generic-brands'
+import { genericCyclesInputs } from '../tests/fixtures/app/src/generic-cycles'
 import { router as headersRouter } from '../tests/fixtures/app/src/headers'
+import {
+  optionalBodies,
+  optionalDetailedBodies,
+  intersectionArgumentNames,
+  literalArgumentNames,
+  literalArgumentNamesReversed,
+} from '../tests/fixtures/app/src/instantiation-names'
+import { interfaceBodies, classViewBodies } from '../tests/fixtures/app/src/interface-bodies'
+import { internedUnions } from '../tests/fixtures/app/src/interned-unions'
+import {
+  boxedJson,
+  errorViewJson,
+  plainErrorViewJson,
+  intersectedToJsonInputs,
+  subErrJson,
+} from '../tests/fixtures/app/src/intersected-tojson'
+import { returnsJSDoc } from '../tests/fixtures/app/src/jsdoc-returns'
+import { keyedMappedTypes } from '../tests/fixtures/app/src/keyed-mapped-types'
+import { linkedCycles } from '../tests/fixtures/app/src/linked-cycles'
+import {
+  anyConverted,
+  recursiveDeepViews,
+  firstConverter,
+  lostAliasNames,
+  bodilessRequests,
+  typeRoles,
+  internedLiterals,
+  missingModuleModel,
+} from '../tests/fixtures/app/src/lost-aliases'
+import {
+  JsonDicts,
+  nestedBrands,
+  nestedBrandsInputs,
+} from '../tests/fixtures/app/src/nested-brands'
+import { nestedPagesInputs } from '../tests/fixtures/app/src/nested-pages'
+import {
+  permutationHolderInObject,
+  permutationHolderInRoot,
+  permutationHolderInRootRoot,
+  permutationHolderRootInRoot,
+  permutationInObjectHolder,
+  permutationInRootHolder,
+  permutationInRootHolderRoot,
+  permutationInRootRootHolder,
+  permutationRootHolderInRoot,
+  permutationRootInRootHolder,
+} from '../tests/fixtures/app/src/order-permutations'
+import {
+  ormModels,
+  writtenArgumentNames,
+  urlParameters,
+  ormModelTypes,
+} from '../tests/fixtures/app/src/orm-models'
+import {
+  boxedClassJson,
+  plainViewToJSON,
+  ownToJsonInputs,
+  viewToJSON,
+} from '../tests/fixtures/app/src/own-tojson'
+import { primitiveViewsInputs } from '../tests/fixtures/app/src/primitive-views'
+import {
+  procedureOrder,
+  procedureOrderForward,
+  procedureOrderMixed,
+  procedureOrderReverse,
+  procedureOrderSwapped,
+} from '../tests/fixtures/app/src/procedure-order'
+import { router } from '../tests/fixtures/app/src/router'
 import {
   decomposed,
   disjoint,
@@ -47,113 +193,48 @@ import {
   records,
   spread,
   unions,
-} from '../tests/fixtures/app/src/round2'
-import { router as round3Router } from '../tests/fixtures/app/src/round3'
-import { classes, directions, jsdoc, mixed, streams } from '../tests/fixtures/app/src/round11'
-import { errorData } from '../tests/fixtures/app/src/round11-broken'
-import { StringRows, viewInputs } from '../tests/fixtures/app/src/round25'
+} from '../tests/fixtures/app/src/router-shapes'
+import { innerRouter, emptyJSDocTags, outerRouter } from '../tests/fixtures/app/src/router-sources'
+import streamRouter from '../tests/fixtures/app/src/routers/stream'
+import { sentValues, fileNames, queryRoles } from '../tests/fixtures/app/src/sent-values'
+import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
+import type { Tile } from '../tests/fixtures/app/src/sized-types'
+import { sizedTypesInputs } from '../tests/fixtures/app/src/sized-types'
 import {
-  callables,
-  FullName,
-  instanceInputs,
-  LabeledStamp,
-} from '../tests/fixtures/app/src/round26'
-import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/round27'
-import { WithArrow, roundTwentyEightInputs } from '../tests/fixtures/app/src/round28'
+  countedNoteInput,
+  countedNoteOutput,
+  splitParameters,
+  countedConversions,
+  unconvertibleZod,
+} from '../tests/fixtures/app/src/standard-schemas'
 import {
-  GetterOnly,
-  roundTwentyNineComponents,
-  roundTwentyNineInputs,
-  roundTwentyNineNamed,
-  StampDate,
-  TaggedDate,
-  TaggedSet,
-  TaggedURL,
-} from '../tests/fixtures/app/src/round29'
-import { roundThirtyOneInputs } from '../tests/fixtures/app/src/round31'
-import { roundThirtyTwoInputs } from '../tests/fixtures/app/src/round32'
-import { roundThirtyThreeInputs } from '../tests/fixtures/app/src/round33'
+  registeredNote,
+  anyTypedProcedures,
+  registeredSchemas,
+} from '../tests/fixtures/app/src/stock-schemas'
+import { templateIndexesInputs } from '../tests/fixtures/app/src/template-indexes'
 import {
-  roundThirtyFourInner,
-  roundThirtyFourJSDoc,
-  roundThirtyFourOuter,
-} from '../tests/fixtures/app/src/round34'
-import { roundThirtyFiveInputs } from '../tests/fixtures/app/src/round35'
-import { roundThirtySixInputs } from '../tests/fixtures/app/src/round36'
-import { roundThirtySevenInputs } from '../tests/fixtures/app/src/round37'
-import { roundThirtyEightJSDoc } from '../tests/fixtures/app/src/round38'
-import { roundThirtyNine, roundThirtyNineInputs } from '../tests/fixtures/app/src/round39'
-import { roundFortyFour } from '../tests/fixtures/app/src/round44'
-import {
-  FunctionHolder,
-  jsonFn,
-  JsonFnForms,
-  JsonFnHolder,
-  MaybeStampHolder,
-  roundFortySixInputs,
-  StampHolder,
-} from '../tests/fixtures/app/src/round46'
-import {
-  JsonPointImpl,
-  labelledBytes,
-  labelledError,
-  roundFortyEightInputs,
-} from '../tests/fixtures/app/src/round48'
-import {
-  AddedDateViewHolder,
-  DateViewHolder,
-  roundFiftyInputs,
-  UndefPointImpl,
-} from '../tests/fixtures/app/src/round50'
-import {
-  boxedJson,
-  errorViewJson,
-  plainErrorViewJson,
-  roundFiftyOneInputs,
-  subErrJson,
-} from '../tests/fixtures/app/src/round51'
-import {
-  boxedClassJson,
-  plainViewToJSON,
-  roundFiftyTwoInputs,
-  viewToJSON,
-} from '../tests/fixtures/app/src/round52'
-import {
-  codedErrors,
-  messageTags,
-  plainTaggedError,
-  relays,
-  roundFiftyThreeInputs,
-  taggedError,
-} from '../tests/fixtures/app/src/round53'
+  DraftNote,
+  toJsonParametersInputs,
+  SearchFilter,
+} from '../tests/fixtures/app/src/tojson-parameters'
 import {
   errorViewMix,
   numberViewJson,
   plainErrorViewMix,
-  roundFiftyFourInputs,
+  toJsonViewsInputs,
   zonedError,
-} from '../tests/fixtures/app/src/round54'
+} from '../tests/fixtures/app/src/tojson-views'
 import {
-  booleanViews,
-  labeledViews,
-  plainLabeledViews,
-  roundFiftyFiveInputs,
-} from '../tests/fixtures/app/src/round55'
-import {
-  boxedViewResults,
-  readonlySets,
-  roundFiftySixInputs,
-} from '../tests/fixtures/app/src/round56'
-import {
-  boxedInterfaces,
-  errorViewJsons,
-  jsonFns,
-  plainBoxedInterfaces,
-  plainErrorViewJsons,
-  roundFiftySevenInputs,
-} from '../tests/fixtures/app/src/round57'
-import { DraftNote, roundFiftyEightInputs, SearchFilter } from '../tests/fixtures/app/src/round58'
-import { roundFiftyNineInputs } from '../tests/fixtures/app/src/round59'
+  classes,
+  directions,
+  jsdoc,
+  mixed,
+  streams,
+} from '../tests/fixtures/app/src/type-only-schemas'
+import { unconvertibleParameters } from '../tests/fixtures/app/src/unconvertible-parameters'
+import { errorData } from '../tests/fixtures/app/src/unresolved-error-data'
+import { WithArrow, viewIntersectionsInputs } from '../tests/fixtures/app/src/view-intersections'
 import {
   boxedNumLikes,
   functionJsonFn,
@@ -163,100 +244,19 @@ import {
   plainJsonFn,
   plainNumLikes,
   plainOptionalJsons,
-  roundSixtyInputs,
+  weakCollectionsInputs,
   weakHolder,
-} from '../tests/fixtures/app/src/round60'
+} from '../tests/fixtures/app/src/weak-collections'
 import {
-  roundSixtyOne,
-  roundSixtyOneForward,
-  roundSixtyOneMixed,
-  roundSixtyOneReverse,
-  roundSixtyOneSwapped,
-} from '../tests/fixtures/app/src/round61'
-import {
-  roundSixtyTwoHolderInObject,
-  roundSixtyTwoHolderInRoot,
-  roundSixtyTwoHolderInRootRoot,
-  roundSixtyTwoHolderRootInRoot,
-  roundSixtyTwoInObjectHolder,
-  roundSixtyTwoInRootHolder,
-  roundSixtyTwoInRootHolderRoot,
-  roundSixtyTwoInRootRootHolder,
-  roundSixtyTwoRootHolderInRoot,
-  roundSixtyTwoRootInRootHolder,
-} from '../tests/fixtures/app/src/round62'
-import {
-  roundSixtyThree,
-  roundSixtyThreeInputs,
-  viewedFnHolder,
-} from '../tests/fixtures/app/src/round63'
-import { roundSixtyFive } from '../tests/fixtures/app/src/round65'
-import {
-  brandedLedger,
-  roundSixtySix,
-  roundSixtySixInputs,
-} from '../tests/fixtures/app/src/round66'
-import {
-  JsonDicts,
-  roundSixtySeven,
-  roundSixtySevenInputs,
-} from '../tests/fixtures/app/src/round67'
-import {
-  countedNoteInput,
-  countedNoteOutput,
-  roundSixtyEight,
-  roundSixtyEightCounted,
-  roundSixtyEightZod,
-} from '../tests/fixtures/app/src/round68'
-import {
-  registeredNote,
-  roundSixtyNineAny,
-  roundSixtyNineRegistered,
-} from '../tests/fixtures/app/src/round69'
-import { roundSeventy } from '../tests/fixtures/app/src/round70'
-import type { Tile } from '../tests/fixtures/app/src/round74'
-import { roundSeventyFourInputs } from '../tests/fixtures/app/src/round74'
-import { roundSeventySixInputs } from '../tests/fixtures/app/src/round76'
-import { roundSeventyEight, roundSeventyEightViews } from '../tests/fixtures/app/src/round78'
-import { roundSeventyNine } from '../tests/fixtures/app/src/round79'
-import {
-  roundEighty,
-  roundEightyNames,
-  roundEightyParameters,
-  roundEightyTypes,
-} from '../tests/fixtures/app/src/round80'
-import {
-  roundEightyOneBodies,
-  roundEightyOneDetailed,
-  roundEightyOneIntersections,
-  roundEightyOneNames,
-  roundEightyOneNamesReversed,
-} from '../tests/fixtures/app/src/round81'
-import {
-  roundEightyTwoConverted,
-  roundEightyTwoDeepViews,
-  roundEightyTwoFirstConverter,
-  roundEightyTwoNames,
-  roundEightyTwoRequests,
-  roundEightyTwoRoles,
-  roundEightyTwoSameLiterals,
-  roundEightyTwoUnresolved,
-} from '../tests/fixtures/app/src/round82'
-import { roundEightyTwoInterned } from '../tests/fixtures/app/src/round82-interned'
-import {
-  roundEightyThree,
-  roundEightyThreeNames,
-  roundEightyThreeRoles,
-} from '../tests/fixtures/app/src/round83'
-import {
-  roundEightyFourAny,
-  roundEightyFourAnyExport,
-  roundEightyFourLazy,
-  roundEightyFourLazyAny,
-} from '../tests/fixtures/app/src/round84'
-import { router } from '../tests/fixtures/app/src/router'
-import streamRouter from '../tests/fixtures/app/src/routers/stream'
-import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
+  GetterOnly,
+  numberedComponents,
+  widenedMappedViewsInputs,
+  numberedBodyComponents,
+  StampDate,
+  TaggedDate,
+  TaggedSet,
+  TaggedURL,
+} from '../tests/fixtures/app/src/widened-views'
 import {
   crewsHeldFirst,
   crewsHeldLast,
@@ -592,8 +592,8 @@ describe('openAPIGenerator', () => {
 
   it('reports the procedures of a sub-router typed any, with no import hint or compiler errors', async () => {
     await expect(
-      generator.generate(roundEightyFourAny, {
-        source: { file: fixture('round84.ts'), export: 'roundEightyFourAny' },
+      generator.generate(anySubRouter, {
+        source: { file: fixture('any-routers.ts'), export: 'anySubRouter' },
       }),
     ).rejects.toThrow(
       new OpenAPIGeneratorError(
@@ -607,8 +607,8 @@ describe('openAPIGenerator', () => {
 
   it('reports the procedures of a lazy router given any', async () => {
     await expect(
-      generator.generate(roundEightyFourLazyAny, {
-        source: { file: fixture('round84.ts'), export: 'roundEightyFourLazyAny' },
+      generator.generate(anyLazy, {
+        source: { file: fixture('any-routers.ts'), export: 'anyLazy' },
       }),
     ).rejects.toThrow(
       new OpenAPIGeneratorError(
@@ -621,22 +621,22 @@ describe('openAPIGenerator', () => {
   })
 
   it('reports an export typed any as no router', async () => {
-    const file = fixture('round84.ts')
+    const file = fixture('any-routers.ts')
 
     await expect(
-      generator.generate(roundEightyFourAnyExport, {
-        source: { file, export: 'roundEightyFourAnyExport' },
+      generator.generate(anyExport, {
+        source: { file, export: 'anyExport' },
       }),
     ).rejects.toThrow(
       new OpenAPIGeneratorError(
-        `[OpenAPIGenerator] The export "roundEightyFourAnyExport" of "${fileURLToPath(file)}" has type "any", which is not a router, procedure or contract.`,
+        `[OpenAPIGenerator] The export "anyExport" of "${fileURLToPath(file)}" has type "any", which is not a router, procedure or contract.`,
       ),
     )
   })
 
   it('documents a lazy router from the router type it is given, though its loader resolves any', async () => {
-    const spec = await generator.generate(roundEightyFourLazy, {
-      source: { file: fixture('round84.ts'), export: 'roundEightyFourLazy' },
+    const spec = await generator.generate(givenLazy, {
+      source: { file: fixture('any-routers.ts'), export: 'givenLazy' },
     })
     const schema = { type: 'array', items: { type: 'number' } }
 
@@ -751,7 +751,7 @@ describe('openAPIGenerator', () => {
   it('reports an export that is not a router once', async () => {
     const procedure = router.health
     const value = { a: procedure, b: procedure, c: { d: procedure } }
-    const file = fixture('round34.ts')
+    const file = fixture('router-sources.ts')
 
     for (const [exportName, typeName] of [
       ['notARouter', '1'],
@@ -767,32 +767,32 @@ describe('openAPIGenerator', () => {
   })
 
   it('reports the unmatched paths when "source" names another level of the router', async () => {
-    const file = fixture('round34.ts')
+    const file = fixture('router-sources.ts')
     const hint = 'its type was not found in the router type'
 
-    const outer = generator.generate(roundThirtyFourOuter, {
-      source: { file, export: 'roundThirtyFourInner' },
+    const outer = generator.generate(outerRouter, {
+      source: { file, export: 'innerRouter' },
     })
     await expect(outer).rejects.toThrow(`Procedure at inner.list: ${hint}`)
     await expect(outer).rejects.toThrow(`Procedure at inner.find: ${hint}`)
     await expect(outer).rejects.not.toThrow('which is not a router')
 
-    const inner = generator.generate(roundThirtyFourInner, {
-      source: { file, export: 'roundThirtyFourOuter' },
+    const inner = generator.generate(innerRouter, {
+      source: { file, export: 'outerRouter' },
     })
     await expect(inner).rejects.toThrow(`Procedure at list: ${hint}`)
     await expect(inner).rejects.toThrow(`Procedure at find: ${hint}`)
     await expect(inner).rejects.not.toThrow('which is not a router')
 
-    const wrapped = generator.generate(roundThirtyFourInner, {
-      source: { file, export: 'roundThirtyFourWrapped' },
+    const wrapped = generator.generate(innerRouter, {
+      source: { file, export: 'wrappedRouter' },
     })
     await expect(wrapped).rejects.toThrow(`Procedure at list: ${hint}`)
     await expect(wrapped).rejects.not.toThrow('which is not a router')
   })
 
   it('reports the unmatched paths of routers that are no plain objects', async () => {
-    const file = fixture('round34.ts')
+    const file = fixture('router-sources.ts')
     const other = { zzz: os.handler(() => 1) }
 
     for (const exportName of [
@@ -822,7 +822,7 @@ describe('openAPIGenerator', () => {
   })
 
   it('tells fast that an export whose type expands generically is no router', async () => {
-    const file = fixture('round34.ts')
+    const file = fixture('router-sources.ts')
 
     for (const [exportName, typeName] of [
       ['grow', 'Grow<number>'],
@@ -831,7 +831,7 @@ describe('openAPIGenerator', () => {
     ]) {
       const start = performance.now()
       await expect(
-        generator.generate(roundThirtyFourInner, { source: { file, export: exportName } }),
+        generator.generate(innerRouter, { source: { file, export: exportName } }),
       ).rejects.toThrow(
         `[OpenAPIGenerator] The export "${exportName}" of "${fileURLToPath(file)}" has type "${typeName}", which is not a router, procedure or contract.`,
       )
@@ -841,14 +841,14 @@ describe('openAPIGenerator', () => {
     // a library class instance with a large type graph
     const start = performance.now()
     await expect(
-      generator.generate(roundThirtyFourInner, { source: { file, export: 'userSchema' } }),
+      generator.generate(innerRouter, { source: { file, export: 'userSchema' } }),
     ).rejects.toThrow(/The export "userSchema" .* has type "ZodObject<.*which is not a router/su)
     expect(performance.now() - start).toBeLessThan(1000)
   })
 
   it('keeps the first line of the comment for an empty @summary or @description', async () => {
-    const spec = await generator.generate(roundThirtyFourJSDoc, {
-      source: { file: fixture('round34.ts'), export: 'roundThirtyFourJSDoc' },
+    const spec = await generator.generate(emptyJSDocTags, {
+      source: { file: fixture('router-sources.ts'), export: 'emptyJSDocTags' },
     })
     const meta = (path: string) => {
       const { summary, description } = (spec.paths as any)[path].post
@@ -863,8 +863,8 @@ describe('openAPIGenerator', () => {
   })
 
   it('takes the success description from @returns, keeping one set by the openapi metadata', async () => {
-    const spec = await generator.generate(roundThirtyEightJSDoc, {
-      source: { file: fixture('round38.ts'), export: 'roundThirtyEightJSDoc' },
+    const spec = await generator.generate(returnsJSDoc, {
+      source: { file: fixture('jsdoc-returns.ts'), export: 'returnsJSDoc' },
     })
     const description = (path: string, method: string, status: number) =>
       (spec.paths as any)[path][method].responses[status].description
@@ -1825,14 +1825,14 @@ describe('openAPIGenerator', () => {
 
     it('resolves routers typed with index signatures', async () => {
       const spec = await generator.generate(records, {
-        source: { file: fixture('round2.ts'), export: 'records' },
+        source: { file: fixture('router-shapes.ts'), export: 'records' },
       })
       expect(outputOf(spec, '/planets/a')).toEqual(OK)
     })
 
     it('resolves routers typed with number and template literal index signatures', async () => {
       const spec = await generator.generate(indexes, {
-        source: { file: fixture('round2.ts'), export: 'indexes' },
+        source: { file: fixture('router-shapes.ts'), export: 'indexes' },
       })
       expect(outputOf(spec, '/versions/v1')).toEqual(OK)
       expect(outputOf(spec, '/numbers/0')).toEqual(B)
@@ -1840,7 +1840,7 @@ describe('openAPIGenerator', () => {
 
     it('resolves routers of a union at keys only some members have', async () => {
       const spec = await generator.generate(unions, {
-        source: { file: fixture('round2.ts'), export: 'unions' },
+        source: { file: fixture('router-shapes.ts'), export: 'unions' },
       })
       expect(outputOf(spec, '/ping')).toEqual(OK)
       expect(outputOf(spec, '/debug')).toEqual(B)
@@ -1848,7 +1848,7 @@ describe('openAPIGenerator', () => {
       const disjointSpec = await generator.generate(
         { ...disjoint, other },
         {
-          source: { file: fixture('round2.ts'), export: 'disjoint' },
+          source: { file: fixture('router-shapes.ts'), export: 'disjoint' },
         },
       )
       expect(outputOf(disjointSpec, '/other')).toEqual(B)
@@ -1872,7 +1872,7 @@ describe('openAPIGenerator', () => {
 
       try {
         const spec = await generator.generate(lazyRouter, {
-          source: { file: fixture('round2.ts'), export: 'lazyRouter' },
+          source: { file: fixture('router-shapes.ts'), export: 'lazyRouter' },
         })
         expect(outputOf(spec, '/api/ping')).toEqual(OK)
         expect(outputOf(spec, '/api/nested/pong')).toEqual(OK)
@@ -1886,14 +1886,14 @@ describe('openAPIGenerator', () => {
 
     it('resolves optional procedures and sub-routers', async () => {
       const spec = await generator.generate(optional, {
-        source: { file: fixture('round2.ts'), export: 'optional' },
+        source: { file: fixture('router-shapes.ts'), export: 'optional' },
       })
       expect(outputOf(spec, '/ping')).toEqual(OK)
       expect(outputOf(spec, '/nested/a')).toEqual(OK)
 
       const spreadSpec = await generator.generate(
         { ...spread, debug: spread.ping },
-        { source: { file: fixture('round2.ts'), export: 'spread' } },
+        { source: { file: fixture('router-shapes.ts'), export: 'spread' } },
       )
       expect(outputOf(spreadSpec, '/debug')).toEqual(OK)
     })
@@ -1902,7 +1902,7 @@ describe('openAPIGenerator', () => {
       await expect(
         generator.generate(
           { ping: optional.ping, nested: { pong: optional.ping } },
-          { source: { file: fixture('round2.ts'), export: 'notProcedures' } },
+          { source: { file: fixture('router-shapes.ts'), export: 'notProcedures' } },
         ),
       ).rejects.toThrow(
         'Failed to infer types for the OpenAPI document (2 errors):\n\nProcedure at ping: its type "string" is not a procedure or contract',
@@ -1911,7 +1911,7 @@ describe('openAPIGenerator', () => {
 
     it('does not leave components for split inputs and detailed outputs', async () => {
       const spec = await generator.generate(decomposed, {
-        source: { file: fixture('round2.ts'), export: 'decomposed' },
+        source: { file: fixture('router-shapes.ts'), export: 'decomposed' },
       })
 
       expect(spec.components?.schemas).toBeUndefined()
@@ -1937,7 +1937,7 @@ describe('openAPIGenerator', () => {
 
     it('adds JSDoc tags to router-level tags', async () => {
       const spec = await generator.generate(decomposed, {
-        source: { file: fixture('round2.ts'), export: 'decomposed' },
+        source: { file: fixture('router-shapes.ts'), export: 'decomposed' },
       })
       expect(spec.paths?.['/things']?.get?.tags).toEqual(['grp', 'fromdoc'])
       expect(spec.paths?.['/things']?.get?.summary).toBe('Find things')
@@ -1958,8 +1958,8 @@ describe('openAPIGenerator', () => {
   })
 
   describe('detailed structures', async () => {
-    const spec = await generator.generate(round3Router, {
-      source: { file: fixture('round3.ts') },
+    const spec = await generator.generate(detailedStatusesRouter, {
+      source: { file: fixture('detailed-statuses.ts') },
     })
 
     it('reads statuses of named aliases and enums', () => {
@@ -1988,8 +1988,8 @@ describe('openAPIGenerator', () => {
     it('reports procedures whose type can not be resolved', async () => {
       await expect(
         generator.generate(
-          { missing: round3Router.sections, ok: round3Router.sections },
-          { source: { file: fixture('round3-unresolved.ts'), export: 'unresolved' } },
+          { missing: detailedStatusesRouter.sections, ok: detailedStatusesRouter.sections },
+          { source: { file: fixture('unresolved-procedure.ts'), export: 'unresolved' } },
         ),
       ).rejects.toThrow('Procedure at missing: Could not resolve its type')
     })
@@ -2008,10 +2008,10 @@ describe('openAPIGenerator', () => {
     ).toEqual({ type: 'object', additionalProperties: true })
   })
 
-  describe('round eleven', () => {
+  describe('type-only schemas, JSDoc sources and class inputs', () => {
     it('reads JSDoc through variables of implemented procedures and namespace members', async () => {
       const spec = await generator.generate(jsdoc, {
-        source: { file: fixture('round11.ts'), export: 'jsdoc' },
+        source: { file: fixture('type-only-schemas.ts'), export: 'jsdoc' },
       })
       const operation = (path: string) => (spec.paths as any)[path].post
 
@@ -2038,7 +2038,7 @@ describe('openAPIGenerator', () => {
 
     it('keeps converted schemas of slots that also have type-only schemas', async () => {
       const spec = await generator.generate(mixed, {
-        source: { file: fixture('round11.ts'), export: 'mixed' },
+        source: { file: fixture('type-only-schemas.ts'), export: 'mixed' },
       })
       const paths = spec.paths as any
       // the inferred schema leaves out the keys the converted schemas describe
@@ -2094,7 +2094,7 @@ describe('openAPIGenerator', () => {
 
     it('keeps what type-only schemas add inside keys converted schemas describe', async () => {
       const spec = await generator.generate(mixed, {
-        source: { file: fixture('round11.ts'), export: 'mixed' },
+        source: { file: fixture('type-only-schemas.ts'), export: 'mixed' },
       })
       const paths = spec.paths as any
       const body = (path: string) =>
@@ -2204,7 +2204,7 @@ describe('openAPIGenerator', () => {
 
     it('documents unions of event iterators as event streams', async () => {
       const spec = await generator.generate(streams, {
-        source: { file: fixture('round11.ts'), export: 'streams' },
+        source: { file: fixture('type-only-schemas.ts'), export: 'streams' },
       })
 
       for (const path of ['/union', '/nullable']) {
@@ -2226,7 +2226,7 @@ describe('openAPIGenerator', () => {
 
     it('documents class inputs as the plain objects or instances a client sends', async () => {
       const spec = await generator.generate(classes, {
-        source: { file: fixture('round11.ts'), export: 'classes' },
+        source: { file: fixture('type-only-schemas.ts'), export: 'classes' },
       })
       const operation = (spec.paths as any)['/create'].post
       const component = (schema: any) =>
@@ -2259,7 +2259,7 @@ describe('openAPIGenerator', () => {
 
     it('names a model the same in both directions, and calls toJSON only of instances in inputs', async () => {
       const spec = await generator.generate(directions, {
-        source: { file: fixture('round11.ts'), export: 'directions' },
+        source: { file: fixture('type-only-schemas.ts'), export: 'directions' },
       })
       const paths = spec.paths as any
       const two = paths['/two'].post
@@ -2282,15 +2282,18 @@ describe('openAPIGenerator', () => {
 
     it('reports unresolved types when only error data needs inference', async () => {
       await expect(
-        generator.generate({ proc: errorData }, { source: { file: fixture('round11-broken.ts') } }),
+        generator.generate(
+          { proc: errorData },
+          { source: { file: fixture('unresolved-error-data.ts') } },
+        ),
       ).rejects.toThrow('Procedure at proc: Could not resolve its type "Missing"')
     })
   })
 
-  describe('round twenty-five', () => {
+  describe('inputs of views of built-ins', () => {
     it('documents inputs of views of built-ins as the built-in or a plain object', async () => {
       const spec = await generator.generate(viewInputs, {
-        source: { file: fixture('round25.ts'), export: 'viewInputs' },
+        source: { file: fixture('builtin-views.ts'), export: 'viewInputs' },
       })
       const body = (path: string) =>
         (spec.paths as any)[path].post.requestBody.content['application/json'].schema
@@ -2347,10 +2350,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round twenty-six', () => {
+  describe('function outputs and class inputs', () => {
     it('documents functions at the root as no body, also in a union', async () => {
       const spec = await generator.generate(callables, {
-        source: { file: fixture('round26.ts'), export: 'callables' },
+        source: { file: fixture('class-views.ts'), export: 'callables' },
       })
       const response = (path: string) => (spec.paths as any)[path].post.responses['200']
 
@@ -2366,7 +2369,7 @@ describe('openAPIGenerator', () => {
 
     it('documents inputs a client may send as an instance or a plain object', async () => {
       const spec = await generator.generate(instanceInputs, {
-        source: { file: fixture('round26.ts'), export: 'instanceInputs' },
+        source: { file: fixture('class-views.ts'), export: 'instanceInputs' },
       })
       const body = (path: string) =>
         JSON.parse(
@@ -2506,10 +2509,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round twenty-seven', () => {
+  describe('inputs of deep views', () => {
     it('documents inputs of views, deep views, and redeclared built-in members', async () => {
       const spec = await generator.generate(viewedInputs, {
-        source: { file: fixture('round27.ts'), export: 'viewedInputs' },
+        source: { file: fixture('deep-views.ts'), export: 'viewedInputs' },
       })
       const schemas = spec.components?.schemas as any
       const body = (path: string) =>
@@ -2597,10 +2600,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round twenty-eight', () => {
+  describe('inputs of intersections and conditional deep views', () => {
     it('documents inputs of intersections, conditional deep views, and views of functions', async () => {
-      const spec = await generator.generate(roundTwentyEightInputs, {
-        source: { file: fixture('round28.ts'), export: 'roundTwentyEightInputs' },
+      const spec = await generator.generate(viewIntersectionsInputs, {
+        source: { file: fixture('view-intersections.ts'), export: 'viewIntersectionsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const body = (path: string) =>
@@ -2654,7 +2657,7 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round twenty-nine', () => {
+  describe('inputs of widened views, and component names', () => {
     const second: any = {
       type: 'object',
       properties: { name: { type: 'string' } },
@@ -2670,8 +2673,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('documents inputs of widened views, mixins applied to built-ins, and URLSearchParams', async () => {
-      const spec = await generator.generate(roundTwentyNineInputs, {
-        source: { file: fixture('round29.ts'), export: 'roundTwentyNineInputs' },
+      const spec = await generator.generate(widenedMappedViewsInputs, {
+        source: { file: fixture('widened-views.ts'), export: 'widenedMappedViewsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const body = (path: string) =>
@@ -2732,8 +2735,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('names the numbered component of a type after it, once its name is free', async () => {
-      const spec = await generator.generate(roundTwentyNineComponents, {
-        source: { file: fixture('round29.ts'), export: 'roundTwentyNineComponents' },
+      const spec = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
       })
 
       expect(spec.components?.schemas).toEqual({ Item: second })
@@ -2742,8 +2745,8 @@ describe('openAPIGenerator', () => {
 
     it('keeps the components of base and the references to them', async () => {
       const user: any = { type: 'string', description: 'user-defined' }
-      const spec: any = await generator.generate(roundTwentyNineComponents, {
-        source: { file: fixture('round29.ts'), export: 'roundTwentyNineComponents' },
+      const spec: any = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
         base: {
           paths: { '/legacy': legacy(ref('Item2')) },
           components: { schemas: { Item2: user } },
@@ -2760,8 +2763,8 @@ describe('openAPIGenerator', () => {
       ).toEqual(second)
 
       // a component of base equal to a generated one is shared, under its own name
-      const shared: any = await generator.generate(roundTwentyNineComponents, {
-        source: { file: fixture('round29.ts'), export: 'roundTwentyNineComponents' },
+      const shared: any = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
         base: {
           paths: { '/legacy': legacy(ref('Item2')) },
           components: { schemas: { Item2: second } },
@@ -2777,8 +2780,8 @@ describe('openAPIGenerator', () => {
 
     it('keeps the names componentName chooses', async () => {
       const componentName = vi.fn((name: string) => (name === 'Item' ? 'FirstItem' : name))
-      const spec = await generator.generate(roundTwentyNineNamed, {
-        source: { file: fixture('round29.ts'), export: 'roundTwentyNineNamed' },
+      const spec = await generator.generate(numberedBodyComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedBodyComponents' },
         componentName,
       })
 
@@ -2788,10 +2791,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round thirty-one', () => {
+  describe('inputs of array-like views', () => {
     it('documents inputs of array-like views, views of primitives, and object', async () => {
-      const spec = await generator.generate(roundThirtyOneInputs, {
-        source: { file: fixture('round31.ts'), export: 'roundThirtyOneInputs' },
+      const spec = await generator.generate(arrayLikeViewsInputs, {
+        source: { file: fixture('array-like-views.ts'), export: 'arrayLikeViewsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const body = (path: string) =>
@@ -2838,10 +2841,10 @@ describe('openAPIGenerator', () => {
       }
     })
   })
-  describe('round thirty-two', () => {
+  describe('inputs of views of primitives', () => {
     it('documents inputs of views of primitives a plain object satisfies', async () => {
-      const spec = await generator.generate(roundThirtyTwoInputs, {
-        source: { file: fixture('round32.ts'), export: 'roundThirtyTwoInputs' },
+      const spec = await generator.generate(primitiveViewsInputs, {
+        source: { file: fixture('primitive-views.ts'), export: 'primitiveViewsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const body = (path: string) =>
@@ -2874,10 +2877,10 @@ describe('openAPIGenerator', () => {
       }
     })
   })
-  describe('round thirty-five', () => {
+  describe('inputs of the values a client holds', () => {
     it('documents inputs of the values a client holding them sends', async () => {
-      const spec = await generator.generate(roundThirtyFiveInputs, {
-        source: { file: fixture('round35.ts'), export: 'roundThirtyFiveInputs' },
+      const spec = await generator.generate(clientValuesInputs, {
+        source: { file: fixture('client-values.ts'), export: 'clientValuesInputs' },
       })
       const body = (path: string) =>
         JSON.parse(
@@ -2927,10 +2930,10 @@ describe('openAPIGenerator', () => {
       }
     })
   })
-  describe('round thirty-six', () => {
+  describe('inputs of deep mapped types over finite models', () => {
     it('documents inputs of conditional deep mapped types over finite models in full', async () => {
-      const spec = await generator.generate(roundThirtySixInputs, {
-        source: { file: fixture('round36.ts'), export: 'roundThirtySixInputs' },
+      const spec = await generator.generate(nestedPagesInputs, {
+        source: { file: fixture('nested-pages.ts'), export: 'nestedPagesInputs' },
       })
       const body = (path: string) =>
         (spec.paths as any)[path].post.requestBody.content['application/json'].schema
@@ -2979,10 +2982,10 @@ describe('openAPIGenerator', () => {
       }
     })
   })
-  describe('round thirty-seven', () => {
+  describe('inputs of cycles through deep mapped types', () => {
     it('documents inputs of cycles through conditional deep mapped types over generic models', async () => {
-      const spec = await generator.generate(roundThirtySevenInputs, {
-        source: { file: fixture('round37.ts'), export: 'roundThirtySevenInputs' },
+      const spec = await generator.generate(genericCyclesInputs, {
+        source: { file: fixture('generic-cycles.ts'), export: 'genericCyclesInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3057,10 +3060,10 @@ describe('openAPIGenerator', () => {
       }
     })
   })
-  describe('round thirty-three', () => {
+  describe('inputs of views of branded primitives', () => {
     it('documents inputs of views of branded primitives a plain object satisfies', async () => {
-      const spec = await generator.generate(roundThirtyThreeInputs, {
-        source: { file: fixture('round33.ts'), export: 'roundThirtyThreeInputs' },
+      const spec = await generator.generate(brandedPrimitiveViewsInputs, {
+        source: { file: fixture('branded-views.ts'), export: 'brandedPrimitiveViewsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const body = (path: string) =>
@@ -3098,14 +3101,14 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round thirty-nine', () => {
+  describe('inputs of discriminated unions', () => {
     const component = (name: string) => `#/components/schemas/${name}`
 
     it.each(['3.2.0', '3.1.1', '3.0.4'] as const)(
       'documents discriminated unions with a discriminator in %s',
       async (version) => {
-        const spec = await generator.generate(roundThirtyNine, {
-          source: { file: fixture('round39.ts'), export: 'roundThirtyNine' },
+        const spec = await generator.generate(discriminatedUnions, {
+          source: { file: fixture('discriminated-unions.ts'), export: 'discriminatedUnions' },
           version,
         })
         const schemas = spec.components?.schemas as any
@@ -3140,8 +3143,8 @@ describe('openAPIGenerator', () => {
     )
 
     it('documents inputs of discriminated unions, not when they are split into parameters', async () => {
-      const spec = await generator.generate(roundThirtyNineInputs, {
-        source: { file: fixture('round39.ts'), export: 'roundThirtyNineInputs' },
+      const spec = await generator.generate(discriminatedUnionsInputs, {
+        source: { file: fixture('discriminated-unions.ts'), export: 'discriminatedUnionsInputs' },
       })
       const paths = spec.paths as any
 
@@ -3160,10 +3163,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round forty-four', () => {
+  describe('cycles with recursive defs', () => {
     it('makes components of the models of a cycle with defs: recursive', async () => {
-      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(roundFortyFour, {
-        source: { file: fixture('round44.ts'), export: 'roundFortyFour' },
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(linkedCycles, {
+        source: { file: fixture('linked-cycles.ts'), export: 'linkedCycles' },
       })
 
       // each refers to itself through the others, so none is written again at each use
@@ -3183,7 +3186,7 @@ describe('openAPIGenerator', () => {
           }).replaceAll('#/components/schemas/', '#/$defs/'),
         ),
       )
-      const output = await call(roundFortyFour.linkedUser, undefined)
+      const output = await call(linkedCycles.linkedUser, undefined)
       const json = JSON.parse(
         JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
       )
@@ -3191,8 +3194,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('makes components of models that reach the cycle only through finished defs', async () => {
-      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(roundFortyFour, {
-        source: { file: fixture('round44.ts'), export: 'roundFortyFour' },
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(linkedCycles, {
+        source: { file: fixture('linked-cycles.ts'), export: 'linkedCycles' },
       })
 
       // each but the last refers to the first only through the next two, defs before it
@@ -3211,17 +3214,17 @@ describe('openAPIGenerator', () => {
           }).replaceAll('#/components/schemas/', '#/$defs/'),
         ),
       )
-      const output = await call(roundFortyFour.fibTwenty, undefined)
+      const output = await call(linkedCycles.fibTwenty, undefined)
       const json = JSON.parse(
         JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
       )
       expect(validate(json) ? [] : validate.errors).toEqual([])
     })
   })
-  describe('round forty-six', () => {
+  describe('inputs holding built-ins with an added toJSON', () => {
     it('documents inputs holding built-ins with an added toJSON, and functions typed by interfaces', async () => {
-      const spec = await generator.generate(roundFortySixInputs, {
-        source: { file: fixture('round46.ts'), export: 'roundFortySixInputs' },
+      const spec = await generator.generate(addedToJsonInputs, {
+        source: { file: fixture('added-tojson.ts'), export: 'addedToJsonInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3268,10 +3271,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round forty-eight', () => {
+  describe('inputs holding errors with an added toJSON', () => {
     it('documents inputs holding errors with an added toJSON, and interfaces declaring toJSON', async () => {
-      const spec = await generator.generate(roundFortyEightInputs, {
-        source: { file: fixture('round48.ts'), export: 'roundFortyEightInputs' },
+      const spec = await generator.generate(errorToJsonInputs, {
+        source: { file: fixture('error-tojson.ts'), export: 'errorToJsonInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3307,10 +3310,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty', () => {
+  describe('inputs of dates intersected with views of a date', () => {
     it('documents inputs holding dates intersected with views of a date, and toJSON writing nothing', async () => {
-      const spec = await generator.generate(roundFiftyInputs, {
-        source: { file: fixture('round50.ts'), export: 'roundFiftyInputs' },
+      const spec = await generator.generate(dateViewsInputs, {
+        source: { file: fixture('date-views.ts'), export: 'dateViewsInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3349,10 +3352,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-one', () => {
+  describe('inputs of a toJSON an intersection adds', () => {
     it('documents inputs whose toJSON an intersection adds to an error, a view of one, or a boxed primitive', async () => {
-      const spec = await generator.generate(roundFiftyOneInputs, {
-        source: { file: fixture('round51.ts'), export: 'roundFiftyOneInputs' },
+      const spec = await generator.generate(intersectedToJsonInputs, {
+        source: { file: fixture('intersected-tojson.ts'), export: 'intersectedToJsonInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3384,10 +3387,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-two', () => {
+  describe('inputs of interfaces with their own toJSON', () => {
     it('documents inputs of interfaces over a view of an error, and boxed primitive subclasses, with their own toJSON', async () => {
-      const spec = await generator.generate(roundFiftyTwoInputs, {
-        source: { file: fixture('round52.ts'), export: 'roundFiftyTwoInputs' },
+      const spec = await generator.generate(ownToJsonInputs, {
+        source: { file: fixture('own-tojson.ts'), export: 'ownToJsonInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3418,10 +3421,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-three', () => {
+  describe('inputs of interfaces extending errors', () => {
     it('documents inputs of interfaces extending an error or a view of one in both forms, and functions toJSON returns', async () => {
-      const spec = await generator.generate(roundFiftyThreeInputs, {
-        source: { file: fixture('round53.ts'), export: 'roundFiftyThreeInputs' },
+      const spec = await generator.generate(errorSubtypesInputs, {
+        source: { file: fixture('error-interfaces.ts'), export: 'errorSubtypesInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3459,10 +3462,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-four', () => {
+  describe('inputs of views adding a toJSON', () => {
     it('documents inputs of views adding toJSON to a view of an error or a boxed number, and of errors toJSON returns a zoned date of', async () => {
-      const spec = await generator.generate(roundFiftyFourInputs, {
-        source: { file: fixture('round54.ts'), export: 'roundFiftyFourInputs' },
+      const spec = await generator.generate(toJsonViewsInputs, {
+        source: { file: fixture('tojson-views.ts'), export: 'toJsonViewsInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3496,10 +3499,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-five', () => {
+  describe('inputs of views of collections', () => {
     it('documents inputs of errors toJSON returns a view of a set or a map of, and plain views of a boolean', async () => {
-      const spec = await generator.generate(roundFiftyFiveInputs, {
-        source: { file: fixture('round55.ts'), export: 'roundFiftyFiveInputs' },
+      const spec = await generator.generate(collectionViewsInputs, {
+        source: { file: fixture('collection-views.ts'), export: 'collectionViewsInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3532,10 +3535,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-six', () => {
+  describe('inputs of plain views of boxed primitives', () => {
     it('documents inputs of plain views of boxed primitives toJSON returns, and of interfaces extending a readonly set', async () => {
-      const spec = await generator.generate(roundFiftySixInputs, {
-        source: { file: fixture('round56.ts'), export: 'roundFiftySixInputs' },
+      const spec = await generator.generate(boxedViewsInputs, {
+        source: { file: fixture('boxed-views.ts'), export: 'boxedViewsInputs' },
       })
       const ajv = new Ajv2020({ strict: false, allErrors: true })
       ajv.addSchema(
@@ -3567,10 +3570,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-eight', () => {
+  describe('inputs split into parameters beside a toJSON', () => {
     it('documents inputs split into parameters by the fields a client sends, not by what toJSON returns', async () => {
-      const spec = await generator.generate(roundFiftyEightInputs, {
-        source: { file: fixture('round58.ts'), export: 'roundFiftyEightInputs' },
+      const spec = await generator.generate(toJsonParametersInputs, {
+        source: { file: fixture('tojson-parameters.ts'), export: 'toJsonParametersInputs' },
       })
       const paths = spec.paths as any
       const parameters = (path: string, method: string) =>
@@ -3604,9 +3607,9 @@ describe('openAPIGenerator', () => {
       })
 
       // what a client holding these values sends, which the server accepts
-      const handler = new OpenAPIHandler(roundFiftyEightInputs)
+      const handler = new OpenAPIHandler(toJsonParametersInputs)
       const sent: Request[] = []
-      const link = new OpenAPILink(roundFiftyEightInputs, {
+      const link = new OpenAPILink(toJsonParametersInputs, {
         origin: 'http://localhost',
         url: '/',
         fetch: async (request, init) => {
@@ -3646,10 +3649,10 @@ describe('openAPIGenerator', () => {
       expect(await sent.at(-1)!.text()).toBe('"t"')
     })
   })
-  describe('round fifty-nine', () => {
+  describe('inputs with empty parts', () => {
     it('documents the fields of a part with an empty object as optional, and of unions of named types declaring toJSON', async () => {
-      const spec = await generator.generate(roundFiftyNineInputs, {
-        source: { file: fixture('round59.ts'), export: 'roundFiftyNineInputs' },
+      const spec = await generator.generate(emptyPartsInputs, {
+        source: { file: fixture('empty-parts.ts'), export: 'emptyPartsInputs' },
       })
       const operations = Object.values(spec.paths as any).flatMap((item: any) =>
         Object.values(item),
@@ -3706,9 +3709,9 @@ describe('openAPIGenerator', () => {
       ).toBeUndefined()
 
       // what a client sends, which the server accepts, has the documented parameters
-      const handler = new OpenAPIHandler(roundFiftyNineInputs)
+      const handler = new OpenAPIHandler(emptyPartsInputs)
       const sent: Request[] = []
-      const link = new OpenAPILink(roundFiftyNineInputs, {
+      const link = new OpenAPILink(emptyPartsInputs, {
         origin: 'http://localhost',
         url: '/',
         fetch: async (request, init) => {
@@ -3758,10 +3761,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round fifty-seven', () => {
+  describe('inputs of views of errors with their own toJSON', () => {
     it('documents inputs of views of errors and boxed primitives with their own toJSON, and of functions typed by interfaces', async () => {
-      const spec = await generator.generate(roundFiftySevenInputs, {
-        source: { file: fixture('round57.ts'), export: 'roundFiftySevenInputs' },
+      const spec = await generator.generate(errorViewsInputs, {
+        source: { file: fixture('error-views.ts'), export: 'errorViewsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const ajv = new Ajv2020({ strict: false, allErrors: true })
@@ -3803,10 +3806,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty', () => {
+  describe('inputs of weak collections', () => {
     it('documents inputs of weak collections, and of interfaces extending Number or Function', async () => {
-      const spec = await generator.generate(roundSixtyInputs, {
-        source: { file: fixture('round60.ts'), export: 'roundSixtyInputs' },
+      const spec = await generator.generate(weakCollectionsInputs, {
+        source: { file: fixture('weak-collections.ts'), export: 'weakCollectionsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const ajv = new Ajv2020({ strict: false, allErrors: true })
@@ -3856,13 +3859,13 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-one', () => {
+  describe('the order of procedures', () => {
     it('names components the same whatever the order of procedures', async () => {
       const generate = (router: Parameters<typeof generator.generate>[0], name: string) =>
         generator.generate(router, {
-          source: { file: fixture('round61.ts'), export: name },
+          source: { file: fixture('procedure-order.ts'), export: name },
         })
-      const forward = await generate(roundSixtyOneForward, 'roundSixtyOneForward')
+      const forward = await generate(procedureOrderForward, 'procedureOrderForward')
 
       // a type converted the same at a root and in a class takes the name without a mode
       expect(Object.keys(forward.components?.schemas ?? {}).toSorted()).toEqual([
@@ -3872,17 +3875,17 @@ describe('openAPIGenerator', () => {
         'MaybeJsonPointHolder',
       ])
       for (const [router, name] of [
-        [roundSixtyOneReverse, 'roundSixtyOneReverse'],
-        [roundSixtyOneMixed, 'roundSixtyOneMixed'],
-        [roundSixtyOneSwapped, 'roundSixtyOneSwapped'],
+        [procedureOrderReverse, 'procedureOrderReverse'],
+        [procedureOrderMixed, 'procedureOrderMixed'],
+        [procedureOrderSwapped, 'procedureOrderSwapped'],
       ] as const) {
         expect(await generate(router, name)).toEqual(forward)
       }
     })
 
     it('leaves functions typed by interfaces over a view of Function optional', async () => {
-      const spec = await generator.generate(roundSixtyOne, {
-        source: { file: fixture('round61.ts'), export: 'roundSixtyOne' },
+      const spec = await generator.generate(procedureOrder, {
+        source: { file: fixture('procedure-order.ts'), export: 'procedureOrder' },
       })
 
       // only a `toJSON` that may be missing drops the function
@@ -3890,33 +3893,33 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-two', () => {
+  describe('the order of procedures beside an input', () => {
     const routers = {
-      roundSixtyTwoHolderInObject,
-      roundSixtyTwoHolderInRoot,
-      roundSixtyTwoHolderInRootRoot,
-      roundSixtyTwoHolderRootInRoot,
-      roundSixtyTwoInObjectHolder,
-      roundSixtyTwoInRootHolder,
-      roundSixtyTwoInRootHolderRoot,
-      roundSixtyTwoInRootRootHolder,
-      roundSixtyTwoRootHolderInRoot,
-      roundSixtyTwoRootInRootHolder,
+      permutationHolderInObject,
+      permutationHolderInRoot,
+      permutationHolderInRootRoot,
+      permutationHolderRootInRoot,
+      permutationInObjectHolder,
+      permutationInRootHolder,
+      permutationInRootHolderRoot,
+      permutationInRootRootHolder,
+      permutationRootHolderInRoot,
+      permutationRootInRootHolder,
     }
     const generate = (name: keyof typeof routers) =>
       generator.generate(routers[name], {
-        source: { file: fixture('round62.ts'), export: name },
+        source: { file: fixture('order-permutations.ts'), export: name },
       })
     const ref = { $ref: '#/components/schemas/SharedMaybeJson' }
 
     it('names components the same whatever the order of procedures, also beside an input', async () => {
       const orders = [
-        'roundSixtyTwoInRootRootHolder',
-        'roundSixtyTwoInRootHolderRoot',
-        'roundSixtyTwoRootInRootHolder',
-        'roundSixtyTwoRootHolderInRoot',
-        'roundSixtyTwoHolderInRootRoot',
-        'roundSixtyTwoHolderRootInRoot',
+        'permutationInRootRootHolder',
+        'permutationInRootHolderRoot',
+        'permutationRootInRootHolder',
+        'permutationRootHolderInRoot',
+        'permutationHolderInRootRoot',
+        'permutationHolderRootInRoot',
       ] as const
       const first = await generate(orders[0])
 
@@ -3937,10 +3940,10 @@ describe('openAPIGenerator', () => {
     })
 
     it.each([
-      'roundSixtyTwoInObjectHolder',
-      'roundSixtyTwoHolderInObject',
-      'roundSixtyTwoInRootHolder',
-      'roundSixtyTwoHolderInRoot',
+      'permutationInObjectHolder',
+      'permutationHolderInObject',
+      'permutationInRootHolder',
+      'permutationHolderInRoot',
     ] as const)(
       'names a type converted the same in an input and a class field once: %s',
       async (name) => {
@@ -3957,10 +3960,10 @@ describe('openAPIGenerator', () => {
     )
   })
 
-  describe('round sixty-three', () => {
+  describe('views of functions', () => {
     it('leaves functions typed by views of interfaces over a view of Function optional', async () => {
-      const spec = await generator.generate(roundSixtyThree, {
-        source: { file: fixture('round63.ts'), export: 'roundSixtyThree' },
+      const spec = await generator.generate(viewedFunctions, {
+        source: { file: fixture('function-views.ts'), export: 'viewedFunctions' },
       })
 
       // only a `toJSON` that may be missing drops the function, also through views of views
@@ -3970,8 +3973,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('leaves them optional in inputs', async () => {
-      const spec = await generator.generate(roundSixtyThreeInputs, {
-        source: { file: fixture('round63.ts'), export: 'roundSixtyThreeInputs' },
+      const spec = await generator.generate(viewedFunctionsInputs, {
+        source: { file: fixture('function-views.ts'), export: 'viewedFunctionsInputs' },
       })
       const schemas = spec.components?.schemas as any
       const ajv = new Ajv2020({ strict: false, allErrors: true })
@@ -4001,10 +4004,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-five', () => {
+  describe('mapped types over fixed keys', () => {
     it('reads no mapped type over keys without type parameters as generic', async () => {
-      const spec = await generator.generate(roundSixtyFive, {
-        source: { file: fixture('round65.ts'), export: 'roundSixtyFive' },
+      const spec = await generator.generate(keyedMappedTypes, {
+        source: { file: fixture('keyed-mapped-types.ts'), export: 'keyedMappedTypes' },
       })
 
       // changing every value, it is no view of the class, whose `toJSON` it cannot hold
@@ -4023,12 +4026,12 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-six', () => {
+  describe('generic brands', () => {
     const either = { anyOf: [{ type: 'number' }, { type: 'object' }] }
 
     it('reads brands keyed by template literals, keys, string mappings or records of type parameters as generic', async () => {
-      const spec = await generator.generate(roundSixtySix, {
-        source: { file: fixture('round66.ts'), export: 'roundSixtySix' },
+      const spec = await generator.generate(genericBrands, {
+        source: { file: fixture('generic-brands.ts'), export: 'genericBrands' },
       })
       const response = (name: string) =>
         (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -4048,8 +4051,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('documents them as numbers or objects in inputs', async () => {
-      const spec = await generator.generate(roundSixtySixInputs, {
-        source: { file: fixture('round66.ts'), export: 'roundSixtySixInputs' },
+      const spec = await generator.generate(genericBrandsInputs, {
+        source: { file: fixture('generic-brands.ts'), export: 'genericBrandsInputs' },
       })
       const body = (name: string) =>
         (spec.paths as any)[`/${name}`].post.requestBody.content['application/json'].schema
@@ -4065,12 +4068,12 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-seven', () => {
+  describe('nested generic brands', () => {
     const either = { anyOf: [{ type: 'number' }, { type: 'object' }] }
 
     it('reads brands keyed by type parameters and literals, or nesting them, as generic', async () => {
-      const spec = await generator.generate(roundSixtySeven, {
-        source: { file: fixture('round67.ts'), export: 'roundSixtySeven' },
+      const spec = await generator.generate(nestedBrands, {
+        source: { file: fixture('nested-brands.ts'), export: 'nestedBrands' },
       })
       const response = (name: string) =>
         (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -4083,8 +4086,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('documents them, and the toJSON results of deep views of classes, in inputs', async () => {
-      const spec = await generator.generate(roundSixtySevenInputs, {
-        source: { file: fixture('round67.ts'), export: 'roundSixtySevenInputs' },
+      const spec = await generator.generate(nestedBrandsInputs, {
+        source: { file: fixture('nested-brands.ts'), export: 'nestedBrandsInputs' },
       })
       const body = (name: string) =>
         (spec.paths as any)[`/${name}`].post.requestBody.content['application/json'].schema
@@ -4095,9 +4098,9 @@ describe('openAPIGenerator', () => {
       expect(body('looseNestedHolder').properties.v).toEqual(either)
 
       // what a client holding these values sends, which the server accepts
-      const handler = new OpenAPIHandler(roundSixtySevenInputs)
+      const handler = new OpenAPIHandler(nestedBrandsInputs)
       const sent: string[] = []
-      const link = new OpenAPILink(roundSixtySevenInputs, {
+      const link = new OpenAPILink(nestedBrandsInputs, {
         origin: 'http://localhost',
         url: '/',
         fetch: async (request, init) => {
@@ -4125,10 +4128,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-eight', () => {
+  describe('Standard JSON Schemas that can not be converted', () => {
     it('documents inputs split into parameters by their fields, also of object types an array satisfies by its members', async () => {
-      const spec = await generator.generate(roundSixtyEight, {
-        source: { file: fixture('round68.ts'), export: 'roundSixtyEight' },
+      const spec = await generator.generate(splitParameters, {
+        source: { file: fixture('standard-schemas.ts'), export: 'splitParameters' },
       })
       const paths = spec.paths as any
       const parameters = (path: string, method: string) =>
@@ -4154,9 +4157,9 @@ describe('openAPIGenerator', () => {
       )
 
       // what a client sends, which the server accepts
-      const handler = new OpenAPIHandler(roundSixtyEight)
+      const handler = new OpenAPIHandler(splitParameters)
       const sent: Request[] = []
-      const link = new OpenAPILink(roundSixtyEight, {
+      const link = new OpenAPILink(splitParameters, {
         origin: 'http://localhost',
         url: '/',
         fetch: async (request, init) => {
@@ -4177,8 +4180,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('infers the types of Standard JSON Schemas that can not be converted', async () => {
-      const spec = await new OpenAPIGenerator().generate(roundSixtyEightZod, {
-        source: { file: fixture('round68.ts'), export: 'roundSixtyEightZod' },
+      const spec = await new OpenAPIGenerator().generate(unconvertibleZod, {
+        source: { file: fixture('standard-schemas.ts'), export: 'unconvertibleZod' },
       })
       const paths = spec.paths as any
       const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
@@ -4201,8 +4204,8 @@ describe('openAPIGenerator', () => {
       })
 
       // the server accepts what a client sends, and its output matches
-      const handler = new OpenAPIHandler(roundSixtyEightZod)
-      const link = new OpenAPILink(roundSixtyEightZod, {
+      const handler = new OpenAPIHandler(unconvertibleZod)
+      const link = new OpenAPILink(unconvertibleZod, {
         origin: 'http://localhost',
         url: '/',
         fetch: async (request, init) =>
@@ -4217,8 +4220,8 @@ describe('openAPIGenerator', () => {
       const inputConversion = vi.spyOn(countedNoteInput['~standard'].jsonSchema, 'input')
       const outputConversion = vi.spyOn(countedNoteOutput['~standard'].jsonSchema, 'output')
 
-      const spec = await new OpenAPIGenerator().generate(roundSixtyEightCounted, {
-        source: { file: fixture('round68.ts'), export: 'roundSixtyEightCounted' },
+      const spec = await new OpenAPIGenerator().generate(countedConversions, {
+        source: { file: fixture('standard-schemas.ts'), export: 'countedConversions' },
       })
       const operation = (spec.paths as any)['/note'].post
 
@@ -4240,10 +4243,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round sixty-nine', () => {
+  describe('stock documentation of unreadable types', () => {
     it('keeps the stock documentation of Standard JSON Schemas that can not be converted, when the procedure types can not be read', async () => {
-      const spec = await new OpenAPIGenerator().generate(roundSixtyNineAny, {
-        source: { file: fixture('round69.ts'), export: 'roundSixtyNineAny' },
+      const spec = await new OpenAPIGenerator().generate(anyTypedProcedures, {
+        source: { file: fixture('stock-schemas.ts'), export: 'anyTypedProcedures' },
       })
 
       // the document generated before such schemas were inferred, byte for byte
@@ -4348,8 +4351,8 @@ describe('openAPIGenerator', () => {
 
     it('reads Standard JSON Schemas again in each generation', async () => {
       const generate = (generator: OpenAPIGenerator) =>
-        generator.generate(roundSixtyNineRegistered, {
-          source: { file: fixture('round69.ts'), export: 'roundSixtyNineRegistered' },
+        generator.generate(registeredSchemas, {
+          source: { file: fixture('stock-schemas.ts'), export: 'registeredSchemas' },
         })
       const body = (spec: any) =>
         spec.paths['/note'].post.requestBody.content['application/json'].schema
@@ -4379,12 +4382,12 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round seventy', () => {
+  describe('parameters-only inputs Zod can not convert', () => {
     it('keeps the stock documentation of parameters-only inputs Zod can not convert, of types not objects', async () => {
-      const spec = await new OpenAPIGenerator().generate(roundSeventy, {
-        source: { file: fixture('round70.ts'), export: 'roundSeventy' },
+      const spec = await new OpenAPIGenerator().generate(unconvertibleParameters, {
+        source: { file: fixture('unconvertible-parameters.ts'), export: 'unconvertibleParameters' },
       })
-      const stock = await new BaseOpenAPIGenerator().generate(roundSeventy)
+      const stock = await new BaseOpenAPIGenerator().generate(unconvertibleParameters)
       const paths = spec.paths as any
 
       for (const [path, method] of [
@@ -4406,12 +4409,12 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round seventy-four', () => {
+  describe('inputs of types a Set or a Map satisfies', () => {
     it.each(['3.2.0', '3.0.4'] as const)(
       'documents inputs a Set or a Map satisfies by its members, and other keys of a number index, in %s',
       async (version) => {
-        const spec = await generator.generate(roundSeventyFourInputs, {
-          source: { file: fixture('round74.ts'), export: 'roundSeventyFourInputs' },
+        const spec = await generator.generate(sizedTypesInputs, {
+          source: { file: fixture('sized-types.ts'), export: 'sizedTypesInputs' },
           version,
         })
         const ajv = new Ajv2020({ strict: false, allErrors: true })
@@ -4453,12 +4456,12 @@ describe('openAPIGenerator', () => {
     )
   })
 
-  describe('round seventy-six', () => {
+  describe('inputs of template literal indexes', () => {
     it.each(['3.2.0', '3.0.4'] as const)(
       'documents typed arrays satisfying an object type, and other keys of a template literal index, in %s',
       async (version) => {
-        const spec = await generator.generate(roundSeventySixInputs, {
-          source: { file: fixture('round76.ts'), export: 'roundSeventySixInputs' },
+        const spec = await generator.generate(templateIndexesInputs, {
+          source: { file: fixture('template-indexes.ts'), export: 'templateIndexesInputs' },
           version,
         })
         const ajv = new Ajv2020({ strict: false, allErrors: true })
@@ -4499,12 +4502,12 @@ describe('openAPIGenerator', () => {
     )
   })
 
-  describe('round seventy-eight', () => {
+  describe('binary bodies of views of classes', () => {
     it.each(['3.2.0', '3.0.4'] as const)(
       'documents whole bodies of built-ins through interfaces, intersections, and detailed structures as binary data, in %s',
       async (version) => {
-        const spec = await generator.generate(roundSeventyEight, {
-          source: { file: fixture('round78.ts'), export: 'roundSeventyEight' },
+        const spec = await generator.generate(interfaceBodies, {
+          source: { file: fixture('interface-bodies.ts'), export: 'interfaceBodies' },
           version,
         })
         const paths = spec.paths as any
@@ -4555,8 +4558,8 @@ describe('openAPIGenerator', () => {
     )
 
     it('documents the body of a detailed output of a view of a class as binary data', async () => {
-      const spec = await generator.generate(roundSeventyEightViews, {
-        source: { file: fixture('round78.ts'), export: 'roundSeventyEightViews' },
+      const spec = await generator.generate(classViewBodies, {
+        source: { file: fixture('interface-bodies.ts'), export: 'classViewBodies' },
       })
 
       expect((spec.paths as any)['/detailedViewBody'].post.responses['200']).toEqual({
@@ -4570,10 +4573,10 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round seventy-nine', () => {
+  describe('requests without a body', () => {
     it('documents no request body of a detailed GET or HEAD input, which sends none', async () => {
-      const spec = await generator.generate(roundSeventyNine, {
-        source: { file: fixture('round79.ts'), export: 'roundSeventyNine' },
+      const spec = await generator.generate(detailedUnions, {
+        source: { file: fixture('detailed-unions.ts'), export: 'detailedUnions' },
       })
       const paths = spec.paths as any
 
@@ -4587,8 +4590,8 @@ describe('openAPIGenerator', () => {
     it.each(['3.2.0', '3.0.4'] as const)(
       'documents the body built-in of a member of a detailed union root as binary data, in %s',
       async (version) => {
-        const spec = await generator.generate(roundSeventyNine, {
-          source: { file: fixture('round79.ts'), export: 'roundSeventyNine' },
+        const spec = await generator.generate(detailedUnions, {
+          source: { file: fixture('detailed-unions.ts'), export: 'detailedUnions' },
           version,
         })
         const paths = spec.paths as any
@@ -4646,7 +4649,7 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round eighty', () => {
+  describe('URL parameters', () => {
     it('documents values a client sends in the URL as strings, as the bracket notation writes them', async () => {
       const spec = await generator.generate(parameterValues, {
         source: {
@@ -4951,15 +4954,15 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round eighty', () => {
-    const routers = { roundEighty, roundEightyTypes, roundEightyParameters, roundEightyNames }
+  describe('toJSON overloads and instantiation names', () => {
+    const routers = { ormModels, ormModelTypes, urlParameters, writtenArgumentNames }
     const generate = (
       version: '3.1.1' | '3.0.4' = '3.1.1',
       defs?: 'recursive',
-      exported: keyof typeof routers = 'roundEighty',
+      exported: keyof typeof routers = 'ormModels',
     ) =>
       new OpenAPIGenerator({ defs }).generate(routers[exported], {
-        source: { file: fixture('round80.ts'), export: exported },
+        source: { file: fixture('orm-models.ts'), export: exported },
         version,
       })
 
@@ -5024,7 +5027,7 @@ describe('openAPIGenerator', () => {
     })
 
     it('names instantiations by their written type arguments, and types in cycles by the alias written for them', async () => {
-      const spec = await generate('3.1.1', undefined, 'roundEightyTypes')
+      const spec = await generate('3.1.1', undefined, 'ormModelTypes')
       const schemas = spec.components?.schemas as any
       const paths = spec.paths as any
       const request = (path: string) => paths[path].post.requestBody.content['application/json']
@@ -5051,7 +5054,7 @@ describe('openAPIGenerator', () => {
     })
 
     it('names recursive instantiations by their printed types with recursive defs', async () => {
-      const schemas = (await generate('3.1.1', 'recursive', 'roundEightyTypes')).components
+      const schemas = (await generate('3.1.1', 'recursive', 'ormModelTypes')).components
         ?.schemas as any
 
       expect(Object.keys(schemas).toSorted()).toEqual([
@@ -5070,7 +5073,7 @@ describe('openAPIGenerator', () => {
     })
 
     it('documents an object of a weak type intersected with object by its fields', async () => {
-      const spec = await generate('3.1.1', undefined, 'roundEightyTypes')
+      const spec = await generate('3.1.1', undefined, 'ormModelTypes')
 
       // a date or an array is also one, written as no object
       expect(
@@ -5111,7 +5114,7 @@ describe('openAPIGenerator', () => {
     })
 
     it('documents an instance of a class of methods only as an object', async () => {
-      const spec = await generate('3.1.1', undefined, 'roundEightyTypes')
+      const spec = await generate('3.1.1', undefined, 'ormModelTypes')
       const schemas = spec.components?.schemas as any
 
       expect(schemas.Svc).toEqual({ type: 'object' })
@@ -5133,7 +5136,7 @@ describe('openAPIGenerator', () => {
     it.each(['3.1.1', '3.0.4'] as const)(
       'leaves keys never written out of parameters and headers, in %s',
       async (version) => {
-        const spec = await generate(version, undefined, 'roundEightyParameters')
+        const spec = await generate(version, undefined, 'urlParameters')
         const paths = spec.paths as any
         const query = (name: string) => ({
           in: 'query',
@@ -5177,7 +5180,7 @@ describe('openAPIGenerator', () => {
     )
 
     it('names instantiations by the written type arguments of nested generics and array items', async () => {
-      const spec = await generate('3.1.1', undefined, 'roundEightyNames')
+      const spec = await generate('3.1.1', undefined, 'writtenArgumentNames')
       const response = (path: string) =>
         (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
 
@@ -5199,23 +5202,23 @@ describe('openAPIGenerator', () => {
       expect(response('/boxes')).toEqual({ $ref: '#/components/schemas/Box_Box_number' })
     })
   })
-  describe('round eighty-one', () => {
+  describe('names of instantiations over intersections', () => {
     const routers = {
-      roundEightyOneNames,
-      roundEightyOneNamesReversed,
-      roundEightyOneIntersections,
-      roundEightyOneBodies,
-      roundEightyOneDetailed,
+      literalArgumentNames,
+      literalArgumentNamesReversed,
+      intersectionArgumentNames,
+      optionalBodies,
+      optionalDetailedBodies,
     }
     const generate = (exported: keyof typeof routers, version: '3.1.1' | '3.0.4' = '3.1.1') =>
       new OpenAPIGenerator().generate(routers[exported], {
-        source: { file: fixture('round81.ts'), export: exported },
+        source: { file: fixture('instantiation-names.ts'), export: exported },
         version,
       })
     const response = (spec: { paths?: unknown }, path: string) =>
       (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
 
-    it.each(['roundEightyOneNames', 'roundEightyOneNamesReversed'] as const)(
+    it.each(['literalArgumentNames', 'literalArgumentNamesReversed'] as const)(
       'names instantiations over object literals apart from those over named types, in %s',
       async (exported) => {
         const spec = await generate(exported)
@@ -5243,7 +5246,7 @@ describe('openAPIGenerator', () => {
     )
 
     it('names instantiations over intersections of object literals by their keys', async () => {
-      const spec = await generate('roundEightyOneIntersections')
+      const spec = await generate('intersectionArgumentNames')
 
       expect(response(spec, '/merged')).toEqual({
         $ref: '#/components/schemas/Page_with-id-title',
@@ -5256,7 +5259,7 @@ describe('openAPIGenerator', () => {
     it.each(['3.1.1', '3.0.4'] as const)(
       'documents a detailed output whose body may be left out as also null, in %s',
       async (version) => {
-        const spec = await generate('roundEightyOneDetailed', version)
+        const spec = await generate('optionalDetailedBodies', version)
         const content = (path: string, status = '200') =>
           (spec.paths as any)[path].post.responses[status].content['application/json'].schema
         const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
@@ -5273,7 +5276,7 @@ describe('openAPIGenerator', () => {
     it.each(['3.1.1', '3.0.4'] as const)(
       'documents an output that may be left out and admits null already as it is, in %s',
       async (version) => {
-        const spec = await generate('roundEightyOneBodies', version)
+        const spec = await generate('optionalBodies', version)
         const content = (path: string) =>
           (spec.paths as any)[path].post.responses['200'].content['application/json']
 
@@ -5299,16 +5302,16 @@ describe('openAPIGenerator', () => {
     )
   })
 
-  describe('round eighty-two', () => {
+  describe('names of models that lost their aliases', () => {
     const routers = {
-      roundEightyTwoConverted,
-      roundEightyTwoDeepViews,
-      roundEightyTwoFirstConverter,
-      roundEightyTwoNames,
-      roundEightyTwoRequests,
-      roundEightyTwoRoles,
-      roundEightyTwoSameLiterals,
-      roundEightyTwoUnresolved,
+      anyConverted,
+      recursiveDeepViews,
+      firstConverter,
+      lostAliasNames,
+      bodilessRequests,
+      typeRoles,
+      internedLiterals,
+      missingModuleModel,
     }
     const generate = (
       exported: keyof typeof routers,
@@ -5316,7 +5319,7 @@ describe('openAPIGenerator', () => {
       generateOptions: Record<string, unknown> = {},
     ) =>
       new OpenAPIGenerator(options).generate(routers[exported], {
-        source: { file: fixture('round82.ts'), export: exported },
+        source: { file: fixture('lost-aliases.ts'), export: exported },
         ...generateOptions,
       }) as Promise<any>
     const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
@@ -5324,7 +5327,7 @@ describe('openAPIGenerator', () => {
       spec.paths[path][method].responses['200'].content['application/json'].schema
 
     it('names instantiations over models by the aliases their types lost', async () => {
-      const spec = await generate('roundEightyTwoNames')
+      const spec = await generate('lostAliasNames')
 
       expect(Object.keys(spec.components.schemas).toSorted()).toEqual([
         'ApiResponse_Page_PublicUser',
@@ -5346,7 +5349,7 @@ describe('openAPIGenerator', () => {
     it.each(['named', 'recursive'] as const)(
       'names deep views of recursive models by their arguments, or the alias they lost, with defs %s',
       async (defs) => {
-        const spec = await generate('roundEightyTwoDeepViews', { defs })
+        const spec = await generate('recursiveDeepViews', { defs })
         const body = (path: string) =>
           spec.paths[path].post.requestBody.content['application/json'].schema
 
@@ -5358,7 +5361,7 @@ describe('openAPIGenerator', () => {
     )
 
     it('names no union of literals after one of the aliases of other items it is interned for', async () => {
-      const spec = await generate('roundEightyTwoSameLiterals')
+      const spec = await generate('internedLiterals')
       const schemas = spec.components.schemas
       const statuses = { type: 'string', enum: ['active', 'inactive'] }
 
@@ -5380,8 +5383,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('names no union of literals after an alias of a model of another file', async () => {
-      const spec: any = await new OpenAPIGenerator().generate(roundEightyTwoInterned, {
-        source: { file: fixture('round82-interned.ts'), export: 'roundEightyTwoInterned' },
+      const spec: any = await new OpenAPIGenerator().generate(internedUnions, {
+        source: { file: fixture('interned-unions.ts'), export: 'internedUnions' },
       })
       const statuses = { type: 'string', enum: ['active', 'inactive'] }
 
@@ -5400,7 +5403,7 @@ describe('openAPIGenerator', () => {
       'documents a type as a parameter, a body and a response once, with the prefix %s',
       async (prefix) => {
         const spec = await generate(
-          'roundEightyTwoRoles',
+          'typeRoles',
           {},
           prefix ? { componentName: (name: string) => `${prefix}${name}` } : {},
         )
@@ -5433,7 +5436,7 @@ describe('openAPIGenerator', () => {
           },
         }
         const spec = await generate(
-          'roundEightyTwoRoles',
+          'typeRoles',
           {},
           { base, componentName: prefix ? (name: string) => `${prefix}${name}` : undefined },
         )
@@ -5468,7 +5471,7 @@ describe('openAPIGenerator', () => {
     it.each(['any', 'throw'] as const)(
       'infers the outputs a converter documents as any value or throws on, with unrepresentable %s',
       async (unrepresentable) => {
-        const spec = await generate('roundEightyTwoConverted', {
+        const spec = await generate('anyConverted', {
           converters: [new ZodToJsonSchemaConverter({ unrepresentable })],
         })
         const ajv = new Ajv2020({ strict: false })
@@ -5484,8 +5487,8 @@ describe('openAPIGenerator', () => {
         expect(spec.paths['/unknown'].post.responses['200'].content).toEqual({})
 
         for (const [name, output] of [
-          ['transformed', await call(roundEightyTwoConverted.transformed, undefined)],
-          ['kept', await call(roundEightyTwoConverted.kept, undefined)],
+          ['transformed', await call(anyConverted.transformed, undefined)],
+          ['kept', await call(anyConverted.kept, undefined)],
         ] as const) {
           expect(ajv.validate(response(spec, `/${name}`), output) ? [] : ajv.errors).toEqual([])
         }
@@ -5503,7 +5506,7 @@ describe('openAPIGenerator', () => {
     ])(
       'infers the schemas the first converter whose condition holds %s, though a later one converts them',
       async (_, convert) => {
-        const spec = await generate('roundEightyTwoFirstConverter', {
+        const spec = await generate('firstConverter', {
           converters: [
             { condition: (schema: any) => schema?.description === 'first', convert },
             new ZodToJsonSchemaConverter(),
@@ -5525,16 +5528,16 @@ describe('openAPIGenerator', () => {
     )
 
     it('names a module a declaration file imports and the compiler does not find', async () => {
-      await expect(generate('roundEightyTwoUnresolved')).rejects.toThrow(
-        /round82-lib\.d\.ts:4:\d+ - Cannot find module "@acme\/not-installed", which this declaration file imports\./,
+      await expect(generate('missingModuleModel')).rejects.toThrow(
+        /uninstalled-lib\.d\.ts:4:\d+ - Cannot find module "@acme\/not-installed", which this declaration file imports\./,
       )
     })
 
     it('documents the requests a client sends without a body, or with a free-form query', async () => {
-      const spec = await generate('roundEightyTwoRequests')
-      const handler = new OpenAPIHandler(roundEightyTwoRequests)
+      const spec = await generate('bodilessRequests')
+      const handler = new OpenAPIHandler(bodilessRequests)
       let sent: Request | undefined
-      const link = new OpenAPILink(roundEightyTwoRequests, {
+      const link = new OpenAPILink(bodilessRequests, {
         origin: 'http://localhost',
         url: '/',
         fetch: async (request, init) => {
@@ -5840,23 +5843,23 @@ describe('openAPIGenerator', () => {
     })
   })
 
-  describe('round eighty-three', () => {
+  describe('file names and path params', () => {
     it('names anonymous classes after their file or as classes, and a hyphen of a literal not as a sign', async () => {
-      const spec = await generator.generate(roundEightyThreeNames, {
-        source: { file: fixture('round83.ts'), export: 'roundEightyThreeNames' },
+      const spec = await generator.generate(fileNames, {
+        source: { file: fixture('sent-values.ts'), export: 'fileNames' },
       })
 
       expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
         'AnonymousClass',
-        'Round83UserCard',
         'Tagged_2024_01',
         'Tagged_neg1',
+        'UserCard',
       ])
     })
 
     it('documents a path param whose value may be undefined as required, as a client sends it', async () => {
-      const spec = await generator.generate(roundEightyThree, {
-        source: { file: fixture('round83.ts'), export: 'roundEightyThree' },
+      const spec = await generator.generate(sentValues, {
+        source: { file: fixture('sent-values.ts'), export: 'sentValues' },
       })
       const parameters = (path: string, method: string) =>
         (spec.paths as any)[path][method].parameters
@@ -5876,8 +5879,8 @@ describe('openAPIGenerator', () => {
     })
 
     it('documents a path param of a type whose value may have a toJSON dropping it as required', async () => {
-      const spec = await generator.generate(roundEightyThree, {
-        source: { file: fixture('round83.ts'), export: 'roundEightyThree' },
+      const spec = await generator.generate(sentValues, {
+        source: { file: fixture('sent-values.ts'), export: 'sentValues' },
       })
       const parameters = (path: string, method: string) =>
         (spec.paths as any)[path][method].parameters
@@ -5897,8 +5900,8 @@ describe('openAPIGenerator', () => {
     ] as const)(
       'names the parameter form of a type after the type with %s',
       async (_, componentName, name) => {
-        const spec = await generator.generate(roundEightyThreeRoles, {
-          source: { file: fixture('round83.ts'), export: 'roundEightyThreeRoles' },
+        const spec = await generator.generate(queryRoles, {
+          source: { file: fixture('sent-values.ts'), export: 'queryRoles' },
           componentName,
         })
 

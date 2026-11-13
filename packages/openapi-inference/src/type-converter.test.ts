@@ -1200,7 +1200,7 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round fourteen', () => {
+  describe('augmented globals and library classes', () => {
     it('keeps recognizing Error subclasses when a package augments the global Error', () => {
       const project = openTypeScriptProject({
         file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
@@ -1376,10 +1376,10 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round eleven', () => {
+  describe('type requests', () => {
     it('asks for the signatures of each type once', () => {
       const project = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round11.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/type-requests.ts', import.meta.url),
       })
 
       try {
@@ -1397,10 +1397,10 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round seven', () => {
+  describe('default exports', () => {
     it('names default exports after their declaration', () => {
       const project = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round7.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/default-exports.ts', import.meta.url),
       })
 
       try {
@@ -1420,12 +1420,12 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round six', () => {
+  describe('JSDoc keywords, template literal keys and mapped built-ins', () => {
     let r6: TypeScriptProject
 
     beforeAll(() => {
       r6 = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round6.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/mapped-builtins.ts', import.meta.url),
       })
     })
 
@@ -1644,12 +1644,12 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round five', () => {
+  describe('nullable aliases, repeated siblings and wide models', () => {
     let r5: TypeScriptProject
 
     beforeAll(() => {
       r5 = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round5.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/nullable-aliases.ts', import.meta.url),
       })
     })
 
@@ -1950,12 +1950,12 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round four', () => {
+  describe('expansion cuts and class expressions', () => {
     let r4: TypeScriptProject
 
     beforeAll(() => {
       r4 = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round4.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/expansion-cuts.ts', import.meta.url),
       })
     })
 
@@ -2190,12 +2190,12 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round three', () => {
+  describe('growth detection and alias JSDoc', () => {
     let r3: TypeScriptProject
 
     beforeAll(() => {
       r3 = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round3.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/growth.ts', import.meta.url),
       })
     })
 
@@ -2437,12 +2437,12 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round two', () => {
+  describe('generic instantiations, built-in subclasses and literals', () => {
     let r2: TypeScriptProject
 
     beforeAll(() => {
       r2 = openTypeScriptProject({
-        file: new URL('../tests/fixtures/types/src/round2.ts', import.meta.url),
+        file: new URL('../tests/fixtures/types/src/generic-instantiations.ts', import.meta.url),
       })
     })
 
@@ -3226,10 +3226,10 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round thirty-five', () => {
+  describe('types no handler returns', () => {
     it('converts types no handler returns as a value of their own', () => {
       const project = openTypeScriptProject({
-        file: new URL('../tests/fixtures/app/src/round35.ts', import.meta.url),
+        file: new URL('../tests/fixtures/app/src/client-values.ts', import.meta.url),
       })
 
       try {
@@ -3253,7 +3253,7 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round twenty-five', () => {
+  describe('a polyfilled BigInt toJSON', () => {
     it('writes a boxed BigInt through its polyfilled toJSON', () => {
       const project = openTypeScriptProject({
         file: new URL('../tests/fixtures/augmented/src/index.ts', import.meta.url),
@@ -3278,10 +3278,10 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round twenty-eight', () => {
+  describe('functions with an optional toJSON', () => {
     it('makes a function with an optional toJSON optional, at the root too', () => {
       const project = openTypeScriptProject({
-        file: new URL('../tests/fixtures/app/src/round27.ts', import.meta.url),
+        file: new URL('../tests/fixtures/app/src/deep-views.ts', import.meta.url),
       })
 
       try {
@@ -3363,10 +3363,10 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round twenty-nine', () => {
+  describe('views of functions and bigint typed arrays', () => {
     it('makes a view of a function optional, at the root too', () => {
       const project = openTypeScriptProject({
-        file: new URL('../tests/fixtures/app/src/round27.ts', import.meta.url),
+        file: new URL('../tests/fixtures/app/src/deep-views.ts', import.meta.url),
       })
 
       try {
@@ -3404,7 +3404,7 @@ describe('typeToJsonSchemaConverter', () => {
     })
   })
 
-  describe('round thirty-nine', () => {
+  describe('discriminators', () => {
     const ref = (name: string) => ({ $ref: `#/$defs/${name}` })
     const discriminated = (propertyName: string, mapping: Record<string, string>) => ({
       oneOf: [...new Set(Object.values(mapping))].map((name) => ref(name)),
@@ -3421,7 +3421,7 @@ describe('typeToJsonSchemaConverter', () => {
 
     beforeAll(() => {
       project = openTypeScriptProject({
-        file: new URL('../tests/fixtures/app/src/round39.ts', import.meta.url),
+        file: new URL('../tests/fixtures/app/src/discriminated-unions.ts', import.meta.url),
       })
       const converters = {
         input: new TypeToJsonSchemaConverter(project.checker, project.program, {

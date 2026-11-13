@@ -4,6 +4,8 @@ import { call } from '@orpc/server'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import { Redacted } from 'effect'
 
+import { BrandedUser } from '../tests/fixtures/app/src/arktype-brands'
+import { bodyBuiltinsInputs } from '../tests/fixtures/app/src/body-builtins'
 import {
   longDeepChain,
   longerDeepChain,
@@ -11,21 +13,19 @@ import {
   shortDeepChain,
 } from '../tests/fixtures/app/src/deep-view-chains'
 import { conditionalRing, nullRing } from '../tests/fixtures/app/src/deep-view-rings'
-import { BrandedUser } from '../tests/fixtures/app/src/round73'
 import {
   BrandedOwner,
   comparedAmount,
   hashedRecord,
   secretConfig,
-} from '../tests/fixtures/app/src/round75'
-import { roundSeventySevenInputs } from '../tests/fixtures/app/src/round77'
-import { roundSeventyEightInputs } from '../tests/fixtures/app/src/round78'
-import { roundEightyTwoDetailed, roundEightyTwoStreams } from '../tests/fixtures/app/src/round82'
+} from '../tests/fixtures/app/src/effect-brands'
+import { interfaceBodiesInputs } from '../tests/fixtures/app/src/interface-bodies'
+import { detailedMembers, emptyStreams } from '../tests/fixtures/app/src/lost-aliases'
 import {
-  roundEightyThree,
-  roundEightyThreeInputs,
-  roundEightyThreeOutputs,
-} from '../tests/fixtures/app/src/round83'
+  sentValues,
+  sentValuesInputs,
+  sentValuesOutputs,
+} from '../tests/fixtures/app/src/sent-values'
 import { router } from '../tests/fixtures/app/src/serialization'
 import { chain8, chain16 } from '../tests/fixtures/app/src/view-chains'
 import { OpenAPIGenerator } from './openapi-generator'
@@ -151,7 +151,7 @@ describe('generated schemas match serialized outputs', async () => {
     ['builtinViews', undefined],
     ['moreViews', undefined],
     ['moreToJSON', undefined],
-    ['roundTwentyThree', undefined],
+    ['aliasedViews', undefined],
     ['eitherForms', undefined],
     ['expandingViews', undefined],
     ['accessors', undefined],
@@ -855,7 +855,7 @@ describe('generated schemas match serialized outputs', async () => {
 
   it('reads views through aliases, intersections, and built-ins', () => {
     const schemas = spec.components?.schemas as any
-    const response = (spec.paths as any)['/roundTwentyThree'].post.responses['200'].content[
+    const response = (spec.paths as any)['/aliasedViews'].post.responses['200'].content[
       'application/json'
     ].schema
     const { properties } = response
@@ -1125,7 +1125,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round twenty-six', () => {
+  describe('cut expansions and views of classes', () => {
     const schemas = () => spec.components?.schemas as any
     const properties = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -1297,7 +1297,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round twenty-seven', () => {
+  describe('interfaces over built-ins and deep mapped types', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -1573,7 +1573,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round twenty-eight', () => {
+  describe('mapped views of errors and classes', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -1746,7 +1746,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round twenty-nine', () => {
+  describe('views of brands, mixins and widened values', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -1892,7 +1892,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty', () => {
+  describe('a toJSON that may be no function, and views of tuples', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -1989,7 +1989,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-one', () => {
+  describe('array-like views and toJSON of several functions', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -2250,7 +2250,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-two', () => {
+  describe('views of primitives and a loosely typed toJSON', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -2287,7 +2287,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-three', () => {
+  describe('a toJSON typed object, and views of branded primitives', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -2412,7 +2412,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-five', () => {
+  describe('cycles through deep mapped types, and keyless types', () => {
     const schemas = () => spec.components?.schemas as any
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
@@ -2611,7 +2611,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-six', () => {
+  describe('deep mapped types over finite models', () => {
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
     const page = (items: object) => ({
@@ -2668,7 +2668,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-seven', () => {
+  describe('deep mapped types over generic models', () => {
     const schemaOf = (name: string) =>
       deref(
         (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema,
@@ -2800,7 +2800,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round thirty-nine', () => {
+  describe('discriminated unions', () => {
     const itemsOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema.items
     const component = (name: string) => ({ $ref: `#/components/schemas/${name}` })
@@ -2848,7 +2848,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round forty-two', () => {
+  describe('toJSON of library interfaces', () => {
     const schemaOf = (name: string) =>
       (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
 
@@ -3019,7 +3019,7 @@ describe('generated schemas match serialized outputs', async () => {
     expect((spec.components?.schemas as any).CycleB.properties.tags['x-native-type']).toBe('set')
   })
 
-  describe('round seventy-one', () => {
+  describe('Infinity literals and object types of indexes', () => {
     it('documents inputs and outputs holding the literal of Infinity, which the compiler can not send, as any value', async () => {
       for (const name of ['limits', 'infinite']) {
         // `Infinity` is sent as `null`
@@ -3047,7 +3047,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round seventy-three', () => {
+  describe('ArkType brands', () => {
     it('leaves out the key ArkType brands an object type with, which no value holds', async () => {
       expect(deref(responseSchema('/brandedUser'))).toEqual({
         description: 'An ArkType brand of an object, a key only its type has',
@@ -3086,7 +3086,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round seventy-four', () => {
+  describe('a Set or a Map satisfying object types', () => {
     it('documents the arrays a Set or a Map is written as where it satisfies an object type by its members', () => {
       const schemas = spec.components?.schemas as any
 
@@ -3110,7 +3110,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round seventy-five', () => {
+  describe('Effect data types', () => {
     const handler = new OpenAPIHandler(router)
     let sent: unknown
     const link = new OpenAPILink(router, {
@@ -3219,7 +3219,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round seventy-seven', () => {
+  describe('promise and stream inputs', () => {
     const handler = new OpenAPIHandler(router)
     let sent: Request | undefined
     const link = new OpenAPILink(router, {
@@ -3253,7 +3253,7 @@ describe('generated schemas match serialized outputs', async () => {
       expect(sentAs(content, response!)).toEqual({ type: 'string', contentMediaType: mediaType })
     })
 
-    it.each(Object.entries(roundSeventySevenInputs))(
+    it.each(Object.entries(bodyBuiltinsInputs))(
       'documents the body a client sends of %s, as is',
       async (name, value) => {
         await expect(link.call([name], value(), { context: {} })).resolves.toBe(1)
@@ -3296,7 +3296,7 @@ describe('generated schemas match serialized outputs', async () => {
     })
   })
 
-  describe('round seventy-eight', () => {
+  describe('binary bodies through interfaces', () => {
     const handler = new OpenAPIHandler(router)
     let sent: Request | undefined
     const link = new OpenAPILink(router, {
@@ -3342,7 +3342,7 @@ describe('generated schemas match serialized outputs', async () => {
       )
     })
 
-    it.each(Object.entries(roundSeventyEightInputs))(
+    it.each(Object.entries(interfaceBodiesInputs))(
       'documents the input a client sends of %s',
       async (name, value) => {
         await expect(link.call([name], value(), { context: {} })).resolves.toBe(1)
@@ -3526,11 +3526,11 @@ describe('rings of deep views of classes', async () => {
 })
 
 /**
- * Runs detailed outputs and event iterators of round 82 and checks each response against what is
+ * Runs detailed outputs and event iterators, and checks each response against what is
  * documented for its status: its body, no content for no body, and the headers required.
  */
-describe('round eighty-two', async () => {
-  const file = new URL('../tests/fixtures/app/src/round82.ts', import.meta.url)
+describe('responses of detailed outputs and event iterators', async () => {
+  const file = new URL('../tests/fixtures/app/src/lost-aliases.ts', import.meta.url)
   const generate = (exported: string, router: any) =>
     new OpenAPIGenerator().generate(router, { source: { file, export: exported } })
   const compile = (spec: any, schema: unknown) =>
@@ -3544,11 +3544,11 @@ describe('round eighty-two', async () => {
     )
 
   describe('detailed outputs', async () => {
-    const spec: any = await generate('roundEightyTwoDetailed', roundEightyTwoDetailed)
-    const handler = new OpenAPIHandler(roundEightyTwoDetailed)
+    const spec: any = await generate('detailedMembers', detailedMembers)
+    const handler = new OpenAPIHandler(detailedMembers)
 
     it.each(
-      Object.keys(roundEightyTwoDetailed).flatMap((name) => [
+      Object.keys(detailedMembers).flatMap((name) => [
         [name, false],
         [name, true],
       ]),
@@ -3587,17 +3587,14 @@ describe('round eighty-two', async () => {
   })
 
   describe('event iterators returning nothing', async () => {
-    const spec: any = await generate('roundEightyTwoStreams', roundEightyTwoStreams)
+    const spec: any = await generate('emptyStreams', emptyStreams)
 
-    it.each(Object.keys(roundEightyTwoStreams))('documents the events of %s', async (name) => {
+    it.each(Object.keys(emptyStreams))('documents the events of %s', async (name) => {
       const validate = compile(
         spec,
         spec.paths[`/${name}`].post.responses['200'].content['text/event-stream'].schema,
       )
-      const iterator: AsyncIterator<unknown> = await call(
-        (roundEightyTwoStreams as any)[name],
-        undefined,
-      )
+      const iterator: AsyncIterator<unknown> = await call((emptyStreams as any)[name], undefined)
       const serialize = (value: unknown) =>
         JSON.parse(JSON.stringify(new OpenAPIJsonSerializer().serializeJson(value).json) ?? 'null')
 
@@ -3625,10 +3622,10 @@ describe('round eighty-two', async () => {
  * the documented parameters, bodies and responses.
  */
 describe('documented values match what is sent and written', async () => {
-  const spec = await new OpenAPIGenerator().generate(roundEightyThree, {
+  const spec = await new OpenAPIGenerator().generate(sentValues, {
     source: {
-      file: new URL('../tests/fixtures/app/src/round83.ts', import.meta.url),
-      export: 'roundEightyThree',
+      file: new URL('../tests/fixtures/app/src/sent-values.ts', import.meta.url),
+      export: 'sentValues',
     },
   })
   const operations = Object.entries(spec.paths as any).flatMap(([path, item]: [string, any]) =>
@@ -3646,9 +3643,9 @@ describe('documented values match what is sent and written', async () => {
   const parameterAjv = ajvOf('array')
   const bodyAjv = ajvOf(false)
 
-  const handler = new OpenAPIHandler(roundEightyThree)
+  const handler = new OpenAPIHandler(sentValues)
   let sent: Request | undefined
-  const link = new OpenAPILink(roundEightyThree, {
+  const link = new OpenAPILink(sentValues, {
     origin: 'http://localhost',
     url: '/',
     fetch: async (request, init) => {
@@ -3722,8 +3719,8 @@ describe('documented values match what is sent and written', async () => {
     return problems
   }
 
-  it.each(roundEightyThreeOutputs)('documents the output of %s as it is written', async (name) => {
-    const output = await call(roundEightyThree[name] as any, undefined)
+  it.each(sentValuesOutputs)('documents the output of %s as it is written', async (name) => {
+    const output = await call(sentValues[name] as any, undefined)
     const json = JSON.parse(
       JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json) ?? 'null',
     )
@@ -3734,7 +3731,7 @@ describe('documented values match what is sent and written', async () => {
     expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
   })
 
-  it.each(Object.entries(roundEightyThreeInputs))(
+  it.each(Object.entries(sentValuesInputs))(
     'documents the inputs a client sends to %s',
     async (name, values) => {
       const { path, operation } = operationOf(name)
