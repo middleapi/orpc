@@ -61,6 +61,7 @@ import {
   getAssignedSymbol,
   getFileErrors,
   getImplementedSymbol,
+  hasUnresolvedModule,
   getJSDoc,
   getOrCreate,
 } from './utils'
@@ -433,7 +434,7 @@ export class OpenAPIGenerator {
           return inferred !== undefined && keepsStock?.(inferred) ? undefined : inferred
         }
 
-        assertProcedureType(ctx, resolved)
+        assertProcedureType(ctx, procedure, resolved)
         const type = getType(resolved.type)
         return type && infer(type)
       } catch (error) {
@@ -766,10 +767,24 @@ function getParameterFields(
  * Inference needs the type of a procedure: it fails when the type is not resolved,
  * instead of documenting `{}`.
  */
-function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType): void {
+function assertProcedureType(
+  ctx: InferenceContext,
+  procedure: WalkedProcedure,
+  resolved: ResolvedRouterType,
+): void {
   if (resolved.type.flags & TypeFlags.Any) {
-    throw new TypeScriptTypeResolutionError(
-      `Could not resolve its type "${ctx.checker.typeToString(resolved.type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+    // the `any` of a name or module the compiler does not find, unlike one written, like `as any`
+    if (
+      resolved.type.isErrorType() ||
+      getDeclaringFiles(ctx, procedure).some((file) => hasUnresolvedModule(ctx.program, file))
+    ) {
+      throw new TypeScriptTypeResolutionError(
+        `Could not resolve its type "${ctx.checker.typeToString(resolved.type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+      )
+    }
+
+    throw new OpenAPIGeneratorError(
+      `Its type is "any". Give it a type, or schemas a converter supports.`,
     )
   }
 
@@ -827,16 +842,10 @@ function isUnsendableTypeError(error: unknown): boolean {
  */
 function getCompilerErrors(
   ctx: InferenceContext,
-  { resolved, assigned }: WalkedProcedure,
+  procedure: WalkedProcedure,
   error: TypeScriptTypeResolutionError,
 ): string[] {
-  const files = new Set<string>([ctx.sourceFile.fileName])
-
-  for (const symbol of [resolved?.symbol, assigned]) {
-    for (const declaration of symbol?.declarations ?? []) {
-      files.add(declaration.path)
-    }
-  }
+  const files = new Set(getDeclaringFiles(ctx, procedure))
 
   for (const file of error.files) {
     if (ctx.getSourceKind(file) === 'project') {
@@ -847,6 +856,25 @@ function getCompilerErrors(
   return [...files]
     .flatMap((file) => getFileErrors(ctx.program, file))
     .concat(getUnresolvedModules(ctx, error.files))
+}
+
+/**
+ * The files declaring a procedure: the router file, and where a procedure assigned to it,
+ * `{ ping }`, is declared.
+ */
+function getDeclaringFiles(
+  ctx: InferenceContext,
+  { resolved, assigned }: WalkedProcedure,
+): string[] {
+  const files = new Set<string>([ctx.sourceFile.fileName])
+
+  for (const symbol of [resolved?.symbol, assigned]) {
+    for (const declaration of symbol?.declarations ?? []) {
+      files.add(declaration.path)
+    }
+  }
+
+  return [...files]
 }
 
 /**

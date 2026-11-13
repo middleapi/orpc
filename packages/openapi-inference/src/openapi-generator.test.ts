@@ -590,9 +590,7 @@ describe('openAPIGenerator', () => {
     ).rejects.toThrow('Procedure at extra: its type was not found in the router type')
   })
 
-  it('reports the procedures of a sub-router typed any as unresolved, with no compiler error', async () => {
-    const tsconfig = fileURLToPath(new URL('../tests/fixtures/app/tsconfig.json', import.meta.url))
-
+  it('reports the procedures of a sub-router typed any, with no import hint or compiler errors', async () => {
     await expect(
       generator.generate(roundEightyFourAny, {
         source: { file: fixture('round84.ts'), export: 'roundEightyFourAny' },
@@ -601,16 +599,13 @@ describe('openAPIGenerator', () => {
       new OpenAPIGeneratorError(
         [
           '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
-          'Procedure at users.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".',
-          `Compiler errors:\n  Using the compiler options of "${tsconfig}".`,
+          'Procedure at users.list: Its type is "any". Give it a type, or schemas a converter supports.',
         ].join('\n\n'),
       ),
     )
   })
 
-  it('reports a lazy router given any as unresolved', async () => {
-    const tsconfig = fileURLToPath(new URL('../tests/fixtures/app/tsconfig.json', import.meta.url))
-
+  it('reports the procedures of a lazy router given any', async () => {
     await expect(
       generator.generate(roundEightyFourLazyAny, {
         source: { file: fixture('round84.ts'), export: 'roundEightyFourLazyAny' },
@@ -619,8 +614,7 @@ describe('openAPIGenerator', () => {
       new OpenAPIGeneratorError(
         [
           '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
-          'Procedure at users.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".',
-          `Compiler errors:\n  Using the compiler options of "${tsconfig}".`,
+          'Procedure at users.list: Its type is "any". Give it a type, or schemas a converter supports.',
         ].join('\n\n'),
       ),
     )
@@ -1069,6 +1063,54 @@ describe('openAPIGenerator', () => {
             missing('2:39'),
             missing('4:32'),
             missing('5:32'),
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('reports a procedure written as any without the unrelated errors of its file', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import { os } from '@orpc/server'\nconst count: number = 'one'\nexport const router = { health: os.handler(() => 'ok'), ping: os.handler(() => count) as any }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { health: procedure, ping: procedure },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          'Procedure at ping: Its type is "any". Give it a type, or schemas a converter supports.',
+        ].join('\n\n'),
+      )
+    })
+
+    it('keeps the import hint for a procedure written as any in a file importing a missing module', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import { os } from '@orpc/server'\nconst path: string = './missing'\nexport const router = { users: os.lazy(() => import(path)), posts: os.lazy(() => import('./posts')) }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { users: { list: procedure }, posts: { list: procedure } },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at users.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+          `Procedure at posts.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/router.ts')}:3:89 - error TS2307: Cannot find module './posts' or its corresponding type declarations.`,
           ].join('\n  '),
         ].join('\n\n'),
       )

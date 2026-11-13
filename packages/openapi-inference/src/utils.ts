@@ -364,6 +364,19 @@ export function getFileErrors(program: Program, file: string): string[] {
 }
 
 /**
+ * The codes of a module the compiler does not find (`Cannot find module`, also of an import
+ * without the file extension `node16` needs), or finds without types (under `noImplicitAny`).
+ */
+const UNRESOLVED_MODULE_CODES = new Set([2307, 2792, 2834, 2835, 7016])
+
+/**
+ * Whether a file imports a module the compiler does not find, whose values are typed `any`.
+ */
+export function hasUnresolvedModule(program: Program, file: string): boolean {
+  return program.getSemanticDiagnostics(file).some((d) => UNRESOLVED_MODULE_CODES.has(d.code))
+}
+
+/**
  * Formats a diagnostic like `tsc`: `file:line:column - error TS2304: Cannot find name 'x'.`
  */
 export function formatDiagnostic(program: Program, diagnostic: Diagnostic): string {
