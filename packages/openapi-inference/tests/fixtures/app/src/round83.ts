@@ -154,7 +154,6 @@ export const roundEightyThree = {
     .handler(() => 1),
   // nor as what `toJSON` drops, which a value of `{}` or `object` may have
   emptyObjectPath: query('/empty-object-path/{id}')
-    // oxlint-disable-next-line typescript/no-empty-object-type -- what is written
     .input(type<{ id: {} }>())
     .handler(() => 1),
   objectPath: os
