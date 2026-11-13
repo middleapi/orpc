@@ -1,10 +1,11 @@
+import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
 import { TypeFlags } from 'typescript/unstable/sync'
 
 import { ExpansionGuard } from './expansion'
 import { getIndexKeyType, toPattern } from './key-patterns'
 import { TypeQueries } from './type-queries'
-import { getCallReturnType, getPromisedType, isMappedType } from './utils'
+import { getAssignedSymbol, getCallReturnType, getPromisedType, isMappedType } from './utils'
 
 export interface ResolvedRouterType {
   type: Type
@@ -46,10 +47,47 @@ export class RouterTypeResolver {
       }
 
       // optional sub-routers and procedures, like `...(dev ? { debug } : {})`
-      current = { type: this.unlazy(this.stripNullish(found.type)), symbol: found.symbol }
+      const type = this.stripNullish(found.type)
+      const loaded = found.symbol && this.getWrittenLoadedAny(found.symbol, type)
+      current = { type: loaded ?? this.unlazy(type), symbol: found.symbol }
     }
 
     return current
+  }
+
+  /**
+   * The `any` the loader of a lazy router resolves as it is written, like the `import()` of a
+   * module the compiler does not find, which the type of the lazy router does not show: it holds
+   * a router of any procedures instead.
+   */
+  private getWrittenLoadedAny(symbol: TSSymbol, type: Type): Type | undefined {
+    if (!this.getPath(type, ['~orpc', 'loader'])) {
+      return undefined
+    }
+
+    return this.types.memo('writtenLoadedAny', symbol.id, () => {
+      // `users: os.lazy(...)`, or `{ users }` and `users: usersRouter` of a variable
+      const loaders = [symbol, getAssignedSymbol(this.checker, symbol)].flatMap((s) =>
+        (s?.declarations ?? []).flatMap((declaration) => {
+          const initializer = (declaration.resolve() as any)?.initializer
+          return initializer?.kind === SyntaxKind.CallExpression ? [...initializer.arguments] : []
+        }),
+      )
+
+      if (!loaders.length) {
+        return undefined
+      }
+
+      return this.checker.getTypeAtLocation(loaders).flatMap((loader) => {
+        const promise = getCallReturnType(this.checker, loader)
+        const loaded = promise && getPromisedType(this.checker, promise)
+        const router =
+          loaded && !(loaded.flags & TypeFlags.Any)
+            ? this.getPropertyType(loaded, 'default')
+            : loaded
+        return router && router.flags & TypeFlags.Any ? [router] : []
+      })[0]
+    })
   }
 
   private resolveSegment(type: Type, segment: string): ResolvedRouterType | undefined {

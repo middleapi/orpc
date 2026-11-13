@@ -977,6 +977,53 @@ describe('openAPIGenerator', () => {
       )
     })
 
+    it('shows the errors behind a lazy router of a module the compiler can not resolve', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/sub/users.ts': `import { os } from '@orpc/server'\nexport const usersRouter = { list: os.handler(() => [1]) }\nexport default usersRouter\n`,
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          `const assigned = os.lazy(() => import('@/sub/users'))`,
+          'export const router = {',
+          `  loaded: os.lazy(() => import('@/sub/users')),`,
+          `  picked: os.lazy(() => import('@/sub/users').then((m) => ({ default: m.usersRouter }))),`,
+          '  assigned,',
+          '}',
+          '',
+        ].join('\n'),
+      })
+      const resolution = `Check its import, and the tsconfig "paths" for aliases like "@/".`
+      const missing = (position: string) =>
+        `${file('src/router.ts')}:${position} - error TS2307: Cannot find module '@/sub/users' or its corresponding type declarations.`
+
+      expect(
+        await message(
+          generator.generate(
+            {
+              loaded: { list: procedure },
+              picked: { list: procedure },
+              assigned: { list: procedure },
+            },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (3 errors):',
+          `Procedure at loaded.list: Could not resolve its type "any". ${resolution}`,
+          `Procedure at picked.list: Could not resolve its type "any". ${resolution}`,
+          `Procedure at assigned.list: Could not resolve its type "any". ${resolution}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            missing('2:39'),
+            missing('4:32'),
+            missing('5:32'),
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
     it('shows the errors of the router file when the type of its export can not be resolved', async () => {
       const file = project({
         'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
