@@ -200,4 +200,39 @@ describe('infer utilities', () => {
       | ThrowableError
     >()
   })
+
+  it('supports lazy and lazyable keys', () => {
+    type LazyRouter = { nested: Lazy<typeof errorRouter> }
+    type LazyableRouter = { nested: Lazyable<typeof errorRouter> }
+
+    type InitialContexts = InferRouterInitialContexts<typeof errorRouter>
+    expectTypeOf<
+      InferRouterInitialContexts<LazyRouter>['nested']
+    >().toEqualTypeOf<InitialContexts>()
+    expectTypeOf<
+      InferRouterInitialContexts<LazyableRouter>['nested']
+    >().toEqualTypeOf<InitialContexts>()
+
+    type FinalContexts = InferRouterFinalContexts<typeof errorRouter>
+    expectTypeOf<InferRouterFinalContexts<LazyRouter>['nested']>().toEqualTypeOf<FinalContexts>()
+    expectTypeOf<
+      InferRouterFinalContexts<LazyableRouter>['nested']
+    >().toEqualTypeOf<FinalContexts>()
+
+    type Inputs = InferRouterInputs<typeof errorRouter>
+    expectTypeOf<InferRouterInputs<LazyRouter>['nested']>().toEqualTypeOf<Inputs>()
+    expectTypeOf<InferRouterInputs<LazyableRouter>['nested']>().toEqualTypeOf<Inputs>()
+
+    type Outputs = InferRouterOutputs<typeof errorRouter>
+    expectTypeOf<InferRouterOutputs<LazyRouter>['nested']>().toEqualTypeOf<Outputs>()
+    expectTypeOf<InferRouterOutputs<LazyableRouter>['nested']>().toEqualTypeOf<Outputs>()
+
+    type Errors = InferRouterErrors<typeof errorRouter>
+    expectTypeOf<InferRouterErrors<LazyRouter>['nested']>().toEqualTypeOf<Errors>()
+    expectTypeOf<InferRouterErrors<LazyableRouter>['nested']>().toEqualTypeOf<Errors>()
+
+    type RouterError = InferRouterError<typeof errorRouter>
+    expectTypeOf<InferRouterError<LazyRouter>>().toEqualTypeOf<RouterError>()
+    expectTypeOf<InferRouterError<LazyableRouter>>().toEqualTypeOf<RouterError>()
+  })
 })

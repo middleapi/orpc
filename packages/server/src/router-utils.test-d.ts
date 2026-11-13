@@ -1,7 +1,7 @@
 import type { MergedErrorMap, Schema } from '@orpc/contract'
 
 import type { MergedInitialContext } from './context'
-import type { Lazy } from './lazy'
+import type { Lazy, Lazyable } from './lazy'
 import type { Procedure } from './procedure'
 import type {
   AugmentedRouter,
@@ -205,6 +205,10 @@ it('UnlaziedRouter', () => {
       ping: typeof ping
       pong: Lazy<typeof pong>
     }>,
+    lazyable: {} as Lazyable<{
+      ping: typeof ping
+      pong: Lazyable<typeof pong>
+    }>,
   }
 
   type Unlazied = UnlaziedRouter<typeof router>
@@ -213,6 +217,10 @@ it('UnlaziedRouter', () => {
     ping,
     pong,
     nested: {
+      ping,
+      pong,
+    },
+    lazyable: {
       ping,
       pong,
     },
