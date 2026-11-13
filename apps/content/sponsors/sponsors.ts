@@ -470,6 +470,18 @@ export default [
     "type": "User"
   },
   {
+    "name": "UsageRail",
+    "login": "usagerail",
+    "avatar": "https://avatars.githubusercontent.com/u/347653714?v=4",
+    "link": "https://usagerail.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Backer",
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-11-12T15:20:24Z",
+    "type": "Organization"
+  },
+  {
     "name": "Alex",
     "login": "piscis",
     "avatar": "https://avatars.githubusercontent.com/u/326163?u=b245f368bd940cf51d08c0b6bf55f8257f359437&v=4",
