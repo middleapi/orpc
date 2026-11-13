@@ -1,10 +1,11 @@
-import type { AnyNestedClient } from '@orpc/client'
+import type { AnyNestedClient, InferClientInputs } from '@orpc/client'
 import type { Schema } from '@orpc/contract'
 import * as z from 'zod'
 
 import { os } from './builder'
 import type { Lazyable } from './lazy'
 import type { ProcedureClient } from './procedure-client'
+import type { AnyRouter } from './router'
 import type { RouterClient } from './router-client'
 import { createRouterClient } from './router-client'
 
@@ -93,10 +94,39 @@ describe('RouterClient', () => {
     >()
   })
 
-  it('maps an optional key to never', () => {
-    type OptionalRouter = { ping?: typeof router.ping }
+  it('supports optional keys', () => {
+    type OptionalRouter = {
+      ping?: typeof router.ping
+      nested?: typeof router.nested
+      lazy?: typeof router.lazy
+      lazyable?: Lazyable<typeof router.nested>
+    }
 
-    expectTypeOf<RouterClient<OptionalRouter>>().toEqualTypeOf<{ ping?: never }>()
+    expectTypeOf<RouterClient<OptionalRouter>>().toEqualTypeOf<{
+      ping?: RouterClient<typeof router.ping>
+      nested?: RouterClient<typeof router.nested>
+      lazy?: RouterClient<typeof router>['lazy']
+      lazyable?: RouterClient<typeof router.nested>
+    }>()
+  })
+
+  it('supports a conditionally spread key', () => {
+    const dev = true as boolean
+    const conditional = os.router({ ping: router.ping, ...(dev ? { debug: router.ping } : {}) })
+    const client = createRouterClient(conditional)
+
+    expectTypeOf(client.debug).toEqualTypeOf<RouterClient<typeof router.ping> | undefined>()
+    expectTypeOf(client.debug?.({ schema1: 1 })).toEqualTypeOf<
+      ReturnType<typeof client.ping> | undefined
+    >()
+    expectTypeOf<InferClientInputs<typeof client>['ping']>().toEqualTypeOf<{ schema1: number }>()
+  })
+
+  it('supports AnyRouter', () => {
+    expectTypeOf<RouterClient<AnyRouter>>().toExtend<AnyNestedClient>()
+    expectTypeOf<
+      RouterClient<ReturnType<typeof os.router<AnyRouter>>>
+    >().toExtend<AnyNestedClient>()
   })
 
   it('support single procedure', () => {

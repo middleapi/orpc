@@ -19,6 +19,9 @@ import { Lazy } from './lazy'
 import type { Middleware, MiddlewareDone } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
 import type { Procedure } from './procedure'
+import type { ProcedureClient } from './procedure-client'
+import type { ContractedRouter } from './router'
+import { createRouterClient } from './router-client'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 
 const errorMap = {
@@ -978,6 +981,32 @@ describe('RouterImplementerWithMiddlewares', () => {
           meta: {},
         }),
       })
+    })
+
+    it('accepts a router annotated as ContractedRouter', () => {
+      const router = {} as ContractedRouter<TContract, { auth: boolean; extra: boolean }>
+
+      const implemented = implementer.router(router)
+
+      expectTypeOf(implemented).toEqualTypeOf<
+        AugmentedRouterWithMiddlewares<typeof router, { auth: boolean }, { extra: boolean }, object>
+      >()
+
+      type Ping = Procedure<
+        MergedInitialContext<
+          { auth: boolean },
+          { extra: boolean },
+          { auth: boolean; extra: boolean }
+        >,
+        any,
+        typeof schema1,
+        typeof schema2,
+        typeof errorMap
+      >
+      expectTypeOf(implemented.ping).toEqualTypeOf<Ping | Lazy<Ping>>()
+      expectTypeOf(
+        createRouterClient(implemented, { context: { auth: true } }).nested.pong,
+      ).toEqualTypeOf<ProcedureClient<object, typeof schema2, typeof schema1, object>>()
     })
 
     it('deep access', () => {

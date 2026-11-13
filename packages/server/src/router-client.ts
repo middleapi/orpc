@@ -32,7 +32,9 @@ export type RouterClient<
         ? RouterClient<TRouter[K], TClientContext>
         : TRouter[K] extends Lazyable<infer U extends AnyRouter>
           ? RouterClient<U, TClientContext>
-          : never
+          : TRouter[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? RouterClient<U, TClientContext>
+            : never
     }
 
 /**

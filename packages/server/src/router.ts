@@ -47,7 +47,9 @@ export type InferRouterInitialContexts<T extends AnyRouter> = T extends {
         ? InferRouterInitialContexts<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? InferRouterInitialContexts<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? InferRouterInitialContexts<U>
+            : never
     }
 
 /**
@@ -67,7 +69,9 @@ export type InferRouterFinalContexts<T extends AnyRouter> = T extends {
         ? InferRouterFinalContexts<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? InferRouterFinalContexts<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? InferRouterFinalContexts<U>
+            : never
     }
 
 /**
@@ -87,7 +91,9 @@ export type InferRouterInputs<T extends AnyRouter> = T extends {
         ? InferRouterInputs<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? InferRouterInputs<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? InferRouterInputs<U>
+            : never
     }
 
 /**
@@ -107,7 +113,9 @@ export type InferRouterOutputs<T extends AnyRouter> = T extends {
         ? InferRouterOutputs<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? InferRouterOutputs<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? InferRouterOutputs<U>
+            : never
     }
 
 /**
@@ -120,11 +128,13 @@ export type InferRouterError<T extends AnyRouter> = T extends {
 }
   ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
   : {
-      [K in keyof T]: T[K] extends AnyRouter
+      [K in keyof T]-?: T[K] extends AnyRouter
         ? InferRouterError<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? InferRouterError<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? InferRouterError<U>
+            : never
     }[keyof T]
 
 /**
@@ -141,5 +151,7 @@ export type InferRouterErrors<T extends AnyRouter> = T extends {
         ? InferRouterErrors<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? InferRouterErrors<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? InferRouterErrors<U>
+            : never
     }
