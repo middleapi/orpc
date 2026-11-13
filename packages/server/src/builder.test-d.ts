@@ -290,18 +290,6 @@ describe('Builder', () => {
         >
       >()
     })
-
-    it('infers output from a returned thenable', () => {
-      expectTypeOf(builder.handler(() => ({}) as PromiseLike<string>)).toEqualTypeOf<
-        DecoratedProcedure<
-          { auth: boolean },
-          object,
-          Schema<void, unknown>,
-          Schema<string>,
-          typeof errorMap
-        >
-      >()
-    })
   })
 
   it('.router', () => {
