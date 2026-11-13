@@ -243,7 +243,11 @@ import {
   roundEightyTwoUnresolved,
 } from '../tests/fixtures/app/src/round82'
 import { roundEightyTwoInterned } from '../tests/fixtures/app/src/round82-interned'
-import { roundEightyThreeNames, roundEightyThreeRoles } from '../tests/fixtures/app/src/round83'
+import {
+  roundEightyThree,
+  roundEightyThreeNames,
+  roundEightyThreeRoles,
+} from '../tests/fixtures/app/src/round83'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -5689,6 +5693,27 @@ describe('openAPIGenerator', () => {
         'Round83UserCard',
         'Tagged_2024_01',
         'Tagged_neg1',
+      ])
+    })
+
+    it('documents a path param whose value may be undefined as required, as a client sends it', async () => {
+      const spec = await generator.generate(roundEightyThree, {
+        source: { file: fixture('round83.ts'), export: 'roundEightyThree' },
+      })
+      const parameters = (path: string, method: string) =>
+        (spec.paths as any)[path][method].parameters
+
+      expect(parameters('/unknown-path/{id}', 'get')[0]).toEqual({
+        in: 'path',
+        required: true,
+        name: 'id',
+        schema: {},
+      })
+      expect(parameters('/any-path/{id}', 'post')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: {} },
+      ])
+      expect(parameters('/undefined-path/{id}', 'get')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
       ])
     })
 

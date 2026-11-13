@@ -141,6 +141,17 @@ export const roundEightyThree = {
     .route({ method: 'POST', path: '/array-path/{tags}' })
     .input(type<{ tags: string[]; x: number }>())
     .handler(() => 1),
+  // nor `undefined`, which a value of any type may be
+  unknownPath: query('/unknown-path/{id}')
+    .input(type<{ id: unknown; tags?: string[] }>())
+    .handler(() => 1),
+  anyPath: os
+    .route({ method: 'POST', path: '/any-path/{id}' })
+    .input(type<{ id: any; x: number }>())
+    .handler(() => 1),
+  undefinedPath: query('/undefined-path/{id}')
+    .input(type<{ id: string | undefined }>())
+    .handler(() => 1),
   detailedPath: os
     .route({ method: 'GET', path: '/detailed-path/{id}', inputStructure: 'detailed' })
     .input(type<{ params: { id: number | null }; query: { tags: string[] } }>())
@@ -195,6 +206,9 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
     { id: 'a', tags: ['b'] },
   ],
   arrayPath: () => [{ tags: ['a', 'b'], x: 1 }],
+  unknownPath: () => [{ id: 'a' }, { id: 1, tags: ['b'] }],
+  anyPath: () => [{ id: 'a', x: 1 }],
+  undefinedPath: () => [{ id: 'a' }],
   detailedPath: () => [{ params: { id: 1 }, query: { tags: [] } }],
   filterQuery: () => [{ f: { id: null, tags: [] } }],
   filterPath: () => [{ id: 'a', tags: [] }],
