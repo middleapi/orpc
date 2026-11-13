@@ -107,7 +107,9 @@ export class RouterTypeResolver {
       }
 
       const types = this.checker.getTypeAtLocation([...given, ...loaders])
-      const givenAny = types.slice(0, given.length).find((type) => type && type.flags & TypeFlags.Any)
+      const givenAny = types
+        .slice(0, given.length)
+        .find((type) => type && type.flags & TypeFlags.Any)
 
       return (
         givenAny ??
