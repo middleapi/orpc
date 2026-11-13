@@ -1157,8 +1157,8 @@ export class TypeQueries {
    * The type alias of the project without type parameters an object type without a name of its
    * own is declared with, which the compiler does not keep for it (`type User = InferSelectModel<typeof users>`),
    * of those of the files `readAliases` read: of the type, else the first one (see `preferAlias`)
-   * of a type of the same shape, which the compiler instantiates anew where it infers or awaits it
-   * (`Promise<User[]>`).
+   * of the same model (see `isSameModel`), which the compiler instantiates anew where it infers or
+   * awaits it (`Promise<User[]>`).
    */
   getLostAlias(type: Type): TSSymbol | undefined {
     const symbol = type.getSymbol()?.id ?? -1
@@ -1173,10 +1173,9 @@ export class TypeQueries {
     // the property types of the candidates, requested together
     const candidates = [...aliases.values()]
     this.getSymbolTypes(candidates.flatMap(([candidate]) => this.getProperties(candidate)))
-    const shape = this.getShape(type)
     let found: TSSymbol | undefined
     for (const [candidate, alias] of candidates) {
-      if (this.getShape(candidate) === shape) {
+      if (this.isSameModel(candidate, type)) {
         found = preferAlias(found, alias)
       }
     }
@@ -1207,6 +1206,30 @@ export class TypeQueries {
   }
 
   /**
+   * Whether two types of one symbol are the same model: of the same shape, with each property
+   * declared in the same places where the compiler links both to their declarations (not through
+   * a key remapping), so not a model of other columns with the same fields
+   * (`Pick<UserColumns, 'id' | 'name'>` for `TagColumns`).
+   */
+  private isSameModel(a: Type, b: Type): boolean {
+    if (this.getShape(a) !== this.getShape(b)) {
+      return false
+    }
+
+    const properties = this.getProperties(b)
+    return this.getProperties(a).every((property, i) => {
+      const declarations = property.declarations
+      const others = properties[i]!.declarations
+      return (
+        !declarations.length ||
+        !others.length ||
+        (declarations.length === others.length &&
+          declarations.every((d, j) => d.path === others[j]!.path && d.index === others[j]!.index))
+      )
+    })
+  }
+
+  /**
    * Records the alias of a type, and whether a conversion may have written the type without it.
    */
   private addLostAlias(type: Type, alias: TSSymbol): void {
@@ -1222,9 +1245,7 @@ export class TypeQueries {
     aliases.set(type.id, [type, preferred])
     const asked = this.askedTypes.get(symbol)
     this.lateAliases ||=
-      !!asked &&
-      (asked.has(type.id) ||
-        [...asked.values()].some((t) => this.getShape(t) === this.getShape(type)))
+      !!asked && (asked.has(type.id) || [...asked.values()].some((t) => this.isSameModel(t, type)))
   }
 
   /**

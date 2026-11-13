@@ -264,6 +264,7 @@ import {
   heldFirst,
   heldLast,
 } from '../tests/fixtures/library-aliases/src/orders'
+import { projections, projectionsReversed } from '../tests/fixtures/library-aliases/src/projections'
 import { router as libraryAliasesRouter } from '../tests/fixtures/library-aliases/src/router'
 import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
 import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
@@ -5524,6 +5525,36 @@ describe('openAPIGenerator', () => {
         expect(Object.keys(spec.components?.schemas ?? {})).toEqual(['Squad'])
         expect(response(spec, '/teams')).toEqual({ type: 'array', items: ref('Squad') })
         expect(response(spec, '/squads')).toEqual({ type: 'array', items: ref('Squad') })
+      }
+    })
+
+    it('names no model of other columns with the same fields after an alias', async () => {
+      const source = new URL(
+        '../tests/fixtures/library-aliases/src/projections.ts',
+        import.meta.url,
+      )
+      const summary = {
+        type: 'object',
+        properties: { id: { type: 'number' }, name: { type: 'string' } },
+        required: ['id', 'name'],
+      }
+
+      for (const [exported, router] of Object.entries({ projections, projectionsReversed })) {
+        const spec = await generator.generate(router, {
+          source: { file: source, export: exported },
+        })
+        const schemas = spec.components?.schemas as any
+
+        expect(schemas).toEqual({ Label: summary })
+        expect(response(spec, '/label')).toEqual(ref('Label'))
+        expect(response(spec, '/labelsAsync')).toEqual({ type: 'array', items: ref('Label') })
+        expect(response(spec, '/labelRows')).toEqual({ type: 'array', items: ref('Label') })
+        expect(response(spec, '/author')).toEqual(summary)
+        expect(response(spec, '/post').properties).toEqual({
+          title: { type: 'string' },
+          author: summary,
+          labels: { type: 'array', items: ref('Label') },
+        })
       }
     })
 
