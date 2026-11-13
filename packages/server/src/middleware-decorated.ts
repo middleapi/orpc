@@ -11,11 +11,6 @@ import type {
   MiddlewareResult,
 } from './middleware'
 
-/**
- * A type alias rather than an interface that extends `Middleware`: passing an interface
- * subtype to `.use()` makes TypeScript compare its call signature with `Middleware`
- * structurally on every use, which an intersection avoids.
- */
 export type DecoratedMiddleware<
   TInContext extends Context,
   TOutContext extends Context,
