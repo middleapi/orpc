@@ -116,7 +116,7 @@ export function middlewareGen<
     const effectContext = opts.context['effect/context']
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
     const ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<
-      MiddlewareResult<TOutContext, TOutput>,
+      Awaited<MiddlewareResult<TOutContext, TOutput>>,
       unknown
     >
 

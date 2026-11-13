@@ -11,13 +11,27 @@ import type {
   MiddlewareResult,
 } from './middleware'
 
-export interface DecoratedMiddleware<
+/**
+ * A type alias rather than an interface that extends `Middleware`: passing an interface
+ * subtype to `.use()` makes TypeScript compare its call signature with `Middleware`
+ * structurally on every use, which an intersection avoids.
+ */
+export type DecoratedMiddleware<
   TInContext extends Context,
   TOutContext extends Context,
   TInput,
   TOutput,
   TErrorMap extends ErrorMap,
-> extends Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
+> = Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> &
+  DecoratedMiddlewareMethods<TInContext, TOutContext, TInput, TOutput, TErrorMap>
+
+export interface DecoratedMiddlewareMethods<
+  TInContext extends Context,
+  TOutContext extends Context,
+  TInput,
+  TOutput,
+  TErrorMap extends ErrorMap,
+> {
   adaptInput<T>(
     adapt: (input: T) => TInput,
   ): DecoratedMiddleware<TInContext, TOutContext, T, TOutput, TErrorMap>

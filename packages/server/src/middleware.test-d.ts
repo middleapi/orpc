@@ -1,7 +1,7 @@
 import type { ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
 import * as z from 'zod'
 
-import type { Middleware } from './middleware'
+import type { Middleware, MiddlewareResultValue } from './middleware'
 
 const errorMap = {
   BASE: {
@@ -80,6 +80,21 @@ describe('Middleware', () => {
       // @ts-expect-error - missing out context
       return done({ output: '123' })
     }
+  })
+
+  it('can return a result directly or as a promise', () => {
+    type T = Middleware<object, { out: number }, unknown, string, typeof errorMap>
+
+    const sync: T = () => ({ output: '123', context: { out: 123 } })
+    const async: T = async ({ next }) => {
+      const result = await next({ context: { out: 123 } })
+      expectTypeOf(result).toEqualTypeOf<MiddlewareResultValue<{ out: number }, string>>()
+      return result
+    }
+    const promise: T = () => Promise.resolve({ output: '123', context: { out: 123 } })
+
+    // @ts-expect-error - invalid output
+    const invalid: T = async () => ({ output: 123, context: { out: 123 } })
   })
 
   it('can infer back error map', async () => {
