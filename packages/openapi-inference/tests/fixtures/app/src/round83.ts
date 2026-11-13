@@ -152,6 +152,15 @@ export const roundEightyThree = {
   undefinedPath: query('/undefined-path/{id}')
     .input(type<{ id: string | undefined }>())
     .handler(() => 1),
+  // nor as what `toJSON` drops, which a value of `{}` or `object` may have
+  emptyObjectPath: query('/empty-object-path/{id}')
+    // oxlint-disable-next-line typescript/no-empty-object-type -- what is written
+    .input(type<{ id: {} }>())
+    .handler(() => 1),
+  objectPath: os
+    .route({ method: 'POST', path: '/object-path/{id}' })
+    .input(type<{ id: object; x: number }>())
+    .handler(() => 1),
   detailedPath: os
     .route({ method: 'GET', path: '/detailed-path/{id}', inputStructure: 'detailed' })
     .input(type<{ params: { id: number | null }; query: { tags: string[] } }>())
@@ -209,6 +218,8 @@ export const roundEightyThreeInputs: Record<string, () => unknown[]> = {
   unknownPath: () => [{ id: 'a' }, { id: 1, tags: ['b'] }],
   anyPath: () => [{ id: 'a', x: 1 }],
   undefinedPath: () => [{ id: 'a' }],
+  emptyObjectPath: () => [{ id: 'a' }, { id: 1 }],
+  objectPath: () => [{ id: new Cents(5), x: 1 }],
   detailedPath: () => [{ params: { id: 1 }, query: { tags: [] } }],
   filterQuery: () => [{ f: { id: null, tags: [] } }],
   filterPath: () => [{ id: 'a', tags: [] }],

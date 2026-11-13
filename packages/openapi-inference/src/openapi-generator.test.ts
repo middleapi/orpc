@@ -5783,6 +5783,21 @@ describe('openAPIGenerator', () => {
       ])
     })
 
+    it('documents a path param of a type whose value may have a toJSON dropping it as required', async () => {
+      const spec = await generator.generate(roundEightyThree, {
+        source: { file: fixture('round83.ts'), export: 'roundEightyThree' },
+      })
+      const parameters = (path: string, method: string) =>
+        (spec.paths as any)[path][method].parameters
+
+      expect(parameters('/empty-object-path/{id}', 'get')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: {} },
+      ])
+      expect(parameters('/object-path/{id}', 'post')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: {} },
+      ])
+    })
+
     it.each([
       ['no componentName', undefined, 'Role'],
       ['the default componentName', (name: string) => name, 'Role'],

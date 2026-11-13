@@ -321,8 +321,8 @@ export class TypeToJsonSchemaConverter {
   private readonly typedArrayForms = new Map<number, 'typed' | 'plain'>()
   /**
    * The required fields of objects, by their `properties`, documented as optional only because
-   * their values may be `undefined` or bracket notation may send nothing for them, which a path
-   * parameter is never sent as, see `withPathFieldsRequired`
+   * their values may be `undefined`, or what `toJSON` drops, or bracket notation may send nothing
+   * for them, which a path parameter is never sent as, see `withPathFieldsRequired`
    */
   private readonly sentAsNothing = new WeakMap<object, readonly string[]>()
   /** Def schemas with their unions written as discriminated ones, see `withDiscriminators` */
@@ -1612,16 +1612,16 @@ export class TypeToJsonSchemaConverter {
           (type.isIntersectionType() || this.types.getMappedSourceMembers(type).length > 1)
         ) &&
         !(property.flags & SymbolFlags.Optional) &&
-        !this.mayDropThroughToJSON(propertyType, fieldsMode !== 'serializer') &&
         // an instance does not write a getter
         (!instanceProperties || instanceProperties.has(property)) &&
         // nor what a view copies from a built-in (`size` of `interface Tags extends Readonly<Set<string>>`)
         !(ownFields && !plain && isBuiltinMember(this.types, property))
       ) {
-        // `undefined` is not written, and bracket notation sends nothing for `null`, and an empty
-        // array or object
+        // `undefined` is not written, nor what `toJSON` drops (which `{}` may have), and bracket
+        // notation sends nothing for `null`, and an empty array or object
         if (
           this.isOptional(propertyType) ||
+          this.mayDropThroughToJSON(propertyType, fieldsMode !== 'serializer') ||
           ((this.parameters || selected === true) &&
             maySendNothing(propertySchema, (name) => this.defs.getSchema(name)))
         ) {
