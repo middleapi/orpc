@@ -171,7 +171,7 @@ importers:
         version: 6.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@2.9.0)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vitest@4.1.11)
       '@hono/node-server':
         specifier: ^2.1.6
-        version: 2.1.6(hono@4.13.5)
+        version: 2.1.6(hono@4.13.18)
       '@opentelemetry/api':
         specifier: ^1.10.0
         version: 1.10.0
@@ -629,7 +629,7 @@ importers:
     devDependencies:
       evlog:
         specifier: ^2.34.0
-        version: 2.34.0(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.3.2)(@orpc/server@packages+server)(ai@7.0.162(zod@4.6.7))(effect@4.1.2)(express@5.3.0(supports-color@10.2.2))(fastify@5.12.7)(h3@1.15.11)(hono@4.13.5)(next@16.4.4(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(ofetch@1.5.1)(react@19.3.1)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
+        version: 2.34.0(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.3.2)(@orpc/server@packages+server)(ai@7.0.162(zod@4.6.7))(effect@4.1.2)(express@5.3.0(supports-color@10.2.2))(fastify@5.12.7)(h3@1.15.11)(hono@4.13.18)(next@16.4.4(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(ofetch@1.5.1)(react@19.3.1)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
 
   packages/hibernation:
     dependencies:
@@ -8463,8 +8463,8 @@ packages:
   highlightjs-vue@1.0.0:
     resolution: {integrity: sha512-PDEfEF102G23vHmPhLyPboFCD+BkMGu+GuJe2d9/eH4FsCwvgBpnc9n0pGE+ffKdph38s6foEZiEjdgHdzp+IA==}
 
-  hono@4.13.5:
-    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
+  hono@4.13.18:
+    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -9596,6 +9596,7 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+    deprecated: This package is no longer needed on supported Node.js versions. Node.js 16+ includes AbortController and AbortSignal as built-in globals. All Node.js versions requiring this polyfill are end-of-life. Use the built-in globals instead.
 
   node-addon-api@8.9.2:
     resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
@@ -13315,9 +13316,9 @@ snapshots:
       '@tanstack/vue-virtual': 3.13.36(vue@3.5.44(typescript@7.0.2))
       vue: 3.5.44(typescript@7.0.2)
 
-  '@hono/node-server@2.1.6(hono@4.13.5)':
+  '@hono/node-server@2.1.6(hono@4.13.18)':
     dependencies:
-      hono: 4.13.5
+      hono: 4.13.18
 
   '@iconify-json/lucide@1.2.140':
     dependencies:
@@ -13748,7 +13749,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.4)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.6(hono@4.13.5)
+      '@hono/node-server': 2.1.6(hono@4.13.18)
       ajv: 8.20.0
       ajv-formats: 3.0.1
       content-type: 1.0.5
@@ -13758,7 +13759,7 @@ snapshots:
       eventsource-parser: 3.1.1
       express: 5.3.0(supports-color@10.2.2)
       express-rate-limit: 8.6.2(express@5.3.0(supports-color@10.2.2))(supports-color@10.2.2)
-      hono: 4.13.5
+      hono: 4.13.18
       jose: 6.2.10
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -19657,7 +19658,7 @@ snapshots:
     dependencies:
       eventsource-parser: 3.1.1
 
-  evlog@2.34.0(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.3.2)(@orpc/server@packages+server)(ai@7.0.162(zod@4.6.7))(effect@4.1.2)(express@5.3.0(supports-color@10.2.2))(fastify@5.12.7)(h3@1.15.11)(hono@4.13.5)(next@16.4.4(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(ofetch@1.5.1)(react@19.3.1)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)):
+  evlog@2.34.0(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.3.2)(@orpc/server@packages+server)(ai@7.0.162(zod@4.6.7))(effect@4.1.2)(express@5.3.0(supports-color@10.2.2))(fastify@5.12.7)(h3@1.15.11)(hono@4.13.18)(next@16.4.4(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(ofetch@1.5.1)(react@19.3.1)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)):
     optionalDependencies:
       '@nestjs/common': 12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
       '@nestjs/core': 12.3.2(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@12.3.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -19667,7 +19668,7 @@ snapshots:
       express: 5.3.0(supports-color@10.2.2)
       fastify: 5.12.7
       h3: 1.15.11
-      hono: 4.13.5
+      hono: 4.13.18
       next: 16.4.4(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       ofetch: 1.5.1
       react: 19.3.1
@@ -20327,7 +20328,7 @@ snapshots:
 
   highlightjs-vue@1.0.0: {}
 
-  hono@4.13.5: {}
+  hono@4.13.18: {}
 
   hookable@5.5.3: {}
 
