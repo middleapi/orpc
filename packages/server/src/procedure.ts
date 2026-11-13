@@ -5,6 +5,7 @@ import type {
   ProcedureContractDefinition,
 } from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
+import type { Promisable } from '@orpc/shared'
 import { getConstructor } from '@orpc/shared'
 
 import type { Context } from './context'
@@ -33,7 +34,7 @@ export interface ProcedureHandler<
   (
     opts: ProcedureHandlerOptions<TCurrentContext, TInput, TErrorConstructorMap>,
     input: TInput,
-  ): Promise<THandlerOutput> | THandlerOutput | PromiseLike<THandlerOutput>
+  ): Promisable<THandlerOutput>
 }
 
 export interface OrderedMiddleware {

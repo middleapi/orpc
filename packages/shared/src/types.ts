@@ -12,6 +12,11 @@ export type DistributiveOmit<T, K extends PropertyKey> = {
  */
 export type Public<T> = Pick<T, keyof T>
 
+/**
+ * A value, or a promise or thenable of it.
+ */
+export type Promisable<T> = Promise<T> | T | PromiseLike<T>
+
 export type PromiseWithError<T, TError> = Promise<T> & { __error?: { type: TError } }
 
 /**
