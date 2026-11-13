@@ -25,7 +25,7 @@ export type RouterClient<
   TClientContext extends ClientContext = object,
 > = RouterClientInner<TRouter, TClientContext>
 
-type RouterClientInner<T, TClientContext extends ClientContext> = T extends {
+export type RouterClientInner<T, TClientContext extends ClientContext> = T extends {
   '~orpc': ProcedureDefinition<any, any, infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
 }
   ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
