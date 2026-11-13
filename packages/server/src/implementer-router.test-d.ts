@@ -980,6 +980,67 @@ describe('RouterImplementerWithMiddlewares', () => {
       })
     })
 
+    it('context is conflict', () => {
+      const router = {
+        ping: {} as Procedure<
+          { auth: boolean; extra: boolean },
+          object,
+          typeof schema1,
+          typeof schema2,
+          typeof errorMap
+        >,
+        nested: {
+          pong: {} as Procedure<{ auth: boolean }, object, typeof schema2, typeof schema1, object>,
+        },
+        use: {} as Procedure<{ auth: boolean }, object, typeof schema3, typeof schema3, object>,
+        middleware: {} as Procedure<
+          { auth: boolean },
+          object,
+          typeof schema1,
+          typeof schema1,
+          object
+        >,
+        router: {
+          router: {} as Procedure<
+            { auth: boolean },
+            object,
+            typeof schema2,
+            typeof schema2,
+            object
+          >,
+        },
+        lazy: {
+          lazy: {} as Procedure<{ auth: boolean }, object, typeof schema2, typeof schema2, object>,
+        },
+      }
+
+      implementer.router(router)
+
+      implementer.router({
+        ...router,
+        // @ts-expect-error - context is conflict
+        ping: {} as Procedure<
+          { auth: 'invalid' },
+          object,
+          typeof schema1,
+          typeof schema2,
+          typeof errorMap
+        >,
+      })
+
+      implementer.router({
+        ...router,
+        // @ts-expect-error - context is conflict
+        ping: {} as Procedure<
+          { extra: 'invalid' },
+          object,
+          typeof schema1,
+          typeof schema2,
+          typeof errorMap
+        >,
+      })
+    })
+
     it('deep access', () => {
       const router = {
         pong: {} as Procedure<
