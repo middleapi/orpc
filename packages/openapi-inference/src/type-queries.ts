@@ -1382,11 +1382,14 @@ export class TypeQueries {
         return undefined
       }
 
-      const type = this.checker.getTypeAtLocation(typeNode)
-      const typeArguments = ((typeNode.typeArguments ?? []) as any[]).flatMap(
-        (node) => this.checker.getTypeFromTypeNode(node) ?? [],
-      )
-      return type ? { alias, type, typeArguments } : undefined
+      // the type and its type arguments, requested together
+      const [type, ...typeArguments] = this.checker.getTypeAtLocation([
+        typeNode,
+        ...(typeNode.typeArguments ?? []),
+      ])
+      return type
+        ? { alias, type, typeArguments: typeArguments.filter((t) => t !== undefined) }
+        : undefined
     })
   }
 }
