@@ -767,7 +767,7 @@ function getParameterFields(
  * instead of documenting `{}`.
  */
 function assertProcedureType(ctx: InferenceContext, resolved: ResolvedRouterType): void {
-  if (resolved.type.isErrorType()) {
+  if (resolved.type.flags & TypeFlags.Any) {
     throw new TypeScriptTypeResolutionError(
       `Could not resolve its type "${ctx.checker.typeToString(resolved.type)}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
     )

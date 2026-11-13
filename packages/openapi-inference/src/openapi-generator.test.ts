@@ -248,6 +248,7 @@ import {
   roundEightyThreeNames,
   roundEightyThreeRoles,
 } from '../tests/fixtures/app/src/round83'
+import { roundEightyFourAny } from '../tests/fixtures/app/src/round84'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -582,6 +583,24 @@ describe('openAPIGenerator', () => {
         { source: { file: fixture('router.ts') } },
       ),
     ).rejects.toThrow('Procedure at extra: its type was not found in the router type')
+  })
+
+  it('reports the procedures of a sub-router typed any as unresolved, with no compiler error', async () => {
+    const tsconfig = fileURLToPath(new URL('../tests/fixtures/app/tsconfig.json', import.meta.url))
+
+    await expect(
+      generator.generate(roundEightyFourAny, {
+        source: { file: fixture('round84.ts'), export: 'roundEightyFourAny' },
+      }),
+    ).rejects.toThrow(
+      new OpenAPIGeneratorError(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          'Procedure at users.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".',
+          `Compiler errors:\n  Using the compiler options of "${tsconfig}".`,
+        ].join('\n\n'),
+      ),
+    )
   })
 
   it('throws on a wrong source', async () => {
