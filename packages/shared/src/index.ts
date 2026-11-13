@@ -52,4 +52,4 @@ export {
 
 export type { AsyncCleanupFn, AsyncIteratorClassNextFn } from '@standard-server/shared'
 
-export type { Arrayable, IsEqual, PartialDeep, Promisable, Writable } from 'type-fest'
+export type { Arrayable, IsEqual, PartialDeep, Writable } from 'type-fest'

@@ -1,5 +1,4 @@
-import type { Promisable } from 'type-fest'
-
+import type { Promisable } from './types'
 import type { Value } from './value'
 import { value } from './value'
 

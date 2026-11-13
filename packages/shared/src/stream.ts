@@ -1,11 +1,11 @@
 import { AsyncIteratorClass } from '@standard-server/shared'
-import type { Promisable } from 'type-fest'
 
 import { once } from './function'
 import { isPlainObject } from './object'
 import { promiseWithResolvers } from './promise'
 import type { StartSpanOptions } from './tracing'
 import { recordSpanError, runInSpanContext, startSpan } from './tracing'
+import type { Promisable } from './types'
 import type { ThrowableError } from './types'
 
 export function replicateReadableStream<T>(
