@@ -39,7 +39,7 @@ import { setOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 import type { SourceFile } from 'typescript/unstable/ast'
 import { SyntaxKind } from 'typescript/unstable/ast'
 import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
-import { DiagnosticCategory, TypeFlags } from 'typescript/unstable/sync'
+import { TypeFlags } from 'typescript/unstable/sync'
 
 import { mergeEquivalentComponents } from './components'
 import type { TypeScriptProjectOptions } from './project'
@@ -58,8 +58,8 @@ import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type
 import type { SourceKind } from './utils'
 import {
   createSourceKindChecker,
-  formatDiagnostic,
   getAssignedSymbol,
+  getFileErrors,
   getImplementedSymbol,
   getJSDoc,
   getOrCreate,
@@ -845,12 +845,7 @@ function getCompilerErrors(
   }
 
   return [...files]
-    .flatMap((file) => [
-      ...ctx.program.getSyntacticDiagnostics(file),
-      ...ctx.program.getSemanticDiagnostics(file),
-    ])
-    .filter((d) => d.category === DiagnosticCategory.Error)
-    .map((d) => formatDiagnostic(ctx.program, d))
+    .flatMap((file) => getFileErrors(ctx.program, file))
     .concat(getUnresolvedModules(ctx, error.files))
 }
 

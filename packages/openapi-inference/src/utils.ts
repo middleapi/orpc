@@ -337,15 +337,7 @@ export function createTypeScriptProject(
 
       // the compiler knows why: a missing module, or a tsconfig "paths" alias it does not map
       if (!type || type.isErrorType()) {
-        const errors = [
-          ...describeConfig(),
-          ...[
-            ...program.getSyntacticDiagnostics(sourceFile.fileName),
-            ...program.getSemanticDiagnostics(sourceFile.fileName),
-          ]
-            .filter((d) => d.category === DiagnosticCategory.Error)
-            .map((d) => formatDiagnostic(program, d)),
-        ]
+        const errors = [...describeConfig(), ...getFileErrors(program, sourceFile.fileName)]
 
         throw new Error(
           `[TypeScript] Could not resolve the type of "${name}" in "${file}". Check its import, and the tsconfig "paths" for aliases like "@/".\n\nCompiler errors:${errors.map((e) => `\n  ${e}`).join('')}`,
@@ -357,6 +349,15 @@ export function createTypeScriptProject(
     describeConfig,
     close,
   }
+}
+
+/**
+ * The syntactic and semantic errors of a file, formatted (see `formatDiagnostic`).
+ */
+export function getFileErrors(program: Program, file: string): string[] {
+  return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)]
+    .filter((d) => d.category === DiagnosticCategory.Error)
+    .map((d) => formatDiagnostic(program, d))
 }
 
 /**

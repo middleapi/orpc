@@ -1287,12 +1287,7 @@ export class TypeQueries {
         ? this.getImportedSymbol(symbol, ...imported)
         : symbol && resolveAlias(this.checker, symbol)
 
-      if (
-        !alias ||
-        !(alias.flags & SymbolFlags.TypeAlias) ||
-        this.aliasSymbols.has(alias.id) ||
-        this.getSymbolSourceKind(alias) !== 'project'
-      ) {
+      if (!this.isProjectTypeAlias(alias) || this.aliasSymbols.has(alias.id)) {
         continue
       }
 
@@ -1346,6 +1341,14 @@ export class TypeQueries {
     return symbol && this.memo('aliased', symbol.id, () => resolveAlias(this.checker, symbol))
   }
 
+  private isProjectTypeAlias(symbol: TSSymbol | undefined): symbol is TSSymbol {
+    return (
+      symbol !== undefined &&
+      Boolean(symbol.flags & SymbolFlags.TypeAlias) &&
+      this.getSymbolSourceKind(symbol) === 'project'
+    )
+  }
+
   /**
    * The project type alias the type annotation of a property names (`count?: Count | null`),
    * with its instantiated type (`Maybe<string>` rather than `T | null`).
@@ -1375,11 +1378,7 @@ export class TypeQueries {
       const symbol = this.checker.getSymbolAtLocation(typeNode.typeName)
       const alias = symbol && resolveAlias(this.checker, symbol)
 
-      if (
-        !alias ||
-        !(alias.flags & SymbolFlags.TypeAlias) ||
-        this.getSymbolSourceKind(alias) !== 'project'
-      ) {
+      if (!this.isProjectTypeAlias(alias)) {
         return undefined
       }
 
