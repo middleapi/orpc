@@ -576,7 +576,7 @@ export class TypeQueries {
     const missing = symbols.filter((s) => !this.symbolTypes.has(s.id))
 
     if (missing.length) {
-      const fetched = this.checker.getTypeOfSymbol([...missing])
+      const fetched = this.checker.getTypeOfSymbol(missing)
       missing.forEach((s, i) => this.symbolTypes.set(s.id, fetched[i]))
     }
 

@@ -406,13 +406,8 @@ export class OpenAPIGenerator {
     procedure: WalkedProcedure,
     resolved: ResolvedRouterType,
   ): AnyProcedureContract {
-    const { contract } = procedure
-    const def = contract['~orpc']
-
-    const { inline, parametersOnly } = getConvertOptions(getOpenAPIMeta(contract))
-
-    const isSupported = (schema: AnySchema, direction: JsonSchemaConverterDirection) =>
-      ctx.schemaConverter.condition(schema, direction)
+    const def = procedure.contract['~orpc']
+    const { inline, parametersOnly } = getConvertOptions(getOpenAPIMeta(procedure.contract))
 
     /**
      * Infers a slot (an input, an output or error data) from its type, which `getType` reads from
@@ -458,7 +453,7 @@ export class OpenAPIGenerator {
       schemas: AnySchema[] | undefined,
       direction: JsonSchemaConverterDirection,
     ): AnySchema[] | undefined => {
-      const supported = (s: AnySchema) => isSupported(s, direction)
+      const supported = (s: AnySchema) => ctx.schemaConverter.condition(s, direction)
       const iterator = getAsyncIteratorObjectSchemasDetails(schemas)
       const leaves = iterator
         ? [...iterator.yieldSchemas, ...iterator.returnSchemas]
@@ -569,7 +564,7 @@ export class OpenAPIGenerator {
       const config = def.errorMap[code]
       let data: AnySchema | undefined
 
-      if (config?.data && !isSupported(config.data, 'output')) {
+      if (config?.data && !ctx.schemaConverter.condition(config.data, 'output')) {
         data = inferSlot(
           [config.data],
           'output',
