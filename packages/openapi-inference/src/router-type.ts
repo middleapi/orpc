@@ -86,32 +86,41 @@ export class RouterTypeResolver {
 
   /**
    * The `any` the loader of a lazy router resolves as it is written, like the `import()` of a
-   * module the compiler does not find, which the type of the lazy router does not show: it holds
-   * a router of any procedures instead.
+   * module the compiler does not find, or the `any` it is given (`os.lazy<any>(...)`), which the
+   * type of the lazy router does not show: it holds a router of any procedures instead.
    */
   private getWrittenLoadedAny(symbol: TSSymbol): Type | undefined {
     return this.types.memo('writtenLoadedAny', symbol.id, () => {
       // `users: os.lazy(...)`, or `{ users }` and `users: usersRouter` of a variable
-      const loaders = [symbol, getAssignedSymbol(this.checker, symbol)].flatMap((s) =>
+      const calls = [symbol, getAssignedSymbol(this.checker, symbol)].flatMap((s) =>
         (s?.declarations ?? []).flatMap((declaration) => {
           const initializer = (declaration.resolve() as any)?.initializer
-          return initializer?.kind === SyntaxKind.CallExpression ? [...initializer.arguments] : []
+          return initializer?.kind === SyntaxKind.CallExpression ? [initializer] : []
         }),
       )
+      // `os.lazy<any>(...)` is given the `any` it loads
+      const given = calls.flatMap((call) => [...(call.typeArguments ?? [])])
+      const loaders = calls.flatMap((call) => [...call.arguments])
 
-      if (!loaders.length) {
+      if (!given.length && !loaders.length) {
         return undefined
       }
 
-      return this.checker.getTypeAtLocation(loaders).flatMap((loader) => {
-        const promise = getCallReturnType(this.checker, loader)
-        const loaded = promise && getPromisedType(this.checker, promise)
-        const router =
-          loaded && !(loaded.flags & TypeFlags.Any)
-            ? this.getPropertyType(loaded, 'default')
-            : loaded
-        return router && router.flags & TypeFlags.Any ? [router] : []
-      })[0]
+      const types = this.checker.getTypeAtLocation([...given, ...loaders])
+      const givenAny = types.slice(0, given.length).find((type) => type && type.flags & TypeFlags.Any)
+
+      return (
+        givenAny ??
+        types.slice(given.length).flatMap((loader) => {
+          const promise = getCallReturnType(this.checker, loader)
+          const loaded = promise && getPromisedType(this.checker, promise)
+          const router =
+            loaded && !(loaded.flags & TypeFlags.Any)
+              ? this.getPropertyType(loaded, 'default')
+              : loaded
+          return router && router.flags & TypeFlags.Any ? [router] : []
+        })[0]
+      )
     })
   }
 

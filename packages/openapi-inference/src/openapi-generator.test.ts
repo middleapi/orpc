@@ -252,6 +252,7 @@ import {
   roundEightyFourAny,
   roundEightyFourAnyExport,
   roundEightyFourLazy,
+  roundEightyFourLazyAny,
 } from '../tests/fixtures/app/src/round84'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
@@ -595,6 +596,24 @@ describe('openAPIGenerator', () => {
     await expect(
       generator.generate(roundEightyFourAny, {
         source: { file: fixture('round84.ts'), export: 'roundEightyFourAny' },
+      }),
+    ).rejects.toThrow(
+      new OpenAPIGeneratorError(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          'Procedure at users.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".',
+          `Compiler errors:\n  Using the compiler options of "${tsconfig}".`,
+        ].join('\n\n'),
+      ),
+    )
+  })
+
+  it('reports a lazy router given any as unresolved', async () => {
+    const tsconfig = fileURLToPath(new URL('../tests/fixtures/app/tsconfig.json', import.meta.url))
+
+    await expect(
+      generator.generate(roundEightyFourLazyAny, {
+        source: { file: fixture('round84.ts'), export: 'roundEightyFourLazyAny' },
       }),
     ).rejects.toThrow(
       new OpenAPIGeneratorError(

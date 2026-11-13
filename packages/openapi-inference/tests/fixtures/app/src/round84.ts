@@ -23,3 +23,9 @@ export const roundEightyFourLazy = {
   ),
   assigned,
 }
+
+/** A lazy router given `any`, whose procedures have no types to infer from */
+export const roundEightyFourLazyAny = {
+  health: os.handler(() => 'ok'),
+  users: os.lazy<any>(() => Promise.resolve({ default: usersRouter })),
+}
