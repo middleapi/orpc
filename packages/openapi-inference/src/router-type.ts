@@ -28,12 +28,17 @@ export class RouterTypeResolver {
   }
 
   /**
-   * Resolves the type at a router path, unwrapping lazy routers on the way.
+   * Resolves the type at a router path, unwrapping lazy routers on the way. A router the compiler
+   * can not resolve, like one of an import it does not find, is the type of its procedures too.
    */
   resolve(path: readonly string[]): ResolvedRouterType | undefined {
     let current: ResolvedRouterType = { ...this.root, type: this.unlazy(this.root.type) }
 
     for (const segment of path) {
+      if (current.type.isErrorType()) {
+        return current
+      }
+
       const found = this.resolveSegment(current.type, segment)
 
       if (!found) {

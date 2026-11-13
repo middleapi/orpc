@@ -921,6 +921,39 @@ describe('openAPIGenerator', () => {
       )
     })
 
+    it('shows the errors behind a sub-router the compiler can not resolve, like one of a missing alias', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/sub/users.ts': `import { os } from '@orpc/server'\nexport const usersRouter = { list: os.handler(() => [1]) }\n`,
+        'src/router.ts': `import { os } from '@orpc/server'\nimport { usersRouter } from '@/sub/users'\nexport const router = { health: os.handler(() => 'ok'), users: usersRouter, lazy: os.lazy(async () => ({ default: { users: usersRouter } })) }\n`,
+      })
+      const resolution = `Check its import, and the tsconfig "paths" for aliases like "@/".`
+
+      expect(
+        await message(
+          generator.generate(
+            {
+              health: procedure,
+              users: { list: procedure },
+              lazy: os.lazy(async () => ({ default: { users: { list: procedure } } })),
+            },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at users.list: Could not resolve its type "any". ${resolution}`,
+          `Procedure at lazy.users.list: Could not resolve its type "any". ${resolution}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/router.ts')}:2:29 - error TS2307: Cannot find module '@/sub/users' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
     it('shows the errors of the router file when the type of its export can not be resolved', async () => {
       const file = project({
         'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
