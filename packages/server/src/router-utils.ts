@@ -13,62 +13,64 @@ import type { Context, MergedInitialContext } from './context'
 import type { Lazyable } from './lazy'
 import { Lazy, unlazy } from './lazy'
 import type { AnyMiddleware } from './middleware'
-import type { AnyProcedure, ProcedureConfig } from './procedure'
+import type { AnyProcedure, ProcedureConfig, ProcedureDefinition } from './procedure'
 import { Procedure } from './procedure'
 import { createContractProcedure } from './procedure-utils'
 import type { AnyRouter } from './router'
 import { getHiddenRouterContract } from './router-hidden'
 
-export type AugmentedRouter<T extends AnyRouter, TErrorMap extends ErrorMap> =
-  T extends Procedure<
+export type AugmentedRouter<T extends AnyRouter, TErrorMap extends ErrorMap> = T extends {
+  '~orpc': ProcedureDefinition<
     infer $InitialContext,
     infer $CurrentContext,
     infer $InputSchema,
     infer $OutputSchema,
     infer $ErrorMap
   >
-    ? Procedure<
-        $InitialContext,
-        $CurrentContext,
-        $InputSchema,
-        $OutputSchema,
-        MergedErrorMap<TErrorMap, $ErrorMap>
-      >
-    : {
-        [K in keyof T]: T[K] extends Lazy<infer $ extends AnyRouter>
+}
+  ? Procedure<
+      $InitialContext,
+      $CurrentContext,
+      $InputSchema,
+      $OutputSchema,
+      MergedErrorMap<TErrorMap, $ErrorMap>
+    >
+  : {
+      [K in keyof T]: T[K] extends AnyRouter
+        ? AugmentedRouter<T[K], TErrorMap>
+        : T[K] extends Lazy<infer $ extends AnyRouter>
           ? Lazy<AugmentedRouter<$, TErrorMap>>
-          : T[K] extends AnyRouter
-            ? AugmentedRouter<T[K], TErrorMap>
-            : never
-      }
+          : never
+    }
 
 export type AugmentedRouterWithMiddlewares<
   T extends AnyRouter,
   TInitialContext extends Context,
   TInjectedContext extends Context,
   TErrorMap extends ErrorMap,
-> =
-  T extends Procedure<
+> = T extends {
+  '~orpc': ProcedureDefinition<
     infer $InitialContext,
     infer $CurrentContext,
     infer $InputSchema,
     infer $OutputSchema,
     infer $ErrorMap
   >
-    ? Procedure<
-        MergedInitialContext<TInitialContext, TInjectedContext, $InitialContext>,
-        $CurrentContext,
-        $InputSchema,
-        $OutputSchema,
-        MergedErrorMap<TErrorMap, $ErrorMap>
-      >
-    : {
-        [K in keyof T]: T[K] extends Lazy<infer $ extends AnyRouter>
+}
+  ? Procedure<
+      MergedInitialContext<TInitialContext, TInjectedContext, $InitialContext>,
+      $CurrentContext,
+      $InputSchema,
+      $OutputSchema,
+      MergedErrorMap<TErrorMap, $ErrorMap>
+    >
+  : {
+      [K in keyof T]: T[K] extends AnyRouter
+        ? AugmentedRouterWithMiddlewares<T[K], TInitialContext, TInjectedContext, TErrorMap>
+        : T[K] extends Lazy<infer $ extends AnyRouter>
           ? Lazy<AugmentedRouterWithMiddlewares<$, TInitialContext, TInjectedContext, TErrorMap>>
-          : T[K] extends AnyRouter
-            ? AugmentedRouterWithMiddlewares<T[K], TInitialContext, TInjectedContext, TErrorMap>
-            : never
-      }
+          : never
+    }
 
 interface AugmentRouterOptions<TErrorMap extends ErrorMap>
   extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
