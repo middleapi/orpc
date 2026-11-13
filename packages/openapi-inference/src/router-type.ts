@@ -35,6 +35,11 @@ export class RouterTypeResolver {
   resolve(path: readonly string[]): ResolvedRouterType | undefined {
     let current: ResolvedRouterType = { ...this.root, type: this.unlazy(this.root.type) }
 
+    // an export written as `any` is no router, unlike one of an import the compiler does not find
+    if (current.type.flags & TypeFlags.Any && !current.type.isErrorType()) {
+      return undefined
+    }
+
     for (const segment of path) {
       if (current.type.flags & TypeFlags.Any) {
         return current
@@ -48,11 +53,35 @@ export class RouterTypeResolver {
 
       // optional sub-routers and procedures, like `...(dev ? { debug } : {})`
       const type = this.stripNullish(found.type)
-      const loaded = found.symbol && this.getWrittenLoadedAny(found.symbol, type)
-      current = { type: loaded ?? this.unlazy(type), symbol: found.symbol }
+      const unlazied = this.unlazy(type)
+      const loaded =
+        found.symbol && this.holdsNoRouter(type, unlazied)
+          ? this.getWrittenLoadedAny(found.symbol)
+          : undefined
+      current = { type: loaded ?? unlazied, symbol: found.symbol }
     }
 
     return current
+  }
+
+  /**
+   * Whether a lazy router loads the `AnyRouter` its type parameter is constrained to, as it does
+   * when its type is inferred from a loader resolving `any`, instead of a router it is given, like
+   * `os.lazy<typeof usersRouter>(...)` or `const users: Lazy<Users> = os.lazy(...)`.
+   */
+  private holdsNoRouter(lazy: Type, unlazied: Type): boolean {
+    if (unlazied.id === lazy.id || !unlazied.isUnionType()) {
+      return false
+    }
+
+    // `Procedure<...> | { [k: string]: Lazyable<Router<...>> }`
+    return this.types.memo('holdsNoRouter', unlazied.id, () => {
+      const members = this.types.getMembers(unlazied)
+      return (
+        members.some((member) => this.checker.getIndexInfosOfType(member).length > 0) &&
+        members.some((member) => this.isProcedure(member))
+      )
+    })
   }
 
   /**
@@ -60,11 +89,7 @@ export class RouterTypeResolver {
    * module the compiler does not find, which the type of the lazy router does not show: it holds
    * a router of any procedures instead.
    */
-  private getWrittenLoadedAny(symbol: TSSymbol, type: Type): Type | undefined {
-    if (!this.getPath(type, ['~orpc', 'loader'])) {
-      return undefined
-    }
-
+  private getWrittenLoadedAny(symbol: TSSymbol): Type | undefined {
     return this.types.memo('writtenLoadedAny', symbol.id, () => {
       // `users: os.lazy(...)`, or `{ users }` and `users: usersRouter` of a variable
       const loaders = [symbol, getAssignedSymbol(this.checker, symbol)].flatMap((s) =>

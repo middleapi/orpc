@@ -248,7 +248,11 @@ import {
   roundEightyThreeNames,
   roundEightyThreeRoles,
 } from '../tests/fixtures/app/src/round83'
-import { roundEightyFourAny } from '../tests/fixtures/app/src/round84'
+import {
+  roundEightyFourAny,
+  roundEightyFourAnyExport,
+  roundEightyFourLazy,
+} from '../tests/fixtures/app/src/round84'
 import { router } from '../tests/fixtures/app/src/router'
 import streamRouter from '../tests/fixtures/app/src/routers/stream'
 import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
@@ -601,6 +605,33 @@ describe('openAPIGenerator', () => {
         ].join('\n\n'),
       ),
     )
+  })
+
+  it('reports an export typed any as no router', async () => {
+    const file = fixture('round84.ts')
+
+    await expect(
+      generator.generate(roundEightyFourAnyExport, {
+        source: { file, export: 'roundEightyFourAnyExport' },
+      }),
+    ).rejects.toThrow(
+      new OpenAPIGeneratorError(
+        `[OpenAPIGenerator] The export "roundEightyFourAnyExport" of "${fileURLToPath(file)}" has type "any", which is not a router, procedure or contract.`,
+      ),
+    )
+  })
+
+  it('documents a lazy router from the router type it is given, though its loader resolves any', async () => {
+    const spec = await generator.generate(roundEightyFourLazy, {
+      source: { file: fixture('round84.ts'), export: 'roundEightyFourLazy' },
+    })
+    const schema = { type: 'array', items: { type: 'number' } }
+
+    for (const name of ['given', 'cast', 'assigned']) {
+      expect(
+        (spec.paths as any)[`/${name}/list`].post.responses[200].content['application/json'],
+      ).toEqual({ schema })
+    }
   })
 
   it('throws on a wrong source', async () => {
