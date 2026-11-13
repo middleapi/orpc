@@ -193,6 +193,9 @@ importers:
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:packages/lock
+      '@orpc/experimental-openapi-inference':
+        specifier: workspace:*
+        version: link:packages/openapi-inference
       '@orpc/hibernation':
         specifier: workspace:*
         version: link:packages/hibernation
@@ -241,6 +244,9 @@ importers:
       '@orpc/zod':
         specifier: workspace:*
         version: link:packages/zod
+      '@scalar/openapi-parser':
+        specifier: ^0.29.11
+        version: 0.29.11
       '@standard-server/core':
         specifier: ~0.16.0
         version: 0.16.0
@@ -280,6 +286,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.11
         version: 4.1.11(vitest@4.1.11)
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       arktype:
         specifier: ^2.2.9
         version: 2.2.9

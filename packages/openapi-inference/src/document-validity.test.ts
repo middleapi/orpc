@@ -4,7 +4,6 @@ import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { validate } from '@scalar/openapi-parser'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
-import { router as bunRouter } from '../../../playgrounds/bun/src/routers/index'
 import { builtinTypes } from '../tests/fixtures/app/src/builtin-types'
 import { classViews } from '../tests/fixtures/app/src/class-views'
 import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
@@ -33,7 +32,7 @@ const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, i
 
 /**
  * Routers with built-ins, tuples, files, event streams, detailed inputs and outputs, headers,
- * parameters of any value, and a real application.
+ * and parameters of any value (`tests/openapi-inference` checks the playground apps).
  */
 const ROUTERS: [name: string, router: AnyRouter, file: URL, exportName: string][] = [
   ['router', router, fixture('router.ts'), 'router'],
@@ -43,12 +42,6 @@ const ROUTERS: [name: string, router: AnyRouter, file: URL, exportName: string][
   ['deep views', classViews, fixture('class-views.ts'), 'classViews'],
   ['loose parameters', splitParameters, fixture('standard-schemas.ts'), 'splitParameters'],
   ['detailed bodies', detailedUnions, fixture('detailed-unions.ts'), 'detailedUnions'],
-  [
-    'bun playground',
-    bunRouter,
-    new URL('../../../playgrounds/bun/src/routers/index.ts', import.meta.url),
-    'router',
-  ],
 ]
 
 const VERSIONS: OpenAPIVersion[] = ['3.2.0', '3.1.1', '3.0.4']
