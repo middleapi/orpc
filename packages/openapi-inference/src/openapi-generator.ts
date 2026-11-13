@@ -52,7 +52,7 @@ import type {
   AsyncIteratorTypes,
   ParameterFields,
   TypeToJsonSchemaConverterOptions,
-  TypeToJsonSchemaConvertOptions,
+  TypeToJsonSchemaConverterConvertOptions,
 } from './type-converter'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter'
 import type { SourceKind } from './utils'
@@ -473,7 +473,7 @@ export class OpenAPIGenerator {
         const complete = (
           parts: AnySchema[],
           partTypes: (Type | readonly Type[] | undefined)[],
-          options?: TypeToJsonSchemaConvertOptions,
+          options?: TypeToJsonSchemaConverterConvertOptions,
           output = false,
         ): AnySchema[] => {
           if (parts.length && parts.every(supported)) {
@@ -625,7 +625,7 @@ function walkProcedure(
  * How the input and output of a procedure are converted, as the stock generator documents them.
  */
 function getConvertOptions(meta: OpenAPIMeta | undefined): {
-  inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions>
+  inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverterConvertOptions>
   /** Whether the stock generator reads only parameters from the input, the fields of an object */
   parametersOnly: boolean
 } {
@@ -640,7 +640,7 @@ function getConvertOptions(meta: OpenAPIMeta | undefined): {
     getDynamicPathParams(`${meta?.prefix ?? ''}${meta?.path ?? ''}` as `/${string}`)?.map(
       (p) => p.parameterName,
     ) ?? []
-  const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConvertOptions> = {
+  const inline: Record<JsonSchemaConverterDirection, TypeToJsonSchemaConverterConvertOptions> = {
     input: {
       inlineRoot: parametersOnly || pathParameters.length > 0,
       inlineProperties: inputDetailed ? ['params', 'query', 'headers'] : undefined,
@@ -735,7 +735,7 @@ function getFieldsExcept(except: string[]): true | ParameterFields {
 
 /**
  * The fields of an input a client sends in the URL with bracket notation (see
- * `TypeToJsonSchemaConvertOptions.parameters`): those of the query string and the path, but the
+ * `TypeToJsonSchemaConverterConvertOptions.parameters`): those of the query string and the path, but the
  * ones of a style (`queryStyles`, `paramsStyles`), whose values are sent in their serialized forms.
  */
 function getParameterFields(

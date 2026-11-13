@@ -113,6 +113,7 @@ export class TypeScriptTypeResolutionError extends TypeError {
   /** The files declaring the types and properties the conversion went through to reach it */
   readonly files: Set<string> = new Set()
 
+  /** @internal */
   addDeclarations(symbol: TSSymbol | undefined): void {
     for (const declaration of symbol?.declarations ?? []) {
       this.files.add(declaration.path)
@@ -143,7 +144,7 @@ export interface TypeToJsonSchemaConverterOptions {
   direction?: 'input' | 'output' | undefined
 }
 
-export interface TypeToJsonSchemaConvertOptions {
+export interface TypeToJsonSchemaConverterConvertOptions {
   /**
    * Inline the root def (and the defs of a root union) when it is not recursive,
    * for schemas that are split into parts like path params, query, headers, and body,
@@ -162,6 +163,8 @@ export interface TypeToJsonSchemaConvertOptions {
   /**
    * With `inlineRoot`, the root properties whose fields are sent each on their own, like `query`
    * and `headers` of a detailed input: when one may be missing, so may each of its fields.
+   *
+   * @internal
    */
   partialProperties?: readonly string[] | undefined
 
@@ -169,6 +172,8 @@ export interface TypeToJsonSchemaConvertOptions {
    * With `inlineRoot`, the root properties whose fields are sent each on their own, but required
    * as the type requires them, like the `headers` of a detailed output, which the stock generator
    * reads by status. `partialProperties` by default.
+   *
+   * @internal
    */
   separateProperties?: readonly string[] | undefined
 
@@ -217,17 +222,21 @@ export interface TypeToJsonSchemaConvertOptions {
    * The fields of the root, or of its `property` (`params` of a detailed input), a client sends in
    * the path. It sends them whole, and an empty one fails, so they stay as required as their types
    * are, also when bracket notation would send nothing for them (see `parameters`).
+   *
+   * @internal
    */
   pathParameters?: PathParameters | undefined
 
   /**
    * The root property holding the headers a client sends (`headers` of a detailed input), which
    * leaves out a header it writes as nothing: `null`, or an array of no line.
+   *
+   * @internal
    */
   headersProperty?: string | undefined
 }
 
-/** The fields sent in the path, see `TypeToJsonSchemaConvertOptions.pathParameters` */
+/** The fields sent in the path, see `TypeToJsonSchemaConverterConvertOptions.pathParameters` */
 export interface PathParameters {
   readonly names: readonly string[]
   /** The root property holding them, the root itself by default */
@@ -235,7 +244,7 @@ export interface PathParameters {
 }
 
 /**
- * The fields of an object holding parameters (see `TypeToJsonSchemaConvertOptions.parameters`):
+ * The fields of an object holding parameters (see `TypeToJsonSchemaConverterConvertOptions.parameters`):
  * all of them but `except`, or only those of `only`, each one whole (`true`) or by its own fields.
  * The fields of a plain object only, else none of them.
  */
@@ -263,7 +272,7 @@ interface ObjectForm {
   plain?: boolean
   /** Converts a built-in subclass by its own fields, as `JSON.stringify` writes what `toJSON` returned */
   ownFields?: boolean
-  /** Converts the `body` property as a whole body (see `TypeToJsonSchemaConvertOptions.body`) */
+  /** Converts the `body` property as a whole body (see `TypeToJsonSchemaConverterConvertOptions.body`) */
   bodyProperty?: boolean
 }
 
@@ -340,7 +349,7 @@ export class TypeToJsonSchemaConverter {
    *   either form, field by field, so views along a chain of views are written once each.
    */
   private mode: ConversionMode = 'serializer'
-  /** Whether the value being converted is a parameter, see `TypeToJsonSchemaConvertOptions.parameters` */
+  /** Whether the value being converted is a parameter, see `TypeToJsonSchemaConverterConvertOptions.parameters` */
   private parameters = false
   /** The depth of the object holding the parameters, its fields (the root, or `query`) */
   private parametersDepth = 0
@@ -380,7 +389,7 @@ export class TypeToJsonSchemaConverter {
    */
   convert(
     type: Type | readonly Type[],
-    options: TypeToJsonSchemaConvertOptions = {},
+    options: TypeToJsonSchemaConverterConvertOptions = {},
   ): [jsonSchema: JsonSchema, optional: boolean] {
     // a list of types is their union, like the yield types of a union of async iterators
     const members = (Array.isArray(type) ? type : [type]).flatMap((t) =>
@@ -511,6 +520,8 @@ export class TypeToJsonSchemaConverter {
    * Reads the type aliases the files of these declarations declare or import, like the files of
    * a router's procedures, which name the models whose types lost them (see
    * `TypeToJsonSchemaConverterOptions.defs`), as do the files of the properties converted.
+   *
+   * @internal
    */
   readAliases(declarations: readonly NodeHandle[]): void {
     this.types.readAliases(declarations)
@@ -520,6 +531,8 @@ export class TypeToJsonSchemaConverter {
    * Whether the aliases read since the last call (see `readAliases`) name types a conversion of
    * this program wrote before, in which case the converters created afterwards give def names anew,
    * so converting again names each type the same, whichever procedure reaches it first.
+   *
+   * @internal
    */
   takeLateAliases(): boolean {
     const late = this.types.takeLateAliases()
@@ -531,6 +544,8 @@ export class TypeToJsonSchemaConverter {
 
   /**
    * The def names the conversions of this program gave (see `mergeEquivalentComponents`).
+   *
+   * @internal
    */
   getDefNames(): DefNameRecord {
     return this.names
@@ -539,6 +554,8 @@ export class TypeToJsonSchemaConverter {
   /**
    * Returns the yield and return types when the type is an async iterable, such as an `AsyncGenerator`,
    * also of a union of async iterables (`AsyncGenerator<A> | AsyncGenerator<B> | undefined`).
+   *
+   * @internal
    */
   getAsyncIteratorTypes(type: Type): AsyncIteratorTypes | undefined {
     return this.types.memo('asyncIterator', type.id, () => this.computeAsyncIteratorTypes(type))
@@ -585,7 +602,7 @@ export class TypeToJsonSchemaConverter {
    * Whether the value can be `undefined`, i.e. omitted, also of a type parameter of a method
    * nothing infers (see `TypeQueries.isUninferredTypeParameter`).
    */
-  isOptional(type: Type): boolean {
+  private isOptional(type: Type): boolean {
     return Boolean(
       type.flags & (UNDEFINED_FLAGS | TypeFlags.Any | TypeFlags.Unknown) ||
       this.types.hasMember(type, UNDEFINED_FLAGS) ||
@@ -2594,7 +2611,7 @@ export class TypeToJsonSchemaConverter {
   }
 
   /**
-   * Converts a parameter, see `TypeToJsonSchemaConvertOptions.parameters`.
+   * Converts a parameter, see `TypeToJsonSchemaConverterConvertOptions.parameters`.
    */
   private withParameters<T>(fn: () => T): T {
     const previous = this.parameters
