@@ -40,7 +40,14 @@ export type AugmentedRouter<T extends AnyRouter, TErrorMap extends ErrorMap> = T
         ? AugmentedRouter<T[K], TErrorMap>
         : T[K] extends Lazy<infer $ extends AnyRouter>
           ? Lazy<AugmentedRouter<$, TErrorMap>>
-          : never
+          : // a `Lazyable<...>` or optional key: augment each member of the union
+            T[K] extends infer $Item
+            ? $Item extends AnyRouter
+              ? AugmentedRouter<$Item, TErrorMap>
+              : $Item extends Lazy<infer $ extends AnyRouter>
+                ? Lazy<AugmentedRouter<$, TErrorMap>>
+                : never
+            : never
     }
 
 export type AugmentedRouterWithMiddlewares<
@@ -69,7 +76,16 @@ export type AugmentedRouterWithMiddlewares<
         ? AugmentedRouterWithMiddlewares<T[K], TInitialContext, TInjectedContext, TErrorMap>
         : T[K] extends Lazy<infer $ extends AnyRouter>
           ? Lazy<AugmentedRouterWithMiddlewares<$, TInitialContext, TInjectedContext, TErrorMap>>
-          : never
+          : // a `Lazyable<...>` or optional key: augment each member of the union
+            T[K] extends infer $Item
+            ? $Item extends AnyRouter
+              ? AugmentedRouterWithMiddlewares<$Item, TInitialContext, TInjectedContext, TErrorMap>
+              : $Item extends Lazy<infer $ extends AnyRouter>
+                ? Lazy<
+                    AugmentedRouterWithMiddlewares<$, TInitialContext, TInjectedContext, TErrorMap>
+                  >
+                : never
+            : never
     }
 
 interface AugmentRouterOptions<TErrorMap extends ErrorMap>
@@ -362,7 +378,9 @@ export type UnlaziedRouter<T extends AnyRouter> = T extends AnyProcedure
         ? UnlaziedRouter<T[K]>
         : T[K] extends Lazyable<infer U extends AnyRouter>
           ? UnlaziedRouter<U>
-          : never
+          : T[K] extends Lazyable<infer U extends AnyRouter> | undefined
+            ? UnlaziedRouter<U>
+            : never
     }
 
 /**

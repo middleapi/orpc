@@ -235,4 +235,51 @@ describe('infer utilities', () => {
     expectTypeOf<InferRouterError<LazyRouter>>().toEqualTypeOf<RouterError>()
     expectTypeOf<InferRouterError<LazyableRouter>>().toEqualTypeOf<RouterError>()
   })
+
+  it('supports optional keys', () => {
+    type OptionalRouter = {
+      nested?: typeof errorRouter
+      lazy?: Lazy<typeof errorRouter>
+      lazyable?: Lazyable<typeof errorRouter>
+    }
+
+    type InitialContexts = InferRouterInitialContexts<typeof errorRouter>
+    expectTypeOf<InferRouterInitialContexts<OptionalRouter>>().toEqualTypeOf<{
+      nested?: InitialContexts
+      lazy?: InitialContexts
+      lazyable?: InitialContexts
+    }>()
+
+    type FinalContexts = InferRouterFinalContexts<typeof errorRouter>
+    expectTypeOf<InferRouterFinalContexts<OptionalRouter>>().toEqualTypeOf<{
+      nested?: FinalContexts
+      lazy?: FinalContexts
+      lazyable?: FinalContexts
+    }>()
+
+    type Inputs = InferRouterInputs<typeof errorRouter>
+    expectTypeOf<InferRouterInputs<OptionalRouter>>().toEqualTypeOf<{
+      nested?: Inputs
+      lazy?: Inputs
+      lazyable?: Inputs
+    }>()
+
+    type Outputs = InferRouterOutputs<typeof errorRouter>
+    expectTypeOf<InferRouterOutputs<OptionalRouter>>().toEqualTypeOf<{
+      nested?: Outputs
+      lazy?: Outputs
+      lazyable?: Outputs
+    }>()
+
+    type Errors = InferRouterErrors<typeof errorRouter>
+    expectTypeOf<InferRouterErrors<OptionalRouter>>().toEqualTypeOf<{
+      nested?: Errors
+      lazy?: Errors
+      lazyable?: Errors
+    }>()
+
+    expectTypeOf<InferRouterError<OptionalRouter>>().toEqualTypeOf<
+      InferRouterError<typeof errorRouter>
+    >()
+  })
 })

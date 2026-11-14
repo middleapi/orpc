@@ -12,11 +12,12 @@ import type {
   BuilderWithOutput,
 } from './builder-variants'
 import type { MergedContext, MergedInitialContext } from './context'
-import type { Lazy } from './lazy'
+import type { Lazy, Lazyable } from './lazy'
 import type { Middleware, MiddlewareDone } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
-import type { Procedure } from './procedure'
+import type { AnyProcedure, Procedure } from './procedure'
 import type { DecoratedProcedure } from './procedure-decorated'
+import type { AnyRouter } from './router'
 import type { AugmentedRouter } from './router-utils'
 
 const errorMap = {
@@ -328,6 +329,30 @@ describe('Builder', () => {
 
     // @ts-expect-error - invalid router
     builder.router(123)
+  })
+
+  it('.router with lazyable and optional keys', () => {
+    const ping = {} as Procedure<object, object, typeof schema1, typeof schema2, object>
+    type Augmented = AugmentedRouter<typeof ping, typeof errorMap>
+
+    const router = {} as {
+      lazyable: Lazyable<{ ping: typeof ping }>
+      optional?: typeof ping
+    }
+
+    expectTypeOf(builder.router(router)).toEqualTypeOf<{
+      lazyable: { ping: Augmented } | Lazy<{ ping: Augmented }>
+      optional?: Augmented
+    }>()
+  })
+
+  it('.router with AnyRouter', () => {
+    const router = builder.router({} as AnyRouter)
+
+    expectTypeOf(router).toExtend<AnyRouter>()
+    expectTypeOf<Exclude<typeof router, AnyProcedure>>().toEqualTypeOf<{
+      [k: string]: Lazyable<AugmentedRouter<AnyRouter, typeof errorMap>>
+    }>()
   })
 
   it('.lazy', () => {
