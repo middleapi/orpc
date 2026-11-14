@@ -6,7 +6,6 @@ import type {
   MiddlewareNextOptions,
   MiddlewareOptions,
   MiddlewareResult,
-  MiddlewareResultValue,
   ORPCErrorConstructorMap,
 } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
@@ -19,7 +18,7 @@ import { runPromise } from './runtime'
 export interface MiddlewareGenNext<TOutput> {
   <U extends Context = object>(
     ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
-  ): Effect.Effect<MiddlewareResultValue<U, TOutput>, unknown>
+  ): Effect.Effect<MiddlewareResult<U, TOutput>, unknown>
 }
 
 export interface MiddlewareGenOptions<
@@ -85,7 +84,7 @@ export function middlewareGen<
       ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
     ) =>
       Effect.contextWith((fiberContext) =>
-        Effect.callback<MiddlewareResultValue<U, TOutput>, unknown>((resume, interruptSignal) => {
+        Effect.callback<MiddlewareResult<U, TOutput>, unknown>((resume, interruptSignal) => {
           const nextOptions = resolveMaybeOptionalOptions(rest)
 
           const promise = Promise.resolve(
@@ -115,7 +114,7 @@ export function middlewareGen<
     const effectContext = opts.context['effect/context']
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
     const ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<
-      MiddlewareResultValue<TOutContext, TOutput>,
+      MiddlewareResult<TOutContext, TOutput>,
       unknown
     >
 
