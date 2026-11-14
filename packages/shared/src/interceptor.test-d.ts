@@ -76,3 +76,37 @@ it('onStart, onSuccess, onError, onFinish, onAsyncIteratorObjectError, onReadabl
     }),
   )
 })
+
+it('falls back to ThrowableError when next returns a plain Promise', () => {
+  const interceptors: Interceptor<{ foo: string }, Promise<'success'>>[] = []
+
+  interceptors.push(
+    onError((error) => {
+      expectTypeOf(error).toEqualTypeOf<Error>()
+    }),
+  )
+
+  interceptors.push(
+    onFinish(([error, data, isSuccess]) => {
+      if (error || !isSuccess) {
+        expectTypeOf(error).toEqualTypeOf<Error>()
+        expectTypeOf(data).toEqualTypeOf<undefined>()
+      } else {
+        expectTypeOf(error).toEqualTypeOf<null>()
+        expectTypeOf(data).toEqualTypeOf<'success'>()
+      }
+    }),
+  )
+
+  interceptors.push(
+    onAsyncIteratorObjectError((error) => {
+      expectTypeOf(error).toEqualTypeOf<Error>()
+    }),
+  )
+
+  interceptors.push(
+    onReadableStreamError((error) => {
+      expectTypeOf(error).toEqualTypeOf<Error>()
+    }),
+  )
+})
