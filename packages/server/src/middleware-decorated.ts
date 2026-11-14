@@ -11,13 +11,22 @@ import type {
   MiddlewareResult,
 } from './middleware'
 
-export interface DecoratedMiddleware<
+export type DecoratedMiddleware<
   TInContext extends Context,
   TOutContext extends Context,
   TInput,
   TOutput,
   TErrorMap extends ErrorMap,
-> extends Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
+> = Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> &
+  DecoratedMiddlewareMethods<TInContext, TOutContext, TInput, TOutput, TErrorMap>
+
+export interface DecoratedMiddlewareMethods<
+  TInContext extends Context,
+  TOutContext extends Context,
+  TInput,
+  TOutput,
+  TErrorMap extends ErrorMap,
+> {
   adaptInput<T>(
     adapt: (input: T) => TInput,
   ): DecoratedMiddleware<TInContext, TOutContext, T, TOutput, TErrorMap>

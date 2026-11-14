@@ -393,7 +393,7 @@ describe('stream interceptors', () => {
       const result = await intercept(
         [onAsyncIteratorObjectError(callback)],
         { foo: 'bar' },
-        () => '__OUTPUT__',
+        async () => '__OUTPUT__',
       )
 
       expect(result).toBe('__OUTPUT__')
@@ -412,7 +412,7 @@ describe('stream interceptors', () => {
       const wrapped = (await intercept(
         [onAsyncIteratorObjectError(callback)],
         { foo: 'bar' },
-        () => iterator,
+        async () => iterator,
       )) as AsyncIterableIterator<string>
 
       await expect(wrapped.next()).resolves.toEqual({ value: 'event', done: false })
@@ -436,7 +436,7 @@ describe('stream interceptors', () => {
       const wrapped = (await intercept(
         [onAsyncIteratorObjectError(callback)],
         { foo: 'bar' },
-        () => iterator,
+        async () => iterator,
       )) as AsyncIterableIterator<string>
 
       await expect(wrapped.next()).resolves.toEqual({ value: 'event', done: false })
@@ -453,7 +453,7 @@ describe('stream interceptors', () => {
       const result = await intercept(
         [onReadableStreamError(callback)],
         { foo: 'bar' },
-        () => '__OUTPUT__',
+        async () => '__OUTPUT__',
       )
 
       expect(result).toBe('__OUTPUT__')
@@ -473,7 +473,7 @@ describe('stream interceptors', () => {
       const wrapped = (await intercept(
         [onReadableStreamError(callback)],
         { foo: 'bar' },
-        () => stream,
+        async () => stream,
       )) as ReadableStream<string>
 
       const reader = wrapped.getReader()
@@ -499,7 +499,7 @@ describe('stream interceptors', () => {
       const wrapped = (await intercept(
         [onReadableStreamError(callback)],
         { foo: 'bar' },
-        () => stream,
+        async () => stream,
       )) as ReadableStream<string>
 
       const reader = wrapped.getReader()

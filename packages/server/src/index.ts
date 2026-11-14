@@ -12,7 +12,7 @@ export type {
 } from './implementer-router'
 export * from './lazy'
 export * from './middleware'
-export type { DecoratedMiddleware } from './middleware-decorated'
+export type { DecoratedMiddleware, DecoratedMiddlewareMethods } from './middleware-decorated'
 export * from './procedure'
 export * from './procedure-client'
 export * from './procedure-decorated'

@@ -1,13 +1,13 @@
 import type { AnyMetaPlugin, ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { MaybeOptionalOptions, Promisable } from '@orpc/shared'
+import type { MaybeOptionalOptions } from '@orpc/shared'
 
 import type { Context } from './context'
 import type { AnyProcedure } from './procedure'
 
-export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<{
+export interface MiddlewareResult<TOutContext extends Context, TOutput> {
   output: TOutput
   context: TOutContext
-}>
+}
 
 export type MiddlewareNextOptions<TOutContext extends Context> = (object extends TOutContext
   ? { context?: TOutContext | undefined }
@@ -19,7 +19,7 @@ export type MiddlewareNextOptions<TOutContext extends Context> = (object extends
 export interface MiddlewareNext<TOutput> {
   <T extends Context = object>(
     ...rest: MaybeOptionalOptions<MiddlewareNextOptions<T>>
-  ): MiddlewareResult<T, TOutput>
+  ): Promise<MiddlewareResult<T, TOutput>>
 }
 
 export type MiddlewareDoneOptions<TOutContext, TOutput> = (object extends TOutContext
@@ -71,7 +71,7 @@ export interface Middleware<
     opts: MiddlewareOptions<TInContext, TOutput, ORPCErrorConstructorMap<TErrorMap>>,
     input: TInput,
     done: MiddlewareDone<TOutput>,
-  ): Promisable<MiddlewareResult<TOutContext, TOutput>>
+  ): Promise<MiddlewareResult<TOutContext, TOutput>> | MiddlewareResult<TOutContext, TOutput>
 }
 
 export type AnyMiddleware = Middleware<any, any, any, any, any>
