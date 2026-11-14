@@ -349,13 +349,18 @@ function acceptsEmptyCollection(
   $defs = schema.$defs ?? $defs
 
   if (typeof schema.$ref === 'string') {
-    const resolved = resolveJsonSchemaRootLocalRef(schema, $defs)
+    const { $ref, ...siblings } = schema
+    const resolved = resolveJsonSchemaRootLocalRef({ $ref }, $defs)
 
-    if (resolved === schema || resolvingRefs.has(schema.$ref)) {
+    if (
+      (typeof resolved === 'object' && resolved.$ref === $ref) ||
+      resolvingRefs.has($ref) ||
+      !acceptsEmptyCollection(resolved, kind, $defs, new Set(resolvingRefs).add($ref))
+    ) {
       return false
     }
 
-    return acceptsEmptyCollection(resolved, kind, $defs, new Set(resolvingRefs).add(schema.$ref))
+    schema = siblings
   }
 
   const accepts = (member: JsonSchema) => acceptsEmptyCollection(member, kind, $defs, resolvingRefs)
@@ -364,6 +369,7 @@ function acceptsEmptyCollection(
     schema.enum !== undefined ||
     schema.const !== undefined ||
     schema.not !== undefined ||
+    schema.if !== undefined ||
     (schema.type !== undefined && !(toArray(schema.type) as string[]).includes(kind))
   ) {
     return false

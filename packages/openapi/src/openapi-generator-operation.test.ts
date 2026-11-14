@@ -420,6 +420,9 @@ describe('openAPIGenerator operation builders', () => {
         ['space-delimited-array', { $ref: '#/$defs/Tags' }, true],
         ['space-delimited-array', { $ref: '#/$defs/Any' }, undefined],
         ['space-delimited-array', { $ref: '#/$defs/Missing' }, true],
+        ['space-delimited-array', { $ref: '#/$defs/Any', minItems: 1 }, true],
+        ['space-delimited-array', { $ref: '#/$defs/Any', maxItems: 2 }, undefined],
+        ['array', { type: 'array', if: { maxItems: 0 }, else: true }, true],
         ['space-delimited-array', { $ref: '#/$defs/Loop' }, true],
         [
           'comma-delimited-array',
