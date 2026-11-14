@@ -21,6 +21,14 @@ const untypedSchema = {
     validate: (value: unknown) => ({ value: value as string }),
   },
 }
+const undefinedTypesSchema = {
+  '~standard': {
+    version: 1 as const,
+    vendor: 'custom',
+    validate: (value: unknown) => ({ value: value as string }),
+    types: undefined,
+  },
+}
 
 type UnionSchema = Schema<{ a: number }, { a: string }> | Schema<{ b: number }, { b: string }>
 
@@ -50,6 +58,21 @@ it('InferSchemaInput', () => {
   expectTypeOf<InferSchemaInput<AnySchema>>().toBeAny()
   expectTypeOf<InferSchemaInput<any>>().toEqualTypeOf<unknown>()
   expectTypeOf<InferSchemaInput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaInput<typeof undefinedTypesSchema>>().toEqualTypeOf<never>()
+})
+
+it('InferSchemaInput with a generic schema', () => {
+  function _generic<T extends Schema<{ id: string }>>(value: InferSchemaInput<T>) {
+    expectTypeOf(value.id).toEqualTypeOf<string>()
+
+    const _id: string = value.id
+    const _value: { id: string } = value
+  }
+
+  function _unsound<T extends AnySchema>(value: unknown): InferSchemaInput<T> {
+    // @ts-expect-error - unknown is not assignable to an unresolved schema type
+    return value
+  }
 })
 
 it('InferSchemaOutput', () => {
@@ -61,6 +84,21 @@ it('InferSchemaOutput', () => {
   expectTypeOf<InferSchemaOutput<AnySchema>>().toBeAny()
   expectTypeOf<InferSchemaOutput<any>>().toEqualTypeOf<unknown>()
   expectTypeOf<InferSchemaOutput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaOutput<typeof undefinedTypesSchema>>().toEqualTypeOf<never>()
+})
+
+it('InferSchemaOutput with a generic schema', () => {
+  function _generic<T extends Schema<{ id: string }>>(value: InferSchemaOutput<T>) {
+    expectTypeOf(value.id).toEqualTypeOf<string>()
+
+    const _id: string = value.id
+    const _value: { id: string } = value
+  }
+
+  function _unsound<T extends AnySchema>(value: unknown): InferSchemaOutput<T> {
+    // @ts-expect-error - unknown is not assignable to an unresolved schema type
+    return value
+  }
 })
 
 describe('MergedSchema', () => {

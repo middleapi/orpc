@@ -154,15 +154,16 @@ export function createProcedureClient<
               : output,
             { mapError: reconcileError },
           ),
-        ) as any
+        ) as typeof output
       } else if (getTracer() && (output as unknown) instanceof ReadableStream) {
         /**
          * @warning
          * Remember use `override` for ReadableStream to remain other special properties
          */
-        const stream = output as unknown as ReadableStream<unknown>
-
-        return override(stream, traceReadableStream('consume_octet_stream_output', stream)) as any
+        return override(
+          output,
+          traceReadableStream('consume_octet_stream_output', output),
+        ) as typeof output
       }
 
       return output

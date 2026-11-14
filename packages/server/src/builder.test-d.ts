@@ -290,6 +290,16 @@ describe('Builder', () => {
         >
       >()
     })
+
+    it('generic input schema', () => {
+      function _crud<T extends Schema<{ id: string }>>(schema: T) {
+        return os.input(schema).handler(({ input }) => {
+          expectTypeOf(input.id).toEqualTypeOf<string>()
+
+          return input.id
+        })
+      }
+    })
   })
 
   it('.router', () => {
