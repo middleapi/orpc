@@ -265,7 +265,7 @@ describe('openAPIGenerator operation builders', () => {
       expect((operation.requestBody as any)?.required).toBeUndefined()
     })
 
-    it('maps compact GET inputs to query parameters and applies every query style, never requiring collection styles', () => {
+    it('maps compact GET inputs to query parameters and applies every query style', () => {
       const { ctx, operation } = createContext()
 
       buildRequest(
@@ -389,6 +389,78 @@ describe('openAPIGenerator operation builders', () => {
         },
       ])
       expect(operation.requestBody).toBeUndefined()
+    })
+
+    it('requires collection-styled query params only when they reject an empty collection', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: {
+                empty: { type: 'array' },
+                minItems: { type: 'array', minItems: 1 },
+                minProperties: { type: 'object', minProperties: 1 },
+                requiredProperty: { type: 'object', required: ['a'] },
+                ref: { $ref: '#/$defs/Tags' },
+                everyBranch: { anyOf: [{ type: 'array', minItems: 1 }, { $ref: '#/$defs/Tags' }] },
+                someBranch: { anyOf: [{ type: 'array', minItems: 1 }, { type: 'array' }] },
+                unconstrained: true,
+                optionalMinItems: { type: 'array', minItems: 1 },
+              },
+              required: [
+                'empty',
+                'minItems',
+                'minProperties',
+                'requiredProperty',
+                'ref',
+                'everyBranch',
+                'someBranch',
+                'unconstrained',
+              ],
+              $defs: {
+                Tags: { type: 'array', minItems: 2 },
+              },
+            }),
+          ],
+        }),
+        {
+          method: 'GET',
+          queryStyles: {
+            empty: 'array',
+            minItems: 'array',
+            minProperties: 'comma-delimited-object',
+            requiredProperty: 'pipe-delimited-object',
+            ref: 'space-delimited-array',
+            everyBranch: 'comma-delimited-array',
+            someBranch: 'comma-delimited-array',
+            unconstrained: 'array',
+            optionalMinItems: 'array',
+          },
+        },
+        undefined,
+      )
+
+      expect(
+        operation.parameters?.map((p) => {
+          const { name, required } = p as OpenAPIV3_2.ParameterObject
+          return { name, required }
+        }),
+      ).toEqual([
+        { name: 'empty', required: undefined },
+        { name: 'minItems', required: true },
+        { name: 'minProperties', required: true },
+        { name: 'requiredProperty', required: true },
+        { name: 'ref', required: true },
+        { name: 'everyBranch', required: true },
+        { name: 'someBranch', required: undefined },
+        { name: 'unconstrained', required: undefined },
+        { name: 'optionalMinItems', required: undefined },
+      ])
     })
 
     it('does not use deepObject for query params whose $ref resolves to a primitive', () => {

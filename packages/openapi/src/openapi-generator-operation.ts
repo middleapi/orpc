@@ -293,7 +293,7 @@ function renderQueryParameters(
 
     const isCollectionStyle = style !== undefined && style !== 'primitive' && style !== 'json'
 
-    if (!optional && !isCollectionStyle) {
+    if (!optional && (!isCollectionStyle || !acceptsEmptyCollection(schema))) {
       parameter.required = true
     }
 
@@ -325,6 +325,22 @@ function renderQueryParameters(
     operation.parameters ??= []
     operation.parameters.push(parameter)
   }
+}
+
+function acceptsEmptyCollection(schema: JsonSchema): boolean {
+  return flattenJsonUnionSchema(schema).some((branch) => {
+    const resolved = resolveJsonSchemaRootLocalRef(branch)
+
+    if (typeof resolved !== 'object') {
+      return resolved
+    }
+
+    return (
+      !((resolved.minItems ?? 0) > 0) &&
+      !((resolved.minProperties ?? 0) > 0) &&
+      !resolved.required?.length
+    )
+  })
 }
 
 function renderHeaderParameters(
