@@ -6,6 +6,7 @@ import type {
   MiddlewareNextOptions,
   MiddlewareOptions,
   MiddlewareResult,
+  MiddlewareResultValue,
   ORPCErrorConstructorMap,
 } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
@@ -18,7 +19,7 @@ import { runPromise } from './runtime'
 export interface MiddlewareGenNext<TOutput> {
   <U extends Context = object>(
     ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
-  ): Effect.Effect<Awaited<MiddlewareResult<U, TOutput>>, unknown>
+  ): Effect.Effect<MiddlewareResultValue<U, TOutput>, unknown>
 }
 
 export interface MiddlewareGenOptions<
@@ -84,39 +85,37 @@ export function middlewareGen<
       ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
     ) =>
       Effect.contextWith((fiberContext) =>
-        Effect.callback<Awaited<MiddlewareResult<U, TOutput>>, unknown>(
-          (resume, interruptSignal) => {
-            const nextOptions = resolveMaybeOptionalOptions(rest)
+        Effect.callback<MiddlewareResultValue<U, TOutput>, unknown>((resume, interruptSignal) => {
+          const nextOptions = resolveMaybeOptionalOptions(rest)
 
-            const promise = Promise.resolve(
-              opts.next<U>({
-                context: {
-                  ...nextOptions.context,
-                  'effect/context': layerChangedServices(
-                    fiberContext,
-                    nextOptions.context?.['effect/context'],
-                    opts.context['effect/context'],
-                  ),
-                },
-                signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
-              } as any),
-            )
+          const promise = Promise.resolve(
+            opts.next<U>({
+              context: {
+                ...nextOptions.context,
+                'effect/context': layerChangedServices(
+                  fiberContext,
+                  nextOptions.context?.['effect/context'],
+                  opts.context['effect/context'],
+                ),
+              },
+              signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
+            } as any),
+          )
 
-            promise.then(
-              (result) => resume(Effect.succeed(result)),
-              (error) => resume(Effect.fail(error)),
-            )
+          promise.then(
+            (result) => resume(Effect.succeed(result)),
+            (error) => resume(Effect.fail(error)),
+          )
 
-            // On interruption, wait for the chain to settle.
-            return Effect.promise(() => promise.catch(() => {}))
-          },
-        ),
+          // On interruption, wait for the chain to settle.
+          return Effect.promise(() => promise.catch(() => {}))
+        }),
       )
 
     const effectContext = opts.context['effect/context']
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
     const ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<
-      Awaited<MiddlewareResult<TOutContext, TOutput>>,
+      MiddlewareResultValue<TOutContext, TOutput>,
       unknown
     >
 
