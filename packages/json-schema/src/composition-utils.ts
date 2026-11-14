@@ -566,3 +566,77 @@ function withRootDefs(
 
   return { ...schema, $defs }
 }
+
+/**
+ * Checks whether a schema accepts the empty collection: `[]` for `array`, `{}` for `object`.
+ *
+ * Understands `type`, `minItems`, `contains`, `minProperties`, `required`, `allOf`, `anyOf`,
+ * `oneOf`, and root-local `$ref`s. Schemas using `enum`, `const`, `not`, `if`,
+ * or an unresolvable `$ref` are reported as not accepting it.
+ */
+export function doesJsonSchemaAcceptEmptyCollection(
+  schema: JsonSchema,
+  kind: 'array' | 'object',
+): boolean {
+  return doesJsonSchemaAcceptEmptyCollectionInternal(schema, kind, undefined, new Set())
+}
+
+function doesJsonSchemaAcceptEmptyCollectionInternal(
+  schema: JsonSchema,
+  kind: 'array' | 'object',
+  $defs: Exclude<JsonSchema, boolean>['$defs'],
+  resolvingRefs: ReadonlySet<string>,
+): boolean {
+  if (typeof schema !== 'object') {
+    return schema
+  }
+
+  $defs = schema.$defs ?? $defs
+
+  if (typeof schema.$ref === 'string') {
+    const { $ref, ...siblings } = schema
+    const resolved = resolveJsonSchemaRootLocalRef({ $ref }, $defs)
+
+    if (
+      (typeof resolved === 'object' && resolved.$ref === $ref) ||
+      resolvingRefs.has($ref) ||
+      !doesJsonSchemaAcceptEmptyCollectionInternal(
+        resolved,
+        kind,
+        $defs,
+        new Set(resolvingRefs).add($ref),
+      )
+    ) {
+      return false
+    }
+
+    schema = siblings
+  }
+
+  const accepts = (member: JsonSchema) =>
+    doesJsonSchemaAcceptEmptyCollectionInternal(member, kind, $defs, resolvingRefs)
+
+  if (
+    schema.enum !== undefined ||
+    schema.const !== undefined ||
+    schema.not !== undefined ||
+    schema.if !== undefined ||
+    (schema.type !== undefined && !(toArray(schema.type) as string[]).includes(kind))
+  ) {
+    return false
+  }
+
+  if (kind === 'array') {
+    if ((schema.minItems ?? 0) > 0 || (schema.contains !== undefined && schema.minContains !== 0)) {
+      return false
+    }
+  } else if ((schema.minProperties ?? 0) > 0 || schema.required?.length) {
+    return false
+  }
+
+  return (
+    (schema.allOf === undefined || schema.allOf.every(accepts)) &&
+    (schema.anyOf === undefined || schema.anyOf.some(accepts)) &&
+    (schema.oneOf === undefined || schema.oneOf.filter(accepts).length === 1)
+  )
+}
