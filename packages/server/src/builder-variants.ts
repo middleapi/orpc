@@ -351,11 +351,11 @@ export interface BuilderWithOutput<
    *
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
-  'handler'<T extends InferSchemaInput<TOutputSchema>>(
+  'handler'(
     handler: ProcedureHandler<
       MergedContext<TInitialContext, TInjectedContext>,
       InferSchemaOutput<InitialInputSchema>,
-      T,
+      InferSchemaInput<TOutputSchema>,
       ORPCErrorConstructorMap<TErrorMap>
     >,
   ): DecoratedProcedure<
@@ -478,11 +478,11 @@ export interface BuilderWithInputOutput<
    *
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
-  'handler'<T extends InferSchemaInput<TOutputSchema>>(
+  'handler'(
     handler: ProcedureHandler<
       MergedContext<TInitialContext, TInjectedContext>,
       InferSchemaOutput<TInputSchema>,
-      T,
+      InferSchemaInput<TOutputSchema>,
       ORPCErrorConstructorMap<TErrorMap>
     >,
   ): DecoratedProcedure<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>

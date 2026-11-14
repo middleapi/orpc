@@ -1,9 +1,9 @@
 import { isAsyncIteratorObject } from '@standard-server/shared'
-import type { Promisable } from 'type-fest'
 
 import { wrapAsyncIterator } from './iterator'
 import { override } from './proxy'
 import { wrapReadableStream } from './stream'
+import type { Promisable } from './types'
 import type { PromiseWithError, ThrowableError } from './types'
 
 export type InterceptableOptions = Record<string, any>
@@ -22,10 +22,9 @@ export type Interceptor<TOptions extends InterceptableOptions, TResult> = (
 /**
  * Can used for interceptors or middlewares
  */
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-export function onStart<T, TOptions extends { next: () => any }, TRest extends any[]>(
+export function onStart<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<(options: TOptions, ...rest: TRest) => Promisable<void>>,
-): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     await callback(options, ...rest)
     return await options.next()
@@ -35,8 +34,7 @@ export function onStart<T, TOptions extends { next: () => any }, TRest extends a
 /**
  * Can used for interceptors or middlewares
  */
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-export function onSuccess<T, TOptions extends { next: () => any }, TRest extends any[]>(
+export function onSuccess<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
       result: Awaited<ReturnType<TOptions['next']>>,
@@ -44,7 +42,7 @@ export function onSuccess<T, TOptions extends { next: () => any }, TRest extends
       ...rest: TRest
     ) => Promisable<void>
   >,
-): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     const result = await options.next()
     await callback(result, options, ...rest)
@@ -58,8 +56,7 @@ export function onSuccess<T, TOptions extends { next: () => any }, TRest extends
  *
  * @see {@link https://orpc.dev/docs/adapters/fetch-api | Fetch API Adapter}
  */
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-export function onError<T, TOptions extends { next: () => any }, TRest extends any[]>(
+export function onError<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
       error: ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
@@ -69,7 +66,7 @@ export function onError<T, TOptions extends { next: () => any }, TRest extends a
       ...rest: TRest
     ) => Promisable<void>
   >,
-): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     try {
       return await options.next()
@@ -87,8 +84,7 @@ export type OnFinishState<TResult, TError> =
 /**
  * Can used for interceptors or middlewares
  */
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-export function onFinish<T, TOptions extends { next: () => any }, TRest extends any[]>(
+export function onFinish<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
       state: OnFinishState<
@@ -99,7 +95,7 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
       ...rest: TRest
     ) => Promisable<void>
   >,
-): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
     let state: any
 
@@ -126,8 +122,6 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
  * catch all possible errors.
  */
 export function onAsyncIteratorObjectError<
-  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-  T,
   TOptions extends { next: () => any },
   TRest extends any[],
 >(
@@ -142,7 +136,7 @@ export function onAsyncIteratorObjectError<
       ...rest: TRest
     ) => Promisable<void>
   >,
-): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   // The typed error should always be combined with `ThrowableError`
   // because an AsyncIterator can throw any error during iteration,
   // while TError only represents errors from the initial promise.
@@ -178,8 +172,7 @@ export function onAsyncIteratorObjectError<
  * callback only fires while consuming the stream. Use both together to catch
  * all possible errors.
  */
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-export function onReadableStreamError<T, TOptions extends { next: () => any }, TRest extends any[]>(
+export function onReadableStreamError<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
       error:
@@ -191,7 +184,7 @@ export function onReadableStreamError<T, TOptions extends { next: () => any }, T
       ...rest: TRest
     ) => Promisable<void>
   >,
-): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   // The typed error should always be combined with `ThrowableError`
   // because a ReadableStream can throw any error during iteration,
   // while TError only represents errors from the initial promise.
