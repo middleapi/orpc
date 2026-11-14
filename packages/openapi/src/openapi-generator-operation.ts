@@ -291,10 +291,6 @@ function renderQueryParameters(
       allowReserved: true,
     }
 
-    /**
-     * Collection styles encode an empty collection by omitting the parameter,
-     * so the parameter itself can never be required.
-     */
     const isCollectionStyle = style !== undefined && style !== 'primitive' && style !== 'json'
 
     if (!optional && !isCollectionStyle) {

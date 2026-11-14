@@ -801,7 +801,6 @@ describe('openAPIHandlerCodec', () => {
           expect(result).toBeDefined()
 
           await expect(result!.decodeInput()).resolves.toEqual({
-            // an exploded array keeps `?array=` as a single empty item
             array: url === '/' ? [] : [''],
             commaArray: [],
             commaObject: {},

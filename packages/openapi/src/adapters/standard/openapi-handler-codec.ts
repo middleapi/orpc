@@ -320,9 +320,6 @@ function isValidDetailedOutput(
   return true
 }
 
-/**
- * An empty collection is encoded by omitting the value, so an absent or empty value decodes to `[]`.
- */
 function decodeDelimitedArray(value: string | undefined, delimiter: string): string[] {
   if (value === undefined || value === '') {
     return []
@@ -331,9 +328,6 @@ function decodeDelimitedArray(value: string | undefined, delimiter: string): str
   return value.split(delimiter)
 }
 
-/**
- * An empty collection is encoded by omitting the value, so an absent or empty value decodes to `{}`.
- */
 function decodeDelimitedObject(
   value: string | undefined,
   delimiter: string,
