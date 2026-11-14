@@ -149,6 +149,8 @@ export interface OpenAPIMeta {
    * - **`json`**: Parses the last value as JSON; falls back to the raw string if parsing fails.
    * - **`undefined`**: Standard bracket-notation decoding This is the default.
    *
+   * **Note**: With `array` and `*-delimited-*`, a missing parameter is decoded as `[]` or `{}`. With the others, it is decoded as `undefined`.
+   *
    * **Note**: `*-delimited-*` strategies do not support keys or values containing the delimiter character.
    *
    * @example
