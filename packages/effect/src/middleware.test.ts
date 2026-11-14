@@ -1,3 +1,7 @@
+import { getEventListeners } from 'node:events'
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
+
 import { call, ORPCError, os } from '@orpc/server'
 import { sleep } from '@orpc/shared'
 import { Cause, Context, Effect, Option, References } from 'effect'
@@ -8,7 +12,18 @@ import { handlerGen } from './handler'
 import { middlewareGen } from './middleware'
 import * as EffectModule from './runtime'
 
-const runPromiseSpy = vi.spyOn(EffectModule, 'runPromise')
+setFlagsFromString('--expose-gc')
+const gc = runInNewContext('gc') as () => void
+
+async function collectGarbage(): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    gc()
+    await sleep(10)
+  }
+}
+
+const untilAborted = (signal: AbortSignal | undefined) =>
+  new Promise((resolve) => signal?.addEventListener('abort', resolve, { once: true }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -263,6 +278,10 @@ describe('middlewareGen', () => {
         )
       })
 
+    const passthrough = middlewareGen(function* ({ next }) {
+      return yield* next()
+    })
+
     const timeoutFallback = middlewareGen(function* ({ next }, _, done) {
       return yield* next().pipe(
         Effect.timeout('20 millis'),
@@ -361,7 +380,7 @@ describe('middlewareGen', () => {
 
     it('aborts the signal of a plain handler and waits for it when Effect.timeout interrupts next', async () => {
       const procedure = os.use(timeoutFallback).handler(async ({ signal }) => {
-        await new Promise((resolve) => signal?.addEventListener('abort', resolve))
+        await untilAborted(signal)
         await sleep(10)
         log.push('handler-aborted')
         throw new Error('dropped after interruption')
@@ -371,26 +390,222 @@ describe('middlewareGen', () => {
       expect(log).toEqual(['handler-aborted', 'mw-timeout'])
     })
 
-    it('links a signal passed to next with interruption', async () => {
-      const controller = new AbortController()
-      let handlerSignal: AbortSignal | undefined
+    it('uses a signal passed to next, as is when already aborted', async () => {
+      const pending = new AbortController()
+      const aborted = new AbortController()
+      aborted.abort(new Error('aborted'))
+      const signals: (AbortSignal | undefined)[] = []
 
       const procedure = os
         .use(
           middlewareGen(function* ({ next }) {
-            return yield* next({ signal: controller.signal })
+            return yield* next({ signal: signals.length ? aborted.signal : pending.signal })
           }),
         )
         .handler(({ signal }) => {
-          handlerSignal = signal
+          signals.push(signal)
           return 'output'
         })
 
       await expect(call(procedure)).resolves.toEqual('output')
-      expect(handlerSignal?.aborted).toBe(false)
+      await expect(call(procedure)).resolves.toEqual('output')
 
-      controller.abort()
-      expect(handlerSignal?.aborted).toBe(true)
+      expect(signals[0]?.aborted).toBe(false)
+      pending.abort()
+      expect(signals[0]?.aborted).toBe(true)
+      expect(signals[1]).toBe(aborted.signal)
+    })
+
+    it.each([
+      { name: 'nested', middleware: passthrough, context: {} },
+      {
+        name: 'uninterruptible',
+        middleware: passthrough,
+        context: { 'effect/wrap': Effect.uninterruptible },
+      },
+      {
+        name: 'suspending before next',
+        middleware: middlewareGen(function* ({ next }) {
+          yield* Effect.sleep('1 millis')
+          return yield* next()
+        }),
+        context: {},
+      },
+    ])('aborts downstream with the request reason ($name)', async ({ middleware, context }) => {
+      const controller = new AbortController()
+      const reason = new Error('request aborted')
+      let handlerReason: unknown
+
+      const procedure = os
+        .$context<Partial<WithEffectContext<never>>>()
+        .use(middleware)
+        .use(passthrough)
+        .handler(async ({ signal }) => {
+          await untilAborted(signal)
+          handlerReason = signal?.reason
+          return 'output'
+        })
+
+      const promise = call(procedure, undefined, { context, signal: controller.signal })
+      await sleep(20)
+      controller.abort(reason)
+
+      await expect(promise).rejects.toBe(reason)
+      expect(handlerReason).toBe(reason)
+    })
+
+    it('aborts only downstream of the middleware whose next is interrupted', async () => {
+      const signals: (AbortSignal | undefined)[] = []
+      const record = os.middleware(({ next, signal }) => {
+        signals.push(signal)
+        return next()
+      })
+
+      const procedure = os
+        .use(passthrough)
+        .use(record)
+        .use(timeoutFallback)
+        .use(record)
+        .handler(async ({ signal }) => {
+          await untilAborted(signal)
+          return 'handler'
+        })
+
+      await expect(call(procedure)).resolves.toEqual('fallback')
+      expect(signals[0]?.aborted).toBe(false)
+      expect(signals[1]?.aborted).toBe(true)
+    })
+
+    it.each([
+      { name: 'passthrough', middleware: passthrough },
+      {
+        name: 'Effect.timeout around next',
+        middleware: middlewareGen(function* ({ next }) {
+          return yield* next().pipe(Effect.timeout('10 millis'))
+        }),
+      },
+    ])(
+      'does not abort a streamed output until the request aborts ($name)',
+      async ({ middleware }) => {
+        const controller = new AbortController()
+        const reason = new Error('request aborted')
+        let handlerSignal: AbortSignal | undefined
+
+        const procedure = os
+          .use(middleware)
+          .use(passthrough)
+          .handler(async function* ({ signal }) {
+            handlerSignal = signal
+            yield 1
+            await untilAborted(signal)
+          })
+
+        const iterator = (await call(procedure, undefined, {
+          signal: controller.signal,
+        })) as AsyncIterator<number>
+
+        await expect(iterator.next()).resolves.toEqual({ value: 1, done: false })
+        await sleep(30)
+        expect(handlerSignal?.aborted).toBe(false)
+
+        controller.abort(reason)
+        expect(handlerSignal?.reason).toBe(reason)
+        await iterator.return?.()
+      },
+    )
+
+    describe('memory', () => {
+      const signals: WeakRef<AbortSignal>[] = []
+      const outputs: WeakRef<object>[] = []
+
+      beforeEach(() => {
+        signals.length = 0
+        outputs.length = 0
+      })
+
+      async function expectCollected(refs: WeakRef<object>[]) {
+        await collectGarbage()
+        expect(refs.map((ref) => ref.deref())).toEqual([undefined, undefined, undefined])
+      }
+
+      const recording = os
+        .use(passthrough)
+        .use(passthrough)
+        .handler(({ signal }) => {
+          const output = { data: 'output' }
+          signals.push(new WeakRef(signal!))
+          outputs.push(new WeakRef(output))
+          return output
+        })
+
+      it('keeps abort listeners on downstream signals after the middlewares returned', async () => {
+        const controller = new AbortController()
+        const reason = new Error('request aborted')
+        let listenerReason: unknown
+
+        const procedure = os
+          .use(passthrough)
+          .use(passthrough)
+          .handler(({ signal }) => {
+            signal?.addEventListener('abort', () => (listenerReason = signal.reason), {
+              once: true,
+            })
+            return 'output'
+          })
+
+        await call(procedure, undefined, { signal: controller.signal })
+        await collectGarbage()
+        controller.abort(reason)
+
+        expect(listenerReason).toBe(reason)
+      })
+
+      it('does not retain the output of a completed next while the request signal is alive', async () => {
+        const controller = new AbortController()
+
+        for (let i = 0; i < 3; i++) {
+          await call(recording, undefined, { signal: controller.signal })
+        }
+
+        await expectCollected(outputs)
+      })
+
+      it.each([
+        { name: 'collected', abort: false },
+        { name: 'aborted', abort: true },
+      ])('releases downstream signals once the request signal is $name', async ({ abort }) => {
+        const controller = new AbortController()
+
+        for (let i = 0; i < 3; i++) {
+          await call(recording, undefined, {
+            signal: abort ? controller.signal : new AbortController().signal,
+          })
+        }
+
+        if (abort) {
+          controller.abort()
+        }
+        await expectCollected(signals)
+      })
+
+      it('releases an interrupted next while the request signal is alive', async () => {
+        const controller = new AbortController()
+
+        const procedure = os.use(timeoutFallback).handler(async ({ signal }) => {
+          signals.push(new WeakRef(signal!))
+          await untilAborted(signal)
+          return 'handler'
+        })
+
+        for (let i = 0; i < 3; i++) {
+          await expect(call(procedure, undefined, { signal: controller.signal })).resolves.toEqual(
+            'fallback',
+          )
+        }
+
+        expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+        await expectCollected(signals)
+      })
     })
   })
 
@@ -628,6 +843,7 @@ describe('middlewareGen', () => {
   })
 
   it('forwards effect/context and the provided signal to runPromise', async () => {
+    const runPromiseSpy = vi.spyOn(EffectModule, 'runPromise')
     const controller = new AbortController()
     const effectContext = Context.empty().pipe(Context.add(Service1, { id: 'Service1' }))
 
@@ -652,5 +868,6 @@ describe('middlewareGen', () => {
       context: effectContext,
       signal: controller.signal,
     })
+    runPromiseSpy.mockRestore()
   })
 })
