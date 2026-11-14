@@ -2464,6 +2464,11 @@ describe('doesJsonSchemaAcceptEmptyCollection', () => {
     ['array', { anyOf: [{ type: 'array', minItems: 1 }, { type: 'array' }] }, true],
     ['array', { allOf: [{ type: 'array' }, { $ref: '#/$defs/Tags' }], $defs }, false],
     ['array', { allOf: [{ type: 'array' }, { $ref: '#/$defs/Any' }], $defs }, true],
+    [
+      'array',
+      { allOf: [{ $ref: '#/$defs/Tags', $defs: { Tags: { type: 'array' } } }], $defs },
+      false,
+    ],
     ['array', { oneOf: [{ type: 'array' }, { type: 'string' }] }, true],
     ['array', { oneOf: [{ type: 'array' }, { type: 'array', items: { const: 'a' } }] }, false],
   ])('%s %j -> %s', (kind, schema, expected) => {

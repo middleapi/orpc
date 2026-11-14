@@ -578,7 +578,12 @@ export function doesJsonSchemaAcceptEmptyCollection(
   schema: JsonSchema,
   kind: 'array' | 'object',
 ): boolean {
-  return doesJsonSchemaAcceptEmptyCollectionInternal(schema, kind, undefined, new Set())
+  return doesJsonSchemaAcceptEmptyCollectionInternal(
+    schema,
+    kind,
+    typeof schema === 'object' ? schema.$defs : undefined,
+    new Set(),
+  )
 }
 
 function doesJsonSchemaAcceptEmptyCollectionInternal(
@@ -590,8 +595,6 @@ function doesJsonSchemaAcceptEmptyCollectionInternal(
   if (typeof schema !== 'object') {
     return schema
   }
-
-  $defs = schema.$defs ?? $defs
 
   if (typeof schema.$ref === 'string') {
     const { $ref, ...siblings } = schema
