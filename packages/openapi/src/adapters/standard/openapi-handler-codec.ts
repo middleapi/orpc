@@ -320,9 +320,9 @@ function isValidDetailedOutput(
   return true
 }
 
-function decodeDelimitedArray(value: string | undefined, delimiter: string): undefined | string[] {
-  if (value === undefined) {
-    return undefined
+function decodeDelimitedArray(value: string | undefined, delimiter: string): string[] {
+  if (value === undefined || value === '') {
+    return []
   }
 
   return value.split(delimiter)
@@ -331,12 +331,13 @@ function decodeDelimitedArray(value: string | undefined, delimiter: string): und
 function decodeDelimitedObject(
   value: string | undefined,
   delimiter: string,
-): undefined | Record<string, unknown> {
-  if (value === undefined) {
-    return undefined
+): Record<string, unknown> {
+  const obj = new NullProtoObj() // Prevent Prototype Pollution with NullProtoObj
+
+  if (value === undefined || value === '') {
+    return obj
   }
 
-  const obj = new NullProtoObj() // Prevent Prototype Pollution with NullProtoObj
   const parts = value.split(delimiter)
 
   for (let i = 0; i < parts.length; i += 2) {

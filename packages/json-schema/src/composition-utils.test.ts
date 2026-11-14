@@ -2,6 +2,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   deduplicateJsonSchemas,
+  doesJsonSchemaAcceptEmptyCollection,
   extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
@@ -2423,5 +2424,54 @@ describe('isJsonObjectLikeSchema', () => {
     ).toBe(false)
     // a cycle never proves the schema describes an object
     expect(isJsonObjectLikeSchema({ $ref: '#/$defs/union', $defs })).toBe(false)
+  })
+})
+
+describe('doesJsonSchemaAcceptEmptyCollection', () => {
+  const $defs = {
+    Tags: { type: 'array', minItems: 2 },
+    Any: { type: 'array' },
+    Loop: { allOf: [{ $ref: '#/$defs/Loop' }] },
+  } satisfies Record<string, JsonSchema>
+
+  it.each<[kind: 'array' | 'object', schema: JsonSchema, expected: boolean]>([
+    ['array', { type: 'array' }, true],
+    ['array', {}, true],
+    ['array', true, true],
+    ['array', false, false],
+    ['array', { type: ['array', 'null'] }, true],
+    ['array', { type: 'string' }, false],
+    ['array', { type: 'array', minItems: 1 }, false],
+    ['array', { type: 'array', minProperties: 1, required: ['a'] }, true],
+    ['array', { type: 'array', contains: { type: 'string' } }, false],
+    ['array', { type: 'array', contains: { type: 'string' }, minContains: 0 }, true],
+    ['array', { type: 'array', enum: [['a']] }, false],
+    ['array', { type: 'array', const: ['a'] }, false],
+    ['array', { type: 'array', not: { maxItems: 0 } }, false],
+    ['array', { type: 'array', if: { maxItems: 0 }, else: true }, false],
+    ['object', { type: 'object' }, true],
+    ['object', { type: 'array' }, false],
+    ['object', { type: 'object', minItems: 1 }, true],
+    ['object', { type: 'object', minProperties: 1 }, false],
+    ['object', { type: 'object', required: ['a'] }, false],
+    ['array', { $ref: '#/$defs/Tags', $defs }, false],
+    ['array', { $ref: '#/$defs/Any', $defs }, true],
+    ['array', { $ref: '#/$defs/Missing', $defs }, false],
+    ['array', { $ref: '#/$defs/Loop', $defs }, false],
+    ['array', { $ref: '#/$defs/Any', minItems: 1, $defs }, false],
+    ['array', { $ref: '#/$defs/Any', maxItems: 2, $defs }, true],
+    ['array', { anyOf: [{ type: 'array', minItems: 1 }, { type: 'null' }] }, false],
+    ['array', { anyOf: [{ type: 'array', minItems: 1 }, { type: 'array' }] }, true],
+    ['array', { allOf: [{ type: 'array' }, { $ref: '#/$defs/Tags' }], $defs }, false],
+    ['array', { allOf: [{ type: 'array' }, { $ref: '#/$defs/Any' }], $defs }, true],
+    [
+      'array',
+      { allOf: [{ $ref: '#/$defs/Tags', $defs: { Tags: { type: 'array' } } }], $defs },
+      false,
+    ],
+    ['array', { oneOf: [{ type: 'array' }, { type: 'string' }] }, true],
+    ['array', { oneOf: [{ type: 'array' }, { type: 'array', items: { const: 'a' } }] }, false],
+  ])('%s %j -> %s', (kind, schema, expected) => {
+    expect(doesJsonSchemaAcceptEmptyCollection(schema, kind)).toBe(expected)
   })
 })

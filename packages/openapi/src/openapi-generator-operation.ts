@@ -9,6 +9,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   containsJsonFileSchema,
+  doesJsonSchemaAcceptEmptyCollection,
   extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
@@ -291,7 +292,14 @@ function renderQueryParameters(
       allowReserved: true,
     }
 
-    if (!optional) {
+    const collectionKind =
+      style === undefined || style === 'primitive' || style === 'json'
+        ? undefined
+        : style.endsWith('object')
+          ? 'object'
+          : 'array'
+
+    if (collectionKind ? !doesJsonSchemaAcceptEmptyCollection(schema, collectionKind) : !optional) {
       parameter.required = true
     }
 
