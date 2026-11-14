@@ -9,7 +9,7 @@ import type {
   ORPCErrorConstructorMap,
 } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import { anyAbortSignal, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { listenAbort, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
 
 import type { InferEffectServices, WithEffectContext } from './context'
@@ -84,8 +84,13 @@ export function middlewareGen<
       ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
     ) =>
       Effect.contextWith((fiberContext) =>
-        Effect.callback<MiddlewareResult<U, TOutput>, unknown>((resume, interruptSignal) => {
+        Effect.callback<MiddlewareResult<U, TOutput>, unknown>((resume) => {
           const nextOptions = resolveMaybeOptionalOptions(rest)
+          const upstream = nextOptions.signal ?? opts.signal
+
+          // Not `AbortSignal.any`: Node flattens its sources, O(N²) across nested middlewares.
+          const controller = upstream?.aborted ? undefined : new AbortController()
+          const unlisten = controller && listenAbort(upstream, controller.abort.bind(controller))
 
           const promise = Promise.resolve(
             opts.next<U>({
@@ -97,7 +102,7 @@ export function middlewareGen<
                   opts.context['effect/context'],
                 ),
               },
-              signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
+              signal: controller?.signal ?? upstream,
             } as any),
           )
 
@@ -107,7 +112,11 @@ export function middlewareGen<
           )
 
           // On interruption, wait for the chain to settle.
-          return Effect.promise(() => promise.catch(() => {}))
+          return Effect.promise(() => {
+            unlisten?.()
+            controller?.abort(upstream?.reason)
+            return promise.catch(() => {})
+          })
         }),
       )
 
