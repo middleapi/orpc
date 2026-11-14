@@ -153,12 +153,7 @@ Supported query styles:
 | `json`                   | `?meta={"enabled":true}`                        | `{ meta: { enabled: true } }`                             |
 | _default_                | `?tags[]=red&tags[]=blue&filter[status]=active` | `{ tags: ['red', 'blue'], filter: { status: 'active' } }` |
 
-The `array` and `*-delimited-*` styles encode an empty array or object by omitting the parameter, so a missing parameter is decoded as `[]` or `{}` instead of `undefined`. For delimited styles, an empty value like `?tags=` is decoded the same way. As a result:
-
-- `.optional()` and `.default()` on these parameters never see a missing value. Use `.min(1)` or a similar constraint to require at least one item.
-- These parameters are never marked as `required` in the generated OpenAPI specification.
-
-With `primitive`, `json`, and the default style, a missing parameter is decoded as `undefined`.
+With the `array` and `*-delimited-*` styles, a missing parameter is decoded as `[]` or `{}`. With the other styles, it is decoded as `undefined`.
 
 :::warning
 When using delimited styles, do not use delimiter characters like `,`, ` `, or `|` in keys or values. They can make the parameter ambiguous.
