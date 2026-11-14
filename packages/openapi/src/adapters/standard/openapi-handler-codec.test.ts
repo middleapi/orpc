@@ -766,44 +766,54 @@ describe('openAPIHandlerCodec', () => {
         })
       })
 
-      it('parsing as undefined for delimited parsing strategies if query is absent', async () => {
-        const codec = new OpenAPIHandlerCodec(
-          os
-            .meta(
-              openapi({
-                method: 'GET',
-                queryStyles: {
-                  commaArray: 'comma-delimited-array',
-                  commaObject: 'comma-delimited-object',
-                  spaceArray: 'space-delimited-array',
-                  spaceObject: 'space-delimited-object',
-                  pipeArray: 'pipe-delimited-array',
-                  pipeObject: 'pipe-delimited-object',
-                },
-              }),
-            )
-            .handler(vi.fn()),
-        )
+      it.each([
+        '/',
+        '/?array=&commaArray=&commaObject=&spaceArray=&spaceObject=&pipeArray=&pipeObject=',
+      ] as const)(
+        'decodes an absent or empty value as an empty collection for collection styles: %s',
+        async (url) => {
+          const codec = new OpenAPIHandlerCodec(
+            os
+              .meta(
+                openapi({
+                  method: 'GET',
+                  queryStyles: {
+                    array: 'array',
+                    commaArray: 'comma-delimited-array',
+                    commaObject: 'comma-delimited-object',
+                    spaceArray: 'space-delimited-array',
+                    spaceObject: 'space-delimited-object',
+                    pipeArray: 'pipe-delimited-array',
+                    pipeObject: 'pipe-delimited-object',
+                    primitive: 'primitive',
+                    json: 'json',
+                  },
+                }),
+              )
+              .handler(vi.fn()),
+          )
 
-        const result = await codec.resolveProcedure(
-          createRequest({
-            method: 'GET',
-            url: '/',
-          }),
-          options as any,
-        )
+          const result = await codec.resolveProcedure(
+            createRequest({ method: 'GET', url }),
+            options as any,
+          )
 
-        expect(result).toBeDefined()
+          expect(result).toBeDefined()
 
-        await expect(result!.decodeInput()).resolves.toEqual({
-          commaArray: undefined,
-          commaObject: undefined,
-          spaceArray: undefined,
-          spaceObject: undefined,
-          pipeArray: undefined,
-          pipeObject: undefined,
-        })
-      })
+          await expect(result!.decodeInput()).resolves.toEqual({
+            // an exploded array keeps `?array=` as a single empty item
+            array: url === '/' ? [] : [''],
+            commaArray: [],
+            commaObject: {},
+            spaceArray: [],
+            spaceObject: {},
+            pipeArray: [],
+            pipeObject: {},
+            primitive: undefined,
+            json: undefined,
+          })
+        },
+      )
 
       it('keeps default bracket-notation decoding when a parsing hint is undefined', async () => {
         const codec = new OpenAPIHandlerCodec(

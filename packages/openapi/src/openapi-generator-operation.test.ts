@@ -265,7 +265,7 @@ describe('openAPIGenerator operation builders', () => {
       expect((operation.requestBody as any)?.required).toBeUndefined()
     })
 
-    it('maps compact GET inputs to query parameters and applies every query style', () => {
+    it('maps compact GET inputs to query parameters and applies every query style, never requiring collection styles', () => {
       const { ctx, operation } = createContext()
 
       buildRequest(
@@ -327,7 +327,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'array',
-          required: true,
           allowEmptyValue: true,
           allowReserved: true,
           schema: { type: 'array' },
@@ -335,7 +334,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'commaArray',
-          required: true,
           explode: false,
           allowEmptyValue: true,
           allowReserved: true,
@@ -344,7 +342,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'pipeObject',
-          required: true,
           style: 'pipeDelimited',
           allowEmptyValue: true,
           allowReserved: true,
@@ -353,7 +350,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'spaceArray',
-          required: true,
           style: 'spaceDelimited',
           allowEmptyValue: true,
           allowReserved: true,
