@@ -20,7 +20,7 @@ import {
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import type { Value } from '@orpc/shared'
-import { getOwn, stringifyJSON, value } from '@orpc/shared'
+import { getOwn, stringifyJSON, toArray, value } from '@orpc/shared'
 
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
@@ -291,9 +291,14 @@ function renderQueryParameters(
       allowReserved: true,
     }
 
-    const isCollectionStyle = style !== undefined && style !== 'primitive' && style !== 'json'
+    const collectionKind =
+      style === undefined || style === 'primitive' || style === 'json'
+        ? undefined
+        : style.endsWith('object')
+          ? 'object'
+          : 'array'
 
-    if (!optional && (!isCollectionStyle || !acceptsEmptyCollection(schema))) {
+    if (collectionKind ? !acceptsEmptyCollection(schema, collectionKind) : !optional) {
       parameter.required = true
     }
 
@@ -327,20 +332,56 @@ function renderQueryParameters(
   }
 }
 
-function acceptsEmptyCollection(schema: JsonSchema): boolean {
-  return flattenJsonUnionSchema(schema).some((branch) => {
-    const resolved = resolveJsonSchemaRootLocalRef(branch)
+/**
+ * Whether the schema accepts the empty collection (`[]` or `{}`) that a missing parameter decodes to.
+ * Unsupported keywords are treated as rejecting it.
+ */
+function acceptsEmptyCollection(
+  schema: JsonSchema,
+  kind: 'array' | 'object',
+  $defs?: Exclude<JsonSchema, boolean>['$defs'],
+  resolvingRefs: ReadonlySet<string> = new Set(),
+): boolean {
+  if (typeof schema !== 'object') {
+    return schema
+  }
 
-    if (typeof resolved !== 'object') {
-      return resolved
+  $defs = schema.$defs ?? $defs
+
+  if (typeof schema.$ref === 'string') {
+    const resolved = resolveJsonSchemaRootLocalRef(schema, $defs)
+
+    if (resolved === schema || resolvingRefs.has(schema.$ref)) {
+      return false
     }
 
-    return (
-      !((resolved.minItems ?? 0) > 0) &&
-      !((resolved.minProperties ?? 0) > 0) &&
-      !resolved.required?.length
-    )
-  })
+    return acceptsEmptyCollection(resolved, kind, $defs, new Set(resolvingRefs).add(schema.$ref))
+  }
+
+  const accepts = (member: JsonSchema) => acceptsEmptyCollection(member, kind, $defs, resolvingRefs)
+
+  if (
+    schema.enum !== undefined ||
+    schema.const !== undefined ||
+    schema.not !== undefined ||
+    (schema.type !== undefined && !(toArray(schema.type) as string[]).includes(kind))
+  ) {
+    return false
+  }
+
+  if (kind === 'array') {
+    if ((schema.minItems ?? 0) > 0 || (schema.contains !== undefined && schema.minContains !== 0)) {
+      return false
+    }
+  } else if ((schema.minProperties ?? 0) > 0 || schema.required?.length) {
+    return false
+  }
+
+  return (
+    (schema.allOf === undefined || schema.allOf.every(accepts)) &&
+    (schema.anyOf === undefined || schema.anyOf.some(accepts)) &&
+    (schema.oneOf === undefined || schema.oneOf.filter(accepts).length === 1)
+  )
 }
 
 function renderHeaderParameters(

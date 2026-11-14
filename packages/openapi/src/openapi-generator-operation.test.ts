@@ -1,9 +1,11 @@
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap } from '@orpc/contract'
 import { asyncIteratorObject, error } from '@orpc/contract'
+import type { JsonSchema } from '@orpc/json-schema'
 import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter } from '@orpc/json-schema'
 
 import { testSchema, testSchemaConverter } from '../tests/__shared__/schema'
+import type { OpenAPIMeta } from './meta'
 import { OpenAPIComponentRegistry } from './openapi-generator-components'
 import type { OpenAPIOperationContext } from './openapi-generator-operation'
 import {
@@ -392,6 +394,53 @@ describe('openAPIGenerator operation builders', () => {
     })
 
     it('requires collection-styled query params only when they reject an empty collection', () => {
+      const cases: [
+        style: NonNullable<OpenAPIMeta['queryStyles']>[string],
+        schema: JsonSchema,
+        required: true | undefined,
+      ][] = [
+        ['array', { type: 'array' }, undefined],
+        ['array', {}, undefined],
+        ['array', true, undefined],
+        ['array', false, true],
+        ['array', { type: ['array', 'null'] }, undefined],
+        ['array', { type: 'array', minItems: 1 }, true],
+        ['array', { type: 'array', minProperties: 1, required: ['a'] }, undefined],
+        ['array', { type: 'array', contains: { type: 'string' } }, true],
+        ['array', { type: 'array', contains: { type: 'string' }, minContains: 0 }, undefined],
+        ['array', { type: 'array', enum: [['a']] }, true],
+        ['array', { type: 'array', const: ['a'] }, true],
+        ['array', { type: 'array', not: { maxItems: 0 } }, true],
+        ['array', { type: 'string' }, true],
+        ['comma-delimited-object', { type: 'object' }, undefined],
+        ['comma-delimited-object', { type: 'object', minItems: 1 }, undefined],
+        ['comma-delimited-object', { type: 'object', minProperties: 1 }, true],
+        ['pipe-delimited-object', { type: 'object', required: ['a'] }, true],
+        ['space-delimited-object', { type: 'array' }, true],
+        ['space-delimited-array', { $ref: '#/$defs/Tags' }, true],
+        ['space-delimited-array', { $ref: '#/$defs/Any' }, undefined],
+        ['space-delimited-array', { $ref: '#/$defs/Missing' }, true],
+        ['space-delimited-array', { $ref: '#/$defs/Loop' }, true],
+        [
+          'comma-delimited-array',
+          { anyOf: [{ type: 'array', minItems: 1 }, { type: 'null' }] },
+          true,
+        ],
+        [
+          'comma-delimited-array',
+          { anyOf: [{ type: 'array', minItems: 1 }, { type: 'array' }] },
+          undefined,
+        ],
+        ['pipe-delimited-array', { allOf: [{ type: 'array' }, { $ref: '#/$defs/Tags' }] }, true],
+        [
+          'pipe-delimited-array',
+          { allOf: [{ type: 'array' }, { $ref: '#/$defs/Any' }] },
+          undefined,
+        ],
+        ['array', { oneOf: [{ type: 'array' }, { type: 'string' }] }, undefined],
+        ['array', { oneOf: [{ type: 'array' }, { type: 'array', items: { const: 'a' } }] }, true],
+      ]
+
       const { ctx, operation } = createContext()
 
       buildRequest(
@@ -401,66 +450,27 @@ describe('openAPIGenerator operation builders', () => {
           inputs: [
             testSchema({
               type: 'object',
-              properties: {
-                empty: { type: 'array' },
-                minItems: { type: 'array', minItems: 1 },
-                minProperties: { type: 'object', minProperties: 1 },
-                requiredProperty: { type: 'object', required: ['a'] },
-                ref: { $ref: '#/$defs/Tags' },
-                everyBranch: { anyOf: [{ type: 'array', minItems: 1 }, { $ref: '#/$defs/Tags' }] },
-                someBranch: { anyOf: [{ type: 'array', minItems: 1 }, { type: 'array' }] },
-                unconstrained: true,
-                optionalMinItems: { type: 'array', minItems: 1 },
-              },
-              required: [
-                'empty',
-                'minItems',
-                'minProperties',
-                'requiredProperty',
-                'ref',
-                'everyBranch',
-                'someBranch',
-                'unconstrained',
-              ],
+              properties: Object.fromEntries(cases.map(([, schema], i) => [`p${i}`, schema])),
+              // requiredness must not depend on whether the property is optional
+              required: cases.map((_, i) => `p${i}`).filter((_, i) => i % 2 === 0),
               $defs: {
                 Tags: { type: 'array', minItems: 2 },
+                Any: { type: 'array' },
+                Loop: { allOf: [{ $ref: '#/$defs/Loop' }] },
               },
             }),
           ],
         }),
         {
           method: 'GET',
-          queryStyles: {
-            empty: 'array',
-            minItems: 'array',
-            minProperties: 'comma-delimited-object',
-            requiredProperty: 'pipe-delimited-object',
-            ref: 'space-delimited-array',
-            everyBranch: 'comma-delimited-array',
-            someBranch: 'comma-delimited-array',
-            unconstrained: 'array',
-            optionalMinItems: 'array',
-          },
+          queryStyles: Object.fromEntries(cases.map(([style], i) => [`p${i}`, style])),
         },
         undefined,
       )
 
-      expect(
-        operation.parameters?.map((p) => {
-          const { name, required } = p as OpenAPIV3_2.ParameterObject
-          return { name, required }
-        }),
-      ).toEqual([
-        { name: 'empty', required: undefined },
-        { name: 'minItems', required: true },
-        { name: 'minProperties', required: true },
-        { name: 'requiredProperty', required: true },
-        { name: 'ref', required: true },
-        { name: 'everyBranch', required: true },
-        { name: 'someBranch', required: undefined },
-        { name: 'unconstrained', required: undefined },
-        { name: 'optionalMinItems', required: undefined },
-      ])
+      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).required)).toEqual(
+        cases.map(([, , required]) => required),
+      )
     })
 
     it('does not use deepObject for query params whose $ref resolves to a primitive', () => {
