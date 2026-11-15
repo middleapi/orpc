@@ -1,4 +1,10 @@
-import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
+import type {
+  ErrorMap,
+  InferRouterContractErrorMap,
+  ProcedureContractDefinition,
+  ProcedureContractDefinitionOf,
+  RouterContract,
+} from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
 import type { IntersectPick, Public } from '@orpc/shared'
 import { bindMethods, omit, setOwn } from '@orpc/shared'
@@ -184,33 +190,40 @@ export interface SharedRouterImplementerWithMiddlewares<
   ): Lazy<AugmentedRouterWithMiddlewares<T, TInitialContext, TInjectedContext, object>>
 }
 
-export type RouterImplementer<TContract extends RouterContract, TInitialContext extends Context> =
-  TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
-    ? ProcedureImplementer<TInitialContext, object, $InputSchema, $OutputSchema, $ErrorMap>
-    : Public<SharedRouterImplementer<TContract, TInitialContext>> & {
-        [K in keyof TContract]: TContract[K] extends RouterContract
-          ? RouterImplementer<TContract[K], TInitialContext>
-          : never
-      }
+export type RouterImplementer<
+  TContract extends RouterContract,
+  TInitialContext extends Context,
+> = TContract extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+  ? ProcedureImplementer<
+      TInitialContext,
+      object,
+      NonNullable<ProcedureContractDefinitionOf<TContract>['__TInputSchema']>['type'],
+      NonNullable<ProcedureContractDefinitionOf<TContract>['__TOutputSchema']>['type'],
+      ProcedureContractDefinitionOf<TContract>['errorMap']
+    >
+  : Public<SharedRouterImplementer<TContract, TInitialContext>> & {
+      [K in keyof TContract]: TContract[K] extends RouterContract
+        ? RouterImplementer<TContract[K], TInitialContext>
+        : never
+    }
 
 export type RouterImplementerWithMiddlewares<
   TContract extends RouterContract,
   TInitialContext extends Context,
   TInjectedContext extends Context,
-> =
-  TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
-    ? ProcedureImplementer<
-        TInitialContext,
-        TInjectedContext,
-        $InputSchema,
-        $OutputSchema,
-        $ErrorMap
-      >
-    : SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> & {
-        [K in keyof TContract]: TContract[K] extends RouterContract
-          ? RouterImplementerWithMiddlewares<TContract[K], TInitialContext, TInjectedContext>
-          : never
-      }
+> = TContract extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+  ? ProcedureImplementer<
+      TInitialContext,
+      TInjectedContext,
+      NonNullable<ProcedureContractDefinitionOf<TContract>['__TInputSchema']>['type'],
+      NonNullable<ProcedureContractDefinitionOf<TContract>['__TOutputSchema']>['type'],
+      ProcedureContractDefinitionOf<TContract>['errorMap']
+    >
+  : SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> & {
+      [K in keyof TContract]: TContract[K] extends RouterContract
+        ? RouterImplementerWithMiddlewares<TContract[K], TInitialContext, TInjectedContext>
+        : never
+    }
 
 export function createRouterImplementer<
   TContract extends RouterContract,

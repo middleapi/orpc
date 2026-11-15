@@ -2,7 +2,8 @@ import type {
   InferSchemaInput,
   InferSchemaOutput,
   ORPCErrorFromErrorMap,
-  ProcedureContract,
+  ProcedureContractDefinition,
+  ProcedureContractDefinitionOf,
   RouterContract,
   ThrowableError,
 } from '@orpc/contract'
@@ -17,14 +18,22 @@ export type Router<TInitialContext extends Context> =
       [k: string]: Lazyable<Router<TInitialContext>>
     }
 
-export type ContractedRouter<T extends RouterContract, TInitialContext extends Context> =
-  T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
-    ? Procedure<TInitialContext, any, $InputSchema, $OutputSchema, $ErrorMap>
-    : {
-        [K in keyof T]: T[K] extends RouterContract
-          ? Lazyable<ContractedRouter<T[K], TInitialContext>>
-          : never
-      }
+export type ContractedRouter<
+  T extends RouterContract,
+  TInitialContext extends Context,
+> = T extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+  ? Procedure<
+      TInitialContext,
+      any,
+      NonNullable<ProcedureContractDefinitionOf<T>['__TInputSchema']>['type'],
+      NonNullable<ProcedureContractDefinitionOf<T>['__TOutputSchema']>['type'],
+      ProcedureContractDefinitionOf<T>['errorMap']
+    >
+  : {
+      [K in keyof T]: T[K] extends RouterContract
+        ? Lazyable<ContractedRouter<T[K], TInitialContext>>
+        : never
+    }
 
 export type AnyRouter = Router<any>
 
@@ -79,9 +88,9 @@ export type InferRouterFinalContexts<T extends AnyRouter> = T extends {
  * @see {@link https://orpc.dev/docs/router#infer-router-inputs | Router - Infer Router Inputs}
  */
 export type InferRouterInputs<T extends AnyRouter> = T extends {
-  '~orpc': ProcedureDefinition<any, any, infer UInputSchema, any, any>
+  '~orpc': ProcedureDefinition<any, any, any, any, any>
 }
-  ? InferSchemaInput<UInputSchema>
+  ? InferSchemaInput<NonNullable<ProcedureContractDefinitionOf<T>['__TInputSchema']>['type']>
   : {
       [K in keyof T]: T[K] extends AnyRouter
         ? InferRouterInputs<T[K]>
@@ -99,9 +108,9 @@ export type InferRouterInputs<T extends AnyRouter> = T extends {
  * @see {@link https://orpc.dev/docs/router#infer-router-outputs | Router - Infer Router Outputs}
  */
 export type InferRouterOutputs<T extends AnyRouter> = T extends {
-  '~orpc': ProcedureDefinition<any, any, any, infer UOutputSchema, any>
+  '~orpc': ProcedureDefinition<any, any, any, any, any>
 }
-  ? InferSchemaOutput<UOutputSchema>
+  ? InferSchemaOutput<NonNullable<ProcedureContractDefinitionOf<T>['__TOutputSchema']>['type']>
   : {
       [K in keyof T]: T[K] extends AnyRouter
         ? InferRouterOutputs<T[K]>

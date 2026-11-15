@@ -61,3 +61,14 @@ export class ProcedureContract<
 }
 
 export type AnyProcedureContract = ProcedureContract<any, any, any>
+
+/**
+ * Reads the `~orpc` definition of a procedure (contract) type, for type-level
+ * lookups of its schemas and error map by indexed access.
+ * `any` reads as `ProcedureContractDefinition<AnySchema, AnySchema, ErrorMap>`.
+ *
+ * @internal
+ */
+export type ProcedureContractDefinitionOf<
+  T extends { '~orpc': ProcedureContractDefinition<any, any, any> },
+> = unknown extends T ? ProcedureContractDefinition<AnySchema, AnySchema, ErrorMap> : T['~orpc']

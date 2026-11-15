@@ -37,9 +37,7 @@ export type InferSchemaOutput<T extends AnySchema> = T extends unknown
     : NonNullable<T['~standard']['types']>['output']
   : never
 
-export type MergedSchema<T extends AnySchema, U extends AnySchema> =
-  T extends Schema<infer TInput, infer TOutput>
-    ? U extends Schema<infer UInput, infer UOutput>
-      ? Schema<TInput & UInput, TOutput & UOutput>
-      : never
-    : never
+export type MergedSchema<T extends AnySchema, U extends AnySchema> = Schema<
+  InferSchemaInput<T> & InferSchemaInput<U>,
+  InferSchemaOutput<T> & InferSchemaOutput<U>
+>

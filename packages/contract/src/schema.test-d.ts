@@ -162,4 +162,56 @@ describe('MergedSchema', () => {
       { schema1: string } & { schema2: number } & { schema3: boolean }
     >()
   })
+
+  it('merges `any` and `AnySchema`', () => {
+    type Schema1 = Schema<{ schema1: number }, { schema1: string }>
+
+    expectTypeOf<MergedSchema<any, Schema1>>().toEqualTypeOf<
+      Schema<{ schema1: number }, { schema1: string }>
+    >()
+    expectTypeOf<MergedSchema<AnySchema, Schema1>>().toEqualTypeOf<Schema<any, any>>()
+  })
+
+  it('merges the declared types of untyped schemas', () => {
+    type Schema1 = Schema<{ schema1: number }, { schema1: string }>
+
+    // The same types InferSchemaInput / InferSchemaOutput read from each schema on its own.
+    expectTypeOf<MergedSchema<typeof untypedSchema, Schema1>>().toEqualTypeOf<
+      Schema<{ schema1: number }, { schema1: string }>
+    >()
+    expectTypeOf<MergedSchema<typeof undefinedTypesSchema, Schema1>>().toEqualTypeOf<
+      Schema<never, never>
+    >()
+  })
+
+  it('merges union schemas', () => {
+    type Schema1 = Schema<{ schema1: number }, { schema1: string }>
+    type TMerged = MergedSchema<UnionSchema, Schema1>
+
+    expectTypeOf<InferSchemaInput<TMerged>>().toEqualTypeOf<
+      ({ a: number } | { b: number }) & { schema1: number }
+    >()
+    expectTypeOf<InferSchemaOutput<TMerged>>().toEqualTypeOf<
+      ({ a: string } | { b: string }) & { schema1: string }
+    >()
+  })
+
+  it('merges a generic schema', () => {
+    function _generic<T extends Schema<{ id: string }, { id: number }>>(
+      input: InferSchemaInput<MergedSchema<T, Schema<{ name: string }>>>,
+      output: InferSchemaOutput<MergedSchema<T, Schema<{ name: string }>>>,
+    ) {
+      expectTypeOf(input.id).toEqualTypeOf<string>()
+      expectTypeOf(input.name).toEqualTypeOf<string>()
+      expectTypeOf(output.id).toEqualTypeOf<number>()
+      expectTypeOf(output.name).toEqualTypeOf<string>()
+    }
+
+    function _unsound<T extends AnySchema>(
+      value: unknown,
+    ): InferSchemaInput<MergedSchema<T, Schema<{ name: string }>>> {
+      // @ts-expect-error - unknown is not assignable to an unresolved schema type
+      return value
+    }
+  })
 })

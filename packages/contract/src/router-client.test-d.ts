@@ -2,6 +2,7 @@ import type { Client, ClientContext, NestedClient, ORPCError, ThrowableError } f
 import { z } from 'zod'
 
 import { oc } from './builder'
+import type { AnyProcedureContract } from './procedure'
 import type { RouterContractClient } from './router-client'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
@@ -47,5 +48,20 @@ describe('RouterContractClient', () => {
     expectTypeOf<ClientType['nested']['ping']>().toEqualTypeOf<ClientType['ping']>()
 
     expectTypeOf<ClientType['nested']['pong']>().toEqualTypeOf<ClientType['pong']>()
+  })
+
+  it('accepts any client as RouterContractClient<any>', () => {
+    const client = {} as RouterContractClient<typeof router>
+
+    const _router: RouterContractClient<any> = client
+    const _procedure: RouterContractClient<any> = client.ping
+    const _key: RouterContractClient<{ ping: any }> = { ping: client.pong }
+  })
+
+  it('keeps a generic procedure unresolved', async () => {
+    async function _generic<T extends AnyProcedureContract>(client: RouterContractClient<T>) {
+      // @ts-expect-error - output of an unresolved procedure is not a string
+      const _output: string = await client(undefined as any)
+    }
   })
 })

@@ -80,6 +80,16 @@ describe('contractedRouter', () => {
     expectTypeOf<Exclude<Router['nested'], Lazy<any>>['pong']>().toEqualTypeOf<Router['pong']>()
   })
 
+  it('accepts any router as ContractedRouter<any>', () => {
+    const router = {} as ContractedRouter<typeof contract, { init?: boolean }>
+
+    const _router: ContractedRouter<any, { init?: boolean }> = router
+    const _procedure: ContractedRouter<any, { init?: boolean }> = {} as Exclude<
+      (typeof router)['ping'],
+      Lazy<any>
+    >
+  })
+
   it('support single procedure', () => {
     type P = ContractedRouter<(typeof contract)['ping'], { init?: boolean }>
 
@@ -159,6 +169,25 @@ describe('infer utilities', () => {
 
     expectTypeOf<Inferred['pong']>().toEqualTypeOf<unknown>()
     expectTypeOf<Inferred['nested']['pong']>().toEqualTypeOf<unknown>()
+  })
+
+  it('InferRouterInputs and InferRouterOutputs of any', () => {
+    expectTypeOf<InferRouterInputs<any>>().toBeAny()
+    expectTypeOf<InferRouterOutputs<any>>().toBeAny()
+    expectTypeOf<InferRouterInputs<{ ping: any }>['ping']>().toBeAny()
+    expectTypeOf<InferRouterOutputs<{ ping: any }>['ping']>().toBeAny()
+  })
+
+  it('InferRouterInputs and InferRouterOutputs of a generic procedure', () => {
+    function _generic<T extends Procedure<any, any, any, any, any>>(
+      input: InferRouterInputs<T>,
+      output: InferRouterOutputs<T>,
+    ) {
+      // @ts-expect-error - input of an unresolved procedure is not a string
+      const _input: string = input
+      // @ts-expect-error - output of an unresolved procedure is not a string
+      const _output: string = output
+    }
   })
 
   const errorRouter = {

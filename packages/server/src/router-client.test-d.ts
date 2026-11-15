@@ -4,6 +4,7 @@ import * as z from 'zod'
 
 import { os } from './builder'
 import type { Lazyable } from './lazy'
+import type { AnyProcedure } from './procedure'
 import type { ProcedureClient } from './procedure-client'
 import type { RouterClient } from './router-client'
 import { createRouterClient } from './router-client'
@@ -97,6 +98,21 @@ describe('RouterClient', () => {
     type OptionalRouter = { ping?: typeof router.ping }
 
     expectTypeOf<RouterClient<OptionalRouter>>().toEqualTypeOf<{ ping?: never }>()
+  })
+
+  it('accepts any client as RouterClient<any>', () => {
+    const client = {} as RouterClient<typeof router>
+
+    const _router: RouterClient<any> = client
+    const _procedure: RouterClient<any> = client.ping
+    const _key: RouterClient<{ ping: any }> = { ping: client.nested.pong }
+  })
+
+  it('keeps a generic procedure unresolved', async () => {
+    async function _generic<T extends AnyProcedure>(client: RouterClient<T>) {
+      // @ts-expect-error - output of an unresolved procedure is not a string
+      const _output: string = await client(undefined as any)
+    }
   })
 
   it('support single procedure', () => {
