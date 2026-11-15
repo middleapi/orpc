@@ -214,7 +214,7 @@ type ClientError = InferClientError<typeof client>
 
 ### Infer Client Context
 
-Infers the [client context](#client-context) type from a client.
+Infers the [client context](#client-context) type from a client. When procedures require different contexts, this is the union of them, since each call carries the context of the procedure being called.
 
 ```ts
 import type { InferClientContext } from '@orpc/client'

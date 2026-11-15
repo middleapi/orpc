@@ -29,15 +29,54 @@ export type NestedClient<TClientContext extends ClientContext> =
       [k: string]: NestedClient<TClientContext>
     }
 
-export type AnyNestedClient = NestedClient<any>
+/**
+ * Matches any client. `Client<any, any, any, any>` alone rejects a client
+ * whose input is `never` (e.g. `.input(z.never())`), since `any` is not assignable to `never`.
+ */
+export type AnyClient = Client<any, any, any, any> | Client<any, never, any, any>
+
+export type AnyNestedClient =
+  | AnyClient
+  | {
+      [k: string]: AnyNestedClient
+    }
 
 /**
  * Infers the **client context type** required by a client.
  *
+ * When procedures require different contexts, this is the union of them:
+ * each call carries the context of the procedure being called.
+ *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-context | Client-Side Clients - Infer Client Context}
  */
 export type InferClientContext<T extends AnyNestedClient> =
-  T extends NestedClient<infer U> ? U : never
+  T extends NestedClient<infer U>
+    ? U
+    : // `any` would otherwise walk into `unknown`
+      0 extends 1 & T
+      ? never
+      : InferClientLeafContexts<T>
+
+type InferClientLeafContexts<T extends AnyNestedClient> =
+  T extends Client<infer UContext, infer _UInput, infer _UOutput, infer _UError>
+    ? UContext
+    : {
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientLeafContexts<T[K]> : never
+      }[keyof T]
+
+/**
+ * Extracts `body` when `T` has a `body` key (`| undefined` when it is optional),
+ * leaving other types, including index signatures, unchanged.
+ */
+type InferBody<T> = string extends keyof T
+  ? T
+  : T extends { body: infer UBody }
+    ? UBody
+    : T extends { body?: infer UBody }
+      ? 'body' extends keyof T
+        ? UBody | undefined
+        : T
+      : T
 
 export interface ClientLink<TClientContext extends ClientContext> {
   call: (path: string[], input: unknown, options: ClientOptions<TClientContext>) => Promise<unknown>
@@ -51,7 +90,7 @@ export interface ClientLink<TClientContext extends ClientContext> {
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-inputs | Client-Side Clients - Infer Client Inputs}
  */
 export type InferClientInputs<T extends AnyNestedClient> =
-  T extends Client<any, infer U, any, any>
+  T extends Client<infer _UContext, infer U, infer _UOutput, infer _UError>
     ? U
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? InferClientInputs<T[K]> : never
@@ -66,10 +105,8 @@ export type InferClientInputs<T extends AnyNestedClient> =
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-inputs | Client-Side Clients - Infer Client Body Inputs}
  */
 export type InferClientBodyInputs<T extends AnyNestedClient> =
-  T extends Client<any, infer U, any, any>
-    ? U extends { body: infer UBody }
-      ? UBody
-      : U
+  T extends Client<infer _UContext, infer U, infer _UOutput, infer _UError>
+    ? InferBody<U>
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? InferClientBodyInputs<T[K]> : never
       }
@@ -82,7 +119,7 @@ export type InferClientBodyInputs<T extends AnyNestedClient> =
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-outputs | Client-Side Clients - Infer Client Outputs}
  */
 export type InferClientOutputs<T extends AnyNestedClient> =
-  T extends Client<any, any, infer U, any>
+  T extends Client<infer _UContext, infer _UInput, infer U, infer _UError>
     ? U
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? InferClientOutputs<T[K]> : never
@@ -97,10 +134,8 @@ export type InferClientOutputs<T extends AnyNestedClient> =
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-outputs | Client-Side Clients - Infer Client Body Outputs}
  */
 export type InferClientBodyOutputs<T extends AnyNestedClient> =
-  T extends Client<any, any, infer U, any>
-    ? U extends { body: infer UBody }
-      ? UBody
-      : U
+  T extends Client<infer _UContext, infer _UInput, infer U, infer _UError>
+    ? InferBody<U>
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? InferClientBodyOutputs<T[K]> : never
       }
@@ -113,7 +148,7 @@ export type InferClientBodyOutputs<T extends AnyNestedClient> =
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-errors | Client-Side Clients - Infer Client Errors}
  */
 export type InferClientErrors<T extends AnyNestedClient> =
-  T extends Client<any, any, any, infer U>
+  T extends Client<infer _UContext, infer _UInput, infer _UOutput, infer U>
     ? U
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? InferClientErrors<T[K]> : never
@@ -127,7 +162,7 @@ export type InferClientErrors<T extends AnyNestedClient> =
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-error | Client-Side Clients - Infer Client Error}
  */
 export type InferClientError<T extends AnyNestedClient> =
-  T extends Client<any, any, any, infer U>
+  T extends Client<infer _UContext, infer _UInput, infer _UOutput, infer U>
     ? U
     : {
         [K in keyof T]: T[K] extends AnyNestedClient ? InferClientError<T[K]> : never

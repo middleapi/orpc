@@ -1,3 +1,4 @@
+import type { Client } from '@orpc/client'
 import { RPCSerializer } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import { OpenAPISerializer } from '@orpc/openapi'
@@ -127,4 +128,49 @@ it('createRouterUtils', () => {
   })
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()
+})
+
+it('createRouterUtils infers the union of contexts when procedures require different contexts', () => {
+  const client = {} as {
+    a: Client<{ x: string }, string, number, Error>
+    b: { c: Client<{ y: number }, string, number, Error> }
+  }
+
+  createRouterUtils(client, {
+    queryInterceptors: [
+      ({ context, next }) => {
+        expectTypeOf(context).not.toBeNever()
+        expectTypeOf(context).toExtend<{ x: string } | { y: number }>()
+
+        return next()
+      },
+    ],
+    mutationInterceptors: [
+      ({ context, next }) => {
+        expectTypeOf(context).not.toBeNever()
+        expectTypeOf(context).toExtend<{ x: string } | { y: number }>()
+
+        return next()
+      },
+    ],
+  })
+})
+
+it('createRouterUtils accepts a client with a `never` input procedure', () => {
+  const router = {
+    never: os.input(z.never()).handler(() => 1),
+    ping,
+  }
+
+  const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
+    queryInterceptors: [
+      ({ context, next }) => {
+        expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()
+
+        return next()
+      },
+    ],
+  })
+
+  expectTypeOf(utils.ping.call).returns.resolves.toEqualTypeOf<{ output: string }>()
 })

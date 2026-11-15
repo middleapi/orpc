@@ -1,5 +1,6 @@
 import type { ORPCError } from './error'
 import type {
+  AnyNestedClient,
   Client,
   ClientContext,
   InferClientBodyInputs,
@@ -178,5 +179,96 @@ describe('infer utilities', () => {
     expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<
       Error | ORPCError<'PING', unknown> | ORPCError<'NESTED_PING', unknown>
     >()
+  })
+})
+
+describe('infer utilities with mixed client contexts', () => {
+  type ORPC = {
+    a: Client<{ x: string }, string, number, Error>
+    b: {
+      c: Client<{ y: number }, string, number, Error>
+    }
+  }
+
+  it('InferClientContext is the union of every procedure context', () => {
+    expectTypeOf<InferClientContext<ORPC>>().toEqualTypeOf<{ x: string } | { y: number }>()
+  })
+
+  it('InferClientContext keeps a shared context as is', () => {
+    expectTypeOf<
+      InferClientContext<{
+        a: Client<{ x?: string }, string, number, Error>
+        b: { c: Client<{ x?: string }, undefined | string, number, Error> }
+      }>
+    >().toEqualTypeOf<{ x?: string }>()
+  })
+})
+
+describe('infer utilities with `never` input', () => {
+  type ORPC = {
+    ping: Client<{ cache: boolean }, never, number, Error>
+    nested: {
+      pong: Client<{ cache: boolean }, string, boolean, TypeError>
+    }
+  }
+
+  it('is a nested client', () => {
+    expectTypeOf<ORPC>().toExtend<AnyNestedClient>()
+    expectTypeOf<ORPC['ping']>().toExtend<AnyNestedClient>()
+  })
+
+  it('infers every utility', () => {
+    expectTypeOf<InferClientContext<ORPC>>().toEqualTypeOf<{ cache: boolean }>()
+    expectTypeOf<InferClientInputs<ORPC>>().toEqualTypeOf<{
+      ping: never
+      nested: { pong: string }
+    }>()
+    expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
+      ping: never
+      nested: { pong: string }
+    }>()
+    expectTypeOf<InferClientOutputs<ORPC>>().toEqualTypeOf<{
+      ping: number
+      nested: { pong: boolean }
+    }>()
+    expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
+      ping: number
+      nested: { pong: boolean }
+    }>()
+    expectTypeOf<InferClientErrors<ORPC>>().toEqualTypeOf<{
+      ping: Error
+      nested: { pong: TypeError }
+    }>()
+    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<Error | TypeError>()
+  })
+})
+
+describe('InferClientBodyInputs & InferClientBodyOutputs edge cases', () => {
+  type ORPC = {
+    optional: Client<ClientContext, { body?: string }, { body?: number }, Error>
+    undefinedable: Client<ClientContext, { body: string } | undefined, { body: number }, Error>
+    withoutBody: Client<ClientContext, { query: string }, { headers: string }, Error>
+    record: Client<ClientContext, Record<string, number>, Record<string, string>, Error>
+    unknown: Client<ClientContext, unknown, unknown, Error>
+  }
+
+  it('InferClientBodyInputs', () => {
+    expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
+      optional: string | undefined
+      undefinedable: string | undefined
+      withoutBody: { query: string }
+      record: Record<string, number>
+      unknown: unknown
+    }>()
+  })
+
+  it('InferClientBodyOutputs', () => {
+    expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
+      optional: number | undefined
+      undefinedable: number
+      withoutBody: { headers: string }
+      record: Record<string, string>
+      unknown: unknown
+    }>()
   })
 })

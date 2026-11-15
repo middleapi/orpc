@@ -5,7 +5,7 @@ import type { PromiseWithError } from '@orpc/shared'
 
 import { createORPCClient } from './client'
 import type { ORPCError } from './error'
-import type { ClientLink } from './types'
+import type { Client, ClientLink } from './types'
 
 const router = {
   ping: os.input(type<number>()).handler(() => 'pong'),
@@ -128,5 +128,47 @@ describe('createORPCClient', () => {
         },
       },
     )
+  })
+
+  it('mixed contexts: link must accept the context of every procedure', () => {
+    type Mixed = {
+      a: Client<{ x: string }, string, number, Error>
+      b: { c: Client<{ y: number }, string, number, Error> }
+    }
+
+    const _ok: Mixed = createORPCClient({} as ClientLink<{ x: string } | { y: number }>, {
+      interceptors: [
+        ({ context, next }) => {
+          expectTypeOf(context).toEqualTypeOf<{ x: string } | { y: number }>()
+
+          return next()
+        },
+      ],
+    })
+
+    const _loose: Mixed = createORPCClient({} as ClientLink<{ x?: string; y?: number }>)
+
+    const _onlyA: Mixed = createORPCClient(
+      // @ts-expect-error -- b.c is called with { y: number }
+      {} as ClientLink<{ x: string }>,
+    )
+
+    const _both: Mixed = createORPCClient(
+      // @ts-expect-error -- each call only carries one of the contexts
+      {} as ClientLink<{ x: string; y: number }>,
+    )
+  })
+
+  it('procedure with `never` input', () => {
+    const router = {
+      ping: os.input(type<never>()).handler(() => 'pong'),
+      pong: os.input(type<string>()).handler(() => 1),
+    }
+
+    const client: RouterClient<typeof router, { cache: string }> = createORPCClient(
+      {} as ClientLink<{ cache: string }>,
+    )
+
+    expectTypeOf(client.pong).returns.resolves.toEqualTypeOf<number>()
   })
 })

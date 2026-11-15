@@ -84,3 +84,14 @@ it('createRouterUtils', () => {
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()
 })
+
+it('createRouterUtils accepts a client with a `never` input procedure', () => {
+  const router = {
+    never: os.input(z.never()).handler(() => 1),
+    ping,
+  }
+
+  const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>)
+
+  expectTypeOf(utils.ping.call).returns.resolves.toEqualTypeOf<{ output: string }>()
+})

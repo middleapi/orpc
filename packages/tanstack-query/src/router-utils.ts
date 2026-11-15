@@ -146,7 +146,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
       ? bindMethods(
           new ProcedureUtils(
             path,
-            client,
+            client as Client<any, any, any, any>,
             plugin.initProcedureOptions(
               path,
               mergeProcedureUtilsOptions(
@@ -159,7 +159,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
                   'infiniteInterceptors',
                   'mutationInterceptors',
                 ]) as ProcedureUtilsOptions<any, any, any, any>,
-                options.scoped ?? {},
+                (options.scoped ?? {}) as ProcedureUtilsOptions<any, any, any, any>,
               ),
             ),
           ),
