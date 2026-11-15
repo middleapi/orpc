@@ -1,8 +1,10 @@
+import type { Client } from '@orpc/client'
 import { RPCSerializer } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import { OpenAPISerializer } from '@orpc/openapi'
 import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
+import type { Public } from '@orpc/shared'
 import * as z from 'zod'
 
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
@@ -146,5 +148,32 @@ it('createRouterUtils', () => {
 
   expectTypeOf(utils).toEqualTypeOf<
     RouterUtils<RouterClient<typeof scopedRouter, { batch?: boolean }>>
+  >()
+})
+
+it('RouterUtils with optional procedures', () => {
+  type OptionalClient = {
+    ping?: Client<{ batch?: boolean }, string, number, Error>
+    nested?: {
+      pong?: Client<{ batch?: boolean }, string, number, Error>
+    }
+  }
+
+  const utils = {} as RouterUtils<OptionalClient>
+
+  expectTypeOf(utils.ping).toEqualTypeOf<
+    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+  >()
+  expectTypeOf(utils.nested?.pong).toEqualTypeOf<
+    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+  >()
+
+  const scoped = {} as RouterUtilsScoped<OptionalClient>
+
+  expectTypeOf(scoped.ping).toEqualTypeOf<
+    ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
+  >()
+  expectTypeOf(scoped.nested?.pong).toEqualTypeOf<
+    ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
   >()
 })

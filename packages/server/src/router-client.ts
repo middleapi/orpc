@@ -37,12 +37,24 @@ export type RouterClient<
       ProcedureContractErrorMapOf<TRouter>
     >
   : {
-      [K in keyof TRouter]: TRouter[K] extends AnyRouter
-        ? RouterClient<TRouter[K], TClientContext>
-        : TRouter[K] extends Lazyable<infer U extends AnyRouter>
-          ? RouterClient<U, TClientContext>
-          : never
+      [K in keyof TRouter]: RouterClientInternal<TRouter[K] & {}, TClientContext>
     }
+
+export type RouterClientInternal<
+  TRouter,
+  TClientContext extends ClientContext,
+> = TRouter extends AnyProcedureLike
+  ? ProcedureClient<
+      TClientContext,
+      ProcedureContractInputSchemaOf<TRouter>,
+      ProcedureContractOutputSchemaOf<TRouter>,
+      ProcedureContractErrorMapOf<TRouter>
+    >
+  : TRouter extends Lazy<infer U>
+    ? RouterClientInternal<U, TClientContext>
+    : {
+        [K in keyof TRouter]: RouterClientInternal<TRouter[K] & {}, TClientContext>
+      }
 
 /**
  * Creates a server-side client that calls the router's procedures directly,

@@ -11,7 +11,7 @@ import type {
 } from '@orpc/contract'
 
 import type { Context, MergedContext } from './context'
-import type { Lazyable } from './lazy'
+import type { Lazy, Lazyable } from './lazy'
 import type { AnyProcedureLike, Procedure, ProcedureDefinition } from './procedure'
 
 export type Router<TInitialContext extends Context> =
@@ -23,6 +23,11 @@ export type Router<TInitialContext extends Context> =
 export type ContractedRouter<
   T extends RouterContract,
   TInitialContext extends Context,
+> = ContractedRouterInternal<T, TInitialContext>
+
+export type ContractedRouterInternal<
+  T,
+  TInitialContext extends Context,
 > = T extends AnyProcedureContractLike
   ? Procedure<
       TInitialContext,
@@ -32,9 +37,7 @@ export type ContractedRouter<
       ProcedureContractErrorMapOf<T>
     >
   : {
-      [K in keyof T]: T[K] extends RouterContract
-        ? Lazyable<ContractedRouter<T[K], TInitialContext>>
-        : never
+      [K in keyof T]: Lazyable<ContractedRouterInternal<T[K] & {}, TInitialContext>>
     }
 
 export type AnyRouter = Router<any>
@@ -49,17 +52,17 @@ export type InferRouterInitialContext<T extends AnyRouter> = T extends Router<in
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-initial-contexts | Router - Infer Router Initial Contexts}
  */
-export type InferRouterInitialContexts<T extends AnyRouter> = T extends {
+export type InferRouterInitialContexts<T extends AnyRouter> = InferRouterInitialContextsInternal<T>
+
+export type InferRouterInitialContextsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<infer UInitialContext, any, any, any, any>
 }
   ? UInitialContext
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? InferRouterInitialContexts<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? InferRouterInitialContexts<U>
-          : never
-    }
+  : T extends Lazy<infer U>
+    ? InferRouterInitialContextsInternal<U>
+    : {
+        [K in keyof T]: InferRouterInitialContextsInternal<T[K] & {}>
+      }
 
 /**
  * Infer all current context of the router.
@@ -69,17 +72,17 @@ export type InferRouterInitialContexts<T extends AnyRouter> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-final-contexts | Router - Infer Router Final Contexts}
  */
-export type InferRouterFinalContexts<T extends AnyRouter> = T extends {
+export type InferRouterFinalContexts<T extends AnyRouter> = InferRouterFinalContextsInternal<T>
+
+export type InferRouterFinalContextsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<infer UInitialContext, infer UInjectedContext, any, any, any>
 }
   ? MergedContext<UInitialContext, UInjectedContext>
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? InferRouterFinalContexts<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? InferRouterFinalContexts<U>
-          : never
-    }
+  : T extends Lazy<infer U>
+    ? InferRouterFinalContextsInternal<U>
+    : {
+        [K in keyof T]: InferRouterFinalContextsInternal<T[K] & {}>
+      }
 
 /**
  * Infer all router inputs.
@@ -89,15 +92,15 @@ export type InferRouterFinalContexts<T extends AnyRouter> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-inputs | Router - Infer Router Inputs}
  */
-export type InferRouterInputs<T extends AnyRouter> = T extends AnyProcedureLike
+export type InferRouterInputs<T extends AnyRouter> = InferRouterInputsInternal<T>
+
+export type InferRouterInputsInternal<T> = T extends AnyProcedureLike
   ? InferSchemaInput<ProcedureContractInputSchemaOf<T>>
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? InferRouterInputs<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? InferRouterInputs<U>
-          : never
-    }
+  : T extends Lazy<infer U>
+    ? InferRouterInputsInternal<U>
+    : {
+        [K in keyof T]: InferRouterInputsInternal<T[K] & {}>
+      }
 
 /**
  * Infer all router outputs.
@@ -107,42 +110,42 @@ export type InferRouterInputs<T extends AnyRouter> = T extends AnyProcedureLike
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-outputs | Router - Infer Router Outputs}
  */
-export type InferRouterOutputs<T extends AnyRouter> = T extends AnyProcedureLike
+export type InferRouterOutputs<T extends AnyRouter> = InferRouterOutputsInternal<T>
+
+export type InferRouterOutputsInternal<T> = T extends AnyProcedureLike
   ? InferSchemaOutput<ProcedureContractOutputSchemaOf<T>>
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? InferRouterOutputs<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? InferRouterOutputs<U>
-          : never
-    }
+  : T extends Lazy<infer U>
+    ? InferRouterOutputsInternal<U>
+    : {
+        [K in keyof T]: InferRouterOutputsInternal<T[K] & {}>
+      }
 
 /**
  * Infer the union of throwable errors for entire router.
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-error | Router - Infer Router Error}
  */
-export type InferRouterError<T extends AnyRouter> = T extends AnyProcedureLike
+export type InferRouterError<T extends AnyRouter> = InferRouterErrorInternal<T>
+
+export type InferRouterErrorInternal<T> = T extends AnyProcedureLike
   ? ORPCErrorFromErrorMap<ProcedureContractErrorMapOf<T>> | ThrowableError
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? InferRouterError<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? InferRouterError<U>
-          : never
-    }[keyof T]
+  : T extends Lazy<infer U>
+    ? InferRouterErrorInternal<U>
+    : {
+        [K in keyof T]-?: InferRouterErrorInternal<T[K] & {}>
+      }[keyof T]
 
 /**
  * Infer throwable errors for each procedure, preserving the router shape.
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-errors | Router - Infer Router Errors}
  */
-export type InferRouterErrors<T extends AnyRouter> = T extends AnyProcedureLike
+export type InferRouterErrors<T extends AnyRouter> = InferRouterErrorsInternal<T>
+
+export type InferRouterErrorsInternal<T> = T extends AnyProcedureLike
   ? ORPCErrorFromErrorMap<ProcedureContractErrorMapOf<T>> | ThrowableError
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? InferRouterErrors<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? InferRouterErrors<U>
-          : never
-    }
+  : T extends Lazy<infer U>
+    ? InferRouterErrorsInternal<U>
+    : {
+        [K in keyof T]: InferRouterErrorsInternal<T[K] & {}>
+      }

@@ -69,4 +69,32 @@ describe('AugmentedContractRouter', () => {
       >
     >()
   })
+
+  it('maps optional keys', () => {
+    type Augmented = AugmentedContractRouter<
+      { ping?: typeof ping; nested?: { pong?: typeof pong } },
+      typeof errorMap
+    >
+
+    expectTypeOf<Augmented>().toEqualTypeOf<{
+      ping?:
+        | ProcedureContract<
+            typeof inputSchema,
+            typeof outputSchema,
+            MergedErrorMap<typeof errorMap, Record<never, never>>
+          >
+        | undefined
+      nested?:
+        | {
+            pong?:
+              | ProcedureContract<
+                  Schema<void, unknown>,
+                  Schema<unknown, unknown>,
+                  MergedErrorMap<typeof errorMap, { PONG: { message: string } }>
+                >
+              | undefined
+          }
+        | undefined
+    }>()
+  })
 })
