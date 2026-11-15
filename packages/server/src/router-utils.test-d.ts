@@ -290,10 +290,6 @@ it('UnlaziedRouter', () => {
       pong,
     },
   })
-})
-
-it('UnlaziedRouter with optional keys', () => {
-  const ping = {} as Procedure<{ i: 1 }, object, Schema<number>, Schema<string>, object>
 
   expectTypeOf<
     UnlaziedRouter<{ ping?: Lazy<typeof ping>; nested?: Lazyable<{ ping?: typeof ping }> }>
