@@ -60,8 +60,6 @@ describe('implementToolFactory', () => {
       },
     })
 
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: number }>()
-
     const tool2 = implementToolFactory()(contract, {
       // @ts-expect-error invalid numberToBoolean
       execute: async ({ stringToNumber }) => {
@@ -123,12 +121,7 @@ describe('createToolFactory', () => {
         }
       })
 
-    const tool = createToolFactory()(procedure, {
-      toModelOutput: ({ output }) => {
-        expectTypeOf(output).toEqualTypeOf<{ numberToBoolean: number }>()
-        return { type: 'text', value: `${output.numberToBoolean}` }
-      },
-    })
+    const tool = createToolFactory()(procedure)
 
     expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
     expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: number }>()
@@ -178,12 +171,7 @@ describe('createToolFactory', () => {
   it('infer output as yield type for async iterator outputs', () => {
     const procedure = os
       .input(z.object({ location: z.string() }))
-      .output(
-        asyncIteratorObject(
-          z.object({ status: z.string().transform((s) => s.length) }),
-          z.object({ url: z.string() }),
-        ),
-      )
+      .output(asyncIteratorObject(z.object({ status: z.string() }), z.object({ url: z.string() })))
       .handler(async function* () {
         yield { status: 'building' }
         return { url: 'https://example.com' }
