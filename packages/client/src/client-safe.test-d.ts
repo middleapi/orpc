@@ -1,6 +1,6 @@
 import type { SafeClient } from './client-safe'
 import type { ORPCError } from './error'
-import type { Client, ClientContext } from './types'
+import type { AnyNestedClient, Client, ClientContext, InferClientContext } from './types'
 
 it('SafeClient', async () => {
   const client = {} as {
@@ -43,4 +43,19 @@ it('SafeClient with optional procedures', async () => {
 
   const pongResult = await safeClient.nested?.pong?.({ id: 123 })
   expectTypeOf(pongResult?.data).toEqualTypeOf<{ result: string } | undefined>()
+})
+
+describe('does not exceed stack depth when inferred against a recursive type', () => {
+  // A recursive contextual type used to send inference back through the mapped type forever.
+  type Recursive = { [k: string]: Recursive } | object
+  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+
+  const client = {} as {
+    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
+  }
+
+  it('SafeClient', () => {
+    const fn = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => SafeClient<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
 })

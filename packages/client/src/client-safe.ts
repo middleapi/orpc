@@ -11,7 +11,7 @@ export type SafeClientInternal<T> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Promise<SafeResult<UOutput, UError>>
     : {
-        [K in keyof T]: SafeClientInternal<T[K]>
+        [K in keyof T]: SafeClientInternal<T[K] & {}>
       }
 
 /**

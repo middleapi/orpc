@@ -1,5 +1,6 @@
 import type { ORPCError } from './error'
 import type {
+  AnyNestedClient,
   Client,
   ClientContext,
   InferClientBodyInputs,
@@ -226,5 +227,63 @@ describe('infer utilities with optional procedures', () => {
 
   it('InferClientError', () => {
     expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<Error | TypeError>()
+  })
+})
+
+describe('does not exceed stack depth when inferred against a recursive type', () => {
+  // A recursive contextual type used to send inference back through the mapped type forever.
+  type Recursive = { [k: string]: Recursive } | object
+  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+
+  const client = {} as {
+    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
+  }
+
+  it('InferClientInputs', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientInputs<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
+
+  it('InferClientBodyInputs', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientBodyInputs<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
+
+  it('InferClientOutputs', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientOutputs<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
+
+  it('InferClientBodyOutputs', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientBodyOutputs<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
+
+  it('InferClientErrors', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientErrors<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
+
+  it('InferClientError', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientError<T>
+    const _: Recursive = fn(client, { context: {} })
   })
 })

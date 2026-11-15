@@ -1,4 +1,4 @@
-import type { Client, ORPCError } from '@orpc/client'
+import type { AnyNestedClient, Client, InferClientContext, ORPCError } from '@orpc/client'
 import type { RouterContractClient } from '@orpc/contract'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import type { AsyncIteratorClass } from '@orpc/shared'
@@ -176,5 +176,23 @@ describe('JsonifiedClient', () => {
         | { find?: Client<{ cache?: boolean }, { now: Date }, { now: string }, Error> | undefined }
         | undefined
     }>()
+  })
+})
+
+describe('does not exceed stack depth when inferred against a recursive type', () => {
+  // A recursive contextual type used to send inference back through the mapped type forever.
+  type Recursive = { [k: string]: Recursive } | object
+  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+
+  const client = {} as {
+    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
+  }
+
+  it('JsonifiedClient', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => JsonifiedClient<T>
+    const _: Recursive = fn(client, { context: {} })
   })
 })

@@ -1,4 +1,4 @@
-import type { Client } from '@orpc/client'
+import type { AnyNestedClient, Client, InferClientContext } from '@orpc/client'
 import { RPCSerializer } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import { OpenAPISerializer } from '@orpc/openapi'
@@ -155,4 +155,27 @@ it('RouterUtils with optional procedures', () => {
   expectTypeOf(scoped.nested?.pong).toEqualTypeOf<
     ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
   >()
+})
+
+describe('does not exceed stack depth when inferred against a recursive type', () => {
+  // A recursive contextual type used to send inference back through the mapped type forever.
+  type Recursive = { [k: string]: Recursive } | object
+  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+
+  const client = {} as {
+    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
+  }
+
+  it('RouterUtils', () => {
+    const fn = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => RouterUtils<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
+
+  it('RouterUtilsScoped', () => {
+    const fn = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => RouterUtilsScoped<T>
+    const _: Recursive = fn(client, { context: {} })
+  })
 })

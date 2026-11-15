@@ -1,4 +1,10 @@
-import type { Client, ClientContext, ORPCError } from '@orpc/client'
+import type {
+  AnyNestedClient,
+  Client,
+  ClientContext,
+  InferClientContext,
+  ORPCError,
+} from '@orpc/client'
 import { isDefinedError } from '@orpc/client'
 import { Effect } from 'effect'
 
@@ -104,5 +110,20 @@ describe('EffectClient', () => {
     expectTypeOf(effectClient.nested?.pong?.({ id: 123 })).toEqualTypeOf<
       Effect.Effect<{ result: string }, Error> | undefined
     >()
+  })
+})
+
+describe('does not exceed stack depth when inferred against a recursive type', () => {
+  // A recursive contextual type used to send inference back through the mapped type forever.
+  type Recursive = { [k: string]: Recursive } | object
+  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+
+  const client = {} as {
+    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
+  }
+
+  it('EffectClient', () => {
+    const fn = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => EffectClient<T>
+    const _: Recursive = fn(client, { context: {} })
   })
 })
