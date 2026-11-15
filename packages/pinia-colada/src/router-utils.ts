@@ -33,7 +33,7 @@ export type RouterUtilsInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>
     : {
-        [K in keyof T]: RouterUtilsInternal<T[K]>
+        [K in keyof T]: RouterUtilsInternal<T[K] & {}>
       } & Public<SharedUtils<unknown>>
 
 export type RouterUtilsScoped<T extends AnyNestedClient> = RouterUtilsScopedInternal<T>
@@ -42,7 +42,7 @@ export type RouterUtilsScopedInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ProcedureUtilsOptions<UClientContext, UInput, UOutput, UError>
     : {
-        [K in keyof T]?: RouterUtilsScopedInternal<T[K]> | undefined
+        [K in keyof T]?: RouterUtilsScopedInternal<T[K] & {}> | undefined
       }
 
 export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyBaseOptions {

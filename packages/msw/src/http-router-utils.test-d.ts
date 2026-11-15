@@ -30,6 +30,20 @@ it('mirrors the router-contract shape', () => {
   expectTypeOf(utils.nested.handler)
 })
 
+it('maps optional keys', () => {
+  type Utils = HTTPRouterUtils<typeof contract, object>
+
+  expectTypeOf<
+    HTTPRouterUtils<
+      { ping?: typeof contract.ping; nested?: { pong?: typeof contract.nested.pong } },
+      object
+    >
+  >().toEqualTypeOf<{
+    ping?: Utils['ping'] | undefined
+    nested?: { pong?: Utils['nested']['pong'] | undefined } | undefined
+  }>()
+})
+
 it('supports implemented routers', () => {
   const router = {
     ping: os

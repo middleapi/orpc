@@ -28,12 +28,18 @@ export type RouterClient<
 }
   ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
   : {
-      [K in keyof TRouter]: TRouter[K] extends AnyRouter
-        ? RouterClient<TRouter[K], TClientContext>
-        : TRouter[K] extends Lazyable<infer U extends AnyRouter>
-          ? RouterClient<U, TClientContext>
-          : never
+      [K in keyof TRouter]: RouterClientInternal<TRouter[K] & {}, TClientContext>
     }
+
+export type RouterClientInternal<TRouter, TClientContext extends ClientContext> = TRouter extends {
+  '~orpc': ProcedureDefinition<any, any, infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
+}
+  ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
+  : TRouter extends Lazy<infer U>
+    ? RouterClientInternal<U, TClientContext>
+    : {
+        [K in keyof TRouter]: RouterClientInternal<TRouter[K] & {}, TClientContext>
+      }
 
 /**
  * Creates a server-side client that calls the router's procedures directly,

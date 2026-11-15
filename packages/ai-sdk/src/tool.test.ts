@@ -1,7 +1,7 @@
 import { asyncIteratorObject, oc, type } from '@orpc/contract'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { os } from '@orpc/server'
-import { generateText } from 'ai'
+import { generateText, safeValidateUIMessages } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import * as z from 'zod'
 
@@ -274,7 +274,7 @@ describe('implementToolFactory', () => {
     })
   })
 
-  it('the AI SDK does not validate execute results against outputSchema, so oRPC must validate output itself', async () => {
+  it('the AI SDK does not validate execute results against outputSchema', async () => {
     const contract = oc.input(inputSchema).output(outputSchema)
 
     const greet = implementToolFactory()(contract, {
@@ -539,17 +539,34 @@ describe('createToolFactory', () => {
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ input: 'invalid' }), 'invalid')
   })
 
-  it('keeps output validation enabled because the AI SDK does not validate execute results', async () => {
-    const procedure = os
-      .input(inputSchema)
-      .output(outputSchema)
-      .handler(() => ({ greeting: 123 }) as any)
+  it('disable output validation at oRPC level, so stored outputs pass validateUIMessages', async () => {
+    const procedure = os.output(z.string().transform((s) => s.length)).handler(() => 'hello')
 
     const tool = createToolFactory()(procedure)
 
-    await expect(tool.execute?.({ name: 'Alice' }, { abortSignal } as any)).rejects.toThrow(
-      'Output validation failed',
-    )
+    const output = await tool.execute?.(undefined, { abortSignal } as any)
+    expect(output).toBe('hello')
+
+    const result = await safeValidateUIMessages({
+      messages: [
+        {
+          id: 'message-1',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'tool-tool',
+              toolCallId: 'call-1',
+              state: 'output-available',
+              input: {},
+              output,
+            },
+          ],
+        },
+      ],
+      tools: { tool },
+    })
+
+    expect(result.success).toBe(true)
   })
 
   describe('async iterator output', () => {
@@ -600,19 +617,7 @@ describe('createToolFactory', () => {
       expect(finallyCalled).toBe(true)
     })
 
-    it('rejects when handler ignores the declared iterator schema', async () => {
-      const procedure = os
-        .input(inputSchema)
-        .output(asyncIteratorObject(yieldSchema))
-        .handler(async () => ({ message: 'not an iterator' }) as any)
-
-      const tool = createToolFactory()(procedure)
-
-      const iterator = (tool as any).execute({ name: 'Alice' }, { abortSignal })
-      await expect(iterator.next()).rejects.toThrow('Output validation failed')
-    })
-
-    it('validates each streamed event against the yield schema', async () => {
+    it('does not validate streamed events against the yield schema', async () => {
       const procedure = os
         .input(inputSchema)
         .output(asyncIteratorObject(yieldSchema))
@@ -623,9 +628,12 @@ describe('createToolFactory', () => {
 
       const tool = createToolFactory()(procedure)
 
-      const iterator = (tool as any).execute({ name: 'Alice' }, { abortSignal })
-      await expect(iterator.next()).resolves.toEqual({ done: false, value: { message: 'one' } })
-      await expect(iterator.next()).rejects.toThrow('AsyncIteratorObject validation failed')
+      const outputs: unknown[] = []
+      for await (const output of (tool as any).execute({ name: 'Alice' }, { abortSignal })) {
+        outputs.push(output)
+      }
+
+      expect(outputs).toEqual([{ message: 'one' }, { message: 123 }])
     })
 
     it('streams events when the handler is an async generator without an output schema', async () => {
