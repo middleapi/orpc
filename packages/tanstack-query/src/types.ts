@@ -40,6 +40,23 @@ export interface OperationContext {
   }
 }
 
+/**
+ * Rest parameters for options that are optional when input and context are.
+ *
+ * @remarks
+ * Cheaper than `MaybeOptionalOptions<TOptions>`, which checks the whole options type.
+ * Every other member of `TOptions` must be optional.
+ */
+export type ProcedureUtilsOptionsRest<
+  TClientContext extends ClientContext,
+  TInput,
+  TOptions,
+> = undefined extends TInput
+  ? {} extends TClientContext
+    ? [options?: TOptions]
+    : [options: TOptions]
+  : [options: TOptions]
+
 export type QueryKeyOptions<TInput> =
   | (undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken })
   | { queryKey: QueryKey }
