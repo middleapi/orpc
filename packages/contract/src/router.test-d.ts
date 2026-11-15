@@ -1,6 +1,6 @@
 import type { ORPCError } from '@orpc/client'
 import type { ThrowableError } from '@orpc/shared'
-import { expectTypeOf, it } from 'vitest'
+import { describe, expectTypeOf, it } from 'vitest'
 import { z } from 'zod'
 
 import { oc } from './builder'
@@ -93,4 +93,59 @@ it('InferRouterContractError', () => {
     | ORPCError<'NOT_FOUND', { schema2: number }>
     | ThrowableError
   >()
+})
+
+describe('optional keys', () => {
+  type OptionalRouter = {
+    ping?: typeof ping
+    nested?: {
+      pong?: typeof pong
+      notFound?: typeof notFound
+    }
+  }
+
+  it('InferRouterContractInputs', () => {
+    expectTypeOf<
+      InferRouterContractInputs<{ ping?: typeof ping; nested?: { ping?: typeof ping } }>
+    >().toEqualTypeOf<{
+      ping?: { schema1: string } | undefined
+      nested?: { ping?: { schema1: string } | undefined } | undefined
+    }>()
+  })
+
+  it('InferRouterContractOutputs', () => {
+    expectTypeOf<InferRouterContractOutputs<OptionalRouter>>().toEqualTypeOf<{
+      ping?: { schema2: number } | undefined
+      nested?: { pong?: unknown; notFound?: unknown } | undefined
+    }>()
+  })
+
+  it('InferRouterContractErrorMap', () => {
+    expectTypeOf<InferRouterContractErrorMap<OptionalRouter>>().toEqualTypeOf<
+      InferRouterContractErrorMap<{
+        ping: typeof ping
+        nested: { pong: typeof pong; notFound: typeof notFound }
+      }>
+    >()
+  })
+
+  it('InferRouterContractErrors', () => {
+    expectTypeOf<InferRouterContractErrors<OptionalRouter>>().toEqualTypeOf<{
+      ping?: ThrowableError | undefined
+      nested?:
+        | {
+            pong?: ORPCError<'BAD_GATEWAY', { schema1: number }> | ThrowableError | undefined
+            notFound?: ORPCError<'NOT_FOUND', { schema2: number }> | ThrowableError | undefined
+          }
+        | undefined
+    }>()
+  })
+
+  it('InferRouterContractError', () => {
+    expectTypeOf<InferRouterContractError<OptionalRouter>>().toEqualTypeOf<
+      | ORPCError<'BAD_GATEWAY', { schema1: number }>
+      | ORPCError<'NOT_FOUND', { schema2: number }>
+      | ThrowableError
+    >()
+  })
 })

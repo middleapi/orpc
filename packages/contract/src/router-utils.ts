@@ -9,13 +9,18 @@ import type { AnyProcedureContract } from './procedure'
 import { ProcedureContract } from './procedure'
 import type { RouterContract } from './router'
 
-export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap> =
+export type AugmentedContractRouter<
+  T extends RouterContract,
+  TErrorMap extends ErrorMap,
+> = AugmentedContractRouterImpl<T, TErrorMap>
+
+// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
+// from optional keys and keeps TypeScript from inferring `T` back through this mapped type.
+type AugmentedContractRouterImpl<T, TErrorMap extends ErrorMap> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
     ? ProcedureContract<$InputSchema, $OutputSchema, MergedErrorMap<TErrorMap, $Errors>>
     : {
-        [K in keyof T]: T[K] extends RouterContract
-          ? AugmentedContractRouter<T[K], TErrorMap>
-          : never
+        [K in keyof T]: AugmentedContractRouterImpl<T[K] & {}, TErrorMap>
       }
 
 export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {

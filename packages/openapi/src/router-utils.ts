@@ -5,12 +5,15 @@ import { isNonPrimitive, pathToHttpPath, toArray } from '@orpc/shared'
 import { getOpenAPIMeta, openapi } from './meta'
 
 export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract> =
+  PopulatedContractRouterOpenAPIPathsImpl<T>
+
+// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
+// from optional keys and keeps TypeScript from inferring `T` back through this mapped type.
+type PopulatedContractRouterOpenAPIPathsImpl<T> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
     ? ProcedureContract<UInputSchema, UOutputSchema, UErrors>
     : {
-        [K in keyof T]: T[K] extends RouterContract
-          ? PopulatedContractRouterOpenAPIPaths<T[K]>
-          : never
+        [K in keyof T]: PopulatedContractRouterOpenAPIPathsImpl<T[K] & {}>
       }
 
 export interface PopulateRouterContractOpenAPIPathsOptions {

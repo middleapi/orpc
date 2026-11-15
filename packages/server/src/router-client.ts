@@ -28,12 +28,21 @@ export type RouterClient<
 }
   ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
   : {
-      [K in keyof TRouter]: TRouter[K] extends AnyRouter
-        ? RouterClient<TRouter[K], TClientContext>
-        : TRouter[K] extends Lazyable<infer U extends AnyRouter>
-          ? RouterClient<U, TClientContext>
-          : never
+      [K in keyof TRouter]: RouterClientImpl<TRouter[K] & {}, TClientContext>
     }
+
+// The public type maps the first level itself, so that `any` does not reach the `Lazy` branch
+// below. Keys are not re-checked against `AnyRouter`; `TRouter[K] & {}` drops `undefined` from
+// optional keys and keeps TypeScript from inferring `TRouter` back through the mapped type.
+type RouterClientImpl<TRouter, TClientContext extends ClientContext> = TRouter extends {
+  '~orpc': ProcedureDefinition<any, any, infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
+}
+  ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap>
+  : TRouter extends Lazy<infer U>
+    ? RouterClientImpl<U, TClientContext>
+    : {
+        [K in keyof TRouter]: RouterClientImpl<TRouter[K] & {}, TClientContext>
+      }
 
 /**
  * Creates a server-side client that calls the router's procedures directly,

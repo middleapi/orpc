@@ -6,11 +6,18 @@ import { isNonPrimitive } from '@orpc/shared'
 import type { HTTPProcedureUtilsOptions } from './http-procedure-utils'
 import { HTTPProcedureUtils } from './http-procedure-utils'
 
-export type HTTPRouterUtils<T extends RouterContract, TContext extends Context> =
+export type HTTPRouterUtils<
+  T extends RouterContract,
+  TContext extends Context,
+> = HTTPRouterUtilsImpl<T, TContext>
+
+// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
+// from optional keys and keeps TypeScript from inferring `T` back through this mapped type.
+type HTTPRouterUtilsImpl<T, TContext extends Context> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>
     ? HTTPProcedureUtils<TContext, UInputSchema, UOutputSchema, UErrorMap>
     : {
-        [K in keyof T]: T[K] extends RouterContract ? HTTPRouterUtils<T[K], TContext> : never
+        [K in keyof T]: HTTPRouterUtilsImpl<T[K] & {}, TContext>
       }
 
 export type HTTPRouterUtilsOptions<TContext extends Context> = HTTPProcedureUtilsOptions<TContext>
