@@ -125,13 +125,13 @@ describe('createToolFactory', () => {
 
     const tool = createToolFactory()(procedure, {
       toModelOutput: ({ output }) => {
-        expectTypeOf(output).toEqualTypeOf<{ numberToBoolean: boolean }>()
+        expectTypeOf(output).toEqualTypeOf<{ numberToBoolean: number }>()
         return { type: 'text', value: `${output.numberToBoolean}` }
       },
     })
 
     expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: boolean }>()
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: number }>()
   })
 
   it('execute is managed by the factory', () => {
@@ -191,7 +191,7 @@ describe('createToolFactory', () => {
 
     const tool = createToolFactory()(procedure)
 
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ status: number }>()
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ status: string }>()
   })
 
   it('infer output as yield type for async generator handlers without an output schema', () => {

@@ -36,10 +36,7 @@ export type AiSdkToolMeta<
   TOutputSchema extends AnySchema = AnySchema,
 > = Partial<
   Omit<
-    FunctionTool<
-      InferSchemaOutput<TInputSchema>,
-      ToolOutput<InferSchemaOutput<TOutputSchema> | InferSchemaInput<TOutputSchema>>
-    >,
+    FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
     'inputSchema' | 'outputSchema' | 'execute'
   >
 >

@@ -276,11 +276,11 @@ export interface ToolFactory<TInitialContext extends Context> {
     procedure: Procedure<TInitialContext, any, TInputSchema, TOutputSchema, any>,
     ...rest: MaybeOptionalOptions<
       Omit<
-        FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaOutput<TOutputSchema>>>,
+        FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
         'inputSchema' | 'outputSchema' | 'execute'
       >
     >
-  ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaOutput<TOutputSchema>>>
+  ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>
 }
 
 /**
@@ -334,12 +334,14 @@ export function createToolFactory<TInitialContext extends Context = object>(
     /**
      * The AI SDK already validates input against the tool's `inputSchema`,
      * so input validation is disabled at the oRPC level to avoid validating twice.
-     * Output validation stays enabled because the AI SDK does not validate
-     * the value returned from `execute` against the tool's `outputSchema`.
+     * Output validation is disabled because the AI SDK treats tool outputs as the
+     * output schema's input side: it converts that side to JSON Schema and checks
+     * stored outputs against it in `validateUIMessages`, so a transformed output would fail.
      */
     const disabledValidation = new Procedure({
       ...procedure['~orpc'],
       disableInputValidation: true,
+      disableOutputValidation: true,
     })
 
     /**
