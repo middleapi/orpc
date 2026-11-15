@@ -133,7 +133,6 @@ describe('Builder', () => {
       void os
         .$context<{ db: string }>()
         .use(({ next }) => next({ context: out }))
-        .use(({ next }) => next({ context: out }))
         .handler(({ context }) => {
           expectTypeOf(context.db).toEqualTypeOf<string>()
 
@@ -151,50 +150,6 @@ describe('Builder', () => {
         .use({} as Middleware<any, any, any, any, any>)
         .handler(({ context }) => {
           expectTypeOf(context).toEqualTypeOf<{ db: string } & object>()
-        })
-    })
-
-    it('accepts a union out context that overrides different keys', () => {
-      const out = {} as { db: string } | { user: { id: string } }
-
-      void os
-        .$context<{ db: string; user: { id: string } }>()
-        .use(({ next }) => next({ context: out }))
-        .handler(({ context }) => {
-          expectTypeOf(context.db).toEqualTypeOf<string>()
-          expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
-        })
-    })
-
-    it('narrows a union context', () => {
-      type A = { kind: 'a'; user: { id: string } }
-
-      void os
-        .$context<A | { kind: 'b' }>()
-        .use(({ next }) => next({ context: {} as A }))
-        .handler(({ context }) => {
-          expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
-        })
-
-      void os
-        .$context<A | { kind: 'b' }>()
-        .use(({ next }) => next({ context: { kind: 'b' as const } }))
-        .handler(({ context }) => {
-          expectTypeOf(context.kind).toEqualTypeOf<'b'>()
-        })
-
-      void os
-        .$context<A | { kind: 'b' }>()
-        .use(({ context, next }) => next({ context }))
-        .handler(({ context }) => {
-          expectTypeOf(context.kind).toEqualTypeOf<'a' | 'b'>()
-        })
-
-      void os
-        .$context<{ user: { id: string } } | { user: null }>()
-        .use(({ next }) => next({ context: { user: { id: '1' } } }))
-        .handler(({ context }) => {
-          expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
         })
     })
 

@@ -4,20 +4,6 @@ export interface Context {
   [key: PropertyKey]: any
 }
 
-/**
- * Whether `T` requires nothing: only index signatures that accept any value,
- * like `Context` or `Record<string, unknown>`.
- */
-type IsOpenContext<T> = string extends keyof T
-  ? { [key: PropertyKey]: unknown } extends T
-    ? keyof {
-        [K in keyof T as Record<never, never> extends Record<K, unknown> ? never : K]: 0
-      } extends never
-      ? true
-      : false
-    : false
-  : false
-
 export type MergedInitialContext<
   TInitial extends Context,
   TOutContext extends Context,
@@ -27,7 +13,9 @@ export type MergedInitialContext<
   : TInContext extends any
     ? Exclude<keyof TInContext, keyof TInitial | keyof TOutContext> extends never
       ? TInitial
-      : IsOpenContext<DistributiveOmit<TInContext, keyof TInitial | keyof TOutContext>> extends true
+      : { [key: PropertyKey]: unknown } extends Required<
+            DistributiveOmit<TInContext, keyof TInitial | keyof TOutContext>
+          >
         ? TInitial
         : TInitial & DistributiveOmit<TInContext, keyof TInitial | keyof TOutContext>
     : never

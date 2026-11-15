@@ -56,6 +56,9 @@ describe('MergedInitialContext', () => {
       MergedInitialContext<{ db: string }, object, Record<string, unknown>>
     >().toEqualTypeOf<{ db: string }>()
     expectTypeOf<
+      MergedInitialContext<{ db: string }, object, Record<number, unknown>>
+    >().toEqualTypeOf<{ db: string }>()
+    expectTypeOf<
       MergedInitialContext<{ db: string }, object, { [k: string]: unknown; db: string }>
     >().toEqualTypeOf<{ db: string }>()
   })
