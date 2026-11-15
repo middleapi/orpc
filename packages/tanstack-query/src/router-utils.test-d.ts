@@ -178,25 +178,18 @@ it('RouterUtils with optional procedures', () => {
   >()
 })
 
-describe('does not exceed stack depth when inferred against a recursive type', () => {
-  // A recursive contextual type used to send inference back through the mapped type forever.
+it('RouterUtils with a recursive contextual type', () => {
+  // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
   type Recursive = { [k: string]: Recursive } | object
   type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+  const client = {} as RouterClient<typeof scopedRouter, { batch?: boolean }>
 
-  const client = {} as {
-    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
-  }
+  const utils = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => RouterUtils<T>
+  const _utils: Recursive = utils(client, { context: {} })
 
-  it('RouterUtils', () => {
-    const fn = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => RouterUtils<T>
-    const _: Recursive = fn(client, { context: {} })
-  })
-
-  it('RouterUtilsScoped', () => {
-    const fn = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => RouterUtilsScoped<T>
-    const _: Recursive = fn(client, { context: {} })
-  })
+  const scoped = {} as <T extends AnyNestedClient>(
+    client: T,
+    options: Options<T>,
+  ) => RouterUtilsScoped<T>
+  const _scoped: Recursive = scoped(client, { context: {} })
 })

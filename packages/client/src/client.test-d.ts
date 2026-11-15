@@ -148,20 +148,15 @@ it('ORPCClientScoped maps optional procedures', () => {
   >()
 })
 
-describe('does not exceed stack depth when inferred against a recursive type', () => {
-  // A recursive contextual type used to send inference back through the mapped type forever.
+it('ORPCClientScoped with a recursive contextual type', () => {
+  // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
   type Recursive = { [k: string]: Recursive } | object
   type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+  const client = {} as RouterClient<typeof router>
 
-  const client = {} as {
-    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
-  }
-
-  it('ORPCClientScoped', () => {
-    const fn = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => ORPCClientScoped<T>
-    const _: Recursive = fn(client, { context: {} })
-  })
+  const scoped = {} as <T extends AnyNestedClient>(
+    client: T,
+    options: Options<T>,
+  ) => ORPCClientScoped<T>
+  const _scoped: Recursive = scoped(client, { context: {} })
 })

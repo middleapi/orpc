@@ -111,19 +111,17 @@ describe('EffectClient', () => {
       Effect.Effect<{ result: string }, Error> | undefined
     >()
   })
-})
 
-describe('does not exceed stack depth when inferred against a recursive type', () => {
-  // A recursive contextual type used to send inference back through the mapped type forever.
-  type Recursive = { [k: string]: Recursive } | object
-  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+  it('maps with a recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as { nested: { ping: Client<ClientContext, string, number, Error> } }
 
-  const client = {} as {
-    nested: { ping: Client<{ cache?: boolean }, { input: number }, { output: string }, Error> }
-  }
-
-  it('EffectClient', () => {
-    const fn = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => EffectClient<T>
-    const _: Recursive = fn(client, { context: {} })
+    const effect = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => EffectClient<T>
+    const _effect: Recursive = effect(client, { context: {} })
   })
 })
