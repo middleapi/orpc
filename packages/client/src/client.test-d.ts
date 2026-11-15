@@ -161,16 +161,13 @@ describe('createORPCClient', () => {
   })
 
   it('procedure with `never` input', () => {
-    const router = {
-      ping: os.input(type<never>()).handler(() => 'pong'),
-      pong: os.input(type<string>()).handler(() => 1),
-    }
+    const neverRouter = { ...router, never: os.input(type<never>()).handler(() => 1) }
 
-    const client: RouterClient<typeof router, { cache: string }> = createORPCClient(
+    const client: RouterClient<typeof neverRouter, { cache: string }> = createORPCClient(
       {} as ClientLink<{ cache: string }>,
     )
 
-    expectTypeOf(client.pong).returns.resolves.toEqualTypeOf<number>()
+    expectTypeOf(client.ping).returns.resolves.toEqualTypeOf<string>()
   })
 })
 

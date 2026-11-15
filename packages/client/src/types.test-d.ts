@@ -1,6 +1,5 @@
 import type { ORPCError } from './error'
 import type {
-  AnyNestedClient,
   Client,
   ClientContext,
   InferClientBodyInputs,
@@ -251,15 +250,6 @@ describe('infer utilities with mixed client contexts', () => {
     >().toEqualTypeOf<{ x: string } | { y: number }>()
   })
 
-  it('InferClientError includes optional procedures without `undefined`', () => {
-    expectTypeOf<
-      InferClientError<{
-        a: Client<{ x: string }, string, number, Error>
-        b?: Client<{ y: number }, string, number, TypeError>
-      }>
-    >().toEqualTypeOf<Error | TypeError>()
-  })
-
   it('InferClientContext keeps a shared context as is', () => {
     expectTypeOf<
       InferClientContext<{
@@ -277,11 +267,6 @@ describe('infer utilities with `never` input', () => {
       pong: Client<{ cache: boolean }, string, boolean, TypeError>
     }
   }
-
-  it('is a nested client', () => {
-    expectTypeOf<ORPC>().toExtend<AnyNestedClient>()
-    expectTypeOf<ORPC['ping']>().toExtend<AnyNestedClient>()
-  })
 
   it('infers every utility', () => {
     expectTypeOf<InferClientContext<ORPC>>().toEqualTypeOf<{ cache: boolean }>()

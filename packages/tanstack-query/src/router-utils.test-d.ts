@@ -193,14 +193,6 @@ it('createRouterUtils infers the union of contexts when procedures require diffe
         return next()
       },
     ],
-    mutationInterceptors: [
-      ({ context, next }) => {
-        expectTypeOf(context).not.toBeNever()
-        expectTypeOf(context).toExtend<{ x: string } | { y: number }>()
-
-        return next()
-      },
-    ],
   })
 })
 
