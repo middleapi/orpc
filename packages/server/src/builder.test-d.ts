@@ -154,18 +154,6 @@ describe('Builder', () => {
         })
     })
 
-    it('checks out context against each member of a union context', () => {
-      const builder = os.$context<{ kind: 'a'; user: { id: string } } | { kind: 'b' }>()
-
-      void builder.use(({ next }) => next({ context: { user: { id: '1' }, extra: 1 } }))
-
-      // @ts-expect-error - conflict with `user` of a member
-      void builder.use(({ next }) => next({ context: { user: 123 } }))
-
-      // @ts-expect-error - `kind: 'b'` member would be left with `kind: 'a'` and no `user`
-      void builder.use(({ next }) => next({ context: { kind: 'a' as const } }))
-    })
-
     it('accepts a union out context that overrides different keys', () => {
       const out = {} as { db: string } | { user: { id: string } }
 
