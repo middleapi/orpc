@@ -84,9 +84,9 @@ describe('contractedRouter', () => {
     const router = {} as ContractedRouter<typeof contract, { init?: boolean }>
 
     const _router: ContractedRouter<any, { init?: boolean }> = router
-    const _procedure: ContractedRouter<any, { init?: boolean }> = {} as Exclude<
-      (typeof router)['ping'],
-      Lazy<any>
+    const _procedure: ContractedRouter<any, { init?: boolean }> = {} as ContractedRouter<
+      (typeof contract)['ping'],
+      { init?: boolean }
     >
   })
 

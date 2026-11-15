@@ -1,8 +1,8 @@
 import type {
+  AnyProcedureContractLike,
   InferSchemaInput,
   InferSchemaOutput,
   ORPCErrorFromErrorMap,
-  AnyProcedureContractLike,
   ProcedureContractErrorMapOf,
   ProcedureContractInputSchemaOf,
   ProcedureContractOutputSchemaOf,
@@ -12,7 +12,7 @@ import type {
 
 import type { Context, MergedContext } from './context'
 import type { Lazyable } from './lazy'
-import type { Procedure, ProcedureDefinition } from './procedure'
+import type { AnyProcedureLike, Procedure, ProcedureDefinition } from './procedure'
 
 export type Router<TInitialContext extends Context> =
   | Procedure<TInitialContext, any, any, any, any>
@@ -89,9 +89,7 @@ export type InferRouterFinalContexts<T extends AnyRouter> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-inputs | Router - Infer Router Inputs}
  */
-export type InferRouterInputs<T extends AnyRouter> = T extends {
-  '~orpc': ProcedureDefinition<any, any, any, any, any>
-}
+export type InferRouterInputs<T extends AnyRouter> = T extends AnyProcedureLike
   ? InferSchemaInput<ProcedureContractInputSchemaOf<T>>
   : {
       [K in keyof T]: T[K] extends AnyRouter
@@ -109,9 +107,7 @@ export type InferRouterInputs<T extends AnyRouter> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-outputs | Router - Infer Router Outputs}
  */
-export type InferRouterOutputs<T extends AnyRouter> = T extends {
-  '~orpc': ProcedureDefinition<any, any, any, any, any>
-}
+export type InferRouterOutputs<T extends AnyRouter> = T extends AnyProcedureLike
   ? InferSchemaOutput<ProcedureContractOutputSchemaOf<T>>
   : {
       [K in keyof T]: T[K] extends AnyRouter

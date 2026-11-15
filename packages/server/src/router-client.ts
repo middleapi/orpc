@@ -12,7 +12,7 @@ import { resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 
 import type { Lazyable } from './lazy'
 import { Lazy } from './lazy'
-import type { ProcedureDefinition } from './procedure'
+import type { AnyProcedureLike } from './procedure'
 import { Procedure } from './procedure'
 import type { ProcedureClient, ProcedureClientOptions } from './procedure-client'
 import { createProcedureClient } from './procedure-client'
@@ -29,7 +29,7 @@ import { getRouter } from './router-utils'
 export type RouterClient<
   TRouter extends AnyRouter,
   TClientContext extends ClientContext = object,
-> = TRouter extends { '~orpc': ProcedureDefinition<any, any, any, any, any> }
+> = TRouter extends AnyProcedureLike
   ? ProcedureClient<
       TClientContext,
       ProcedureContractInputSchemaOf<TRouter>,

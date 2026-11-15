@@ -146,3 +146,6 @@ export class Procedure<
 }
 
 export type AnyProcedure = Procedure<any, any, any, any, any>
+
+/** @internal */
+export type AnyProcedureLike = { '~orpc': ProcedureDefinition<any, any, any, any, any> }

@@ -1,7 +1,7 @@
 import type {
+  AnyProcedureContractLike,
   ErrorMap,
   InferRouterContractErrorMap,
-  AnyProcedureContractLike,
   ProcedureContractErrorMapOf,
   ProcedureContractInputSchemaOf,
   ProcedureContractOutputSchemaOf,
