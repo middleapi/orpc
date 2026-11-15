@@ -48,6 +48,35 @@ declare module '@orpc/server' {
 }
 ```
 
+### Mixing Initial Contexts
+
+A router can contain procedures that declare different initial contexts. Clients and other helpers infer the context the whole router requires, but handler classes such as `RPCHandler` and `OpenAPIHandler` cannot combine unrelated contexts from the constructor argument and report a type error. Pass the router's initial context explicitly:
+
+```ts twoslash
+import { os } from '@orpc/server'
+import type { InferRouterInitialContext } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
+
+const router = {
+  users: os.$context<{ db: string }>().handler(() => []),
+  files: os.$context<{ bucket: string }>().handler(() => []),
+}
+
+const handler = new RPCHandler<InferRouterInitialContext<typeof router>>(router)
+
+export default {
+  async fetch(request: Request) {
+    const { response } = await handler.handle(request, {
+      context: { db: 'postgres://...', bucket: 'uploads' },
+    })
+
+    return response ?? new Response('Not Found', { status: 404 })
+  },
+}
+```
+
+Declaring one shared initial context on a base builder avoids this.
+
 ## Injected Context
 
 Injected context is injected at runtime through [middleware](/docs/middleware#middleware-context):
