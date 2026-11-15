@@ -1,8 +1,10 @@
 import type {
   ErrorMap,
   InferRouterContractErrorMap,
-  ProcedureContractDefinition,
-  ProcedureContractDefinitionOf,
+  AnyProcedureContractLike,
+  ProcedureContractErrorMapOf,
+  ProcedureContractInputSchemaOf,
+  ProcedureContractOutputSchemaOf,
   RouterContract,
 } from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
@@ -193,13 +195,13 @@ export interface SharedRouterImplementerWithMiddlewares<
 export type RouterImplementer<
   TContract extends RouterContract,
   TInitialContext extends Context,
-> = TContract extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+> = TContract extends AnyProcedureContractLike
   ? ProcedureImplementer<
       TInitialContext,
       object,
-      NonNullable<ProcedureContractDefinitionOf<TContract>['__TInputSchema']>['type'],
-      NonNullable<ProcedureContractDefinitionOf<TContract>['__TOutputSchema']>['type'],
-      ProcedureContractDefinitionOf<TContract>['errorMap']
+      ProcedureContractInputSchemaOf<TContract>,
+      ProcedureContractOutputSchemaOf<TContract>,
+      ProcedureContractErrorMapOf<TContract>
     >
   : Public<SharedRouterImplementer<TContract, TInitialContext>> & {
       [K in keyof TContract]: TContract[K] extends RouterContract
@@ -211,13 +213,13 @@ export type RouterImplementerWithMiddlewares<
   TContract extends RouterContract,
   TInitialContext extends Context,
   TInjectedContext extends Context,
-> = TContract extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+> = TContract extends AnyProcedureContractLike
   ? ProcedureImplementer<
       TInitialContext,
       TInjectedContext,
-      NonNullable<ProcedureContractDefinitionOf<TContract>['__TInputSchema']>['type'],
-      NonNullable<ProcedureContractDefinitionOf<TContract>['__TOutputSchema']>['type'],
-      ProcedureContractDefinitionOf<TContract>['errorMap']
+      ProcedureContractInputSchemaOf<TContract>,
+      ProcedureContractOutputSchemaOf<TContract>,
+      ProcedureContractErrorMapOf<TContract>
     >
   : SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> & {
       [K in keyof TContract]: TContract[K] extends RouterContract

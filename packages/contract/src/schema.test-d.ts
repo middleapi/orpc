@@ -175,7 +175,6 @@ describe('MergedSchema', () => {
   it('merges the declared types of untyped schemas', () => {
     type Schema1 = Schema<{ schema1: number }, { schema1: string }>
 
-    // The same types InferSchemaInput / InferSchemaOutput read from each schema on its own.
     expectTypeOf<MergedSchema<typeof untypedSchema, Schema1>>().toEqualTypeOf<
       Schema<{ schema1: number }, { schema1: string }>
     >()

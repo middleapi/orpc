@@ -1,6 +1,11 @@
 import type { ClientContext } from '@orpc/client'
 
-import type { ProcedureContractDefinition, ProcedureContractDefinitionOf } from './procedure'
+import type {
+  AnyProcedureContractLike,
+  ProcedureContractErrorMapOf,
+  ProcedureContractInputSchemaOf,
+  ProcedureContractOutputSchemaOf,
+} from './procedure'
 import type { ProcedureContractClient } from './procedure-client'
 import type { RouterContract } from './router'
 
@@ -13,12 +18,12 @@ import type { RouterContract } from './router'
 export type RouterContractClient<
   TRouter extends RouterContract,
   TClientContext extends ClientContext = object,
-> = TRouter extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+> = TRouter extends AnyProcedureContractLike
   ? ProcedureContractClient<
       TClientContext,
-      NonNullable<ProcedureContractDefinitionOf<TRouter>['__TInputSchema']>['type'],
-      NonNullable<ProcedureContractDefinitionOf<TRouter>['__TOutputSchema']>['type'],
-      ProcedureContractDefinitionOf<TRouter>['errorMap']
+      ProcedureContractInputSchemaOf<TRouter>,
+      ProcedureContractOutputSchemaOf<TRouter>,
+      ProcedureContractErrorMapOf<TRouter>
     >
   : {
       [K in keyof TRouter]: TRouter[K] extends RouterContract

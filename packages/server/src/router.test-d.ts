@@ -5,7 +5,7 @@ import type { ThrowableError } from '@orpc/shared'
 import * as z from 'zod'
 
 import type { Lazy, Lazyable } from './lazy'
-import type { Procedure } from './procedure'
+import type { AnyProcedure, Procedure } from './procedure'
 import type {
   ContractedRouter,
   InferRouterError,
@@ -179,7 +179,7 @@ describe('infer utilities', () => {
   })
 
   it('InferRouterInputs and InferRouterOutputs of a generic procedure', () => {
-    function _generic<T extends Procedure<any, any, any, any, any>>(
+    function _generic<T extends AnyProcedure>(
       input: InferRouterInputs<T>,
       output: InferRouterOutputs<T>,
     ) {

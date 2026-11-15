@@ -58,7 +58,7 @@ describe('RouterContractClient', () => {
     const _key: RouterContractClient<{ ping: any }> = { ping: client.pong }
   })
 
-  it('keeps a generic procedure unresolved', async () => {
+  it('keeps a generic procedure unresolved', () => {
     async function _generic<T extends AnyProcedureContract>(client: RouterContractClient<T>) {
       // @ts-expect-error - output of an unresolved procedure is not a string
       const _output: string = await client(undefined as any)

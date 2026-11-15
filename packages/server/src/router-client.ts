@@ -1,6 +1,12 @@
 import type { AnyNestedClient, ClientContext } from '@orpc/client'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
-import type { ErrorMap, ProcedureContractDefinitionOf, Schema } from '@orpc/contract'
+import type {
+  ErrorMap,
+  ProcedureContractErrorMapOf,
+  ProcedureContractInputSchemaOf,
+  ProcedureContractOutputSchemaOf,
+  Schema,
+} from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 
@@ -26,9 +32,9 @@ export type RouterClient<
 > = TRouter extends { '~orpc': ProcedureDefinition<any, any, any, any, any> }
   ? ProcedureClient<
       TClientContext,
-      NonNullable<ProcedureContractDefinitionOf<TRouter>['__TInputSchema']>['type'],
-      NonNullable<ProcedureContractDefinitionOf<TRouter>['__TOutputSchema']>['type'],
-      ProcedureContractDefinitionOf<TRouter>['errorMap']
+      ProcedureContractInputSchemaOf<TRouter>,
+      ProcedureContractOutputSchemaOf<TRouter>,
+      ProcedureContractErrorMapOf<TRouter>
     >
   : {
       [K in keyof TRouter]: TRouter[K] extends AnyRouter

@@ -2,8 +2,10 @@ import type {
   InferSchemaInput,
   InferSchemaOutput,
   ORPCErrorFromErrorMap,
-  ProcedureContractDefinition,
-  ProcedureContractDefinitionOf,
+  AnyProcedureContractLike,
+  ProcedureContractErrorMapOf,
+  ProcedureContractInputSchemaOf,
+  ProcedureContractOutputSchemaOf,
   RouterContract,
   ThrowableError,
 } from '@orpc/contract'
@@ -21,13 +23,13 @@ export type Router<TInitialContext extends Context> =
 export type ContractedRouter<
   T extends RouterContract,
   TInitialContext extends Context,
-> = T extends { '~orpc': ProcedureContractDefinition<any, any, any> }
+> = T extends AnyProcedureContractLike
   ? Procedure<
       TInitialContext,
       any,
-      NonNullable<ProcedureContractDefinitionOf<T>['__TInputSchema']>['type'],
-      NonNullable<ProcedureContractDefinitionOf<T>['__TOutputSchema']>['type'],
-      ProcedureContractDefinitionOf<T>['errorMap']
+      ProcedureContractInputSchemaOf<T>,
+      ProcedureContractOutputSchemaOf<T>,
+      ProcedureContractErrorMapOf<T>
     >
   : {
       [K in keyof T]: T[K] extends RouterContract
@@ -90,7 +92,7 @@ export type InferRouterFinalContexts<T extends AnyRouter> = T extends {
 export type InferRouterInputs<T extends AnyRouter> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, any, any>
 }
-  ? InferSchemaInput<NonNullable<ProcedureContractDefinitionOf<T>['__TInputSchema']>['type']>
+  ? InferSchemaInput<ProcedureContractInputSchemaOf<T>>
   : {
       [K in keyof T]: T[K] extends AnyRouter
         ? InferRouterInputs<T[K]>
@@ -110,7 +112,7 @@ export type InferRouterInputs<T extends AnyRouter> = T extends {
 export type InferRouterOutputs<T extends AnyRouter> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, any, any>
 }
-  ? InferSchemaOutput<NonNullable<ProcedureContractDefinitionOf<T>['__TOutputSchema']>['type']>
+  ? InferSchemaOutput<ProcedureContractOutputSchemaOf<T>>
   : {
       [K in keyof T]: T[K] extends AnyRouter
         ? InferRouterOutputs<T[K]>

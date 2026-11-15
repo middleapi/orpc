@@ -62,13 +62,24 @@ export class ProcedureContract<
 
 export type AnyProcedureContract = ProcedureContract<any, any, any>
 
-/**
- * Reads the `~orpc` definition of a procedure (contract) type, for type-level
- * lookups of its schemas and error map by indexed access.
- * `any` reads as `ProcedureContractDefinition<AnySchema, AnySchema, ErrorMap>`.
- *
- * @internal
- */
-export type ProcedureContractDefinitionOf<
-  T extends { '~orpc': ProcedureContractDefinition<any, any, any> },
-> = unknown extends T ? ProcedureContractDefinition<AnySchema, AnySchema, ErrorMap> : T['~orpc']
+/** @internal */
+export type AnyProcedureContractLike = { '~orpc': ProcedureContractDefinition<any, any, any> }
+
+/** @internal */
+export type ProcedureContractDefinitionOf<T extends AnyProcedureContractLike> = unknown extends T
+  ? ProcedureContractDefinition<AnySchema, AnySchema, ErrorMap>
+  : T['~orpc']
+
+/** @internal */
+export type ProcedureContractInputSchemaOf<T extends AnyProcedureContractLike> = NonNullable<
+  ProcedureContractDefinitionOf<T>['__TInputSchema']
+>['type']
+
+/** @internal */
+export type ProcedureContractOutputSchemaOf<T extends AnyProcedureContractLike> = NonNullable<
+  ProcedureContractDefinitionOf<T>['__TOutputSchema']
+>['type']
+
+/** @internal */
+export type ProcedureContractErrorMapOf<T extends AnyProcedureContractLike> =
+  ProcedureContractDefinitionOf<T>['errorMap']
