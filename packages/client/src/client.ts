@@ -49,7 +49,7 @@ export type ORPCClientScopedInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ORPCClientScopedOptions<UClientContext, UInput, UOutput, UError>
     : {
-        [K in keyof T]?: ORPCClientScopedInternal<T[K]> | undefined
+        [K in keyof T]?: ORPCClientScopedInternal<T[K] & {}> | undefined
       }
 
 export interface ORPCClientOptions<T extends AnyNestedClient> {

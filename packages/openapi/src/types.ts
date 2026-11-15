@@ -81,5 +81,5 @@ export type JsonifiedClientInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Client<UClientContext, UInput, JsonifiedValue<UOutput>, JsonifiedClientError<UError>>
     : {
-        [K in keyof T]: JsonifiedClientInternal<T[K]>
+        [K in keyof T]: JsonifiedClientInternal<T[K] & {}>
       }

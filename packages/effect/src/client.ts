@@ -25,7 +25,7 @@ export type EffectClientInternal<T> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Effect.Effect<UOutput, UError>
     : {
-        [K in keyof T]: EffectClientInternal<T[K]>
+        [K in keyof T]: EffectClientInternal<T[K] & {}>
       }
 
 /**
