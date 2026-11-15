@@ -20,19 +20,14 @@ export type RouterContract =
  *
  * @see {@link https://orpc.dev/docs/contract/router#infer-router-contract-inputs | Router Contract - Infer Router Contract Inputs}
  */
-export type InferRouterContractInputs<T extends RouterContract> = T extends unknown
-  ? InferRouterContractInputsImpl<T>
-  : never
+export type InferRouterContractInputs<T extends RouterContract> =
+  InferRouterContractInputsInternal<T>
 
-// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
-// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
-// public type instead of inlining this one.
-type InferRouterContractInputsImpl<T> =
+export type InferRouterContractInputsInternal<T> =
   T extends ProcedureContract<infer UInputSchema, any, any>
     ? InferSchemaInput<UInputSchema>
     : {
-        [K in keyof T]: InferRouterContractInputsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterContractInputsInternal<T[K] & {}>
       }
 
 /**
@@ -40,15 +35,14 @@ type InferRouterContractInputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/contract/router#infer-router-contract-outputs | Router Contract - Infer Router Contract Outputs}
  */
-export type InferRouterContractOutputs<T extends RouterContract> = T extends unknown
-  ? InferRouterContractOutputsImpl<T>
-  : never
+export type InferRouterContractOutputs<T extends RouterContract> =
+  InferRouterContractOutputsInternal<T>
 
-type InferRouterContractOutputsImpl<T> =
+export type InferRouterContractOutputsInternal<T> =
   T extends ProcedureContract<any, infer UOutputSchema, any>
     ? InferSchemaOutput<UOutputSchema>
     : {
-        [K in keyof T]: InferRouterContractOutputsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterContractOutputsInternal<T[K] & {}>
       }
 
 /**
@@ -56,15 +50,14 @@ type InferRouterContractOutputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/contract/router#infer-router-contract-error-map | Router Contract - Infer Router Contract Error Map}
  */
-export type InferRouterContractErrorMap<T extends RouterContract> = T extends unknown
-  ? InferRouterContractErrorMapImpl<T>
-  : never
+export type InferRouterContractErrorMap<T extends RouterContract> =
+  InferRouterContractErrorMapInternal<T>
 
-type InferRouterContractErrorMapImpl<T> =
+export type InferRouterContractErrorMapInternal<T> =
   T extends ProcedureContract<any, any, infer UErrorMap>
     ? UErrorMap
     : {
-        [K in keyof T]-?: InferRouterContractErrorMapImpl<T[K] & {}>
+        [K in keyof T]-?: InferRouterContractErrorMapInternal<T[K] & {}>
       }[keyof T]
 
 /**
@@ -72,15 +65,13 @@ type InferRouterContractErrorMapImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/contract/router#infer-router-contract-error | Router Contract - Infer Router Contract Error}
  */
-export type InferRouterContractError<T extends RouterContract> = T extends unknown
-  ? InferRouterContractErrorImpl<T>
-  : never
+export type InferRouterContractError<T extends RouterContract> = InferRouterContractErrorInternal<T>
 
-type InferRouterContractErrorImpl<T> =
+export type InferRouterContractErrorInternal<T> =
   T extends ProcedureContract<any, any, infer UErrorMap>
     ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
     : {
-        [K in keyof T]-?: InferRouterContractErrorImpl<T[K] & {}>
+        [K in keyof T]-?: InferRouterContractErrorInternal<T[K] & {}>
       }[keyof T]
 
 /**
@@ -88,13 +79,12 @@ type InferRouterContractErrorImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/contract/router#infer-router-contract-errors | Router Contract - Infer Router Contract Errors}
  */
-export type InferRouterContractErrors<T extends RouterContract> = T extends unknown
-  ? InferRouterContractErrorsImpl<T>
-  : never
+export type InferRouterContractErrors<T extends RouterContract> =
+  InferRouterContractErrorsInternal<T>
 
-type InferRouterContractErrorsImpl<T> =
+export type InferRouterContractErrorsInternal<T> =
   T extends ProcedureContract<any, any, infer UErrorMap>
     ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
     : {
-        [K in keyof T]: InferRouterContractErrorsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterContractErrorsInternal<T[K] & {}>
       }

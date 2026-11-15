@@ -6,19 +6,16 @@ import { isNonPrimitive } from '@orpc/shared'
 import type { HTTPProcedureUtilsOptions } from './http-procedure-utils'
 import { HTTPProcedureUtils } from './http-procedure-utils'
 
-export type HTTPRouterUtils<T extends RouterContract, TContext extends Context> = T extends unknown
-  ? HTTPRouterUtilsImpl<T, TContext>
-  : never
+export type HTTPRouterUtils<
+  T extends RouterContract,
+  TContext extends Context,
+> = HTTPRouterUtilsInternal<T, TContext>
 
-// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
-// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
-// public type instead of inlining this one.
-type HTTPRouterUtilsImpl<T, TContext extends Context> =
+export type HTTPRouterUtilsInternal<T, TContext extends Context> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>
     ? HTTPProcedureUtils<TContext, UInputSchema, UOutputSchema, UErrorMap>
     : {
-        [K in keyof T]: HTTPRouterUtilsImpl<T[K] & {}, TContext>
+        [K in keyof T]: HTTPRouterUtilsInternal<T[K] & {}, TContext>
       }
 
 export type HTTPRouterUtilsOptions<TContext extends Context> = HTTPProcedureUtilsOptions<TContext>

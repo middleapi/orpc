@@ -4,19 +4,14 @@ import { isNonPrimitive, pathToHttpPath, toArray } from '@orpc/shared'
 
 import { getOpenAPIMeta, openapi } from './meta'
 
-export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract> = T extends unknown
-  ? PopulatedContractRouterOpenAPIPathsImpl<T>
-  : never
+export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract> =
+  PopulatedContractRouterOpenAPIPathsInternal<T>
 
-// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
-// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
-// public type instead of inlining this one.
-type PopulatedContractRouterOpenAPIPathsImpl<T> =
+export type PopulatedContractRouterOpenAPIPathsInternal<T> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
     ? ProcedureContract<UInputSchema, UOutputSchema, UErrors>
     : {
-        [K in keyof T]: PopulatedContractRouterOpenAPIPathsImpl<T[K] & {}>
+        [K in keyof T]: PopulatedContractRouterOpenAPIPathsInternal<T[K] & {}>
       }
 
 export interface PopulateRouterContractOpenAPIPathsOptions {

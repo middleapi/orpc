@@ -36,13 +36,10 @@ export type AugmentedRouter<T extends AnyRouter, TErrorMap extends ErrorMap> = T
       MergedErrorMap<TErrorMap, $ErrorMap>
     >
   : {
-      [K in keyof T]: AugmentedRouterImpl<T[K] & {}, TErrorMap>
+      [K in keyof T]: AugmentedRouterInternal<T[K] & {}, TErrorMap>
     }
 
-// The public type maps the first level itself, so that `any` does not reach the `Lazy` branch
-// below. Keys are not re-checked against `AnyRouter`; `T[K] & {}` drops `undefined` from
-// optional keys and keeps TypeScript from inferring `T` back through the mapped type.
-type AugmentedRouterImpl<T, TErrorMap extends ErrorMap> = T extends {
+export type AugmentedRouterInternal<T, TErrorMap extends ErrorMap> = T extends {
   '~orpc': ProcedureDefinition<
     infer $InitialContext,
     infer $CurrentContext,
@@ -59,9 +56,9 @@ type AugmentedRouterImpl<T, TErrorMap extends ErrorMap> = T extends {
       MergedErrorMap<TErrorMap, $ErrorMap>
     >
   : T extends Lazy<infer $>
-    ? Lazy<AugmentedRouterImpl<$, TErrorMap>>
+    ? Lazy<AugmentedRouterInternal<$, TErrorMap>>
     : {
-        [K in keyof T]: AugmentedRouterImpl<T[K] & {}, TErrorMap>
+        [K in keyof T]: AugmentedRouterInternal<T[K] & {}, TErrorMap>
       }
 
 export type AugmentedRouterWithMiddlewares<
@@ -86,7 +83,7 @@ export type AugmentedRouterWithMiddlewares<
       MergedErrorMap<TErrorMap, $ErrorMap>
     >
   : {
-      [K in keyof T]: AugmentedRouterWithMiddlewaresImpl<
+      [K in keyof T]: AugmentedRouterWithMiddlewaresInternal<
         T[K] & {},
         TInitialContext,
         TInjectedContext,
@@ -94,8 +91,7 @@ export type AugmentedRouterWithMiddlewares<
       >
     }
 
-// See `AugmentedRouterImpl`.
-type AugmentedRouterWithMiddlewaresImpl<
+export type AugmentedRouterWithMiddlewaresInternal<
   T,
   TInitialContext extends Context,
   TInjectedContext extends Context,
@@ -117,9 +113,9 @@ type AugmentedRouterWithMiddlewaresImpl<
       MergedErrorMap<TErrorMap, $ErrorMap>
     >
   : T extends Lazy<infer $>
-    ? Lazy<AugmentedRouterWithMiddlewaresImpl<$, TInitialContext, TInjectedContext, TErrorMap>>
+    ? Lazy<AugmentedRouterWithMiddlewaresInternal<$, TInitialContext, TInjectedContext, TErrorMap>>
     : {
-        [K in keyof T]: AugmentedRouterWithMiddlewaresImpl<
+        [K in keyof T]: AugmentedRouterWithMiddlewaresInternal<
           T[K] & {},
           TInitialContext,
           TInjectedContext,
@@ -410,18 +406,14 @@ export async function walkProcedureContractsAsync(
   }
 }
 
-export type UnlaziedRouter<T extends AnyRouter> = T extends unknown ? UnlaziedRouterImpl<T> : never
+export type UnlaziedRouter<T extends AnyRouter> = UnlaziedRouterInternal<T>
 
-// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
-// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
-// public type instead of inlining this one.
-type UnlaziedRouterImpl<T> = T extends AnyProcedure
+export type UnlaziedRouterInternal<T> = T extends AnyProcedure
   ? T
   : T extends Lazy<infer U>
-    ? UnlaziedRouterImpl<U>
+    ? UnlaziedRouterInternal<U>
     : {
-        [K in keyof T]: UnlaziedRouterImpl<T[K] & {}>
+        [K in keyof T]: UnlaziedRouterInternal<T[K] & {}>
       }
 
 /**

@@ -20,17 +20,13 @@ export type Router<TInitialContext extends Context> =
 export type ContractedRouter<
   T extends RouterContract,
   TInitialContext extends Context,
-> = T extends unknown ? ContractedRouterImpl<T, TInitialContext> : never
+> = ContractedRouterInternal<T, TInitialContext>
 
-// Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
-// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
-// public type instead of inlining this one.
-type ContractedRouterImpl<T, TInitialContext extends Context> =
+export type ContractedRouterInternal<T, TInitialContext extends Context> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
     ? Procedure<TInitialContext, any, $InputSchema, $OutputSchema, $ErrorMap>
     : {
-        [K in keyof T]: Lazyable<ContractedRouterImpl<T[K] & {}, TInitialContext>>
+        [K in keyof T]: Lazyable<ContractedRouterInternal<T[K] & {}, TInitialContext>>
       }
 
 export type AnyRouter = Router<any>
@@ -45,18 +41,16 @@ export type InferRouterInitialContext<T extends AnyRouter> = T extends Router<in
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-initial-contexts | Router - Infer Router Initial Contexts}
  */
-export type InferRouterInitialContexts<T extends AnyRouter> = T extends unknown
-  ? InferRouterInitialContextsImpl<T>
-  : never
+export type InferRouterInitialContexts<T extends AnyRouter> = InferRouterInitialContextsInternal<T>
 
-type InferRouterInitialContextsImpl<T> = T extends {
+export type InferRouterInitialContextsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<infer UInitialContext, any, any, any, any>
 }
   ? UInitialContext
   : T extends Lazy<infer U>
-    ? InferRouterInitialContextsImpl<U>
+    ? InferRouterInitialContextsInternal<U>
     : {
-        [K in keyof T]: InferRouterInitialContextsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterInitialContextsInternal<T[K] & {}>
       }
 
 /**
@@ -67,18 +61,16 @@ type InferRouterInitialContextsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-final-contexts | Router - Infer Router Final Contexts}
  */
-export type InferRouterFinalContexts<T extends AnyRouter> = T extends unknown
-  ? InferRouterFinalContextsImpl<T>
-  : never
+export type InferRouterFinalContexts<T extends AnyRouter> = InferRouterFinalContextsInternal<T>
 
-type InferRouterFinalContextsImpl<T> = T extends {
+export type InferRouterFinalContextsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<infer UInitialContext, infer UInjectedContext, any, any, any>
 }
   ? MergedContext<UInitialContext, UInjectedContext>
   : T extends Lazy<infer U>
-    ? InferRouterFinalContextsImpl<U>
+    ? InferRouterFinalContextsInternal<U>
     : {
-        [K in keyof T]: InferRouterFinalContextsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterFinalContextsInternal<T[K] & {}>
       }
 
 /**
@@ -89,18 +81,16 @@ type InferRouterFinalContextsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-inputs | Router - Infer Router Inputs}
  */
-export type InferRouterInputs<T extends AnyRouter> = T extends unknown
-  ? InferRouterInputsImpl<T>
-  : never
+export type InferRouterInputs<T extends AnyRouter> = InferRouterInputsInternal<T>
 
-type InferRouterInputsImpl<T> = T extends {
+export type InferRouterInputsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, infer UInputSchema, any, any>
 }
   ? InferSchemaInput<UInputSchema>
   : T extends Lazy<infer U>
-    ? InferRouterInputsImpl<U>
+    ? InferRouterInputsInternal<U>
     : {
-        [K in keyof T]: InferRouterInputsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterInputsInternal<T[K] & {}>
       }
 
 /**
@@ -111,18 +101,16 @@ type InferRouterInputsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-outputs | Router - Infer Router Outputs}
  */
-export type InferRouterOutputs<T extends AnyRouter> = T extends unknown
-  ? InferRouterOutputsImpl<T>
-  : never
+export type InferRouterOutputs<T extends AnyRouter> = InferRouterOutputsInternal<T>
 
-type InferRouterOutputsImpl<T> = T extends {
+export type InferRouterOutputsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, infer UOutputSchema, any>
 }
   ? InferSchemaOutput<UOutputSchema>
   : T extends Lazy<infer U>
-    ? InferRouterOutputsImpl<U>
+    ? InferRouterOutputsInternal<U>
     : {
-        [K in keyof T]: InferRouterOutputsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterOutputsInternal<T[K] & {}>
       }
 
 /**
@@ -130,18 +118,16 @@ type InferRouterOutputsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-error | Router - Infer Router Error}
  */
-export type InferRouterError<T extends AnyRouter> = T extends unknown
-  ? InferRouterErrorImpl<T>
-  : never
+export type InferRouterError<T extends AnyRouter> = InferRouterErrorInternal<T>
 
-type InferRouterErrorImpl<T> = T extends {
+export type InferRouterErrorInternal<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, any, infer UErrorMap>
 }
   ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
   : T extends Lazy<infer U>
-    ? InferRouterErrorImpl<U>
+    ? InferRouterErrorInternal<U>
     : {
-        [K in keyof T]-?: InferRouterErrorImpl<T[K] & {}>
+        [K in keyof T]-?: InferRouterErrorInternal<T[K] & {}>
       }[keyof T]
 
 /**
@@ -149,16 +135,14 @@ type InferRouterErrorImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-errors | Router - Infer Router Errors}
  */
-export type InferRouterErrors<T extends AnyRouter> = T extends unknown
-  ? InferRouterErrorsImpl<T>
-  : never
+export type InferRouterErrors<T extends AnyRouter> = InferRouterErrorsInternal<T>
 
-type InferRouterErrorsImpl<T> = T extends {
+export type InferRouterErrorsInternal<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, any, infer UErrorMap>
 }
   ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
   : T extends Lazy<infer U>
-    ? InferRouterErrorsImpl<U>
+    ? InferRouterErrorsInternal<U>
     : {
-        [K in keyof T]: InferRouterErrorsImpl<T[K] & {}>
+        [K in keyof T]: InferRouterErrorsInternal<T[K] & {}>
       }
