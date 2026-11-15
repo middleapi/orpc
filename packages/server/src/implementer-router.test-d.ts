@@ -1,4 +1,7 @@
 import type {
+  AnyProcedureContract,
+  AnySchema,
+  ErrorMap,
   InferRouterContractErrorMap,
   ORPCErrorConstructorMap,
   ProcedureContract,
@@ -562,6 +565,26 @@ describe('RouterImplementer', () => {
         >
       >()
     })
+  })
+
+  it('reads `any` as the schema and error map constraints', () => {
+    expectTypeOf<
+      Extract<
+        RouterImplementer<any, { auth: boolean }>,
+        ProcedureImplementer<any, any, any, any, any>
+      >
+    >().toEqualTypeOf<
+      ProcedureImplementer<{ auth: boolean }, object, AnySchema, AnySchema, ErrorMap>
+    >()
+  })
+
+  it('keeps a generic procedure unresolved', () => {
+    function _generic<T extends AnyProcedureContract>(implementer: RouterImplementer<T, object>) {
+      return implementer.handler(({ input }) => {
+        // @ts-expect-error - input of an unresolved procedure is not a string
+        const _input: string = input
+      })
+    }
   })
 })
 
@@ -1352,5 +1375,27 @@ describe('RouterImplementerWithMiddlewares', () => {
         >
       >()
     })
+  })
+
+  it('reads `any` as the schema and error map constraints', () => {
+    expectTypeOf<
+      Extract<
+        RouterImplementerWithMiddlewares<any, { auth: boolean }, { extra: boolean }>,
+        ProcedureImplementer<any, any, any, any, any>
+      >
+    >().toEqualTypeOf<
+      ProcedureImplementer<{ auth: boolean }, { extra: boolean }, AnySchema, AnySchema, ErrorMap>
+    >()
+  })
+
+  it('keeps a generic procedure unresolved', () => {
+    function _generic<T extends AnyProcedureContract>(
+      implementer: RouterImplementerWithMiddlewares<T, object, object>,
+    ) {
+      return implementer.handler(({ input }) => {
+        // @ts-expect-error - input of an unresolved procedure is not a string
+        const _input: string = input
+      })
+    }
   })
 })

@@ -1,5 +1,6 @@
 import type { ProcedureContract, RouterContract } from '@orpc/contract'
 
+import type { Context } from './context'
 import type { Implementer } from './implementer'
 import type { RouterImplementer } from './implementer-router'
 
@@ -42,5 +43,12 @@ describe('Implementer', () => {
     expectTypeOf(implementer).toExtend<
       RouterImplementer<TContract['ping'], { auth: boolean } & object>
     >()
+  })
+
+  it('keeps the middlewares of a generic contract unresolved', () => {
+    function _generic<T extends RouterContract, C extends Context>(implementer: Implementer<T, C>) {
+      // @ts-expect-error - an unresolved contract can't check the injected context
+      return implementer.use(({ next }) => next({ context: { extra: true } }))
+    }
   })
 })

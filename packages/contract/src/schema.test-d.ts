@@ -172,6 +172,13 @@ describe('MergedSchema', () => {
     expectTypeOf<MergedSchema<AnySchema, Schema1>>().toEqualTypeOf<Schema<any, any>>()
   })
 
+  it('merges `never`', () => {
+    type Schema1 = Schema<{ schema1: number }, { schema1: string }>
+
+    expectTypeOf<MergedSchema<never, Schema1>>().toEqualTypeOf<Schema<never, never>>()
+    expectTypeOf<MergedSchema<Schema1, never>>().toEqualTypeOf<Schema<never, never>>()
+  })
+
   it('merges the declared types of untyped schemas', () => {
     type Schema1 = Schema<{ schema1: number }, { schema1: string }>
 

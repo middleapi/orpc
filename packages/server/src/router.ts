@@ -122,10 +122,8 @@ export type InferRouterOutputs<T extends AnyRouter> = T extends AnyProcedureLike
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-error | Router - Infer Router Error}
  */
-export type InferRouterError<T extends AnyRouter> = T extends {
-  '~orpc': ProcedureDefinition<any, any, any, any, infer UErrorMap>
-}
-  ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
+export type InferRouterError<T extends AnyRouter> = T extends AnyProcedureLike
+  ? ORPCErrorFromErrorMap<ProcedureContractErrorMapOf<T>> | ThrowableError
   : {
       [K in keyof T]: T[K] extends AnyRouter
         ? InferRouterError<T[K]>
@@ -139,10 +137,8 @@ export type InferRouterError<T extends AnyRouter> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-errors | Router - Infer Router Errors}
  */
-export type InferRouterErrors<T extends AnyRouter> = T extends {
-  '~orpc': ProcedureDefinition<any, any, any, any, infer UErrorMap>
-}
-  ? ORPCErrorFromErrorMap<UErrorMap> | ThrowableError
+export type InferRouterErrors<T extends AnyRouter> = T extends AnyProcedureLike
+  ? ORPCErrorFromErrorMap<ProcedureContractErrorMapOf<T>> | ThrowableError
   : {
       [K in keyof T]: T[K] extends AnyRouter
         ? InferRouterErrors<T[K]>

@@ -65,7 +65,8 @@ export type AnyProcedureContract = ProcedureContract<any, any, any>
 /** @internal */
 export type AnyProcedureContractLike = { '~orpc': ProcedureContractDefinition<any, any, any> }
 
-type ProcedureContractDefinitionOf<T extends AnyProcedureContractLike> = unknown extends T
+/** @internal */
+export type ProcedureContractDefinitionOf<T extends AnyProcedureContractLike> = unknown extends T
   ? ProcedureContractDefinition<AnySchema, AnySchema, ErrorMap>
   : T['~orpc']
 
