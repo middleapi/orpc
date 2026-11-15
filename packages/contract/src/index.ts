@@ -46,7 +46,11 @@ export {
   getRouterContract,
   minifyRouterContract,
 } from './router-utils'
-export type { AugmentContractRouterOptions, AugmentedContractRouter } from './router-utils'
+export type {
+  AugmentContractRouterOptions,
+  AugmentedContractRouter,
+  AugmentedContractRouterInternal,
+} from './router-utils'
 export {
   /**
    * @deprecated Use `getRouterContract` instead.
