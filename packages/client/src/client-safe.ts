@@ -5,16 +5,13 @@ import type { AnyNestedClient, Client, ClientRest } from './types'
 import type { SafeResult } from './utils'
 import { safe } from './utils'
 
-export type SafeClient<T extends AnyNestedClient> = T extends unknown ? SafeClientImpl<T> : never
+export type SafeClient<T extends AnyNestedClient> = SafeClientInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type SafeClientImpl<T> =
+export type SafeClientInternal<T> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Promise<SafeResult<UOutput, UError>>
     : {
-        [K in keyof T]: SafeClientImpl<T[K]>
+        [K in keyof T]: SafeClientInternal<T[K]>
       }
 
 /**

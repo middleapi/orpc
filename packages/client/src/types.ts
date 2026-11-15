@@ -50,18 +50,13 @@ export interface ClientLink<TClientContext extends ClientContext> {
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-inputs | Client-Side Clients - Infer Client Inputs}
  */
-export type InferClientInputs<T extends AnyNestedClient> = T extends unknown
-  ? InferClientInputsImpl<T>
-  : never
+export type InferClientInputs<T extends AnyNestedClient> = InferClientInputsInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type InferClientInputsImpl<T> =
+export type InferClientInputsInternal<T> =
   T extends Client<any, infer U, any, any>
     ? U
     : {
-        [K in keyof T]: InferClientInputsImpl<T[K]>
+        [K in keyof T]: InferClientInputsInternal<T[K]>
       }
 
 /**
@@ -72,20 +67,15 @@ type InferClientInputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-inputs | Client-Side Clients - Infer Client Body Inputs}
  */
-export type InferClientBodyInputs<T extends AnyNestedClient> = T extends unknown
-  ? InferClientBodyInputsImpl<T>
-  : never
+export type InferClientBodyInputs<T extends AnyNestedClient> = InferClientBodyInputsInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type InferClientBodyInputsImpl<T> =
+export type InferClientBodyInputsInternal<T> =
   T extends Client<any, infer U, any, any>
     ? U extends { body: infer UBody }
       ? UBody
       : U
     : {
-        [K in keyof T]: InferClientBodyInputsImpl<T[K]>
+        [K in keyof T]: InferClientBodyInputsInternal<T[K]>
       }
 
 /**
@@ -95,18 +85,13 @@ type InferClientBodyInputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-outputs | Client-Side Clients - Infer Client Outputs}
  */
-export type InferClientOutputs<T extends AnyNestedClient> = T extends unknown
-  ? InferClientOutputsImpl<T>
-  : never
+export type InferClientOutputs<T extends AnyNestedClient> = InferClientOutputsInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type InferClientOutputsImpl<T> =
+export type InferClientOutputsInternal<T> =
   T extends Client<any, any, infer U, any>
     ? U
     : {
-        [K in keyof T]: InferClientOutputsImpl<T[K]>
+        [K in keyof T]: InferClientOutputsInternal<T[K]>
       }
 
 /**
@@ -117,20 +102,15 @@ type InferClientOutputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-outputs | Client-Side Clients - Infer Client Body Outputs}
  */
-export type InferClientBodyOutputs<T extends AnyNestedClient> = T extends unknown
-  ? InferClientBodyOutputsImpl<T>
-  : never
+export type InferClientBodyOutputs<T extends AnyNestedClient> = InferClientBodyOutputsInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type InferClientBodyOutputsImpl<T> =
+export type InferClientBodyOutputsInternal<T> =
   T extends Client<any, any, infer U, any>
     ? U extends { body: infer UBody }
       ? UBody
       : U
     : {
-        [K in keyof T]: InferClientBodyOutputsImpl<T[K]>
+        [K in keyof T]: InferClientBodyOutputsInternal<T[K]>
       }
 
 /**
@@ -140,18 +120,13 @@ type InferClientBodyOutputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-errors | Client-Side Clients - Infer Client Errors}
  */
-export type InferClientErrors<T extends AnyNestedClient> = T extends unknown
-  ? InferClientErrorsImpl<T>
-  : never
+export type InferClientErrors<T extends AnyNestedClient> = InferClientErrorsInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type InferClientErrorsImpl<T> =
+export type InferClientErrorsInternal<T> =
   T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: InferClientErrorsImpl<T[K]>
+        [K in keyof T]: InferClientErrorsInternal<T[K]>
       }
 
 /**
@@ -161,16 +136,11 @@ type InferClientErrorsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-error | Client-Side Clients - Infer Client Error}
  */
-export type InferClientError<T extends AnyNestedClient> = T extends unknown
-  ? InferClientErrorImpl<T>
-  : never
+export type InferClientError<T extends AnyNestedClient> = InferClientErrorInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type InferClientErrorImpl<T> =
+export type InferClientErrorInternal<T> =
   T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]-?: InferClientErrorImpl<T[K]>
+        [K in keyof T]-?: InferClientErrorInternal<T[K]>
       }[keyof T]

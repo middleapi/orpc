@@ -19,18 +19,13 @@ function callAsEffect<TClientContext extends ClientContext, TInput, TOutput, TEr
   })
 }
 
-export type EffectClient<T extends AnyNestedClient> = T extends unknown
-  ? EffectClientImpl<T>
-  : never
+export type EffectClient<T extends AnyNestedClient> = EffectClientInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type EffectClientImpl<T> =
+export type EffectClientInternal<T> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Effect.Effect<UOutput, UError>
     : {
-        [K in keyof T]: EffectClientImpl<T[K]>
+        [K in keyof T]: EffectClientInternal<T[K]>
       }
 
 /**

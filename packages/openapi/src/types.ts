@@ -75,16 +75,11 @@ export type JsonifiedClientError<T> =
  *
  * @see {@link https://orpc.dev/docs/openapi/link | OpenAPI Link}
  */
-export type JsonifiedClient<T extends AnyNestedClient> = T extends unknown
-  ? JsonifiedClientImpl<T>
-  : never
+export type JsonifiedClient<T extends AnyNestedClient> = JsonifiedClientInternal<T>
 
-// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
-// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
-// instead of inlining this unexported helper.
-type JsonifiedClientImpl<T> =
+export type JsonifiedClientInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Client<UClientContext, UInput, JsonifiedValue<UOutput>, JsonifiedClientError<UError>>
     : {
-        [K in keyof T]: JsonifiedClientImpl<T[K]>
+        [K in keyof T]: JsonifiedClientInternal<T[K]>
       }
