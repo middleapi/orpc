@@ -25,13 +25,11 @@ export type ErrorMap = {
 }
 
 export type ORPCErrorFromErrorMap<TErrorMap extends ErrorMap> = {
-  [K in keyof TErrorMap]-?: TErrorMap[K] extends infer I
-    ? I extends ErrorMapItem
-      ? ORPCError<
-          K & ORPCErrorCode,
-          I['data'] extends AnySchema ? InferSchemaOutput<I['data']> : unknown
-        >
-      : never
+  [K in keyof TErrorMap]-?: Exclude<TErrorMap[K], undefined> extends infer I extends ErrorMapItem
+    ? ORPCError<
+        K & ORPCErrorCode,
+        I['data'] extends AnySchema ? InferSchemaOutput<I['data']> : unknown
+      >
     : never
 }[keyof TErrorMap]
 

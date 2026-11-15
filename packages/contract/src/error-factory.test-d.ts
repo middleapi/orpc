@@ -161,4 +161,20 @@ describe('ORPCErrorConstructorMap', () => {
     expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<any>>()
     expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<ErrorMap>>()
   })
+
+  it('keeps union-valued entries in one constructor signature', () => {
+    const flag = true as boolean
+    const unionErrorMap = {
+      FAILURE: flag ? { data: z.string() } : { data: z.number() },
+    } satisfies ErrorMap
+
+    const unionConstructors = {} as ORPCErrorConstructorMap<typeof unionErrorMap>
+
+    expectTypeOf(unionConstructors.FAILURE({ data: 'x' })).toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+    expectTypeOf(unionConstructors.FAILURE({ data: 1 })).toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+  })
 })

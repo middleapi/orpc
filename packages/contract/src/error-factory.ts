@@ -127,13 +127,11 @@ export interface ORPCErrorConstructorMapItem<TCode extends ORPCErrorCode, TInDat
  * the variance unmeasurable, which breaks assignability to `ORPCErrorConstructorMap<any>`.
  */
 export type ORPCErrorConstructorMap<out T extends ErrorMap> = {
-  [K in keyof T]-?: T[K] extends infer I
-    ? I extends ErrorMapItem
-      ? ORPCErrorConstructorMapItem<
-          K & ORPCErrorCode,
-          I['data'] extends AnySchema ? InferSchemaInput<I['data']> : unknown
-        >
-      : never
+  [K in keyof T]-?: Exclude<T[K], undefined> extends infer I extends ErrorMapItem
+    ? ORPCErrorConstructorMapItem<
+        K & ORPCErrorCode,
+        I['data'] extends AnySchema ? InferSchemaInput<I['data']> : unknown
+      >
     : never
 }
 

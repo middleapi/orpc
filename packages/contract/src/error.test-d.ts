@@ -39,4 +39,15 @@ describe('ORPCErrorFromErrorMap', () => {
     expectTypeOf<undefined>().not.toExtend<ORPCErrorFromErrorMap<ErrorMap>>()
     expectTypeOf<ORPCErrorFromErrorMap<ErrorMap>>().toExtend<ORPCError<any, unknown>>()
   })
+
+  it('keeps union-valued entries in one ORPCError', () => {
+    const flag = true as boolean
+    const errorMap = {
+      FAILURE: flag ? { data: z.string() } : { data: z.number() },
+    }
+
+    expectTypeOf<ORPCErrorFromErrorMap<typeof errorMap>>().toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+  })
 })
