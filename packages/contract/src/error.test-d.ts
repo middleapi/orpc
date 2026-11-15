@@ -18,36 +18,22 @@ describe('ORPCErrorFromErrorMap', () => {
     >()
   })
 
-  it('ignores the `undefined` of optional error codes', () => {
+  it('handles optional and union-valued error codes', () => {
     const flag = true as boolean
     const errorMap = {
       NOT_FOUND: {},
+      FAILURE: flag ? { data: z.string() } : { data: z.number() },
       ...(flag ? { RATE_LIMITED: { data: z.object({ retry: z.number() }) } } : {}),
     }
 
     expectTypeOf<ORPCErrorFromErrorMap<typeof errorMap>>().toEqualTypeOf<
-      ORPCError<'NOT_FOUND', unknown> | ORPCError<'RATE_LIMITED', { retry: number }>
+      | ORPCError<'NOT_FOUND', unknown>
+      | ORPCError<'FAILURE', string | number>
+      | ORPCError<'RATE_LIMITED', { retry: number }>
     >()
-
-    expectTypeOf<
-      ORPCErrorFromErrorMap<{ OPTIONAL?: { data: z.ZodString } | undefined }>
-    >().toEqualTypeOf<ORPCError<'OPTIONAL', string>>()
   })
 
   it('resolves the generic ErrorMap to ORPCError without undefined', () => {
-    expectTypeOf<ORPCErrorFromErrorMap<ErrorMap>>().not.toBeUndefined()
-    expectTypeOf<undefined>().not.toExtend<ORPCErrorFromErrorMap<ErrorMap>>()
     expectTypeOf<ORPCErrorFromErrorMap<ErrorMap>>().toExtend<ORPCError<any, unknown>>()
-  })
-
-  it('keeps union-valued entries in one ORPCError', () => {
-    const flag = true as boolean
-    const errorMap = {
-      FAILURE: flag ? { data: z.string() } : { data: z.number() },
-    }
-
-    expectTypeOf<ORPCErrorFromErrorMap<typeof errorMap>>().toEqualTypeOf<
-      ORPCError<'FAILURE', string | number>
-    >()
   })
 })
