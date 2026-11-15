@@ -33,6 +33,9 @@ it('IntersectPick allows narrowing a union', () => {
     IntersectPick<T, { kind: unknown; user: unknown }>
   >()
 
+  expectTypeOf<T>().toExtend<IntersectPick<T, T>>()
+  expectTypeOf<U | { kind: 'c' }>().not.toExtend<IntersectPick<T, U | { kind: 'c' }>>()
+
   type N = { user: { id: string } } | { user: null }
   expectTypeOf<{ user: { id: string } }>().toExtend<IntersectPick<N, { user: unknown }>>()
   expectTypeOf<{ user: number }>().not.toExtend<IntersectPick<N, { user: unknown }>>()

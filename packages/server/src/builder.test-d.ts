@@ -177,6 +177,13 @@ describe('Builder', () => {
         })
 
       void os
+        .$context<A | { kind: 'b' }>()
+        .use(({ context, next }) => next({ context }))
+        .handler(({ context }) => {
+          expectTypeOf(context.kind).toEqualTypeOf<'a' | 'b'>()
+        })
+
+      void os
         .$context<{ user: { id: string } } | { user: null }>()
         .use(({ next }) => next({ context: { user: { id: '1' } } }))
         .handler(({ context }) => {
