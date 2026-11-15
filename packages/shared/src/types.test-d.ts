@@ -12,33 +12,41 @@ it('IntersectPick', () => {
   expectTypeOf<IntersectPick<{ a: number }, { b: number }>>().toEqualTypeOf<Empty>()
 })
 
-it('IntersectPick with union', () => {
-  type T = { kind: 'a'; user: { id: string } } | { kind: 'b' }
+// How `.use` applies it: the override `U` is checked against `IntersectPick<T, U>`
+type Accepts<T, U> = [U] extends [IntersectPick<T, U>] ? true : false
 
-  expectTypeOf<{ user: { id: string } }>().toExtend<IntersectPick<T, { user: unknown }>>()
-  expectTypeOf<{ user: number }>().not.toExtend<IntersectPick<T, { user: unknown }>>()
-  expectTypeOf<{ kind: 'a' }>().not.toExtend<IntersectPick<T, { kind: unknown }>>()
-  expectTypeOf<{ other: number }>().toExtend<IntersectPick<T, { other: unknown }>>()
+it('IntersectPick with union', () => {
+  type A = { kind: 'a'; user: { id: string } }
+  type T = A | { kind: 'b' }
+
+  expectTypeOf<Accepts<T, { user: { id: string } }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { other: number }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { user: number }>>().toEqualTypeOf<false>()
+  // leaves the `kind: 'b'` member with `kind: 'a'` and no `user`
+  expectTypeOf<Accepts<T, { kind: 'a' }>>().toEqualTypeOf<false>()
+  expectTypeOf<Accepts<T, { kind: 'c'; user: { id: string } }>>().toEqualTypeOf<false>()
 })
 
 it('IntersectPick allows narrowing a union', () => {
-  type T = { kind: 'a'; user: { id: string } } | { kind: 'b' }
-  type U = { kind: 'a'; user: { id: string } }
+  type A = { kind: 'a'; user: { id: string } }
+  type T = A | { kind: 'b' }
 
-  expectTypeOf<U>().toExtend<IntersectPick<T, U>>()
-  expectTypeOf<{ kind: 'b'; user: number }>().toExtend<
-    IntersectPick<T, { kind: unknown; user: unknown }>
-  >()
-  expectTypeOf<{ kind: 'c'; user: { id: string } }>().not.toExtend<
-    IntersectPick<T, { kind: unknown; user: unknown }>
-  >()
-
-  expectTypeOf<T>().toExtend<IntersectPick<T, T>>()
-  expectTypeOf<U | { kind: 'c' }>().not.toExtend<IntersectPick<T, U | { kind: 'c' }>>()
+  expectTypeOf<Accepts<T, A>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { kind: 'b' }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { kind: 'b'; user: number }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, T>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, A | { kind: 'c' }>>().toEqualTypeOf<false>()
 
   type N = { user: { id: string } } | { user: null }
-  expectTypeOf<{ user: { id: string } }>().toExtend<IntersectPick<N, { user: unknown }>>()
-  expectTypeOf<{ user: number }>().not.toExtend<IntersectPick<N, { user: unknown }>>()
+  expectTypeOf<Accepts<N, { user: { id: string } }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<N, { user: number }>>().toEqualTypeOf<false>()
+})
+
+it('IntersectPick with union override', () => {
+  type T = { db: string; user: { id: string } }
+
+  expectTypeOf<Accepts<T, { db: string } | { user: { id: string } }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { db: string } | { user: number }>>().toEqualTypeOf<false>()
 })
 
 it('DistributiveOmit', () => {

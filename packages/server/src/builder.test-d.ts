@@ -166,6 +166,18 @@ describe('Builder', () => {
       void builder.use(({ next }) => next({ context: { kind: 'a' as const } }))
     })
 
+    it('accepts a union out context that overrides different keys', () => {
+      const out = {} as { db: string } | { user: { id: string } }
+
+      void os
+        .$context<{ db: string; user: { id: string } }>()
+        .use(({ next }) => next({ context: out }))
+        .handler(({ context }) => {
+          expectTypeOf(context.db).toEqualTypeOf<string>()
+          expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
+        })
+    })
+
     it('narrows a union context', () => {
       type A = { kind: 'a'; user: { id: string } }
 
@@ -174,6 +186,13 @@ describe('Builder', () => {
         .use(({ next }) => next({ context: {} as A }))
         .handler(({ context }) => {
           expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
+        })
+
+      void os
+        .$context<A | { kind: 'b' }>()
+        .use(({ next }) => next({ context: { kind: 'b' as const } }))
+        .handler(({ context }) => {
+          expectTypeOf(context.kind).toEqualTypeOf<'b'>()
         })
 
       void os
