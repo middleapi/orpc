@@ -3,9 +3,10 @@ import type { RouterClient } from '@orpc/server'
 import { os, type } from '@orpc/server'
 import type { PromiseWithError } from '@orpc/shared'
 
+import type { ORPCClientScoped, ORPCClientScopedOptions } from './client'
 import { createORPCClient } from './client'
 import type { ORPCError } from './error'
-import type { ClientLink } from './types'
+import type { Client, ClientLink } from './types'
 
 const router = {
   ping: os.input(type<number>()).handler(() => 'pong'),
@@ -129,4 +130,20 @@ describe('createORPCClient', () => {
       },
     )
   })
+})
+
+it('ORPCClientScoped maps optional procedures', () => {
+  type Scoped = ORPCClientScoped<{
+    ping?: Client<{ cache: string }, number, string, Error>
+    nested?: {
+      pong?: Client<{ cache: string }, string, number, TypeError>
+    }
+  }>
+
+  expectTypeOf<Scoped['ping']>().toEqualTypeOf<
+    ORPCClientScopedOptions<{ cache: string }, number, string, Error> | undefined
+  >()
+  expectTypeOf<NonNullable<Scoped['nested']>['pong']>().toEqualTypeOf<
+    ORPCClientScopedOptions<{ cache: string }, string, number, TypeError> | undefined
+  >()
 })

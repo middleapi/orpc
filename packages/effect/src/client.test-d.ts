@@ -88,3 +88,21 @@ describe('createEffectClient', () => {
     expectTypeOf(recovered).toEqualTypeOf<Effect.Effect<number | 'recovered', Error>>()
   })
 })
+
+describe('EffectClient', () => {
+  it('maps optional procedures', () => {
+    const effectClient = {} as EffectClient<{
+      ping?: Client<ClientContext, string, number, Error>
+      nested?: {
+        pong?: Client<ClientContext, { id: number }, { result: string }, Error>
+      }
+    }>
+
+    expectTypeOf(effectClient.ping?.('test')).toEqualTypeOf<
+      Effect.Effect<number, Error> | undefined
+    >()
+    expectTypeOf(effectClient.nested?.pong?.({ id: 123 })).toEqualTypeOf<
+      Effect.Effect<{ result: string }, Error> | undefined
+    >()
+  })
+})
