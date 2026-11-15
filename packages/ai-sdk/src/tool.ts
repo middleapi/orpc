@@ -332,14 +332,13 @@ export function createToolFactory<TInitialContext extends Context = object>(
     const toolOptions = resolveMaybeOptionalOptions(rest)
 
     /**
-     * The AI SDK already validates input against the tool's `inputSchema`,
-     * so input validation is disabled at the oRPC level to avoid validating twice.
-     * Output validation stays enabled because the AI SDK does not validate
-     * the value returned from `execute` against the tool's `outputSchema`.
+     * The AI SDK validates input itself, and treats outputs as the output schema's
+     * input side (e.g. in `validateUIMessages`), so oRPC validates neither.
      */
     const disabledValidation = new Procedure({
       ...procedure['~orpc'],
       disableInputValidation: true,
+      disableOutputValidation: true,
     })
 
     /**
