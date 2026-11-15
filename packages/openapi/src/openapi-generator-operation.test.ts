@@ -1,9 +1,11 @@
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap } from '@orpc/contract'
 import { asyncIteratorObject, error } from '@orpc/contract'
+import type { JsonSchema } from '@orpc/json-schema'
 import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter } from '@orpc/json-schema'
 
 import { testSchema, testSchemaConverter } from '../tests/__shared__/schema'
+import type { OpenAPIMeta } from './meta'
 import { OpenAPIComponentRegistry } from './openapi-generator-components'
 import type { OpenAPIOperationContext } from './openapi-generator-operation'
 import {
@@ -327,7 +329,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'array',
-          required: true,
           allowEmptyValue: true,
           allowReserved: true,
           schema: { type: 'array' },
@@ -335,7 +336,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'commaArray',
-          required: true,
           explode: false,
           allowEmptyValue: true,
           allowReserved: true,
@@ -344,7 +344,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'pipeObject',
-          required: true,
           style: 'pipeDelimited',
           allowEmptyValue: true,
           allowReserved: true,
@@ -353,7 +352,6 @@ describe('openAPIGenerator operation builders', () => {
         {
           in: 'query',
           name: 'spaceArray',
-          required: true,
           style: 'spaceDelimited',
           allowEmptyValue: true,
           allowReserved: true,
@@ -393,6 +391,54 @@ describe('openAPIGenerator operation builders', () => {
         },
       ])
       expect(operation.requestBody).toBeUndefined()
+    })
+
+    it('requires collection-styled query params only when they reject an empty collection', () => {
+      const cases: [
+        style: NonNullable<OpenAPIMeta['queryStyles']>[string],
+        schema: JsonSchema,
+        required: true | undefined,
+      ][] = [
+        ['array', { type: 'array' }, undefined],
+        ['array', { type: 'array' }, undefined],
+        ['array', { type: 'array', minItems: 1 }, true],
+        ['array', { type: 'array', minItems: 1 }, true],
+        ['comma-delimited-array', { $ref: '#/$defs/Tags' }, true],
+        ['comma-delimited-array', { $ref: '#/$defs/Any' }, undefined],
+        ['pipe-delimited-object', { type: 'object' }, undefined],
+        ['space-delimited-object', { type: 'object', required: ['a'] }, true],
+        ['space-delimited-object', { type: 'array' }, true],
+      ]
+
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: Object.fromEntries(cases.map(([, schema], i) => [`p${i}`, schema])),
+              // requiredness must not depend on whether the property is optional
+              required: cases.map((_, i) => `p${i}`).filter((_, i) => i % 2 === 0),
+              $defs: {
+                Tags: { type: 'array', minItems: 2 },
+                Any: { type: 'array' },
+              },
+            }),
+          ],
+        }),
+        {
+          method: 'GET',
+          queryStyles: Object.fromEntries(cases.map(([style], i) => [`p${i}`, style])),
+        },
+        undefined,
+      )
+
+      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).required)).toEqual(
+        cases.map(([, , required]) => required),
+      )
     })
 
     it('does not use deepObject for query params whose $ref resolves to a primitive', () => {
