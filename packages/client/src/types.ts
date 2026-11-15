@@ -56,7 +56,7 @@ export type InferClientInputsInternal<T> =
   T extends Client<any, infer U, any, any>
     ? U
     : {
-        [K in keyof T]: InferClientInputsInternal<T[K]>
+        [K in keyof T]: InferClientInputsInternal<T[K] & {}>
       }
 
 /**
@@ -75,7 +75,7 @@ export type InferClientBodyInputsInternal<T> =
       ? UBody
       : U
     : {
-        [K in keyof T]: InferClientBodyInputsInternal<T[K]>
+        [K in keyof T]: InferClientBodyInputsInternal<T[K] & {}>
       }
 
 /**
@@ -91,7 +91,7 @@ export type InferClientOutputsInternal<T> =
   T extends Client<any, any, infer U, any>
     ? U
     : {
-        [K in keyof T]: InferClientOutputsInternal<T[K]>
+        [K in keyof T]: InferClientOutputsInternal<T[K] & {}>
       }
 
 /**
@@ -110,7 +110,7 @@ export type InferClientBodyOutputsInternal<T> =
       ? UBody
       : U
     : {
-        [K in keyof T]: InferClientBodyOutputsInternal<T[K]>
+        [K in keyof T]: InferClientBodyOutputsInternal<T[K] & {}>
       }
 
 /**
@@ -126,7 +126,7 @@ export type InferClientErrorsInternal<T> =
   T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: InferClientErrorsInternal<T[K]>
+        [K in keyof T]: InferClientErrorsInternal<T[K] & {}>
       }
 
 /**
@@ -142,5 +142,5 @@ export type InferClientErrorInternal<T> =
   T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]-?: InferClientErrorInternal<T[K]>
+        [K in keyof T]-?: InferClientErrorInternal<T[K] & {}>
       }[keyof T]
