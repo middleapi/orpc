@@ -7,8 +7,8 @@ import { os } from '@orpc/server'
 import type { Public } from '@orpc/shared'
 import * as z from 'zod'
 
-import type { ProcedureUtils } from './procedure-utils'
-import type { RouterUtils } from './router-utils'
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
+import type { RouterUtils, RouterUtilsScoped } from './router-utils'
 import { createRouterUtils } from './router-utils'
 import type { SharedUtils } from './shared-utils'
 
@@ -128,6 +128,33 @@ it('createRouterUtils', () => {
   })
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()
+})
+
+it('RouterUtils with optional procedures', () => {
+  type OptionalClient = {
+    ping?: Client<{ batch?: boolean }, string, number, Error>
+    nested?: {
+      pong?: Client<{ batch?: boolean }, string, number, Error>
+    }
+  }
+
+  const utils = {} as RouterUtils<OptionalClient>
+
+  expectTypeOf(utils.ping).toEqualTypeOf<
+    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+  >()
+  expectTypeOf(utils.nested?.pong).toEqualTypeOf<
+    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+  >()
+
+  const scoped = {} as RouterUtilsScoped<OptionalClient>
+
+  expectTypeOf(scoped.ping).toEqualTypeOf<
+    ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
+  >()
+  expectTypeOf(scoped.nested?.pong).toEqualTypeOf<
+    ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
+  >()
 })
 
 it('createRouterUtils infers the union of contexts when procedures require different contexts', () => {

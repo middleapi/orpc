@@ -5,11 +5,13 @@ import type { AnyNestedClient, Client, ClientRest } from './types'
 import type { SafeResult } from './utils'
 import { safe } from './utils'
 
-export type SafeClient<T extends AnyNestedClient> =
+export type SafeClient<T extends AnyNestedClient> = SafeClientInternal<T>
+
+export type SafeClientInternal<T> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Promise<SafeResult<UOutput, UError>>
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? SafeClient<T[K]> : never
+        [K in keyof T]: SafeClientInternal<T[K]>
       }
 
 /**

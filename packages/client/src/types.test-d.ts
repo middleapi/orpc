@@ -182,6 +182,54 @@ describe('infer utilities', () => {
   })
 })
 
+describe('infer utilities with optional procedures', () => {
+  type ORPC = {
+    ping?: Client<{ cache?: boolean }, string, number, Error>
+    nested?: {
+      pong?: Client<{ cache?: boolean }, { body: number }, { body: string }, TypeError>
+    }
+  }
+
+  it('InferClientInputs', () => {
+    expectTypeOf<InferClientInputs<ORPC>>().toEqualTypeOf<{
+      ping?: string | undefined
+      nested?: { pong?: { body: number } | undefined } | undefined
+    }>()
+  })
+
+  it('InferClientBodyInputs', () => {
+    expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
+      ping?: string | undefined
+      nested?: { pong?: number | undefined } | undefined
+    }>()
+  })
+
+  it('InferClientOutputs', () => {
+    expectTypeOf<InferClientOutputs<ORPC>>().toEqualTypeOf<{
+      ping?: number | undefined
+      nested?: { pong?: { body: string } | undefined } | undefined
+    }>()
+  })
+
+  it('InferClientBodyOutputs', () => {
+    expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
+      ping?: number | undefined
+      nested?: { pong?: string | undefined } | undefined
+    }>()
+  })
+
+  it('InferClientErrors', () => {
+    expectTypeOf<InferClientErrors<ORPC>>().toEqualTypeOf<{
+      ping?: Error | undefined
+      nested?: { pong?: TypeError | undefined } | undefined
+    }>()
+  })
+
+  it('InferClientError', () => {
+    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<Error | TypeError>()
+  })
+})
+
 describe('infer utilities with mixed client contexts', () => {
   type ORPC = {
     a: Client<{ x: string }, string, number, Error>

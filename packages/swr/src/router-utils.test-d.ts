@@ -1,3 +1,4 @@
+import type { Client } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { RouterClient } from '@orpc/server'
 import { os } from '@orpc/server'
@@ -83,6 +84,24 @@ it('createRouterUtils', () => {
   })
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()
+})
+
+it('RouterUtils with optional procedures', () => {
+  type OptionalClient = {
+    ping?: Client<{ batch?: boolean }, string, number, Error>
+    nested?: {
+      pong?: Client<{ batch?: boolean }, string, number, Error>
+    }
+  }
+
+  const utils = {} as RouterUtils<OptionalClient>
+
+  expectTypeOf(utils.ping).toEqualTypeOf<
+    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+  >()
+  expectTypeOf(utils.nested?.pong).toEqualTypeOf<
+    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+  >()
 })
 
 it('createRouterUtils accepts a client with a `never` input procedure', () => {

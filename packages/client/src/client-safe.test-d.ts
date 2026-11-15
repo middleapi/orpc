@@ -29,3 +29,18 @@ it('SafeClient', async () => {
   expectTypeOf(pongResult.definedError).toEqualTypeOf<null>()
   expectTypeOf(pongResult.isSuccess).toEqualTypeOf<boolean>()
 })
+
+it('SafeClient with optional procedures', async () => {
+  const safeClient = {} as SafeClient<{
+    ping?: Client<ClientContext, string, number, Error>
+    nested?: {
+      pong?: Client<ClientContext, { id: number }, { result: string }, Error>
+    }
+  }>
+
+  const pingResult = await safeClient.ping?.('test')
+  expectTypeOf(pingResult?.data).toEqualTypeOf<number | undefined>()
+
+  const pongResult = await safeClient.nested?.pong?.({ id: 123 })
+  expectTypeOf(pongResult?.data).toEqualTypeOf<{ result: string } | undefined>()
+})

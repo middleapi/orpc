@@ -161,4 +161,20 @@ describe('JsonifiedClient', () => {
       }
     }>()
   })
+
+  it('optional procedures', () => {
+    expectTypeOf<
+      JsonifiedClient<{
+        ping?: Client<{ cache?: boolean }, { now: Date }, { now: Date }, Error>
+        planet?: {
+          find?: Client<{ cache?: boolean }, { now: Date }, { now: Date }, Error>
+        }
+      }>
+    >().toEqualTypeOf<{
+      ping?: Client<{ cache?: boolean }, { now: Date }, { now: string }, Error> | undefined
+      planet?:
+        | { find?: Client<{ cache?: boolean }, { now: Date }, { now: string }, Error> | undefined }
+        | undefined
+    }>()
+  })
 })
