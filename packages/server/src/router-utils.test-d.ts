@@ -89,24 +89,13 @@ describe('AugmentedRouter', () => {
       }>
     }>()
   })
-  it('lazyable router', () => {
-    type ErrorMap = { E2: { message: string } }
-    type Augmented = AugmentedRouter<typeof router, ErrorMap>
 
-    const lazyableRouter = {
-      lazyable: {} as Lazyable<typeof router>,
-    }
-
-    expectTypeOf<AugmentedRouter<typeof lazyableRouter, ErrorMap>>().toEqualTypeOf<{
-      lazyable: Augmented | Lazy<Augmented>
-    }>()
-  })
-
-  it('optional keys', () => {
+  it('lazyable and optional keys', () => {
     type ErrorMap = { E2: { message: string } }
     type Augmented = AugmentedRouter<typeof router, ErrorMap>
 
     type OptionalRouter = {
+      lazyableRequired: Lazyable<typeof router>
       ping?: typeof router.ping
       nested?: typeof router.nested
       lazy?: Lazy<typeof router>
@@ -114,6 +103,7 @@ describe('AugmentedRouter', () => {
     }
 
     expectTypeOf<AugmentedRouter<OptionalRouter, ErrorMap>>().toEqualTypeOf<{
+      lazyableRequired: Augmented | Lazy<Augmented>
       ping?: Augmented['ping']
       nested?: Augmented['nested']
       lazy?: Lazy<Augmented>
@@ -228,34 +218,8 @@ describe('AugmentedRouterWithMiddlewares', () => {
       }>
     }>()
   })
-  it('lazyable router', () => {
-    type ErrorMap = { E2: { message: string } }
-    type TInitialContext = { baseI: string }
-    type TInjectedContext = { baseC: number }
-    type Augmented = AugmentedRouterWithMiddlewares<
-      typeof router,
-      TInitialContext,
-      TInjectedContext,
-      ErrorMap
-    >
 
-    const lazyableRouter = {
-      lazyable: {} as Lazyable<typeof router>,
-    }
-
-    expectTypeOf<
-      AugmentedRouterWithMiddlewares<
-        typeof lazyableRouter,
-        TInitialContext,
-        TInjectedContext,
-        ErrorMap
-      >
-    >().toEqualTypeOf<{
-      lazyable: Augmented | Lazy<Augmented>
-    }>()
-  })
-
-  it('optional keys', () => {
+  it('lazyable and optional keys', () => {
     type ErrorMap = { E2: { message: string } }
     type TInitialContext = { baseI: string }
     type TInjectedContext = { baseC: number }
@@ -267,6 +231,7 @@ describe('AugmentedRouterWithMiddlewares', () => {
     >
 
     type OptionalRouter = {
+      lazyableRequired: Lazyable<typeof router>
       ping?: typeof router.ping
       nested?: typeof router.nested
       lazy?: Lazy<typeof router>
@@ -276,6 +241,7 @@ describe('AugmentedRouterWithMiddlewares', () => {
     expectTypeOf<
       AugmentedRouterWithMiddlewares<OptionalRouter, TInitialContext, TInjectedContext, ErrorMap>
     >().toEqualTypeOf<{
+      lazyableRequired: Augmented | Lazy<Augmented>
       ping?: Augmented['ping']
       nested?: Augmented['nested']
       lazy?: Lazy<Augmented>
