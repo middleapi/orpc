@@ -27,20 +27,22 @@ import { SharedUtils } from './shared-utils'
  *
  * @see {@link https://orpc.dev/docs/integrations/pinia-colada | Pinia Colada Integration}
  */
-export type RouterUtils<T extends AnyNestedClient> =
+export type RouterUtils<T extends AnyNestedClient> = RouterUtilsImpl<T>
+
+type RouterUtilsImpl<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? RouterUtils<T[K]> : never
+        [K in keyof T]: RouterUtilsImpl<T[K]>
       } & Public<SharedUtils<unknown>>
 
-export type RouterUtilsScoped<T extends AnyNestedClient> =
+export type RouterUtilsScoped<T extends AnyNestedClient> = RouterUtilsScopedImpl<T>
+
+type RouterUtilsScopedImpl<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ProcedureUtilsOptions<UClientContext, UInput, UOutput, UError>
     : {
-        [K in keyof T]?:
-          | (T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never)
-          | undefined
+        [K in keyof T]?: RouterUtilsScopedImpl<T[K]> | undefined
       }
 
 export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyBaseOptions {

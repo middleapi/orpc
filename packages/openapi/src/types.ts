@@ -75,9 +75,11 @@ export type JsonifiedClientError<T> =
  *
  * @see {@link https://orpc.dev/docs/openapi/link | OpenAPI Link}
  */
-export type JsonifiedClient<T extends AnyNestedClient> =
+export type JsonifiedClient<T extends AnyNestedClient> = JsonifiedClientImpl<T>
+
+type JsonifiedClientImpl<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Client<UClientContext, UInput, JsonifiedValue<UOutput>, JsonifiedClientError<UError>>
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? JsonifiedClient<T[K]> : T[K]
+        [K in keyof T]: JsonifiedClientImpl<T[K]>
       }

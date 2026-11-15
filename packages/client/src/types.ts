@@ -50,11 +50,13 @@ export interface ClientLink<TClientContext extends ClientContext> {
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-inputs | Client-Side Clients - Infer Client Inputs}
  */
-export type InferClientInputs<T extends AnyNestedClient> =
+export type InferClientInputs<T extends AnyNestedClient> = InferClientInputsImpl<T>
+
+type InferClientInputsImpl<T> =
   T extends Client<any, infer U, any, any>
     ? U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientInputs<T[K]> : never
+        [K in keyof T]: InferClientInputsImpl<T[K]>
       }
 
 /**
@@ -65,13 +67,15 @@ export type InferClientInputs<T extends AnyNestedClient> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-inputs | Client-Side Clients - Infer Client Body Inputs}
  */
-export type InferClientBodyInputs<T extends AnyNestedClient> =
+export type InferClientBodyInputs<T extends AnyNestedClient> = InferClientBodyInputsImpl<T>
+
+type InferClientBodyInputsImpl<T> =
   T extends Client<any, infer U, any, any>
     ? U extends { body: infer UBody }
       ? UBody
       : U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientBodyInputs<T[K]> : never
+        [K in keyof T]: InferClientBodyInputsImpl<T[K]>
       }
 
 /**
@@ -81,11 +85,13 @@ export type InferClientBodyInputs<T extends AnyNestedClient> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-outputs | Client-Side Clients - Infer Client Outputs}
  */
-export type InferClientOutputs<T extends AnyNestedClient> =
+export type InferClientOutputs<T extends AnyNestedClient> = InferClientOutputsImpl<T>
+
+type InferClientOutputsImpl<T> =
   T extends Client<any, any, infer U, any>
     ? U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientOutputs<T[K]> : never
+        [K in keyof T]: InferClientOutputsImpl<T[K]>
       }
 
 /**
@@ -96,13 +102,15 @@ export type InferClientOutputs<T extends AnyNestedClient> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-outputs | Client-Side Clients - Infer Client Body Outputs}
  */
-export type InferClientBodyOutputs<T extends AnyNestedClient> =
+export type InferClientBodyOutputs<T extends AnyNestedClient> = InferClientBodyOutputsImpl<T>
+
+type InferClientBodyOutputsImpl<T> =
   T extends Client<any, any, infer U, any>
     ? U extends { body: infer UBody }
       ? UBody
       : U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientBodyOutputs<T[K]> : never
+        [K in keyof T]: InferClientBodyOutputsImpl<T[K]>
       }
 
 /**
@@ -112,11 +120,13 @@ export type InferClientBodyOutputs<T extends AnyNestedClient> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-errors | Client-Side Clients - Infer Client Errors}
  */
-export type InferClientErrors<T extends AnyNestedClient> =
+export type InferClientErrors<T extends AnyNestedClient> = InferClientErrorsImpl<T>
+
+type InferClientErrorsImpl<T> =
   T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientErrors<T[K]> : never
+        [K in keyof T]: InferClientErrorsImpl<T[K]>
       }
 
 /**
@@ -126,9 +136,11 @@ export type InferClientErrors<T extends AnyNestedClient> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-error | Client-Side Clients - Infer Client Error}
  */
-export type InferClientError<T extends AnyNestedClient> =
+export type InferClientError<T extends AnyNestedClient> = InferClientErrorImpl<T>
+
+type InferClientErrorImpl<T> =
   T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientError<T[K]> : never
+        [K in keyof T]-?: InferClientErrorImpl<T[K]>
       }[keyof T]

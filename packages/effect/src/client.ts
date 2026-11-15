@@ -19,11 +19,13 @@ function callAsEffect<TClientContext extends ClientContext, TInput, TOutput, TEr
   })
 }
 
-export type EffectClient<T extends AnyNestedClient> =
+export type EffectClient<T extends AnyNestedClient> = EffectClientImpl<T>
+
+type EffectClientImpl<T> =
   T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Effect.Effect<UOutput, UError>
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? EffectClient<T[K]> : never
+        [K in keyof T]: EffectClientImpl<T[K]>
       }
 
 /**
