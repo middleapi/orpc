@@ -187,6 +187,10 @@ export interface ImplementToolFactoryOptions {
 }
 
 export interface ToolImplementer {
+  /**
+   * The value returned from `execute` is not validated against the output schema,
+   * so the tool outputs the schema input, like a handler returns.
+   */
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
     contract: ProcedureContract<TInputSchema, TOutputSchema, any>,
     ...rest: MaybeOptionalOptions<
@@ -276,11 +280,11 @@ export interface ToolFactory<TInitialContext extends Context> {
     procedure: Procedure<TInitialContext, any, TInputSchema, TOutputSchema, any>,
     ...rest: MaybeOptionalOptions<
       Omit<
-        FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>,
+        FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaOutput<TOutputSchema>>>,
         'inputSchema' | 'outputSchema' | 'execute'
       >
     >
-  ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>
+  ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaOutput<TOutputSchema>>>
 }
 
 /**

@@ -60,6 +60,10 @@ describe('implementToolFactory', () => {
       },
     })
 
+    expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
+    // execute results are not validated, so the tool outputs what execute returns
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: number }>()
+
     const tool2 = implementToolFactory()(contract, {
       // @ts-expect-error invalid numberToBoolean
       execute: async ({ stringToNumber }) => {
@@ -124,7 +128,35 @@ describe('createToolFactory', () => {
     const tool = createToolFactory()(procedure)
 
     expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: number }>()
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: boolean }>()
+  })
+
+  it('infer output after output schema transforms, since output is validated', async () => {
+    const procedure = os.output(z.string().transform((s) => s.length)).handler(() => 'hello')
+
+    const tool = createToolFactory()(procedure, {
+      toModelOutput: ({ output }) => {
+        expectTypeOf(output).toEqualTypeOf<number>()
+        return { type: 'text', value: `${output}` }
+      },
+    })
+
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<number>()
+    expectTypeOf(await tool.execute!(undefined, {} as any)).toEqualTypeOf<
+      number | AsyncIterable<number>
+    >()
+  })
+
+  it('infer yield output after yield schema transforms', () => {
+    const procedure = os
+      .output(asyncIteratorObject(z.string().transform((s) => s.length)))
+      .handler(async function* () {
+        yield 'hello'
+      })
+
+    const tool = createToolFactory()(procedure)
+
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<number>()
   })
 
   it('execute is managed by the factory', () => {

@@ -31,6 +31,18 @@ describe('aiSdkTool meta', () => {
     )
   })
 
+  it('infer output as both schema input and output, since either factory may consume the meta', () => {
+    oc.output(z.string().transform((s) => s.length)).meta(
+      aiSdkTool({
+        toModelOutput: ({ output }) => {
+          expectTypeOf(output).toEqualTypeOf<string | number>()
+
+          return { type: 'text', value: `${output}` }
+        },
+      }),
+    )
+  })
+
   it('infer output as yield type for async iterator outputs', () => {
     os.input(z.object({ location: z.string() }))
       .output(asyncIteratorObject(z.object({ status: z.string() })))

@@ -552,6 +552,14 @@ describe('createToolFactory', () => {
     )
   })
 
+  it('outputs the value after output schema transforms', async () => {
+    const procedure = os.output(z.string().transform((s) => s.length)).handler(() => 'hello')
+
+    const tool = createToolFactory()(procedure)
+
+    await expect(tool.execute?.(undefined, { abortSignal } as any)).resolves.toBe(5)
+  })
+
   describe('async iterator output', () => {
     const yieldSchema = z.object({ message: z.string() })
     const returnSchema = z.object({ count: z.number() })
