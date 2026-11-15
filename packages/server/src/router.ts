@@ -20,10 +20,12 @@ export type Router<TInitialContext extends Context> =
 export type ContractedRouter<
   T extends RouterContract,
   TInitialContext extends Context,
-> = ContractedRouterImpl<T, TInitialContext>
+> = T extends unknown ? ContractedRouterImpl<T, TInitialContext> : never
 
 // Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type.
+// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
+// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
+// public type instead of inlining this one.
 type ContractedRouterImpl<T, TInitialContext extends Context> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
     ? Procedure<TInitialContext, any, $InputSchema, $OutputSchema, $ErrorMap>
@@ -43,7 +45,9 @@ export type InferRouterInitialContext<T extends AnyRouter> = T extends Router<in
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-initial-contexts | Router - Infer Router Initial Contexts}
  */
-export type InferRouterInitialContexts<T extends AnyRouter> = InferRouterInitialContextsImpl<T>
+export type InferRouterInitialContexts<T extends AnyRouter> = T extends unknown
+  ? InferRouterInitialContextsImpl<T>
+  : never
 
 type InferRouterInitialContextsImpl<T> = T extends {
   '~orpc': ProcedureDefinition<infer UInitialContext, any, any, any, any>
@@ -63,7 +67,9 @@ type InferRouterInitialContextsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-final-contexts | Router - Infer Router Final Contexts}
  */
-export type InferRouterFinalContexts<T extends AnyRouter> = InferRouterFinalContextsImpl<T>
+export type InferRouterFinalContexts<T extends AnyRouter> = T extends unknown
+  ? InferRouterFinalContextsImpl<T>
+  : never
 
 type InferRouterFinalContextsImpl<T> = T extends {
   '~orpc': ProcedureDefinition<infer UInitialContext, infer UInjectedContext, any, any, any>
@@ -83,7 +89,9 @@ type InferRouterFinalContextsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-inputs | Router - Infer Router Inputs}
  */
-export type InferRouterInputs<T extends AnyRouter> = InferRouterInputsImpl<T>
+export type InferRouterInputs<T extends AnyRouter> = T extends unknown
+  ? InferRouterInputsImpl<T>
+  : never
 
 type InferRouterInputsImpl<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, infer UInputSchema, any, any>
@@ -103,7 +111,9 @@ type InferRouterInputsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-outputs | Router - Infer Router Outputs}
  */
-export type InferRouterOutputs<T extends AnyRouter> = InferRouterOutputsImpl<T>
+export type InferRouterOutputs<T extends AnyRouter> = T extends unknown
+  ? InferRouterOutputsImpl<T>
+  : never
 
 type InferRouterOutputsImpl<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, infer UOutputSchema, any>
@@ -120,7 +130,9 @@ type InferRouterOutputsImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-error | Router - Infer Router Error}
  */
-export type InferRouterError<T extends AnyRouter> = InferRouterErrorImpl<T>
+export type InferRouterError<T extends AnyRouter> = T extends unknown
+  ? InferRouterErrorImpl<T>
+  : never
 
 type InferRouterErrorImpl<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, any, infer UErrorMap>
@@ -137,7 +149,9 @@ type InferRouterErrorImpl<T> = T extends {
  *
  * @see {@link https://orpc.dev/docs/router#infer-router-errors | Router - Infer Router Errors}
  */
-export type InferRouterErrors<T extends AnyRouter> = InferRouterErrorsImpl<T>
+export type InferRouterErrors<T extends AnyRouter> = T extends unknown
+  ? InferRouterErrorsImpl<T>
+  : never
 
 type InferRouterErrorsImpl<T> = T extends {
   '~orpc': ProcedureDefinition<any, any, any, any, infer UErrorMap>

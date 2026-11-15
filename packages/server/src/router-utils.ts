@@ -410,10 +410,12 @@ export async function walkProcedureContractsAsync(
   }
 }
 
-export type UnlaziedRouter<T extends AnyRouter> = UnlaziedRouterImpl<T>
+export type UnlaziedRouter<T extends AnyRouter> = T extends unknown ? UnlaziedRouterImpl<T> : never
 
 // Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type.
+// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
+// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
+// public type instead of inlining this one.
 type UnlaziedRouterImpl<T> = T extends AnyProcedure
   ? T
   : T extends Lazy<infer U>

@@ -12,10 +12,12 @@ import type { RouterContract } from './router'
 export type AugmentedContractRouter<
   T extends RouterContract,
   TErrorMap extends ErrorMap,
-> = AugmentedContractRouterImpl<T, TErrorMap>
+> = T extends unknown ? AugmentedContractRouterImpl<T, TErrorMap> : never
 
 // Recurses without re-checking each key against the constraint. `T[K] & {}` drops `undefined`
-// from optional keys and keeps TypeScript from inferring `T` back through this mapped type.
+// from optional keys and keeps TypeScript from inferring `T` back through this mapped type. The
+// public type wraps it in `T extends unknown ? ... : never` so emitted declarations name the
+// public type instead of inlining this one.
 type AugmentedContractRouterImpl<T, TErrorMap extends ErrorMap> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
     ? ProcedureContract<$InputSchema, $OutputSchema, MergedErrorMap<TErrorMap, $Errors>>
