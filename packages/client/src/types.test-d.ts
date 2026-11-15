@@ -194,6 +194,24 @@ describe('infer utilities with mixed client contexts', () => {
     expectTypeOf<InferClientContext<ORPC>>().toEqualTypeOf<{ x: string } | { y: number }>()
   })
 
+  it('InferClientContext includes optional procedures without `undefined`', () => {
+    expectTypeOf<
+      InferClientContext<{
+        a: Client<{ x: string }, string, number, Error>
+        b?: Client<{ y: number }, string, number, Error>
+      }>
+    >().toEqualTypeOf<{ x: string } | { y: number }>()
+  })
+
+  it('InferClientError includes optional procedures without `undefined`', () => {
+    expectTypeOf<
+      InferClientError<{
+        a: Client<{ x: string }, string, number, Error>
+        b?: Client<{ y: number }, string, number, TypeError>
+      }>
+    >().toEqualTypeOf<Error | TypeError>()
+  })
+
   it('InferClientContext keeps a shared context as is', () => {
     expectTypeOf<
       InferClientContext<{

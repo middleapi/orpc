@@ -61,7 +61,9 @@ type InferClientLeafContexts<T extends AnyNestedClient> =
   T extends Client<infer UContext, infer _UInput, infer _UOutput, infer _UError>
     ? UContext
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientLeafContexts<T[K]> : never
+        [K in keyof T]-?: NonNullable<T[K]> extends AnyNestedClient
+          ? InferClientLeafContexts<NonNullable<T[K]>>
+          : never
       }[keyof T]
 
 /**
@@ -165,5 +167,7 @@ export type InferClientError<T extends AnyNestedClient> =
   T extends Client<infer _UContext, infer _UInput, infer _UOutput, infer U>
     ? U
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientError<T[K]> : never
+        [K in keyof T]-?: NonNullable<T[K]> extends AnyNestedClient
+          ? InferClientError<NonNullable<T[K]>>
+          : never
       }[keyof T]
