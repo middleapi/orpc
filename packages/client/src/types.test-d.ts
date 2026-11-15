@@ -262,7 +262,15 @@ describe('infer utilities with `never` input', () => {
 })
 
 describe('InferClientBodyInputs & InferClientBodyOutputs edge cases', () => {
+  type Indexed = { [key: string]: number | undefined; body?: number }
+
   type ORPC = {
+    indexedUnion: Client<
+      ClientContext,
+      Indexed | { body: string },
+      Indexed | { body: string },
+      Error
+    >
     optional: Client<ClientContext, { body?: string }, { body?: number }, Error>
     undefinedable: Client<ClientContext, { body: string } | undefined, { body: number }, Error>
     withoutBody: Client<ClientContext, { query: string }, { headers: string }, Error>
@@ -272,6 +280,7 @@ describe('InferClientBodyInputs & InferClientBodyOutputs edge cases', () => {
 
   it('InferClientBodyInputs', () => {
     expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
+      indexedUnion: Indexed | string
       optional: string | undefined
       undefinedable: string | undefined
       withoutBody: { query: string }
@@ -282,6 +291,7 @@ describe('InferClientBodyInputs & InferClientBodyOutputs edge cases', () => {
 
   it('InferClientBodyOutputs', () => {
     expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
+      indexedUnion: Indexed | string
       optional: number | undefined
       undefinedable: number
       withoutBody: { headers: string }

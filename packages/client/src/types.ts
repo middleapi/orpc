@@ -68,17 +68,19 @@ type InferClientLeafContexts<T extends AnyNestedClient> =
 
 /**
  * Extracts `body` when `T` has a `body` key (`| undefined` when it is optional),
- * leaving other types, including index signatures, unchanged.
+ * leaving other types, including index signatures, unchanged. Applied per union member.
  */
-type InferBody<T> = string extends keyof T
-  ? T
-  : T extends { body: infer UBody }
-    ? UBody
-    : T extends { body?: infer UBody }
-      ? 'body' extends keyof T
-        ? UBody | undefined
+type InferBody<T> = T extends unknown
+  ? string extends keyof T
+    ? T
+    : T extends { body: infer UBody }
+      ? UBody
+      : T extends { body?: infer UBody }
+        ? 'body' extends keyof T
+          ? UBody | undefined
+          : T
         : T
-      : T
+  : never
 
 export interface ClientLink<TClientContext extends ClientContext> {
   call: (path: string[], input: unknown, options: ClientOptions<TClientContext>) => Promise<unknown>
