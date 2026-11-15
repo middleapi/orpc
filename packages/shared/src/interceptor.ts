@@ -20,16 +20,11 @@ export type Interceptor<TOptions extends InterceptableOptions, TResult> = (
 ) => TResult
 
 /**
- * Infers the error type of `next()`. Falls back to `ThrowableError` when `next()`
- * returns a promise without a typed error (`PromiseWithError`'s `__error` is optional,
- * so a plain promise would otherwise infer `unknown`).
+ * Infers the error type of `next()` from `PromiseWithError`, or `unknown` when
+ * `next()` doesn't carry a typed error (e.g. it returns a plain promise).
  */
 export type InferNextError<TOptions extends { next: () => any }> =
-  ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
-    ? unknown extends E
-      ? ThrowableError
-      : E
-    : ThrowableError
+  ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : unknown
 
 /**
  * Can used for interceptors or middlewares

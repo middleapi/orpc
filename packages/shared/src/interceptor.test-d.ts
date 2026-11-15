@@ -77,19 +77,19 @@ it('onStart, onSuccess, onError, onFinish, onAsyncIteratorObjectError, onReadabl
   )
 })
 
-it('falls back to ThrowableError when next returns a plain Promise', () => {
+it('infers unknown error when next returns a plain Promise', () => {
   const interceptors: Interceptor<{ foo: string }, Promise<'success'>>[] = []
 
   interceptors.push(
     onError((error) => {
-      expectTypeOf(error).toEqualTypeOf<Error>()
+      expectTypeOf(error).toEqualTypeOf<unknown>()
     }),
   )
 
   interceptors.push(
     onFinish(([error, data, isSuccess]) => {
-      if (error || !isSuccess) {
-        expectTypeOf(error).toEqualTypeOf<Error>()
+      if (!isSuccess) {
+        expectTypeOf(error).toEqualTypeOf<unknown>()
         expectTypeOf(data).toEqualTypeOf<undefined>()
       } else {
         expectTypeOf(error).toEqualTypeOf<null>()
@@ -100,13 +100,27 @@ it('falls back to ThrowableError when next returns a plain Promise', () => {
 
   interceptors.push(
     onAsyncIteratorObjectError((error) => {
-      expectTypeOf(error).toEqualTypeOf<Error>()
+      expectTypeOf(error).toEqualTypeOf<unknown>()
     }),
   )
 
   interceptors.push(
     onReadableStreamError((error) => {
-      expectTypeOf(error).toEqualTypeOf<Error>()
+      expectTypeOf(error).toEqualTypeOf<unknown>()
     }),
   )
+})
+
+it('infers unknown error when next does not return a promise', () => {
+  type Options = { next: () => 'success' }
+
+  onError<Options, []>((error) => {
+    expectTypeOf(error).toEqualTypeOf<unknown>()
+  })
+
+  onFinish<Options, []>(([error, , isSuccess]) => {
+    if (!isSuccess) {
+      expectTypeOf(error).toEqualTypeOf<unknown>()
+    }
+  })
 })
