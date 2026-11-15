@@ -1,6 +1,6 @@
 import { expectTypeOf, it } from 'vitest'
 
-import type { MergedContext, MergedInitialContext } from './context'
+import type { Context, MergedContext, MergedInitialContext } from './context'
 
 describe('MergedInitialContext', () => {
   it('no extra', () => {
@@ -44,6 +44,33 @@ describe('MergedInitialContext', () => {
       MergedInitialContext<object, object, { [k: string]: unknown; db: string }>
     >().toEqualTypeOf<object & { [k: string]: unknown; db: string }>()
   })
+
+  it('ignores in context that requires nothing', () => {
+    expectTypeOf<MergedInitialContext<{ db: string }, object, Context>>().toEqualTypeOf<{
+      db: string
+    }>()
+    expectTypeOf<MergedInitialContext<{ db: string }, object, any>>().toEqualTypeOf<{
+      db: string
+    }>()
+    expectTypeOf<
+      MergedInitialContext<{ db: string }, object, Record<string, unknown>>
+    >().toEqualTypeOf<{ db: string }>()
+    expectTypeOf<
+      MergedInitialContext<{ db: string }, object, { [k: string]: unknown; db: string }>
+    >().toEqualTypeOf<{ db: string }>()
+  })
+
+  it('keeps in context that requires something', () => {
+    expectTypeOf<MergedInitialContext<{ db: string }, object, { a?: string }>>().toEqualTypeOf<
+      { db: string } & { a?: string }
+    >()
+    expectTypeOf<
+      MergedInitialContext<{ db: string }, object, { [k: string]: unknown; a?: string }>
+    >().toEqualTypeOf<{ db: string } & { [k: string]: unknown; a?: string }>()
+    expectTypeOf<MergedInitialContext<object, object, Record<string, number>>>().toEqualTypeOf<
+      object & Record<string, number>
+    >()
+  })
 })
 
 describe('MergedContext', () => {
@@ -79,5 +106,22 @@ describe('MergedContext', () => {
     expectTypeOf<
       MergedContext<{ [k: string]: unknown; db: string }, { user: number }>
     >().toEqualTypeOf<{ [k: string]: unknown; db: string } & { user: number }>()
+  })
+
+  it('merges each member of a union new context', () => {
+    expectTypeOf<
+      MergedContext<{ db: string }, { user: { id: string } } | { anon: true }>
+    >().toEqualTypeOf<
+      ({ db: string } & { user: { id: string } }) | ({ db: string } & { anon: true })
+    >()
+    expectTypeOf<
+      MergedContext<{ db: string; anon: false }, { user: { id: string } } | { anon: true }>
+    >().toEqualTypeOf<
+      ({ db: string; anon: false } & { user: { id: string } }) | ({ db: string } & { anon: true })
+    >()
+  })
+
+  it('returns current if new context is any', () => {
+    expectTypeOf<MergedContext<{ db: string }, any>>().toEqualTypeOf<{ db: string }>()
   })
 })

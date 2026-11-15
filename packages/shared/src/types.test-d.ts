@@ -12,6 +12,15 @@ it('IntersectPick', () => {
   expectTypeOf<IntersectPick<{ a: number }, { b: number }>>().toEqualTypeOf<Empty>()
 })
 
+it('IntersectPick with union', () => {
+  type T = { kind: 'a'; user: { id: string } } | { kind: 'b' }
+
+  expectTypeOf<{ user: { id: string } }>().toExtend<IntersectPick<T, { user: unknown }>>()
+  expectTypeOf<{ user: number }>().not.toExtend<IntersectPick<T, { user: unknown }>>()
+  expectTypeOf<{ kind: 'a' }>().not.toExtend<IntersectPick<T, { kind: unknown }>>()
+  expectTypeOf<{ other: number }>().toExtend<IntersectPick<T, { other: unknown }>>()
+})
+
 it('DistributiveOmit', () => {
   expectTypeOf<DistributiveOmit<{ a: number; b: number }, 'b'>>().toEqualTypeOf<{ a: number }>()
   expectTypeOf<DistributiveOmit<{ readonly a?: number; b: number }, 'b'>>().toEqualTypeOf<{
