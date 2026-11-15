@@ -20,6 +20,13 @@ export type Interceptor<TOptions extends InterceptableOptions, TResult> = (
 ) => TResult
 
 /**
+ * Infers the error type of `next()` from `PromiseWithError`, or `unknown` when
+ * `next()` doesn't carry a typed error (e.g. it returns a plain promise).
+ */
+export type InferNextError<TOptions extends { next: () => any }> =
+  ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : unknown
+
+/**
  * Can used for interceptors or middlewares
  */
 export function onStart<TOptions extends { next: () => any }, TRest extends any[]>(
@@ -58,13 +65,7 @@ export function onSuccess<TOptions extends { next: () => any }, TRest extends an
  */
 export function onError<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
-    (
-      error: ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
-        ? E
-        : ThrowableError,
-      options: TOptions,
-      ...rest: TRest
-    ) => Promisable<void>
+    (error: InferNextError<TOptions>, options: TOptions, ...rest: TRest) => Promisable<void>
   >,
 ): (options: TOptions, ...rest: TRest) => Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
@@ -87,10 +88,7 @@ export type OnFinishState<TResult, TError> =
 export function onFinish<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
-      state: OnFinishState<
-        Awaited<ReturnType<TOptions['next']>>,
-        ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError
-      >,
+      state: OnFinishState<Awaited<ReturnType<TOptions['next']>>, InferNextError<TOptions>>,
       options: TOptions,
       ...rest: TRest
     ) => Promisable<void>
@@ -127,11 +125,7 @@ export function onAsyncIteratorObjectError<
 >(
   callback: NoInfer<
     (
-      error:
-        | ThrowableError
-        | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
-            ? E
-            : ThrowableError),
+      error: ThrowableError | InferNextError<TOptions>,
       options: TOptions,
       ...rest: TRest
     ) => Promisable<void>
@@ -175,11 +169,7 @@ export function onAsyncIteratorObjectError<
 export function onReadableStreamError<TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<
     (
-      error:
-        | ThrowableError
-        | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E>
-            ? E
-            : ThrowableError),
+      error: ThrowableError | InferNextError<TOptions>,
       options: TOptions,
       ...rest: TRest
     ) => Promisable<void>
