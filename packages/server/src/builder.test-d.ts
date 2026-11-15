@@ -161,6 +161,27 @@ describe('Builder', () => {
 
       // @ts-expect-error - conflict with `user` of a member
       void builder.use(({ next }) => next({ context: { user: 123 } }))
+
+      // @ts-expect-error - `kind: 'b'` member would be left with `kind: 'a'` and no `user`
+      void builder.use(({ next }) => next({ context: { kind: 'a' as const } }))
+    })
+
+    it('narrows a union context', () => {
+      type A = { kind: 'a'; user: { id: string } }
+
+      void os
+        .$context<A | { kind: 'b' }>()
+        .use(({ next }) => next({ context: {} as A }))
+        .handler(({ context }) => {
+          expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
+        })
+
+      void os
+        .$context<{ user: { id: string } } | { user: null }>()
+        .use(({ next }) => next({ context: { user: { id: '1' } } }))
+        .handler(({ context }) => {
+          expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
+        })
     })
 
     it('ignores in context that requires nothing', () => {

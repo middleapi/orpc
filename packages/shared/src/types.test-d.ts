@@ -21,6 +21,23 @@ it('IntersectPick with union', () => {
   expectTypeOf<{ other: number }>().toExtend<IntersectPick<T, { other: unknown }>>()
 })
 
+it('IntersectPick allows narrowing a union', () => {
+  type T = { kind: 'a'; user: { id: string } } | { kind: 'b' }
+  type U = { kind: 'a'; user: { id: string } }
+
+  expectTypeOf<U>().toExtend<IntersectPick<T, U>>()
+  expectTypeOf<{ kind: 'b'; user: number }>().toExtend<
+    IntersectPick<T, { kind: unknown; user: unknown }>
+  >()
+  expectTypeOf<{ kind: 'c'; user: { id: string } }>().not.toExtend<
+    IntersectPick<T, { kind: unknown; user: unknown }>
+  >()
+
+  type N = { user: { id: string } } | { user: null }
+  expectTypeOf<{ user: { id: string } }>().toExtend<IntersectPick<N, { user: unknown }>>()
+  expectTypeOf<{ user: number }>().not.toExtend<IntersectPick<N, { user: unknown }>>()
+})
+
 it('DistributiveOmit', () => {
   expectTypeOf<DistributiveOmit<{ a: number; b: number }, 'b'>>().toEqualTypeOf<{ a: number }>()
   expectTypeOf<DistributiveOmit<{ readonly a?: number; b: number }, 'b'>>().toEqualTypeOf<{
