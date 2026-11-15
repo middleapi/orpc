@@ -1,4 +1,13 @@
-import type { InferRouterInitialContext, Procedure, Router, Schema } from '@orpc/server'
+import type {
+  InferRouterInitialContext,
+  InferRouterInputs,
+  Lazyable,
+  Procedure,
+  Router,
+  RouterClient,
+  Schema,
+} from '@orpc/server'
+import { unlazy } from '@orpc/server'
 import type { AsyncIteratorClass } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import type { TrackedData } from '@trpc/server/unstable-core-do-not-import'
@@ -104,32 +113,66 @@ describe('toORPCRouter', () => {
     >
   >()
 
-  expectTypeOf(orpcRouter.nested).toEqualTypeOf<{
-    ping: Procedure<
-      TRPCContext,
-      object,
-      Schema<{ a: string }, unknown>,
-      Schema<unknown, number>,
-      object
-    >
-  }>()
-
-  expectTypeOf(orpcRouter.lazy).toEqualTypeOf<{
-    subscribe: Procedure<
-      TRPCContext,
-      object,
-      Schema<void, unknown>,
-      Schema<unknown, AsyncIteratorClass<string, void, any>>,
-      object
-    >
-    lazy: {
-      throw: Procedure<
+  // tRPC erases `lazy()` in router types, so every nested router is typed as `Lazyable`
+  expectTypeOf(orpcRouter.nested).toEqualTypeOf<
+    Lazyable<{
+      ping: Procedure<
         TRPCContext,
         object,
-        Schema<{ input: number }, unknown>,
-        Schema<unknown, { output: string }>,
+        Schema<{ a: string }, unknown>,
+        Schema<unknown, number>,
         object
       >
-    }
-  }>()
+    }>
+  >()
+
+  expectTypeOf(orpcRouter.lazy).toEqualTypeOf<
+    Lazyable<{
+      subscribe: Procedure<
+        TRPCContext,
+        object,
+        Schema<void, unknown>,
+        Schema<unknown, AsyncIteratorClass<string, void, any>>,
+        object
+      >
+      lazy: Lazyable<{
+        throw: Procedure<
+          TRPCContext,
+          object,
+          Schema<{ input: number }, unknown>,
+          Schema<unknown, { output: string }>,
+          object
+        >
+      }>
+    }>
+  >()
+
+  it('requires unlazy before accessing nested routers', async () => {
+    // @ts-expect-error may be a lazy router at runtime
+    void orpcRouter.lazy.subscribe
+
+    const { default: lazyRouter } = await unlazy(orpcRouter.lazy)
+    expectTypeOf(lazyRouter.subscribe).toEqualTypeOf<
+      Procedure<
+        TRPCContext,
+        object,
+        Schema<void, unknown>,
+        Schema<unknown, AsyncIteratorClass<string, void, any>>,
+        object
+      >
+    >()
+  })
+
+  it('works with router utilities', () => {
+    const client = {} as RouterClient<typeof orpcRouter>
+
+    expectTypeOf(client.nested.ping).parameter(0).toEqualTypeOf<{ a: string }>()
+    expectTypeOf(client.nested.ping).returns.resolves.toEqualTypeOf<number>()
+    expectTypeOf(client.lazy.lazy.throw).parameter(0).toEqualTypeOf<{ input: number }>()
+    expectTypeOf(client.lazy.lazy.throw).returns.resolves.toEqualTypeOf<{ output: string }>()
+
+    expectTypeOf<InferRouterInputs<typeof orpcRouter>['lazy']['lazy']['throw']>().toEqualTypeOf<{
+      input: number
+    }>()
+  })
 })

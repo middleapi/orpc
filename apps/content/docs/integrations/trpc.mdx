@@ -23,6 +23,8 @@ const orpcRouter = toORPCRouter(trpcRouter)
 
 The result is a regular oRPC router that works with any oRPC feature. For example, you can expose it through an [RPC Handler](/docs/rpc/handler) or [OpenAPI Handler](/docs/openapi/handler), or call it directly with [Server-Side Clients](/docs/client/server-side).
 
+tRPC router types don't tell [lazy routers](https://trpc.io/docs/server/merging-routers#lazy-load) apart from regular ones, so every nested router in the result is typed as a possibly [lazy router](/docs/router#lazy-router). Handlers and clients resolve them for you; to access a nested router directly, resolve it with `unlazy` from `@orpc/server` first.
+
 ### Error Formatting
 
 `toORPCRouter` does not support [tRPC Error Formatting](https://trpc.io/docs/server/error-formatting). Instead, errors thrown by tRPC are wrapped in `ORPCError`.

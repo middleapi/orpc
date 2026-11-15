@@ -11,6 +11,9 @@ export type ToORPCOutput<T> =
     ? AsyncIteratorClass<TData, TReturn, TNext>
     : T
 
+/**
+ * tRPC erases `lazy()` in router types, so any nested router may be an {@link ORPC.Lazy} at runtime.
+ */
 export type ToORPCRouterResult<
   TContext extends ORPC.Context,
   TRecord extends Record<string, any>,
@@ -24,7 +27,7 @@ export type ToORPCRouterResult<
         object
       >
     : TRecord[K] extends Record<string, any>
-      ? ToORPCRouterResult<TContext, TRecord[K]>
+      ? ORPC.Lazyable<ToORPCRouterResult<TContext, TRecord[K]>>
       : never
 }
 

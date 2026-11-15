@@ -76,7 +76,10 @@ describe('toORPCRouter', () => {
     )
 
     expect(orpcRouter.ping).toBeInstanceOf(Procedure)
-    expect(orpcRouter.nested.ping).toBeInstanceOf(Procedure)
+    // typed as `Lazyable` (tRPC erases `lazy()` in types), but a plain nested router at runtime
+    expect(orpcRouter.nested).not.toBeInstanceOf(Lazy)
+    const { default: nested } = await unlazy(orpcRouter.nested)
+    expect(nested.ping).toBeInstanceOf(Procedure)
 
     expect(orpcRouter.lazy).toBeInstanceOf(Lazy)
     const unlazyLazy = await unlazy(orpcRouter.lazy)
@@ -86,8 +89,8 @@ describe('toORPCRouter', () => {
     const unlazyLazyLazy = await unlazy(unlazyLazy.default.lazy)
     expect(unlazyLazyLazy.default.ping).toBeInstanceOf(Procedure)
 
-    expect(orpcRouter.nested.lazy).toBeInstanceOf(Lazy)
-    const unlazyNestedLazy = await unlazy(orpcRouter.nested.lazy)
+    expect(nested.lazy).toBeInstanceOf(Lazy)
+    const unlazyNestedLazy = await unlazy(nested.lazy)
     expect(unlazyNestedLazy.default.ping).toBeInstanceOf(Procedure)
 
     expect(unlazyNestedLazy.default.lazy).toBeInstanceOf(Lazy)
