@@ -50,7 +50,7 @@ export type InferClientContext<T extends AnyNestedClient> =
 export type InferClientContextInternal<T> =
   T extends Client<infer UContext, any, any, any>
     ? UContext
-    : { [K in keyof T]-?: InferClientContextInternal<T[K]> }[keyof T]
+    : { [K in keyof T]-?: InferClientContextInternal<T[K] & {}> }[keyof T]
 
 type InferBody<T> = T extends unknown
   ? string extends keyof T
