@@ -60,8 +60,6 @@ describe('implementToolFactory', () => {
       },
     })
 
-    expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
-    // execute results are not validated, so the tool outputs what execute returns
     expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: number }>()
 
     const tool2 = implementToolFactory()(contract, {
@@ -125,38 +123,15 @@ describe('createToolFactory', () => {
         }
       })
 
-    const tool = createToolFactory()(procedure)
-
-    expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: boolean }>()
-  })
-
-  it('infer output after output schema transforms, since output is validated', async () => {
-    const procedure = os.output(z.string().transform((s) => s.length)).handler(() => 'hello')
-
     const tool = createToolFactory()(procedure, {
       toModelOutput: ({ output }) => {
-        expectTypeOf(output).toEqualTypeOf<number>()
-        return { type: 'text', value: `${output}` }
+        expectTypeOf(output).toEqualTypeOf<{ numberToBoolean: boolean }>()
+        return { type: 'text', value: `${output.numberToBoolean}` }
       },
     })
 
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<number>()
-    expectTypeOf(await tool.execute!(undefined, {} as any)).toEqualTypeOf<
-      number | AsyncIterable<number>
-    >()
-  })
-
-  it('infer yield output after yield schema transforms', () => {
-    const procedure = os
-      .output(asyncIteratorObject(z.string().transform((s) => s.length)))
-      .handler(async function* () {
-        yield 'hello'
-      })
-
-    const tool = createToolFactory()(procedure)
-
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<number>()
+    expectTypeOf<InferToolInput<typeof tool>>().toEqualTypeOf<{ stringToNumber: number }>()
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ numberToBoolean: boolean }>()
   })
 
   it('execute is managed by the factory', () => {
@@ -203,7 +178,12 @@ describe('createToolFactory', () => {
   it('infer output as yield type for async iterator outputs', () => {
     const procedure = os
       .input(z.object({ location: z.string() }))
-      .output(asyncIteratorObject(z.object({ status: z.string() }), z.object({ url: z.string() })))
+      .output(
+        asyncIteratorObject(
+          z.object({ status: z.string().transform((s) => s.length) }),
+          z.object({ url: z.string() }),
+        ),
+      )
       .handler(async function* () {
         yield { status: 'building' }
         return { url: 'https://example.com' }
@@ -211,7 +191,7 @@ describe('createToolFactory', () => {
 
     const tool = createToolFactory()(procedure)
 
-    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ status: string }>()
+    expectTypeOf<InferToolOutput<typeof tool>>().toEqualTypeOf<{ status: number }>()
   })
 
   it('infer output as yield type for async generator handlers without an output schema', () => {

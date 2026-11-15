@@ -187,10 +187,6 @@ export interface ImplementToolFactoryOptions {
 }
 
 export interface ToolImplementer {
-  /**
-   * The value returned from `execute` is not validated against the output schema,
-   * so the tool outputs the schema input, like a handler returns.
-   */
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
     contract: ProcedureContract<TInputSchema, TOutputSchema, any>,
     ...rest: MaybeOptionalOptions<

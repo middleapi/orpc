@@ -38,12 +38,7 @@ export type AiSdkToolMeta<
   Omit<
     FunctionTool<
       InferSchemaOutput<TInputSchema>,
-      /**
-       * `createToolFactory` validates the output so its tools output the schema output, but
-       * `implementToolFactory` passes through what `execute` returns, which is the schema input.
-       * Meta does not know which one consumes it, so it accepts both.
-       */
-      ToolOutput<InferSchemaOutput<TOutputSchema>> | ToolOutput<InferSchemaInput<TOutputSchema>>
+      ToolOutput<InferSchemaOutput<TOutputSchema> | InferSchemaInput<TOutputSchema>>
     >,
     'inputSchema' | 'outputSchema' | 'execute'
   >
