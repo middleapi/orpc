@@ -20,9 +20,11 @@ type IsValidOverride<T, U, TAll = T> = [
 type StrictIntersectPick<T, U> = (
   U extends any
     ? (
-        x: (T extends any ? (x: Pick<T, keyof T & keyof U>) => void : never) extends (
-          x: infer I,
-        ) => void
+        x: (
+          T extends any
+            ? (x: { [K in keyof T as K extends keyof U ? K : never]: T[K] }) => void
+            : never
+        ) extends (x: infer I) => void
           ? I
           : never,
       ) => void

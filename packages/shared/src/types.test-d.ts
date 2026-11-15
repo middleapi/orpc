@@ -42,6 +42,16 @@ it('IntersectPick allows narrowing a union', () => {
   expectTypeOf<Accepts<N, { user: number }>>().toEqualTypeOf<false>()
 })
 
+it('IntersectPick with index signature', () => {
+  type T = { [k: string]: unknown; db: string }
+
+  expectTypeOf<Accepts<T, { [k: string]: unknown; db: string }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { user: number }>>().toEqualTypeOf<true>()
+  expectTypeOf<Accepts<T, { [k: string]: unknown; db: number }>>().toEqualTypeOf<false>()
+  expectTypeOf<Accepts<T, Record<string, unknown>>>().toEqualTypeOf<false>()
+  expectTypeOf<Accepts<T, { db: number }>>().toEqualTypeOf<false>()
+})
+
 it('IntersectPick with union override', () => {
   type T = { db: string; user: { id: string } }
 
