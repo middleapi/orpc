@@ -132,4 +132,33 @@ describe('ORPCErrorConstructorMap', () => {
       ORPCError<'FACTORY', { output: number }>
     >()
   })
+
+  it('constructors of optional error codes are not possibly undefined', () => {
+    const flag = true as boolean
+    const optionalErrorMap = {
+      NOT_FOUND: {},
+      ...(flag ? { RATE_LIMITED: { data: z.object({ retry: z.number() }) } } : {}),
+    } satisfies ErrorMap
+
+    const optionalConstructors = {} as ORPCErrorConstructorMap<typeof optionalErrorMap>
+
+    expectTypeOf(optionalConstructors.NOT_FOUND()).toEqualTypeOf<ORPCError<'NOT_FOUND', unknown>>()
+    expectTypeOf(optionalConstructors.RATE_LIMITED({ data: { retry: 1 } })).toEqualTypeOf<
+      ORPCError<'RATE_LIMITED', { retry: number }>
+    >()
+
+    // @ts-expect-error - invalid data
+    optionalConstructors.RATE_LIMITED({ data: { retry: '1' } })
+  })
+
+  it('constructors of the generic ErrorMap are not possibly undefined', () => {
+    const genericConstructors = {} as ORPCErrorConstructorMap<ErrorMap>
+
+    expectTypeOf(genericConstructors.NOT_FOUND()).toEqualTypeOf<ORPCError<'NOT_FOUND', unknown>>()
+  })
+
+  it('is assignable to ORPCErrorConstructorMap<any> and ORPCErrorConstructorMap<ErrorMap>', () => {
+    expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<any>>()
+    expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<ErrorMap>>()
+  })
 })

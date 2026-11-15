@@ -122,12 +122,18 @@ export interface ORPCErrorConstructorMapItem<TCode extends ORPCErrorCode, TInDat
   ): ORPCError<TCode, TInData>
 }
 
-export type ORPCErrorConstructorMap<T extends ErrorMap> = {
-  [K in keyof T]: T[K] extends ErrorMapItem
-    ? ORPCErrorConstructorMapItem<
-        K & ORPCErrorCode,
-        T[K]['data'] extends AnySchema ? InferSchemaInput<T[K]['data']> : unknown
-      >
+/**
+ * `out` keeps the covariance TypeScript measured before `-?` was added: `-?` makes
+ * the variance unmeasurable, which breaks assignability to `ORPCErrorConstructorMap<any>`.
+ */
+export type ORPCErrorConstructorMap<out T extends ErrorMap> = {
+  [K in keyof T]-?: T[K] extends infer I
+    ? I extends ErrorMapItem
+      ? ORPCErrorConstructorMapItem<
+          K & ORPCErrorCode,
+          I['data'] extends AnySchema ? InferSchemaInput<I['data']> : unknown
+        >
+      : never
     : never
 }
 
