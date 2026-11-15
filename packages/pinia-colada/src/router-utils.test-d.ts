@@ -42,133 +42,153 @@ const router = {
   }),
 }
 
-it('RouterUtils', () => {
-  const utils = {} as RouterUtils<RouterClient<typeof router, { batch?: boolean }>>
+type OptionalClient = {
+  ping?: Client<{ batch?: boolean }, string, number, Error>
+  nested?: {
+    pong?: Client<{ batch?: boolean }, string, number, Error>
+  }
+}
 
-  expectTypeOf(utils).toExtend<Public<SharedUtils<unknown>>>()
-  expectTypeOf(utils.nested).toExtend<Public<SharedUtils<unknown>>>()
+describe('RouterUtils', () => {
+  it('maps procedures', () => {
+    const utils = {} as RouterUtils<RouterClient<typeof router, { batch?: boolean }>>
 
-  expectTypeOf(utils.ping).toExtend<Public<SharedUtils<{ input: number }>>>()
-  expectTypeOf(utils.nested.ping).toExtend<Public<SharedUtils<{ input: number }>>>()
+    expectTypeOf(utils).toExtend<Public<SharedUtils<unknown>>>()
+    expectTypeOf(utils.nested).toExtend<Public<SharedUtils<unknown>>>()
 
-  expectTypeOf(utils.ping).toExtend<
-    Public<
-      ProcedureUtils<
-        { batch?: boolean },
-        { input: number },
-        { output: string },
-        ORPCErrorFromErrorMap<typeof baseErrorMap> | Error
+    expectTypeOf(utils.ping).toExtend<Public<SharedUtils<{ input: number }>>>()
+    expectTypeOf(utils.nested.ping).toExtend<Public<SharedUtils<{ input: number }>>>()
+
+    expectTypeOf(utils.ping).toExtend<
+      Public<
+        ProcedureUtils<
+          { batch?: boolean },
+          { input: number },
+          { output: string },
+          ORPCErrorFromErrorMap<typeof baseErrorMap> | Error
+        >
       >
-    >
-  >()
-  expectTypeOf(utils.nested.ping).toExtend<
-    Public<
-      ProcedureUtils<
-        { batch?: boolean },
-        { input: number },
-        { output: string },
-        ORPCErrorFromErrorMap<typeof baseErrorMap> | Error
+    >()
+    expectTypeOf(utils.nested.ping).toExtend<
+      Public<
+        ProcedureUtils<
+          { batch?: boolean },
+          { input: number },
+          { output: string },
+          ORPCErrorFromErrorMap<typeof baseErrorMap> | Error
+        >
       >
-    >
-  >()
+    >()
 
-  expectTypeOf(utils.pong).toExtend<
-    Public<ProcedureUtils<{ batch?: boolean }, unknown, unknown, Error>>
-  >()
-  expectTypeOf(utils.nested.pong).toExtend<
-    Public<ProcedureUtils<{ batch?: boolean }, unknown, unknown, Error>>
-  >()
+    expectTypeOf(utils.pong).toExtend<
+      Public<ProcedureUtils<{ batch?: boolean }, unknown, unknown, Error>>
+    >()
+    expectTypeOf(utils.nested.pong).toExtend<
+      Public<ProcedureUtils<{ batch?: boolean }, unknown, unknown, Error>>
+    >()
+  })
+
+  it('maps optional procedures', () => {
+    const utils = {} as RouterUtils<OptionalClient>
+
+    expectTypeOf(utils.ping).toEqualTypeOf<
+      Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+    >()
+    expectTypeOf(utils.nested?.pong).toEqualTypeOf<
+      Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
+    >()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as RouterClient<typeof router, { batch?: boolean }>
+
+    const utils = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => RouterUtils<T>
+    const _utils: Recursive = utils(client, { context: {} })
+  })
 })
 
-it('createRouterUtils accepts an OpenAPI serializer', () => {
-  createRouterUtils({} as RouterClient<typeof router>, { serializer: new OpenAPISerializer() })
+describe('RouterUtilsScoped', () => {
+  it('maps optional procedures', () => {
+    const scoped = {} as RouterUtilsScoped<OptionalClient>
+
+    expectTypeOf(scoped.ping).toEqualTypeOf<
+      ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
+    >()
+    expectTypeOf(scoped.nested?.pong).toEqualTypeOf<
+      ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
+    >()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as RouterClient<typeof router, { batch?: boolean }>
+
+    const scoped = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => RouterUtilsScoped<T>
+    const _scoped: Recursive = scoped(client, { context: {} })
+  })
 })
 
-it('createRouterUtils', () => {
-  const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
-    prefix: '__prefix__',
-    serializer: new RPCSerializer(),
-    queryInterceptors: [
-      ({ next, context, path }) => {
-        expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()
-        expectTypeOf(path).toEqualTypeOf<string[]>()
+describe('createRouterUtils', () => {
+  it('infers router utils', () => {
+    const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
+      prefix: '__prefix__',
+      serializer: new RPCSerializer(),
+      queryInterceptors: [
+        ({ next, context, path }) => {
+          expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()
+          expectTypeOf(path).toEqualTypeOf<string[]>()
 
-        return next()
-      },
-    ],
-    mutationInterceptors: [
-      ({ next, context }) => {
-        expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()
+          return next()
+        },
+      ],
+      mutationInterceptors: [
+        ({ next, context }) => {
+          expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()
 
-        return next()
-      },
-    ],
-    scoped: {
-      nested: {
-        ping: {
-          mutationOptions: {
-            onSuccess: (output) => {
-              expectTypeOf(output).toEqualTypeOf<{ output: string }>()
+          return next()
+        },
+      ],
+      scoped: {
+        nested: {
+          ping: {
+            mutationOptions: {
+              onSuccess: (output) => {
+                expectTypeOf(output).toEqualTypeOf<{ output: string }>()
+              },
             },
           },
         },
       },
-    },
-    plugins: [
-      {
-        name: 'test-plugin',
-        init: (options) => options,
-        initProcedureOptions: (path, options) => {
-          expectTypeOf(path).toEqualTypeOf<string[]>()
+      plugins: [
+        {
+          name: 'test-plugin',
+          init: (options) => options,
+          initProcedureOptions: (path, options) => {
+            expectTypeOf(path).toEqualTypeOf<string[]>()
 
-          return options
+            return options
+          },
         },
-      },
-    ],
+      ],
+    })
+
+    expectTypeOf(utils).toEqualTypeOf<
+      RouterUtils<RouterClient<typeof router, { batch?: boolean }>>
+    >()
   })
 
-  expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()
-})
-
-it('RouterUtils with optional procedures', () => {
-  type OptionalClient = {
-    ping?: Client<{ batch?: boolean }, string, number, Error>
-    nested?: {
-      pong?: Client<{ batch?: boolean }, string, number, Error>
-    }
-  }
-
-  const utils = {} as RouterUtils<OptionalClient>
-
-  expectTypeOf(utils.ping).toEqualTypeOf<
-    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
-  >()
-  expectTypeOf(utils.nested?.pong).toEqualTypeOf<
-    Public<ProcedureUtils<{ batch?: boolean }, string, number, Error>> | undefined
-  >()
-
-  const scoped = {} as RouterUtilsScoped<OptionalClient>
-
-  expectTypeOf(scoped.ping).toEqualTypeOf<
-    ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
-  >()
-  expectTypeOf(scoped.nested?.pong).toEqualTypeOf<
-    ProcedureUtilsOptions<{ batch?: boolean }, string, number, Error> | undefined
-  >()
-})
-
-it('RouterUtils with a recursive contextual type', () => {
-  // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
-  type Recursive = { [k: string]: Recursive } | object
-  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
-  const client = {} as RouterClient<typeof router, { batch?: boolean }>
-
-  const utils = {} as <T extends AnyNestedClient>(client: T, options: Options<T>) => RouterUtils<T>
-  const _utils: Recursive = utils(client, { context: {} })
-
-  const scoped = {} as <T extends AnyNestedClient>(
-    client: T,
-    options: Options<T>,
-  ) => RouterUtilsScoped<T>
-  const _scoped: Recursive = scoped(client, { context: {} })
+  it('accepts an OpenAPI serializer', () => {
+    createRouterUtils({} as RouterClient<typeof router>, { serializer: new OpenAPISerializer() })
+  })
 })

@@ -106,21 +106,34 @@ describe('client', () => {
   })
 })
 
-describe('infer utilities', () => {
-  type ORPC = {
-    ping: Client<{ cache?: boolean }, string, number, Error | ORPCError<'PING', unknown>>
+type ORPC = {
+  ping: Client<{ cache?: boolean }, string, number, Error | ORPCError<'PING', unknown>>
+  pong: Client<{ cache?: boolean }, { body: number }, { body: string }, Error>
+  nested: {
+    ping: Client<{ cache?: boolean }, string, number, Error | ORPCError<'NESTED_PING', unknown>>
     pong: Client<{ cache?: boolean }, { body: number }, { body: string }, Error>
-    nested: {
-      ping: Client<{ cache?: boolean }, string, number, Error | ORPCError<'NESTED_PING', unknown>>
-      pong: Client<{ cache?: boolean }, { body: number }, { body: string }, Error>
-    }
   }
+}
 
-  it('InferClientContext', () => {
+type OptionalORPC = {
+  ping?: Client<{ cache?: boolean }, string, number, Error>
+  nested?: {
+    pong?: Client<{ cache?: boolean }, { body: number }, { body: string }, TypeError>
+  }
+}
+
+// Inferring `T` must not flow back through the recursive mapped types, or TS fails with TS2321.
+type Recursive = { [k: string]: Recursive } | object
+type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+
+describe('InferClientContext', () => {
+  it('infers the context of procedures', () => {
     expectTypeOf<InferClientContext<ORPC>>().toEqualTypeOf<{ cache?: boolean }>()
   })
+})
 
-  it('InferClientInputs', () => {
+describe('InferClientInputs', () => {
+  it('maps procedures', () => {
     expectTypeOf<InferClientInputs<ORPC>>().toEqualTypeOf<{
       ping: string
       pong: { body: number }
@@ -131,7 +144,24 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientBodyInputs', () => {
+  it('maps optional procedures', () => {
+    expectTypeOf<InferClientInputs<OptionalORPC>>().toEqualTypeOf<{
+      ping?: string | undefined
+      nested?: { pong?: { body: number } | undefined } | undefined
+    }>()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    const infer = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientInputs<T>
+    const _: Recursive = infer({} as ORPC, { context: {} })
+  })
+})
+
+describe('InferClientBodyInputs', () => {
+  it('maps procedures', () => {
     expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
       ping: string
       pong: number
@@ -142,7 +172,24 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientOutputs', () => {
+  it('maps optional procedures', () => {
+    expectTypeOf<InferClientBodyInputs<OptionalORPC>>().toEqualTypeOf<{
+      ping?: string | undefined
+      nested?: { pong?: number | undefined } | undefined
+    }>()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    const infer = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientBodyInputs<T>
+    const _: Recursive = infer({} as ORPC, { context: {} })
+  })
+})
+
+describe('InferClientOutputs', () => {
+  it('maps procedures', () => {
     expectTypeOf<InferClientOutputs<ORPC>>().toEqualTypeOf<{
       ping: number
       pong: { body: string }
@@ -153,7 +200,24 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientBodyOutputs', () => {
+  it('maps optional procedures', () => {
+    expectTypeOf<InferClientOutputs<OptionalORPC>>().toEqualTypeOf<{
+      ping?: number | undefined
+      nested?: { pong?: { body: string } | undefined } | undefined
+    }>()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    const infer = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientOutputs<T>
+    const _: Recursive = infer({} as ORPC, { context: {} })
+  })
+})
+
+describe('InferClientBodyOutputs', () => {
+  it('maps procedures', () => {
     expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
       ping: number
       pong: string
@@ -164,7 +228,24 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientErrors', () => {
+  it('maps optional procedures', () => {
+    expectTypeOf<InferClientBodyOutputs<OptionalORPC>>().toEqualTypeOf<{
+      ping?: number | undefined
+      nested?: { pong?: string | undefined } | undefined
+    }>()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    const infer = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientBodyOutputs<T>
+    const _: Recursive = infer({} as ORPC, { context: {} })
+  })
+})
+
+describe('InferClientErrors', () => {
+  it('maps procedures', () => {
     expectTypeOf<InferClientErrors<ORPC>>().toEqualTypeOf<{
       ping: Error | ORPCError<'PING', unknown>
       pong: Error
@@ -175,100 +256,38 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientError', () => {
-    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<
-      Error | ORPCError<'PING', unknown> | ORPCError<'NESTED_PING', unknown>
-    >()
-  })
-
-  it('with a recursive contextual type', () => {
-    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
-    type Recursive = { [k: string]: Recursive } | object
-    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
-    const client = {} as ORPC
-
-    const inputs = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => InferClientInputs<T>
-    const _inputs: Recursive = inputs(client, { context: {} })
-
-    const bodyInputs = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => InferClientBodyInputs<T>
-    const _bodyInputs: Recursive = bodyInputs(client, { context: {} })
-
-    const outputs = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => InferClientOutputs<T>
-    const _outputs: Recursive = outputs(client, { context: {} })
-
-    const bodyOutputs = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => InferClientBodyOutputs<T>
-    const _bodyOutputs: Recursive = bodyOutputs(client, { context: {} })
-
-    const errors = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => InferClientErrors<T>
-    const _errors: Recursive = errors(client, { context: {} })
-
-    const error = {} as <T extends AnyNestedClient>(
-      client: T,
-      options: Options<T>,
-    ) => InferClientError<T>
-    const _error: Recursive = error(client, { context: {} })
-  })
-})
-
-describe('infer utilities with optional procedures', () => {
-  type ORPC = {
-    ping?: Client<{ cache?: boolean }, string, number, Error>
-    nested?: {
-      pong?: Client<{ cache?: boolean }, { body: number }, { body: string }, TypeError>
-    }
-  }
-
-  it('InferClientInputs', () => {
-    expectTypeOf<InferClientInputs<ORPC>>().toEqualTypeOf<{
-      ping?: string | undefined
-      nested?: { pong?: { body: number } | undefined } | undefined
-    }>()
-  })
-
-  it('InferClientBodyInputs', () => {
-    expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
-      ping?: string | undefined
-      nested?: { pong?: number | undefined } | undefined
-    }>()
-  })
-
-  it('InferClientOutputs', () => {
-    expectTypeOf<InferClientOutputs<ORPC>>().toEqualTypeOf<{
-      ping?: number | undefined
-      nested?: { pong?: { body: string } | undefined } | undefined
-    }>()
-  })
-
-  it('InferClientBodyOutputs', () => {
-    expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
-      ping?: number | undefined
-      nested?: { pong?: string | undefined } | undefined
-    }>()
-  })
-
-  it('InferClientErrors', () => {
-    expectTypeOf<InferClientErrors<ORPC>>().toEqualTypeOf<{
+  it('maps optional procedures', () => {
+    expectTypeOf<InferClientErrors<OptionalORPC>>().toEqualTypeOf<{
       ping?: Error | undefined
       nested?: { pong?: TypeError | undefined } | undefined
     }>()
   })
 
-  it('InferClientError', () => {
-    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<Error | TypeError>()
+  it('maps with a recursive contextual type', () => {
+    const infer = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientErrors<T>
+    const _: Recursive = infer({} as ORPC, { context: {} })
+  })
+})
+
+describe('InferClientError', () => {
+  it('unions errors of procedures', () => {
+    expectTypeOf<InferClientError<ORPC>>().toEqualTypeOf<
+      Error | ORPCError<'PING', unknown> | ORPCError<'NESTED_PING', unknown>
+    >()
+  })
+
+  it('unions errors of optional procedures', () => {
+    expectTypeOf<InferClientError<OptionalORPC>>().toEqualTypeOf<Error | TypeError>()
+  })
+
+  it('unions with a recursive contextual type', () => {
+    const infer = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => InferClientError<T>
+    const _: Recursive = infer({} as ORPC, { context: {} })
   })
 })

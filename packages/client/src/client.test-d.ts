@@ -132,31 +132,33 @@ describe('createORPCClient', () => {
   })
 })
 
-it('ORPCClientScoped maps optional procedures', () => {
-  type Scoped = ORPCClientScoped<{
-    ping?: Client<{ cache: string }, number, string, Error>
-    nested?: {
-      pong?: Client<{ cache: string }, string, number, TypeError>
-    }
-  }>
+describe('ORPCClientScoped', () => {
+  it('maps optional procedures', () => {
+    type Scoped = ORPCClientScoped<{
+      ping?: Client<{ cache: string }, number, string, Error>
+      nested?: {
+        pong?: Client<{ cache: string }, string, number, TypeError>
+      }
+    }>
 
-  expectTypeOf<Scoped['ping']>().toEqualTypeOf<
-    ORPCClientScopedOptions<{ cache: string }, number, string, Error> | undefined
-  >()
-  expectTypeOf<NonNullable<Scoped['nested']>['pong']>().toEqualTypeOf<
-    ORPCClientScopedOptions<{ cache: string }, string, number, TypeError> | undefined
-  >()
-})
+    expectTypeOf<Scoped['ping']>().toEqualTypeOf<
+      ORPCClientScopedOptions<{ cache: string }, number, string, Error> | undefined
+    >()
+    expectTypeOf<NonNullable<Scoped['nested']>['pong']>().toEqualTypeOf<
+      ORPCClientScopedOptions<{ cache: string }, string, number, TypeError> | undefined
+    >()
+  })
 
-it('ORPCClientScoped with a recursive contextual type', () => {
-  // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
-  type Recursive = { [k: string]: Recursive } | object
-  type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
-  const client = {} as RouterClient<typeof router>
+  it('maps with a recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as RouterClient<typeof router>
 
-  const scoped = {} as <T extends AnyNestedClient>(
-    client: T,
-    options: Options<T>,
-  ) => ORPCClientScoped<T>
-  const _scoped: Recursive = scoped(client, { context: {} })
+    const scoped = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => ORPCClientScoped<T>
+    const _scoped: Recursive = scoped(client, { context: {} })
+  })
 })
