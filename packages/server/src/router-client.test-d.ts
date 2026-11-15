@@ -112,4 +112,19 @@ describe('createRouterClient', () => {
   it('accepts an untyped router', () => {
     const _client: AnyNestedClient = createRouterClient({} as any, {})
   })
+
+  it('optional options if context is optional', () => {
+    const router = { ping: os.$context<Record<string, unknown>>().handler(() => 'output') }
+
+    void createRouterClient(router)
+    void createRouterClient(router, { context: { any: 1 } })
+  })
+
+  it('requires options if context is required', () => {
+    const router = { ping: os.$context<{ auth: boolean }>().handler(() => 'output') }
+
+    // @ts-expect-error - options is required
+    void createRouterClient(router)
+    void createRouterClient(router, { context: { auth: true } })
+  })
 })

@@ -33,6 +33,14 @@ describe('call', () => {
     expectTypeOf(output).toEqualTypeOf<string>()
   })
 
+  it('optional options if context is an index signature', async () => {
+    const procedure = os.$context<Record<string, unknown>>().handler(() => 'output')
+
+    expectTypeOf(await call(procedure)).toEqualTypeOf<string>()
+    expectTypeOf(await call(procedure, undefined)).toEqualTypeOf<string>()
+    void call(procedure, undefined, { context: { any: 1 } })
+  })
+
   it('infer correct input types', () => {
     const procedure = os.input(z.number()).handler(() => 'output')
 

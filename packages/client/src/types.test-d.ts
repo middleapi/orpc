@@ -74,6 +74,13 @@ describe('client', () => {
       void client({ val: '123' }, { context: { userId: '123' } })
     })
 
+    it('optional options when context is an index signature', () => {
+      const client = {} as Client<Record<string, unknown>, undefined, { val: number }, Error>
+
+      void client()
+      void client(undefined, { context: { any: 1 } })
+    })
+
     it('can call without args when both input and context are optional', () => {
       const client = {} as Client<
         { userId?: string },

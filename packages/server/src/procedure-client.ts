@@ -73,7 +73,7 @@ export type ProcedureClientOptions<
 > = {
   path?: string[] | undefined
   interceptors?: ProcedureClientInterceptor<TInitialContext, TOutputSchema, TErrorMap>[] | undefined
-} & (object extends TInitialContext
+} & ({} extends TInitialContext
   ? { context?: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> | undefined }
   : { context: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> })
 

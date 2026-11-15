@@ -52,7 +52,7 @@ export type QueryOptionsIn<
   TSelectData,
   TInitialData,
 > = (undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken }) &
-  (object extends TClientContext
+  ({} extends TClientContext
     ? { context?: TClientContext | undefined }
     : { context: TClientContext }) &
   Omit<
@@ -121,7 +121,7 @@ export type InfiniteOptionsIn<
   input: ((pageParam: TPageParam) => TInput) | SkipToken
   initialData?: TInitialData
   queryKey?: QueryKey | undefined
-} & (object extends TClientContext
+} & ({} extends TClientContext
   ? { context?: TClientContext | undefined }
   : { context: TClientContext }) &
   Omit<
@@ -161,7 +161,7 @@ export type MutationOptionsIn<
   TOutput,
   TError,
   TMutationContext,
-> = (object extends TClientContext
+> = ({} extends TClientContext
   ? { context?: TClientContext | undefined }
   : { context: TClientContext }) &
   MutationOptionsOut<TInput, TOutput, TError, TMutationContext>
