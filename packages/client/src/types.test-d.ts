@@ -313,6 +313,15 @@ describe('infer utilities with mixed client contexts', () => {
     >().toEqualTypeOf<{ x: string } | { y: number }>()
   })
 
+  it('InferClientContext includes a `never` input procedure', () => {
+    expectTypeOf<
+      InferClientContext<{
+        a: Client<{ x: string }, never, number, Error>
+        b: { c: Client<{ y: number }, string, number, Error> }
+      }>
+    >().toEqualTypeOf<{ x: string } | { y: number }>()
+  })
+
   it('InferClientContext keeps a shared context as is', () => {
     expectTypeOf<
       InferClientContext<{

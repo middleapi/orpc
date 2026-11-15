@@ -48,7 +48,7 @@ export type InferClientContext<T extends AnyNestedClient> =
   T extends NestedClient<infer U> ? U : 0 extends 1 & T ? never : InferClientContextInternal<T>
 
 export type InferClientContextInternal<T> =
-  T extends Client<infer UContext, any, any, any>
+  T extends Client<infer UContext, infer _UInput, any, any>
     ? UContext
     : { [K in keyof T]-?: InferClientContextInternal<T[K] & {}> }[keyof T]
 
