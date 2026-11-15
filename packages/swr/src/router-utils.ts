@@ -7,8 +7,11 @@ import type { OperationKeyPrefixOptions } from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { SharedUtils } from './shared-utils'
 
-export type RouterUtils<T extends AnyNestedClient> = RouterUtilsImpl<T>
+export type RouterUtils<T extends AnyNestedClient> = T extends unknown ? RouterUtilsImpl<T> : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type RouterUtilsImpl<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>

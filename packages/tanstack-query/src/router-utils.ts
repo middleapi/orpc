@@ -27,8 +27,11 @@ import { SharedUtils } from './shared-utils'
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query | TanStack Query Integration}
  */
-export type RouterUtils<T extends AnyNestedClient> = RouterUtilsImpl<T>
+export type RouterUtils<T extends AnyNestedClient> = T extends unknown ? RouterUtilsImpl<T> : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type RouterUtilsImpl<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>
@@ -36,8 +39,13 @@ type RouterUtilsImpl<T> =
         [K in keyof T]: RouterUtilsImpl<T[K]>
       } & Public<SharedUtils<unknown>>
 
-export type RouterUtilsScoped<T extends AnyNestedClient> = RouterUtilsScopedImpl<T>
+export type RouterUtilsScoped<T extends AnyNestedClient> = T extends unknown
+  ? RouterUtilsScopedImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type RouterUtilsScopedImpl<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ProcedureUtilsOptions<UClientContext, UInput, UOutput, UError>

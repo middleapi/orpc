@@ -50,8 +50,13 @@ export interface ClientLink<TClientContext extends ClientContext> {
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-inputs | Client-Side Clients - Infer Client Inputs}
  */
-export type InferClientInputs<T extends AnyNestedClient> = InferClientInputsImpl<T>
+export type InferClientInputs<T extends AnyNestedClient> = T extends unknown
+  ? InferClientInputsImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type InferClientInputsImpl<T> =
   T extends Client<any, infer U, any, any>
     ? U
@@ -67,8 +72,13 @@ type InferClientInputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-inputs | Client-Side Clients - Infer Client Body Inputs}
  */
-export type InferClientBodyInputs<T extends AnyNestedClient> = InferClientBodyInputsImpl<T>
+export type InferClientBodyInputs<T extends AnyNestedClient> = T extends unknown
+  ? InferClientBodyInputsImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type InferClientBodyInputsImpl<T> =
   T extends Client<any, infer U, any, any>
     ? U extends { body: infer UBody }
@@ -85,8 +95,13 @@ type InferClientBodyInputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-outputs | Client-Side Clients - Infer Client Outputs}
  */
-export type InferClientOutputs<T extends AnyNestedClient> = InferClientOutputsImpl<T>
+export type InferClientOutputs<T extends AnyNestedClient> = T extends unknown
+  ? InferClientOutputsImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type InferClientOutputsImpl<T> =
   T extends Client<any, any, infer U, any>
     ? U
@@ -102,8 +117,13 @@ type InferClientOutputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-body-outputs | Client-Side Clients - Infer Client Body Outputs}
  */
-export type InferClientBodyOutputs<T extends AnyNestedClient> = InferClientBodyOutputsImpl<T>
+export type InferClientBodyOutputs<T extends AnyNestedClient> = T extends unknown
+  ? InferClientBodyOutputsImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type InferClientBodyOutputsImpl<T> =
   T extends Client<any, any, infer U, any>
     ? U extends { body: infer UBody }
@@ -120,8 +140,13 @@ type InferClientBodyOutputsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-errors | Client-Side Clients - Infer Client Errors}
  */
-export type InferClientErrors<T extends AnyNestedClient> = InferClientErrorsImpl<T>
+export type InferClientErrors<T extends AnyNestedClient> = T extends unknown
+  ? InferClientErrorsImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type InferClientErrorsImpl<T> =
   T extends Client<any, any, any, infer U>
     ? U
@@ -136,8 +161,13 @@ type InferClientErrorsImpl<T> =
  *
  * @see {@link https://orpc.dev/docs/client/client-side#infer-client-error | Client-Side Clients - Infer Client Error}
  */
-export type InferClientError<T extends AnyNestedClient> = InferClientErrorImpl<T>
+export type InferClientError<T extends AnyNestedClient> = T extends unknown
+  ? InferClientErrorImpl<T>
+  : never
 
+// Recurses without re-checking `AnyNestedClient` per key (the public alias's constraint covers it).
+// The public alias wraps it in `T extends unknown` so generic declaration emit names the public alias
+// instead of inlining this unexported helper.
 type InferClientErrorImpl<T> =
   T extends Client<any, any, any, infer U>
     ? U
