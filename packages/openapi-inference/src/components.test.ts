@@ -409,6 +409,47 @@ describe('mergeEquivalentComponents', () => {
     })
   })
 
+  it('keeps the sibling of a def in a direction, whichever comes first, when one merged takes its name', () => {
+    const user = (self: string) => ({ type: 'object', properties: { next: { $ref: ref(self) } } })
+    const input1 = { type: 'object', properties: { a: { type: 'number' } } }
+    const input2 = { type: 'object', properties: { b: { type: 'string' } } }
+
+    for (const order of [
+      ['User2Input', 'UserInput'],
+      ['UserInput', 'User2Input'],
+    ]) {
+      const inputs: Record<string, unknown> = { UserInput: input1, User2Input: input2 }
+      const document = {
+        components: {
+          schemas: {
+            User: user('User'),
+            User2: user('User2'),
+            ...Object.fromEntries(order.map((name) => [name, inputs[name]])),
+          },
+        },
+        paths: {
+          '/a': { schema: { $ref: ref('UserInput') } },
+          '/b': { schema: { $ref: ref('User2Input') } },
+        },
+      }
+
+      mergeEquivalentComponents(document, {
+        used: new Set(['User', 'User2']),
+        numbered: new Map([['User2', 'User']]),
+      })
+
+      expect(document).toEqual({
+        components: {
+          schemas: { User: user('User'), UserInput: input1, User2Input: input2 },
+        },
+        paths: {
+          '/a': { schema: { $ref: ref('UserInput') } },
+          '/b': { schema: { $ref: ref('User2Input') } },
+        },
+      })
+    }
+  })
+
   it('neither moves nor merges a component of base named like a sibling of a def', () => {
     const point = { type: 'object', properties: { x: { type: 'number' } } }
     const pointInput = { type: 'object', properties: { x: { type: 'string' } } }

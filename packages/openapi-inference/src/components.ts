@@ -236,11 +236,18 @@ export function mergeEquivalentComponents(
     return renamed.get(kept) ?? kept
   }
 
+  // the ones keeping their name first, which the others then do not take (`UserInput` of `User`
+  // before `User2Input` of `User2` merged into `User`)
+  const keeps = ([name, { base, direction }]: [string, { base: string; direction: string }]) =>
+    `${resolve(base)}${direction}` === name
   const siblings = [...directed].filter(([name, { sibling }]) => sibling && !merged.has(name))
   for (const [name] of siblings) {
     holders.delete(name)
   }
-  for (const [name, { base, direction }] of siblings) {
+  for (const [name, { base, direction }] of [
+    ...siblings.filter(keeps),
+    ...siblings.filter((entry) => !keeps(entry)),
+  ]) {
     const to = `${resolve(base)}${direction}`
     if (to !== name && (!taken(to) || taken(name))) {
       move(name, getFreeName(to, taken))
