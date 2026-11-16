@@ -1,5 +1,8 @@
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 
+import type { JsonAmount } from '../tests/fixtures/convert-coverage/src/class-views'
+import { Amount } from '../tests/fixtures/convert-coverage/src/class-views'
 import type { TypeScriptProject } from './project'
 import { openTypeScriptProject } from './project'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter'
@@ -3751,14 +3754,30 @@ describe('typeToJsonSchemaConverter of rarer shapes', () => {
     })
 
     it('writes an instance of the classes behind an interface or intersection', () => {
-      // an interface over a built-in subclass, of which only instances are values
-      expect(convert('JsonAmount')).toEqual([
-        {
-          type: 'number',
-          description: 'An interface over it, adding a `toJSON` the class does not have',
-        },
-        false,
-      ])
+      // an interface over a built-in subclass, of which only instances are values, written by the
+      // `toJSON` it adds, which `JSON.stringify` calls of a boxed number the serializer leaves to it
+      const jsonAmount = {
+        type: 'string',
+        description: 'An interface over it, adding a `toJSON` the class does not have',
+      }
+      expect(convert('JsonAmount')).toEqual([jsonAmount, false])
+      expect(
+        new TypeToJsonSchemaConverter(project.checker, project.program, {
+          direction: 'input',
+        }).convert(project.getExportType('JsonAmount').type),
+      ).toEqual([jsonAmount, false])
+      class StrAmount extends Amount {
+        toJSON() {
+          return 'twelve'
+        }
+      }
+      const written: JsonAmount = new StrAmount(12)
+      expect(
+        validate(
+          jsonAmount,
+          JSON.parse(JSON.stringify(new OpenAPIJsonSerializer().serializeJson(written).json)),
+        ),
+      ).toBe(true)
 
       // a client sends an instance, written as the built-in, or as an instance of the other class
       const input = new TypeToJsonSchemaConverter(project.checker, project.program, {

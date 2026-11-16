@@ -1344,7 +1344,16 @@ export class TypeToJsonSchemaConverter {
         : fields
     }
 
-    if (instanceClass && !ownFields) {
+    if (
+      instanceClass &&
+      !ownFields &&
+      // but `JSON.stringify` calls a `toJSON` an interface adds to a class extending a built-in it
+      // is left to (`interface JsonAmount extends Amount { toJSON(): string }` of `class Amount
+      // extends Number`), which writes an instance, as for a class of its own (see `getBuiltin`)
+      (ignoreToJSON ||
+        getBuiltinBaseName(this.types, type) === undefined ||
+        getBuiltin(this.types, type, this.mode === 'stringify') !== undefined)
+    ) {
       // of each class behind it (`interface L extends Pick<A, 'id'>, Pick<class B extends Date, 'v'>`)
       const classes = getClassTypes(this.types, type).filter((c) => c.id !== type.id)
       const subclasses = classes
