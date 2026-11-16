@@ -94,8 +94,7 @@ function printWritten(
     return printed
   }
 
-  const index = printed.indexOf('<')
-  const head = index < 0 ? printed : printed.slice(0, index)
+  const head = printed.split('<', 1)[0]!
   return args.length ? `${head}<${args.join(', ')}>` : head
 }
 
@@ -251,8 +250,9 @@ function getSymbolName(symbol: TSSymbol): string {
   }
 
   // `index.ts` by its directory
-  const parts = String(declaration?.path ?? '')
-    .split(/[\\/]/u)
+  const parts = symbol.declarations
+    .slice(0, 1)
+    .flatMap((d) => d.path.split(/[\\/]/u))
     .map((part) => part.replace(/\..*$/u, ''))
   const file = parts[parts.length - 1]
   const directory = parts[parts.length - 2]

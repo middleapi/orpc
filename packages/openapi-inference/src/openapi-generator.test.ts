@@ -108,6 +108,14 @@ import {
   viewedFunctionsInputs,
   viewedFnHolder,
 } from '../tests/fixtures/app/src/function-views'
+import { eitherLazy, handIterables } from '../tests/fixtures/app/src/generator-routers'
+import {
+  describedYields,
+  partlyInstalled,
+  schemaless,
+  taggedJSDoc,
+  unreadableCustomTypes,
+} from '../tests/fixtures/app/src/generator-slots'
 import {
   brandedLedger,
   genericBrands,
@@ -5911,5 +5919,230 @@ describe('openAPIGenerator', () => {
         })
       },
     )
+  })
+
+  describe('converters, slots and router shapes', () => {
+    const throwingZodConverter = () => ({
+      condition: (schema: any) => schema?.['~standard'].vendor === 'zod',
+      convert: (): never => {
+        throw new Error('Zod schemas are not supported here')
+      },
+    })
+
+    it('keeps the stock documentation of inputs Zod documents as any value, when the compiler can not resolve or send their types', async () => {
+      const spec = await generator.generate(unreadableCustomTypes, {
+        source: { file: fixture('generator-slots.ts'), export: 'unreadableCustomTypes' },
+      })
+      const stock = await new BaseOpenAPIGenerator({
+        converters: [new ZodToJsonSchemaConverter()],
+      }).generate(unreadableCustomTypes)
+
+      expect((spec.paths as any)['/readable'].post.requestBody).toEqual({
+        required: true,
+        content: {
+          'application/json': {
+            schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+          },
+        },
+      })
+      for (const path of ['/unresolved', '/infinite']) {
+        expect((stock.paths as any)[path].post.requestBody).toBeUndefined()
+        expect((spec.paths as any)[path].post.requestBody).toBeUndefined()
+      }
+    })
+
+    it('closes event iterators whose yields one schema describes with each of their return types', async () => {
+      const spec = await generator.generate(describedYields, {
+        source: { file: fixture('generator-slots.ts'), export: 'describedYields' },
+      })
+      const yielded = {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+        additionalProperties: false,
+      }
+      const [message, close] = (spec.paths as any)['/events'].post.responses['200'].content[
+        'text/event-stream'
+      ].schema.oneOf
+
+      // the schema describing the yields of both is kept for each of them
+      expect(message.properties.data).toEqual({ allOf: [yielded, yielded] })
+      expect(close.properties.data).toEqual({
+        allOf: [
+          { type: 'object', properties: { done: { type: 'boolean' } }, required: ['done'] },
+          { type: 'object', properties: { total: { type: 'number' } }, required: ['total'] },
+        ],
+      })
+    })
+
+    it('documents a missing schema as a converter taking it does', async () => {
+      const spec = await new OpenAPIGenerator({
+        converters: [
+          {
+            condition: (schema) => schema === undefined,
+            convert: () => [{ type: 'null' }, true],
+          },
+        ],
+      }).generate(schemaless, {
+        source: { file: fixture('generator-slots.ts'), export: 'schemaless' },
+      })
+
+      expect((spec.components?.schemas?.Gone as any).properties.data).toEqual({ type: 'null' })
+      // the output is inferred from the type
+      expect(
+        (spec.paths as any)['/ping'].post.responses['200'].content['application/json'].schema,
+      ).toEqual({ type: 'string' })
+    })
+
+    it('fails like the stock generator with the error of a converter, when no type can stand in for the schema', async () => {
+      const source = { file: fixture('stock-schemas.ts'), export: 'anyTypedProcedures' }
+
+      await expect(
+        new BaseOpenAPIGenerator({ converters: [throwingZodConverter()] }).generate(
+          anyTypedProcedures,
+        ),
+      ).rejects.toThrow('Zod schemas are not supported here')
+      await expect(
+        new OpenAPIGenerator({ converters: [throwingZodConverter()] }).generate(
+          anyTypedProcedures,
+          { source },
+        ),
+      ).rejects.toThrow('Zod schemas are not supported here')
+    })
+
+    it('fails with the error a converter condition throws, not as an inference failure', async () => {
+      const error = await new OpenAPIGenerator({
+        converters: [
+          {
+            condition: () => {
+              throw new TypeError('The condition failed')
+            },
+            convert: () => [{}, true],
+          },
+        ],
+      })
+        .generate(unreadableCustomTypes, {
+          source: { file: fixture('generator-slots.ts'), export: 'unreadableCustomTypes' },
+        })
+        .catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(TypeError)
+      expect((error as Error).message).toBe('The condition failed')
+    })
+
+    it('stands in for the inferred schemas with schemas taking any value as it is', async () => {
+      const generate = vi.spyOn(BaseOpenAPIGenerator.prototype, 'generate')
+
+      try {
+        await generator.generate(schemaless, {
+          source: { file: fixture('generator-slots.ts'), export: 'schemaless' },
+        })
+
+        const inferred = generate.mock.calls[0]![0] as any
+        const [output] = inferred.ping['~orpc'].outputSchemas
+        expect(output['~standard'].vendor).toBe('orpc-typescript')
+        expect(output['~standard'].validate('pong')).toEqual({ value: 'pong' })
+        expect(output['~standard'].validate(1)).toEqual({ value: 1 })
+      } finally {
+        generate.mockRestore()
+      }
+    })
+
+    it('names only the modules a declaration file imports that the compiler does not find', async () => {
+      const error = await generator
+        .generate(partlyInstalled, {
+          source: { file: fixture('generator-slots.ts'), export: 'partlyInstalled' },
+        })
+        .catch((e: unknown) => e as Error)
+
+      const file = fileURLToPath(fixture('generator-partly-installed.d.ts'))
+      expect(error).toBeInstanceOf(OpenAPIGeneratorError)
+      expect((error as Error).message).toContain(
+        `\n  ${file}:6:17 - Cannot find module "@acme/not-installed", which this declaration file imports.`,
+      )
+      expect((error as Error).message).not.toContain('infinity-limits')
+    })
+
+    it('adds the tags of @tag, without reading an empty @returns or tags it does not know', async () => {
+      const spec = await generator.generate(taggedJSDoc, {
+        source: { file: fixture('generator-slots.ts'), export: 'taggedJSDoc' },
+      })
+      const operation = (spec.paths as any)['/ping'].post
+
+      expect(operation.summary).toBe('Pings it')
+      expect(operation.description).toBeUndefined()
+      expect(operation.tags).toEqual(['health', 'ping'])
+      expect(operation.responses['200'].description).toBe('OK')
+    })
+
+    it('documents the procedures of lazy routers whose types do not show the router they load as the stock generator does', async () => {
+      const procedure = os.handler(() => [1])
+      const router = { factory: { list: procedure }, anyRouter: { list: procedure } }
+      const spec = await generator.generate(router, {
+        source: { file: fixture('generator-routers.ts'), export: 'unshownLazy' },
+      })
+
+      expect(Object.keys(spec.paths ?? {})).toEqual(['/factory/list', '/anyRouter/list'])
+      for (const path of ['/factory/list', '/anyRouter/list']) {
+        expect((spec.paths as any)[path].post.responses['200']).toEqual({
+          description: 'OK',
+          content: {},
+        })
+      }
+    })
+
+    it('resolves a lazy router of one of two loaders of the same router, but not of different routers', async () => {
+      const procedure = os.handler(() => [1])
+      const source = { file: fixture('generator-routers.ts'), export: 'eitherLazy' }
+
+      const spec = await generator.generate({ same: eitherLazy.same }, { source })
+      expect(
+        (spec.paths as any)['/same/list'].post.responses['200'].content['application/json'],
+      ).toEqual({ schema: { type: 'array', items: { type: 'number' } } })
+
+      await expect(
+        generator.generate(
+          { same: { list: procedure }, differing: { list: procedure } },
+          { source },
+        ),
+      ).rejects.toThrow(
+        'Procedure at differing.list: its type was not found in the router type, make sure "source" points to the type of this router.',
+      )
+    })
+
+    it('documents async iterables written by hand by the results of their iterators', async () => {
+      const spec = await generator.generate(handIterables, {
+        source: { file: fixture('generator-routers.ts'), export: 'handIterables' },
+      })
+      const content = (path: string) => (spec.paths as any)[path].post.responses['200'].content
+
+      // a result without a value is no yield
+      const [message, close] = content('/ticks')['text/event-stream'].schema.oneOf
+      expect(message.properties.data).toEqual({ type: 'number' })
+      expect(close.properties.data).toEqual({ not: {} })
+      // iterators yielding nothing, or of untyped results, are no event streams
+      expect(content('/finished')).toEqual({
+        'application/json': { schema: { $ref: '#/components/schemas/Finished' } },
+      })
+      expect(content('/untyped')).toEqual({
+        'application/json': { schema: { $ref: '#/components/schemas/Untyped' } },
+      })
+      expect(content('/set')['application/json'].schema).toEqual({
+        'type': 'array',
+        'uniqueItems': true,
+        'items': { type: 'number' },
+        'x-native-type': 'set',
+      })
+      expect(content('/map')['application/json'].schema).toEqual({
+        'type': 'array',
+        'items': {
+          type: 'array',
+          prefixItems: [{ type: 'string' }, { type: 'number' }],
+          maxItems: 2,
+          minItems: 2,
+        },
+        'x-native-type': 'map',
+      })
+    })
   })
 })

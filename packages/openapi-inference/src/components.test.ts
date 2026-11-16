@@ -338,6 +338,98 @@ describe('mergeEquivalentComponents', () => {
 
     expect(document.components.schemas).toEqual({ User: user, User2: row })
   })
+
+  it('tells components apart by the components not of the conversion they refer to', () => {
+    const item = (target: string) => ({
+      type: 'object',
+      properties: { a: { $ref: ref(target) }, b: { $ref: 'shared.json#/Item' } },
+    })
+    const document = {
+      components: {
+        schemas: {
+          Base: { type: 'string' },
+          Other: { type: 'number' },
+          Item: item('Base'),
+          Item2: item('Base'),
+          Item3: item('Other'),
+        },
+      },
+      paths: {
+        '/a': { schema: { $ref: ref('Item2') } },
+        '/b': { schema: { $ref: ref('Item3') } },
+      },
+    }
+
+    mergeEquivalentComponents(
+      document,
+      {
+        used: new Set(['Item', 'Item2', 'Item3']),
+        numbered: new Map([
+          ['Item2', 'Item'],
+          ['Item3', 'Item'],
+        ]),
+      },
+      { reserved: new Set(['Base', 'Other']) },
+    )
+
+    // refs that are not to components are left as they are
+    expect(document).toEqual({
+      components: {
+        schemas: {
+          Base: { type: 'string' },
+          Other: { type: 'number' },
+          Item: item('Base'),
+          Item3: item('Other'),
+        },
+      },
+      paths: {
+        '/a': { schema: { $ref: ref('Item') } },
+        '/b': { schema: { $ref: ref('Item3') } },
+      },
+    })
+  })
+
+  it('keeps the name of a component the stock generator gave a def in a direction, when the one of its def renamed is taken', () => {
+    const node = { type: 'object', properties: { s: { type: 'string' } } }
+    const nodeInput = { type: 'object', properties: { s: { type: 'object' } } }
+    const declared = { type: 'object', properties: { id: { type: 'number' } } }
+    const document = {
+      components: { schemas: { Node2: node, Node2Input: nodeInput, NodeInput: declared } },
+      paths: { '/in': { schema: { $ref: ref('Node2Input') } } },
+    }
+
+    mergeEquivalentComponents(document, {
+      used: new Set(['Node2', 'NodeInput']),
+      numbered: new Map([['Node2', 'Node']]),
+    })
+
+    expect(document).toEqual({
+      components: { schemas: { Node: node, Node2Input: nodeInput, NodeInput: declared } },
+      paths: { '/in': { schema: { $ref: ref('Node2Input') } } },
+    })
+  })
+
+  it('names a numbered component after the name the stock generator makes valid, also an empty one', () => {
+    const item = { type: 'object', properties: { id: { type: 'number' } } }
+    const document = {
+      components: { schemas: { Item2: item } },
+      paths: { '/item': { schema: { $ref: ref('Item2') } } },
+    }
+
+    mergeEquivalentComponents(
+      document,
+      { used: new Set(['Item2']), numbered: new Map([['Item2', 'Item']]) },
+      {
+        defNames: new Map([['Item2', 'Item2']]),
+        componentName: (name) => (name === 'Item' ? '' : name),
+      },
+    )
+
+    expect(document).toEqual({
+      components: { schemas: { _: item } },
+      paths: { '/item': { schema: { $ref: ref('_') } } },
+    })
+  })
 })
 
 describe('getFreeName', () => {

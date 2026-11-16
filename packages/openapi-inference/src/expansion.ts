@@ -448,8 +448,9 @@ export class ExpansionGuard {
     const innerValues = this.getValues(inner)
     return holdEach(innerValues, (value, index) => {
       const outerValue = outerValues[index]
+      // the compiler API types the type of a symbol as possibly undefined, a property always has one
       return value === undefined
-        ? HELD
+        ? /* v8 ignore next - defensive */ HELD
         : outerValue && this.holdsAgain(outerValue, value, depth - 1)
     })
   }

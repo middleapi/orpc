@@ -50,9 +50,10 @@ export function toPattern(types: TypeQueries, type: Type): string {
   if (flags & TypeFlags.TemplateLiteral) {
     const template = type as TemplateLiteralType
     const parts = types.getMembers(template)
-    let pattern = escapeRegExp(template.texts[0] ?? '')
+    // a text before each part, and one after the last
+    let pattern = escapeRegExp(template.texts[0]!)
     for (let i = 0; i < parts.length; i++) {
-      pattern += toPattern(types, parts[i]!) + escapeRegExp(template.texts[i + 1] ?? '')
+      pattern += toPattern(types, parts[i]!) + escapeRegExp(template.texts[i + 1]!)
     }
     return pattern
   }

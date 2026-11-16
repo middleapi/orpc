@@ -68,17 +68,10 @@ export function getJSDoc(
   getSourceKind: (path: string) => SourceKind,
 ): JSDoc | undefined {
   const mayHaveJSDoc = symbol.declarations.some((declaration) => {
-    if (getSourceKind(declaration.path) !== 'project') {
-      return true
-    }
+    // library files are not loaded, the compiler is asked about their declarations
+    const node = getSourceKind(declaration.path) === 'project' ? declaration.resolve() : undefined
 
-    const node = declaration.resolve()
-
-    if (!node) {
-      return true
-    }
-
-    return [node, node.parent, node.parent?.parent].some((n) => Boolean(n?.jsDoc?.length))
+    return !node || [node, node.parent, node.parent?.parent].some((n) => Boolean(n?.jsDoc?.length))
   })
 
   if (!mayHaveJSDoc) {

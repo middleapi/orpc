@@ -202,7 +202,7 @@ function sortedUnique(values: readonly unknown[]): unknown[] {
   return (
     [...byKey.keys()]
       // oxlint-disable-next-line unicorn/no-array-sort -- sorts a copy
-      .sort((a, b) => (a! < b! ? -1 : a! > b! ? 1 : 0))
+      .sort((a, b) => Number(a! > b!) - Number(a! < b!))
       .map((key) => byKey.get(key))
   )
 }

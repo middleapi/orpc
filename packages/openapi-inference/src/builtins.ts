@@ -99,12 +99,13 @@ export function getBuiltin(
     return { kind: 'typed-array', items: getNumberIndexType(types, type) }
   }
 
-  const [first, second] = types.getReferenceArguments(type)
+  const typeArguments = types.getReferenceArguments(type)
+  const [first, second] = typeArguments
 
   switch (symbol.name) {
     case 'Set':
     case 'ReadonlySet':
-      return stringify ? emptyObject() : { kind: 'set', items: first ? [first] : [] }
+      return stringify ? emptyObject() : { kind: 'set', items: typeArguments.slice(0, 1) }
     case 'Map':
     case 'ReadonlyMap':
       return stringify ? emptyObject() : { kind: 'map', key: first, value: second }
@@ -360,7 +361,8 @@ export function getBuiltinFields(
 ): JsonSchema | 'members' | undefined {
   const declared = getDeclaredBuiltinName(types, type)
 
-  if (declared !== undefined && !((type.getSymbol()?.flags ?? 0) & SymbolFlags.Value)) {
+  // a declared built-in has a symbol, of its name
+  if (declared !== undefined && !(type.getSymbol()!.flags & SymbolFlags.Value)) {
     return PLAIN_DATA_INTERFACES.has(declared) ? undefined : 'members'
   }
 

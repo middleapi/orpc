@@ -1161,6 +1161,52 @@ describe('openAPIGenerator operation builders', () => {
       ).toEqual(['multipart/form-data', 'application/json'])
     })
 
+    it('reads whether a body may hold no file through oneOf, boolean schemas and recursive refs', () => {
+      const file = { type: 'string', contentEncoding: 'binary' } as const
+      const contentTypes = (schema: JsonSchema) => {
+        const { ctx, operation } = createContext()
+        buildSuccessResponse(ctx, operation, testDef({ outputs: [testSchema(schema)] }), undefined)
+        return Object.keys((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content!)
+      }
+
+      // a member of a oneOf holding no file is sent as JSON
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { file: { oneOf: [file, { type: 'null' }] } },
+          required: ['file'],
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { file: { oneOf: [file, { ...file, contentMediaType: 'image/png' }] } },
+          required: ['file'],
+        }),
+      ).toEqual(['multipart/form-data'])
+      // a required key of any value may hold no file
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { file, meta: true },
+          required: ['meta'],
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+      // a ref already being read is not read again, and counts as one that may hold no file
+      expect(
+        contentTypes({
+          $ref: '#/$defs/Folder',
+          $defs: {
+            Folder: {
+              type: 'object',
+              properties: { file, parent: { $ref: '#/$defs/Folder' } },
+              required: ['parent'],
+            },
+          },
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+    })
+
     it('reads the content media type of a file body from its $ref target', () => {
       const { ctx, operation } = createContext()
 

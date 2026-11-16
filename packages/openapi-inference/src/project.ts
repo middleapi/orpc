@@ -104,7 +104,9 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     }
   }
 
-  const api = new API({ cwd: path.dirname(tsconfig ?? file) })
+  // what the project is loaded for, the tsconfig passed or the file
+  const target = tsconfig ?? file
+  const api = new API({ cwd: path.dirname(target) })
 
   try {
     /** The project of the first tsconfig that includes the file */
@@ -167,7 +169,7 @@ export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeSc
     }
 
     if (!project) {
-      throw new Error(`[TypeScript] Could not load the project for "${tsconfig ?? file}".`)
+      throw new Error(`[TypeScript] Could not load the project for "${target}".`)
     }
 
     const sourceFile = project.program.getSourceFile(file)

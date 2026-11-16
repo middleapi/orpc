@@ -686,11 +686,15 @@ function withNullBody(
   schema: JsonSchema,
   optional: boolean,
   detailed: boolean,
-  $defs = typeof schema === 'object' ? schema.$defs : undefined,
+  $defs?: Exclude<JsonSchema, boolean>['$defs'],
 ): JsonSchema {
+  /* v8 ignore next 3 - the type converter writes no boolean schema, this only narrows the type */
   if (typeof schema !== 'object') {
     return schema
   }
+
+  // the defs of the root, which its members and body refer to
+  $defs ??= schema.$defs
 
   if (detailed) {
     if (schema.anyOf) {

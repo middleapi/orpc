@@ -436,10 +436,7 @@ export class TypeQueries {
             !this.isPrimitiveInterface(other) &&
             [...names].every((name) => otherNames.has(name)) &&
             (otherNames.size > names.size || j < i) &&
-            !(
-              (owner.getSymbol()?.flags ?? 0) & SymbolFlags.TypeLiteral &&
-              !this.checker.isTypeAssignableTo(other, owner)
-            ),
+            !(isTypeLiteral(owner) && !this.checker.isTypeAssignableTo(other, owner)),
         )
           ? []
           : [owner],
@@ -498,10 +495,10 @@ export class TypeQueries {
       case SyntaxKind.ClassExpression:
         // the instance type its construct signatures return
         return this.memo('ownerType', location, () => {
-          const constructor = this.checker.getTypeAtLocation(owner)
-          const [signature] = constructor
-            ? this.checker.getSignaturesOfType(constructor, SignatureKind.Construct)
-            : []
+          const [signature] = this.checker.getSignaturesOfType(
+            this.checker.getTypeAtLocation(owner)!,
+            SignatureKind.Construct,
+          )
           return signature && this.checker.getReturnTypeOfSignature(signature)
         })
       default:
@@ -598,7 +595,7 @@ export class TypeQueries {
       return type
     }
 
-    return this.memo('nonNullable', type.id, () => this.checker.getNonNullableType(type) ?? type)
+    return this.memo('nonNullable', type.id, () => this.checker.getNonNullableType(type)!)
   }
 
   /**
@@ -968,7 +965,7 @@ export class TypeQueries {
     const children =
       type.flags & TypeFlags.UnionOrIntersection
         ? this.getMembers(type)
-        : (type.getSymbol()?.flags ?? 0) & SymbolFlags.TypeLiteral
+        : isTypeLiteral(type)
           ? this.getPropertyTypes(type).filter((child) => child !== undefined)
           : this.getReferenceArguments(type)
 
@@ -986,7 +983,7 @@ export class TypeQueries {
 
     const children =
       type.flags & (TypeFlags.UnionOrIntersection | TypeFlags.TemplateLiteral)
-        ? (((type as any).getTypes() ?? []) as readonly Type[])
+        ? ((type as any).getTypes() as readonly Type[])
         : type.flags & TypeFlags.StringMapping
           ? [(type as any).getTarget() as Type]
           : undefined
@@ -1257,8 +1254,10 @@ export class TypeQueries {
     const names: any[] = []
     // an import is looked up in the exports of its module, whose specifier is in `names`
     const imports = new Map<number, readonly [name: any, exported: string]>()
-    const collect = (statements: readonly any[]): void => {
-      for (const statement of statements) {
+    // the statements of a file or of the body of a namespace, which a shorthand ambient module
+    // (`declare module 'a'`) has none of
+    const collect = (statements: readonly any[] | undefined): void => {
+      for (const statement of statements ?? []) {
         if (statement.kind === SyntaxKind.TypeAliasDeclaration) {
           names.push(statement.name)
         } else if (statement.kind === SyntaxKind.ImportDeclaration) {
@@ -1277,7 +1276,7 @@ export class TypeQueries {
           while (body?.kind === SyntaxKind.ModuleDeclaration) {
             body = body.body
           }
-          collect(body?.statements ?? [])
+          collect(body?.statements)
         }
       }
     }
@@ -1288,7 +1287,7 @@ export class TypeQueries {
         this.getSourceKind(declaration.path) === 'project'
       ) {
         this.aliasFiles.add(declaration.path)
-        collect(declaration.resolve()?.getSourceFile().statements ?? [])
+        collect(declaration.resolve()?.getSourceFile().statements)
       }
     }
 
@@ -1404,9 +1403,7 @@ export class TypeQueries {
         typeNode,
         ...(typeNode.typeArguments ?? []),
       ])
-      return type
-        ? { alias, type, typeArguments: typeArguments.filter((t) => t !== undefined) }
-        : undefined
+      return { alias, type: type!, typeArguments: typeArguments.filter((t) => t !== undefined) }
     })
   }
 }
@@ -1435,6 +1432,11 @@ function createMap<K, V>(): Map<K, V> {
 /** Types without repeats by their ids, in the order they come first */
 function uniqueTypes(types: readonly (Type | undefined)[]): Type[] {
   return [...new Map(types.flatMap((t) => (t ? [[t.id, t] as const] : []))).values()]
+}
+
+/** Whether a type is of an object type literal (`{ a: string }`) */
+function isTypeLiteral(type: Type): boolean {
+  return Boolean((type.getSymbol()?.flags ?? 0) & SymbolFlags.TypeLiteral)
 }
 
 /** Whether comparing a value with its source may nest deeper: a union or a mapped type */

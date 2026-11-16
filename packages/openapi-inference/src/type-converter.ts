@@ -484,8 +484,9 @@ export class TypeToJsonSchemaConverter {
 
       $defs = this.defs.getReferencedDefs(schema)
 
-      // on the final schemas, once inlined members are no longer refs
-      const getDef = (name: string) => (Object.hasOwn($defs, name) ? $defs[name] : undefined)
+      // on the final schemas, once inlined members are no longer refs. They refer only to the
+      // defs `getReferencedDefs` collected, also those of the defs they refer to
+      const getDef = (name: string) => $defs[name]
       schema = withDiscriminators(schema, getDef)
       for (const [name, def] of Object.entries($defs)) {
         // a def's schema is final, and so are those of the defs it refers to
@@ -638,8 +639,8 @@ export class TypeToJsonSchemaConverter {
       (symbol.name === 'Promise' || symbol.name === 'PromiseLike') &&
       this.types.getSymbolSourceKind(symbol) === 'default'
     ) {
-      const [value] = this.types.getReferenceArguments(type)
-      return value ? this.getAwaitedType(value) : type
+      // the default library's `Promise<T>` and `PromiseLike<T>`, which have a type argument
+      return this.getAwaitedType(this.types.getReferenceArguments(type)[0]!)
     }
 
     return type
@@ -1947,12 +1948,11 @@ export class TypeToJsonSchemaConverter {
       case 'map-entries':
         return mapSchema(this.visitElements(builtin.entries))
       case 'typed-array':
-        // `JSON.stringify` writes the items, also of a request, a `bigint` only by a polyfilled `toJSON`
+        // `JSON.stringify` writes the items, also of a request, a `bigint` only by a polyfilled `toJSON`.
+        // They are those of the number index each typed array of the default library declares.
         return {
           type: 'object',
-          additionalProperties: builtin.items
-            ? this.withMode('stringify', () => this.visit(builtin.items!))
-            : { type: 'number' },
+          additionalProperties: this.withMode('stringify', () => this.visit(builtin.items!)),
         }
     }
 
@@ -1978,10 +1978,10 @@ export class TypeToJsonSchemaConverter {
       (builtin, i) =>
         builtin ?? this.withMode(modes[i]!, () => this.convertObject(type, { ownFields: true })),
     )
-    // a boxed `BigInt` can not be written by `JSON.stringify`
-    const writable = forms.filter((form) => !isNeverSchema(form))
-
-    return writable.length ? anyOfDeduped(writable) : forms[0]!
+    // a boxed `BigInt` can not be written by `JSON.stringify`. The serializer writes any built-in
+    // `JSON.stringify` does (only a `toJSON` it calls leaves the built-in to the fields), never as
+    // nothing, so its form is always written.
+    return anyOfDeduped(forms.filter((form) => !isNeverSchema(form)))
   }
 
   /**
@@ -2014,8 +2014,11 @@ export class TypeToJsonSchemaConverter {
     const ordered = elements.every((e) => e !== undefined) ? (elements as TSSymbol[]) : numeric
     const [lengthType, ...elementTypes] = this.types.getSymbolTypes([length, ...ordered])
     // `Partial` makes the length optional, a tuple with optional elements has several
-    // (`1 | 2` of `Readonly<[number, string?] & { extra?: string }>`)
-    const members = lengthType ? this.types.getUnionMembers(lengthType) : []
+    // (`1 | 2` of `Readonly<[number, string?] & { extra?: string }>`). The compiler API types the
+    // type of a symbol as possibly undefined, a property always has one.
+    const members = lengthType
+      ? this.types.getUnionMembers(lengthType)
+      : /* v8 ignore next - defensive */ []
     const lengths = members.filter((t) => t.flags & TypeFlags.NumberLike)
 
     // a mapped type changing the values (`{ [K in keyof T]?: true }`) is no array
@@ -2355,6 +2358,9 @@ export class TypeToJsonSchemaConverter {
       sources.flatMap((s) => this.types.getProperties(s)).map((p) => [p.name, p]),
     )
     const properties = this.types.getProperties(type)
+    // a view found for its sources has no property they lack
+    /* v8 ignore next - defensive */
+    const sourceFlags = (name: string) => sourceProperties.get(name)?.flags ?? 0
 
     return (
       this.types.isPrimitiveView(type) ||
@@ -2375,9 +2381,7 @@ export class TypeToJsonSchemaConverter {
       ) ||
       properties.length < sourceProperties.size ||
       properties.some(
-        (p) =>
-          p.flags & SymbolFlags.Optional &&
-          !((sourceProperties.get(p.name)?.flags ?? 0) & SymbolFlags.Optional),
+        (p) => p.flags & SymbolFlags.Optional && !(sourceFlags(p.name) & SymbolFlags.Optional),
       )
     )
   }
@@ -2400,9 +2404,13 @@ export class TypeToJsonSchemaConverter {
     // by the names of all members, a symbol key (`[Symbol.iterator]`) is not found by its name
     const apparent = this.checker.getApparentType(primitive)
     const members = apparent && getPropertyNames(this.types, apparent)
-    return members && this.types.getProperties(type).every((p) => members.has(p.name))
-      ? (this.checker.getBaseTypeOfLiteralType(primitive) ?? branded)
-      : branded
+    if (!members || !this.types.getProperties(type).every((p) => members.has(p.name))) {
+      return branded
+    }
+
+    // the compiler API types the base type as possibly undefined, a literal always has one
+    /* v8 ignore next - defensive */
+    return this.checker.getBaseTypeOfLiteralType(primitive) ?? branded
   }
 
   private findMappedBrandedPrimitive(type: Type): Type | undefined {
@@ -2661,11 +2669,10 @@ export class TypeToJsonSchemaConverter {
   private withUnsentHeadersOptional(schema: JsonSchema, property: string): JsonSchema {
     const resolve = (name: string) => this.defs.getSchema(name)
     return this.mapPropertyObjects(schema, property, (object) => {
+      // an object requires only fields it has, see `convertObject`
       const required =
         typeof object === 'object' && object.required
-          ? object.required.filter(
-              (name) => !mayWriteNoHeader(object.properties?.[name] ?? {}, resolve),
-            )
+          ? object.required.filter((name) => !mayWriteNoHeader(object.properties![name]!, resolve))
           : undefined
 
       if (
@@ -2693,17 +2700,18 @@ export class TypeToJsonSchemaConverter {
       return this.defs.mapObjects(schema, map)
     }
 
+    // `mapObjects` maps object schemas only
     return this.defs.mapObjects(schema, (object) => {
-      const value = typeof object === 'object' ? object.properties?.[property] : undefined
+      const value = (object as ObjectJsonSchema).properties?.[property]
       const mapped = value === undefined ? value : this.defs.mapObjects(value, map)
 
-      if (typeof object !== 'object' || mapped === value) {
+      if (mapped === value) {
         return object
       }
 
-      const properties = { ...object.properties }
+      const properties = { ...(object as ObjectJsonSchema).properties }
       setOwn(properties, property, mapped)
-      return { ...object, properties }
+      return { ...(object as ObjectJsonSchema), properties }
     })
   }
 

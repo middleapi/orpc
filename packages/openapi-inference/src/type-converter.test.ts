@@ -1,3 +1,5 @@
+import { Ajv2020 } from 'ajv/dist/2020.js'
+
 import type { TypeScriptProject } from './project'
 import { openTypeScriptProject } from './project'
 import { TypeScriptTypeResolutionError, TypeToJsonSchemaConverter } from './type-converter'
@@ -3499,6 +3501,504 @@ describe('typeToJsonSchemaConverter', () => {
           expect.objectContaining({ type: 'object', required: ['kind', 'size'] }),
         ],
       })
+    })
+  })
+})
+
+describe('typeToJsonSchemaConverter of rarer shapes', () => {
+  const fixture = (path: string) => new URL(`../tests/fixtures/${path}`, import.meta.url)
+  const open = (path: string) => openTypeScriptProject({ file: fixture(path) })
+  const ajv = new Ajv2020({ strict: false, allErrors: true })
+  const validate = (schema: unknown, value: unknown) => ajv.validate(schema as object, value)
+
+  describe('cycles', () => {
+    let project: TypeScriptProject
+
+    beforeAll(() => {
+      project = open('convert-coverage/src/cycles.ts')
+    })
+
+    afterAll(() => {
+      project.close()
+    })
+
+    it('fixture has no type errors', () => {
+      expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+    })
+
+    it('closes a cycle that comes back to an anonymous view through a model, then directly', () => {
+      const converter = new TypeToJsonSchemaConverter(project.checker, project.program, {
+        defs: 'recursive',
+      })
+      const partialNode = { $ref: '#/$defs/Partial_Node' }
+      const node = { $ref: '#/$defs/Node' }
+
+      // the view is one def however often it comes back, which its first conversion keeps
+      expect(converter.convert(project.getExportType('partialNode').type)).toEqual([
+        {
+          ...partialNode,
+          $defs: {
+            Partial_Node: { type: 'object', properties: { self: node, view: partialNode } },
+            Node: {
+              type: 'object',
+              properties: { self: node, view: partialNode },
+              required: ['self', 'view'],
+              description: 'A model holding itself, and a view of itself that holds itself again',
+            },
+          },
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('parameters and headers', () => {
+    let project: TypeScriptProject
+    let converter: TypeToJsonSchemaConverter
+
+    const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+    const search = {
+      type: 'object',
+      properties: { page: { type: 'number' }, since: date },
+      required: ['page', 'since'],
+    }
+
+    beforeAll(() => {
+      project = open('convert-coverage/src/parameters.ts')
+      converter = new TypeToJsonSchemaConverter(project.checker, project.program, {
+        direction: 'input',
+      })
+    })
+
+    afterAll(() => {
+      project.close()
+    })
+
+    it('fixture has no type errors', () => {
+      expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+    })
+
+    it('reads the parameters only of the fields of a plain object root', () => {
+      const convert = (name: string) =>
+        converter.convert(project.getExportType(name).type, { parameters: { except: [] } })
+
+      // a plain object is written in place by its fields
+      expect(convert('Search')).toEqual([search, false])
+      // a class or an array is a value of its own, with its def
+      expect(convert('SearchClass')).toEqual([
+        {
+          $ref: '#/$defs/SearchClass',
+          $defs: {
+            SearchClass: {
+              ...search,
+              description: 'A class, whose fields hold no parameters when it is the root',
+            },
+          },
+        },
+        false,
+      ])
+      expect(convert('Pages')).toEqual([
+        {
+          $ref: '#/$defs/Pages',
+          $defs: {
+            Pages: {
+              type: 'array',
+              items: { $ref: '#/$defs/Search' },
+              description: 'An array, whose items hold no parameters when it is the root',
+            },
+            Search: { ...search, description: 'A plain object, whose fields hold the parameters' },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('sends a parameter of a class with private members as the string of an instance', () => {
+      const [schema] = converter.convert(project.getExportType('CursorQuery').type, {
+        parameters: true,
+      }) as [any, boolean]
+
+      expect(schema.$defs.CursorQueryParam.properties).toEqual({
+        // no plain object satisfies the class, only an instance, sent as `String(value)`
+        cursor: {
+          type: 'string',
+          description: 'A class with a private member, which only an instance satisfies',
+        },
+        origin: { $ref: '#/$defs/OriginParam' },
+      })
+      expect(schema.$defs.OriginParam.anyOf).toEqual([
+        { type: 'string' },
+        { type: 'object', properties: { x: { type: 'number' } }, required: ['x'] },
+      ])
+    })
+
+    it('makes the headers a client may leave out optional, also through a def', () => {
+      const headers = (name: string) =>
+        (
+          converter.convert(project.getExportType(name).type, { headersProperty: 'headers' }) as [
+            any,
+            boolean,
+          ]
+        )[0].properties.headers
+
+      // `null` is sent as no header, also of the def
+      expect(headers('OptionalHeaders')).toEqual({
+        type: 'object',
+        properties: {
+          'x-mode': { $ref: '#/$defs/Mode' },
+          'x-trace': { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        },
+      })
+      expect(headers('SomeHeaders')).toEqual({
+        type: 'object',
+        properties: { 'x-mode': { $ref: '#/$defs/Mode' }, 'x-id': { type: 'string' } },
+        required: ['x-id'],
+      })
+    })
+  })
+
+  describe('views of classes and built-ins', () => {
+    let project: TypeScriptProject
+    let converter: TypeToJsonSchemaConverter
+
+    const convert = (name: string) => converter.convert(project.getExportType(name).type)
+
+    beforeAll(() => {
+      project = open('convert-coverage/src/class-views.ts')
+      converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+    })
+
+    afterAll(() => {
+      project.close()
+    })
+
+    it('fixture has no type errors', () => {
+      expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+    })
+
+    it('writes a view of an interface extending a built-in and a view as the built-in', () => {
+      expect(convert('LabelledSetView')).toEqual([
+        {
+          'type': 'array',
+          'uniqueItems': true,
+          'items': { type: 'string' },
+          'x-native-type': 'set',
+        },
+        false,
+      ])
+    })
+
+    it('writes an instance of the classes behind an interface or intersection', () => {
+      // an interface over a built-in subclass, of which only instances are values
+      expect(convert('JsonAmount')).toEqual([
+        {
+          type: 'number',
+          description: 'An interface over it, adding a `toJSON` the class does not have',
+        },
+        false,
+      ])
+
+      // a client sends an instance, written as the built-in, or as an instance of the other class
+      const input = new TypeToJsonSchemaConverter(project.checker, project.program, {
+        direction: 'input',
+      })
+      expect(input.convert(project.getExportType('StampOwner').type)).toEqual([
+        {
+          $ref: '#/$defs/StampOwner',
+          $defs: {
+            StampOwner: {
+              anyOf: [
+                { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+                {
+                  type: 'object',
+                  properties: { owned: { type: 'boolean' }, name: { type: 'string' } },
+                  required: ['owned', 'name'],
+                },
+              ],
+              description:
+                'A view of the built-in subclass and the class, which only instances satisfy',
+            },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('writes a view of a class holding a view of another one by their fields', () => {
+      expect(convert('OuterView')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            inner: {
+              type: 'object',
+              properties: { a: { type: 'number' }, b: { type: 'string' } },
+              required: ['a', 'b'],
+            },
+          },
+          required: ['inner'],
+        },
+        false,
+      ])
+    })
+
+    it('writes a type parameter of a class instance by its constraint, under JSON.stringify', () => {
+      // `JSON.stringify` writes a `Set` as `{}`
+      expect(convert('TagBox')).toEqual([
+        {
+          $ref: '#/$defs/TagBox_T',
+          $defs: {
+            TagBox_T: {
+              type: 'object',
+              properties: { tags: { type: 'object' }, previous: { type: 'object' } },
+              required: ['tags', 'previous'],
+              description: 'A class over a type parameter constrained to a built-in',
+            },
+          },
+        },
+        false,
+      ])
+    })
+  })
+
+  describe('array-like objects', () => {
+    let project: TypeScriptProject
+    let converter: TypeToJsonSchemaConverter
+
+    const convert = (name: string) =>
+      (converter.convert(project.getExportType(name).type) as [any, boolean])[0].$defs
+
+    beforeAll(() => {
+      project = open('convert-coverage/src/array-likes.ts')
+      converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+    })
+
+    afterAll(() => {
+      project.close()
+    })
+
+    it('fixture has no type errors', () => {
+      expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+    })
+
+    it('writes the tuple an object type of indexes holds with the items of its number index', () => {
+      const items = { anyOf: [{ type: 'string' }, { type: 'number' }] }
+
+      expect(convert('IndexedPair').IndexedPair.anyOf).toEqual([
+        {
+          type: 'array',
+          prefixItems: [{ type: 'string' }, { type: 'number' }],
+          minItems: 2,
+          items,
+        },
+        {
+          type: 'object',
+          properties: { 0: { type: 'string' }, 1: { type: 'number' } },
+          required: ['0', '1'],
+          patternProperties: { '^(?:0|-?[1-9]\\d{0,14})$': items },
+        },
+      ])
+    })
+
+    it('writes an unresolved generic spread as items of any value', () => {
+      expect(convert('Spread').Spread_T.properties.items).toEqual({
+        type: 'array',
+        prefixItems: [{ type: 'string' }],
+        items: {},
+        minItems: 1,
+      })
+    })
+
+    it('writes a view of a tuple leaving out an element as an array of its items', () => {
+      expect(convert('WithoutFirst').WithoutFirst).toEqual({
+        type: 'array',
+        items: { anyOf: [{ type: 'boolean' }, { type: 'string' }, { type: 'number' }] },
+        description: 'A view of a rest tuple without its first element, still an array',
+      })
+    })
+
+    it('writes a mapped type changing the length of an array as an object', () => {
+      expect(convert('StringFlags').Flags_Strings).toEqual({
+        type: 'object',
+        properties: {
+          length: {
+            type: 'boolean',
+            const: true,
+            description:
+              'Gets or sets the length of the array. This is a number one higher than the highest index in the array.',
+          },
+        },
+        patternProperties: { '^(?:0|-?[1-9]\\d{0,14})$': { type: 'boolean', const: true } },
+      })
+    })
+  })
+
+  describe('expansions', () => {
+    let project: TypeScriptProject
+    let converter: TypeToJsonSchemaConverter
+
+    const convert = (name: string) =>
+      converter.convert(project.getExportType(name).type) as [any, boolean]
+
+    beforeAll(() => {
+      project = open('convert-coverage/src/expansions.ts')
+      converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+    })
+
+    afterAll(() => {
+      project.close()
+    })
+
+    it('fixture has no type errors', () => {
+      expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+    })
+
+    it('converts a model inside more library mapped types than are unwrapped', () => {
+      expect(convert('wrapped')).toEqual([
+        {
+          type: 'object',
+          properties: { v: { $ref: '#/$defs/Model' } },
+          $defs: {
+            Model: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] },
+          },
+        },
+        false,
+      ])
+    })
+
+    it('expands models nesting themselves with other type arguments in full', () => {
+      const [swapped] = convert('swapped')
+      expect(swapped.$defs.Swap_string_number.properties.next).toEqual({
+        anyOf: [{ $ref: '#/$defs/Swap_number_string' }, { type: 'null' }],
+      })
+      expect(swapped.$defs.Swap_number_string.properties.next).toEqual({
+        anyOf: [{ $ref: '#/$defs/Swap_string_number' }, { type: 'null' }],
+      })
+
+      const [deep] = convert('deep')
+      const boxes = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { v: boxes(depth - 1, end) }
+      expect(Object.keys(deep.$defs)).toEqual([
+        'Deep_Box_Box_Box_Box_number',
+        'Deep_Box_Box_Box_Box_string',
+        'Box_Box_Box_Box_string',
+        'Box_Box_Box_string',
+        'Box_Box_string',
+        'Box_string',
+        'Box_Box_Box_Box_number',
+        'Box_Box_Box_number',
+        'Box_Box_number',
+        'Box_number',
+      ])
+      expect(validate(deep, { v: boxes(4, 1), other: { v: boxes(4, 'a'), other: null } })).toBe(
+        true,
+      )
+      expect(validate(deep, { v: boxes(4, 1), other: { v: boxes(4, 1), other: null } })).toBe(false)
+
+      const [nullable] = convert('nullable')
+      expect(nullable.$defs.Nullable.properties).toEqual({
+        v: { anyOf: [{ $ref: '#/$defs/Box_number' }, { type: 'null' }] },
+        other: { anyOf: [{ $ref: '#/$defs/Nullable2' }, { type: 'null' }] },
+      })
+      expect(nullable.$defs.Nullable2.properties).toEqual({
+        v: { anyOf: [{ $ref: '#/$defs/Box_string' }, { type: 'null' }] },
+        other: { anyOf: [{ $ref: '#/$defs/Nullable2' }, { type: 'null' }] },
+      })
+    })
+
+    it('documents each level of cycles through deep mapped types over generic models', () => {
+      const unions = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: unions(depth - 1, end), m: [] } }
+      const [viaUnions] = convert('viaUnions')
+      expect(validate(viaUnions, unions(6, 1))).toBe(true)
+      expect(validate(viaUnions, unions(6, 'x'))).toBe(false)
+      expect(validate(viaUnions, unions(3, { inner: { other: 'x' } }))).toBe(true)
+
+      const conditionals = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { c: 2, a: conditionals(depth - 1, end), l: [] } }
+      const [viaConditionals] = convert('viaConditionals')
+      expect(validate(viaConditionals, conditionals(6, 1))).toBe(true)
+      expect(validate(viaConditionals, conditionals(6, 'x'))).toBe(false)
+
+      // an index signature may hold the model at any key, which the path does not name, so the
+      // nesting is cut after two levels, below which any value is documented
+      const indexes = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: indexes(depth - 1, end), l: [] } }
+      const [viaIndexes] = convert('viaIndexes')
+      expect(validate(viaIndexes, indexes(2, 'x'))).toBe(false)
+      expect(validate(viaIndexes, indexes(3, 'x'))).toBe(true)
+      expect(validate(viaIndexes, indexes(6, 1))).toBe(true)
+
+      const wrappers = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: wrappers(depth - 1, end) }
+      const [viaWrappers] = convert('viaWrappers')
+      expect(validate(viaWrappers, wrappers(6, 1))).toBe(true)
+      expect(validate(viaWrappers, wrappers(6, 'x'))).toBe(false)
+      expect(validate(viaWrappers, wrappers(3, { w: wrappers(3, 1) }))).toBe(true)
+
+      // through the values of an index signature, which the property next to it is not one of
+      const values = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { key: { p: values(depth - 1, end), l: [] } }
+      const [alternating] = convert('alternating')
+      expect(validate(alternating, values(6, 1))).toBe(true)
+      expect(validate(alternating, values(6, 'x'))).toBe(false)
+      const [alternatingRecords] = convert('alternatingRecords')
+      expect(validate(alternatingRecords, values(6, 1))).toBe(true)
+      expect(validate(alternatingRecords, values(6, 'x'))).toBe(false)
+    })
+  })
+
+  describe('a polyfilled BigInt toJSON in a view', () => {
+    it('writes a bigint of a view of a class as either form', () => {
+      const project = open('convert-bigint-json/src/index.ts')
+
+      try {
+        expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+
+        // the serializer writes the bigint, `JSON.stringify` the string its `toJSON` returns
+        expect(converter.convert(project.getExportType('LedgerView').type)).toEqual([
+          {
+            type: 'object',
+            properties: {
+              total: {
+                anyOf: [
+                  { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' },
+                  { type: 'string' },
+                ],
+              },
+            },
+            required: ['total'],
+          },
+          false,
+        ])
+      } finally {
+        project.close()
+      }
+    })
+  })
+
+  describe('a library without BigInt and iterators', () => {
+    it('writes what the globals of the library tell', () => {
+      const project = open('convert-old-lib/src/index.ts')
+
+      try {
+        expect(project.program.getSemanticDiagnostics(project.sourceFile.fileName)).toEqual([])
+        const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
+        const convert = (name: string) =>
+          (converter.convert(project.getExportType(name).type) as [any, boolean])[0].$defs[name]
+
+        // `JSON.stringify` throws on a bigint, no `toJSON` of `BigInt` could be polyfilled
+        expect(convert('Counter').properties.count).toEqual({ not: {} })
+        // the items of a set subclass, which has no iterator
+        expect(convert('Tags')).toEqual({
+          'type': 'array',
+          'items': {},
+          'x-native-type': 'set',
+          'description': 'A set subclass, which no iterator of the library tells the items of',
+        })
+      } finally {
+        project.close()
+      }
     })
   })
 })

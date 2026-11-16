@@ -137,7 +137,7 @@ export function mergeEquivalentComponents(
   const preference = (a: string, b: string) =>
     Number(names.numbered.has(defName(a))) - Number(names.numbered.has(defName(b))) ||
     defName(a).length - defName(b).length ||
-    (a < b ? -1 : a > b ? 1 : 0)
+    Number(a > b) - Number(a < b)
 
   // the name of the component `componentName` gave a def, or would give it
   const componentNames = new Map([...(defNames ?? [])].map(([name, def]) => [def, name]))
