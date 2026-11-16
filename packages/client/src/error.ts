@@ -40,9 +40,7 @@ export const COMMON_ERROR_STATUS_MAP = {
  * Customize the suggested codes through `Registry['ORPCErrorCode']`.
  *
  * @remarks
- * A custom `ORPCErrorCode` must include `(string & {})`: oRPC creates errors with its own
- * codes (such as `INTERNAL_SERVER_ERROR` and `BAD_REQUEST`) and its types rely on every
- * string being a valid code.
+ * A custom `ORPCErrorCode` must keep `(string & {})`, since oRPC throws its own codes.
  *
  * @see {@link https://orpc.dev/docs/error-handling#orpc-error-codes | Error Handling - ORPC Error Codes}
  */

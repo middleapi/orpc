@@ -3,15 +3,10 @@ import { ORPCError } from './error'
 
 describe('ORPCErrorCode', () => {
   it('suggests common codes and accepts any string', () => {
+    // oRPC relies on any string being a valid code, see docs/error-handling
     expectTypeOf<ORPCErrorCode>().toEqualTypeOf<
       keyof typeof COMMON_ERROR_STATUS_MAP | (string & {})
     >()
-  })
-
-  it('accepts any string, which oRPC relies on for its own error codes', () => {
-    // A custom `Registry['ORPCErrorCode']` must keep `(string & {})`, see docs/error-handling
-    expectTypeOf<string>().toExtend<ORPCErrorCode>()
-    expectTypeOf<'INTERNAL_SERVER_ERROR'>().toExtend<ORPCErrorCode>()
   })
 })
 
