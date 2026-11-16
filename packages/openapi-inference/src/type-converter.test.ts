@@ -1442,6 +1442,41 @@ describe('typeToJsonSchemaConverter', () => {
       expect(r6.program.getSemanticDiagnostics(r6.sourceFile.fileName)).toEqual([])
     })
 
+    it('writes the items of a generic interface over a view of a set or a map', () => {
+      const [schema] = convertR6('GenericCollectionViews') as [any, boolean]
+      expect(schema.$defs.ValueSet_string).toEqual({
+        'type': 'array',
+        'uniqueItems': true,
+        'items': { type: 'string' },
+        'x-native-type': 'set',
+      })
+      expect(schema.$defs.ValueSet_number.items).toEqual({ type: 'number' })
+      expect(schema.$defs.ValueSet_LetterArray.items).toEqual({
+        type: 'array',
+        items: { $ref: '#/$defs/Letter' },
+      })
+      expect(schema.$defs.ValueMap_boolean).toEqual({
+        'type': 'array',
+        'items': {
+          type: 'array',
+          prefixItems: [{ type: 'string' }, { type: 'boolean' }],
+          maxItems: 2,
+          minItems: 2,
+        },
+        'x-native-type': 'map',
+      })
+      // one keeping no iterator holds any set or map with its `size`
+      expect(schema.$defs.SizedValues_string.anyOf).toEqual([
+        { 'type': 'array', 'items': {}, 'x-native-type': 'set' },
+        {
+          'type': 'array',
+          'items': { type: 'array', prefixItems: [{}, {}], maxItems: 2, minItems: 2 },
+          'x-native-type': 'map',
+        },
+        { type: 'object', properties: { size: { type: 'number' } }, required: ['size'] },
+      ])
+    })
+
     it('only sets JSDoc keywords to values of their type', () => {
       expect(convertR6('KeywordTypes')).toEqual([
         {

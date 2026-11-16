@@ -477,6 +477,18 @@ function getBuiltinSubclass(
       }
 
       const builtin = getMappedBuiltin(types, view, stringify)
+      // the view a generic interface extends is of its type parameters (`Readonly<Set<T>>` of
+      // `interface Values<T> extends Readonly<Set<T>>`), an instantiation iterates its arguments
+      const items =
+        (builtin?.kind === 'set' || builtin?.kind === 'map') && type.isTypeReference()
+          ? getIteratorTypes(types.checker, type, types.getProperties(type), false)?.yieldTypes
+          : undefined
+      if (items !== undefined) {
+        return builtin!.kind === 'set'
+          ? { kind: 'set', items }
+          : { kind: 'map-entries', entries: items }
+      }
+
       if (builtin !== undefined) {
         return builtin
       }

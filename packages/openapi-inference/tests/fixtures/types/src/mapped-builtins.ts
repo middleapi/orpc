@@ -60,4 +60,18 @@ export type PartialLookAlikes = ConditionalDeepPartial<MappedLookAlikes>
 export interface Page<T> {
   item: T
 }
+
+// generic interfaces extending a view of a set or a map, of their type arguments
+export interface ValueSet<T> extends Readonly<Set<T>> {}
+export interface ValueMap<T> extends Readonly<Map<string, T>> {}
+export interface SizedValues<T> extends Pick<Set<T>, 'size'> {}
+export interface GenericCollectionViews {
+  strings: ValueSet<string>
+  numbers: ValueSet<number>
+  lists: ValueSet<Letter[]>
+  map: ValueMap<boolean>
+  sized: SizedValues<string>
+}
+export type Letter = 'a' | 'b'
+
 export type NumericPages = { a: Page<-1>; b: Page<1>; c: Page<12> }
