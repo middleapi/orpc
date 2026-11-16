@@ -1,0 +1,611 @@
+import type { JsonSchema } from '@orpc/json-schema'
+import { setOwn, stringifyJSON } from '@orpc/shared'
+
+import { getFreeName } from './components'
+import {
+  collectDefRefs,
+  fromRef,
+  isNeverSchema,
+  objectMembers,
+  toRef,
+  withoutRequired,
+} from './schema-utils'
+
+/**
+ * How a value is written: by the OpenAPI JSON serializer, by `JSON.stringify` (inside class
+ * instances, which the serializer leaves to it), or by either one (a view of a class, like
+ * `Readonly<C>`, holds an instance or a plain object the serializer walks).
+ */
+export type ConversionMode = 'serializer' | 'stringify' | 'either'
+
+/** Keys of the `either` mode come after all type ids */
+const EITHER_KEY_OFFSET = 2 ** 40
+
+/**
+ * The conversion key of a type in a mode, for a type that converts differently in it than under
+ * the serializer: `JSON.stringify` keys are negative, `either` keys come after the type ids.
+ */
+export function toModeKey(id: number, mode: Exclude<ConversionMode, 'serializer'>): number {
+  return mode === 'stringify' ? -id : id + EITHER_KEY_OFFSET
+}
+
+/** Keys of values sent as parameters come after the keys of the modes, see `toParameterKey` */
+const PARAMETER_KEY_OFFSET = 2 ** 42
+
+/**
+ * The conversion key of a value sent as a parameter (in the query string or the path), which the
+ * bracket notation sends without the serializer's forms of some built-ins.
+ */
+export function toParameterKey(key: number): number {
+  return key < 0 ? key - PARAMETER_KEY_OFFSET : key + PARAMETER_KEY_OFFSET
+}
+
+/**
+ * The type id of a conversion key, and the suffixes of the def names of its type in its mode, so
+ * names do not depend on which mode was converted first (`Json` under `JSON.stringify`, `Any` for
+ * either one), and as a parameter, so its def does not take the name of the def of the value as a
+ * body (`Param`, which it drops when no other def has that name, see `mergeEquivalentComponents`).
+ */
+function parseKey(key: number): { id: number; modeSuffix: string; parameterSuffix: string } {
+  const parameter = Math.abs(key) >= PARAMETER_KEY_OFFSET
+  const modeKey = parameter ? key - Math.sign(key) * PARAMETER_KEY_OFFSET : key
+  const parameterSuffix = parameter ? 'Param' : ''
+
+  return modeKey < 0
+    ? { id: -modeKey, modeSuffix: 'Json', parameterSuffix }
+    : modeKey >= EITHER_KEY_OFFSET
+      ? { id: modeKey - EITHER_KEY_OFFSET, modeSuffix: 'Any', parameterSuffix }
+      : { id: modeKey, modeSuffix: '', parameterSuffix }
+}
+
+/** The def name of a type in the mode of a key, as a parameter (`PointJsonParam` of `Point`) */
+function getBaseName(key: number, preferredName: string): string {
+  const { modeSuffix, parameterSuffix } = parseKey(key)
+  return `${preferredName}${modeSuffix}${parameterSuffix}`
+}
+
+export interface Def {
+  name: string
+  /** The conversion key of the type */
+  key: number
+  schema?: JsonSchema
+  /** The defs the schema refers to, computed once the schema is final */
+  deps?: Set<string>
+  /** Whether no expansion was cut while converting it, so it does not depend on where it started */
+  stable?: boolean
+}
+
+/**
+ * Def names shared by the registries of one program (the converters for inputs and outputs),
+ * so a type gets the same name in both.
+ */
+export class DefNames {
+  readonly byKey = new Map<number, string>()
+  readonly used = new Set<string>()
+  /**
+   * Names numbered after a name another def held, with that name (`Page2` of `Page`), and names
+   * of a mode a def of the same type in another mode shared, with its shorter name (`PointJson`
+   * of `Point`), see `DefRegistry.share`
+   */
+  readonly numbered = new Map<string, string>()
+  /** Names of a type in a mode, with the name of the type without it (`PointJson` of `Point`) */
+  readonly modes = new Map<string, string>()
+  /** Names of the forms of types as parameters (`HolderParam` of `Holder`), see `toParameterKey` */
+  readonly parameters = new Set<string>()
+  /**
+   * Names of defs named after a project alias their type lost (see `TypeQueries.getLostAlias`),
+   * which yield to the defs of declared types (see `mergeEquivalentComponents`)
+   */
+  readonly aliased = new Set<string>()
+  /** How many registries have a def of each name */
+  private readonly holders = new Map<string, number>()
+
+  /**
+   * Records a def of a name in a registry.
+   */
+  hold(name: string): void {
+    this.holders.set(name, (this.holders.get(name) ?? 0) + 1)
+  }
+
+  /**
+   * Records a registry no longer has a def of a name, whose name stays given.
+   */
+  unhold(name: string): void {
+    const count = (this.holders.get(name) ?? 1) - 1
+    if (count > 0) {
+      this.holders.set(name, count)
+    } else {
+      this.holders.delete(name)
+    }
+  }
+
+  /**
+   * Frees the name of a def a registry no longer has, unless another one has a def of it (a type
+   * the registry of outputs shares the def of another mode of, which the one of inputs names the
+   * same), also for the type it named.
+   */
+  release({ name, key }: Def): void {
+    if (this.holders.has(name)) {
+      return
+    }
+
+    this.used.delete(name)
+    // a type later given the name (a declared `User2` after a second `User`) is not numbered
+    this.numbered.delete(name)
+    this.modes.delete(name)
+    this.parameters.delete(name)
+    this.aliased.delete(name)
+    if (this.byKey.get(key) === name) {
+      this.byKey.delete(key)
+    }
+  }
+}
+
+/**
+ * The defs and shared results of the conversions, by the conversion key of their type.
+ * What a conversion adds can be discarded, when it failed or depends on where it started.
+ */
+export class DefRegistry {
+  private readonly defs = new Map<number, Def>()
+  private readonly defsByName = new Map<string, Def>()
+  /** Names emitted by discarded conversions, with the schema they were emitted with */
+  private readonly reservedNames = new Map<string, JsonSchema | undefined>()
+  /**
+   * Finished conversions of anonymous types, shared between their uses,
+   * and of named types whose schema is clearer inline, like `type UserId = string & { ... }`
+   */
+  private readonly anonymous = new Map<number, JsonSchema>()
+  /** Finished defs by their group and schema, see `share` */
+  private readonly shared = new Map<string, Def>()
+
+  private createdDefs: Def[] = []
+  /** Anonymous results the conversion added, with whether they are stable (see `Def.stable`) */
+  private createdAnonymous: { key: number; stable: boolean }[] = []
+
+  constructor(private readonly names: DefNames) {}
+
+  get(key: number): Def | undefined {
+    return this.defs.get(key)
+  }
+
+  getAnonymous(key: number): JsonSchema | undefined {
+    return this.anonymous.get(key)
+  }
+
+  /**
+   * The schema of a def by its name, `undefined` while it is converted.
+   */
+  getSchema(name: string): JsonSchema | undefined {
+    return this.defsByName.get(name)?.schema
+  }
+
+  /**
+   * Whether the def of the type is being converted, so its schema is not final yet.
+   */
+  isConverting(key: number): boolean {
+    const def = this.defs.get(key)
+    return def !== undefined && def.schema === undefined
+  }
+
+  create(key: number, preferredName: string): Def {
+    const taken = (name: string) => this.defsByName.has(name) || this.reservedNames.has(name)
+    let name = this.names.byKey.get(key)
+
+    if (name === undefined || taken(name)) {
+      name = getFreeName(
+        getBaseName(key, preferredName),
+        (candidate) => taken(candidate) || this.names.used.has(candidate),
+      )
+      this.give(key, name, preferredName)
+    }
+
+    const def: Def = { name, key }
+    this.add(def)
+    this.createdDefs.push(def)
+    return def
+  }
+
+  /**
+   * Gives a finished def the name a discarded conversion emitted for the same schema
+   * (a type next to a cut expansion, converted again), instead of a numbered one.
+   */
+  reclaimName(def: Def, preferredName: string): void {
+    const name = getBaseName(def.key, preferredName)
+    const reserved = this.reservedNames.get(name)
+
+    if (
+      def.name === name ||
+      def.schema === undefined ||
+      reserved === undefined ||
+      this.defsByName.has(name) ||
+      stringifyJSON(reserved) !== stringifyJSON(def.schema) ||
+      this.isReferenced(def)
+    ) {
+      return
+    }
+
+    this.remove(def)
+    this.names.release(def)
+    def.name = name
+    this.add(def)
+    this.give(def.key, name, preferredName)
+  }
+
+  /**
+   * Gives a type the name of its def, recording what it was named after (see `DefNames`).
+   */
+  private give(key: number, name: string, preferredName: string): void {
+    const { modeSuffix, parameterSuffix } = parseKey(key)
+    const modeName = `${preferredName}${modeSuffix}`
+    this.names.byKey.set(key, name)
+    this.names.used.add(name)
+    if (name !== modeName) {
+      this.names.numbered.set(name, modeName)
+    }
+    if (modeSuffix || parameterSuffix) {
+      this.names.modes.set(name, preferredName)
+    }
+    if (parameterSuffix) {
+      this.names.parameters.add(name)
+    }
+  }
+
+  /**
+   * Replaces a def nothing references yet by its schema, used inline.
+   */
+  inline(def: Def, schema: JsonSchema): void {
+    this.remove(def)
+    this.setAnonymous(def.key, schema, def.stable)
+  }
+
+  /**
+   * Replaces a def by another one (`{ $ref }`), freeing its name unless the other registry of
+   * the program has a def of it, when nothing refers to it: neither its schema nor the defs
+   * created while it was converted.
+   */
+  replaceIfUnreferenced(def: Def, schema: JsonSchema): boolean {
+    if (this.isReferenced(def)) {
+      return false
+    }
+
+    this.inline(def, schema)
+    this.names.release(def)
+    return true
+  }
+
+  /**
+   * The live def of the same group with the same schema, replacing this finished def when nothing
+   * refers to it yet; otherwise this def, which later ones of the group and schema share.
+   * A type converted the same in two modes is named by the shorter name of its modes
+   * (`Point` over `PointJson`), whichever comes first: the def kept takes it once no component
+   * has it (see `mergeEquivalentComponents`).
+   */
+  share(def: Def, group: string): Def {
+    const signature = `${group}:${stringifyJSON(def.schema)}`
+    const existing = this.shared.get(signature)
+
+    if (
+      existing &&
+      existing.key !== def.key &&
+      this.defs.get(existing.key)?.name === existing.name &&
+      this.replaceIfUnreferenced(def, { $ref: toRef(existing.name) })
+    ) {
+      const preferred = this.names.numbered.get(existing.name) ?? existing.name
+      if (
+        parseKey(def.key).id === parseKey(existing.key).id &&
+        def.name.length < preferred.length
+      ) {
+        this.names.numbered.set(existing.name, def.name)
+      }
+      return existing
+    }
+
+    this.shared.set(signature, def)
+    return def
+  }
+
+  /**
+   * Whether its schema or the defs created while it was converted may refer to a def.
+   */
+  private isReferenced(def: Def): boolean {
+    const later = this.createdDefs.slice(this.createdDefs.indexOf(def) + 1)
+
+    return (
+      this.getDeps(def).has(def.name) ||
+      later.some((other) => other.schema === undefined || this.getDeps(other).has(def.name))
+    )
+  }
+
+  /**
+   * Whether a schema refers to a def being converted, also through finished defs, which the type it
+   * describes is then in a cycle with.
+   */
+  refersToConverting(schema: JsonSchema): boolean {
+    // the defs collected all exist
+    return [...this.collectDeps(collectDefRefs(schema))].some(
+      (name) => this.defsByName.get(name)!.schema === undefined,
+    )
+  }
+
+  setAnonymous(key: number, schema: JsonSchema, stable = true): void {
+    this.anonymous.set(key, schema)
+    this.createdAnonymous.push({ key, stable })
+  }
+
+  /**
+   * Keeps what the conversion added.
+   */
+  keepCreated(): void {
+    this.createdDefs = []
+    this.createdAnonymous = []
+  }
+
+  /**
+   * Removes what the conversion added, or with `keepStable`, only what depends on where it started:
+   * a stable def or result (see `Def.stable`) that refers only to kept defs is kept, so a type
+   * next to a cut expansion keeps its def and name (an enum `E` next to `Expand<T>`).
+   */
+  discardCreated(keepStable = false): void {
+    const created = new Set(this.createdDefs.map((def) => def.name))
+    const kept = new Set(
+      keepStable
+        ? this.createdDefs
+            .filter((def) => def.stable && this.defs.get(def.key) === def)
+            .map((def) => def.name)
+        : [],
+    )
+    const refersToDiscarded = (schema: JsonSchema) =>
+      [...collectDefRefs(schema)].some((name) => created.has(name) && !kept.has(name))
+
+    // until no kept def refers to a discarded one
+    for (let changed = true; changed;) {
+      changed = false
+      for (const name of kept) {
+        if (refersToDiscarded(this.defsByName.get(name)!.schema!)) {
+          kept.delete(name)
+          changed = true
+        }
+      }
+    }
+
+    for (const def of this.createdDefs) {
+      if (!kept.has(def.name)) {
+        this.remove(def)
+        // it was emitted by the discarded conversion, a different schema must not take its name
+        this.reservedNames.set(def.name, def.schema)
+      }
+    }
+    for (const { key, stable } of this.createdAnonymous) {
+      const schema = this.anonymous.get(key)
+      if (!keepStable || !stable || schema === undefined || refersToDiscarded(schema)) {
+        this.anonymous.delete(key)
+      }
+    }
+    this.keepCreated()
+  }
+
+  /**
+   * The schemas of the defs a schema references, also through other defs.
+   */
+  getReferencedDefs(schema: JsonSchema): Record<string, JsonSchema> {
+    const $defs: Record<string, JsonSchema> = {}
+
+    for (const name of this.collectDeps(collectDefRefs(schema))) {
+      setOwn($defs, name, this.defsByName.get(name)!.schema!)
+    }
+
+    return $defs
+  }
+
+  /**
+   * Inlines the root def, the defs of a root union, and the defs of `properties` of the root
+   * (or of each root union member), unless they are recursive. Their parts are read by their
+   * fields, so only the members a client sends the fields of are kept, also of the defs they
+   * refer to. The fields of `separateProperties` (and of the root, with `separateRoot`) are sent
+   * each on their own, so a field never written is left out of them, see
+   * {@link withoutUnwrittenFields}, and when one of `partialProperties` may be missing, so may
+   * each of its fields.
+   */
+  inlineRoot(
+    schema: JsonSchema,
+    properties: readonly string[],
+    partialProperties: readonly string[] = [],
+    separateRoot = false,
+    separateProperties: readonly string[] = partialProperties,
+  ): JsonSchema {
+    const inlined = this.inlineRootDefs(schema, properties, partialProperties)
+
+    if (!separateRoot && !separateProperties.length) {
+      return inlined
+    }
+
+    const separate = (member: JsonSchema): JsonSchema =>
+      mapProperties(
+        separateRoot ? withoutUnwrittenFields(member) : member,
+        separateProperties,
+        (property) => this.mapObjects(property, withoutUnwrittenFields),
+      )
+
+    return this.mapObjects(inlined, separate)
+  }
+
+  /**
+   * Maps the object schemas of a schema, also the members of a union or an intersection and the
+   * defs they refer to, which are inlined when they change.
+   */
+  mapObjects(
+    schema: JsonSchema,
+    map: (object: JsonSchema) => JsonSchema,
+    followed: ReadonlySet<string> = new Set(),
+  ): JsonSchema {
+    if (typeof schema !== 'object') {
+      return schema
+    }
+
+    const name = fromRef(schema)
+    if (name !== undefined) {
+      const def = this.defsByName.get(name)
+      if (def?.schema === undefined || followed.has(name)) {
+        return schema
+      }
+
+      const mapped = this.mapObjects(def.schema, map, new Set(followed).add(name))
+      return mapped === def.schema ? schema : mapped
+    }
+
+    let result = map(schema)
+    for (const keyword of ['anyOf', 'oneOf', 'allOf'] as const) {
+      if (typeof result !== 'object') {
+        break
+      }
+
+      const members = result[keyword]
+      const mapped = members?.map((m) => this.mapObjects(m, map, followed))
+      if (mapped?.some((m, i) => m !== members![i])) {
+        result = { ...result, [keyword]: mapped }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * The root with its defs inlined, see `inlineRoot`.
+   */
+  private inlineRootDefs(
+    schema: JsonSchema,
+    properties: readonly string[],
+    partialProperties: readonly string[],
+  ): JsonSchema {
+    const resolve = (member: JsonSchema): JsonSchema | undefined => {
+      const name = fromRef(member)
+      const def = name === undefined ? undefined : this.defsByName.get(name)
+
+      return !def || this.collectDeps(this.getDeps(def)).has(def.name) ? undefined : def.schema!
+    }
+
+    const inlineRef = (member: JsonSchema): JsonSchema =>
+      objectMembers(resolve(member) ?? member, resolve)
+
+    const inlineProperties = (member: JsonSchema): JsonSchema =>
+      mapProperties(inlineRef(member), properties, inlineRef)
+
+    let root = inlineProperties(schema)
+
+    if (typeof root === 'object' && root.anyOf) {
+      root = objectMembers({ ...root, anyOf: root.anyOf.map(inlineProperties) }, resolve)
+    }
+
+    const members = typeof root === 'object' ? (root.anyOf ?? [root]) : []
+    const partial = partialProperties.filter((property) =>
+      members.some(
+        (m) => typeof m === 'object' && m.$ref === undefined && !m.required?.includes(property),
+      ),
+    )
+
+    if (!partial.length) {
+      return root
+    }
+
+    // also of a def not inlined, a recursive one (`interface Q { a: string; self?: Q }`)
+    const withPartial = (member: JsonSchema): JsonSchema =>
+      mapProperties(member, partial, (property) => this.mapObjects(property, withoutRequired))
+
+    return typeof root === 'object' && root.anyOf
+      ? { ...root, anyOf: root.anyOf.map(withPartial) }
+      : withPartial(root)
+  }
+
+  private add(def: Def): void {
+    this.defs.set(def.key, def)
+    this.defsByName.set(def.name, def)
+    this.names.hold(def.name)
+  }
+
+  /**
+   * Removes a def, whose name stays given (see `discardCreated`).
+   */
+  private remove(def: Def): void {
+    this.defs.delete(def.key)
+    this.defsByName.delete(def.name)
+    this.names.unhold(def.name)
+  }
+
+  private getDeps(def: Def): Set<string> {
+    // an unfinished def has no deps yet, and must not cache that
+    if (def.schema === undefined) {
+      return new Set()
+    }
+
+    def.deps ??= collectDefRefs(def.schema)
+    return def.deps
+  }
+
+  /**
+   * The defs reachable from the given ones, including them.
+   */
+  private collectDeps(names: Iterable<string>): Set<string> {
+    const collected = new Set<string>()
+    const queue = [...names]
+
+    while (queue.length) {
+      const name = queue.pop()!
+      const def = this.defsByName.get(name)
+
+      if (collected.has(name) || !def) {
+        continue
+      }
+
+      collected.add(name)
+      queue.push(...this.getDeps(def))
+    }
+
+    return collected
+  }
+}
+
+/**
+ * An object schema without the fields no value of which is written (`{ not: {} }`, like the keys
+ * `[P]?: never` of an exclusive or), for an object whose fields are sent each on their own, as
+ * parameters or headers, none of which could hold them.
+ */
+function withoutUnwrittenFields(schema: JsonSchema): JsonSchema {
+  if (typeof schema !== 'object' || !schema.properties) {
+    return schema
+  }
+
+  const { properties, required, ...rest } = schema
+  const kept = Object.entries(properties).filter(([, property]) => !isNeverSchema(property))
+  if (kept.length === Object.keys(properties).length) {
+    return schema
+  }
+
+  const stillRequired = required?.filter((name) => kept.some(([kept]) => kept === name))
+  return {
+    ...rest,
+    ...(kept.length ? { properties: Object.fromEntries(kept) } : {}),
+    ...(stillRequired?.length ? { required: stillRequired } : {}),
+  }
+}
+
+/**
+ * An object schema with some of its properties mapped, the same schema without any to map.
+ */
+function mapProperties(
+  schema: JsonSchema,
+  names: readonly string[],
+  map: (property: JsonSchema) => JsonSchema,
+): JsonSchema {
+  if (typeof schema !== 'object' || !schema.properties || !names.length) {
+    return schema
+  }
+
+  const properties = { ...schema.properties }
+  for (const name of names) {
+    if (properties[name] !== undefined) {
+      properties[name] = map(properties[name])
+    }
+  }
+
+  return { ...schema, properties }
+}

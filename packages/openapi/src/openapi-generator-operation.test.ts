@@ -393,6 +393,213 @@ describe('openAPIGenerator operation builders', () => {
       expect(operation.requestBody).toBeUndefined()
     })
 
+    it('documents no request body when every field is a path param and no other key is allowed', () => {
+      const path = '/planets/{id}' as const
+      const build = (extra: object) => {
+        const { ctx, operation } = createContext()
+        buildRequest(
+          ctx,
+          operation,
+          testDef({
+            inputs: [
+              testSchema({
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+                ...extra,
+              }),
+            ],
+          }),
+          { method: 'DELETE', path },
+          getDynamicPathParams(path),
+        )
+        return operation.requestBody
+      }
+
+      expect(build({ additionalProperties: false })).toBeUndefined()
+
+      // other keys may still be sent, which `v.looseObject` and arktype objects keep without
+      // writing `additionalProperties`
+      expect(build({})).toEqual({
+        content: { 'application/json': { schema: { type: 'object', properties: {} } } },
+      })
+      expect(build({ additionalProperties: true })).toEqual({
+        content: {
+          'application/json': {
+            schema: { type: 'object', properties: {}, additionalProperties: true },
+          },
+        },
+      })
+      expect(build({ additionalProperties: { type: 'number' } })).toEqual({
+        content: {
+          'application/json': {
+            schema: { type: 'object', properties: {}, additionalProperties: { type: 'number' } },
+          },
+        },
+      })
+    })
+
+    it.each([
+      [
+        'compact',
+        {
+          type: 'object',
+          properties: { a: { type: 'string' } },
+          additionalProperties: { type: 'number' },
+        },
+      ],
+      [
+        'detailed',
+        {
+          type: 'object',
+          properties: { query: { type: 'object', additionalProperties: { type: 'number' } } },
+        },
+      ],
+    ] as const)(
+      'documents the free-form keys of a %s query as an object of form style',
+      (inputStructure, input) => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(
+          ctx,
+          operation,
+          testDef({ inputs: [testSchema(input)] }),
+          { method: 'GET', inputStructure },
+          undefined,
+        )
+
+        expect(operation.parameters?.at(-1)).toEqual({
+          in: 'query',
+          name: 'query',
+          schema: { type: 'object', additionalProperties: { type: 'number' } },
+          style: 'form',
+          explode: true,
+        })
+      },
+    )
+
+    it('documents the free-form keys of a query whose names are only strings', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            // `z.record(z.string(), z.string())`
+            testSchema({
+              type: 'object',
+              propertyNames: { type: 'string' },
+              additionalProperties: { type: 'string' },
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters).toEqual([
+        {
+          in: 'query',
+          name: 'query',
+          schema: { type: 'object', additionalProperties: { type: 'string' } },
+          style: 'form',
+          explode: true,
+        },
+      ])
+    })
+
+    it.each<[JsonSchema]>([
+      [false],
+      [{ not: {} }],
+      // sent in bracket notation (`b[0]=1`), which a form object does not describe
+      [true],
+      [{}],
+      [{ type: 'array', items: { type: 'string' } }],
+      [{ anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }],
+      [{ type: 'object', additionalProperties: { type: 'string' } }],
+    ])('documents no free-form query keys of %j', (additionalProperties) => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { a: { type: 'string' } },
+              additionalProperties,
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).name)).toEqual([
+        'a',
+      ])
+    })
+
+    it.each<[Record<string, unknown>]>([
+      // `z.record(z.enum(['x', 'y']), z.string())`
+      [{ propertyNames: { type: 'string', enum: ['x', 'y'] }, required: ['x', 'y'] }],
+      [{ propertyNames: { type: 'string', minLength: 1 } }],
+      [{ propertyNames: { pattern: '^x-' } }],
+      [{ required: ['a', 'b'] }],
+      [{ patternProperties: { '^x-': { type: 'string' } } }],
+      [{ minProperties: 1 }],
+      [{ maxProperties: 3 }],
+    ])('documents no free-form query keys constrained by %j', (constraints) => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { a: { type: 'string' } },
+              additionalProperties: { type: 'string' },
+              ...constraints,
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters?.map((p) => (p as OpenAPIV3_2.ParameterObject).name)).toEqual([
+        'a',
+      ])
+    })
+
+    it('documents no free-form query keys beside a field named like their parameter', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { query: { type: 'string' } },
+              additionalProperties: { type: 'string' },
+            }),
+          ],
+        }),
+        { method: 'GET' },
+        undefined,
+      )
+
+      expect(operation.parameters).toEqual([
+        expect.objectContaining({ in: 'query', name: 'query', schema: { type: 'string' } }),
+      ])
+    })
+
     it('requires collection-styled query params only when they reject an empty collection', () => {
       const cases: [
         style: NonNullable<OpenAPIMeta['queryStyles']>[string],
@@ -607,6 +814,28 @@ describe('openAPIGenerator operation builders', () => {
         required: true,
         content: { 'application/json': { schema: { type: 'string' } } },
       })
+    })
+
+    it('documents no request body for a detailed body of any value, which has no media type', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(
+        ctx,
+        operation,
+        testDef({
+          inputs: [
+            testSchema({
+              type: 'object',
+              properties: { query: { type: 'object' }, body: {} },
+              required: ['body'],
+            }),
+          ],
+        }),
+        { inputStructure: 'detailed' },
+        undefined,
+      )
+
+      expect(operation.requestBody).toBeUndefined()
     })
 
     it('maps AsyncIteratorObject inputs to an SSE request body', () => {
@@ -858,6 +1087,7 @@ describe('openAPIGenerator operation builders', () => {
             testSchema({
               type: 'object',
               properties: { file: { type: 'string', contentEncoding: 'binary' } },
+              required: ['file'],
             }),
           ],
         }),
@@ -871,10 +1101,64 @@ describe('openAPIGenerator operation builders', () => {
             schema: {
               type: 'object',
               properties: { file: { type: 'string', contentEncoding: 'binary' } },
+              required: ['file'],
             },
           },
         },
       })
+    })
+
+    it('also uses application/json for bodies whose nested files may be left out', () => {
+      const file = { type: 'string', contentEncoding: 'binary' } as const
+      const contentTypes = (schema: JsonSchema) => {
+        const { ctx, operation } = createContext()
+        buildSuccessResponse(ctx, operation, testDef({ outputs: [testSchema(schema)] }), undefined)
+        return Object.keys((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content!)
+      }
+
+      // a value holding no file is sent as JSON
+      expect(contentTypes({ type: 'object', properties: { file } })).toEqual([
+        'multipart/form-data',
+        'application/json',
+      ])
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { files: { type: 'array', items: file } },
+          required: ['files'],
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { file: { anyOf: [file, { type: 'null' }] } },
+          required: ['file'],
+        }),
+      ).toEqual(['multipart/form-data', 'application/json'])
+      // through refs and compositions, a required file is always sent
+      expect(
+        contentTypes({
+          allOf: [
+            { type: 'object', properties: { file: { $ref: '#/$defs/File' } }, required: ['file'] },
+            { type: 'object', properties: { name: { type: 'string' } } },
+          ],
+          $defs: { File: file },
+        }),
+      ).toEqual(['multipart/form-data'])
+      // nor are the first items of an array, also of a tuple
+      expect(
+        contentTypes({
+          type: 'object',
+          properties: { files: { type: 'array', prefixItems: [file], minItems: 1, maxItems: 1 } },
+          required: ['files'],
+        }),
+      ).toEqual(['multipart/form-data'])
+      expect(contentTypes({ type: 'array', items: file, minItems: 1 })).toEqual([
+        'multipart/form-data',
+      ])
+      expect(
+        contentTypes({ type: 'array', prefixItems: [{ type: 'string' }, file], minItems: 1 }),
+      ).toEqual(['multipart/form-data', 'application/json'])
     })
 
     it('reads the content media type of a file body from its $ref target', () => {
@@ -978,7 +1262,8 @@ describe('openAPIGenerator operation builders', () => {
         201: {
           description: 'created',
           headers: {
-            'x-id': { required: true, schema: { type: 'string' } },
+            // the second 201 member sends no headers
+            'x-id': { schema: { type: 'string' } },
           },
           content: {
             'application/json': {
@@ -1000,6 +1285,129 @@ describe('openAPIGenerator operation builders', () => {
             'x-opt': { schema: { type: 'string' } },
           },
         },
+      })
+    })
+
+    it('requires the headers every detailed member of a status sends', () => {
+      const { ctx, operation } = createContext()
+      const headers = (required: string[]): JsonSchema => ({
+        type: 'object',
+        properties: { 'x-id': { type: 'string' }, 'x-opt': { type: 'string' } },
+        required,
+      })
+
+      buildSuccessResponse(
+        ctx,
+        operation,
+        testDef({
+          outputs: [
+            testSchema({
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: { status: { const: 201 }, headers: headers(['x-id', 'x-opt']) },
+                  required: ['status', 'headers'],
+                },
+                {
+                  type: 'object',
+                  properties: { status: { const: 201 }, headers: headers(['x-id']) },
+                  required: ['status', 'headers'],
+                },
+                {
+                  type: 'object',
+                  properties: { headers: headers(['x-id']) },
+                  required: [],
+                },
+                {
+                  type: 'object',
+                  properties: { status: { const: 202 } },
+                  required: ['status'],
+                },
+              ],
+            }),
+          ],
+        }),
+        { outputStructure: 'detailed' },
+      )
+
+      const responses = operation.responses as Record<string, OpenAPIV3_2.ResponseObject>
+      expect(responses['201']?.headers).toEqual({
+        'x-id': { required: true, schema: { type: 'string' } },
+        'x-opt': { schema: { type: 'string' } },
+      })
+      // a member whose headers may be left out sends none
+      expect(responses['200']?.headers).toEqual({
+        'x-id': { schema: { type: 'string' } },
+        'x-opt': { schema: { type: 'string' } },
+      })
+      expect(responses['202']?.headers).toBeUndefined()
+    })
+
+    it('requires no header of a status one of whose members has no headers', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(
+        ctx,
+        operation,
+        testDef({
+          outputs: [
+            testSchema({
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    status: { const: 200 },
+                    headers: {
+                      type: 'object',
+                      properties: { etag: { type: 'string' } },
+                      required: ['etag'],
+                    },
+                    body: { type: 'string' },
+                  },
+                  required: ['status', 'headers', 'body'],
+                },
+                {
+                  type: 'object',
+                  properties: { status: { const: 200 }, body: { type: 'string' } },
+                  required: ['status', 'body'],
+                },
+              ],
+            }),
+          ],
+        }),
+        { outputStructure: 'detailed' },
+      )
+
+      expect((operation.responses as any)['200'].headers).toEqual({
+        etag: { schema: { type: 'string' } },
+      })
+    })
+
+    it('documents a detailed body once when members of a status share it', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(
+        ctx,
+        operation,
+        testDef({
+          outputs: [
+            testSchema({
+              anyOf: [
+                {
+                  type: 'object',
+                  properties: { headers: { type: 'object' }, body: { type: 'string' } },
+                  required: ['headers', 'body'],
+                },
+                { type: 'object', properties: { body: { type: 'string' } }, required: ['body'] },
+              ],
+            }),
+          ],
+        }),
+        { outputStructure: 'detailed' },
+      )
+
+      expect((operation.responses?.['200'] as OpenAPIV3_2.ResponseObject).content).toEqual({
+        'application/json': { schema: { type: 'string' } },
       })
     })
 

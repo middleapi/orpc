@@ -1,0 +1,5915 @@
+import { Buffer } from 'node:buffer'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+
+import {
+  OpenAPIGenerator as BaseOpenAPIGenerator,
+  BracketNotationSerializer,
+  openapi,
+  OpenAPIGeneratorError,
+  OpenAPIJsonSerializer,
+} from '@orpc/openapi'
+import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
+import { call, os, Procedure } from '@orpc/server'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+import { Ajv2020 } from 'ajv/dist/2020.js'
+import { Checker, Program } from 'typescript/unstable/sync'
+import * as z from 'zod'
+
+import { canGenerateWithin, generateWithin } from '../tests/bounded-generate'
+import {
+  FunctionHolder,
+  jsonFn,
+  JsonFnForms,
+  JsonFnHolder,
+  MaybeStampHolder,
+  addedToJsonInputs,
+  StampHolder,
+} from '../tests/fixtures/app/src/added-tojson'
+import { anySubRouter, anyExport, givenLazy, anyLazy } from '../tests/fixtures/app/src/any-routers'
+import { arrayLikeViewsInputs } from '../tests/fixtures/app/src/array-like-views'
+import {
+  boxedViewResults,
+  readonlySets,
+  boxedViewsInputs,
+} from '../tests/fixtures/app/src/boxed-views'
+import { brandedPrimitiveViewsInputs } from '../tests/fixtures/app/src/branded-views'
+import { router as brokenRouter } from '../tests/fixtures/app/src/broken'
+import { StringRows, viewInputs } from '../tests/fixtures/app/src/builtin-views'
+import {
+  classInputs,
+  Guarded,
+  Labels,
+  Link,
+  Lookup,
+  Money,
+  Order,
+  Person,
+  Sealed,
+  Stamp,
+  Tagged,
+} from '../tests/fixtures/app/src/class-inputs'
+import {
+  callables,
+  FullName,
+  instanceInputs,
+  LabeledStamp,
+} from '../tests/fixtures/app/src/class-views'
+import { clientValuesInputs } from '../tests/fixtures/app/src/client-values'
+import {
+  booleanViews,
+  labeledViews,
+  plainLabeledViews,
+  collectionViewsInputs,
+} from '../tests/fixtures/app/src/collection-views'
+import { contract, implemented } from '../tests/fixtures/app/src/contract'
+import {
+  AddedDateViewHolder,
+  DateViewHolder,
+  dateViewsInputs,
+  UndefPointImpl,
+} from '../tests/fixtures/app/src/date-views'
+import { Getters, StampedDate, viewedInputs } from '../tests/fixtures/app/src/deep-views'
+import { router as detailedRouter } from '../tests/fixtures/app/src/detailed'
+import { router as detailedStatusesRouter } from '../tests/fixtures/app/src/detailed-statuses'
+import { detailedUnions } from '../tests/fixtures/app/src/detailed-unions'
+import {
+  discriminatedUnions,
+  discriminatedUnionsInputs,
+} from '../tests/fixtures/app/src/discriminated-unions'
+import { emptyPartsInputs } from '../tests/fixtures/app/src/empty-parts'
+import {
+  codedErrors,
+  messageTags,
+  plainTaggedError,
+  relays,
+  errorSubtypesInputs,
+  taggedError,
+} from '../tests/fixtures/app/src/error-interfaces'
+import {
+  JsonPointImpl,
+  labelledBytes,
+  labelledError,
+  errorToJsonInputs,
+} from '../tests/fixtures/app/src/error-tojson'
+import {
+  boxedInterfaces,
+  errorViewJsons,
+  jsonFns,
+  plainBoxedInterfaces,
+  plainErrorViewJsons,
+  errorViewsInputs,
+} from '../tests/fixtures/app/src/error-views'
+import {
+  viewedFunctions,
+  viewedFunctionsInputs,
+  viewedFnHolder,
+} from '../tests/fixtures/app/src/function-views'
+import {
+  brandedLedger,
+  genericBrands,
+  genericBrandsInputs,
+} from '../tests/fixtures/app/src/generic-brands'
+import { genericCyclesInputs } from '../tests/fixtures/app/src/generic-cycles'
+import { router as headersRouter } from '../tests/fixtures/app/src/headers'
+import {
+  optionalBodies,
+  optionalDetailedBodies,
+  intersectionArgumentNames,
+  literalArgumentNames,
+  literalArgumentNamesReversed,
+} from '../tests/fixtures/app/src/instantiation-names'
+import { interfaceBodies, classViewBodies } from '../tests/fixtures/app/src/interface-bodies'
+import { internedUnions } from '../tests/fixtures/app/src/interned-unions'
+import {
+  boxedJson,
+  errorViewJson,
+  plainErrorViewJson,
+  intersectedToJsonInputs,
+  subErrJson,
+} from '../tests/fixtures/app/src/intersected-tojson'
+import { returnsJSDoc } from '../tests/fixtures/app/src/jsdoc-returns'
+import { keyedMappedTypes } from '../tests/fixtures/app/src/keyed-mapped-types'
+import { linkedCycles } from '../tests/fixtures/app/src/linked-cycles'
+import {
+  anyConverted,
+  recursiveDeepViews,
+  firstConverter,
+  lostAliasNames,
+  bodilessRequests,
+  typeRoles,
+  internedLiterals,
+  missingModuleModel,
+} from '../tests/fixtures/app/src/lost-aliases'
+import {
+  JsonDicts,
+  nestedBrands,
+  nestedBrandsInputs,
+} from '../tests/fixtures/app/src/nested-brands'
+import { nestedPagesInputs } from '../tests/fixtures/app/src/nested-pages'
+import {
+  permutationHolderInObject,
+  permutationHolderInRoot,
+  permutationHolderInRootRoot,
+  permutationHolderRootInRoot,
+  permutationInObjectHolder,
+  permutationInRootHolder,
+  permutationInRootHolderRoot,
+  permutationInRootRootHolder,
+  permutationRootHolderInRoot,
+  permutationRootInRootHolder,
+} from '../tests/fixtures/app/src/order-permutations'
+import {
+  ormModels,
+  writtenArgumentNames,
+  urlParameters,
+  ormModelTypes,
+} from '../tests/fixtures/app/src/orm-models'
+import {
+  boxedClassJson,
+  plainViewToJSON,
+  ownToJsonInputs,
+  viewToJSON,
+} from '../tests/fixtures/app/src/own-tojson'
+import { primitiveViewsInputs } from '../tests/fixtures/app/src/primitive-views'
+import {
+  procedureOrder,
+  procedureOrderForward,
+  procedureOrderMixed,
+  procedureOrderReverse,
+  procedureOrderSwapped,
+} from '../tests/fixtures/app/src/procedure-order'
+import { router } from '../tests/fixtures/app/src/router'
+import {
+  decomposed,
+  disjoint,
+  indexes,
+  lazyRouter,
+  optional,
+  other,
+  records,
+  spread,
+  unions,
+} from '../tests/fixtures/app/src/router-shapes'
+import { innerRouter, emptyJSDocTags, outerRouter } from '../tests/fixtures/app/src/router-sources'
+import streamRouter from '../tests/fixtures/app/src/routers/stream'
+import { sentValues, fileNames, queryRoles } from '../tests/fixtures/app/src/sent-values'
+import { router as shorthandRouter } from '../tests/fixtures/app/src/shorthand'
+import type { Tile } from '../tests/fixtures/app/src/sized-types'
+import { sizedTypesInputs } from '../tests/fixtures/app/src/sized-types'
+import {
+  countedNoteInput,
+  countedNoteOutput,
+  splitParameters,
+  countedConversions,
+  unconvertibleZod,
+} from '../tests/fixtures/app/src/standard-schemas'
+import {
+  registeredNote,
+  anyTypedProcedures,
+  registeredSchemas,
+} from '../tests/fixtures/app/src/stock-schemas'
+import { templateIndexesInputs } from '../tests/fixtures/app/src/template-indexes'
+import {
+  DraftNote,
+  toJsonParametersInputs,
+  SearchFilter,
+} from '../tests/fixtures/app/src/tojson-parameters'
+import {
+  errorViewMix,
+  numberViewJson,
+  plainErrorViewMix,
+  toJsonViewsInputs,
+  zonedError,
+} from '../tests/fixtures/app/src/tojson-views'
+import {
+  classes,
+  directions,
+  jsdoc,
+  mixed,
+  streams,
+} from '../tests/fixtures/app/src/type-only-schemas'
+import { unconvertibleParameters } from '../tests/fixtures/app/src/unconvertible-parameters'
+import { errorData } from '../tests/fixtures/app/src/unresolved-error-data'
+import { WithArrow, viewIntersectionsInputs } from '../tests/fixtures/app/src/view-intersections'
+import {
+  boxedNumLikes,
+  functionJsonFn,
+  numViewJsons,
+  OptionalJsonHolder,
+  optionalJsons,
+  plainJsonFn,
+  plainNumLikes,
+  plainOptionalJsons,
+  weakCollectionsInputs,
+  weakHolder,
+} from '../tests/fixtures/app/src/weak-collections'
+import {
+  GetterOnly,
+  numberedComponents,
+  widenedMappedViewsInputs,
+  numberedBodyComponents,
+  StampDate,
+  TaggedDate,
+  TaggedSet,
+  TaggedURL,
+} from '../tests/fixtures/app/src/widened-views'
+import {
+  crewsHeldFirst,
+  crewsHeldLast,
+  crewsLazy,
+} from '../tests/fixtures/library-aliases/src/crews'
+import {
+  documents as libraryDocuments,
+  named as libraryNamed,
+} from '../tests/fixtures/library-aliases/src/documents'
+import {
+  aliases,
+  aliasesReversed,
+  collision,
+  collisionReversed,
+  heldFirst,
+  heldLast,
+} from '../tests/fixtures/library-aliases/src/orders'
+import { projections, projectionsReversed } from '../tests/fixtures/library-aliases/src/projections'
+import { router as libraryAliasesRouter } from '../tests/fixtures/library-aliases/src/router'
+import { router as nestedRouter } from '../tests/fixtures/nested/proj/scripts/router'
+import { bufferQueries } from '../tests/fixtures/runtime/src/buffer-queries'
+import { bodyNames, mixedNames, queryNames } from '../tests/fixtures/runtime/src/parameter-names'
+import {
+  optionalParameterValues,
+  parameterValues,
+} from '../tests/fixtures/runtime/src/parameter-values'
+import { router as outsideRouter } from '../tests/fixtures/solution-outside/router'
+import { router as solutionRouter } from '../tests/fixtures/solution/app/router'
+import { OpenAPIGenerator } from './openapi-generator'
+
+// the documents of the `app` fixture are generated from one compiler, started once
+const projects = vi.hoisted(() => ({ close: () => {} }))
+vi.mock('./project', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./project')>()
+  const { shareProjects } = await import('../tests/shared-project')
+  const shared = shareProjects(
+    actual.openTypeScriptProject,
+    new URL('../tests/fixtures/app/src/', import.meta.url),
+  )
+  projects.close = shared.close
+  return { ...actual, openTypeScriptProject: shared.open }
+})
+afterAll(() => projects.close())
+
+const fixture = (file: string) => new URL(`../tests/fixtures/app/src/${file}`, import.meta.url)
+
+const PLANET = {
+  type: 'object',
+  properties: {
+    id: { type: 'number', description: 'Unique id' },
+    name: { type: 'string' },
+    description: { type: 'string' },
+    discoveredAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+    moons: { type: 'array', items: { $ref: '#/components/schemas/Planet' } },
+  },
+  required: ['id', 'name', 'discoveredAt', 'moons'],
+  description: 'A planet in the solar system',
+}
+
+describe('openAPIGenerator', () => {
+  const generator = new OpenAPIGenerator({
+    converters: [new ZodToJsonSchemaConverter()],
+  })
+
+  describe('router', async () => {
+    const spec = await generator.generate(router, {
+      source: { file: fixture('router.ts') },
+      base: { info: { title: 'Planets', version: '1.0.0' } },
+    })
+
+    it('keeps base options', () => {
+      expect(spec.openapi).toBe('3.2.0')
+      expect(spec.info).toEqual({ title: 'Planets', version: '1.0.0' })
+    })
+
+    it('infers outputs without .output, resolving `@/` imports and named types', () => {
+      expect(spec.components?.schemas?.Planet).toEqual(PLANET)
+      // union members are ordered as the checker stores them
+      expect(spec.components?.schemas?.PlanetKind).toEqual({
+        type: 'string',
+        enum: expect.toSatisfy(
+          (e: string[]) => e.length === 2 && e.includes('rocky') && e.includes('gas'),
+        ),
+      })
+
+      expect(spec.paths?.['/planets/{id}']?.get?.responses?.['200']).toEqual({
+        description: 'OK',
+        content: {
+          'application/json': {
+            schema: { anyOf: [{ $ref: '#/components/schemas/Planet' }, { type: 'null' }] },
+          },
+        },
+      })
+    })
+
+    it('infers inputs of type-only schemas', () => {
+      expect(spec.paths?.['/planets/{id}']?.get?.parameters).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'number' } },
+      ])
+
+      expect(spec.paths?.['/planets']?.post?.requestBody).toEqual({
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                description: { type: 'string' },
+                discoveredAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+              },
+              required: ['name', 'discoveredAt'],
+            },
+          },
+        },
+      })
+    })
+
+    it('prefers converters when they support the schema', () => {
+      const parameters = spec.paths?.['/planets']?.get?.parameters as any[]
+
+      expect(parameters.map((p) => [p.name, p.schema])).toEqual([
+        ['limit', { type: 'integer', minimum: -9007199254740991, maximum: 9007199254740991 }],
+        ['kind', { type: 'string', enum: ['rocky', 'gas'] }],
+      ])
+
+      // the zod error data is converted, the type-only one inferred
+      expect(spec.components?.schemas?.Forbidden).toMatchObject({
+        properties: { data: { properties: { reason: { type: 'string' } } } },
+      })
+      expect(spec.components?.schemas?.Conflict).toMatchObject({
+        properties: {
+          data: {
+            type: 'object',
+            properties: { existingId: { type: 'number' } },
+            required: ['existingId'],
+          },
+        },
+      })
+    })
+
+    it('fills operation meta from JSDoc, keeping .route values', () => {
+      const find = spec.paths?.['/planets/{id}']?.get
+      expect(find?.summary).toBe('Find a planet')
+      expect(find?.description).toBe('Looks a planet up by its id.')
+
+      const list = spec.paths?.['/planets']?.get
+      expect(list?.deprecated).toBe(true)
+      expect(list?.tags).toEqual(['planets', 'legacy'])
+      expect(list?.summary).toBeUndefined()
+
+      const create = spec.paths?.['/planets']?.post
+      expect(create?.summary).toBe('Summary from route')
+      expect(Object.keys(create?.responses ?? {})).toEqual(['201', '403', '409'])
+
+      expect(spec.paths?.['/health']?.post?.summary).toBe('Health check')
+    })
+
+    it('infers async iterator outputs of lazy routers as event streams', () => {
+      const content = (spec.paths?.['/stream/ticks']?.post?.responses?.['200'] as any).content
+      const [message, close] = content['text/event-stream'].schema.oneOf
+
+      expect(message.properties.data).toEqual({
+        type: 'object',
+        properties: { tick: { type: 'number' } },
+        required: ['tick'],
+      })
+      expect(close.properties.data).toEqual({ type: 'string', const: 'done' })
+
+      const plain = (spec.paths?.['/stream/plain']?.post?.responses?.['200'] as any).content
+      expect(plain['text/event-stream'].schema.oneOf[0].properties.data).toEqual({ type: 'string' })
+      // a generator returning nothing closes without data
+      expect(plain['text/event-stream'].schema.oneOf[1].properties.data).toEqual({ not: {} })
+      expect(plain['text/event-stream'].schema.oneOf[1].required).toEqual(['event'])
+    })
+
+    it('documents void outputs as empty responses', () => {
+      expect(spec.paths?.['/void']?.post?.responses?.['200']).toEqual({
+        description: 'OK',
+        content: {},
+      })
+    })
+
+    it('infers plain outputs', () => {
+      expect(spec.paths?.['/health']?.post?.responses?.['200']).toEqual({
+        description: 'OK',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                ok: { type: 'boolean', const: true },
+                uptime: { type: 'number' },
+                at: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+              },
+              required: ['ok', 'uptime', 'at'],
+            },
+          },
+        },
+      })
+    })
+  })
+
+  it('resolves type exports', async () => {
+    const fromValue = await generator.generate(router, { source: { file: fixture('router.ts') } })
+    const fromType = await generator.generate(router, {
+      source: { file: fixture('router.ts'), export: 'AppRouter' },
+    })
+
+    expect(fromType).toEqual(fromValue)
+  })
+
+  it('accepts an explicit tsconfig', async () => {
+    const spec = await generator.generate(router, {
+      source: { file: fixture('router.ts'), tsconfig: fixture('../tsconfig.json') },
+    })
+
+    expect(spec.components?.schemas?.Planet).toEqual(PLANET)
+  })
+
+  it.each([
+    ['contract', contract, 'contract'],
+    ['implemented router', implemented, 'implemented'],
+  ])('supports a %s', async (_, value, exportName) => {
+    const spec = await generator.generate(value, {
+      source: { file: fixture('contract.ts'), export: exportName },
+    })
+
+    const todo = {
+      type: 'object',
+      properties: { id: { type: 'string' }, title: { type: 'string' }, done: { type: 'boolean' } },
+      required: ['id', 'title', 'done'],
+    }
+
+    expect(spec.components?.schemas?.Todo).toEqual(todo)
+    expect(spec.paths?.['/todo/get']?.post?.summary).toBe('Get a todo')
+    expect(spec.paths?.['/todo/get']?.post?.description).toBe('Fetches one todo.')
+    expect(spec.paths?.['/todo/get']?.post?.tags).toEqual(['todos'])
+    expect(spec.paths?.['/todo/get']?.post?.requestBody).toEqual({
+      required: true,
+      content: {
+        'application/json': {
+          schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        },
+      },
+    })
+    // `Todo | undefined`, where no todo is sent as no body
+    expect((spec.paths?.['/todo/get']?.post?.responses?.['200'] as any).content).toEqual({
+      'application/json': {
+        schema: { anyOf: [{ $ref: '#/components/schemas/Todo' }, { type: 'null' }] },
+      },
+    })
+    expect((spec.paths?.['/todo/list']?.post?.responses?.['200'] as any).content).toEqual({
+      'application/json': {
+        schema: { type: 'array', items: { $ref: '#/components/schemas/Todo' } },
+      },
+    })
+  })
+
+  it.each(['3.1.1', '3.0.4'] as const)('downgrades to %s', async (version) => {
+    const spec = await generator.generate(router, {
+      source: { file: fixture('router.ts') },
+      version,
+    })
+
+    expect(spec.openapi).toBe(version)
+
+    const schema = (spec.paths?.['/planets/{id}']?.get?.responses?.['200'] as any).content[
+      'application/json'
+    ].schema
+
+    if (version === '3.0.4') {
+      expect(JSON.stringify(spec)).not.toContain('"type":"null"')
+      expect(JSON.stringify(spec)).not.toContain('"const"')
+      expect(JSON.stringify(schema)).toContain('"nullable":true')
+    } else {
+      expect(schema).toEqual({
+        anyOf: [{ $ref: '#/components/schemas/Planet' }, { type: 'null' }],
+      })
+    }
+  })
+
+  it('filters procedures with the original procedure', async () => {
+    const filter = vi.fn((procedure: unknown, path: readonly string[]) => {
+      expect(procedure).toBeInstanceOf(Procedure)
+      return path[0] === 'health'
+    })
+
+    const spec = await generator.generate(router, {
+      source: { file: fixture('router.ts') },
+      filter,
+    })
+
+    expect(Object.keys(spec.paths ?? {})).toEqual(['/health'])
+    expect(filter).toHaveBeenCalledTimes(7)
+  })
+
+  it('reports unresolved types per procedure', async () => {
+    await expect(
+      generator.generate(brokenRouter, { source: { file: fixture('broken.ts') } }),
+    ).rejects.toThrow(OpenAPIGeneratorError)
+
+    await expect(
+      generator.generate(brokenRouter, { source: { file: fixture('broken.ts') } }),
+    ).rejects.toThrow(
+      'Failed to infer types for the OpenAPI document (1 error):\n\nProcedure at broken: Could not resolve the type "Missing"',
+    )
+  })
+
+  it('documents an operation given whole by a spec object without its types', async () => {
+    const spec = { operationId: 'upload', responses: { 200: { description: 'Uploaded' } } }
+    const withSpec = {
+      ok: brokenRouter.ok,
+      broken: brokenRouter.broken.meta(openapi({ spec })),
+      extra: brokenRouter.ok.meta(openapi({ spec: { ...spec, operationId: 'extra' } })),
+    }
+
+    const document = await generator.generate(withSpec, { source: { file: fixture('broken.ts') } })
+    const stock = await new BaseOpenAPIGenerator().generate(withSpec)
+
+    expect(document.paths?.['/broken']).toEqual(stock.paths?.['/broken'])
+    expect(document.paths?.['/extra']).toEqual(stock.paths?.['/extra'])
+  })
+
+  it('reports procedures missing from the router type', async () => {
+    await expect(
+      generator.generate(
+        { ...router, extra: router.health },
+        { source: { file: fixture('router.ts') } },
+      ),
+    ).rejects.toThrow('Procedure at extra: its type was not found in the router type')
+  })
+
+  it('reports the procedures of a sub-router typed any, with no import hint or compiler errors', async () => {
+    await expect(
+      generator.generate(anySubRouter, {
+        source: { file: fixture('any-routers.ts'), export: 'anySubRouter' },
+      }),
+    ).rejects.toThrow(
+      new OpenAPIGeneratorError(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          'Procedure at users.list: Its type is "any". Give it a type, or schemas a converter supports.',
+        ].join('\n\n'),
+      ),
+    )
+  })
+
+  it('reports the procedures of a lazy router given any', async () => {
+    await expect(
+      generator.generate(anyLazy, {
+        source: { file: fixture('any-routers.ts'), export: 'anyLazy' },
+      }),
+    ).rejects.toThrow(
+      new OpenAPIGeneratorError(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          'Procedure at users.list: Its type is "any". Give it a type, or schemas a converter supports.',
+        ].join('\n\n'),
+      ),
+    )
+  })
+
+  it('reports an export typed any as no router', async () => {
+    const file = fixture('any-routers.ts')
+
+    await expect(
+      generator.generate(anyExport, {
+        source: { file, export: 'anyExport' },
+      }),
+    ).rejects.toThrow(
+      new OpenAPIGeneratorError(
+        `[OpenAPIGenerator] The export "anyExport" of "${fileURLToPath(file)}" has type "any", which is not a router, procedure or contract.`,
+      ),
+    )
+  })
+
+  it('documents a lazy router from the router type it is given, though its loader resolves any', async () => {
+    const spec = await generator.generate(givenLazy, {
+      source: { file: fixture('any-routers.ts'), export: 'givenLazy' },
+    })
+    const schema = { type: 'array', items: { type: 'number' } }
+
+    for (const name of ['given', 'cast', 'assigned']) {
+      expect(
+        (spec.paths as any)[`/${name}/list`].post.responses[200].content['application/json'],
+      ).toEqual({ schema })
+    }
+  })
+
+  it('throws on a wrong source', async () => {
+    await expect(
+      generator.generate(router, { source: { file: fixture('router.ts'), export: 'nope' } }),
+    ).rejects.toThrow('has no export named "nope"')
+
+    await expect(
+      generator.generate(router, { source: { file: fixture('missing.ts') } }),
+    ).rejects.toThrow('does not exist')
+  })
+
+  it('lists the exports of the file when the export is missing', async () => {
+    await expect(
+      generator.generate(streamRouter, { source: { file: fixture('routers/stream.ts') } }),
+    ).rejects.toThrow(
+      `has no export named "router". Available exports: default. Use export: 'default' for the default export.`,
+    )
+    await expect(
+      generator.generate(router, { source: { file: fixture('router.ts'), export: 'nope' } }),
+    ).rejects.toThrow('Available exports: router, AppRouter.')
+  })
+
+  it('names missing files, missing tsconfigs, and directories', async () => {
+    const src = fileURLToPath(fixture(''))
+
+    await expect(generator.generate(router, { source: { file: src } })).rejects.toThrow(
+      `File "${path.resolve(src)}" is a directory, expected a source file.`,
+    )
+    await expect(
+      generator.generate(router, {
+        source: { file: fixture('router.ts'), tsconfig: fixture('../nope.json') },
+      }),
+    ).rejects.toThrow(`tsconfig "${fileURLToPath(fixture('../nope.json'))}" does not exist.`)
+
+    // a directory stands for its tsconfig.json
+    const spec = await generator.generate(router, {
+      source: { file: fixture('router.ts'), tsconfig: fixture('..') },
+    })
+    expect(spec.components?.schemas?.Planet).toEqual(PLANET)
+  })
+
+  it('accepts a solution tsconfig, using the referenced project that includes the file', async () => {
+    const solution = new URL('../tests/fixtures/solution/tsconfig.json', import.meta.url)
+    const spec = await generator.generate(solutionRouter, {
+      source: {
+        file: new URL('../tests/fixtures/solution/app/router.ts', import.meta.url),
+        tsconfig: solution,
+      },
+    })
+    expect((spec.paths?.['/ping']?.post?.responses?.['200'] as any).content).toEqual({
+      'application/json': {
+        schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      },
+    })
+
+    // a file outside the solution is not part of it
+    await expect(
+      generator.generate(router, { source: { file: fixture('router.ts'), tsconfig: solution } }),
+    ).rejects.toThrow('Pass the tsconfig that includes it, or leave out "tsconfig"')
+
+    // nor is a file of a project under the solution's directory that it does not reference
+    await expect(
+      generator.generate(solutionRouter, {
+        source: {
+          file: new URL('../tests/fixtures/solution/unreferenced/router.ts', import.meta.url),
+          tsconfig: solution,
+        },
+      }),
+    ).rejects.toThrow(`is not part of the project "${fileURLToPath(solution)}"`)
+
+    // a referenced project outside the solution's directory is part of it
+    const outside = await generator.generate(outsideRouter, {
+      source: {
+        file: new URL('../tests/fixtures/solution-outside/router.ts', import.meta.url),
+        tsconfig: solution,
+      },
+    })
+    expect((outside.paths?.['/pong']?.post?.responses?.['200'] as any).content).toEqual({
+      'application/json': {
+        schema: { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+      },
+    })
+  })
+
+  it.each([
+    ['a file URL string', () => fixture('routers/stream.ts').href],
+    [
+      'a path relative to the current working directory',
+      () => path.relative(process.cwd(), fileURLToPath(fixture('routers/stream.ts'))),
+    ],
+  ])('reads the default export from %s', async (_, file) => {
+    const fromURL = await generator.generate(streamRouter, {
+      source: { file: fixture('routers/stream.ts'), export: 'default' },
+    })
+    expect(Object.keys(fromURL.paths ?? {})).toEqual(['/ticks', '/plain'])
+
+    const spec = await generator.generate(streamRouter, {
+      source: { file: file(), export: 'default' },
+    })
+    expect(spec).toEqual(fromURL)
+  })
+
+  it('reports an export that is not a router once', async () => {
+    const procedure = router.health
+    const value = { a: procedure, b: procedure, c: { d: procedure } }
+    const file = fixture('router-sources.ts')
+
+    for (const [exportName, typeName] of [
+      ['notARouter', '1'],
+      ['NotARouterShape', 'NotARouterShape'],
+      ['notARouterFunction', '() => number'],
+    ]) {
+      await expect(
+        generator.generate(value, { source: { file, export: exportName } }),
+      ).rejects.toThrow(
+        `[OpenAPIGenerator] The export "${exportName}" of "${fileURLToPath(file)}" has type "${typeName}", which is not a router, procedure or contract.`,
+      )
+    }
+  })
+
+  it('reports the unmatched paths when "source" names another level of the router', async () => {
+    const file = fixture('router-sources.ts')
+    const hint = 'its type was not found in the router type'
+
+    const outer = generator.generate(outerRouter, {
+      source: { file, export: 'innerRouter' },
+    })
+    await expect(outer).rejects.toThrow(`Procedure at inner.list: ${hint}`)
+    await expect(outer).rejects.toThrow(`Procedure at inner.find: ${hint}`)
+    await expect(outer).rejects.not.toThrow('which is not a router')
+
+    const inner = generator.generate(innerRouter, {
+      source: { file, export: 'outerRouter' },
+    })
+    await expect(inner).rejects.toThrow(`Procedure at list: ${hint}`)
+    await expect(inner).rejects.toThrow(`Procedure at find: ${hint}`)
+    await expect(inner).rejects.not.toThrow('which is not a router')
+
+    const wrapped = generator.generate(innerRouter, {
+      source: { file, export: 'wrappedRouter' },
+    })
+    await expect(wrapped).rejects.toThrow(`Procedure at list: ${hint}`)
+    await expect(wrapped).rejects.not.toThrow('which is not a router')
+  })
+
+  it('reports the unmatched paths of routers that are no plain objects', async () => {
+    const file = fixture('router-sources.ts')
+    const other = { zzz: os.handler(() => 1) }
+
+    for (const exportName of [
+      'assignedRouter',
+      'nestedAssigned',
+      'intersectedRouter',
+      'heldRouter',
+      'heldService',
+      'callableRouter',
+    ]) {
+      const generated = generator.generate(other, { source: { file, export: exportName } })
+      await expect(generated).rejects.toThrow(
+        'Procedure at zzz: its type was not found in the router type',
+      )
+      await expect(generated).rejects.not.toThrow('which is not a router')
+    }
+
+    const assigned = await generator.generate(
+      Object.assign(
+        {},
+        { users: { list: os.handler(() => [1]) } },
+        { posts: { list: os.handler(() => ['p']) } },
+      ),
+      { source: { file, export: 'assignedRouter' } },
+    )
+    expect(Object.keys(assigned.paths ?? {})).toEqual(['/users/list', '/posts/list'])
+  })
+
+  it('tells fast that an export whose type expands generically is no router', async () => {
+    const file = fixture('router-sources.ts')
+
+    for (const [exportName, typeName] of [
+      ['grow', 'Grow<number>'],
+      ['chain', 'Chain<number>'],
+      ['cursor', 'Cursor<string>'],
+    ]) {
+      const start = performance.now()
+      await expect(
+        generator.generate(innerRouter, { source: { file, export: exportName } }),
+      ).rejects.toThrow(
+        `[OpenAPIGenerator] The export "${exportName}" of "${fileURLToPath(file)}" has type "${typeName}", which is not a router, procedure or contract.`,
+      )
+      expect(performance.now() - start).toBeLessThan(1000)
+    }
+
+    // a library class instance with a large type graph
+    const start = performance.now()
+    await expect(
+      generator.generate(innerRouter, { source: { file, export: 'userSchema' } }),
+    ).rejects.toThrow(/The export "userSchema" .* has type "ZodObject<.*which is not a router/su)
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
+
+  it('keeps the first line of the comment for an empty @summary or @description', async () => {
+    const spec = await generator.generate(emptyJSDocTags, {
+      source: { file: fixture('router-sources.ts'), export: 'emptyJSDocTags' },
+    })
+    const meta = (path: string) => {
+      const { summary, description } = (spec.paths as any)[path].post
+      return { summary, description }
+    }
+
+    expect(meta('/emptySummary')).toEqual({ summary: 'Get it', description: undefined })
+    expect(meta('/emptyDescription')).toEqual({
+      summary: 'Describe it',
+      description: 'From the comment.',
+    })
+  })
+
+  it('takes the success description from @returns, keeping one set by the openapi metadata', async () => {
+    const spec = await generator.generate(returnsJSDoc, {
+      source: { file: fixture('jsdoc-returns.ts'), export: 'returnsJSDoc' },
+    })
+    const description = (path: string, method: string, status: number) =>
+      (spec.paths as any)[path][method].responses[status].description
+
+    expect(description('/created', 'post', 201)).toBe('The created account')
+    expect(description('/found', 'post', 200)).toBe('The found account')
+    expect(description('/updated', 'post', 200)).toBe('From the route')
+    expect(description('/removed', 'post', 200)).toBe('From the metadata')
+    expect(description('/listed', 'post', 200)).toBe('OK')
+  })
+
+  it('shows the compiler errors behind an unresolved type', async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'orpc-inference-'))
+
+    try {
+      writeFileSync(
+        path.join(directory, 'tsconfig.json'),
+        JSON.stringify({ extends: './missing-base.json', include: ['*.ts'] }),
+      )
+      writeFileSync(
+        path.join(directory, 'sub.ts'),
+        `import type { User } from './nope-user'\nexport const a = null as unknown as User\n`,
+      )
+      writeFileSync(
+        path.join(directory, 'router.ts'),
+        `import { a } from './sub'\nexport const router = { a, b: undefinedVariable }\n`,
+      )
+
+      const procedure = os.handler(() => 1)
+      const error = await generator
+        .generate(
+          { a: procedure, b: procedure },
+          { source: { file: path.join(directory, 'router.ts') } },
+        )
+        .catch((e: unknown) => e as Error)
+
+      const file = (name: string) => path.join(directory, name)
+      expect(error).toBeInstanceOf(OpenAPIGeneratorError)
+      const resolution = `Check its import, and the tsconfig "paths" for aliases like "@/".`
+      const config = `error TS5083: Cannot read file '${file('missing-base.json')}'.`
+      const undeclared = `${file('router.ts')}:2:31 - error TS2304: Cannot find name 'undefinedVariable'.`
+
+      // of the router file, and of the file a procedure assigned to it is declared in, once
+      expect((error as Error).message).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at a: Could not resolve its type "User". ${resolution}`,
+          `Procedure at b: Could not resolve its type "any". ${resolution}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            config,
+            undeclared,
+            `${file('sub.ts')}:1:27 - error TS2307: Cannot find module './nope-user' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  describe('compiler errors of project setups', () => {
+    const procedure = os.handler(() => 1)
+    const roots: string[] = []
+    afterAll(() => {
+      for (const root of roots) {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    /** A project in a temporary directory, which resolves `@orpc/server` */
+    const project = (files: Record<string, string>) => {
+      const root = mkdtempSync(path.join(tmpdir(), 'orpc-inference-'))
+      roots.push(root)
+      symlinkSync(
+        fileURLToPath(new URL('../node_modules', import.meta.url)),
+        path.join(root, 'node_modules'),
+      )
+      for (const [name, content] of Object.entries(files)) {
+        mkdirSync(path.dirname(path.join(root, name)), { recursive: true })
+        writeFileSync(path.join(root, name), content)
+      }
+      return (name: string) => path.join(root, name)
+    }
+    const options = { strict: true, module: 'esnext', moduleResolution: 'bundler' }
+    const message = (promise: Promise<unknown>) =>
+      promise.then(
+        () => '',
+        (e: Error) => e.message,
+      )
+    const unresolved = (name: string) =>
+      `Could not resolve the type "${name}". Check its import, and the tsconfig "paths" for aliases like "@/".`
+
+    it('shows the errors of the compiler options, like a removed baseUrl', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: { ...options, baseUrl: 'src', paths: { '@/*': ['*'] } },
+          include: ['src'],
+        }),
+        'src/model.ts': 'export interface M { v: number; at: Date }\n',
+        'src/router.ts': `import { os } from '@orpc/server'\nimport type { M } from '@/model'\nexport const router = { m: os.handler((): M => ({ v: 1, at: new Date(0) })) }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate({ m: procedure }, { source: { file: file('src/router.ts') } }),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          `Procedure at m: ${unresolved('M')}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('tsconfig.json')} - error TS5102: Option 'baseUrl' has been removed. Please remove it from your configuration.`,
+            `${file('tsconfig.json')} - error TS5090: Non-relative paths are not allowed. Did you forget a leading './'?`,
+            `${file('src/router.ts')}:2:24 - error TS2307: Cannot find module '@/model' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('shows the errors behind a sub-router the compiler can not resolve, like one of a missing alias', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/sub/users.ts': `import { os } from '@orpc/server'\nexport const usersRouter = { list: os.handler(() => [1]) }\n`,
+        'src/router.ts': `import { os } from '@orpc/server'\nimport { usersRouter } from '@/sub/users'\nexport const router = { health: os.handler(() => 'ok'), users: usersRouter, lazy: os.lazy(async () => ({ default: { users: usersRouter } })) }\n`,
+      })
+      const resolution = `Check its import, and the tsconfig "paths" for aliases like "@/".`
+
+      expect(
+        await message(
+          generator.generate(
+            {
+              health: procedure,
+              users: { list: procedure },
+              lazy: os.lazy(async () => ({ default: { users: { list: procedure } } })),
+            },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at users.list: Could not resolve its type "any". ${resolution}`,
+          `Procedure at lazy.users.list: Could not resolve its type "any". ${resolution}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/router.ts')}:2:29 - error TS2307: Cannot find module '@/sub/users' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('shows the errors behind a lazy router of a module the compiler can not resolve', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/sub/users.ts': `import { os } from '@orpc/server'\nexport const usersRouter = { list: os.handler(() => [1]) }\nexport default usersRouter\n`,
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          `const assigned = os.lazy(() => import('@/sub/users'))`,
+          'export const router = {',
+          `  loaded: os.lazy(() => import('@/sub/users')),`,
+          `  picked: os.lazy(() => import('@/sub/users').then((m) => ({ default: m.usersRouter }))),`,
+          '  assigned,',
+          '}',
+          '',
+        ].join('\n'),
+      })
+      const resolution = `Check its import, and the tsconfig "paths" for aliases like "@/".`
+      const missing = (position: string) =>
+        `${file('src/router.ts')}:${position} - error TS2307: Cannot find module '@/sub/users' or its corresponding type declarations.`
+
+      expect(
+        await message(
+          generator.generate(
+            {
+              loaded: { list: procedure },
+              picked: { list: procedure },
+              assigned: { list: procedure },
+            },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (3 errors):',
+          `Procedure at loaded.list: Could not resolve its type "any". ${resolution}`,
+          `Procedure at picked.list: Could not resolve its type "any". ${resolution}`,
+          `Procedure at assigned.list: Could not resolve its type "any". ${resolution}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            missing('2:39'),
+            missing('4:32'),
+            missing('5:32'),
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('reports a procedure written as any without the unrelated errors of its file', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import { os } from '@orpc/server'\nconst count: number = 'one'\nexport const router = { health: os.handler(() => 'ok'), ping: os.handler(() => count) as any }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { health: procedure, ping: procedure },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (1 error):',
+          'Procedure at ping: Its type is "any". Give it a type, or schemas a converter supports.',
+        ].join('\n\n'),
+      )
+    })
+
+    it('keeps the import hint for a procedure written as any in a file importing a missing module', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import { os } from '@orpc/server'\nconst path: string = './missing'\nexport const router = { users: os.lazy(() => import(path)), posts: os.lazy(() => import('./posts')) }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { users: { list: procedure }, posts: { list: procedure } },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at users.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+          `Procedure at posts.list: Could not resolve its type "any". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/router.ts')}:3:89 - error TS2307: Cannot find module './posts' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('shows the errors of the router file when the type of its export can not be resolved', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import type { appRouter } from '@/server/router'\nexport type Router = typeof appRouter\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { m: procedure },
+            { source: { file: file('src/router.ts'), export: 'Router' } },
+          ),
+        ),
+      ).toBe(
+        [
+          `[TypeScript] Could not resolve the type of "Router" in "${file('src/router.ts')}". Check its import, and the tsconfig "paths" for aliases like "@/".`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/router.ts')}:1:32 - error TS2307: Cannot find module '@/server/router' or its corresponding type declarations.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('shows the errors of the files declaring the types that lead to an unresolved one', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/models.ts': `import type { Address } from './adress'\nexport interface Bad { a: string; missing: Missing }\nexport interface Holder { addr: Address }\n`,
+        'src/router.ts': `import { os } from '@orpc/server'\nimport type { Bad, Holder } from './models'\nexport const router = { bad: os.handler((): Bad => ({ a: 'x' }) as any), holder: os.handler((): Holder => ({}) as any) }\n`,
+      })
+
+      expect(
+        await message(
+          generator.generate(
+            { bad: procedure, holder: procedure },
+            { source: { file: file('src/router.ts') } },
+          ),
+        ),
+      ).toBe(
+        [
+          '[OpenAPIGenerator] Failed to infer types for the OpenAPI document (2 errors):',
+          `Procedure at bad: ${unresolved('Missing')}`,
+          `Procedure at holder: ${unresolved('Address')}`,
+          [
+            'Compiler errors:',
+            `Using the compiler options of "${file('tsconfig.json')}".`,
+            `${file('src/models.ts')}:1:30 - error TS2307: Cannot find module './adress' or its corresponding type declarations.`,
+            `${file('src/models.ts')}:2:44 - error TS2304: Cannot find name 'Missing'.`,
+          ].join('\n  '),
+        ].join('\n\n'),
+      )
+    })
+
+    it('throws on unresolved names in the template of a mapped type, and nested deep', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          `import type { Jsonify } from './nope'`,
+          'interface Model { a: number; at: Date }',
+          'interface Box<T> { v: T }',
+          'type Serialized<T> = { [K in keyof T]: Jsonify<T[K]> }',
+          'type Queried<T> = { [K in keyof T]: typeof missingValue }',
+          'type Bare<T> = { [K in keyof T]: Missing }',
+          'type CD<T> = T extends object ? { readonly [K in keyof T]: CD<T[K]> } : T',
+          'export const router = {',
+          '  serialized: os.handler((): { v: Serialized<Model> } => ({}) as any),',
+          '  queried: os.handler((): { v: Queried<Model> } => ({}) as any),',
+          '  lists: os.handler((): { v: Missing[][][][] } => ({}) as any),',
+          '  boxes: os.handler((): { v: Box<Box<Box<Box<Missing>>>> } => ({}) as any),',
+          '  typed: os.handler((): { v: Box<Box<Box<Box<typeof missingValue>>>> } => ({}) as any),',
+          // under a mapped view of a mapped type, whose declaration is on no way to the error
+          '  cdSerialized: os.handler((): CD<Serialized<Model>> => ({}) as any),',
+          '  cdNested: os.handler((): CD<{ c: Serialized<Model> }> => ({}) as any),',
+          '  cdBare: os.handler((): CD<{ c: Bare<Model> }> => ({}) as any),',
+          '  cdQueried: os.handler((): CD<Queried<Model>> => ({}) as any),',
+          '  partialQueried: os.handler((): Partial<Queried<Model>> => ({}) as any),',
+          '  twice: os.handler((): Twice => ({ f0: null, f2: { a: { b: 1 } } })),',
+          '}',
+          'type Expanding<T> = T extends object ? { [K in keyof T]: Expanding<Expanding<T[K]>> } : T',
+          'interface Twice { f0: Expanding<Expanding<Expanding<Twice>>> | null; f2: { a: { b: number } } }',
+          '',
+        ].join('\n'),
+      })
+      const names = [
+        'serialized',
+        'queried',
+        'lists',
+        'boxes',
+        'typed',
+        'cdSerialized',
+        'cdNested',
+        'cdBare',
+        'cdQueried',
+        'partialQueried',
+        'twice',
+      ]
+
+      const thrown = await message(
+        generator.generate(Object.fromEntries(names.map((name) => [name, procedure])), {
+          source: { file: file('src/router.ts') },
+        }),
+      )
+      expect(thrown).toContain(`(${names.length} errors)`)
+      expect(thrown).toContain(`Procedure at serialized: ${unresolved('Jsonify<T[K]>')}`)
+      expect(thrown).toContain(`Procedure at queried: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at lists: ${unresolved('Missing')}`)
+      expect(thrown).toContain(`Procedure at boxes: ${unresolved('Missing')}`)
+      expect(thrown).toContain(`Procedure at typed: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdSerialized: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdNested: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdBare: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at cdQueried: ${unresolved('any')}`)
+      expect(thrown).toContain(`Procedure at partialQueried: ${unresolved('any')}`)
+      expect(thrown).toContain(
+        `${file('src/router.ts')}:6:44 - error TS2304: Cannot find name 'missingValue'.`,
+      )
+
+      // the error type of an instantiation the compiler gives up on is not told from an
+      // unresolved name, which is never written as any value
+      expect(thrown).toContain(
+        `Procedure at twice: ${unresolved('any')} It may also be an unresolved name under a mapped type, or a type nested too deep for the compiler to instantiate.`,
+      )
+    })
+
+    it('throws on unresolved names in files whose errors the compiler does not report', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: { ...options, skipLibCheck: true },
+          include: ['src'],
+        }),
+        'src/types.d.ts': [
+          'export interface DModel { a: number; at: Date }',
+          'export type DQueried<T> = { [K in keyof T]: typeof missingValue }',
+          'export type DBare<T> = { [K in keyof T]: Missing }',
+          '',
+        ].join('\n'),
+        'src/unchecked.ts': [
+          '// @ts-nocheck',
+          `import { os } from '@orpc/server'`,
+          'interface Model { a: number; at: Date }',
+          'interface Box<T> { v: T }',
+          'type Queried<T> = { [K in keyof T]: typeof missingValue }',
+          'export const unchecked = {',
+          '  queried: os.handler((): { v: Queried<Model> } => ({}) as any),',
+          '  boxes: os.handler((): { v: Box<Box<Box<Box<Queried<Model>>>>> } => ({}) as any),',
+          '  bare: os.handler((): { v: Missing } => ({}) as any),',
+          '}',
+          '',
+        ].join('\n'),
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          `import type { DBare, DModel, DQueried } from './types'`,
+          `export { unchecked } from './unchecked'`,
+          'export const router = {',
+          '  declared: os.handler((): { v: DQueried<DModel> } => ({}) as any),',
+          '  declaredBare: os.handler((): { v: DBare<DModel> } => ({}) as any),',
+          '}',
+          '',
+        ].join('\n'),
+      })
+
+      const declared = await message(
+        generator.generate(
+          { declared: procedure, declaredBare: procedure },
+          { source: { file: file('src/router.ts') } },
+        ),
+      )
+      expect(declared).toContain('(2 errors)')
+      expect(declared).toContain(`Procedure at declared: ${unresolved('any')}`)
+      expect(declared).toContain(`Procedure at declaredBare: ${unresolved('Missing')}`)
+
+      const unchecked = await message(
+        generator.generate(
+          { queried: procedure, boxes: procedure, bare: procedure },
+          { source: { file: file('src/router.ts'), export: 'unchecked' } },
+        ),
+      )
+      expect(unchecked).toContain('(3 errors)')
+      expect(unchecked).toContain(`Procedure at queried: ${unresolved('any')}`)
+      expect(unchecked).toContain(`Procedure at boxes: ${unresolved('any')}`)
+      expect(unchecked).toContain(`Procedure at bare: ${unresolved('Missing')}`)
+    })
+
+    it('throws on index signatures of unresolved names, which are no index signature of any', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': [
+          `import { os } from '@orpc/server'`,
+          'export const router = {',
+          '  record: os.handler((): { v: Record<string, Missing> } => ({}) as any),',
+          '  root: os.handler((): Record<string, Missing> => ({}) as any),',
+          '  signature: os.handler((): { v: { [k: string]: Missing } } => ({}) as any),',
+          '  partial: os.handler((): { v: Partial<Record<string, Missing>> } => ({}) as any),',
+          '  lists: os.handler((): { v: Record<string, Missing>[][][] } => ({}) as any),',
+          '  intersection: os.handler((): { v: object & Record<string, Missing> } => ({}) as any),',
+          '}',
+          '',
+        ].join('\n'),
+      })
+      const names = ['record', 'root', 'signature', 'partial', 'lists', 'intersection']
+
+      const thrown = await message(
+        generator.generate(Object.fromEntries(names.map((name) => [name, procedure])), {
+          source: { file: file('src/router.ts') },
+        }),
+      )
+      expect(thrown).toContain(`(${names.length} errors)`)
+      for (const name of names) {
+        expect(thrown).toContain(
+          `Procedure at ${name}: ${unresolved(name === 'partial' ? 'any' : 'Missing')}`,
+        )
+      }
+    })
+
+    it.runIf(canGenerateWithin)(
+      'cuts cycles through conditional deep mapped types, also over generic models, in time',
+      () => {
+        const cases: Record<string, string> = {
+          generic: 'os.handler((): GenCycle<number> => ({}) as any)',
+          genericInput: 'os.input(type<GenCycle<number>>()).handler(() => 1)',
+          self: 'os.handler((): GenSelf<string> => ({}) as any)',
+          wrap: 'os.handler((): Wrap<{ a: number }> => ({}) as any)',
+          wrapInput: 'os.input(type<Wrap<{ a: number }>>()).handler(() => 1)',
+          pair: 'os.handler((): CD<Pair<number>> => ({}) as any)',
+          mutual: 'os.handler((): Expanding<MA> => ({}) as any)',
+          list: 'os.handler((): ListCycle => ({}) as any)',
+          index: 'os.handler((): IndexCycle => ({}) as any)',
+          aliased: 'os.handler((): AliasCycle => ({}) as any)',
+          recursive: 'os.handler((): Expanding<Rec> => ({}) as any)',
+          branches: 'os.handler((): CD<Der<number>> => ({}) as any)',
+          branchesInput: 'os.input(type<CD<Der<number>>>()).handler(() => 1)',
+          viewed: 'os.handler((): CD<DerView<number>> => ({}) as any)',
+          x1: 'os.handler((): CD<Der1<number>> => ({}) as any)',
+          x2: 'os.handler((): CD<Der2<number>> => ({}) as any)',
+          x3: 'os.handler((): CD<Der3<number>> => ({}) as any)',
+          x3i: 'os.input(type<CD<Der3<number>>>()).handler(() => 1)',
+          x4: 'os.handler((): CD<Der4<number>> => ({}) as any)',
+          mapped: 'os.handler((): CD<MapDer<number>> => ({}) as any)',
+          mappedInput: 'os.input(type<CD<MapDer<number>>>()).handler(() => 1)',
+          mappedClass: 'os.handler((): CD<MapDerClass<number>> => ({}) as any)',
+          method: 'os.handler((): CD<MethodDer<number>> => ({}) as any)',
+          mapView: 'os.handler((): CD<MapView<number>> => ({}) as any)',
+          mapViewInput: 'os.input(type<Expanding<MapView<number>>>()).handler(() => 1)',
+          mapDirect: 'os.handler((): CD<MapDirect<number>> => ({}) as any)',
+          swapped: 'os.handler((): CD<Swap<number, string>> => ({}) as any)',
+          swappedInput: 'os.input(type<CD<Swap<number, string>>>()).handler(() => 1)',
+          mapSwapped: 'os.handler((): CD<MapSwap<number, string>> => ({}) as any)',
+          mapSwappedInput: 'os.input(type<Expanding<MapSwap<number, string>>>()).handler(() => 1)',
+          swappedFour: 'os.handler((): CD<SwapFour<number, string>> => ({}) as any)',
+          swappedFourInput:
+            'os.input(type<Expanding<SwapFour<number, string>>>()).handler(() => 1)',
+          rotated: 'os.handler((): CD<Rotate<number, string, boolean>> => ({}) as any)',
+          rotatedInput: 'os.input(type<CD<Rotate<number, string, boolean>>>()).handler(() => 1)',
+          indexed: 'os.handler((): CD<IndexDer<number>> => ({}) as any)',
+          indexedSwapped: 'os.handler((): CD<IndexSwap<number, string>> => ({}) as any)',
+          indexedSwappedInput: 'os.input(type<CD<IndexSwap<number, string>>>()).handler(() => 1)',
+          mutualLiterals: 'os.handler((): CD<LitA<number>> => ({}) as any)',
+          mutualLiteralsInput: 'os.input(type<Expanding<LitA<number>>>()).handler(() => 1)',
+          mutualGetters: 'os.handler((): CD<FnA<number>> => ({}) as any)',
+          mutualGettersInput: 'os.input(type<CD<FnA<number>>>()).handler(() => 1)',
+          boxedLiteral: 'os.handler((): CD<BoxLit<number>> => ({}) as any)',
+          boxedLiteralInput: 'os.input(type<Expanding<BoxLitMap<number>>>()).handler(() => 1)',
+          passedOn: 'os.handler((): CD<PassBox<number>> => ({}) as any)',
+          passedOnInput: 'os.input(type<Expanding<PassBox<number>>>()).handler(() => 1)',
+          shortRoute: 'os.handler((): CD<Route<number>> => ({}) as any)',
+          longRoute: 'os.handler((): CD<LongRoute<number>> => ({}) as any)',
+          tupleView: 'os.handler((): CD<TupleDer<number>> => ({}) as any)',
+          tupleViewInput: 'os.input(type<CD<TupleDer<number>>>()).handler(() => 1)',
+          tupleGrow: 'os.handler((): CD<TupleGrow<number>> => ({}) as any)',
+          tupleGrowInput: 'os.input(type<CD<TupleGrow<number>>>()).handler(() => 1)',
+          pairView: 'os.handler((): CD<PairDer<number>> => ({}) as any)',
+          pairViewInput: 'os.input(type<CD<PairDer<number>>>()).handler(() => 1)',
+          dictView: 'os.handler((): CD<DictDer<number>> => ({}) as any)',
+          dictViewInput: 'os.input(type<CD<DictDer<number>>>()).handler(() => 1)',
+          listView: 'os.handler((): CD<ListDer<number>> => ({}) as any)',
+          listViewInput: 'os.input(type<CD<ListDer<number>>>()).handler(() => 1)',
+          plainSelf: 'os.handler((): CD<PlainSelf<number>> => ({}) as any)',
+          tupleSelf: 'os.handler((): CD<TupleSelf<number>> => ({}) as any)',
+          pairSelf: 'os.handler((): CD<PairSelf<number>> => ({}) as any)',
+          dictSelf: 'os.handler((): CD<DictSelf<number>> => ({}) as any)',
+          listSelf: 'os.handler((): CD<ListSelf<number>> => ({}) as any)',
+          boxedSelf: 'os.handler((): CD<BoxedSelf<number>> => ({}) as any)',
+          passedArgument: 'os.handler((): PassArg<number, string> => ({}) as any)',
+          passedSameArgument: 'os.handler((): PassArg<number, number> => ({}) as any)',
+          passedSameArgumentInput: 'os.input(type<PassArg<number, number>>()).handler(() => 1)',
+        }
+        const file = project({
+          'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+          'src/router.ts': [
+            `import { os, type } from '@orpc/server'`,
+            'type Expanding<T> = T extends object ? { [K in keyof T]: Expanding<T[K]> } : T',
+            'type CD<T> = T extends object ? { readonly [K in keyof T]: CD<T[K]> } : T',
+            'interface GenCycle<T> { f0: Expanding<GenCycle<T>> | null; f2: { a: T } }',
+            'interface GenSelf<T> { v: T; self: CD<GenSelf<T>> | null }',
+            'interface Wrap<T> { inner: T; f0: Expanding<Wrap<T>> | null }',
+            'interface Pair<T> { v: T; nested: Pair<T[]> | null }',
+            'interface MA { b: Expanding<MB> | null; x: { a: number } }',
+            'interface MB { a: Expanding<MA> | null; y: { b: string } }',
+            'interface ListCycle { kids: Expanding<ListCycle>[]; f2: { a: number } }',
+            'interface IndexCycle { m: Record<string, Expanding<IndexCycle>>; f2: { a: number } }',
+            'type Aliased = Expanding<AliasCycle>',
+            'interface AliasCycle { f0: Aliased | null; f2: { a: number } }',
+            'interface Box<T> { v: T }',
+            'type Rec = Box<Expanding<Rec>>',
+            'interface Base<T> { a: Box<T>; b: Box<T> }',
+            'interface Der<T> extends Base<Der<T[]>> { v: T }',
+            'interface DerView<T> extends Base<CD<DerView<T>>> { v: T }',
+            'interface BoxVia<T> { inner: Box<T> }',
+            'interface Base1<T> { inner: Box<T>; other: BoxVia<T> }',
+            'interface Der1<T> extends Base1<Der1<BoxVia<T>>> { v: T }',
+            'interface Base2<T> { list: Box<T>[]; rec: Record<string, BoxVia<T>> }',
+            'interface Der2<T> extends Base2<CD<Der2<T>>> { v: T }',
+            'type I<T> = BoxVia<T> & { x: T }',
+            'interface Der3<T> extends BoxVia<I<Der3<T[]>>> { v: T }',
+            'interface Der4<T> extends Base<Der4<T[]>> { v: T; w: BoxVia<T> }',
+            'interface MapBase<T> { a: Map<string, Box<T>>; b: Box<T>[]; c: BoxVia<T> }',
+            'interface MapDer<T> extends MapBase<MapDer<T[]>> { v: T }',
+            'class MapBaseClass<T> { a!: Map<string, Box<T>>; b!: Box<T>[]; c!: BoxVia<T> }',
+            'class MapDerClass<T> extends MapBaseClass<MapDerClass<T[]>> { v!: T }',
+            'interface MethodBase<T> { f: () => Box<T>; b: Box<T>[]; c: BoxVia<T> }',
+            'interface MethodDer<T> extends MethodBase<MethodDer<T[]>> { v: T }',
+            'interface MapView<T> extends MapBase<CD<MapView<T>>> { v: T }',
+            'interface MapDirect<T> { a: Map<string, T>; b: MapDirect<T[]>[]; c: BoxVia<MapDirect<T[]>> }',
+            'interface Swap<T, U> extends Base<Swap<U, T[]>> { v: T; u: U }',
+            'interface MapSwap<T, U> extends MapBase<MapSwap<U, T[]>> { v: T; u: U }',
+            'interface BaseFour<T> { a: Box<T>; b: Box<T>; c: Box<T>; d: BoxVia<T> }',
+            'interface SwapFour<T, U> extends BaseFour<SwapFour<U, T[]>> { v: T; u: U }',
+            'interface LitBase<T> { a: { x: Box<T>; m: Map<string, T> }; b: { y: Box<T>; f: () => T }; c: { z: BoxVia<T> } }',
+            'interface Rotate<T, U, V> extends LitBase<CD<Rotate<U, V, T>>> { v: T; u: U; w: V }',
+            'interface IndexBase<T> { a: Map<string, Box<T>>; i: { [k: string]: Box<T> }; j: { [k: string]: Box<T> } }',
+            'interface IndexDer<T> extends IndexBase<CD<IndexDer<T>>> { v: T }',
+            'interface IndexSwap<T, U> extends IndexBase<IndexSwap<U, T[]>> { v: T; u: U }',
+            'interface LitA<T> { b: Box<CD<LitB<T>>>; c: { d: Box<CD<LitB<T>>> }; m: Map<string, T> }',
+            'interface LitB<T> { a: Box<CD<LitA<T>>>; e: { f: CD<LitA<T>> }; v: T; g: () => T }',
+            'interface FnA<T> { c: { d: Box<CD<FnB<T>>> }; e: { f: CD<FnB<T>> }; g: () => T }',
+            'interface FnB<T> { c: { d: Box<CD<FnA<T>>> }; e: { f: CD<FnA<T>> }; v: T; h: () => T }',
+            'interface BoxLit<T> { inner: Box<{ a: T; b: Box<CD<BoxLit<T>>> }>; m: Map<string, T> }',
+            'interface BoxLitMap<T> { inner: Box<{ a: T; m: Map<string, BoxLitMap<T>>; b: Box<CD<BoxLitMap<T>>> }> }',
+            'interface PassBox<T, U = string> { v: T; u: U; next: Box<PassBox<Box<T>, U>> | null }',
+            'interface Route<T> { v: T; c: { p: Route<T[]> | null } }',
+            // its route is 17 object literals long
+            `interface LongRoute<T> { v: T; c: ${'{ p: '.repeat(17)}LongRoute<T[]> | null${' }'.repeat(17)} }`,
+            // through the items of a tuple, an index signature or an array the project declares
+            'interface TupleBase<T> { a: [T, number]; b: Box<T>; c: BoxVia<T> }',
+            'interface TupleDer<T> extends TupleBase<CD<TupleDer<T>>> { v: T }',
+            'interface TupleGrow<T> extends TupleBase<TupleGrow<T[]>> { v: T }',
+            'type Pairish<T> = [T, number]',
+            'interface PairBase<T> { a: Pairish<T>; b: Pairish<T>; c: Pairish<T> }',
+            'interface PairDer<T> extends PairBase<CD<PairDer<T>>> { v: T }',
+            'interface Dict<T> { [k: string]: T }',
+            'interface DictBase<T> { a: Dict<T>; b: Dict<T>; c: BoxVia<T> }',
+            'interface DictDer<T> extends DictBase<CD<DictDer<T>>> { v: T }',
+            'interface List<T> extends Array<T> {}',
+            'interface ListBase<T> { a: List<T>; b: List<T>; c: BoxVia<T> }',
+            'interface ListDer<T> extends ListBase<CD<ListDer<T>>> { v: T }',
+            'interface PlainSelf<T> { v: T; a: CD<PlainSelf<T>> | null }',
+            'interface TupleSelf<T> { v: T; a: [CD<TupleSelf<T>>, T] | null }',
+            'interface PairSelf<T> { v: T; a: Pairish<CD<PairSelf<T>>> | null }',
+            'interface DictSelf<T> { v: T; a: Dict<CD<DictSelf<T>>> }',
+            'interface ListSelf<T> { v: T; a: List<CD<ListSelf<T>>> }',
+            'interface BoxedSelf<T> { v: T; a: Box<Box<CD<BoxedSelf<T>>>> | null }',
+            'interface PassArg<T, U> { v: T; u: U; next: PassArg<U, Box<T>> | null }',
+            'export const router = {',
+            ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
+            '}',
+            '',
+          ].join('\n'),
+        })
+
+        const { spec, error } = generateWithin(file('src/router.ts'), 60_000)
+        expect(error).toBeUndefined()
+
+        const schemas = spec.components?.schemas ?? {}
+        const deref = (schema: any): any =>
+          schema?.$ref ? deref(schemas[schema.$ref.replace('#/components/schemas/', '')]) : schema
+        const growing = ['passedArgument', 'passedSameArgument', 'passedSameArgumentInput']
+        for (const [name, procedure] of Object.entries(cases)) {
+          if (growing.includes(name)) {
+            continue
+          }
+          const operation = spec.paths[`/${name}`].post
+          const schema = procedure.includes('input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+          // cut after a few levels, in the component of `Aliased` (`Expanding<AliasCycle>`)
+          const cut = name === 'aliased' ? schemas.Aliased : deref(schema)
+          expect([name, JSON.stringify(cut)]).toEqual([name, expect.stringMatching(/\{\}/)])
+        }
+        // a cycle through models holding each other in object literals, cut as early as others
+        for (const name of [
+          'mutualLiterals',
+          'mutualLiteralsInput',
+          ...['tupleView', 'tupleGrow', 'pairView', 'dictView', 'listView'].flatMap((name) => [
+            name,
+            `${name}Input`,
+          ]),
+        ]) {
+          const operation = spec.paths[`/${name}`].post
+          const schema = name.endsWith('Input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+          expect([name, JSON.stringify(schema).length < 50_000]).toEqual([name, true])
+        }
+        // also through a long route, after as many levels as through a short one
+        const levels = (name: string) =>
+          JSON.stringify(spec.paths[`/${name}`].post.responses['200']).match(/"v":/g)?.length
+        expect(levels('longRoute')).toBe(levels('shortRoute'))
+        // a model nesting itself through a tuple, an index signature or an array the project
+        // declares, as early as directly
+        const nested = (name: string) =>
+          JSON.stringify(spec.paths[`/${name}`].post.responses['200']).match(/"a":/g)?.length
+        for (const name of ['tupleSelf', 'pairSelf', 'dictSelf', 'listSelf', 'boxedSelf']) {
+          expect([name, nested(name)]).toEqual([name, nested('plainSelf')])
+        }
+        // a model growing a type argument as many levels when its other one is the same type
+        const inline = (schema: any): any =>
+          schema?.$ref
+            ? inline(schemas[schema.$ref.replace('#/components/schemas/', '')])
+            : schema && typeof schema === 'object'
+              ? Object.fromEntries(Object.entries(schema).map(([k, v]) => [k, inline(v)]))
+              : schema
+        const grown = (name: string) => {
+          const operation = spec.paths[`/${name}`].post
+          const schema = name.endsWith('Input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+          return JSON.stringify(inline(schema)).match(/"next":/g)?.length
+        }
+        for (const name of growing) {
+          expect([name, grown(name)]).toEqual([name, grown('passedArgument')])
+        }
+      },
+      120_000,
+    )
+
+    it.runIf(canGenerateWithin)(
+      'cuts cycles growing a type argument from one passed on in place as early, in time',
+      () => {
+        const cases: Record<string, string> = {
+          branches: 'os.handler((): KeepGrow<number, string> => ({}) as any)',
+          branchesSame: 'os.handler((): KeepGrow<number, number> => ({}) as any)',
+          branchesInput: 'os.input(type<KeepGrow<number, string>>()).handler(() => 1)',
+          literal: 'os.handler((): KeepGrowLit<number, string> => ({}) as any)',
+          literalInput: 'os.input(type<KeepGrowLit<number, string>>()).handler(() => 1)',
+          wrapped: 'os.handler((): KeepGrowWrap<number, string> => ({}) as any)',
+          wrappedInput: 'os.input(type<KeepGrowWrap<number, string>>()).handler(() => 1)',
+          three: 'os.handler((): KeepGrowThree<number, string, boolean> => ({}) as any)',
+          kept: `os.handler((): ${'Kept<'.repeat(6)}number${'>'.repeat(6)} => ({}) as any)`,
+          keptInput: `os.input(type<${'Kept<'.repeat(6)}number${'>'.repeat(6)}>()).handler(() => 1)`,
+        }
+        const file = project({
+          'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+          'src/router.ts': [
+            `import { os, type } from '@orpc/server'`,
+            'interface Box<T> { v: T }',
+            'interface KeepGrow<T, U> { v: T; u: U; x: KeepGrow<T, Box<T>> | null; y: KeepGrow<Box<T>, U> | null; z: KeepGrow<T, Set<T>> | null; w: KeepGrow<Set<T>, U> | null }',
+            'interface KeepGrowLit<T, U> { v: T; u: U; n: { x: KeepGrowLit<T, Box<T>> | null; y: KeepGrowLit<Box<T>, U> | null; z: KeepGrowLit<T, Set<T>> | null; w: KeepGrowLit<Set<T>, U> | null } }',
+            'interface KeepGrowWrap<T, U> { v: T; u: U; x: Map<string, KeepGrowWrap<T, Box<T>>>; y: Set<KeepGrowWrap<Box<T>, U>>; z: KeepGrowWrap<T, T[]>[]; w: Record<string, KeepGrowWrap<T[], U>> }',
+            'interface KeepGrowThree<A, B, C> { a: A; b: B; c: C; x: KeepGrowThree<A, Box<A>, C> | null; y: KeepGrowThree<Box<A>, B, C> | null; z: KeepGrowThree<A, B, Box<B>> | null }',
+            'interface Kept<T, U = string> { a: T; b: U; m: Map<string, Kept<T, U>> }',
+            'export const router = {',
+            ...Object.entries(cases).map(([name, procedure]) => `  ${name}: ${procedure},`),
+            '}',
+            '',
+          ].join('\n'),
+        })
+
+        const { spec, error } = generateWithin(file('src/router.ts'), 60_000)
+        expect(error).toBeUndefined()
+
+        const schemas = spec.components?.schemas ?? {}
+        const component = (ref: string) => schemas[ref.replace('#/components/schemas/', '')]
+        const schemaOf = (name: string) => {
+          const operation = spec.paths[`/${name}`].post
+          return name.endsWith('Input')
+            ? operation.requestBody.content['application/json'].schema
+            : operation.responses['200'].content['application/json'].schema
+        }
+        // the schema with every component it reaches
+        const reached = (schema: unknown, seen = new Set<string>()): number => {
+          const json = JSON.stringify(schema)
+          let size = json.length
+          for (const [, ref] of json.matchAll(/"\$ref":"([^"]+)"/g)) {
+            if (!seen.has(ref!)) {
+              seen.add(ref!)
+              size += reached(component(ref!), seen)
+            }
+          }
+          return size
+        }
+        for (const name of Object.keys(cases).filter((name) => !name.startsWith('kept'))) {
+          expect([name, reached(schemaOf(name)) < 20_000]).toEqual([name, true])
+        }
+
+        // a finite nesting passing on its default type argument is expanded in full
+        const deref = (schema: any): any => (schema?.$ref ? deref(component(schema.$ref)) : schema)
+        for (const name of ['kept', 'keptInput']) {
+          let schema = deref(schemaOf(name))
+          let levels = 0
+          while (schema.type === 'object') {
+            expect([name, levels, schema.properties.b]).toEqual([name, levels, { type: 'string' }])
+            schema = deref(schema.properties.a)
+            levels++
+          }
+          expect([name, levels, schema]).toEqual([name, 6, { type: 'number' }])
+        }
+      },
+      120_000,
+    )
+
+    it('reads no diagnostics of the whole program, which would check all of it', async () => {
+      const file = project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: options, include: ['src'] }),
+        'src/router.ts': `import { os } from '@orpc/server'\nimport type { M } from './nope'\nexport const router = { m: os.handler((): M => ({}) as any) }\n`,
+      })
+      const global = vi.spyOn(Program.prototype, 'getGlobalDiagnostics')
+
+      try {
+        expect(
+          await message(
+            generator.generate({ m: procedure }, { source: { file: file('src/router.ts') } }),
+          ),
+        ).toContain(`Procedure at m: ${unresolved('M')}`)
+        expect(global).not.toHaveBeenCalled()
+      } finally {
+        global.mockRestore()
+      }
+    })
+
+    it('names the nearest tsconfig when it does not include the file, and why', async () => {
+      const file = project({
+        'app/tsconfig.json': JSON.stringify({
+          extends: '@scr/tsconfig/base',
+          compilerOptions: { paths: { '@/*': ['./src/*'] } },
+        }),
+        'app/node_modules/@scr/tsconfig/package.json': JSON.stringify({ name: '@scr/tsconfig' }),
+        'app/node_modules/@scr/tsconfig/base.json': JSON.stringify({
+          compilerOptions: options,
+          include: ['src'],
+        }),
+        'app/src/model.ts': 'export interface M { v: number }\n',
+        'app/src/router.ts': `import { os } from '@orpc/server'\nimport type { M } from '@/model'\nexport const router = { m: os.handler((): M => ({ v: 1 })) }\n`,
+      })
+      const router = file('app/src/router.ts')
+      const noInputs = `error TS18003: No inputs were found in config file '${file('app/tsconfig.json')}'. Specified 'include' paths were '["node_modules/@scr/tsconfig/src"]' and 'exclude' paths were '[]'.`
+
+      // the include of a base tsconfig is relative to the base
+      const nearest = await message(
+        generator.generate({ m: procedure }, { source: { file: router } }),
+      )
+      expect(nearest).toContain(
+        [
+          'Compiler errors:',
+          `"${file('app/tsconfig.json')}" does not include "${router}".`,
+          noInputs,
+        ].join('\n  '),
+      )
+      expect(nearest).toContain(
+        `${router}:2:24 - error TS2307: Cannot find module '@/model' or its corresponding type declarations.`,
+      )
+
+      // passing the nearest tsconfig, leaving it out is no help
+      expect(
+        await message(
+          generator.generate({ m: procedure }, { source: { file: router, tsconfig: file('app') } }),
+        ),
+      ).toBe(
+        `[TypeScript] "${router}" is not part of the project "${file('app/tsconfig.json')}". Pass the tsconfig that includes it.\n  ${noInputs}`,
+      )
+    }, 20_000)
+
+    it('names files of other languages, which the compiler can not parse', async () => {
+      const file = project({ 'App.vue': 'export const router = {}\n', 'notes.txt': '' })
+
+      for (const name of ['App.vue', 'notes.txt']) {
+        await expect(generator.generate({}, { source: { file: file(name) } })).rejects.toThrow(
+          `[TypeScript] File "${file(name)}" is not a TypeScript or JavaScript source file (.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs).`,
+        )
+      }
+    })
+  })
+
+  it('documents with recursive defs only', async () => {
+    const spec = await new OpenAPIGenerator({
+      converters: [new ZodToJsonSchemaConverter()],
+      defs: 'recursive',
+    }).generate(router, { source: { file: fixture('router.ts') } })
+    const schemas = spec.components?.schemas ?? {}
+
+    // `Planet` refers to itself, `PlanetKind` is written where it is used
+    expect(schemas.Planet).toEqual(PLANET)
+    expect(schemas).not.toHaveProperty('PlanetKind')
+    expect(JSON.stringify(spec)).not.toContain('PlanetKind')
+    expect(JSON.stringify(spec)).toMatch(/"enum":\["(rocky|gas)","(rocky|gas)"\]/u)
+  })
+
+  it('works without converters, inferring zod schemas from their types', async () => {
+    const spec = await new OpenAPIGenerator().generate(router, {
+      source: { file: fixture('router.ts') },
+    })
+
+    // zod 4 implements Standard JSON Schema, so it is still converted
+    expect((spec.paths?.['/planets']?.get?.parameters as any[])[0].schema.type).toBe('integer')
+  })
+
+  it('supports detailed input and output structures', async () => {
+    const spec = await generator.generate(detailedRouter, {
+      source: { file: fixture('detailed.ts') },
+    })
+
+    const operation = spec.paths?.['/things/{id}']?.patch
+
+    expect(operation?.summary).toBe('Update a thing')
+    expect(operation?.description).toBe('Updates a thing by id.')
+    expect(operation?.parameters).toEqual([
+      { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+      {
+        in: 'query',
+        name: 'force',
+        schema: { type: 'boolean' },
+        allowEmptyValue: true,
+        allowReserved: true,
+      },
+      { in: 'header', name: 'x-token', required: true, schema: { type: 'string' } },
+    ])
+    expect(operation?.requestBody).toEqual({
+      required: true,
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              tags: { type: 'array', items: { type: 'string' } },
+            },
+            required: ['name'],
+          },
+        },
+      },
+    })
+    expect(operation?.responses).toEqual({
+      202: {
+        description: 'OK',
+        headers: { 'x-request-id': { required: true, schema: { type: 'string' } } },
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { ok: { type: 'boolean' } },
+              required: ['ok'],
+            },
+          },
+        },
+      },
+    })
+  })
+
+  it('reads JSDoc of procedures assigned from variables', async () => {
+    const spec = await generator.generate(shorthandRouter, {
+      source: { file: fixture('shorthand.ts') },
+    })
+
+    const meta = (path: `/${string}`) => {
+      const { summary, description } = spec.paths?.[path]?.post ?? {}
+      return { summary, description }
+    }
+
+    expect(meta('/ping')).toEqual({ summary: 'Ping it', description: undefined })
+    expect(meta('/pong')).toEqual({ summary: 'Pong', description: 'Answers with pong.' })
+    expect(meta('/renamed')).toEqual({ summary: 'Ping it', description: undefined })
+    expect(meta('/overridden')).toEqual({ summary: 'Own JSDoc wins', description: undefined })
+  })
+
+  it('documents a router that is a single procedure', async () => {
+    const { pong } = await import('../tests/fixtures/app/src/routers/pong')
+    const spec = await generator.generate(pong, {
+      source: { file: fixture('routers/pong.ts'), export: 'pong' },
+    })
+
+    expect(spec.paths?.['/']?.post).toMatchObject({
+      summary: 'Pong',
+      description: 'Answers with pong.',
+      responses: { 200: { content: { 'application/json': { schema: { type: 'string' } } } } },
+    })
+
+    await expect(
+      generator.generate(pong, { source: { file: fixture('shorthand.ts') } }),
+    ).rejects.toThrow(/Procedure at \(root\): its type ".*" is not a procedure or contract/)
+  })
+
+  describe('router types', () => {
+    const OK = {
+      'application/json': {
+        schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      },
+    }
+
+    const B = {
+      'application/json': {
+        schema: { type: 'object', properties: { b: { type: 'string' } }, required: ['b'] },
+      },
+    }
+
+    const outputOf = (spec: any, path: string) => spec.paths[path].post.responses['200'].content
+
+    it('resolves routers typed with index signatures', async () => {
+      const spec = await generator.generate(records, {
+        source: { file: fixture('router-shapes.ts'), export: 'records' },
+      })
+      expect(outputOf(spec, '/planets/a')).toEqual(OK)
+    })
+
+    it('resolves routers typed with number and template literal index signatures', async () => {
+      const spec = await generator.generate(indexes, {
+        source: { file: fixture('router-shapes.ts'), export: 'indexes' },
+      })
+      expect(outputOf(spec, '/versions/v1')).toEqual(OK)
+      expect(outputOf(spec, '/numbers/0')).toEqual(B)
+    })
+
+    it('resolves routers of a union at keys only some members have', async () => {
+      const spec = await generator.generate(unions, {
+        source: { file: fixture('router-shapes.ts'), export: 'unions' },
+      })
+      expect(outputOf(spec, '/ping')).toEqual(OK)
+      expect(outputOf(spec, '/debug')).toEqual(B)
+
+      const disjointSpec = await generator.generate(
+        { ...disjoint, other },
+        {
+          source: { file: fixture('router-shapes.ts'), export: 'disjoint' },
+        },
+      )
+      expect(outputOf(disjointSpec, '/other')).toEqual(B)
+      expect(outputOf(disjointSpec, '/ping')).toEqual(OK)
+      expect(outputOf(disjointSpec, '/shared')).toEqual({
+        'application/json': {
+          schema: { anyOf: [OK['application/json'].schema, B['application/json'].schema] },
+        },
+      })
+    })
+
+    it('loads a lazy router once for the types of its procedures', async () => {
+      const calls = new Map<string, number>()
+      const getReturnTypeOfSignature = Checker.prototype.getReturnTypeOfSignature
+      const spy = vi
+        .spyOn(Checker.prototype, 'getReturnTypeOfSignature')
+        .mockImplementation(function (this: Checker, signature) {
+          calls.set(String(signature.id), (calls.get(String(signature.id)) ?? 0) + 1)
+          return getReturnTypeOfSignature.call(this, signature)
+        })
+
+      try {
+        const spec = await generator.generate(lazyRouter, {
+          source: { file: fixture('router-shapes.ts'), export: 'lazyRouter' },
+        })
+        expect(outputOf(spec, '/api/ping')).toEqual(OK)
+        expect(outputOf(spec, '/api/nested/pong')).toEqual(OK)
+        expect(outputOf(spec, '/api/nested/other')).toEqual(B)
+      } finally {
+        spy.mockRestore()
+      }
+
+      expect([...calls.values()].every((count) => count === 1)).toBe(true)
+    })
+
+    it('resolves optional procedures and sub-routers', async () => {
+      const spec = await generator.generate(optional, {
+        source: { file: fixture('router-shapes.ts'), export: 'optional' },
+      })
+      expect(outputOf(spec, '/ping')).toEqual(OK)
+      expect(outputOf(spec, '/nested/a')).toEqual(OK)
+
+      const spreadSpec = await generator.generate(
+        { ...spread, debug: spread.ping },
+        { source: { file: fixture('router-shapes.ts'), export: 'spread' } },
+      )
+      expect(outputOf(spreadSpec, '/debug')).toEqual(OK)
+    })
+
+    it('reports types that are not procedures', async () => {
+      await expect(
+        generator.generate(
+          { ping: optional.ping, nested: { pong: optional.ping } },
+          { source: { file: fixture('router-shapes.ts'), export: 'notProcedures' } },
+        ),
+      ).rejects.toThrow(
+        'Failed to infer types for the OpenAPI document (2 errors):\n\nProcedure at ping: its type "string" is not a procedure or contract',
+      )
+    })
+
+    it('does not leave components for split inputs and detailed outputs', async () => {
+      const spec = await generator.generate(decomposed, {
+        source: { file: fixture('router-shapes.ts'), export: 'decomposed' },
+      })
+
+      expect(spec.components?.schemas).toBeUndefined()
+      expect(spec.paths?.['/things']?.get?.parameters).toEqual([
+        {
+          in: 'query',
+          name: 'limit',
+          schema: { type: 'number' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        {
+          in: 'query',
+          name: 'search',
+          required: true,
+          schema: { type: 'string' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+      ])
+      expect(Object.keys(spec.paths?.['/things']?.post?.responses ?? {})).toEqual(['201', '202'])
+    })
+
+    it('adds JSDoc tags to router-level tags', async () => {
+      const spec = await generator.generate(decomposed, {
+        source: { file: fixture('router-shapes.ts'), export: 'decomposed' },
+      })
+      expect(spec.paths?.['/things']?.get?.tags).toEqual(['grp', 'fromdoc'])
+      expect(spec.paths?.['/things']?.get?.summary).toBe('Find things')
+    })
+
+    it('finds an ancestor tsconfig.json when the nearest one does not include the file', async () => {
+      const spec = await generator.generate(nestedRouter, {
+        source: {
+          file: new URL('../tests/fixtures/nested/proj/scripts/router.ts', import.meta.url),
+        },
+      })
+      expect(spec.components?.schemas?.Account).toEqual({
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      })
+    })
+  })
+
+  describe('detailed structures', async () => {
+    const spec = await generator.generate(detailedStatusesRouter, {
+      source: { file: fixture('detailed-statuses.ts') },
+    })
+
+    it('reads statuses of named aliases and enums', () => {
+      expect(Object.keys(spec.paths?.['/alias']?.post?.responses ?? {})).toEqual(['200', '201'])
+      expect(Object.keys(spec.paths?.['/enum']?.post?.responses ?? {})).toEqual(['200', '201'])
+      expect((spec.paths?.['/alias']?.post?.responses?.['201'] as any).headers).toEqual({
+        location: { required: true, schema: { type: 'string' } },
+      })
+    })
+
+    it('does not leave components for split sections', () => {
+      expect(Object.keys(spec.components?.schemas ?? {})).toEqual(['Item'])
+      expect(spec.paths?.['/sections/{id}']?.patch?.parameters).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+        {
+          in: 'query',
+          name: 'limit',
+          schema: { type: 'number' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        { in: 'header', name: 'location', required: true, schema: { type: 'string' } },
+      ])
+    })
+
+    it('reports procedures whose type can not be resolved', async () => {
+      await expect(
+        generator.generate(
+          { missing: detailedStatusesRouter.sections, ok: detailedStatusesRouter.sections },
+          { source: { file: fixture('unresolved-procedure.ts'), export: 'unresolved' } },
+        ),
+      ).rejects.toThrow('Procedure at missing: Could not resolve its type')
+    })
+  })
+
+  it('leaves template literal keys open in OpenAPI 3.0', async () => {
+    const spec = await generator.generate(headersRouter, {
+      source: { file: fixture('headers.ts') },
+      version: '3.0.4',
+    })
+
+    // OpenAPI 3.0 has no `patternProperties`, and other keys may be there
+    expect(
+      (spec.paths?.['/headers']?.post?.responses?.['200'] as any).content['application/json'].schema
+        .properties.headers,
+    ).toEqual({ type: 'object', additionalProperties: true })
+  })
+
+  describe('type-only schemas, JSDoc sources and class inputs', () => {
+    it('reads JSDoc through variables of implemented procedures and namespace members', async () => {
+      const spec = await generator.generate(jsdoc, {
+        source: { file: fixture('type-only-schemas.ts'), export: 'jsdoc' },
+      })
+      const operation = (path: string) => (spec.paths as any)[path].post
+
+      expect(operation('/users/get')).toMatchObject({
+        summary: 'Get a user',
+        description: 'Looks a user up by id.',
+        tags: ['users'],
+      })
+      expect(operation('/users/list').summary).toBe('List users')
+
+      // comments of builders and helpers are not the procedure's
+      expect(operation('/getMe').summary).toBeUndefined()
+      expect(operation('/getGeneric').summary).toBeUndefined()
+      expect(operation('/secret').summary).toBeUndefined()
+
+      for (const path of ['/ns', '/star', '/healthPing']) {
+        expect(operation(path)).toMatchObject({
+          summary: 'Ping the server',
+          description: 'Returns pong.',
+          tags: ['health'],
+        })
+      }
+    })
+
+    it('keeps converted schemas of slots that also have type-only schemas', async () => {
+      const spec = await generator.generate(mixed, {
+        source: { file: fixture('type-only-schemas.ts'), export: 'mixed' },
+      })
+      const paths = spec.paths as any
+      // the inferred schema leaves out the keys the converted schemas describe
+      const inferred = {
+        type: 'object',
+        properties: { b: { type: 'number' } },
+        required: ['b'],
+      }
+
+      expect(paths['/input'].post.requestBody.content['application/json'].schema).toEqual({
+        allOf: [
+          {
+            type: 'object',
+            properties: { a: { type: 'string', minLength: 3 } },
+            required: ['a'],
+          },
+          inferred,
+        ],
+      })
+      expect(
+        paths['/output'].post.responses['200'].content['application/json'].schema.allOf,
+      ).toEqual([
+        expect.objectContaining({ properties: { a: { type: 'string', minLength: 3 } } }),
+        inferred,
+      ])
+
+      const [message, close] =
+        paths['/iterator'].post.responses['200'].content['text/event-stream'].schema.oneOf
+      expect(message.properties.data.properties).toEqual({ id: { type: 'string', minLength: 2 } })
+      expect(close.properties.data).toEqual({
+        type: 'object',
+        properties: { total: { type: 'number' } },
+        required: ['total'],
+      })
+
+      // query parameters stay primitive
+      const parameters = paths['/query'].get.parameters
+      expect(parameters.map((p: any) => [p.name, p.schema, p.style])).toEqual([
+        ['a', { type: 'string', minLength: 3 }, undefined],
+        ['b', { type: 'number' }, undefined],
+      ])
+
+      // several event iterators are an intersection of iterators
+      const [streamMessage] =
+        paths['/iterators'].post.responses['200'].content['text/event-stream'].schema.oneOf
+      expect(streamMessage.properties.data).toEqual({
+        allOf: [
+          expect.objectContaining({ properties: { id: { type: 'string', minLength: 2 } } }),
+          { type: 'object', properties: { n: { type: 'number' } }, required: ['n'] },
+        ],
+      })
+    })
+
+    it('keeps what type-only schemas add inside keys converted schemas describe', async () => {
+      const spec = await generator.generate(mixed, {
+        source: { file: fixture('type-only-schemas.ts'), export: 'mixed' },
+      })
+      const paths = spec.paths as any
+      const body = (path: string) =>
+        paths[path].post.requestBody.content['application/json'].schema.allOf[1]
+
+      expect(
+        paths['/detailed/{id}'].post.parameters.map((p: any) => [p.in, p.name, p.schema]),
+      ).toEqual([
+        ['path', 'id', { type: 'string' }],
+        ['query', 'a', { type: 'string' }],
+        ['query', 'b', { type: 'number' }],
+      ])
+      expect(body('/nested')).toEqual({
+        type: 'object',
+        properties: {
+          user: { type: 'object', properties: { age: { type: 'number' } }, required: ['age'] },
+        },
+        required: ['user'],
+      })
+      // refs point into different `$defs`, so the same ref text is not the same schema
+      // (zod's `Tag` takes the name, so the inferred one is renamed)
+      const tagSchema = (ref: string) =>
+        (spec.components?.schemas as any)[ref.replace('#/components/schemas/', '')]
+      expect(tagSchema(body('/sameRef').properties.tag.$ref)).toMatchObject({
+        required: ['label', 'color'],
+      })
+      // the type requires `a`, which zod makes optional
+      // (on the converted schema, which query parameters read)
+      const optionalInZod =
+        paths['/optionalInZod'].post.requestBody.content['application/json'].schema.allOf
+      expect(optionalInZod[0]).toMatchObject({
+        properties: { a: { type: 'string' } },
+        required: ['a'],
+      })
+      expect(optionalInZod[1]).toEqual({
+        type: 'object',
+        properties: { b: { type: 'number' } },
+        required: ['b'],
+      })
+      // query parameters stay primitive, also with equal enums in another order
+      const parameters = (path: string) =>
+        paths[path].get.parameters.map((p: any) => [p.name, p.schema, p.style])
+      expect(parameters('/queryDefault')).toEqual([
+        ['lim', { type: 'number', default: 10 }, undefined],
+        ['extra', { type: 'string' }, undefined],
+      ])
+      expect(
+        paths['/queryRequired'].get.parameters.map((p: any) => [p.name, p.required, p.style]),
+      ).toEqual([
+        ['a', true, undefined],
+        ['b', true, undefined],
+      ])
+      for (const path of ['/queryNullableEnum', '/queryDuplicateEnum', '/queryConst']) {
+        expect(parameters(path).map(([name, , style]: any) => [name, style])).toEqual([
+          ['s', undefined],
+          ['extra', undefined],
+        ])
+      }
+      expect(parameters('/queryEnum')).toEqual([
+        ['s', { type: 'string', enum: ['archived', 'active'] }, undefined],
+        ['extra', { type: 'string' }, undefined],
+      ])
+
+      // a recursive schema keeps its levels, the inferred part requires `name` at the root only
+      const recursive =
+        paths['/recursive'].post.requestBody.content['application/json'].schema.allOf
+      const category = (spec.components?.schemas as any)[
+        recursive[0].$ref.replace('#/components/schemas/', '')
+      ]
+      expect(category.required).toEqual(['children'])
+      expect(recursive[1].properties.extra).toEqual({ type: 'number' })
+      // not named after the `Array` around the anonymous recursive item
+      expect(Object.keys(spec.components?.schemas ?? {})).not.toContain('Array')
+      expect(recursive[1].required).toEqual(expect.arrayContaining(['name', 'extra']))
+
+      // refs into the converted schema's own defs are not recursion, and describe their keys
+      expect(
+        paths['/path-with-ref/{id}'].post.parameters.map((p: any) => [p.in, p.name, p.required]),
+      ).toEqual([['path', 'id', true]])
+      expect(
+        paths['/queryWithRef'].get.parameters.map((p: any) => [p.name, p.required, p.style]),
+      ).toEqual([
+        ['a', true, undefined],
+        ['s', true, undefined],
+        ['b', true, undefined],
+      ])
+
+      expect(paths['/queryDescribedRef'].get.parameters.map((p: any) => [p.name, p.style])).toEqual(
+        [
+          ['s', undefined],
+          ['b', undefined],
+        ],
+      )
+
+      // constraints only the type has
+      expect(body('/constraints').properties.id).toEqual({
+        type: 'string',
+        pattern: '^user_[\\s\\S]*$',
+      })
+
+      // `z.unknown()` says less than `Tag`
+      expect(Object.keys(body('/weaker').properties)).toEqual(['tag', 'b'])
+      expect(tagSchema(body('/weaker').properties.tag.$ref)).toMatchObject({
+        required: ['label', 'color'],
+      })
+    })
+
+    it('documents unions of event iterators as event streams', async () => {
+      const spec = await generator.generate(streams, {
+        source: { file: fixture('type-only-schemas.ts'), export: 'streams' },
+      })
+
+      for (const path of ['/union', '/nullable']) {
+        const content = (spec.paths as any)[path].post.responses['200'].content
+        expect(Object.keys(content)).toEqual(['text/event-stream'])
+      }
+
+      const [message] = (spec.paths as any)['/union'].post.responses['200'].content[
+        'text/event-stream'
+      ].schema.oneOf
+      expect(message.properties.data.anyOf).toHaveLength(2)
+
+      // `genA` returns nothing, so the close event may have no data
+      const [, close] = (spec.paths as any)['/partialReturn'].post.responses['200'].content[
+        'text/event-stream'
+      ].schema.oneOf
+      expect(close.required).toEqual(['event'])
+    })
+
+    it('documents class inputs as the plain objects or instances a client sends', async () => {
+      const spec = await generator.generate(classes, {
+        source: { file: fixture('type-only-schemas.ts'), export: 'classes' },
+      })
+      const operation = (spec.paths as any)['/create'].post
+      const component = (schema: any) =>
+        schema.$ref
+          ? (spec.components?.schemas as any)[schema.$ref.replace('#/components/schemas/', '')]
+          : schema
+
+      const input = component(operation.requestBody.content['application/json'].schema)
+      // `JSON.stringify` writes the `Set` of an instance as `{}`, and throws on its bigint
+      expect(input.properties.tags).toEqual({
+        anyOf: [
+          expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+          { type: 'object' },
+        ],
+      })
+      expect(input.properties.views).toMatchObject({ 'type': 'string', 'x-native-type': 'bigint' })
+
+      // the server sends an instance, which `JSON.stringify` writes
+      const output = component(operation.responses['200'].content['application/json'].schema)
+      expect(output.properties.tags).toEqual({ type: 'object' })
+      // which throws on a bigint field
+      expect(output.properties.views).toEqual({ not: {} })
+      expect(output.required).toContain('views')
+
+      const value = await call(classes.create, { title: 't', tags: new Set(['a']), views: 1n })
+      expect(() => JSON.stringify(new OpenAPIJsonSerializer().serializeJson(value).json)).toThrow(
+        'BigInt',
+      )
+    })
+
+    it('names a model the same in both directions, and calls toJSON only of instances in inputs', async () => {
+      const spec = await generator.generate(directions, {
+        source: { file: fixture('type-only-schemas.ts'), export: 'directions' },
+      })
+      const paths = spec.paths as any
+      const two = paths['/two'].post
+
+      // one component for the second `Item`, used by the request and the response
+      const names = Object.keys(spec.components?.schemas ?? {})
+      expect(names).toEqual(expect.arrayContaining(['Item', 'Item2']))
+      expect(names).not.toContain('ItemInput')
+      expect(two.requestBody.content['application/json'].schema).toEqual(
+        two.responses['200'].content['application/json'].schema,
+      )
+
+      // an instance of `SecretJSON` is written as nothing, a plain object by its fields
+      const secret = (spec.components?.schemas as any).HoldsSecret
+      expect(secret.required).toEqual(['list'])
+      expect(secret.properties.list.items).toEqual({
+        anyOf: [{ $ref: '#/components/schemas/SecretJSON' }, { type: 'null' }],
+      })
+    })
+
+    it('reports unresolved types when only error data needs inference', async () => {
+      await expect(
+        generator.generate(
+          { proc: errorData },
+          { source: { file: fixture('unresolved-error-data.ts') } },
+        ),
+      ).rejects.toThrow('Procedure at proc: Could not resolve its type "Missing"')
+    })
+  })
+
+  describe('inputs of views of built-ins', () => {
+    it('documents inputs of views of built-ins as the built-in or a plain object', async () => {
+      const spec = await generator.generate(viewInputs, {
+        source: { file: fixture('builtin-views.ts'), export: 'viewInputs' },
+      })
+      const body = (path: string) =>
+        (spec.paths as any)[path].post.requestBody.content['application/json'].schema
+      const uri = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }
+      const href = expect.objectContaining({ type: 'string' })
+
+      expect(body('/partialDate')).toEqual({
+        anyOf: [
+          { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+          { type: 'object' },
+        ],
+      })
+      expect(body('/pickedURL')).toEqual({
+        anyOf: [uri, { type: 'object', properties: { href }, required: ['href'] }],
+      })
+      expect(body('/pickedURLWithX')).toEqual({
+        anyOf: [
+          uri,
+          { type: 'object', properties: { href, x: { type: 'number' } }, required: ['href', 'x'] },
+        ],
+      })
+      // a client sends an instance of the array subclass as an array, a plain object by its fields
+      expect(body('/partialRowsWithX')).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          expect.objectContaining({
+            type: 'object',
+            properties: expect.objectContaining({
+              label: { type: 'string' },
+              x: { type: 'string' },
+            }),
+            required: ['x'],
+          }),
+        ],
+      })
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      for (const [path, value] of [
+        ['/partialDate', new Date(0)],
+        ['/partialDate', {}],
+        ['/pickedURL', new URL('http://x/')],
+        ['/pickedURL', { href: 'http://x/' }],
+        ['/pickedURLWithX', Object.assign(new URL('http://x/'), { x: 1 })],
+        ['/pickedURLWithX', { href: 'h', x: 1 }],
+        ['/partialRowsWithX', { label: 'a', x: 'x' }],
+        ['/partialRowsWithX', Object.assign(new StringRows(), { x: 'x' })],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : validate.errors).toEqual([])
+      }
+    })
+  })
+
+  describe('function outputs and class inputs', () => {
+    it('documents functions at the root as no body, also in a union', async () => {
+      const spec = await generator.generate(callables, {
+        source: { file: fixture('class-views.ts'), export: 'callables' },
+      })
+      const response = (path: string) => (spec.paths as any)[path].post.responses['200']
+
+      // like a plain function or `undefined`
+      expect(response('/tagged')).toEqual({ description: 'OK', content: {} })
+      expect(response('/callable')).toEqual({ description: 'OK', content: {} })
+      // a function is sent as no body
+      expect(response('/taggedOrNumber').content['application/json'].schema).toEqual({
+        anyOf: [{ type: 'number' }, { type: 'null' }],
+      })
+      expect(spec.components?.schemas ?? {}).toEqual({})
+    })
+
+    it('documents inputs a client may send as an instance or a plain object', async () => {
+      const spec = await generator.generate(instanceInputs, {
+        source: { file: fixture('class-views.ts'), export: 'instanceInputs' },
+      })
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // the getter is optional, as in the class itself an instance does not write it
+      expect(body('/frozenFullName')).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, full: { type: 'string' } },
+        required: ['name'],
+      })
+      expect(body('/pickedStamp')).toEqual({
+        anyOf: [
+          { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+          { type: 'object', properties: { label: { type: 'string' } }, required: ['label'] },
+        ],
+      })
+      expect((spec.components?.schemas as any).LabeledLink.anyOf[0]).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect((spec.components?.schemas as any).MaybeCodedError.required).toBeUndefined()
+      expect(body('/branded')).toEqual({
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      })
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/frozenFullName', new FullName()],
+        ['/frozenFullName', { name: 'n', full: 'f' }],
+        ['/fullName', new FullName()],
+        ['/pickedStamp', new LabeledStamp(0)],
+        ['/pickedStamp', { label: 'l' }],
+        ['/link', new URL('http://x/')],
+        ['/link', { href: 'h', label: 'l' }],
+        ['/error', new Error('boom')],
+        ['/error', { code: 1, message: 'm' }],
+        ['/branded', { id: 'abc' }],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : validate.errors).toEqual([])
+      }
+    })
+  })
+
+  describe('class inputs', () => {
+    it('documents inputs of class types as the instances and plain objects a client sends', async () => {
+      const spec = await generator.generate(classInputs, {
+        source: { file: fixture('class-inputs.ts'), export: 'classInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // an instance leaves its getter out, a plain object has it
+      expect(schemas.Person.required).toEqual(['first', 'last'])
+      expect(schemas.Person.properties.full).toEqual({ type: 'string' })
+      // only an instance satisfies a class with private members, `JSON.stringify` writes it
+      expect(schemas.Sealed.properties.tags).toEqual({ type: 'object' })
+
+      // what a client holding these values sends, which the server accepts
+      const handler = new OpenAPIHandler(classInputs)
+      const sent: string[] = []
+      const link = new OpenAPILink(classInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(await handled.clone().text())
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const plainTagged = { tags: new Set(['a']), counts: new Map([['a', 1]]), name: 'n' }
+      const plainMoney = { amount: 1, currency: 'X' }
+
+      for (const [name, value] of [
+        ['money', { m: new Money(1, 'X') }],
+        ['money', { m: plainMoney }],
+        ['tagged', new Tagged()],
+        ['tagged', plainTagged],
+        ['person', new Person()],
+        ['person', { first: 'a', last: 'b', full: 'a b' }],
+        ['readonlyTagged', new Tagged()],
+        ['readonlyTagged', plainTagged],
+        ['pickedMoney', new Money(1, 'X')],
+        ['pickedMoney', { amount: 1 }],
+        ['partialPerson', new Person()],
+        ['partialPerson', { full: 'a b' }],
+        ['order', new Order()],
+        ['order', { total: plainMoney, items: [plainTagged, new Tagged()] }],
+        ['readonlyOrder', new Order()],
+        ['readonlyOrder', { total: new Money(1, 'X'), items: [plainTagged] }],
+        ['moneys', [new Money(1, 'X'), plainMoney]],
+        ['tags', { list: [new Tagged(), plainTagged] }],
+        ['sealed', new Sealed()],
+        ['guarded', { g: new Guarded() }],
+        ['stamp', new Stamp(0)],
+        ['link', new Link('http://x/')],
+        ['labels', new Labels(['a'])],
+        ['lookup', new Lookup([['a', 1]])],
+      ] as const) {
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(sent.at(-1)!)
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of deep views', () => {
+    it('documents inputs of views, deep views, and redeclared built-in members', async () => {
+      const spec = await generator.generate(viewedInputs, {
+        source: { file: fixture('deep-views.ts'), export: 'viewedInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const dateTime = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+      const stamped = {
+        anyOf: [
+          dateTime,
+          {
+            type: 'object',
+            properties: { id: { type: 'number' }, label: { type: 'string' } },
+            required: ['id', 'label'],
+          },
+        ],
+      }
+
+      // the built-in of each class behind it, whatever their order
+      expect(schemas.IdStamp).toEqual(stamped)
+      expect(schemas.StampId).toEqual(stamped)
+      expect(schemas.InterStamp).toEqual(stamped)
+      // a getter is optional in a deep view too
+      expect(schemas.DeepRO_Getters.required).toBeUndefined()
+      // redeclared members of a built-in are not written by an instance
+      expect(schemas.MsgError.required).toBeUndefined()
+      expect(schemas.ViaMsgError.required).toEqual(['code'])
+      expect(schemas.SizedParams.required).toBeUndefined()
+      expect(schemas.DeepRO_RegExp).toEqual({ description: 'Read-only all the way down' })
+      expect(body('/partialSized').anyOf[0]).toEqual(
+        expect.objectContaining({ 'type': 'array', 'x-native-type': 'set' }),
+      )
+      expect(body('/readonlyLink').anyOf[0]).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect(body('/partialStr').anyOf[1]).toEqual(
+        expect.objectContaining({
+          type: 'object',
+          properties: expect.objectContaining({ a: { type: 'number' } }),
+        }),
+      )
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/idStamp', Object.assign(new StampedDate(0), { id: 1 })],
+        ['/idStamp', { id: 1, label: 'l' }],
+        ['/interStamp', Object.assign(new StampedDate(0), { id: 1 })],
+        ['/stampId', Object.assign(new StampedDate(0), { id: 1 })],
+        ['/deepGetters', new Getters()],
+        ['/msg', new Error('m')],
+        ['/msg', { message: 'm' }],
+        ['/via', { e: Object.assign(new Error('m'), { code: 'c' }) }],
+        ['/params', { p: new URLSearchParams('a=1') }],
+        ['/deepRe', { r: /a/u }],
+        ['/dateOrSized', new Set(['a'])],
+        ['/dateOrSized', new Date(0)],
+        ['/readonlyLink', new URL('http://x/')],
+        ['/readonlyLink', { href: 'h', label: 'l' }],
+        ['/pickedLink', new URL('http://x/')],
+        ['/partialSized', new Set(['a'])],
+        ['/partialSized', {}],
+        ['/partialStr', {}],
+        ['/partialStr', 'abc'],
+        ['/bufView', { buffer: new ArrayBuffer(1), label: 'l' }],
+        ['/bufView', Object.assign(new Uint8Array([1]), { label: 'l' })],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of intersections and conditional deep views', () => {
+    it('documents inputs of intersections, conditional deep views, and views of functions', async () => {
+      const spec = await generator.generate(viewIntersectionsInputs, {
+        source: { file: fixture('view-intersections.ts'), export: 'viewIntersectionsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // members inherited from `Error` are not written by an instance
+      expect(schemas.CodedFailureExtra.required).toEqual(['code', 'extra'])
+      expect(body('/brandedConditional').properties.id).toEqual({ type: 'string' })
+      expect(body('/simplified').properties.n).toEqual({ type: 'number' })
+      expect(body('/conditionalDate').properties.at).toMatchObject({
+        type: 'string',
+        format: 'date-time',
+      })
+      // a client drops the function a view of it holds
+      for (const path of ['/frozenCallback', '/conditionalCallback', '/conditionalCallbackField']) {
+        expect(body(path).required).toEqual(['n'])
+      }
+      expect(schemas.DeepRO_WithCallback.required).toEqual(['n'])
+      expect(body('/conditionalArrow').required).toEqual(['n'])
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/errorIntersection', { e: Object.assign(new Error('m'), { code: 1, extra: 1 }) }],
+        ['/brandedConditional', { id: 'x' }],
+        ['/simplified', { n: 1 }],
+        ['/conditionalDate', { at: new Date(0) }],
+        ['/frozenCallback', { cb: () => {}, n: 1 }],
+        ['/deepCallback', { cb: () => {}, n: 1 }],
+        ['/conditionalCallback', { cb: () => {}, n: 1 }],
+        ['/conditionalCallbackField', { cb: () => {}, n: 1 }],
+        ['/conditionalArrow', new WithArrow()],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of widened views, and component names', () => {
+    const second: any = {
+      type: 'object',
+      properties: { name: { type: 'string' } },
+      required: ['name'],
+    }
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+    const responseOf = (spec: any, path: string) =>
+      spec.paths[path].post.responses['200'].content['application/json'].schema
+    const legacy = (schema: unknown): any => ({
+      get: {
+        responses: { 200: { description: 'OK', content: { 'application/json': { schema } } } },
+      },
+    })
+
+    it('documents inputs of widened views, mixins applied to built-ins, and URLSearchParams', async () => {
+      const spec = await generator.generate(widenedMappedViewsInputs, {
+        source: { file: fixture('widened-views.ts'), export: 'widenedMappedViewsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+
+      expect(body('/orString').properties.id).toEqual({
+        type: 'string',
+        description: 'Values, or strings',
+      })
+      expect(body('/mixinDate').properties.d).toEqual(date)
+      expect(body('/mixinURL').properties.u).toEqual({
+        'type': 'string',
+        'format': 'uri',
+        'x-native-type': 'url',
+      })
+      expect(schemas.TaggedSet).toEqual({
+        'type': 'array',
+        'uniqueItems': true,
+        'items': { type: 'number' },
+        'x-native-type': 'set',
+      })
+      expect(body('/pickedMixinDate').properties.d.anyOf[0]).toEqual(date)
+      // an instance does not write the `size` a `URLSearchParams` has on its prototype
+      expect(body('/params').properties.p.type).toBe('object')
+      expect(body('/params').properties.p.required).toBeUndefined()
+      expect(schemas.OrList_GetterOnly.required).toEqual(['n'])
+
+      // what a client holding these values sends
+      const serializer = new OpenAPIJsonSerializer()
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/orString', { id: 'x' }],
+        ['/orListStamp', { at: new StampDate(0) }],
+        ['/orListGetter', new GetterOnly()],
+        ['/mixinDate', { d: new TaggedDate(0) }],
+        ['/mixinURL', { u: new TaggedURL('http://x/') }],
+        ['/mixinSet', { s: new TaggedSet([1]) }],
+        ['/pickedMixinDate', { d: new TaggedDate(0) }],
+        ['/params', { p: new URLSearchParams('a=1') }],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+
+    it('names the numbered component of a type after it, once its name is free', async () => {
+      const spec = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
+      })
+
+      expect(spec.components?.schemas).toEqual({ Item: second })
+      expect(responseOf(spec, '/second').properties.i).toEqual(ref('Item'))
+    })
+
+    it('keeps the components of base and the references to them', async () => {
+      const user: any = { type: 'string', description: 'user-defined' }
+      const spec: any = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
+        base: {
+          paths: { '/legacy': legacy(ref('Item2')) },
+          components: { schemas: { Item2: user } },
+        },
+      })
+
+      expect(spec.components.schemas.Item2).toEqual(user)
+      expect(spec.components.schemas.Item).toBeUndefined()
+      expect(spec.paths['/legacy'].get.responses['200'].content['application/json'].schema).toEqual(
+        ref('Item2'),
+      )
+      expect(
+        spec.components.schemas[responseOf(spec, '/second').properties.i.$ref.split('/').at(-1)],
+      ).toEqual(second)
+
+      // a component of base equal to a generated one is shared, under its own name
+      const shared: any = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
+        base: {
+          paths: { '/legacy': legacy(ref('Item2')) },
+          components: { schemas: { Item2: second } },
+        },
+      })
+
+      expect(shared.components.schemas).toEqual({ Item2: second })
+      expect(responseOf(shared, '/second').properties.i).toEqual(ref('Item2'))
+      expect(
+        shared.paths['/legacy'].get.responses['200'].content['application/json'].schema,
+      ).toEqual(ref('Item2'))
+    })
+
+    it('keeps the names componentName chooses', async () => {
+      const componentName = vi.fn((name: string) => (name === 'Item' ? 'FirstItem' : name))
+      const spec = await generator.generate(numberedBodyComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedBodyComponents' },
+        componentName,
+      })
+
+      expect(componentName.mock.calls.map(([name]) => name).toSorted()).toEqual(['Item', 'Item2'])
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual(['FirstItem', 'Item2'])
+      expect(responseOf(spec, '/second').properties.i).toEqual(ref('Item2'))
+    })
+  })
+
+  describe('inputs of array-like views', () => {
+    it('documents inputs of array-like views, views of primitives, and object', async () => {
+      const spec = await generator.generate(arrayLikeViewsInputs, {
+        source: { file: fixture('array-like-views.ts'), export: 'arrayLikeViewsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      expect(body('/pickedTuple')).toEqual({
+        anyOf: [
+          { type: 'array', prefixItems: [{ type: 'number' }, {}], minItems: 2, maxItems: 2 },
+          { type: 'object', properties: { 0: { type: 'number' } }, required: ['0'] },
+        ],
+      })
+      expect(body('/omittedString').anyOf[0]).toEqual({ type: 'string' })
+      expect(body('/brandedView')).toEqual({ type: 'string' })
+      expect(body('/objectField')).toEqual({ type: 'object', properties: { v: {} } })
+      expect(schemas.OrString.anyOf[0]).toEqual({ type: 'array', items: { type: 'string' } })
+
+      // what a client holding these values sends
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/partialPair', {}],
+        ['/partialPair', { extra: 'x' }],
+        ['/partialPair', [1, 'a']],
+        ['/widenedArray', ['a']],
+        ['/pickedTuple', [1, 'a']],
+        ['/pickedTuple', { 0: 1 }],
+        ['/omittedString', 'abc'],
+        ['/brandedView', 'abc'],
+        ['/objectField', {}],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('inputs of views of primitives', () => {
+    it('documents inputs of views of primitives a plain object satisfies', async () => {
+      const spec = await generator.generate(primitiveViewsInputs, {
+        source: { file: fixture('primitive-views.ts'), export: 'primitiveViewsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      expect(schemas.PlainBoolean.anyOf).toEqual([{ type: 'boolean' }, { type: 'object' }])
+
+      // what a client holding these values sends
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/plainBoolean', { v: {} }],
+        ['/plainBoolean', { v: true }],
+        ['/plainBooleanRoot', {}],
+        ['/plainBooleanRoot', false],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('inputs of the values a client holds', () => {
+    it('documents inputs of the values a client holding them sends', async () => {
+      const spec = await generator.generate(clientValuesInputs, {
+        source: { file: fixture('client-values.ts'), export: 'clientValuesInputs' },
+      })
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      // an instance of a view of a class, written by `JSON.stringify`, or a plain object
+      expect(body('/moneyView').properties.m).toEqual({
+        anyOf: [
+          { type: 'string' },
+          { type: 'object', properties: { cents: { type: 'number' } }, required: ['cents'] },
+        ],
+      })
+      expect(body('/taggedView').properties.t.properties.tags).toEqual({
+        anyOf: [expect.objectContaining({ 'x-native-type': 'set' }), { type: 'object' }],
+      })
+      expect(body('/anyRecord')).toEqual({ type: 'object', properties: { v: {} } })
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/expandingCycle', { f0: null, f2: { a: 1 } }],
+        ['/anyRecord', { v: [1, 2] }],
+        ['/primitiveView', { v: 'x' }],
+        ['/omittedLength', { v: [[1]] }],
+        ['/objectIntersection', { v: [1] }],
+        ['/keylessIntersection', { v: 5 }],
+        ['/iterable', { ids: ['a'] }],
+        ['/arrayLike', { ids: [1, 2] }],
+        ['/numbered', { ids: ['a', 'b'] }],
+        ['/moneyView', { m: '1c' }],
+        ['/moneyView', { m: { cents: 1 } }],
+        ['/taggedView', { t: { tags: {} } }],
+        ['/taggedView', { t: { tags: ['a'] } }],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+  describe('inputs of deep mapped types over finite models', () => {
+    it('documents inputs of conditional deep mapped types over finite models in full', async () => {
+      const spec = await generator.generate(nestedPagesInputs, {
+        source: { file: fixture('nested-pages.ts'), export: 'nestedPagesInputs' },
+      })
+      const body = (path: string) =>
+        (spec.paths as any)[path].post.requestBody.content['application/json'].schema
+
+      // the fourth nested page is documented, not cut
+      expect(JSON.stringify(body('/deepFeed'))).toContain(
+        '"likes":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"by":{"type":"string"}},"required":["by"]}}',
+      )
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const page = <T>(items: T[]) => ({ items, total: items.length })
+      for (const [path, value, valid] of [
+        [
+          '/deepFeed',
+          {
+            name: 'a',
+            posts: page([
+              {
+                title: 't',
+                comments: page([
+                  { text: 'c', replies: page([{ text: 'r', likes: page([{ by: 'b' }]) }]) },
+                ]),
+              },
+            ]),
+          },
+          true,
+        ],
+        [
+          '/deepFeed',
+          {
+            name: 'a',
+            posts: page([
+              {
+                title: 't',
+                comments: page([{ text: 'c', replies: page([{ text: 'r', likes: 1 }]) }]),
+              },
+            ]),
+          },
+          false,
+        ],
+        ['/nestedBoxes', { v: { v: { v: { v: 1 } } } }, true],
+        ['/nestedBoxes', { v: { v: { v: { v: 'x' } } } }, false],
+        ['/lengthExtra', { v: [1] }, true],
+      ] as const) {
+        expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
+      }
+    })
+  })
+  describe('inputs of cycles through deep mapped types', () => {
+    it('documents inputs of cycles through conditional deep mapped types over generic models', async () => {
+      const spec = await generator.generate(genericCyclesInputs, {
+        source: { file: fixture('generic-cycles.ts'), export: 'genericCyclesInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const boxes = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { v: boxes(depth - 1, end) }
+      const getters = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: getters(depth - 1, end) } }
+      const linked = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: linked(depth - 1, end), next: null } }
+      const mapped = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: mapped(depth - 1, end), m: [] } }
+      const sets = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: sets(depth - 1, end), s: [] } }
+      const deep = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { deep: { a: deep(depth - 1, end), m: [] } } }
+      const lists = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: lists(depth - 1, end), l: [] } }
+      const records = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: records(depth - 1, end), r: {} } }
+      const boxed = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { v: { a: boxed(depth - 1, end), m: [] } } }
+      const passed = (depth: number, end: unknown): unknown =>
+        depth === 0 ? end : { inner: { a: passed(depth - 1, end), b: 'b', m: [] } }
+
+      for (const [path, value, valid] of [
+        ['/genericCycle', { f0: { f0: null, f2: { a: 2 } }, f2: { a: 1 } }, true],
+        ['/genericCycle', { f0: { f0: null, f2: { a: 'x' } }, f2: { a: 1 } }, false],
+        ['/genericSelf', { v: 'a', self: { v: 'b', self: null } }, true],
+        ['/wrapCycle', { inner: { a: 1 }, f0: { inner: { a: 2 }, f0: null } }, true],
+        ['/deepBoxes', boxes(8, 1), true],
+        ['/deepBoxes', boxes(8, 'x'), false],
+        // a function beside the type argument tells the levels apart, so all six are documented
+        ['/viaGetters', getters(6, 1), true],
+        ['/viaGetters', getters(6, 'x'), false],
+        // also when the alias between them names itself
+        ['/viaLinkedGetters', linked(6, 1), true],
+        ['/viaLinkedGetters', linked(6, 'x'), false],
+        // and when the object literal between them holds a map or set of the model
+        ['/viaSelfMaps', mapped(8, 1), true],
+        ['/viaSelfMaps', mapped(8, 'x'), false],
+        ['/viaSelfSets', sets(5, 1), true],
+        ['/viaSelfSets', sets(5, 'x'), false],
+        // also two object literals deep, and beside a list or record of the model
+        ['/viaDeepMaps', deep(5, 1), true],
+        ['/viaDeepMaps', deep(5, 'x'), false],
+        ['/viaSelfLists', lists(8, 1), true],
+        ['/viaSelfLists', lists(8, 'x'), false],
+        ['/viaSelfRecords', records(5, 1), true],
+        ['/viaSelfRecords', records(5, 'x'), false],
+        // also through a generic model of the object literal, and passing on a type argument
+        ['/viaBoxedMaps', boxed(8, 1), true],
+        ['/viaBoxedMaps', boxed(8, 'x'), false],
+        ['/viaExpandedBoxedMaps', boxed(5, 1), true],
+        ['/viaExpandedBoxedMaps', boxed(5, 'x'), false],
+        ['/viaDefaultMaps', passed(6, 1), true],
+        ['/viaDefaultMaps', passed(6, 'x'), false],
+      ] as const) {
+        expect([path, ajv.validate(body(path), value)]).toEqual([path, valid])
+      }
+    })
+  })
+  describe('inputs of views of branded primitives', () => {
+    it('documents inputs of views of branded primitives a plain object satisfies', async () => {
+      const spec = await generator.generate(brandedPrimitiveViewsInputs, {
+        source: { file: fixture('branded-views.ts'), export: 'brandedPrimitiveViewsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+
+      expect(body('/omittedBrand').properties.v.anyOf[0]).toEqual({ type: 'string' })
+      expect(body('/partialBrand').properties.v.anyOf[0]).toEqual({ type: 'string' })
+      expect(body('/keylessClass')).toEqual({ type: 'object', properties: { v: {} } })
+
+      // what a client holding these values sends
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      for (const [path, value] of [
+        ['/omittedBrand', { v: 'abc' }],
+        ['/omittedBrand', { v: { length: 1 } }],
+        ['/partialBrand', { v: 'abc' }],
+        ['/partialBrand', { v: {} }],
+        ['/keylessClass', {}],
+        ['/keylessClass', { v: 'str' }],
+      ] as const) {
+        const validate = ajv.compile(body(path))
+        expect(validate(value) ? [] : [path, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of discriminated unions', () => {
+    const component = (name: string) => `#/components/schemas/${name}`
+
+    it.each(['3.2.0', '3.1.1', '3.0.4'] as const)(
+      'documents discriminated unions with a discriminator in %s',
+      async (version) => {
+        const spec = await generator.generate(discriminatedUnions, {
+          source: { file: fixture('discriminated-unions.ts'), export: 'discriminatedUnions' },
+          version,
+        })
+        const schemas = spec.components?.schemas as any
+        const discriminated = (mapping: Record<string, string>) => ({
+          oneOf: [...new Set(Object.values(mapping))].map((name) => ({ $ref: component(name) })),
+          discriminator: {
+            propertyName: 'kind',
+            mapping: Object.fromEntries(
+              Object.entries(mapping).map(([value, name]) => [value, component(name)]),
+            ),
+          },
+        })
+
+        expect(schemas.Shape).toEqual({
+          description: 'A shape, told apart by its kind',
+          ...discriminated({ circle: 'Circle', square: 'Square' }),
+        })
+        expect(schemas.Tree).toEqual({
+          description: 'A tree of leaves',
+          ...discriminated({ branch: 'Branch', leaf: 'Leaf' }),
+        })
+        expect(
+          (spec.paths as any)['/relabelled'].post.responses['200'].content['application/json']
+            .schema.items,
+        ).toEqual(discriminated({ renamed: 'Relabelled', square: 'Square' }))
+        expect(schemas.Circle.properties.kind).toEqual(
+          version === '3.0.4'
+            ? { type: 'string', enum: ['circle'] }
+            : { type: 'string', const: 'circle' },
+        )
+      },
+    )
+
+    it('documents inputs of discriminated unions, not when they are split into parameters', async () => {
+      const spec = await generator.generate(discriminatedUnionsInputs, {
+        source: { file: fixture('discriminated-unions.ts'), export: 'discriminatedUnionsInputs' },
+      })
+      const paths = spec.paths as any
+
+      expect(paths['/shape'].post.requestBody.content['application/json'].schema).toEqual({
+        $ref: component('Shape'),
+      })
+      // an instance is sent with the kind of its `toJSON`, a plain object with its own
+      expect(paths['/relabelled'].post.requestBody.content['application/json'].schema).toEqual({
+        anyOf: [{ $ref: component('Relabelled') }, { $ref: component('Square') }],
+      })
+      expect(paths['/queried'].get.parameters.map((p: any) => p.name)).toEqual([
+        'kind',
+        'radius',
+        'size',
+      ])
+    })
+  })
+
+  describe('cycles with recursive defs', () => {
+    it('makes components of the models of a cycle with defs: recursive', async () => {
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(linkedCycles, {
+        source: { file: fixture('linked-cycles.ts'), export: 'linkedCycles' },
+      })
+
+      // each refers to itself through the others, so none is written again at each use
+      expect(
+        Object.keys(spec.components?.schemas ?? {})
+          .filter((name) => name.startsWith('Linked'))
+          .toSorted(),
+      ).toEqual(['LinkedComment', 'LinkedPost', 'LinkedUser'])
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify({
+            $defs: spec.components?.schemas,
+            ...(spec.paths as any)['/linkedUser'].post.responses['200'].content['application/json']
+              .schema,
+          }).replaceAll('#/components/schemas/', '#/$defs/'),
+        ),
+      )
+      const output = await call(linkedCycles.linkedUser, undefined)
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
+      )
+      expect(validate(json) ? [] : validate.errors).toEqual([])
+    })
+
+    it('makes components of models that reach the cycle only through finished defs', async () => {
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(linkedCycles, {
+        source: { file: fixture('linked-cycles.ts'), export: 'linkedCycles' },
+      })
+
+      // each but the last refers to the first only through the next two, defs before it
+      expect(
+        Object.keys(spec.components?.schemas ?? {}).filter((name) => name.startsWith('FibTwenty')),
+      ).toHaveLength(20)
+      expect(JSON.stringify(spec).length).toBeLessThan(50_000)
+
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify({
+            $defs: spec.components?.schemas,
+            ...(spec.paths as any)['/fibTwenty'].post.responses['200'].content['application/json']
+              .schema,
+          }).replaceAll('#/components/schemas/', '#/$defs/'),
+        ),
+      )
+      const output = await call(linkedCycles.fibTwenty, undefined)
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(output).json),
+      )
+      expect(validate(json) ? [] : validate.errors).toEqual([])
+    })
+  })
+  describe('inputs holding built-ins with an added toJSON', () => {
+    it('documents inputs holding built-ins with an added toJSON, and functions typed by interfaces', async () => {
+      const spec = await generator.generate(addedToJsonInputs, {
+        source: { file: fixture('added-tojson.ts'), export: 'addedToJsonInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // what a client holding these values sends: an instance by `JSON.stringify`, which calls
+      // the added `toJSON`, a plain object by the serializer, which does not
+      for (const [name, value] of [
+        ['stampHolder', new StampHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['stampHolder', { ...new StampHolder() }],
+        ['functionHolder', new FunctionHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['functionHolder', { ...new FunctionHolder() }],
+        ['maybeStampHolder', new MaybeStampHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['maybeStampHolder', { ...new MaybeStampHolder() }],
+        ['jsonFnHolder', new JsonFnHolder()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['jsonFnHolder', { ...new JsonFnHolder() }],
+        ['jsonFnForms', new JsonFnForms()],
+        // oxlint-disable-next-line typescript/no-misused-spread -- the plain object a client sends
+        ['jsonFnForms', { ...new JsonFnForms() }],
+        ['jsonFnViews', { added: jsonFn(), fn: jsonFn(), view: jsonFn(), addedView: jsonFn() }],
+        ['jsonFnViews', { added: jsonFn(), fn: jsonFn(), view: { name: 'n' }, addedView: {} }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs holding errors with an added toJSON', () => {
+    it('documents inputs holding errors with an added toJSON, and interfaces declaring toJSON', async () => {
+      const spec = await generator.generate(errorToJsonInputs, {
+        source: { file: fixture('error-tojson.ts'), export: 'errorToJsonInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // the serializer leaves an error to `JSON.stringify`, which calls its `toJSON`, and so is
+      // an instance of a class implementing an interface that declares one
+      for (const [name, value] of [
+        ['plainLabelledError', { e: labelledError() }],
+        ['plainLabelledBytes', { b: labelledBytes() }],
+        ['jsonPoint', new JsonPointImpl()],
+        ['jsonPoint', { x: 1 }],
+        ['jsonPoints', { p: new JsonPointImpl(), list: [new JsonPointImpl(), { x: 1 }] }],
+        ['jsonPoints', { p: { x: 1 }, list: [] }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of dates intersected with views of a date', () => {
+    it('documents inputs holding dates intersected with views of a date, and toJSON writing nothing', async () => {
+      const spec = await generator.generate(dateViewsInputs, {
+        source: { file: fixture('date-views.ts'), export: 'dateViewsInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        ['dateViewHolder', new DateViewHolder()],
+        ['addedDateViewHolder', new AddedDateViewHolder()],
+        ['undefPoint', { p: new UndefPointImpl(), n: 1 }],
+        ['undefPoint', { p: { x: 1 }, n: 1 }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+
+      // a view of the date adds no `toJSON` to it
+      const { dr, dp, dg } = (spec.components?.schemas as any)[
+        body('/dateViewHolder').$ref.replace('spec#/$defs/', '')
+      ].properties
+      expect(dr).toEqual({ 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' })
+      expect(dp).toEqual(dg)
+    })
+  })
+
+  describe('inputs of a toJSON an intersection adds', () => {
+    it('documents inputs whose toJSON an intersection adds to an error, a view of one, or a boxed primitive', async () => {
+      const spec = await generator.generate(intersectedToJsonInputs, {
+        source: { file: fixture('intersected-tojson.ts'), export: 'intersectedToJsonInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        ['subErrJson', subErrJson()],
+        ['errorViewJson', errorViewJson()],
+        ['errorViewJson', plainErrorViewJson()],
+        ['boxedJson', boxedJson()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of interfaces with their own toJSON', () => {
+    it('documents inputs of interfaces over a view of an error, and boxed primitive subclasses, with their own toJSON', async () => {
+      const spec = await generator.generate(ownToJsonInputs, {
+        source: { file: fixture('own-tojson.ts'), export: 'ownToJsonInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        ['viewToJSON', viewToJSON()],
+        ['viewToJSON', plainViewToJSON()],
+        ['boxedClassJson', boxedClassJson()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of interfaces extending errors', () => {
+    it('documents inputs of interfaces extending an error or a view of one in both forms, and functions toJSON returns', async () => {
+      const spec = await generator.generate(errorSubtypesInputs, {
+        source: { file: fixture('error-interfaces.ts'), export: 'errorSubtypesInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // the serializer leaves an error to `JSON.stringify`, which writes a `Set` or `Map` as `{}`
+      for (const [name, value] of [
+        ['taggedError', taggedError()],
+        ['taggedError', plainTaggedError()],
+        ['taggedErrorHolder', { error: taggedError() }],
+        ['taggedErrorHolder', { error: plainTaggedError() }],
+        // a function `toJSON` returns is written as nothing, without calling its own `toJSON`
+        ['relays', relays()],
+        // also of an interface extending a view of an error
+        ['codedErrors', codedErrors()],
+        ['messageTags', messageTags()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of views adding a toJSON', () => {
+    it('documents inputs of views adding toJSON to a view of an error or a boxed number, and of errors toJSON returns a zoned date of', async () => {
+      const spec = await generator.generate(toJsonViewsInputs, {
+        source: { file: fixture('tojson-views.ts'), export: 'toJsonViewsInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // the serializer leaves an error or a boxed number to `JSON.stringify`, which calls its `toJSON`
+      for (const [name, value] of [
+        ['errorViewMix', errorViewMix()],
+        ['errorViewMix', plainErrorViewMix()],
+        ['numberViewJson', { n: numberViewJson() }],
+        ['zonedError', { error: zonedError() }],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+      expect((spec.components?.schemas as any).ZonedError.anyOf[0].required).toEqual(['zone'])
+    })
+  })
+
+  describe('inputs of views of collections', () => {
+    it('documents inputs of errors toJSON returns a view of a set or a map of, and plain views of a boolean', async () => {
+      const spec = await generator.generate(collectionViewsInputs, {
+        source: { file: fixture('collection-views.ts'), export: 'collectionViewsInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // `JSON.stringify` does not write the `size` of a set or a map, a plain object may
+      for (const [name, value] of [
+        ['labeledViews', labeledViews()],
+        ['labeledViews', plainLabeledViews()],
+        // the serializer walks a plain object of a view of `Boolean`
+        ['booleanViews', booleanViews()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs of plain views of boxed primitives', () => {
+    it('documents inputs of plain views of boxed primitives toJSON returns, and of interfaces extending a readonly set', async () => {
+      const spec = await generator.generate(boxedViewsInputs, {
+        source: { file: fixture('boxed-views.ts'), export: 'boxedViewsInputs' },
+      })
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      for (const [name, value] of [
+        // `JSON.stringify` writes the plain object `toJSON` returns by its own fields
+        ['boxedViewResults', boxedViewResults()],
+        // the serializer writes a set without calling its `toJSON`
+        ['readonlySets', readonlySets()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('inputs split into parameters beside a toJSON', () => {
+    it('documents inputs split into parameters by the fields a client sends, not by what toJSON returns', async () => {
+      const spec = await generator.generate(toJsonParametersInputs, {
+        source: { file: fixture('tojson-parameters.ts'), export: 'toJsonParametersInputs' },
+      })
+      const paths = spec.paths as any
+      const parameters = (path: string, method: string) =>
+        paths[path][method].parameters.map((p: any) => [p.in, p.name, p.schema, p.required])
+
+      // a query and path params hold the fields, never the string `toJSON` returns
+      expect(parameters('/search', 'get')).toEqual([
+        ['query', 'term', { type: 'string' }, true],
+        ['query', 'limit', { type: 'number' }, undefined],
+      ])
+      expect(parameters('/page', 'get')).toEqual([['query', 'size', { type: 'number' }, true]])
+      expect(parameters('/labels', 'get')).toEqual([['query', 'label', { type: 'string' }, true]])
+      expect(
+        parameters('/either', 'get')
+          .map((p: any) => p[1])
+          .toSorted(),
+      ).toEqual(['limit', 'size', 'term'])
+      expect(parameters('/term/{term}', 'patch')).toEqual([
+        ['path', 'term', { type: 'string' }, true],
+      ])
+      expect(parameters('/draft/{id}', 'delete')).toEqual([
+        ['path', 'id', { type: 'string' }, true],
+      ])
+      expect(parameters('/detailed', 'post')).toEqual([
+        ['query', 'size', { type: 'number' }, true],
+        ['header', 'x-trace', { type: 'string' }, true],
+      ])
+      // a body is written by `JSON.stringify`, which calls the `toJSON` of an instance
+      expect(paths['/detailed'].post.requestBody.content['application/json'].schema).toEqual({
+        $ref: '#/components/schemas/SearchFilter',
+      })
+
+      // what a client holding these values sends, which the server accepts
+      const handler = new OpenAPIHandler(toJsonParametersInputs)
+      const sent: Request[] = []
+      const link = new OpenAPILink(toJsonParametersInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+
+      for (const [name, value, search] of [
+        ['search', { term: 'a', limit: 1, toJSON: () => 'a' }, '?term=a&limit=1'],
+        ['page', { size: 2, toJSON: () => 'all' as const }, '?size=2'],
+        ['labels', { label: 'l' }, '?label=l'],
+        ['either', { size: 2, toJSON: () => 'all' as const }, '?size=2'],
+        // the params and the body of an instance are its fields
+        ['draft', new DraftNote(), ''],
+        ['term', new SearchFilter(), ''],
+      ] as const) {
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+        expect(new URL(sent.at(-1)!.url).search).toBe(search)
+      }
+      expect(new URL(sent.at(-1)!.url).pathname).toBe('/term/t')
+
+      await expect(
+        link.call(
+          ['detailed'],
+          {
+            query: { size: 1, toJSON: () => 'all' as const },
+            headers: { 'x-trace': 't', 'toJSON': () => 't' },
+            body: new SearchFilter(),
+          },
+          { context: {} },
+        ),
+      ).resolves.toBe(1)
+      expect(new URL(sent.at(-1)!.url).search).toBe('?size=1')
+      expect(sent.at(-1)!.headers.get('x-trace')).toBe('t')
+      expect(await sent.at(-1)!.text()).toBe('"t"')
+    })
+  })
+  describe('inputs with empty parts', () => {
+    it('documents the fields of a part with an empty object as optional, and of unions of named types declaring toJSON', async () => {
+      const spec = await generator.generate(emptyPartsInputs, {
+        source: { file: fixture('empty-parts.ts'), export: 'emptyPartsInputs' },
+      })
+      const operations = Object.values(spec.paths as any).flatMap((item: any) =>
+        Object.values(item),
+      )
+      const parameters = (operationId: string) =>
+        (operations.find((o: any) => o.operationId === operationId) as any).parameters.map(
+          (p: any) => [p.in, p.name, p.required],
+        )
+
+      // an empty object (`object`, `{}`, an empty interface, a view leaving every key out) holds none of the fields
+      for (const name of ['object', 'shape', 'omitted', 'picked']) {
+        expect(parameters(name)).toEqual([
+          ['path', 'id', true],
+          ['query', 'a', undefined],
+        ])
+      }
+      expect(parameters('empty')).toEqual([
+        ['path', 'id', true],
+        ['query', 'q', undefined],
+      ])
+      expect(parameters('getObject')).toEqual([['query', 'a', undefined]])
+      expect(parameters('getMoney')).toEqual([
+        ['query', 'amount', undefined],
+        ['query', 'currency', undefined],
+      ])
+      expect(parameters('moneyQuery')).toEqual([
+        ['query', 'amount', undefined],
+        ['query', 'currency', undefined],
+      ])
+      expect(parameters('emptyHeaders')).toEqual([['header', 'x-trace', undefined]])
+      // a section missing from a root member is missing with each of its fields
+      expect(parameters('sections')).toEqual([
+        ['query', 'title', undefined],
+        ['header', 'x-trace', undefined],
+      ])
+      // a named type declaring `toJSON` in a union is sent by its fields
+      expect(parameters('refQuery')).toEqual([
+        ['path', 'id', true],
+        ['query', 'title', undefined],
+        ['query', 'q', undefined],
+      ])
+      expect(parameters('classQuery')).toEqual([
+        ['query', 'radius', undefined],
+        ['query', 'title', undefined],
+      ])
+      expect(parameters('refHeaders')).toEqual([
+        ['header', 'x-trace', undefined],
+        ['header', 'x-b', undefined],
+      ])
+      expect(parameters('refParams')).toEqual([['path', 'id', true]])
+      expect(parameters('optionalQuery')).toEqual([['query', 'a', undefined]])
+      expect(
+        (spec.paths as any)['/optional-headers'].get.responses['200'].headers['x-o'].required,
+      ).toBeUndefined()
+
+      // what a client sends, which the server accepts, has the documented parameters
+      const handler = new OpenAPIHandler(emptyPartsInputs)
+      const sent: Request[] = []
+      const link = new OpenAPILink(emptyPartsInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+
+      for (const [name, value] of [
+        ['object', { params: { id: 'i' }, query: {} }],
+        ['empty', { params: { id: 'i' }, query: {} }],
+        ['shape', { params: { id: 'i' }, query: {} }],
+        ['omitted', { params: { id: 'i' }, query: {} }],
+        ['picked', { params: { id: 'i' }, query: {} }],
+        ['sections', { headers: { 'x-trace': 't', 'toJSON': () => 't' } }],
+        ['sections', { query: { title: 't', toJSON: () => 't' } }],
+        ['getObject', {}],
+        ['getMoney', {}],
+        ['moneyQuery', { query: {} }],
+        ['emptyHeaders', { headers: {} }],
+        ['refQuery', { params: { id: 'i' }, query: { q: 'q' } }],
+        ['refQuery', { params: { id: 'i' }, query: { title: 't', toJSON: () => 't' } }],
+        ['classQuery', { query: { radius: 2 } }],
+        ['refHeaders', { headers: { 'x-b': 'b' } }],
+        ['refParams', { params: { id: 'i', toJSON: () => 1 } }],
+        ['optionalQuery', {}],
+      ] as const) {
+        await expect(link.call([name], value, { context: {} })).resolves.toBe(1)
+
+        const request = sent.at(-1)!
+        const documented = (operations.find((o: any) => o.operationId === name) as any).parameters
+        const query = new URL(request.url).searchParams
+        for (const key of query.keys()) {
+          expect(documented).toContainEqual(expect.objectContaining({ in: 'query', name: key }))
+        }
+        for (const p of documented.filter((p: any) => p.required)) {
+          const present =
+            p.in === 'query'
+              ? query.has(p.name)
+              : p.in === 'header'
+                ? request.headers.has(p.name)
+                : true
+          expect(present, `${name}: ${p.in} ${p.name}`).toBe(true)
+        }
+      }
+    })
+  })
+
+  describe('inputs of views of errors with their own toJSON', () => {
+    it('documents inputs of views of errors and boxed primitives with their own toJSON, and of functions typed by interfaces', async () => {
+      const spec = await generator.generate(errorViewsInputs, {
+        source: { file: fixture('error-views.ts'), export: 'errorViewsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // a client's serializer leaves an instance to `JSON.stringify`, which calls its `toJSON`,
+      // and walks a plain object without it
+      for (const [name, value] of [
+        ['errorViewJsons', errorViewJsons()],
+        ['errorViewJsons', plainErrorViewJsons()],
+        ['boxedInterfaces', boxedInterfaces()],
+        ['boxedInterfaces', plainBoxedInterfaces()],
+        ['jsonFns', jsonFns()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+
+      // a plain object of a subclass of `Number` is written as an object
+      expect(schemas.MyNum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+      expect(schemas.INum).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+      // a function is written by its `toJSON`, a plain object by its fields, as in outputs
+      expect(schemas.JsonFn).toMatchObject({ anyOf: [{ type: 'string' }, { type: 'object' }] })
+    })
+  })
+
+  describe('inputs of weak collections', () => {
+    it('documents inputs of weak collections, and of interfaces extending Number or Function', async () => {
+      const spec = await generator.generate(weakCollectionsInputs, {
+        source: { file: fixture('weak-collections.ts'), export: 'weakCollectionsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const body = (path: string) =>
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        )
+      const serializer = new OpenAPIJsonSerializer()
+
+      // what a client holding these values sends
+      for (const [name, value] of [
+        ['weakHolder', weakHolder()],
+        ['plainJsonFnRoot', plainJsonFn()],
+        ['plainJsonFnRoot', functionJsonFn()],
+        ['plainJsonFnHolder', { fn: plainJsonFn() }],
+        ['plainJsonFnHolder', { fn: functionJsonFn() }],
+        ['numViewJsons', numViewJsons()],
+        ['numLikes', plainNumLikes()],
+        ['numLikes', boxedNumLikes()],
+        ['optionalJsons', optionalJsons()],
+        ['optionalJsons', plainOptionalJsons()],
+        ['optionalJsonHolder', new OptionalJsonHolder()],
+      ] as const) {
+        const validate = ajv.compile(body(`/${name}`))
+        const json = JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+
+      expect(schemas.WeakLookupClass).not.toHaveProperty('type')
+      expect(schemas.PlainJsonFn).toMatchObject({
+        anyOf: [{ type: 'string' }, { type: 'object' }],
+      })
+      // without its optional `toJSON`, a value is also the primitive, or a boxed one
+      expect(schemas.OptJsonNum).toMatchObject({
+        anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'object' }],
+      })
+    })
+  })
+
+  describe('the order of procedures', () => {
+    it('names components the same whatever the order of procedures', async () => {
+      const generate = (router: Parameters<typeof generator.generate>[0], name: string) =>
+        generator.generate(router, {
+          source: { file: fixture('procedure-order.ts'), export: name },
+        })
+      const forward = await generate(procedureOrderForward, 'procedureOrderForward')
+
+      // a type converted the same at a root and in a class takes the name without a mode
+      expect(Object.keys(forward.components?.schemas ?? {}).toSorted()).toEqual([
+        'MaybeJsonCount',
+        'MaybeJsonCountHolder',
+        'MaybeJsonPoint',
+        'MaybeJsonPointHolder',
+      ])
+      for (const [router, name] of [
+        [procedureOrderReverse, 'procedureOrderReverse'],
+        [procedureOrderMixed, 'procedureOrderMixed'],
+        [procedureOrderSwapped, 'procedureOrderSwapped'],
+      ] as const) {
+        expect(await generate(router, name)).toEqual(forward)
+      }
+    })
+
+    it('leaves functions typed by interfaces over a view of Function optional', async () => {
+      const spec = await generator.generate(procedureOrder, {
+        source: { file: fixture('procedure-order.ts'), export: 'procedureOrder' },
+      })
+
+      // only a `toJSON` that may be missing drops the function
+      expect((spec.components?.schemas as any).FnViewHolder.required).toEqual(['json'])
+    })
+  })
+
+  describe('the order of procedures beside an input', () => {
+    const routers = {
+      permutationHolderInObject,
+      permutationHolderInRoot,
+      permutationHolderInRootRoot,
+      permutationHolderRootInRoot,
+      permutationInObjectHolder,
+      permutationInRootHolder,
+      permutationInRootHolderRoot,
+      permutationInRootRootHolder,
+      permutationRootHolderInRoot,
+      permutationRootInRootHolder,
+    }
+    const generate = (name: keyof typeof routers) =>
+      generator.generate(routers[name], {
+        source: { file: fixture('order-permutations.ts'), export: name },
+      })
+    const ref = { $ref: '#/components/schemas/SharedMaybeJson' }
+
+    it('names components the same whatever the order of procedures, also beside an input', async () => {
+      const orders = [
+        'permutationInRootRootHolder',
+        'permutationInRootHolderRoot',
+        'permutationRootInRootHolder',
+        'permutationRootHolderInRoot',
+        'permutationHolderInRootRoot',
+        'permutationHolderRootInRoot',
+      ] as const
+      const first = await generate(orders[0])
+
+      // the input, the output root, and the class field share one component
+      expect(Object.keys(first.components?.schemas ?? {}).toSorted()).toEqual([
+        'SharedMaybeJson',
+        'SharedMaybeJsonHolder',
+      ])
+      expect(
+        (first.paths as any)['/root'].post.responses['200'].content['application/json'].schema,
+      ).toEqual(ref)
+      expect((first.components?.schemas as any).SharedMaybeJsonHolder.properties.shared).toEqual(
+        ref,
+      )
+      for (const name of orders.slice(1)) {
+        expect(await generate(name)).toEqual(first)
+      }
+    })
+
+    it.each([
+      'permutationInObjectHolder',
+      'permutationHolderInObject',
+      'permutationInRootHolder',
+      'permutationHolderInRoot',
+    ] as const)(
+      'names a type converted the same in an input and a class field once: %s',
+      async (name) => {
+        const spec = await generate(name)
+
+        expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+          'SharedMaybeJson',
+          'SharedMaybeJsonHolder',
+        ])
+        expect((spec.components?.schemas as any).SharedMaybeJsonHolder.properties.shared).toEqual(
+          ref,
+        )
+      },
+    )
+  })
+
+  describe('views of functions', () => {
+    it('leaves functions typed by views of interfaces over a view of Function optional', async () => {
+      const spec = await generator.generate(viewedFunctions, {
+        source: { file: fixture('function-views.ts'), export: 'viewedFunctions' },
+      })
+
+      // only a `toJSON` that may be missing drops the function, also through views of views
+      const schemas = spec.components?.schemas as any
+      expect(schemas.ViewedFnHolder.required).toEqual(['json', 'jsonDeep'])
+      expect(schemas.ViewedFnClassHolder.required).toEqual(['json'])
+    })
+
+    it('leaves them optional in inputs', async () => {
+      const spec = await generator.generate(viewedFunctionsInputs, {
+        source: { file: fixture('function-views.ts'), export: 'viewedFunctionsInputs' },
+      })
+      const schemas = spec.components?.schemas as any
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const validate = ajv.compile(
+        JSON.parse(
+          JSON.stringify(
+            (spec.paths as any)['/viewedFnHolder'].post.requestBody.content['application/json']
+              .schema,
+          ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+        ),
+      )
+
+      // what a client holding these values sends
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(viewedFnHolder()).json),
+      )
+      expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
+      expect(schemas.ViewedFnHolder.required).toEqual(['json', 'jsonDeep'])
+    })
+  })
+
+  describe('mapped types over fixed keys', () => {
+    it('reads no mapped type over keys without type parameters as generic', async () => {
+      const spec = await generator.generate(keyedMappedTypes, {
+        source: { file: fixture('keyed-mapped-types.ts'), export: 'keyedMappedTypes' },
+      })
+
+      // changing every value, it is no view of the class, whose `toJSON` it cannot hold
+      expect(
+        (spec.paths as any)['/textualTally'].post.responses['200'].content['application/json']
+          .schema,
+      ).toEqual({
+        type: 'object',
+        properties: {
+          counts: { type: 'string' },
+          codes: { type: 'string' },
+          none: { type: 'string' },
+        },
+        required: ['counts', 'codes', 'none'],
+      })
+    })
+  })
+
+  describe('generic brands', () => {
+    const either = { anyOf: [{ type: 'number' }, { type: 'object' }] }
+
+    it('reads brands keyed by template literals, keys, string mappings or records of type parameters as generic', async () => {
+      const spec = await generator.generate(genericBrands, {
+        source: { file: fixture('generic-brands.ts'), export: 'genericBrands' },
+      })
+      const response = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+
+      for (const name of ['Tpl', 'Key', 'Upper', 'Record']) {
+        // every key of a deep partial type is optional, so a plain object is one too
+        expect(response(`loose${name}Num`)).toEqual(either)
+        expect(response(`mapped${name}Num`)).toEqual({ type: 'number' })
+      }
+      expect(response('looseUpperHolder').properties.v).toEqual(either)
+      expect(response('looseBrandedLedger').properties).toEqual({
+        tpl: either,
+        key: either,
+        upper: either,
+        record: either,
+      })
+    })
+
+    it('documents them as numbers or objects in inputs', async () => {
+      const spec = await generator.generate(genericBrandsInputs, {
+        source: { file: fixture('generic-brands.ts'), export: 'genericBrandsInputs' },
+      })
+      const body = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.requestBody.content['application/json'].schema
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+      const validate = ajv.compile(body('looseBrandedLedger'))
+
+      // what a client holding these values sends
+      const json = JSON.parse(
+        JSON.stringify(new OpenAPIJsonSerializer().serializeJson(brandedLedger()).json),
+      )
+      expect(validate(json) ? [] : [json, validate.errors]).toEqual([])
+      expect(body('looseKeyNum')).toEqual(either)
+    })
+  })
+
+  describe('nested generic brands', () => {
+    const either = { anyOf: [{ type: 'number' }, { type: 'object' }] }
+
+    it('reads brands keyed by type parameters and literals, or nesting them, as generic', async () => {
+      const spec = await generator.generate(nestedBrands, {
+        source: { file: fixture('nested-brands.ts'), export: 'nestedBrands' },
+      })
+      const response = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.responses['200'].content['application/json'].schema
+
+      for (const name of ['UnionKey', 'RecordUnion', 'Nested']) {
+        expect(response(`loose${name}Num`)).toEqual(either)
+        expect(response(`mapped${name}Num`)).toEqual({ type: 'number' })
+      }
+      expect(response('looseNestedHolder').properties.v).toEqual(either)
+    })
+
+    it('documents them, and the toJSON results of deep views of classes, in inputs', async () => {
+      const spec = await generator.generate(nestedBrandsInputs, {
+        source: { file: fixture('nested-brands.ts'), export: 'nestedBrandsInputs' },
+      })
+      const body = (name: string) =>
+        (spec.paths as any)[`/${name}`].post.requestBody.content['application/json'].schema
+      const ajv = new Ajv2020({ strict: false, allErrors: true })
+
+      expect(body('looseUnionKeyNum')).toEqual(either)
+      expect(body('looseRecordUnionNum')).toEqual(either)
+      expect(body('looseNestedHolder').properties.v).toEqual(either)
+
+      // what a client holding these values sends, which the server accepts
+      const handler = new OpenAPIHandler(nestedBrandsInputs)
+      const sent: string[] = []
+      const link = new OpenAPILink(nestedBrandsInputs, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(await handled.clone().text())
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const plainDicts = { counts: { a: 1 }, none: {} }
+
+      for (const [name, value] of [
+        ['looseUnionKeyNum', 5],
+        ['looseRecordUnionNum', 5],
+        ['looseNestedHolder', { v: 5 }],
+        ['looseJsonDicts', new JsonDicts()],
+        ['looseJsonDicts', plainDicts],
+        ['looseJsonDictsHolder', { d: new JsonDicts() }],
+        ['looseJsonDictsHolder', { d: plainDicts }],
+      ] as const) {
+        await expect(link.call([name], value as any, { context: {} })).resolves.toBe(1)
+        const validate = ajv.compile(body(name))
+        const json = JSON.parse(sent.at(-1)!)
+        expect(validate(json) ? [] : [name, json, validate.errors]).toEqual([])
+      }
+    })
+  })
+
+  describe('Standard JSON Schemas that can not be converted', () => {
+    it('documents inputs split into parameters by their fields, also of object types an array satisfies by its members', async () => {
+      const spec = await generator.generate(splitParameters, {
+        source: { file: fixture('standard-schemas.ts'), export: 'splitParameters' },
+      })
+      const paths = spec.paths as any
+      const parameters = (path: string, method: string) =>
+        paths[path][method].parameters.map((p: any) => [p.in, p.name, p.schema, p.required])
+
+      expect(parameters('/loose-filter', 'get')).toEqual([
+        ['query', 'filter', {}, undefined],
+        ['query', 'page', { type: 'number' }, undefined],
+      ])
+      expect(parameters('/object-sort/{id}', 'get')).toEqual([
+        ['path', 'id', { type: 'string' }, true],
+        ['query', 'sort', {}, undefined],
+      ])
+      expect(parameters('/detailed-values', 'post')).toEqual([['query', 'values', {}, undefined]])
+      // a body may still be an array
+      expect(paths['/detailed-values'].post.requestBody.content['application/json'].schema).toEqual(
+        {
+          anyOf: [
+            { type: 'array', items: {} },
+            { type: 'object', properties: { filter: {} } },
+          ],
+        },
+      )
+
+      // what a client sends, which the server accepts
+      const handler = new OpenAPIHandler(splitParameters)
+      const sent: Request[] = []
+      const link = new OpenAPILink(splitParameters, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+
+      await expect(
+        link.call(['looseFilter'], { filter: { status: 'a' }, page: 2 }, { context: {} }),
+      ).resolves.toBe(1)
+      expect(new URL(sent.at(-1)!.url).search).toBe('?filter%5Bstatus%5D=a&page=2')
+      await expect(
+        link.call(['objectSort'], { id: 'i', sort: { by: 'name' } }, { context: {} }),
+      ).resolves.toBe(1)
+      expect(new URL(sent.at(-1)!.url).search).toBe('?sort%5Bby%5D=name')
+    })
+
+    it('infers the types of Standard JSON Schemas that can not be converted', async () => {
+      const spec = await new OpenAPIGenerator().generate(unconvertibleZod, {
+        source: { file: fixture('standard-schemas.ts'), export: 'unconvertibleZod' },
+      })
+      const paths = spec.paths as any
+      const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+
+      expect(
+        paths['/search'].get.parameters.map((p: any) => [p.in, p.name, p.schema, p.required]),
+      ).toEqual([
+        ['query', 'q', { type: 'string' }, undefined],
+        ['query', 'from', {}, undefined],
+      ])
+      expect(paths['/stamp'].post.requestBody.content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: { at: date, note: { type: 'string' } },
+        required: ['at', 'note'],
+      })
+      expect(paths['/stamp'].post.responses['200'].content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: { at: date },
+        required: ['at'],
+      })
+
+      // the server accepts what a client sends, and its output matches
+      const handler = new OpenAPIHandler(unconvertibleZod)
+      const link = new OpenAPILink(unconvertibleZod, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) =>
+          (await handler.handle(new Request(request, init))).response!,
+      })
+      await expect(
+        link.call(['search'], { q: 'a', from: new Date(0) }, { context: {} }),
+      ).resolves.toBe(1)
+    })
+
+    it('converts each Standard JSON Schema once per direction, also when it throws', async () => {
+      const inputConversion = vi.spyOn(countedNoteInput['~standard'].jsonSchema, 'input')
+      const outputConversion = vi.spyOn(countedNoteOutput['~standard'].jsonSchema, 'output')
+
+      const spec = await new OpenAPIGenerator().generate(countedConversions, {
+        source: { file: fixture('standard-schemas.ts'), export: 'countedConversions' },
+      })
+      const operation = (spec.paths as any)['/note'].post
+
+      expect(inputConversion).toHaveBeenCalledTimes(1)
+      expect(outputConversion).toHaveBeenCalledTimes(1)
+      expect(operation.requestBody.content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text'],
+      })
+      expect(operation.responses['200'].content['application/json'].schema).toEqual({
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+          at: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+        },
+        required: ['text', 'at'],
+      })
+    })
+  })
+
+  describe('stock documentation of unreadable types', () => {
+    it('keeps the stock documentation of Standard JSON Schemas that can not be converted, when the procedure types can not be read', async () => {
+      const spec = await new OpenAPIGenerator().generate(anyTypedProcedures, {
+        source: { file: fixture('stock-schemas.ts'), export: 'anyTypedProcedures' },
+      })
+
+      // the document generated before such schemas were inferred, byte for byte
+      expect(JSON.stringify(spec)).toBe(
+        JSON.stringify({
+          openapi: '3.2.0',
+          info: {
+            title: 'API Reference',
+            version: '0.0.0',
+          },
+          components: {
+            schemas: {
+              UndefinedError: {
+                title: 'UndefinedError',
+                type: 'object',
+                properties: {
+                  defined: {
+                    const: false,
+                  },
+                  code: {
+                    type: 'string',
+                  },
+                  message: {
+                    type: 'string',
+                  },
+                  data: {},
+                },
+                required: ['defined', 'code', 'message'],
+              },
+              Late: {
+                title: 'LATE',
+                type: 'object',
+                properties: {
+                  defined: {
+                    const: true,
+                  },
+                  code: {
+                    const: 'LATE',
+                  },
+                  message: {
+                    type: 'string',
+                  },
+                  data: {},
+                },
+                required: ['defined', 'code', 'message'],
+              },
+            },
+          },
+          paths: {
+            '/dated': {
+              post: {
+                operationId: 'dated',
+                responses: {
+                  '200': {
+                    description: 'OK',
+                    content: {},
+                  },
+                  '400': {
+                    description: '400',
+                    content: {
+                      'application/json': {
+                        schema: {
+                          oneOf: [
+                            {
+                              $ref: '#/components/schemas/Late',
+                            },
+                            {
+                              $ref: '#/components/schemas/UndefinedError',
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            '/listed': {
+              get: {
+                operationId: 'listed',
+                responses: {
+                  '200': {
+                    description: 'OK',
+                    content: {
+                      'application/json': {
+                        schema: {
+                          type: 'array',
+                          items: {
+                            type: 'string',
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      )
+    })
+
+    it('reads Standard JSON Schemas again in each generation', async () => {
+      const generate = (generator: OpenAPIGenerator) =>
+        generator.generate(registeredSchemas, {
+          source: { file: fixture('stock-schemas.ts'), export: 'registeredSchemas' },
+        })
+      const body = (spec: any) =>
+        spec.paths['/note'].post.requestBody.content['application/json'].schema
+      const generator = new OpenAPIGenerator()
+
+      expect(body(await generate(generator))).toEqual({
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text'],
+      })
+
+      z.globalRegistry.add(registeredNote, { description: 'A note' })
+
+      try {
+        const described = {
+          type: 'object',
+          properties: { text: { type: 'string' } },
+          required: ['text'],
+          description: 'A note',
+        }
+
+        expect(body(await generate(new OpenAPIGenerator()))).toEqual(described)
+        expect(body(await generate(generator))).toEqual(described)
+      } finally {
+        z.globalRegistry.remove(registeredNote)
+      }
+    })
+  })
+
+  describe('parameters-only inputs Zod can not convert', () => {
+    it('keeps the stock documentation of parameters-only inputs Zod can not convert, of types not objects', async () => {
+      const spec = await new OpenAPIGenerator().generate(unconvertibleParameters, {
+        source: { file: fixture('unconvertible-parameters.ts'), export: 'unconvertibleParameters' },
+      })
+      const stock = await new BaseOpenAPIGenerator().generate(unconvertibleParameters)
+      const paths = spec.paths as any
+
+      for (const [path, method] of [
+        ['/since', 'get'],
+        ['/counts', 'get'],
+        ['/tags', 'get'],
+        ['/detailed-since', 'post'],
+      ] as const) {
+        const operation = (stock.paths as any)[path][method]
+        expect(paths[path][method].parameters).toEqual(operation.parameters)
+        expect(paths[path][method].requestBody).toEqual(operation.requestBody)
+      }
+
+      // an object input still documents its parameters
+      expect(paths['/range'].get.parameters.map((p: any) => [p.in, p.name])).toEqual([
+        ['query', 'from'],
+        ['query', 'to'],
+      ])
+    })
+  })
+
+  describe('inputs of types a Set or a Map satisfies', () => {
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents inputs a Set or a Map satisfies by its members, and other keys of a number index, in %s',
+      async (version) => {
+        const spec = await generator.generate(sizedTypesInputs, {
+          source: { file: fixture('sized-types.ts'), export: 'sizedTypesInputs' },
+          version,
+        })
+        const ajv = new Ajv2020({ strict: false, allErrors: true })
+        ajv.addSchema(
+          JSON.parse(
+            JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+              '#/components/schemas/',
+              'spec#/$defs/',
+            ),
+          ),
+        )
+        const body = (path: string) =>
+          JSON.parse(
+            JSON.stringify(
+              (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+            ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+          )
+        // what a client sends
+        const serializer = new OpenAPIJsonSerializer()
+        const sent = (value: unknown) =>
+          JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        const settings = { mode: 'fast' }
+
+        for (const [path, value, valid] of [
+          ['/partialTile', new Set([1]), true],
+          ['/partialTile', new Map([['a', 1]]), true],
+          ['/partialTile', { kind: 'square', size: 1 } satisfies Partial<Tile>, true],
+          ['/sized', new Set(['a']), true],
+          ['/sized', new Map([['a', 1]]), true],
+          ['/sized', {}, false],
+          ['/numberRecord', settings, true],
+          ['/numberRecord', { 0: { value: 1 }, ...settings }, true],
+          // OpenAPI 3.0 has no `patternProperties`, so leaves the keys open
+          ['/numberRecord', { 0: { value: 'x' } }, version === '3.0.4'],
+        ] as const) {
+          expect([path, value, ajv.validate(body(path), sent(value))]).toEqual([path, value, valid])
+        }
+      },
+    )
+  })
+
+  describe('inputs of template literal indexes', () => {
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents typed arrays satisfying an object type, and other keys of a template literal index, in %s',
+      async (version) => {
+        const spec = await generator.generate(templateIndexesInputs, {
+          source: { file: fixture('template-indexes.ts'), export: 'templateIndexesInputs' },
+          version,
+        })
+        const ajv = new Ajv2020({ strict: false, allErrors: true })
+        ajv.addSchema(
+          JSON.parse(
+            JSON.stringify({ $id: 'spec', $defs: spec.components?.schemas ?? {} }).replaceAll(
+              '#/components/schemas/',
+              'spec#/$defs/',
+            ),
+          ),
+        )
+        const body = (path: string) =>
+          JSON.parse(
+            JSON.stringify(
+              (spec.paths as any)[path].post.requestBody.content['application/json'].schema,
+            ).replaceAll('#/components/schemas/', 'spec#/$defs/'),
+          )
+        // what a client sends
+        const serializer = new OpenAPIJsonSerializer()
+        const sent = (value: unknown) =>
+          JSON.parse(JSON.stringify(serializer.serializeJson(value).json))
+        const settings = { mode: 'fast' }
+
+        for (const [path, value, valid] of [
+          ['/arrayLike', new Uint8Array([1]), true],
+          ['/arrayLike', new Float64Array([0.5, 2]), true],
+          ['/arrayLike', [1], true],
+          ['/arrayLike', { length: 1, 0: 1 }, true],
+          ['/arrayLike', { 0: 'x' }, false],
+          ['/templateRecord', settings, true],
+          ['/templateRecord', { 'id-a': { value: 1 }, ...settings }, true],
+          // OpenAPI 3.0 has no `patternProperties`, so leaves the keys open
+          ['/templateRecord', { 'id-a': { value: 'x' } }, version === '3.0.4'],
+        ] as const) {
+          expect([path, value, ajv.validate(body(path), sent(value))]).toEqual([path, value, valid])
+        }
+      },
+    )
+  })
+
+  describe('binary bodies of views of classes', () => {
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents whole bodies of built-ins through interfaces, intersections, and detailed structures as binary data, in %s',
+      async (version) => {
+        const spec = await generator.generate(interfaceBodies, {
+          source: { file: fixture('interface-bodies.ts'), export: 'interfaceBodies' },
+          version,
+        })
+        const paths = spec.paths as any
+        const binary = (mediaType: string) => ({
+          [mediaType]: {
+            schema:
+              version === '3.0.4'
+                ? { type: 'string', format: 'binary' }
+                : { type: 'string', contentMediaType: mediaType },
+          },
+        })
+        const form = binary('multipart/form-data')
+        const stream = binary('application/octet-stream')
+        const params = binary('application/x-www-form-urlencoded')
+        const request = (path: string) => paths[path].post.requestBody
+        const response = (path: string) => paths[path].post.responses['200']
+
+        expect(request('/uploadFormInput').content).toEqual(form)
+        expect(request('/taggedFormInput').content).toEqual(form)
+        // not an event stream
+        expect(request('/textStreamInput').content).toEqual(stream)
+        expect(response('/textStreamBody').content).toEqual(stream)
+        expect(response('/uploadFormBody').content).toEqual(form)
+        expect(response('/taggedFormBody').content).toEqual(form)
+        expect(response('/taggedParamsBody').content).toEqual(params)
+
+        expect(request('/detailedFormInput')).toEqual({ required: true, content: form })
+        expect(paths['/detailedFormInput'].post.parameters).toEqual([
+          expect.objectContaining({ in: 'query', name: 'a' }),
+        ])
+        expect(request('/detailedParamsInput')).toEqual({ content: params })
+        expect(response('/detailedFormBody')).toEqual({
+          description: expect.any(String),
+          headers: { 'x-id': { required: true, schema: { type: 'string' } } },
+          content: form,
+        })
+        expect(response('/detailedStreamBody').content).toEqual({
+          'application/json': {
+            schema:
+              version === '3.0.4'
+                ? { type: 'string', enum: [null], nullable: true }
+                : { type: 'null' },
+          },
+          ...stream,
+        })
+        expect(spec.components?.schemas ?? {}).toEqual({})
+      },
+    )
+
+    it('documents the body of a detailed output of a view of a class as binary data', async () => {
+      const spec = await generator.generate(classViewBodies, {
+        source: { file: fixture('interface-bodies.ts'), export: 'classViewBodies' },
+      })
+
+      expect((spec.paths as any)['/detailedViewBody'].post.responses['200']).toEqual({
+        description: expect.any(String),
+        content: {
+          'multipart/form-data': {
+            schema: { type: 'string', contentMediaType: 'multipart/form-data' },
+          },
+        },
+      })
+    })
+  })
+
+  describe('requests without a body', () => {
+    it('documents no request body of a detailed GET or HEAD input, which sends none', async () => {
+      const spec = await generator.generate(detailedUnions, {
+        source: { file: fixture('detailed-unions.ts'), export: 'detailedUnions' },
+      })
+      const paths = spec.paths as any
+
+      for (const operation of [paths['/detailedFormGet'].get, paths['/detailedFormHead'].head]) {
+        expect(JSON.stringify(operation)).not.toMatch(/multipart|contentMediaType/u)
+        expect(operation.requestBody).toBeUndefined()
+        expect(operation.parameters).toEqual([expect.objectContaining({ in: 'query', name: 'a' })])
+      }
+    })
+
+    it.each(['3.2.0', '3.0.4'] as const)(
+      'documents the body built-in of a member of a detailed union root as binary data, in %s',
+      async (version) => {
+        const spec = await generator.generate(detailedUnions, {
+          source: { file: fixture('detailed-unions.ts'), export: 'detailedUnions' },
+          version,
+        })
+        const paths = spec.paths as any
+        const content = {
+          'application/json': {
+            schema: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          },
+          'multipart/form-data': {
+            schema:
+              version === '3.0.4'
+                ? { type: 'string', format: 'binary' }
+                : { type: 'string', contentMediaType: 'multipart/form-data' },
+          },
+        }
+
+        expect(paths['/unionDetailedBody'].post.responses['200'].content).toEqual(content)
+        expect(paths['/unionDetailedInput'].post.requestBody).toEqual({ required: true, content })
+      },
+    )
+
+    it('documents a typed array input of a GET request by no parameters, not by the Buffer form', async () => {
+      const spec = await generator.generate(bufferQueries, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/buffer-queries.ts', import.meta.url),
+          export: 'bufferQueries',
+        },
+      })
+      const paths = spec.paths as any
+      const buffer = {
+        type: 'object',
+        properties: {
+          type: { type: 'string', const: 'Buffer' },
+          data: { type: 'array', items: { type: 'number' } },
+        },
+        required: ['type', 'data'],
+      }
+
+      expect(paths['/root'].get.parameters).toBeUndefined()
+      // the client sends it as a string without a name, which no parameter describes
+      let sent: Request | undefined
+      const link = new OpenAPILink(bufferQueries, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          sent = new Request(request, init)
+          return new Response('1', { headers: { 'content-type': 'application/json' } })
+        },
+      })
+      await link.call(['root'], new Uint8Array([1, 2]), { context: {} })
+      expect(new URL(sent!.url).search).toBe('?=1%2C2')
+      // a request body may be a Buffer, written by its `toJSON`
+      expect(
+        paths['/post'].post.requestBody.content['application/json'].schema.anyOf,
+      ).toContainEqual(buffer)
+    })
+  })
+
+  describe('URL parameters', () => {
+    it('documents values a client sends in the URL as strings, as the bracket notation writes them', async () => {
+      const spec = await generator.generate(parameterValues, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/parameter-values.ts', import.meta.url),
+          export: 'parameterValues',
+        },
+      })
+      const paths = spec.paths as any
+      const schemas = spec.components?.schemas as any
+      const string = { type: 'string' }
+      const parameter = (path: string, method: string, name: string) =>
+        paths[path][method].parameters.find((p: any) => p.name === name)
+
+      for (const name of [
+        'bytes',
+        'buffer',
+        'floats',
+        'pattern',
+        'raw',
+        'view',
+        'either',
+        'frozen',
+      ]) {
+        expect(parameter('/search', 'get', name), name).toEqual(
+          expect.objectContaining({ in: 'query', schema: string, required: true }),
+        )
+        expect(parameter('/search', 'get', name).style, name).toBeUndefined()
+      }
+      expect(parameter('/search', 'get', 'list').schema).toEqual({ type: 'array', items: string })
+      expect(parameter('/search', 'get', 'nested').schema.properties.pattern).toEqual(string)
+      // the model keeps its form in a request body
+      expect(parameter('/search', 'get', 'attachment').schema).toEqual({
+        $ref: '#/components/schemas/AttachmentParam',
+      })
+      expect(schemas.AttachmentParam.properties.data).toEqual(string)
+      expect(paths['/upload'].post.requestBody.content['application/json'].schema).toEqual({
+        $ref: '#/components/schemas/Attachment',
+      })
+      expect(schemas.Attachment.properties.data.anyOf).toContainEqual({
+        type: 'object',
+        additionalProperties: { type: 'number' },
+      })
+      expect(parameter('/detailed/{id}', 'post', 'id').schema).toEqual(string)
+      expect(parameter('/detailed/{id}', 'post', 'pattern').schema).toEqual(string)
+      expect(parameter('/path/{pattern}', 'put', 'pattern').schema).toEqual(string)
+
+      // what a client sends, which the server accepts, has the documented parameters and body
+      const ajv = new Ajv2020({ strict: false, allErrors: true, coerceTypes: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const toAjv = (schema: unknown) =>
+        JSON.parse(JSON.stringify(schema).replaceAll('#/components/schemas/', 'spec#/$defs/'))
+      const handler = new OpenAPIHandler(parameterValues)
+      const sent: Request[] = []
+      const link = new OpenAPILink(parameterValues, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          const handled = new Request(request, init)
+          sent.push(handled.clone())
+          return (await handler.handle(handled)).response!
+        },
+      })
+      const attachment = { data: new Uint8Array([1, 2]), size: 2 }
+
+      for (const [name, input] of [
+        [
+          'search',
+          {
+            bytes: new Uint8Array([1, 2]),
+            buffer: Buffer.from('hi'),
+            floats: new Float64Array([1.5]),
+            pattern: /a+/g,
+            raw: new ArrayBuffer(1),
+            view: new DataView(new ArrayBuffer(1)),
+            either: new Uint8Array([1]),
+            list: [new Uint8Array([1])],
+            nested: { pattern: /a/, count: 1 },
+            attachment,
+            at: new Date(0),
+            frozen: /a/,
+          },
+        ],
+        ['upload', attachment],
+        [
+          'detailed',
+          {
+            params: { id: new Uint8Array([1]) },
+            query: { pattern: /a/, attachment },
+            body: { data: new Uint8Array([1]) },
+          },
+        ],
+        ['path', { pattern: /a/, data: new Uint8Array([1]) }],
+      ] as const) {
+        await expect(link.call([name], input as any, { context: {} })).resolves.toBe(1)
+
+        const request = sent.at(-1)!
+        const url = new URL(request.url)
+        const [template, item] = Object.entries(paths).find(([, i]: any) =>
+          Object.values(i).some((o: any) => o.operationId === name),
+        )! as [string, any]
+        const operation = item[request.method.toLowerCase()]
+        const documented = operation.parameters ?? []
+
+        // a value sent whole is documented as one, a plain object or array by its fields
+        const query = new BracketNotationSerializer().deserialize([...url.searchParams])
+        for (const key of url.searchParams.keys()) {
+          const [field] = new BracketNotationSerializer().parsePath(key)
+          const p = documented.find((p: any) => p.in === 'query' && p.name === field)
+          expect(p?.style, `${name}: ${key}`).toBe(key === field ? undefined : 'deepObject')
+        }
+        // the decoded values match the documented schemas, read as the handler's coercion would
+        const values: Record<string, unknown> = { ...query }
+        const segments = template.split('/')
+        url.pathname.split('/').forEach((segment, i) => {
+          const match = /^\{(.+)\}$/u.exec(segments[i]!)
+          if (match) {
+            values[match[1]!] = decodeURIComponent(segment)
+          }
+        })
+        const validate = ajv.compile(
+          toAjv({
+            type: 'object',
+            properties: Object.fromEntries(
+              documented.filter((p: any) => p.in !== 'header').map((p: any) => [p.name, p.schema]),
+            ),
+            required: documented.filter((p: any) => p.required).map((p: any) => p.name),
+          }),
+        )
+        expect(validate(values) ? [] : [name, values, validate.errors]).toEqual([])
+
+        if (operation.requestBody) {
+          const validateBody = ajv.compile(
+            toAjv(operation.requestBody.content['application/json'].schema),
+          )
+          const body = await request.json()
+          expect(validateBody(body) ? [] : [name, body, validateBody.errors]).toEqual([])
+        }
+      }
+    })
+
+    it('keeps the serialized forms of values of a query or path style, which a client sends', async () => {
+      const spec = await generator.generate(parameterValues, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/parameter-values.ts', import.meta.url),
+          export: 'parameterValues',
+        },
+      })
+      const paths = spec.paths as any
+      const schemas = spec.components?.schemas as any
+      const string = { type: 'string' }
+      const parameter = (path: string, method: string, name: string) =>
+        paths[path][method].parameters.find((p: any) => p.name === name)
+      const styled = '/styled/{pairs}/{patterns}'
+
+      expect(parameter(styled, 'get', 'json').content['application/json'].schema).not.toEqual(
+        string,
+      )
+      expect(parameter(styled, 'get', 'jsonPattern').content['application/json'].schema).toEqual({})
+      expect(parameter(styled, 'get', 'comma').schema).not.toEqual(string)
+      expect(parameter(styled, 'get', 'array').schema).toEqual({})
+      // the bracket notation, also of a style reset to it
+      expect(parameter(styled, 'get', 'plain').schema).toEqual(string)
+      expect(parameter(styled, 'get', 'reset').schema).toEqual(string)
+      expect(parameter(styled, 'get', 'patterns').schema).toEqual({})
+      expect(parameter('/styled-detailed/{pairs}', 'get', 'pattern').schema).toEqual(string)
+      expect(parameter('/styled-path/{pairs}/{pattern}', 'put', 'pattern').schema).toEqual(string)
+      expect(parameter('/styled-path/{pairs}/{pattern}', 'put', 'pairs').schema).not.toEqual(string)
+
+      // the values the handler decodes match the documented parameters
+      const ajv = new Ajv2020({ strict: false, allErrors: true, coerceTypes: true })
+      ajv.addSchema(
+        JSON.parse(
+          JSON.stringify({ $id: 'spec', $defs: schemas ?? {} }).replaceAll(
+            '#/components/schemas/',
+            'spec#/$defs/',
+          ),
+        ),
+      )
+      const toAjv = (schema: unknown) =>
+        JSON.parse(JSON.stringify(schema).replaceAll('#/components/schemas/', 'spec#/$defs/'))
+      let decoded: any
+      const handler = new OpenAPIHandler(parameterValues, {
+        clientInterceptors: [
+          ({ input, next }) => {
+            decoded = input
+            return next()
+          },
+        ],
+      })
+      const link = new OpenAPILink(parameterValues, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) =>
+          (await handler.handle(new Request(request, init))).response!,
+      })
+      const bytes = new Uint8Array([1, 2])
+
+      for (const [name, input, fields] of [
+        [
+          'styled',
+          {
+            pairs: bytes,
+            patterns: /a/,
+            json: bytes,
+            jsonPattern: /a/,
+            jsonList: [bytes],
+            jsonHolder: { bytes, pattern: /a/ },
+            comma: bytes,
+            space: bytes,
+            pipe: bytes,
+            array: /a/,
+            commaArray: /a/,
+            pipeArray: /a/,
+            reset: bytes,
+            plain: bytes,
+          },
+          (value: any) => value,
+        ],
+        [
+          'styledDetailed',
+          { params: { pairs: bytes }, query: { json: [bytes], pattern: /a/ } },
+          (value: any) => ({ ...value.params, ...value.query }),
+        ],
+        ['styledPath', { pairs: bytes, pattern: /a/, data: bytes }, (value: any) => value],
+      ] as const) {
+        await expect(link.call([name], input as any, { context: {} })).resolves.toBe(1)
+
+        const operation = Object.values(paths)
+          .flatMap((item: any) => Object.values(item))
+          .find((o: any) => o.operationId === name) as any
+        const values = fields(decoded)
+
+        for (const p of operation.parameters) {
+          const schema = p.schema ?? p.content['application/json'].schema
+          const validate = ajv.compile(toAjv(schema))
+          expect(validate(values[p.name]) ? [] : [name, p.name, values[p.name]]).toEqual([])
+        }
+      }
+    })
+
+    it('sends the fields of an optional input with bracket notation, but for those of a style', async () => {
+      const spec = await generator.generate(optionalParameterValues, {
+        source: {
+          file: new URL('../tests/fixtures/runtime/src/parameter-values.ts', import.meta.url),
+          export: 'optionalParameterValues',
+        },
+      })
+      const paths = spec.paths as any
+      const parameters = (path: string) =>
+        Object.fromEntries(paths[path].get.parameters.map((p: any) => [p.name, p]))
+
+      for (const path of ['/styled', '/styled-detailed']) {
+        const { json, pattern } = parameters(path)
+        expect(pattern.schema, path).toEqual({ type: 'string' })
+        // the typed array, as `JSON.stringify` writes it
+        expect(json.content['application/json'].schema.anyOf, path).toContainEqual({
+          type: 'object',
+          additionalProperties: { type: 'number' },
+        })
+      }
+    })
+
+    it('names the query forms of models apart from the models named like them', async () => {
+      const generate = async (router: any, exported: string) => {
+        const spec = await generator.generate(router, {
+          source: {
+            file: new URL('../tests/fixtures/runtime/src/parameter-names.ts', import.meta.url),
+            export: exported,
+          },
+        })
+        return spec.components?.schemas as any
+      }
+      const holderQuery = {
+        type: 'object',
+        properties: { bytes: { type: 'string' } },
+        required: ['bytes'],
+      }
+      const named = expect.objectContaining({ properties: { other: { type: 'boolean' } } })
+
+      const queries = await generate(queryNames, 'queryNames')
+      expect(Object.keys(queries).toSorted()).toEqual(['Holder', 'HolderParam'])
+      expect(queries.HolderParam).toEqual(named)
+      expect(queries.Holder).toEqual(expect.objectContaining(holderQuery))
+
+      const bodies = await generate(bodyNames, 'bodyNames')
+      expect(Object.keys(bodies).toSorted()).toEqual(['Holder', 'HolderParam', 'HolderParam2'])
+      expect(bodies.HolderParam).toEqual(named)
+      expect(bodies.HolderParam2).toEqual(expect.objectContaining(holderQuery))
+      expect(bodies.Holder.properties.bytes).not.toEqual({ type: 'string' })
+
+      const mixed = await generate(mixedNames, 'mixedNames')
+      expect(Object.keys(mixed).toSorted()).toEqual(['Holder', 'HolderParam'])
+      expect(mixed.HolderParam).toEqual(named)
+      expect(mixed.Holder).toEqual(expect.objectContaining(holderQuery))
+    })
+  })
+
+  describe('toJSON overloads and instantiation names', () => {
+    const routers = { ormModels, ormModelTypes, urlParameters, writtenArgumentNames }
+    const generate = (
+      version: '3.1.1' | '3.0.4' = '3.1.1',
+      defs?: 'recursive',
+      exported: keyof typeof routers = 'ormModels',
+    ) =>
+      new OpenAPIGenerator({ defs }).generate(routers[exported], {
+        source: { file: fixture('orm-models.ts'), export: exported },
+        version,
+      })
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'documents an output that may be left out as also null, in %s',
+      async (version) => {
+        const spec = await generate(version)
+        const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+
+        expect((spec.paths as any)['/missingRow'].post.responses['200'].content).toEqual({
+          'application/json': {
+            schema:
+              version === '3.0.4' ? { ...row, nullable: true } : { anyOf: [row, { type: 'null' }] },
+          },
+        })
+      },
+    )
+
+    it('writes a toJSON by the overload JSON.stringify calls, and its unresolved results by their constraints', async () => {
+      const schemas = (await generate()).components?.schemas as any
+
+      // not the overloads whose `this` the value does not satisfy, or that need an argument
+      expect(schemas['Doc_with-name']).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, _id: { type: 'string' } },
+        required: ['name', '_id'],
+      })
+      // a value carrying the properties of a generic `this` may call that overload
+      expect(schemas.MarkedDoc).toEqual({
+        type: 'object',
+        description: expect.any(String),
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+      })
+      expect(schemas.Populated).toEqual({
+        type: 'object',
+        properties: { populated: {} },
+        required: ['populated'],
+      })
+      // the class a conditional result may hold is written by its fields, not by `toJSON` again
+      expect(schemas.Looping.anyOf).toEqual([
+        { type: 'number' },
+        { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+      ])
+    })
+
+    it('writes an intersection with a class whose toJSON it calls as an instance', async () => {
+      const schemas = (await generate()).components?.schemas as any
+
+      expect(schemas['Hydrated_with-name']).toEqual({
+        type: 'object',
+        properties: { name: { type: 'string' }, key: { type: 'string' } },
+        required: ['name', 'key'],
+      })
+      // also under `JSON.stringify`, in what a `toJSON` returns
+      expect(schemas.DocHolder.properties.docs.items).toEqual({
+        type: 'object',
+        properties: { street: { type: 'string' }, key: { type: 'string' } },
+        required: ['street', 'key'],
+      })
+      expect(schemas.Conn).toBeUndefined()
+    })
+
+    it('names instantiations by their written type arguments, and types in cycles by the alias written for them', async () => {
+      const spec = await generate('3.1.1', undefined, 'ormModelTypes')
+      const schemas = spec.components?.schemas as any
+      const paths = spec.paths as any
+      const request = (path: string) => paths[path].post.requestBody.content['application/json']
+
+      // a type argument left to its default is not named
+      expect(request('/findArgs').schema).toEqual({ $ref: '#/components/schemas/FindArgs' })
+      // an instantiation over object literals by their keys
+      const response = (path: string) =>
+        paths[path].post.responses['200'].content['application/json'].schema
+      expect(response('/posts')).toEqual({ $ref: '#/components/schemas/Paginated_with-id-title' })
+      expect(response('/accounts')).toEqual({
+        $ref: '#/components/schemas/Paginated_with-id-handle',
+      })
+      // `Node & object` is `Node`, and a cycle through what `XOR<Filter, Where>` distributes to
+      // is named after it
+      expect(schemas.Node.properties.next).toEqual({ $ref: '#/components/schemas/Node' })
+      expect(schemas.Where.properties.author).toEqual({
+        $ref: '#/components/schemas/XOR_Filter_Where',
+      })
+      // the keys of a view name it
+      expect(request('/pickPosts').schema).toEqual({
+        $ref: '#/components/schemas/Pick-CUser-id-posts',
+      })
+    })
+
+    it('names recursive instantiations by their printed types with recursive defs', async () => {
+      const schemas = (await generate('3.1.1', 'recursive', 'ormModelTypes')).components
+        ?.schemas as any
+
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'CPost',
+        'CUser',
+        'DeepPartial_Post',
+        'DeepPartial_PostArray',
+        'DeepPartial_User',
+        'Node',
+        'Post',
+        'User',
+        'WeakNode',
+        'Where',
+        'XOR_Filter_Where',
+      ])
+    })
+
+    it('documents an object of a weak type intersected with object by its fields', async () => {
+      const spec = await generate('3.1.1', undefined, 'ormModelTypes')
+
+      // a date or an array is also one, written as no object
+      expect(
+        (spec.paths as any)['/objectOnly'].post.requestBody.content['application/json'].schema,
+      ).toEqual({
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' } } },
+          { not: { type: 'object' } },
+        ],
+      })
+      // the keys of the other member of an exclusive or are never written
+      const notObject = { not: { type: 'object' } }
+      expect(
+        (spec.paths as any)['/optionalXor'].post.requestBody.content['application/json'].schema,
+      ).toEqual({
+        anyOf: [
+          {
+            anyOf: [
+              { type: 'object', properties: { a: { not: {} }, b: { type: 'number' } } },
+              notObject,
+            ],
+          },
+          {
+            anyOf: [
+              { type: 'object', properties: { a: { type: 'string' }, b: { not: {} } } },
+              notObject,
+            ],
+          },
+        ],
+      })
+      // of a declared type, by its def
+      expect(
+        (spec.paths as any)['/weakNode'].post.requestBody.content['application/json'].schema,
+      ).toEqual({ $ref: '#/components/schemas/WeakNode' })
+      expect((spec.components?.schemas as any).WeakNode.properties.next).toEqual({
+        anyOf: [{ $ref: '#/components/schemas/WeakNode' }, { not: { type: 'object' } }],
+      })
+    })
+
+    it('documents an instance of a class of methods only as an object', async () => {
+      const spec = await generate('3.1.1', undefined, 'ormModelTypes')
+      const schemas = spec.components?.schemas as any
+
+      expect(schemas.Svc).toEqual({ type: 'object' })
+      expect((spec.paths as any)['/svc'].post.responses['200'].content).toEqual({
+        'application/json': { schema: { $ref: '#/components/schemas/Svc' } },
+      })
+      // a client sends what its `toJSON` returns, or a plain object of no fields
+      expect(schemas.Stamp.anyOf).toEqual([{ type: 'string' }, { type: 'object' }])
+    })
+
+    it('documents a value whose files are optional as JSON too', async () => {
+      const spec = await generate()
+
+      expect(
+        Object.keys((spec.paths as any)['/optionalBlob'].post.responses['200'].content),
+      ).toEqual(['multipart/form-data', 'application/json'])
+    })
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'leaves keys never written out of parameters and headers, in %s',
+      async (version) => {
+        const spec = await generate(version, undefined, 'urlParameters')
+        const paths = spec.paths as any
+        const query = (name: string) => ({
+          in: 'query',
+          name,
+          schema: { type: 'string' },
+          allowEmptyValue: true,
+          allowReserved: true,
+        })
+
+        // the members of an exclusive or, also named ones, and of a query style, by their keys
+        for (const path of ['/xorQuery', '/namedXorQuery', '/styledXorQuery']) {
+          expect(paths[path].get.parameters).toEqual([query('id'), query('slug')])
+        }
+        expect(paths['/pathNever/{id}'].get.parameters).toEqual([
+          { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+        ])
+        expect(paths['/detailedInput'].post.parameters).toEqual([
+          { ...query('a'), required: true },
+          { in: 'header', name: 'x-a', required: true, schema: { type: 'string' } },
+        ])
+        expect(paths['/detailedOutput'].post.responses['200'].headers).toEqual({
+          'x-a': { required: true, schema: { type: 'string' } },
+        })
+        // a body still holds them, which tell the members of an exclusive or apart
+        expect(paths['/detailedInput'].post.requestBody.content['application/json'].schema).toEqual(
+          {
+            type: 'object',
+            properties: { c: { not: {} }, d: { type: 'string' } },
+            required: ['d'],
+          },
+        )
+        expect(paths['/pathBody/{id}'].post.requestBody.content['application/json'].schema).toEqual(
+          { type: 'object', properties: { q: { not: {} } } },
+        )
+        expect((spec.components?.schemas as any).ById).toEqual({
+          type: 'object',
+          properties: { id: { type: 'string' }, slug: { not: {} } },
+          required: ['id'],
+        })
+      },
+    )
+
+    it('names instantiations by the written type arguments of nested generics and array items', async () => {
+      const spec = await generate('3.1.1', undefined, 'writtenArgumentNames')
+      const response = (path: string) =>
+        (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
+
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+        'Box',
+        'Box_Box',
+        'Box_Box_number',
+        'Box_number',
+        'Paginated_Result_with-id',
+        'Paginated_with-idArray',
+        'Result_with-id',
+        'Result_with-nameArray',
+      ])
+      expect(response('/rows')).toEqual({ $ref: '#/components/schemas/Paginated_with-idArray' })
+      expect(response('/results')).toEqual({ $ref: '#/components/schemas/Result_with-nameArray' })
+      expect(response('/pages')).toEqual({ $ref: '#/components/schemas/Paginated_Result_with-id' })
+      // a type argument left to its default is not named, also in another one
+      expect(response('/box')).toEqual({ $ref: '#/components/schemas/Box_Box' })
+      expect(response('/boxes')).toEqual({ $ref: '#/components/schemas/Box_Box_number' })
+    })
+  })
+  describe('names of instantiations over intersections', () => {
+    const routers = {
+      literalArgumentNames,
+      literalArgumentNamesReversed,
+      intersectionArgumentNames,
+      optionalBodies,
+      optionalDetailedBodies,
+    }
+    const generate = (exported: keyof typeof routers, version: '3.1.1' | '3.0.4' = '3.1.1') =>
+      new OpenAPIGenerator().generate(routers[exported], {
+        source: { file: fixture('instantiation-names.ts'), export: exported },
+        version,
+      })
+    const response = (spec: { paths?: unknown }, path: string) =>
+      (spec.paths as any)[path].post.responses['200'].content['application/json'].schema
+
+    it.each(['literalArgumentNames', 'literalArgumentNamesReversed'] as const)(
+      'names instantiations over object literals apart from those over named types, in %s',
+      async (exported) => {
+        const spec = await generate(exported)
+
+        expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+          'Invoice',
+          'Page_Invoice',
+          'Page_number',
+          'Page_with-Invoice',
+          'Page_with-avg-sum',
+          'Page_with-number',
+        ])
+        expect(response(spec, '/counts')).toEqual({ $ref: '#/components/schemas/Page_number' })
+        expect(response(spec, '/named')).toEqual({ $ref: '#/components/schemas/Page_Invoice' })
+        expect(response(spec, '/invoices')).toEqual({
+          $ref: '#/components/schemas/Page_with-number',
+        })
+        expect(response(spec, '/byInvoice')).toEqual({
+          $ref: '#/components/schemas/Page_with-Invoice',
+        })
+        expect(response(spec, '/aggregates')).toEqual({
+          $ref: '#/components/schemas/Page_with-avg-sum',
+        })
+      },
+    )
+
+    it('names instantiations over intersections of object literals by their keys', async () => {
+      const spec = await generate('intersectionArgumentNames')
+
+      expect(response(spec, '/merged')).toEqual({
+        $ref: '#/components/schemas/Page_with-id-title',
+      })
+      expect(response(spec, '/mergedRows')).toEqual({
+        $ref: '#/components/schemas/Page_with-id-titleArray',
+      })
+    })
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'documents a detailed output whose body may be left out as also null, in %s',
+      async (version) => {
+        const spec = await generate('optionalDetailedBodies', version)
+        const content = (path: string, status = '200') =>
+          (spec.paths as any)[path].post.responses[status].content['application/json'].schema
+        const row = { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }
+        const nullable =
+          version === '3.0.4' ? { ...row, nullable: true } : { anyOf: [row, { type: 'null' }] }
+
+        expect(content('/optionalBody')).toEqual(nullable)
+        expect(content('/requiredBody')).toEqual(row)
+        expect(content('/statuses')).toEqual(row)
+        expect(content('/statuses', '202')).toEqual(nullable)
+      },
+    )
+
+    it.each(['3.1.1', '3.0.4'] as const)(
+      'documents an output that may be left out and admits null already as it is, in %s',
+      async (version) => {
+        const spec = await generate('optionalBodies', version)
+        const content = (path: string) =>
+          (spec.paths as any)[path].post.responses['200'].content['application/json']
+
+        expect(content('/nullOrUndefined')).toEqual({
+          schema:
+            version === '3.0.4'
+              ? { type: 'string', enum: [null], nullable: true }
+              : { type: 'null' },
+        })
+        expect(content('/maybeNull')).toEqual({
+          schema:
+            version === '3.0.4'
+              ? { type: 'string', nullable: true }
+              : { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        })
+        // a union with `{}`, through its def
+        expect(content('/anyJSON')).toEqual({ schema: { $ref: '#/components/schemas/AnyJSON' } })
+        expect(content('/maybeAnyJSON')).toEqual({
+          schema: { $ref: '#/components/schemas/AnyJSON' },
+        })
+        expect((spec.components?.schemas as any).AnyJSON.anyOf[0]).toEqual({})
+      },
+    )
+  })
+
+  describe('names of models that lost their aliases', () => {
+    const routers = {
+      anyConverted,
+      recursiveDeepViews,
+      firstConverter,
+      lostAliasNames,
+      bodilessRequests,
+      typeRoles,
+      internedLiterals,
+      missingModuleModel,
+    }
+    const generate = (
+      exported: keyof typeof routers,
+      options: { defs?: 'named' | 'recursive'; converters?: any[] } = {},
+      generateOptions: Record<string, unknown> = {},
+    ) =>
+      new OpenAPIGenerator(options).generate(routers[exported], {
+        source: { file: fixture('lost-aliases.ts'), export: exported },
+        ...generateOptions,
+      }) as Promise<any>
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+    const response = (spec: any, path: string, method = 'post') =>
+      spec.paths[path][method].responses['200'].content['application/json'].schema
+
+    it('names instantiations over models by the aliases their types lost', async () => {
+      const spec = await generate('lostAliasNames')
+
+      expect(Object.keys(spec.components.schemas).toSorted()).toEqual([
+        'ApiResponse_Page_PublicUser',
+        'Page_Item',
+        'Page_Pick_Product_id',
+        'Page_Product',
+        'Page_PublicUser',
+        'Page_Summary',
+        'Page_with-id-title-done',
+        'Product',
+      ])
+      expect(response(spec, '/items')).toEqual(ref('Page_Item'))
+      expect(response(spec, '/products')).toEqual(ref('Page_Product'))
+      expect(response(spec, '/picked')).toEqual(ref('Page_Pick_Product_id'))
+      expect(response(spec, '/publicUsers')).toEqual(ref('ApiResponse_Page_PublicUser'))
+      expect(response(spec, '/summaries')).toEqual(ref('Page_Summary'))
+    })
+
+    it.each(['named', 'recursive'] as const)(
+      'names deep views of recursive models by their arguments, or the alias they lost, with defs %s',
+      async (defs) => {
+        const spec = await generate('recursiveDeepViews', { defs })
+        const body = (path: string) =>
+          spec.paths[path].post.requestBody.content['application/json'].schema
+
+        expect(body('/comment')).toEqual(ref('PartialObjectDeep_Comment'))
+        expect(body('/menuItem')).toEqual(ref('PartialObjectDeep_MenuItem'))
+        expect(body('/personPatch')).toEqual(ref('PersonPatch'))
+        expect(response(spec, '/readonlyComment')).toEqual(ref('ReadonlyObjectDeep_Comment'))
+      },
+    )
+
+    it('names no union of literals after one of the aliases of other items it is interned for', async () => {
+      const spec = await generate('internedLiterals')
+      const schemas = spec.components.schemas
+      const statuses = { type: 'string', enum: ['active', 'inactive'] }
+
+      expect(schemas.User.properties.status).toEqual(statuses)
+      expect(schemas.Project.properties.state).toEqual(statuses)
+      expect(spec.paths['/projects'].get.parameters[0].schema).toEqual(statuses)
+      expect(schemas.Issue.properties.kind).toEqual({ type: 'string', enum: ['bug', 'task'] })
+      // also when the other alias is read once the union was converted
+      const states = { type: 'string', enum: ['closed', 'open'] }
+      expect(schemas.Account.properties.status).toEqual(states)
+      expect(schemas.Workspace.properties.state).toEqual(states)
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'Account',
+        'Issue',
+        'Project',
+        'User',
+        'Workspace',
+      ])
+    })
+
+    it('names no union of literals after an alias of a model of another file', async () => {
+      const spec: any = await new OpenAPIGenerator().generate(internedUnions, {
+        source: { file: fixture('interned-unions.ts'), export: 'internedUnions' },
+      })
+      const statuses = { type: 'string', enum: ['active', 'inactive'] }
+
+      expect(Object.keys(spec.components.schemas)).toEqual(['User'])
+      expect(spec.components.schemas.User.properties.status).toEqual(statuses)
+      expect(response(spec, '/project').properties.state).toEqual(statuses)
+      expect(response(spec, '/rows/{id}', 'get').properties.state).toEqual(statuses)
+      expect(spec.paths['/filter'].get.parameters.map((p: any) => p.schema)).toEqual([
+        statuses,
+        { type: 'string', enum: ['no', 'yes'] },
+      ])
+      expect(spec.paths['/status'].get.parameters[0].schema).toEqual(statuses)
+    })
+
+    it.each([undefined, 'Acme.'])(
+      'documents a type as a parameter, a body and a response once, with the prefix %s',
+      async (prefix) => {
+        const spec = await generate(
+          'typeRoles',
+          {},
+          prefix ? { componentName: (name: string) => `${prefix}${name}` } : {},
+        )
+        const role = ref(`${prefix ?? ''}Role`)
+
+        expect(Object.keys(spec.components.schemas).toSorted()).toEqual(
+          ['Account', 'Role'].map((name) => `${prefix ?? ''}${name}`),
+        )
+        expect(spec.paths['/list'].get.parameters[0].schema).toEqual(role)
+        expect(spec.paths['/list'].get.responses['200'].content['application/json'].schema).toEqual(
+          { type: 'array', items: role },
+        )
+        expect(
+          spec.paths['/create'].post.requestBody.content['application/json'].schema.properties.role,
+        ).toEqual(role)
+      },
+    )
+
+    it.each(['', 'X.'])(
+      'numbers a type named after a component of base, in both directions, with the prefix %j',
+      async (prefix) => {
+        const base = {
+          components: {
+            schemas: {
+              [`${prefix}Role`]: { type: 'string' },
+              [`${prefix}Account`]: { type: 'object' },
+              // the names without the prefix are not those of the types
+              Role: { type: 'string' },
+            },
+          },
+        }
+        const spec = await generate(
+          'typeRoles',
+          {},
+          { base, componentName: prefix ? (name: string) => `${prefix}${name}` : undefined },
+        )
+        const named = (name: string) => `${prefix}${name}`
+
+        expect(Object.keys(spec.components.schemas).toSorted()).toEqual(
+          [
+            ...new Set([
+              named('Account'),
+              named('Account2'),
+              named('Role'),
+              named('Role2'),
+              'Role',
+            ]),
+          ].toSorted(),
+        )
+        expect(spec.components.schemas[named('Role')]).toEqual({ type: 'string' })
+        expect(spec.paths['/list'].get.parameters[0].schema).toEqual(ref(named('Role2')))
+        expect(spec.paths['/list'].get.responses['200'].content['application/json'].schema).toEqual(
+          { type: 'array', items: ref(named('Role2')) },
+        )
+        expect(
+          spec.paths['/create'].post.requestBody.content['application/json'].schema.properties.role,
+        ).toEqual(ref(named('Role2')))
+        expect(spec.paths['/account'].post.requestBody.content['application/json'].schema).toEqual(
+          ref(named('Account2')),
+        )
+        expect(response(spec, '/account')).toEqual(ref(named('Account2')))
+      },
+    )
+
+    it.each(['any', 'throw'] as const)(
+      'infers the outputs a converter documents as any value or throws on, with unrepresentable %s',
+      async (unrepresentable) => {
+        const spec = await generate('anyConverted', {
+          converters: [new ZodToJsonSchemaConverter({ unrepresentable })],
+        })
+        const ajv = new Ajv2020({ strict: false })
+
+        expect(response(spec, '/transformed')).toEqual({
+          type: 'object',
+          properties: { slug: { type: 'string' }, n: { type: 'number' } },
+          required: ['slug', 'n'],
+        })
+        // the schemas it converts are kept
+        expect(response(spec, '/kept').properties.slug).toEqual({ type: 'string', minLength: 1 })
+        // and so is any value, of a value typed `unknown`
+        expect(spec.paths['/unknown'].post.responses['200'].content).toEqual({})
+
+        for (const [name, output] of [
+          ['transformed', await call(anyConverted.transformed, undefined)],
+          ['kept', await call(anyConverted.kept, undefined)],
+        ] as const) {
+          expect(ajv.validate(response(spec, `/${name}`), output) ? [] : ajv.errors).toEqual([])
+        }
+      },
+    )
+
+    it.each([
+      [
+        'throws on',
+        () => {
+          throw new Error('converter failed')
+        },
+      ],
+      ['documents as any value', () => [{}, false]],
+    ])(
+      'infers the schemas the first converter whose condition holds %s, though a later one converts them',
+      async (_, convert) => {
+        const spec = await generate('firstConverter', {
+          converters: [
+            { condition: (schema: any) => schema?.description === 'first', convert },
+            new ZodToJsonSchemaConverter(),
+          ],
+        })
+
+        expect(response(spec, '/output')).toEqual({ type: 'string' })
+        expect(spec.paths['/input'].post.requestBody.content['application/json'].schema).toEqual({
+          type: 'object',
+          properties: { a: { type: 'string' } },
+          required: ['a'],
+        })
+        expect(spec.components.schemas.Bad.properties.data).toEqual({
+          type: 'object',
+          properties: { reason: { type: 'string' } },
+          required: ['reason'],
+        })
+      },
+    )
+
+    it('names a module a declaration file imports and the compiler does not find', async () => {
+      await expect(generate('missingModuleModel')).rejects.toThrow(
+        /uninstalled-lib\.d\.ts:4:\d+ - Cannot find module "@acme\/not-installed", which this declaration file imports\./,
+      )
+    })
+
+    it('documents the requests a client sends without a body, or with a free-form query', async () => {
+      const spec = await generate('bodilessRequests')
+      const handler = new OpenAPIHandler(bodilessRequests)
+      let sent: Request | undefined
+      const link = new OpenAPILink(bodilessRequests, {
+        origin: 'http://localhost',
+        url: '/',
+        fetch: async (request, init) => {
+          sent = new Request(request, init)
+          return (await handler.handle(sent.clone())).response!
+        },
+      })
+
+      await expect(link.call(['remove'], { id: 'a' }, { context: {} })).resolves.toBe(1)
+      expect(await sent!.text()).toBe('')
+      // but the other keys an object type allows in a body, which is optional
+      await expect(link.call(['remove'], { id: 'a', b: 'x' }, { context: {} })).resolves.toBe(1)
+      expect(await sent!.text()).toBe('{"b":"x"}')
+      expect(spec.paths['/items/{id}'].delete.requestBody).toEqual({
+        content: { 'application/json': { schema: { type: 'object', properties: {} } } },
+      })
+
+      // the keys of a free-form query, as an object of form style
+      await expect(
+        link.call(['record'], { query: { a: 'x', b: 'y' } }, { context: {} }),
+      ).resolves.toBe(2)
+      expect(new URL(sent!.url).search).toBe('?a=x&b=y')
+      expect(spec.paths['/record'].get.parameters).toEqual([
+        {
+          in: 'query',
+          name: 'query',
+          schema: { type: 'object', additionalProperties: { type: 'string' } },
+          style: 'form',
+          explode: true,
+        },
+      ])
+
+      // array values are sent in bracket notation, which no parameter style describes
+      await expect(
+        link.call(['arrays'], { query: { a: 'x', b: ['1', '2'] } }, { context: {} }),
+      ).resolves.toBe(2)
+      expect(new URL(sent!.url).search).toBe('?a=x&b%5B0%5D=1&b%5B1%5D=2')
+      expect(spec.paths['/arrays'].get.parameters).toBeUndefined()
+      await expect(link.call(['compactArrays'], { t: ['a', 'b'] }, { context: {} })).resolves.toBe(
+        1,
+      )
+      expect(new URL(sent!.url).search).toBe('?t%5B0%5D=a&t%5B1%5D=b')
+      expect(spec.paths['/compactArrays'].get.parameters).toBeUndefined()
+      expect(spec.paths['/enumRecord'].get.parameters).toBeUndefined()
+    })
+  })
+
+  describe('project aliases of library models', () => {
+    const file = new URL('../tests/fixtures/library-aliases/src/router.ts', import.meta.url)
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
+    const response = (spec: any, path: string) =>
+      spec.paths[path].post.responses['200'].content['application/json'].schema
+    const user = {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        name: { type: 'string' },
+        bio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+      },
+      required: ['id', 'name', 'bio'],
+    }
+
+    it('names a model after the alias of the project its type lost, wherever it is written', async () => {
+      const spec = await generator.generate(libraryAliasesRouter, { source: { file } })
+      const schemas = spec.components?.schemas as any
+
+      // one component of a type two aliases name, after the first one; the others as before
+      expect(Object.keys(schemas).toSorted()).toEqual([
+        'Account',
+        'Feed',
+        'Kept',
+        'Paginated_Post',
+        'Post',
+        'PostRecord',
+        'PostWithAuthor',
+        'Profile',
+        'Settings',
+        'User',
+      ])
+      expect(schemas.User).toEqual({ ...user, description: 'A registered user' })
+      expect(schemas.Post).toEqual({
+        type: 'object',
+        properties: { id: { type: 'number' }, title: { type: 'string' } },
+        required: ['id', 'title'],
+      })
+      expect(schemas.Account).toEqual({
+        type: 'object',
+        properties: { id: { type: 'number' }, handle: { type: 'string' } },
+        required: ['id', 'handle'],
+      })
+
+      // return annotations
+      expect(response(spec, '/users')).toEqual({ type: 'array', items: ref('User') })
+      expect(response(spec, '/user')).toEqual(ref('User'))
+      expect(response(spec, '/accounts')).toEqual({ type: 'array', items: ref('Account') })
+      expect(response(spec, '/kept')).toEqual({ type: 'array', items: ref('Kept') })
+      // an alias the router file imports, of a type whose fields the library declares
+      expect(response(spec, '/postRecords')).toEqual({ type: 'array', items: ref('PostRecord') })
+      expect(schemas.PostRecord).toEqual({
+        type: 'object',
+        properties: {
+          id: { type: 'number' },
+          title: { type: 'string' },
+          authorId: { type: 'number' },
+        },
+        required: ['id', 'title', 'authorId'],
+      })
+      expect(schemas.Feed.properties.latest).toEqual({
+        anyOf: [ref('PostRecord'), { type: 'null' }],
+      })
+      // type arguments, by the alias their type lost
+      expect(response(spec, '/posts')).toEqual(ref('Paginated_Post'))
+      expect(schemas.Paginated_Post.properties.items).toEqual({
+        type: 'array',
+        items: ref('Post'),
+      })
+      // property annotations
+      expect(schemas.PostWithAuthor.properties).toEqual({
+        post: ref('Post'),
+        author: ref('User'),
+        reviewer: { anyOf: [ref('User'), { type: 'null' }] },
+      })
+      expect(response(spec, '/profile').properties).toEqual({
+        profile: ref('Profile'),
+        settings: ref('Settings'),
+      })
+      // input types
+      expect(
+        (spec.paths as any)['/createUser'].post.requestBody.content['application/json'].schema,
+      ).toEqual(ref('User'))
+    })
+
+    it('keeps the name of a declared type, whichever procedure comes first', async () => {
+      const source = new URL('../tests/fixtures/library-aliases/src/orders.ts', import.meta.url)
+
+      for (const [exported, router] of Object.entries({ collision, collisionReversed })) {
+        const spec = await generator.generate(router, {
+          source: { file: source, export: exported },
+        })
+        const schemas = spec.components?.schemas as any
+
+        expect(Object.keys(schemas).toSorted()).toEqual(['User', 'User2'])
+        expect(schemas.User).toEqual({
+          type: 'object',
+          properties: { id: { type: 'string' }, email: { type: 'string' } },
+          required: ['id', 'email'],
+          description: 'The user of the API',
+        })
+        expect(schemas.User2).toEqual({
+          type: 'object',
+          properties: { id: { type: 'number' }, handle: { type: 'string' } },
+          required: ['id', 'handle'],
+        })
+        expect(response(spec, '/api')).toEqual({ type: 'array', items: ref('User') })
+        expect(response(spec, '/rows')).toEqual({ type: 'array', items: ref('User2') })
+        // also where the compiler awaits or infers the type, which it instantiates anew
+        expect(response(spec, '/rowsAsync')).toEqual({ type: 'array', items: ref('User2') })
+        expect(
+          (spec.paths as any)['/createRow'].post.requestBody.content['application/json'].schema,
+        ).toEqual(ref('User2'))
+      }
+    })
+
+    it('names a type the same, whichever procedure reaches it first', async () => {
+      const source = new URL('../tests/fixtures/library-aliases/src/orders.ts', import.meta.url)
+      const generate = (exported: string, router: Parameters<typeof generator.generate>[0]) =>
+        generator.generate(router, { source: { file: source, export: exported } })
+
+      // the file of `Holder.team` is read once a conversion reaches it, after `direct`
+      for (const [exported, router] of Object.entries({ heldLast, heldFirst })) {
+        const spec = await generate(exported, router)
+        const schemas = spec.components?.schemas as any
+
+        expect(Object.keys(schemas).toSorted()).toEqual(['Holder', 'Team'])
+        expect(response(spec, '/direct')).toEqual({ type: 'array', items: ref('Team') })
+        expect(schemas.Holder.properties.team).toEqual(ref('Team'))
+      }
+
+      // two aliases of one type: each procedure keeps the alias it returns
+      for (const [exported, router] of Object.entries({ aliases, aliasesReversed })) {
+        const spec = await generate(exported, router)
+
+        expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual(['Squad', 'Team'])
+        expect(response(spec, '/teams')).toEqual({ type: 'array', items: ref('Team') })
+        expect(response(spec, '/squads')).toEqual({ type: 'array', items: ref('Squad') })
+      }
+    })
+
+    it('names no model of other columns with the same fields after an alias', async () => {
+      const source = new URL(
+        '../tests/fixtures/library-aliases/src/projections.ts',
+        import.meta.url,
+      )
+      const summary = {
+        type: 'object',
+        properties: { id: { type: 'number' }, name: { type: 'string' } },
+        required: ['id', 'name'],
+      }
+
+      for (const [exported, router] of Object.entries({ projections, projectionsReversed })) {
+        const spec = await generator.generate(router, {
+          source: { file: source, export: exported },
+        })
+        const schemas = spec.components?.schemas as any
+
+        expect(schemas).toEqual({ Label: summary })
+        expect(response(spec, '/label')).toEqual(ref('Label'))
+        expect(response(spec, '/labelsAsync')).toEqual({ type: 'array', items: ref('Label') })
+        expect(response(spec, '/labelRows')).toEqual({ type: 'array', items: ref('Label') })
+        expect(response(spec, '/author')).toEqual(summary)
+        expect(response(spec, '/post').properties).toEqual({
+          title: { type: 'string' },
+          author: summary,
+          labels: { type: 'array', items: ref('Label') },
+        })
+      }
+    })
+
+    it('names a type by an alias only a later procedure reaches, walking the router once', async () => {
+      const source = new URL('../tests/fixtures/library-aliases/src/crews.ts', import.meta.url)
+      let loads = 0
+      const lazy = {
+        ...crewsLazy,
+        direct: os.lazy(async () => {
+          loads++
+          return { default: crewsHeldLast.direct }
+        }),
+      }
+
+      for (const [exported, router] of Object.entries({
+        crewsHeldLast,
+        crewsHeldFirst,
+        crewsLazy: lazy,
+      })) {
+        const filtered: string[] = []
+        const spec = await generator.generate(router, {
+          source: { file: source, export: exported },
+          filter: (_, path) => {
+            filtered.push(path.join('.'))
+            return true
+          },
+        })
+        const schemas = spec.components?.schemas as any
+
+        expect(Object.keys(schemas).toSorted()).toEqual(['Crew', 'CrewHolder'])
+        expect(response(spec, '/direct')).toEqual({ type: 'array', items: ref('Crew') })
+        expect(schemas.CrewHolder.properties.crew).toEqual(ref('Crew'))
+        expect(filtered.toSorted()).toEqual(['direct', 'held'])
+      }
+
+      expect(loads).toBe(1)
+    })
+
+    it('names an intersection, like a document with timestamps', async () => {
+      const spec = await generator.generate(libraryDocuments, {
+        source: {
+          file: new URL('../tests/fixtures/library-aliases/src/documents.ts', import.meta.url),
+          export: 'documents',
+        },
+      })
+      const schemas = spec.components?.schemas as any
+      const date = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
+
+      expect(schemas).toEqual({
+        Note: {
+          type: 'object',
+          properties: { title: { type: 'string' }, createdAt: date, updatedAt: date },
+          required: ['title', 'createdAt', 'updatedAt'],
+        },
+      })
+      expect(response(spec, '/note')).toEqual(ref('Note'))
+      expect(response(spec, '/notes')).toEqual({ type: 'array', items: ref('Note') })
+      expect(response(spec, '/held').properties.note).toEqual(ref('Note'))
+    })
+
+    it('names no interface of a library after an alias', async () => {
+      const spec = await generator.generate(libraryNamed, {
+        source: {
+          file: new URL('../tests/fixtures/library-aliases/src/documents.ts', import.meta.url),
+          export: 'named',
+        },
+      })
+
+      expect(spec.components?.schemas).toBeUndefined()
+      expect(response(spec, '/amount')).toEqual({
+        type: 'object',
+        properties: {
+          digits: { type: 'array', items: { type: 'number' } },
+          exponent: { type: 'number' },
+        },
+        required: ['digits', 'exponent'],
+      })
+    })
+
+    it('makes no def of it with defs: recursive', async () => {
+      const spec = await new OpenAPIGenerator({ defs: 'recursive' }).generate(
+        libraryAliasesRouter,
+        { source: { file } },
+      )
+
+      expect(spec.components?.schemas).toBeUndefined()
+      expect(response(spec, '/users')).toEqual({ type: 'array', items: user })
+    })
+  })
+
+  describe('file names and path params', () => {
+    it('names anonymous classes after their file or as classes, and a hyphen of a literal not as a sign', async () => {
+      const spec = await generator.generate(fileNames, {
+        source: { file: fixture('sent-values.ts'), export: 'fileNames' },
+      })
+
+      expect(Object.keys(spec.components?.schemas ?? {}).toSorted()).toEqual([
+        'AnonymousClass',
+        'Tagged_2024_01',
+        'Tagged_neg1',
+        'UserCard',
+      ])
+    })
+
+    it('documents a path param whose value may be undefined as required, as a client sends it', async () => {
+      const spec = await generator.generate(sentValues, {
+        source: { file: fixture('sent-values.ts'), export: 'sentValues' },
+      })
+      const parameters = (path: string, method: string) =>
+        (spec.paths as any)[path][method].parameters
+
+      expect(parameters('/unknown-path/{id}', 'get')[0]).toEqual({
+        in: 'path',
+        required: true,
+        name: 'id',
+        schema: {},
+      })
+      expect(parameters('/any-path/{id}', 'post')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: {} },
+      ])
+      expect(parameters('/undefined-path/{id}', 'get')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+      ])
+    })
+
+    it('documents a path param of a type whose value may have a toJSON dropping it as required', async () => {
+      const spec = await generator.generate(sentValues, {
+        source: { file: fixture('sent-values.ts'), export: 'sentValues' },
+      })
+      const parameters = (path: string, method: string) =>
+        (spec.paths as any)[path][method].parameters
+
+      expect(parameters('/empty-object-path/{id}', 'get')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: {} },
+      ])
+      expect(parameters('/object-path/{id}', 'post')).toEqual([
+        { in: 'path', required: true, name: 'id', schema: {} },
+      ])
+    })
+
+    it.each([
+      ['no componentName', undefined, 'Role'],
+      ['the default componentName', (name: string) => name, 'Role'],
+      ['a prefix', (name: string) => `Acme.${name}`, 'Acme.Role'],
+    ] as const)(
+      'names the parameter form of a type after the type with %s',
+      async (_, componentName, name) => {
+        const spec = await generator.generate(queryRoles, {
+          source: { file: fixture('sent-values.ts'), export: 'queryRoles' },
+          componentName,
+        })
+
+        expect(Object.keys(spec.components?.schemas ?? {})).toEqual([name])
+        expect((spec.paths as any)['/roles'].get.parameters[0].schema).toEqual({
+          $ref: `#/components/schemas/${name}`,
+        })
+      },
+    )
+  })
+})
