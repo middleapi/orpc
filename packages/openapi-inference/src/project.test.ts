@@ -90,6 +90,21 @@ describe('openTypeScriptProject', () => {
     ).toEqual([`Using the compiler options of "${path.join(root, 'app/tsconfig.json')}".`])
   })
 
+  it('reads the references of a solution tsconfig starting with a byte order mark', () => {
+    write(
+      'tsconfig.json',
+      `\uFEFF${JSON.stringify({ files: [], references: [{ path: './app' }] })}`,
+    )
+    write('app/tsconfig.json', JSON.stringify({ include: ['.'] }))
+    write('app/router.ts', 'export const router = 1\n')
+
+    expect(
+      open({ file: path.join(root, 'app/router.ts'), tsconfig: root }, (project) =>
+        project.describeConfig(),
+      ),
+    ).toEqual([`Using the compiler options of "${path.join(root, 'app/tsconfig.json')}".`])
+  })
+
   it('lists no exports of a script, read from a path relative to the current working directory', () => {
     write('tsconfig.json', JSON.stringify({ include: ['*.ts'] }))
     write('script.ts', 'const router = 1\n')

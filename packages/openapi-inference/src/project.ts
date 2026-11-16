@@ -287,11 +287,13 @@ function getReferencedTsconfigs(tsconfig: string): Set<string> {
 }
 
 /**
- * The `references[].path` values of a tsconfig, which is JSON with comments and trailing commas.
+ * The `references[].path` values of a tsconfig, which is JSON with comments and trailing commas,
+ * also after a byte order mark, which the compiler skips.
  */
 function readReferencePaths(tsconfig: string): string[] {
   try {
-    const config = JSON.parse(stripJsonComments(readFileSync(tsconfig, 'utf8')))
+    const text = readFileSync(tsconfig, 'utf8').replace(/^\uFEFF/u, '')
+    const config = JSON.parse(stripJsonComments(text))
     const references: unknown = config?.references
 
     return Array.isArray(references)
