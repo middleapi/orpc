@@ -194,7 +194,8 @@ export class RouterTypeResolver {
     }
 
     // every instantiation of `interface Grow<T> { next: Grow<T[]> }` is a new type
-    return (
+    const cuts = expansion.cuts
+    const held =
       expansion.expand(
         current,
         () =>
@@ -208,7 +209,13 @@ export class RouterTypeResolver {
             .getIndexInfosOfType(current)
             .some((info) => this.holdsProcedureIn(info.valueType, expansion, seen)),
       ) ?? false
-    )
+
+    // a search cut on the way was not done, where the type comes back it may reach further
+    if (expansion.cuts !== cuts) {
+      seen.delete(current.id)
+    }
+
+    return held
   }
 
   /**

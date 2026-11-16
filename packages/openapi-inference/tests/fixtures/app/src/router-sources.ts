@@ -44,6 +44,22 @@ export interface Grow<T> {
 
 export declare const grow: Grow<number>
 
+/**
+ * A router whose procedure a search finds only from the instantiation holding it, which the search
+ * of a sibling reaches first nested, where it is cut
+ */
+export interface Boxed<T> {
+  v: T
+}
+export interface GrowingRouter<T> {
+  next: GrowingRouter<Boxed<T>>
+  procedure: T extends Boxed<Boxed<Boxed<number>>> ? typeof innerRouter.list : undefined
+}
+export declare const cutFirst: {
+  a: GrowingRouter<number>
+  b: GrowingRouter<Boxed<Boxed<Boxed<number>>>>
+}
+
 export class Chain<T> {
   constructor(readonly value: T) {}
 

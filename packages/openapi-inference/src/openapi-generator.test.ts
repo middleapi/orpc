@@ -799,6 +799,17 @@ describe('openAPIGenerator', () => {
     await expect(wrapped).rejects.not.toThrow('which is not a router')
   })
 
+  it('reports the unmatched paths of a router whose procedure is cut where it is reached first', async () => {
+    const generated = generator.generate(
+      { zzz: os.handler(() => 1) },
+      { source: { file: fixture('router-sources.ts'), export: 'cutFirst' } },
+    )
+    await expect(generated).rejects.toThrow(
+      'Procedure at zzz: its type was not found in the router type',
+    )
+    await expect(generated).rejects.not.toThrow('which is not a router')
+  })
+
   it('reports the unmatched paths of routers that are no plain objects', async () => {
     const file = fixture('router-sources.ts')
     const other = { zzz: os.handler(() => 1) }
