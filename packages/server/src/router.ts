@@ -29,7 +29,7 @@ export type ContractedRouter<T extends RouterContract, TInitialContext extends C
 export type AnyRouter = Router<any>
 
 /**
- * Infer the initial context required by every procedure in the router combined.
+ * Infer the combined initial context of every procedure in the router.
  *
  * @see {@link https://orpc.dev/docs/context#mixing-initial-contexts | Context - Mixing Initial Contexts}
  */

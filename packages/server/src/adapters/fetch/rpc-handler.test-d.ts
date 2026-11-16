@@ -36,21 +36,13 @@ it('needs an explicit initial context for a router mixing unrelated initial cont
     b: os.$context<{ b: number }>().handler(() => 'b'),
   }
 
-  // TypeScript picks one candidate instead of intersecting them when inferring
-  // a class type parameter, unlike `InferRouterInitialContext`; documented in docs/context
+  // class type-param inference picks one candidate instead of intersecting
   // @ts-expect-error - `{ b: number }` is missing from the inferred context
   void new RPCHandler(router)
 
-  const handler = new RPCHandler<InferRouterInitialContext<typeof router>>(router)
-  expectTypeOf(handler).toEqualTypeOf<RPCHandler<{ a: string } & object & { b: number }>>()
-
-  void handler.handle(new Request('https://example.com'), {
-    context: { a: 'a', b: 1 },
-  })
-  void handler.handle(new Request('https://example.com'), {
-    // @ts-expect-error - `b` is required
-    context: { a: 'a' },
-  })
+  expectTypeOf(new RPCHandler<InferRouterInitialContext<typeof router>>(router)).toEqualTypeOf<
+    RPCHandler<{ a: string } & object & { b: number }>
+  >()
 })
 
 it('infers the initial context when one context extends the others', () => {

@@ -50,9 +50,11 @@ declare module '@orpc/server' {
 
 ### Mixing Initial Contexts
 
-A router can contain procedures that declare different initial contexts. Clients and other helpers infer the context the whole router requires, but handler classes such as `RPCHandler` and `OpenAPIHandler` cannot combine unrelated contexts from the constructor argument and report a type error. Pass the router's initial context explicitly:
+When procedures in a router declare unrelated initial contexts, `RPCHandler` and `OpenAPIHandler` cannot infer the combined context and report a type error. Pass it explicitly:
 
 ```ts twoslash
+declare const request: Request
+// ---cut---
 import { os } from '@orpc/server'
 import type { InferRouterInitialContext } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
@@ -64,18 +66,10 @@ const router = {
 
 const handler = new RPCHandler<InferRouterInitialContext<typeof router>>(router)
 
-export default {
-  async fetch(request: Request) {
-    const { response } = await handler.handle(request, {
-      context: { db: 'postgres://...', bucket: 'uploads' },
-    })
-
-    return response ?? new Response('Not Found', { status: 404 })
-  },
-}
+await handler.handle(request, { context: { db: 'postgres://...', bucket: 'uploads' } })
 ```
 
-Declaring one shared initial context on a base builder avoids this.
+Or avoid this by declaring one shared initial context on a base builder.
 
 ## Injected Context
 
