@@ -56,7 +56,7 @@ type InferBody<T> = T extends unknown
   ? string extends keyof T
     ? T
     : 'body' extends keyof T
-      ? T['body' & keyof T]
+      ? T['body']
       : T
   : never
 

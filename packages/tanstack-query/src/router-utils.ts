@@ -151,7 +151,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
             client as Client<any, any, any, any>,
             plugin.initProcedureOptions(
               path,
-              mergeProcedureUtilsOptions(
+              mergeProcedureUtilsOptions<any, any, any, any>(
                 pick(options, [
                   'prefix',
                   'serializer',
@@ -160,8 +160,8 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
                   'liveInterceptors',
                   'infiniteInterceptors',
                   'mutationInterceptors',
-                ]) as ProcedureUtilsOptions<any, any, any, any>,
-                (options.scoped ?? {}) as ProcedureUtilsOptions<any, any, any, any>,
+                ]),
+                options.scoped ?? {},
               ),
             ),
           ),
