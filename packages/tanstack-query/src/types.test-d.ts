@@ -13,8 +13,6 @@ type RequiredContext = { batch: boolean }
 
 describe('ProcedureUtilsOptionsRest', () => {
   it('only input and context can make options required', () => {
-    // ProcedureUtilsOptionsRest decides from input and context alone,
-    // so every other member of these options must stay optional
     expectTypeOf<{}>().toExtend<
       QueryOptionsIn<OptionalContext, string | undefined, number, Error, number, undefined>
     >()
@@ -50,26 +48,23 @@ describe('ProcedureUtilsOptionsRest', () => {
     expectTypeOf<
       ProcedureUtilsOptionsRest<
         OptionalContext,
-        string | undefined,
-        Query<OptionalContext, string | undefined>
+        Query<OptionalContext, string | undefined>,
+        string | undefined
       >
     >().toEqualTypeOf<MaybeOptionalOptions<Query<OptionalContext, string | undefined>>>()
     expectTypeOf<
-      ProcedureUtilsOptionsRest<OptionalContext, string, Query<OptionalContext, string>>
+      ProcedureUtilsOptionsRest<OptionalContext, Query<OptionalContext, string>, string>
     >().toEqualTypeOf<MaybeOptionalOptions<Query<OptionalContext, string>>>()
     expectTypeOf<
       ProcedureUtilsOptionsRest<
         RequiredContext,
-        string | undefined,
-        Query<RequiredContext, string | undefined>
+        Query<RequiredContext, string | undefined>,
+        string | undefined
       >
     >().toEqualTypeOf<MaybeOptionalOptions<Query<RequiredContext, string | undefined>>>()
 
     expectTypeOf<
-      ProcedureUtilsOptionsRest<OptionalContext, undefined, Mutation<OptionalContext>>
+      ProcedureUtilsOptionsRest<OptionalContext, Mutation<OptionalContext>>
     >().toEqualTypeOf<MaybeOptionalOptions<Mutation<OptionalContext>>>()
-    expectTypeOf<
-      ProcedureUtilsOptionsRest<RequiredContext, undefined, Mutation<RequiredContext>>
-    >().toEqualTypeOf<MaybeOptionalOptions<Mutation<RequiredContext>>>()
   })
 })

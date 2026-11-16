@@ -437,8 +437,8 @@ export class ProcedureUtils<
   queryOptions<USelectData = TOutput, UInitialData = undefined>(
     ...rest: ProcedureUtilsOptionsRest<
       TClientContext,
-      TInput,
-      QueryOptionsIn<TClientContext, TInput, TOutput, TError, USelectData, UInitialData>
+      QueryOptionsIn<TClientContext, TInput, TOutput, TError, USelectData, UInitialData>,
+      TInput
     >
   ): NoInfer<QueryOptionsOut<TOutput, TError, USelectData, UInitialData>> {
     let optionsIn = resolveProcedureUtilsOptionsRest(rest)
@@ -523,7 +523,6 @@ export class ProcedureUtils<
   streamedOptions<USelectData = InferStreamedQueryOutput<TOutput>, UInitialData = undefined>(
     ...rest: ProcedureUtilsOptionsRest<
       TClientContext,
-      TInput,
       StreamedOptionsIn<
         TClientContext,
         TInput,
@@ -531,7 +530,8 @@ export class ProcedureUtils<
         TError,
         USelectData,
         UInitialData
-      >
+      >,
+      TInput
     >
   ): NoInfer<
     StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>
@@ -623,7 +623,6 @@ export class ProcedureUtils<
   liveOptions<USelectData = InferLiveQueryOutput<TOutput>, UInitialData = undefined>(
     ...rest: ProcedureUtilsOptionsRest<
       TClientContext,
-      TInput,
       LiveOptionsIn<
         TClientContext,
         TInput,
@@ -631,7 +630,8 @@ export class ProcedureUtils<
         TError,
         USelectData,
         UInitialData
-      >
+      >,
+      TInput
     >
   ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, USelectData, UInitialData>> {
     let optionsIn = resolveProcedureUtilsOptionsRest(rest)
@@ -809,7 +809,6 @@ export class ProcedureUtils<
   mutationOptions<UMutationContext>(
     ...rest: ProcedureUtilsOptionsRest<
       TClientContext,
-      undefined,
       MutationOptionsIn<TClientContext, TInput, TOutput, TError, UMutationContext>
     >
   ): NoInfer<MutationOptionsOut<TInput, TOutput, TError, UMutationContext>> {
