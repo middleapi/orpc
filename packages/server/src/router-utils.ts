@@ -36,12 +36,30 @@ export type AugmentedRouter<T extends AnyRouter, TErrorMap extends ErrorMap> = T
       MergedErrorMap<TErrorMap, $ErrorMap>
     >
   : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? AugmentedRouter<T[K], TErrorMap>
-        : T[K] extends Lazy<infer $ extends AnyRouter>
-          ? Lazy<AugmentedRouter<$, TErrorMap>>
-          : never
+      [K in keyof T]: AugmentedRouterInternal<T[K] & {}, TErrorMap>
     }
+
+export type AugmentedRouterInternal<T, TErrorMap extends ErrorMap> = T extends {
+  '~orpc': ProcedureDefinition<
+    infer $InitialContext,
+    infer $CurrentContext,
+    infer $InputSchema,
+    infer $OutputSchema,
+    infer $ErrorMap
+  >
+}
+  ? Procedure<
+      $InitialContext,
+      $CurrentContext,
+      $InputSchema,
+      $OutputSchema,
+      MergedErrorMap<TErrorMap, $ErrorMap>
+    >
+  : T extends Lazy<infer $>
+    ? Lazy<AugmentedRouterInternal<$, TErrorMap>>
+    : {
+        [K in keyof T]: AugmentedRouterInternal<T[K] & {}, TErrorMap>
+      }
 
 export type AugmentedRouterWithMiddlewares<
   T extends AnyRouter,
@@ -65,12 +83,45 @@ export type AugmentedRouterWithMiddlewares<
       MergedErrorMap<TErrorMap, $ErrorMap>
     >
   : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? AugmentedRouterWithMiddlewares<T[K], TInitialContext, TInjectedContext, TErrorMap>
-        : T[K] extends Lazy<infer $ extends AnyRouter>
-          ? Lazy<AugmentedRouterWithMiddlewares<$, TInitialContext, TInjectedContext, TErrorMap>>
-          : never
+      [K in keyof T]: AugmentedRouterWithMiddlewaresInternal<
+        T[K] & {},
+        TInitialContext,
+        TInjectedContext,
+        TErrorMap
+      >
     }
+
+export type AugmentedRouterWithMiddlewaresInternal<
+  T,
+  TInitialContext extends Context,
+  TInjectedContext extends Context,
+  TErrorMap extends ErrorMap,
+> = T extends {
+  '~orpc': ProcedureDefinition<
+    infer $InitialContext,
+    infer $CurrentContext,
+    infer $InputSchema,
+    infer $OutputSchema,
+    infer $ErrorMap
+  >
+}
+  ? Procedure<
+      MergedInitialContext<TInitialContext, TInjectedContext, $InitialContext>,
+      $CurrentContext,
+      $InputSchema,
+      $OutputSchema,
+      MergedErrorMap<TErrorMap, $ErrorMap>
+    >
+  : T extends Lazy<infer $>
+    ? Lazy<AugmentedRouterWithMiddlewaresInternal<$, TInitialContext, TInjectedContext, TErrorMap>>
+    : {
+        [K in keyof T]: AugmentedRouterWithMiddlewaresInternal<
+          T[K] & {},
+          TInitialContext,
+          TInjectedContext,
+          TErrorMap
+        >
+      }
 
 interface AugmentRouterOptions<TErrorMap extends ErrorMap>
   extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
@@ -355,15 +406,15 @@ export async function walkProcedureContractsAsync(
   }
 }
 
-export type UnlaziedRouter<T extends AnyRouter> = T extends AnyProcedure
+export type UnlaziedRouter<T extends AnyRouter> = UnlaziedRouterInternal<T>
+
+export type UnlaziedRouterInternal<T> = T extends AnyProcedure
   ? T
-  : {
-      [K in keyof T]: T[K] extends AnyRouter
-        ? UnlaziedRouter<T[K]>
-        : T[K] extends Lazyable<infer U extends AnyRouter>
-          ? UnlaziedRouter<U>
-          : never
-    }
+  : T extends Lazy<infer U>
+    ? UnlaziedRouterInternal<U>
+    : {
+        [K in keyof T]: UnlaziedRouterInternal<T[K] & {}>
+      }
 
 /**
  * Fully resolves all lazy routers inside a router, returning a plain router.

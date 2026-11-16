@@ -11,7 +11,7 @@ import type {
   BuilderWithMiddlewares,
   BuilderWithOutput,
 } from './builder-variants'
-import type { MergedContext, MergedInitialContext } from './context'
+import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { Lazy } from './lazy'
 import type { Middleware, MiddlewareDone } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
@@ -125,6 +125,40 @@ describe('Builder', () => {
         .handler(({ context }) => {
           expectTypeOf(context.db).toEqualTypeOf<string>()
         })
+    })
+
+    it('merges union out context', () => {
+      const out = {} as { user: { id: string } } | { anon: true }
+
+      void os
+        .$context<{ db: string }>()
+        .use(({ next }) => next({ context: out }))
+        .handler(({ context }) => {
+          expectTypeOf(context.db).toEqualTypeOf<string>()
+
+          if ('user' in context) {
+            expectTypeOf(context.user).toEqualTypeOf<{ id: string }>()
+          } else {
+            expectTypeOf(context.anon).toEqualTypeOf<true>()
+          }
+        })
+    })
+
+    it('ignores any out context', () => {
+      void os
+        .$context<{ db: string }>()
+        .use({} as Middleware<any, any, any, any, any>)
+        .handler(({ context }) => {
+          expectTypeOf(context).toEqualTypeOf<{ db: string } & object>()
+        })
+    })
+
+    it('ignores in context that requires nothing', () => {
+      expectTypeOf(
+        os.$context<{ db: string }>().use({} as Middleware<Context, object, unknown, any, object>),
+      ).toEqualTypeOf<
+        BuilderWithMiddlewares<{ db: string } & object, object, Record<never, never>>
+      >()
     })
 
     it('outline middleware', () => {

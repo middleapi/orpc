@@ -9,13 +9,16 @@ import type { AnyProcedureContract } from './procedure'
 import { ProcedureContract } from './procedure'
 import type { RouterContract } from './router'
 
-export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap> =
+export type AugmentedContractRouter<
+  T extends RouterContract,
+  TErrorMap extends ErrorMap,
+> = AugmentedContractRouterInternal<T, TErrorMap>
+
+export type AugmentedContractRouterInternal<T, TErrorMap extends ErrorMap> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
     ? ProcedureContract<$InputSchema, $OutputSchema, MergedErrorMap<TErrorMap, $Errors>>
     : {
-        [K in keyof T]: T[K] extends RouterContract
-          ? AugmentedContractRouter<T[K], TErrorMap>
-          : never
+        [K in keyof T]: AugmentedContractRouterInternal<T[K] & {}, TErrorMap>
       }
 
 export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {

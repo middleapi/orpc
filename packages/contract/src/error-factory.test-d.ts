@@ -132,4 +132,35 @@ describe('ORPCErrorConstructorMap', () => {
       ORPCError<'FACTORY', { output: number }>
     >()
   })
+
+  it('constructors of optional and union-valued error codes are callable', () => {
+    const flag = true as boolean
+    const mixedErrorMap = {
+      FAILURE: flag ? { data: z.string() } : { data: z.number() },
+      ...(flag ? { RATE_LIMITED: { data: z.object({ retry: z.number() }) } } : {}),
+    } satisfies ErrorMap
+
+    const mixedConstructors = {} as ORPCErrorConstructorMap<typeof mixedErrorMap>
+
+    expectTypeOf(mixedConstructors.RATE_LIMITED({ data: { retry: 1 } })).toEqualTypeOf<
+      ORPCError<'RATE_LIMITED', { retry: number }>
+    >()
+    expectTypeOf(mixedConstructors.FAILURE({ data: 'x' })).toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+    expectTypeOf(mixedConstructors.FAILURE({ data: 1 })).toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+  })
+
+  it('constructors of the generic ErrorMap are callable', () => {
+    const genericConstructors = {} as ORPCErrorConstructorMap<ErrorMap>
+
+    expectTypeOf(genericConstructors.NOT_FOUND()).toEqualTypeOf<ORPCError<'NOT_FOUND', unknown>>()
+  })
+
+  it('is assignable to ORPCErrorConstructorMap<any> and ORPCErrorConstructorMap<ErrorMap>', () => {
+    expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<any>>()
+    expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<ErrorMap>>()
+  })
 })

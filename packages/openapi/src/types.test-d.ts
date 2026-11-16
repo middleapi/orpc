@@ -1,4 +1,4 @@
-import type { Client, ORPCError } from '@orpc/client'
+import type { AnyNestedClient, Client, InferClientContext, ORPCError } from '@orpc/client'
 import type { RouterContractClient } from '@orpc/contract'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import type { AsyncIteratorClass } from '@orpc/shared'
@@ -160,5 +160,36 @@ describe('JsonifiedClient', () => {
         >
       }
     }>()
+  })
+
+  it('optional procedures', () => {
+    expectTypeOf<
+      JsonifiedClient<{
+        ping?: Client<{ cache?: boolean }, { now: Date }, { now: Date }, Error>
+        planet?: {
+          find?: Client<{ cache?: boolean }, { now: Date }, { now: Date }, Error>
+        }
+      }>
+    >().toEqualTypeOf<{
+      ping?: Client<{ cache?: boolean }, { now: Date }, { now: string }, Error> | undefined
+      planet?:
+        | { find?: Client<{ cache?: boolean }, { now: Date }, { now: string }, Error> | undefined }
+        | undefined
+    }>()
+  })
+
+  it('recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as {
+      planet: { find: Client<{ cache?: boolean }, { now: Date }, { now: Date }, Error> }
+    }
+
+    const jsonified = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => JsonifiedClient<T>
+    const _jsonified: Recursive = jsonified(client, { context: {} })
   })
 })
