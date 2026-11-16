@@ -3754,13 +3754,36 @@ describe('typeToJsonSchemaConverter of rarer shapes', () => {
     })
 
     it('writes an instance of the classes behind an interface or intersection', () => {
-      // an interface over a built-in subclass, of which only instances are values, written by the
-      // `toJSON` it adds, which `JSON.stringify` calls of a boxed number the serializer leaves to it
+      // an interface over a built-in subclass, of which only instances are values, written as the
+      // built-in, or by the `toJSON` it adds, which `JSON.stringify` calls of a boxed number the
+      // serializer leaves to it
+      expect(convert('JsonStamp')).toEqual([
+        {
+          'type': 'string',
+          'format': 'date-time',
+          'x-native-type': 'date',
+          'description':
+            'An interface over it, adding a `toJSON` the serializer does not call of a date',
+        },
+        false,
+      ])
       const jsonAmount = {
         type: 'string',
         description: 'An interface over it, adding a `toJSON` the class does not have',
       }
       expect(convert('JsonAmount')).toEqual([jsonAmount, false])
+      expect(convert('MaybeJsonAmount')).toEqual([
+        {
+          $ref: '#/$defs/MaybeJsonAmount',
+          $defs: {
+            MaybeJsonAmount: {
+              anyOf: [{ type: 'string' }, { type: 'number' }],
+              description: 'An interface over it, adding a `toJSON` an instance may lack',
+            },
+          },
+        },
+        false,
+      ])
       expect(
         new TypeToJsonSchemaConverter(project.checker, project.program, {
           direction: 'input',

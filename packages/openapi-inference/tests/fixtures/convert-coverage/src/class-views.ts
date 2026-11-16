@@ -13,6 +13,11 @@ export class Stamp extends Date {
   private stamped = true
 }
 
+/** An interface over it, adding a `toJSON` the serializer does not call of a date */
+export interface JsonStamp extends Stamp {
+  toJSON(): 'stamp'
+}
+
 /** A class with a private member, extending no built-in */
 export class Owner {
   private owned = true
@@ -30,6 +35,11 @@ export class Amount extends Number {
 /** An interface over it, adding a `toJSON` the class does not have */
 export interface JsonAmount extends Amount {
   toJSON(): string
+}
+
+/** An interface over it, adding a `toJSON` an instance may lack */
+export interface MaybeJsonAmount extends Amount {
+  toJSON?(): string
 }
 
 class Inner {
