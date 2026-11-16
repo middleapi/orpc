@@ -2990,6 +2990,7 @@ describe('generated schemas match serialized outputs', async () => {
     expect(new Set(bodies).size).toBe(bodies.length)
   })
 
+  // generates the whole fixture a second time, which can take longer than the default under coverage
   it('does not depend on the order of procedures', async () => {
     const reversed = Object.fromEntries(Object.entries(router).toReversed())
     const other = await new OpenAPIGenerator().generate(reversed as typeof router, {
@@ -3005,7 +3006,7 @@ describe('generated schemas match serialized outputs', async () => {
         (spec.components?.schemas as any)[name],
       )
     }
-  })
+  }, 30_000)
 
   it('generates quickly', () => {
     expect(generationTime).toBeLessThan(10_000)

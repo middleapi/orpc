@@ -181,13 +181,18 @@ async function validateDocument(doc: unknown): Promise<string[]> {
 describe.each(OPTIONS)('the documents of the bun playground, with %s', (_, options) => {
   const generator = new OpenAPIGenerator(options)
 
-  it.each(VERSIONS)('are valid OpenAPI documents in %s', async (version) => {
-    const doc = await generator.generate(bunRouter, {
-      version,
-      source: { file: new URL(PLAYGROUNDS[0][2], import.meta.url), export: 'router' },
-    })
+  // a whole generation each, which can take longer than the default under coverage
+  it.each(VERSIONS)(
+    'are valid OpenAPI documents in %s',
+    async (version) => {
+      const doc = await generator.generate(bunRouter, {
+        version,
+        source: { file: new URL(PLAYGROUNDS[0][2], import.meta.url), export: 'router' },
+      })
 
-    expect(doc.openapi).toBe(version)
-    expect(await validateDocument(doc)).toEqual([])
-  })
+      expect(doc.openapi).toBe(version)
+      expect(await validateDocument(doc)).toEqual([])
+    },
+    30_000,
+  )
 })

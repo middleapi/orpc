@@ -114,15 +114,20 @@ describe('generated documents are valid OpenAPI documents', () => {
     const generator = new OpenAPIGenerator(options)
 
     describe.each(ROUTERS)('%s', (_, router, file, exportName) => {
-      it.each(VERSIONS)('in %s', async (version) => {
-        const doc = await generator.generate(router, {
-          version,
-          source: { file, export: exportName },
-        })
+      // a whole generation each, which can take longer than the default under coverage
+      it.each(VERSIONS)(
+        'in %s',
+        async (version) => {
+          const doc = await generator.generate(router, {
+            version,
+            source: { file, export: exportName },
+          })
 
-        expect(doc.openapi).toBe(version)
-        expect(await validateDocument(doc)).toEqual([])
-      })
+          expect(doc.openapi).toBe(version)
+          expect(await validateDocument(doc)).toEqual([])
+        },
+        30_000,
+      )
     })
   })
 
