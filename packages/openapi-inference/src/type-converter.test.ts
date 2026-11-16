@@ -2130,6 +2130,33 @@ describe('typeToJsonSchemaConverter', () => {
       ])
     })
 
+    it('compares two types nesting themselves in a type argument', () => {
+      // `SelfModel<SelfB>` inside `SelfModel<SelfA>` compares `SelfA` with `SelfB`, which compare
+      // their type arguments `SelfA` and `SelfB` again
+      const [schema] = convertR4('HoldsSelfModels') as [any, boolean]
+      expect(countEmpty(schema)).toBe(0)
+      expect(schema.$defs.SelfModel_SelfA.properties).toEqual({
+        x: { $ref: '#/$defs/SelfA' },
+        other: { $ref: '#/$defs/SelfModel_SelfB' },
+      })
+      expect(schema.$defs.SelfModel_SelfB.properties.other).toEqual({
+        $ref: '#/$defs/SelfModel_SelfB',
+      })
+      expect(schema.$defs.SelfB).toEqual({
+        type: 'object',
+        properties: { v: { $ref: '#/$defs/SelfB' } },
+        required: ['v'],
+      })
+      // also through a union holding the type reference (`type PairA = SelfPair<PairA> | null`)
+      expect(schema.$defs.PairModel_PairA.properties).toEqual({
+        x: { $ref: '#/$defs/PairA' },
+        other: { $ref: '#/$defs/PairModel_PairB' },
+      })
+      expect(schema.$defs.PairB).toEqual({
+        anyOf: [{ $ref: '#/$defs/SelfPair_PairB2' }, { type: 'null' }],
+      })
+    })
+
     it('makes the def at the named type of a cycle, not at its wrapper', () => {
       expect(convertR4('WrappersFirst', { defs: 'recursive' })).toEqual([
         {

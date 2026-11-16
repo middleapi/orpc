@@ -310,3 +310,27 @@ export class MyStream extends Readable {
 export class MyZodError extends z.ZodError {
   extra = 1
 }
+
+export interface SelfBox<T> {
+  v: T
+}
+export type SelfA = SelfBox<SelfA>
+export type SelfB = SelfBox<SelfB>
+export interface SelfModel<T> {
+  x: T
+  other: SelfModel<SelfB>
+}
+export interface SelfPair<T> {
+  a: T
+  b: SelfPair<T> | null
+}
+export type PairA = SelfPair<PairA> | null
+export type PairB = SelfPair<PairB> | null
+export interface PairModel<T> {
+  x: T
+  other: PairModel<PairB>
+}
+export interface HoldsSelfModels {
+  m: SelfModel<SelfA>
+  p: PairModel<PairA>
+}

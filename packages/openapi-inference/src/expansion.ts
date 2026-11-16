@@ -68,6 +68,8 @@ export class ExpansionGuard {
 
   private readonly expansions = new Map<number, Expansion[]>()
   private readonly instantiations = new Map<number, Set<number>>()
+  /** The type references `holdsAgain` is comparing, by both ids and the depth */
+  private readonly comparing = new Set<string>()
 
   constructor(private readonly types: TypeQueries) {}
 
@@ -423,12 +425,30 @@ export class ExpansionGuard {
     if (outer.isTypeReference() || inner.isTypeReference()) {
       const outerArguments = this.types.getReferenceArguments(outer)
       const innerArguments = this.types.getReferenceArguments(inner)
-      return outer.isTypeReference() &&
-        inner.isTypeReference() &&
-        outer.getTarget().id === inner.getTarget().id &&
-        outerArguments.length === innerArguments.length
-        ? holdEach(innerArguments, (i, index) => this.holdsAgain(outerArguments[index]!, i, depth))
-        : undefined
+      if (
+        !outer.isTypeReference() ||
+        !inner.isTypeReference() ||
+        outer.getTarget().id !== inner.getTarget().id ||
+        outerArguments.length !== innerArguments.length
+      ) {
+        return undefined
+      }
+
+      // two types nesting themselves in a type argument (`type A = Box<A>` and `type B = Box<B>`)
+      // compare the same again, which holds what the rest of them holds
+      const pair = `${outer.id},${inner.id},${depth}`
+      if (this.comparing.has(pair)) {
+        return HELD
+      }
+
+      this.comparing.add(pair)
+      try {
+        return holdEach(innerArguments, (i, index) =>
+          this.holdsAgain(outerArguments[index]!, i, depth),
+        )
+      } finally {
+        this.comparing.delete(pair)
+      }
     }
 
     const keys = this.getKeys(outer)
