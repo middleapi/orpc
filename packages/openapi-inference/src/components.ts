@@ -89,6 +89,11 @@ export function mergeEquivalentComponents(
     { def: string; base: string; direction: string; sibling: boolean }
   >()
   for (const name of Object.keys(schemas)) {
+    // not one of `base` (`PointJsonInput` of `PointJson`), which stays as it is
+    if (reserved.has(name)) {
+      continue
+    }
+
     const [, base, direction] = /^(.+)(Input|Output)$/u.exec(name) ?? []
     const sibling = !!base && !reserved.has(base) && Object.hasOwn(schemas, base)
     const def =

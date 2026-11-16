@@ -409,6 +409,44 @@ describe('mergeEquivalentComponents', () => {
     })
   })
 
+  it('neither moves nor merges a component of base named like a sibling of a def', () => {
+    const point = { type: 'object', properties: { x: { type: 'number' } } }
+    const pointInput = { type: 'object', properties: { x: { type: 'string' } } }
+    const user = { type: 'string', description: 'user-defined' }
+    const document = {
+      components: {
+        schemas: {
+          Point: point,
+          PointJson: point,
+          PointJsonInput: user,
+          PointInput: pointInput,
+        },
+      },
+      paths: {
+        '/legacy': { schema: { $ref: ref('PointJsonInput') } },
+        '/in': { schema: { $ref: ref('PointInput') } },
+      },
+    }
+
+    mergeEquivalentComponents(
+      document,
+      {
+        used: new Set(['Point', 'PointJson']),
+        numbered: new Map(),
+        modes: new Map([['PointJson', 'Point']]),
+      },
+      { reserved: new Set(['PointJsonInput']) },
+    )
+
+    expect(document).toEqual({
+      components: { schemas: { Point: point, PointJsonInput: user, PointInput: pointInput } },
+      paths: {
+        '/legacy': { schema: { $ref: ref('PointJsonInput') } },
+        '/in': { schema: { $ref: ref('PointInput') } },
+      },
+    })
+  })
+
   it('names a numbered component after the name the stock generator makes valid, also an empty one', () => {
     const item = { type: 'object', properties: { id: { type: 'number' } } }
     const document = {

@@ -2797,6 +2797,22 @@ describe('openAPIGenerator', () => {
       ).toEqual(ref('Item2'))
     })
 
+    it('keeps a component of base named like one the stock generator gives a renamed def in a direction', async () => {
+      const user: any = { type: 'string', description: 'user-defined' }
+      const spec: any = await generator.generate(numberedComponents, {
+        source: { file: fixture('widened-views.ts'), export: 'numberedComponents' },
+        base: {
+          paths: { '/legacy': legacy(ref('Item2Input')) },
+          components: { schemas: { Item2Input: user } },
+        },
+      })
+
+      expect(spec.components.schemas).toEqual({ Item: second, Item2Input: user })
+      expect(spec.paths['/legacy'].get.responses['200'].content['application/json'].schema).toEqual(
+        ref('Item2Input'),
+      )
+    })
+
     it('keeps the names componentName chooses', async () => {
       const componentName = vi.fn((name: string) => (name === 'Item' ? 'FirstItem' : name))
       const spec = await generator.generate(numberedBodyComponents, {
