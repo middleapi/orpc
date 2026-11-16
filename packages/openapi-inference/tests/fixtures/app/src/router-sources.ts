@@ -44,6 +44,77 @@ export interface Grow<T> {
 
 export declare const grow: Grow<number>
 
+/** A type graph sharing each of its types, the last one holding an expansion that is cut */
+export interface Shared0 {
+  a: Shared1
+  b: Shared1
+}
+export interface Shared1 {
+  a: Shared2
+  b: Shared2
+}
+export interface Shared2 {
+  a: Shared3
+  b: Shared3
+}
+export interface Shared3 {
+  a: Shared4
+  b: Shared4
+}
+export interface Shared4 {
+  a: Shared5
+  b: Shared5
+}
+export interface Shared5 {
+  a: Shared6
+  b: Shared6
+}
+export interface Shared6 {
+  a: Shared7
+  b: Shared7
+}
+export interface Shared7 {
+  a: Shared8
+  b: Shared8
+}
+export interface Shared8 {
+  a: Shared9
+  b: Shared9
+}
+export interface Shared9 {
+  a: Shared10
+  b: Shared10
+}
+export interface Shared10 {
+  a: Shared11
+  b: Shared11
+}
+export interface Shared11 {
+  a: Shared12
+  b: Shared12
+}
+export interface Shared12 {
+  a: Shared13
+  b: Shared13
+}
+export interface Shared13 {
+  a: Shared14
+  b: Shared14
+}
+export interface Shared14 {
+  a: Shared15
+  b: Shared15
+}
+export interface Shared15 {
+  a: Shared16
+  b: Shared16
+}
+export interface Shared16 {
+  grow: Grow<number>
+}
+
+export declare const shared: Shared0
+
 /**
  * A router whose procedure a search finds only from the instantiation holding it, which the search
  * of a sibling reaches first nested, where it is cut

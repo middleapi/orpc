@@ -65,6 +65,8 @@ export class ExpansionGuard {
   cuts = 0
   /** The properties being converted, outermost first */
   readonly path: TSSymbol[] = []
+  /** How many instantiations are being expanded, of all declarations */
+  depth = 0
 
   private readonly expansions = new Map<number, Expansion[]>()
   private readonly instantiations = new Map<number, Set<number>>()
@@ -119,10 +121,12 @@ export class ExpansionGuard {
 
     this.expansions.set(declaration, stack)
     stack.push({ type, growth, at: this.path.length })
+    this.depth++
 
     try {
       return convert()
     } finally {
+      this.depth--
       stack.pop()
 
       // the budget is per outermost instantiation, siblings (`A[]` next to `B[]`) are not nested

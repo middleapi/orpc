@@ -847,6 +847,7 @@ describe('openAPIGenerator', () => {
       ['grow', 'Grow<number>'],
       ['chain', 'Chain<number>'],
       ['cursor', 'Cursor<string>'],
+      ['shared', 'Shared0'],
     ]) {
       const start = performance.now()
       await expect(

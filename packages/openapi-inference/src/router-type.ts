@@ -7,6 +7,15 @@ import { getIndexKeyType, toPattern } from './key-patterns'
 import { TypeQueries } from './type-queries'
 import { getAssignedSymbol, getCallReturnType, getPromisedType, isMappedType } from './utils'
 
+/** The state of a search for a procedure in a router type (see `RouterTypeResolver#holdsProcedure`) */
+interface ProcedureSearch {
+  readonly expansion: ExpansionGuard
+  /** The types searched, by the expansion depth they were searched at, and whether it was cut */
+  readonly searched: Map<number, { depth: number; cut: boolean }>
+  /** How many times the search came to a type whose search was cut */
+  skipped: number
+}
+
 export interface ResolvedRouterType {
   type: Type
   /** The symbol the router or procedure is declared with, carrying its JSDoc */
@@ -165,18 +174,41 @@ export class RouterTypeResolver {
    * is told apart from an export that is no router at all.
    */
   holdsProcedure(): boolean {
-    return this.holdsProcedureIn(this.root.type, new ExpansionGuard(this.types), new Set())
+    return this.holdsProcedureIn(this.root.type, {
+      expansion: new ExpansionGuard(this.types),
+      searched: new Map(),
+      skipped: 0,
+    })
   }
 
-  private holdsProcedureIn(type: Type, expansion: ExpansionGuard, seen: Set<number>): boolean {
-    const types = this.types
+  private holdsProcedureIn(type: Type, search: ProcedureSearch): boolean {
     const current = this.unlazy(this.stripNullish(type))
+    const depth = search.expansion.depth
+    const searched = search.searched.get(current.id)
 
-    if (seen.has(current.id)) {
+    // a search cut on the way was not done, the type may reach further where it comes back less
+    // deeply nested. Searching it again only then, not on each path to it, keeps the search of a
+    // type graph sharing such a type (`{ a: Shared; b: Shared }`) from growing with its paths
+    if (searched && !(searched.cut && depth < searched.depth)) {
+      // what comes to it relies on its search, which was cut
+      if (searched.cut) {
+        search.skipped++
+      }
       return false
     }
 
-    seen.add(current.id)
+    const entry = { depth, cut: false }
+    search.searched.set(current.id, entry)
+
+    const cuts = search.expansion.cuts + search.skipped
+    const held = this.searchProcedure(current, search)
+    entry.cut = search.expansion.cuts + search.skipped !== cuts
+
+    return held
+  }
+
+  private searchProcedure(current: Type, search: ProcedureSearch): boolean {
+    const types = this.types
 
     if (this.isProcedure(current)) {
       return true
@@ -184,9 +216,7 @@ export class RouterTypeResolver {
 
     // optional routers, and the `{ users } & { posts }` of `Object.assign`
     if (current.flags & TypeFlags.UnionOrIntersection) {
-      return types
-        .getMembers(current)
-        .some((member) => this.holdsProcedureIn(member, expansion, seen))
+      return types.getMembers(current).some((member) => this.holdsProcedureIn(member, search))
     }
 
     if (!this.canBeRouter(current)) {
@@ -194,28 +224,20 @@ export class RouterTypeResolver {
     }
 
     // every instantiation of `interface Grow<T> { next: Grow<T[]> }` is a new type
-    const cuts = expansion.cuts
-    const held =
-      expansion.expand(
+    return (
+      search.expansion.expand(
         current,
         () =>
           types
             .getPropertyTypes(current)
             .some(
-              (property) =>
-                property !== undefined && this.holdsProcedureIn(property, expansion, seen),
+              (property) => property !== undefined && this.holdsProcedureIn(property, search),
             ) ||
           this.checker
             .getIndexInfosOfType(current)
-            .some((info) => this.holdsProcedureIn(info.valueType, expansion, seen)),
+            .some((info) => this.holdsProcedureIn(info.valueType, search)),
       ) ?? false
-
-    // a search cut on the way was not done, where the type comes back it may reach further
-    if (expansion.cuts !== cuts) {
-      seen.delete(current.id)
-    }
-
-    return held
+    )
   }
 
   /**
