@@ -113,7 +113,7 @@ describe('createRouterClient', () => {
     const _client: AnyNestedClient = createRouterClient({} as any, {})
   })
 
-  it('optional options if context is optional', () => {
+  it('optional options if context is an index signature', () => {
     const router = { ping: os.$context<Record<string, unknown>>().handler(() => 'output') }
 
     void createRouterClient(router)

@@ -24,7 +24,6 @@ it('MaybeOptionalOptions', () => {
     expectTypeOf(options).toEqualTypeOf<Record<string, unknown> | undefined>()
   }
 
-  // index signatures accept an empty object, so options is optional
   c()
   c({ any: 1 })
 

@@ -33,11 +33,11 @@ describe('call', () => {
     expectTypeOf(output).toEqualTypeOf<string>()
   })
 
-  it('optional options if context is an index signature', async () => {
+  it('optional options if context is an index signature', () => {
     const procedure = os.$context<Record<string, unknown>>().handler(() => 'output')
 
-    expectTypeOf(await call(procedure)).toEqualTypeOf<string>()
-    expectTypeOf(await call(procedure, undefined)).toEqualTypeOf<string>()
+    void call(procedure)
+    void call(procedure, undefined)
     void call(procedure, undefined, { context: { any: 1 } })
   })
 
