@@ -33,7 +33,7 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
    */
   locker: Value<
     Promisable<Locker>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
   >
 
   /**
@@ -41,7 +41,7 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
    */
   key: Value<
     Promisable<string>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
   >
 
   /**
@@ -52,7 +52,7 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
   ttl?:
     | Value<
         Promisable<number | undefined>,
-        [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+        [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
       >
     | undefined
 
@@ -64,7 +64,7 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
   timeout?:
     | Value<
         Promisable<number | undefined>,
-        [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+        [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
       >
     | undefined
 

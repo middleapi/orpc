@@ -16,7 +16,7 @@ describe('PopulatedContractRouterOpenAPIPaths', () => {
     const populated = populateRouterContractOpenAPIPaths({ ping, nested: { pong } })
 
     expectTypeOf(populated).toEqualTypeOf<{
-      ping: ProcedureContract<typeof inputSchema, typeof outputSchema, Record<never, never>>
+      ping: ProcedureContract<typeof inputSchema, typeof outputSchema, {}>
       nested: {
         pong: ProcedureContract<
           Schema<void, unknown>,
@@ -31,9 +31,7 @@ describe('PopulatedContractRouterOpenAPIPaths', () => {
     expectTypeOf<
       PopulatedContractRouterOpenAPIPaths<{ ping?: typeof ping; nested?: { pong?: typeof pong } }>
     >().toEqualTypeOf<{
-      ping?:
-        | ProcedureContract<typeof inputSchema, typeof outputSchema, Record<never, never>>
-        | undefined
+      ping?: ProcedureContract<typeof inputSchema, typeof outputSchema, {}> | undefined
       nested?:
         | {
             pong?:

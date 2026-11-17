@@ -57,7 +57,7 @@ export class ContractBuilder<TErrorMap extends ErrorMap> extends ProcedureContra
    *
    * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
    */
-  static create(): ContractBuilder<Record<never, never>> {
+  static create(): ContractBuilder<{}> {
     return new ContractBuilder({
       errorMap: {},
       meta: {},
@@ -160,4 +160,4 @@ export class ContractBuilder<TErrorMap extends ErrorMap> extends ProcedureContra
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export const oc: ContractBuilder<Record<never, never>> = /* @__PURE__ */ ContractBuilder.create()
+export const oc: ContractBuilder<{}> = /* @__PURE__ */ ContractBuilder.create()

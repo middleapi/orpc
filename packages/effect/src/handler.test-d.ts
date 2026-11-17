@@ -55,7 +55,7 @@ describe('handlerGen', () => {
         object,
         InitialInputSchema,
         Schema<boolean>,
-        Record<never, never>
+        {}
       >
     >()
   })
@@ -143,12 +143,7 @@ describe('handlerGen', () => {
       yield* Service1
     })
     expectTypeOf(defaults).toEqualTypeOf<
-      ProcedureHandler<
-        WithEffectContext<Service1>,
-        unknown,
-        unknown,
-        ORPCErrorConstructorMap<Record<never, never>>
-      >
+      ProcedureHandler<WithEffectContext<Service1>, unknown, unknown, ORPCErrorConstructorMap<{}>>
     >()
   })
 })

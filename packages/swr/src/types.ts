@@ -46,7 +46,7 @@ export type MatcherOptions<TStrategy extends MatcherStrategy, TInput> = ('partia
 
 export type Matcher = (key?: unknown) => boolean
 
-export type FetcherOptions<TClientContext extends ClientContext> = object extends TClientContext
+export type FetcherOptions<TClientContext extends ClientContext> = {} extends TClientContext
   ? { context?: TClientContext | undefined }
   : { context: TClientContext }
 

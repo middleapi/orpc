@@ -25,7 +25,7 @@ export interface NestStandardLazyRequest extends StandardLazyRequest {
 
 export type ORPCModuleConfig = OpenAPIHandlerCodecCoreOptions<DefaultInitialContext> &
   StandardHandlerOptions<DefaultInitialContext> &
-  (object extends DefaultInitialContext
+  ({} extends DefaultInitialContext
     ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> | undefined }
     : { context: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> }) & {
     /**

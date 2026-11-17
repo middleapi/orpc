@@ -76,7 +76,7 @@ export type CallRest<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 > =
-  object extends CallOptions<TInitialContext, TOutputSchema, TErrorMap>
+  {} extends CallOptions<TInitialContext, TOutputSchema, TErrorMap>
     ? undefined extends InferSchemaInput<TInputSchema>
       ? [
           input?: InferSchemaInput<TInputSchema>,

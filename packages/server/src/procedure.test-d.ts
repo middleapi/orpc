@@ -8,7 +8,7 @@ type P<TInitialContext extends object, TInjectedContext extends object> = Proced
   TInjectedContext,
   Schema<unknown, unknown>,
   Schema<unknown, unknown>,
-  Record<never, never>
+  {}
 >
 
 describe('Procedure', () => {

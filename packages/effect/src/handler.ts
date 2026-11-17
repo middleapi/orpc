@@ -35,9 +35,7 @@ export function handlerGen<
   TCurrentContext extends Context,
   TInput = unknown,
   TReturn = unknown,
-  TErrorConstructorMap extends ORPCErrorConstructorMap<any> = ORPCErrorConstructorMap<
-    Record<never, never>
-  >,
+  TErrorConstructorMap extends ORPCErrorConstructorMap<any> = ORPCErrorConstructorMap<{}>,
   TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>> = Effect.Effect<
     any,
     any,

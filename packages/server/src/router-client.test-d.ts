@@ -127,6 +127,21 @@ describe('createRouterClient', () => {
     const _client: AnyNestedClient = createRouterClient({} as any, {})
   })
 
+  it('optional options if context is an index signature', () => {
+    const router = { ping: os.$context<Record<string, unknown>>().handler(() => 'output') }
+
+    void createRouterClient(router)
+    void createRouterClient(router, { context: { any: 1 } })
+  })
+
+  it('requires options if context is required', () => {
+    const router = { ping: os.$context<{ auth: boolean }>().handler(() => 'output') }
+
+    // @ts-expect-error - options is required
+    void createRouterClient(router)
+    void createRouterClient(router, { context: { auth: true } })
+  })
+
   it('can be assigned to a recursive client type while passing context', () => {
     const router = { ping: os.$context<{ db: string }>().handler(() => 1) }
 

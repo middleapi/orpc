@@ -1,4 +1,4 @@
-export type MaybeOptionalOptions<TOptions> = object extends TOptions
+export type MaybeOptionalOptions<TOptions> = {} extends TOptions
   ? [options?: TOptions]
   : [options: TOptions]
 

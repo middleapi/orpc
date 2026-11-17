@@ -41,7 +41,7 @@ export type HTTPProcedureUtilsOptions<TContext extends Context> = ProcedureConfi
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
   handler: (router: Router<TContext>) => NoInfer<FetchHandler<TContext>>
-} & (object extends TContext
+} & ({} extends TContext
     ? {
         /**
          * The context passed to the created handler for each request, resolved
