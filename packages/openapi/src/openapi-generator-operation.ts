@@ -9,6 +9,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   containsJsonFileSchema,
+  deduplicateJsonSchemas,
   doesJsonSchemaAcceptEmptyCollection,
   extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
@@ -17,6 +18,7 @@ import {
   isJsonPrimitiveSchema,
   isUnconstrainedSchema,
   matchArrayableJsonSchema,
+  resolveJsonSchemaLocalPointer,
   resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
@@ -97,6 +99,8 @@ export function toOpenAPIPath(
 interface RequestParts {
   paramsEntries: JsonObjectSchemaEntry[] | undefined
   queryEntries: JsonObjectSchemaEntry[] | undefined
+  /** The schema of the query, whose keys other than those of `queryEntries` are free-form */
+  querySchema?: JsonSchema | undefined
   headersEntries: JsonObjectSchemaEntry[] | undefined
   bodySchema: JsonSchema | undefined
   bodyOptional: boolean | undefined
@@ -146,12 +150,17 @@ export function buildRequest(
 
   renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
   renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
+  renderFreeFormQueryParameter(ctx, operation, parts)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
-  if (parts.bodySchema !== undefined) {
+  const content =
+    parts.bodySchema === undefined ? {} : toBodyContent(ctx, 'input', parts.bodySchema)
+
+  // a body of any value has no media type to document, like an unconstrained compact input
+  if (Object.keys(content).length > 0) {
     operation.requestBody = {
       required: parts.bodyOptional ? undefined : true,
-      content: toBodyContent(ctx, 'input', parts.bodySchema),
+      content,
     }
   }
 }
@@ -176,20 +185,25 @@ function extractCompactRequestParts(
   const restEntries = entries?.filter(([name]) => !dynamicParams?.includes(name))
 
   const hasBody = !isBodylessMethod(method)
+  // read only for a body without the path params, since it visits the whole schema
+  const additionalProperties =
+    hasBody && dynamicParams?.length
+      ? extractJsonObjectSchemaAdditionalProperties(schema)
+      : undefined
   const bodySchema = !hasBody
     ? undefined
     : !dynamicParams?.length
       ? schema
-      : restEntries
-        ? combineJsonObjectSchemaEntries(
-            restEntries,
-            extractJsonObjectSchemaAdditionalProperties(schema),
-          )
+      : // a client sends no body when every field is a path param and the input has no other keys,
+        // which an input without `additionalProperties` may have (`v.looseObject`, arktype objects)
+        restEntries?.length || additionalProperties !== false
+        ? combineJsonObjectSchemaEntries(restEntries ?? [], additionalProperties)
         : undefined
 
   return {
     paramsEntries,
     queryEntries: isBodylessMethod(method) ? restEntries : undefined,
+    querySchema: isBodylessMethod(method) ? schema : undefined,
     headersEntries: undefined,
     bodySchema,
     bodyOptional: !dynamicParams?.length
@@ -213,6 +227,7 @@ function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
   return {
     paramsEntries: extractJsonObjectSchemaEntries(section('params')?.[1] ?? false),
     queryEntries: extractJsonObjectSchemaEntries(section('query')?.[1] ?? false),
+    querySchema: section('query')?.[1],
     headersEntries: extractJsonObjectSchemaEntries(section('headers')?.[1] ?? false),
     bodySchema: section('body')?.[1],
     bodyOptional: section('body')?.[2],
@@ -333,6 +348,62 @@ function renderQueryParameters(
   }
 }
 
+/**
+ * The keys of a query other than its fields, like those of a record, as an object of form style,
+ * unless their values are not primitives, which are sent in bracket notation (`b[0]=1`) no style
+ * describes, or the query constrains them in ways the parameter would lose (`propertyNames`).
+ */
+function renderFreeFormQueryParameter(
+  ctx: OpenAPIOperationContext,
+  operation: OpenAPIV3_2.OperationObject,
+  { querySchema, queryEntries }: RequestParts,
+): void {
+  if (querySchema === undefined) {
+    return
+  }
+
+  const query = resolveJsonSchemaRootLocalRef(querySchema)
+  const additionalProperties = extractJsonObjectSchemaAdditionalProperties(querySchema)
+  if (
+    additionalProperties === undefined ||
+    !flattenJsonUnionSchema(additionalProperties).every(isPrimitive) ||
+    queryEntries?.some(([name]) => name === 'query') ||
+    (typeof query === 'object' &&
+      (constrainsKeys(query.propertyNames) ||
+        query.patternProperties !== undefined ||
+        query.minProperties !== undefined ||
+        query.maxProperties !== undefined ||
+        query.required?.some((name) => !Object.hasOwn(query.properties ?? {}, name))))
+  ) {
+    return
+  }
+
+  const { properties: _, ...schema } = combineJsonObjectSchemaEntries([], additionalProperties)
+  operation.parameters ??= []
+  operation.parameters.push({
+    in: 'query',
+    name: 'query',
+    schema: ctx.registry.toOpenAPISchema(schema, 'input'),
+    style: 'form',
+    explode: true,
+  })
+}
+
+/**
+ * Whether a schema of the keys of an object constrains them, which one saying only that they are
+ * strings (like those Zod writes for its records) does not.
+ */
+function constrainsKeys(propertyNames: JsonSchema | undefined): boolean {
+  return (
+    propertyNames !== undefined &&
+    !(
+      typeof propertyNames === 'object' &&
+      propertyNames.type === 'string' &&
+      Object.keys(propertyNames).length === 1
+    )
+  )
+}
+
 function renderHeaderParameters(
   ctx: OpenAPIOperationContext,
   operation: OpenAPIV3_2.OperationObject,
@@ -398,7 +469,7 @@ export function buildSuccessResponse(
       responseObject.content = toBodyContent(
         ctx,
         'output',
-        combineJsonSchemasWithComposition('anyOf', parts.bodies),
+        combineJsonSchemasWithComposition('anyOf', deduplicateJsonSchemas(parts.bodies)),
       )
     }
 
@@ -470,7 +541,8 @@ function extractDetailedResponseParts(
       statuses.set(defaultStatus, undefined)
     }
 
-    const headersSchema = entries.find(([name]) => name === 'headers')?.[1]
+    const [, headersSchema, headersOptional = true] =
+      entries.find(([name]) => name === 'headers') ?? []
     const bodySchema = entries.find(([name]) => name === 'body')?.[1]
 
     for (const [status, description] of statuses) {
@@ -486,6 +558,11 @@ function extractDetailedResponseParts(
 
       if (headersSchema !== undefined) {
         parts.headers.push(headersSchema)
+      }
+
+      // a member that may send no headers sends none of those of its status that others require
+      if (headersOptional) {
+        parts.headers.push({ type: 'object' })
       }
 
       if (bodySchema !== undefined) {
@@ -709,17 +786,23 @@ function toBodyContent(
     const restSchema = fileSchemasByMediaType.size
       ? combineJsonSchemasWithComposition('anyOf', rest)
       : schema
-    const hasNestedFiles = containsJsonFileSchema(restSchema)
+    // a value holding no file is sent as JSON, also when its schema has optional files
+    const contentTypes = !containsJsonFileSchema(restSchema)
+      ? ['application/json']
+      : mayHoldNoFiles(restSchema)
+        ? ['multipart/form-data', 'application/json']
+        : ['multipart/form-data']
 
-    const contentType = hasNestedFiles ? 'multipart/form-data' : 'application/json'
-    const fileSchemas = fileSchemasByMediaType.get(contentType)
-    fileSchemasByMediaType.delete(contentType)
+    for (const contentType of contentTypes) {
+      const fileSchemas = fileSchemasByMediaType.get(contentType)
+      fileSchemasByMediaType.delete(contentType)
 
-    content[contentType] = {
-      schema: ctx.registry.toOpenAPISchema(
-        combineJsonSchemasWithComposition('anyOf', [restSchema, ...(fileSchemas ?? [])]),
-        direction,
-      ),
+      content[contentType] = {
+        schema: ctx.registry.toOpenAPISchema(
+          combineJsonSchemasWithComposition('anyOf', [restSchema, ...(fileSchemas ?? [])]),
+          direction,
+        ),
+      }
     }
   }
 
@@ -733,6 +816,51 @@ function toBodyContent(
   }
 
   return content
+}
+
+/**
+ * Whether a value of the schema may hold no file, like one whose files are optional: a value is
+ * sent as `multipart/form-data` only when it holds a file, which a required key or one of the
+ * first `minItems` items of an array (`[Blob]`) may always hold.
+ */
+function mayHoldNoFiles(
+  root: JsonSchema,
+  schema: JsonSchema = root,
+  visiting: Set<object> = new Set(),
+): boolean {
+  if (typeof schema === 'boolean' || visiting.has(schema)) {
+    return true
+  }
+
+  if (isJsonFileSchema(schema)) {
+    return false
+  }
+
+  visiting.add(schema)
+
+  try {
+    const target =
+      typeof schema.$ref === 'string' ? resolveJsonSchemaLocalPointer(root, schema.$ref) : undefined
+    const holdsNoFiles = (s: JsonSchema) => mayHoldNoFiles(root, s, visiting)
+    const minItems = schema.minItems ?? 0
+
+    return (
+      (target === undefined || holdsNoFiles(target)) &&
+      (schema.anyOf === undefined || schema.anyOf.some(holdsNoFiles)) &&
+      (schema.oneOf === undefined || schema.oneOf.some(holdsNoFiles)) &&
+      (schema.allOf === undefined || schema.allOf.every(holdsNoFiles)) &&
+      (schema.prefixItems ?? []).slice(0, minItems).every(holdsNoFiles) &&
+      (schema.items === undefined ||
+        minItems <= (schema.prefixItems?.length ?? 0) ||
+        holdsNoFiles(schema.items)) &&
+      (schema.required ?? []).every((name) => {
+        const property = schema.properties?.[name]
+        return property === undefined || holdsNoFiles(property)
+      })
+    )
+  } finally {
+    visiting.delete(schema)
+  }
 }
 
 function isPrimitive(schema: JsonSchema): boolean {

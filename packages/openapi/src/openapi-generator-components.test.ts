@@ -579,6 +579,117 @@ describe('openAPIComponentRegistry', () => {
       expect(Object.keys(doc.components?.schemas ?? {}).toSorted()).toEqual(['Data', 'Wrapper'])
     })
 
+    it('checks a def again when a def it refers to is another schema', () => {
+      const { doc, registry } = createRegistry()
+      const list = { type: 'array' as const, items: { $ref: '#/$defs/Item' } }
+
+      registry.hoistDefs({ $ref: '#/$defs/List', $defs: { List: list, Item: { type: 'string' } } })
+
+      // the same `List` schema, but its `Item` differs, so the existing `List` is not reused
+      expect(
+        registry.hoistDefs({
+          $ref: '#/$defs/List',
+          $defs: { List: list, Item: { type: 'number' } },
+        }),
+      ).toEqual({ $ref: '#/components/schemas/List2' })
+      expect(
+        registry.hoistDefs({
+          $ref: '#/$defs/List',
+          $defs: { List: list, Item: { type: 'string' } },
+        }),
+      ).toEqual({ $ref: '#/components/schemas/List' })
+      expect(doc.components?.schemas?.List2).toEqual({
+        type: 'array',
+        items: { $ref: '#/components/schemas/Item2' },
+      })
+    })
+
+    it('checks a def again when its schema was changed in place', () => {
+      const { doc, registry } = createRegistry()
+      const user: any = { type: 'object', properties: { id: { type: 'string' } } }
+      const hoist = () => registry.hoistDefs({ $ref: '#/$defs/User', $defs: { User: user } })
+
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User' })
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User' })
+
+      user.properties = { id: { type: 'number' } }
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User2' })
+
+      user.properties.id.type = 'boolean'
+      expect(hoist()).toEqual({ $ref: '#/components/schemas/User3' })
+
+      expect(doc.components?.schemas).toEqual({
+        User: { type: 'object', properties: { id: { type: 'string' } } },
+        User2: { type: 'object', properties: { id: { type: 'number' } } },
+        User3: { type: 'object', properties: { id: { type: 'boolean' } } },
+      })
+    })
+
+    it('keeps a component as written when a value the converter returned is changed in place', () => {
+      const { doc, registry } = createRegistry()
+      const shared: any = { type: 'string', enum: ['a', 'b'] }
+      const hoist = (kind: any) =>
+        registry.hoistDefs({ $ref: '#/$defs/Kind', $defs: { Kind: kind } })
+
+      expect(hoist(shared)).toEqual({ $ref: '#/components/schemas/Kind' })
+      expect(hoist(shared)).toEqual({ $ref: '#/components/schemas/Kind' })
+
+      shared.enum.push('c')
+      expect(hoist({ type: 'string', enum: ['a', 'b'] })).toEqual({
+        $ref: '#/components/schemas/Kind',
+      })
+      expect(hoist({ type: 'string', enum: ['a', 'b', 'c'] })).toEqual({
+        $ref: '#/components/schemas/Kind2',
+      })
+      expect(doc.components?.schemas).toEqual({
+        Kind: { type: 'string', enum: ['a', 'b'] },
+        Kind2: { type: 'string', enum: ['a', 'b', 'c'] },
+      })
+    })
+
+    it('checks a def again when it holds values compared by identity', () => {
+      const { doc, registry } = createRegistry()
+      const hoist = (value: unknown) =>
+        registry.hoistDefs({ $ref: '#/$defs/Stamp', $defs: { Stamp: { default: value } } })
+
+      expect(hoist(new Date(0))).toEqual({ $ref: '#/components/schemas/Stamp' })
+      expect(hoist(new Date(0))).toEqual({ $ref: '#/components/schemas/Stamp2' })
+      expect(hoist([Number.NaN])).toEqual({ $ref: '#/components/schemas/Stamp3' })
+      expect(hoist([Number.NaN])).toEqual({ $ref: '#/components/schemas/Stamp3' })
+      expect(hoist([null])).toEqual({ $ref: '#/components/schemas/Stamp4' })
+      expect(Object.keys(doc.components?.schemas ?? {})).toHaveLength(4)
+    })
+
+    it('checks a def again when it holds an object with toJSON, whose JSON form differs', () => {
+      const { doc, registry } = createRegistry()
+      const hoist = (value: unknown) =>
+        registry.hoistDefs({ $ref: '#/$defs/Shape', $defs: { Shape: { default: value } } })
+
+      expect(hoist({ x: 1 })).toEqual({ $ref: '#/components/schemas/Shape' })
+      expect(hoist({ x: 1 })).toEqual({ $ref: '#/components/schemas/Shape' })
+      expect(hoist({ toJSON: () => ({ x: 1 }) })).toEqual({ $ref: '#/components/schemas/Shape2' })
+      expect(Object.keys(doc.components?.schemas ?? {})).toHaveLength(2)
+    })
+
+    it('checks a def again once a ref to a missing component resolves', () => {
+      const { doc, registry } = createRegistry({
+        schemas: { Box: { items: { $ref: '#/components/schemas/Left' } } },
+      })
+      const box = { items: { $ref: '#/components/schemas/Right' } }
+
+      // `Left` and `Right` are missing, so the refs are compared as they are
+      expect(registry.hoistDefs({ $ref: '#/$defs/Box', $defs: { Box: box } })).toEqual({
+        $ref: '#/components/schemas/Box2',
+      })
+
+      doc.components!.schemas!.Left = { type: 'string' }
+      doc.components!.schemas!.Right = { type: 'string' }
+
+      expect(registry.hoistDefs({ $ref: '#/$defs/Box', $defs: { Box: box } })).toEqual({
+        $ref: '#/components/schemas/Box',
+      })
+    })
+
     it.each([
       {
         name: 'at the bare name',
@@ -634,6 +745,33 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components?.schemas?.Wrapper2).toEqual({
         items: { $ref: '#/components/schemas/Post2' },
       })
+    })
+
+    it('compares a sibling def once when a reuse check already paired it with its component', () => {
+      const { doc, registry } = createRegistry()
+      const schema = () => ({
+        $ref: '#/$defs/User',
+        $defs: {
+          User: { type: 'object' as const, properties: { team: { $ref: '#/$defs/Team' } } },
+          Team: { type: 'object' as const, properties: { name: { type: 'string' as const } } },
+        },
+      })
+
+      registry.hoistDefs(schema())
+
+      let reads = 0
+      const schemas: Record<string, any> = doc.components!.schemas!
+      schemas.Team = new Proxy(schemas.Team, {
+        ownKeys: (target) => {
+          reads++
+          return Reflect.ownKeys(target)
+        },
+      })
+
+      // checking `User` pairs `Team` with its component, so `Team` is not compared again
+      expect(registry.hoistDefs(schema())).toEqual({ $ref: '#/components/schemas/User' })
+      expect(reads).toBe(1)
+      expect(Object.keys(schemas)).toEqual(['User', 'Team'])
     })
 
     it('reuses mutually recursive sibling defs', () => {

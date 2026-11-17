@@ -5,8 +5,16 @@ import {
   ensureJsonSchemaObject,
   getJsonSchemaKeywordKind,
   mapJsonSchemaRefs,
+  visitJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { getOwn, isDeepEqual, isPlainObject, isPlainObjectOrArray, setOwn } from '@orpc/shared'
+import {
+  clone,
+  getOwn,
+  isDeepEqual,
+  isPlainObject,
+  isPlainObjectOrArray,
+  setOwn,
+} from '@orpc/shared'
 
 import type { OpenAPIV3_2 } from './types'
 
@@ -35,6 +43,16 @@ export class OpenAPIComponentRegistry {
    * no sanitizing, which keeps `base.components` family reuse (`Planet`, `Planet2`) intact.
    */
   private readonly componentSources = new Map<string, string>()
+
+  /**
+   * Reuse checks already made, by the def, the content of the def schemas it reaches, and the
+   * component. A component is never rewritten once written, so a check made again gives the same
+   * result. Keyed by content, not by object, since a converter may change a schema it returned;
+   * components are written as copies for the same reason.
+   */
+  private readonly reuseResults = new Map<string, boolean>()
+  /** An id for each def schema content, so the keys stay short */
+  private readonly contentIds = new Map<string, number>()
 
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
@@ -95,6 +113,15 @@ export class OpenAPIComponentRegistry {
     const renameMap = new Map<string, string>()
     const pendingSchemas: { cleanSchema: Exclude<JsonSchema, boolean>; componentName: string }[] =
       []
+    const contents = new Map<string, DefContent | null | undefined>()
+
+    const closureKeys = new Map<string, string | null>()
+    const getClosureKey = (defName: string): string | null => {
+      if (!closureKeys.has(defName)) {
+        closureKeys.set(defName, this.getDefClosureKey(defName, defs, contents))
+      }
+      return closureKeys.get(defName)!
+    }
 
     for (const [defName, cleanSchema] of defs) {
       const sourceName = this.componentName ? this.componentName(defName, cleanSchema) : defName
@@ -102,10 +129,10 @@ export class OpenAPIComponentRegistry {
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
         new Set(renameMap.values()),
-        defName,
         preferredName,
-        (name) => (this.componentSources.get(name) ?? preferredName) === sourceName,
-        defs,
+        (name) =>
+          (this.componentSources.get(name) ?? preferredName) === sourceName &&
+          this.isEquivalentForReuse(defName, name, getClosureKey, defs, componentsSchemas),
         direction,
       )
 
@@ -118,10 +145,139 @@ export class OpenAPIComponentRegistry {
     }
 
     for (const { cleanSchema, componentName } of pendingSchemas) {
-      setOwn(componentsSchemas, componentName, rewriteComponentSchemaRefs(cleanSchema, renameMap))
+      // a copy, so a converter changing a value it returned (an `enum` array) leaves the component as written
+      setOwn(
+        componentsSchemas,
+        componentName,
+        clone(rewriteComponentSchemaRefs(cleanSchema, renameMap)),
+      )
     }
 
     return rewriteComponentSchemaRefs(rest, renameMap)
+  }
+
+  /**
+   * Whether a def is equivalent to an existing component, so the component can be reused.
+   */
+  private isEquivalentForReuse(
+    defName: string,
+    componentName: string,
+    getClosureKey: (defName: string) => string | null,
+    defs: ReadonlyMap<string, JsonSchema>,
+    componentsSchemas: Record<string, any>,
+  ): boolean {
+    const closureKey = getClosureKey(defName)
+    const key = closureKey === null ? undefined : `${closureKey}\0${componentName}`
+    let result = key === undefined ? undefined : this.reuseResults.get(key)
+
+    if (result === undefined) {
+      const ctx: ReuseComparisonContext = {
+        defs,
+        componentsSchemas,
+        candidateToExistingKeys: new Map(),
+        pairedExistingKeys: new Set(),
+        visited: new WeakMap(),
+        unresolved: false,
+      }
+
+      result = areSchemaRefsEquivalentForReuse(
+        DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
+        COMPONENTS_REF_PREFIX + componentName,
+        ctx,
+      )
+
+      // a ref to a missing schema may resolve once more components are written
+      if (key !== undefined && !ctx.unresolved) {
+        this.reuseResults.set(key, result)
+
+        // a check that succeeds pairs every def it reaches with an equivalent component, which a
+        // check of that def would pair the same way, so those checks are made too
+        if (result) {
+          for (const [candidateKey, existingKey] of ctx.candidateToExistingKeys) {
+            const pairedKey =
+              candidateKey.startsWith(DEFS_REF_PREFIX) &&
+              getClosureKey(candidateKey.slice(DEFS_REF_PREFIX.length))
+
+            if (pairedKey) {
+              this.reuseResults.set(
+                `${pairedKey}\0${existingKey.slice(COMPONENTS_REF_PREFIX.length)}`,
+                true,
+              )
+            }
+          }
+        }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Identifies a def and the content of the def schemas it reaches through `#/$defs/` refs,
+   * which a reuse check compares, or `null` when a schema has no JSON form (a cycle of objects).
+   */
+  private getDefClosureKey(
+    defName: string,
+    defs: ReadonlyMap<string, JsonSchema>,
+    contents: Map<string, DefContent | null | undefined>,
+  ): string | null {
+    const names = new Set([defName])
+    const ids: string[] = []
+
+    for (const name of names) {
+      let content = contents.get(name)
+
+      if (!contents.has(name)) {
+        content = this.getDefContent(defs.get(name))
+        contents.set(name, content)
+      }
+
+      if (content === null) {
+        return null
+      }
+
+      ids.push(`${name}=${content?.id ?? ''}`)
+
+      for (const ref of content?.refs ?? []) {
+        names.add(ref)
+      }
+    }
+
+    // oxlint-disable-next-line unicorn/no-array-sort
+    return `${defName}\0${ids.sort().join('\0')}`
+  }
+
+  private getDefContent(schema: JsonSchema | undefined): DefContent | null | undefined {
+    if (typeof schema !== 'object') {
+      return undefined
+    }
+
+    let json: string
+
+    try {
+      // an object always has a JSON form, which the replacer checks
+      // oxlint-disable-next-line no-restricted-properties
+      json = JSON.stringify(schema, assertJsonContent)
+    } catch {
+      return null
+    }
+
+    let id = this.contentIds.get(json)
+
+    if (id === undefined) {
+      id = this.contentIds.size
+      this.contentIds.set(json, id)
+    }
+
+    const refs: string[] = []
+    visitJsonSchemaRefs(schema, (ref) => {
+      const refName = parseRefName(ref, DEFS_REF_PREFIX)
+      if (refName !== undefined) {
+        refs.push(refName)
+      }
+    })
+
+    return { id, refs }
   }
 
   toOpenAPISchema(
@@ -145,10 +301,8 @@ export class OpenAPIComponentRegistry {
 function resolveComponentName(
   componentsSchemas: Record<string, any>,
   claimedNames: Set<string>,
-  defName: string,
   preferredName: string,
   isReusable: (componentName: string) => boolean,
-  defs: ReadonlyMap<string, JsonSchema>,
   direction: JsonSchemaConverterDirection | undefined,
 ): [componentName: string, reuseExisting: boolean] {
   let mintName: string | undefined
@@ -170,20 +324,7 @@ function resolveComponentName(
       continue
     }
 
-    if (
-      isReusable(componentName) &&
-      areSchemaRefsEquivalentForReuse(
-        DEFS_REF_PREFIX + encodeJsonPointerSegment(defName),
-        COMPONENTS_REF_PREFIX + componentName,
-        {
-          defs,
-          componentsSchemas,
-          candidateToExistingKeys: new Map(),
-          pairedExistingKeys: new Set(),
-          visited: new WeakMap(),
-        },
-      )
-    ) {
+    if (isReusable(componentName)) {
       return [componentName, true]
     }
   }
@@ -225,6 +366,35 @@ function definedKeysOf(object: Record<string, unknown>): string[] {
   )
 }
 
+/**
+ * A `JSON.stringify` replacer throwing on values the reuse check compares otherwise than their JSON
+ * form: by identity (a `Date`, a class instance, a function), an object with `toJSON`, `NaN`, `-0`,
+ * or `undefined` in an array.
+ */
+function assertJsonContent(this: unknown, key: string, value: unknown): unknown {
+  const raw = (this as Record<string, unknown>)[key]
+
+  if (
+    typeof raw === 'function' ||
+    typeof raw === 'symbol' ||
+    (typeof raw === 'number' && (!Number.isFinite(raw) || Object.is(raw, -0))) ||
+    (raw === undefined && Array.isArray(this)) ||
+    (typeof raw === 'object' &&
+      raw !== null &&
+      (!isPlainObjectOrArray(raw) || typeof (raw as { toJSON?: unknown }).toJSON === 'function'))
+  ) {
+    throw new TypeError('Not comparable by its JSON form')
+  }
+
+  return value
+}
+
+/** The content id of a def schema, and the `#/$defs/` names it refers to */
+interface DefContent {
+  id: number
+  refs: string[]
+}
+
 interface ReuseComparisonContext {
   defs: ReadonlyMap<string, JsonSchema>
   componentsSchemas: Record<string, any>
@@ -232,6 +402,8 @@ interface ReuseComparisonContext {
   candidateToExistingKeys: Map<string, string>
   pairedExistingKeys: Set<string>
   visited: WeakMap<object, WeakSet<object>>
+  /** Whether a ref to a missing schema was compared */
+  unresolved: boolean
 }
 
 /**
@@ -398,6 +570,7 @@ function areSchemaRefsEquivalentForReuse(
   const existing = resolveNamedRef(existingRef, COMPONENTS_REF_PREFIX, getComponent)
 
   if (candidate === undefined || existing === undefined) {
+    ctx.unresolved = true
     return !candidate && !existing && candidateRef === existingRef
   }
 

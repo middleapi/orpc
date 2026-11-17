@@ -193,6 +193,9 @@ importers:
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:packages/lock
+      '@orpc/experimental-openapi-inference':
+        specifier: workspace:*
+        version: link:packages/openapi-inference
       '@orpc/hibernation':
         specifier: workspace:*
         version: link:packages/hibernation
@@ -241,6 +244,9 @@ importers:
       '@orpc/zod':
         specifier: workspace:*
         version: link:packages/zod
+      '@scalar/openapi-parser':
+        specifier: ^0.29.11
+        version: 0.29.11
       '@standard-server/core':
         specifier: ~0.16.0
         version: 0.16.0
@@ -280,6 +286,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.11
         version: 4.1.11(vitest@4.1.11)
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       arktype:
         specifier: ^2.2.9
         version: 2.2.9
@@ -914,6 +923,52 @@ importers:
       swagger-ui:
         specifier: ^5.34.1
         version: 5.34.1(@types/react@19.3.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+
+  packages/openapi-inference:
+    dependencies:
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/json-schema':
+        specifier: workspace:*
+        version: link:../json-schema
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+    devDependencies:
+      '@orpc/zod':
+        specifier: workspace:*
+        version: link:../zod
+      '@scalar/openapi-parser':
+        specifier: ^0.29.11
+        version: 0.29.11
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      arktype:
+        specifier: ^2.2.9
+        version: 2.2.9
+      effect:
+        specifier: ^4.1.2
+        version: 4.1.2
+      type-fest:
+        specifier: ^5.10.0
+        version: 5.10.0
+      valibot:
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@7.0.2)
       zod:
         specifier: ^4.6.7
         version: 4.6.7
