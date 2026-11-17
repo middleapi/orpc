@@ -1,4 +1,5 @@
 import type { MaybeOptionalOptions } from './args'
+import { resolveMaybeOptionalOptions } from './args'
 
 it('MaybeOptionalOptions', () => {
   const a = (...[options]: MaybeOptionalOptions<{ a: number }>) => {
@@ -34,4 +35,13 @@ it('MaybeOptionalOptions', () => {
   // @ts-expect-error - options is required
   d()
   d({ d: 1 })
+})
+
+it('resolveMaybeOptionalOptions', () => {
+  const a = (...rest: MaybeOptionalOptions<{ a: number }>) => resolveMaybeOptionalOptions(rest)
+  expectTypeOf(a).returns.toEqualTypeOf<{ a: number }>()
+
+  // also accepts any optional-options tuple, not only `MaybeOptionalOptions`
+  const b = (...rest: [options?: { b?: number }]) => resolveMaybeOptionalOptions(rest)
+  expectTypeOf(b).returns.toEqualTypeOf<{ b?: number }>()
 })
