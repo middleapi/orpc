@@ -43,6 +43,10 @@ import type {
 } from './types'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
+function resolveProcedureUtilsOptionsRest<T>(rest: [options?: T]): T {
+  return rest[0] ?? ({} as T) // only undefined when options are optional
+}
+
 export interface ProcedureUtilsQueryInterceptorOptions<
   TClientContext extends ClientContext,
   TInput,
@@ -437,7 +441,7 @@ export class ProcedureUtils<
       TInput
     >
   ): NoInfer<QueryOptionsOut<TOutput, TError, USelectData, UInitialData>> {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
 
     if (typeof this.options.queryOptions === 'function') {
       optionsIn = this.options.queryOptions(optionsIn) as any
@@ -532,7 +536,7 @@ export class ProcedureUtils<
   ): NoInfer<
     StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>
   > {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
 
     if (typeof this.options.streamedOptions === 'function') {
       optionsIn = this.options.streamedOptions(optionsIn) as any
@@ -630,7 +634,7 @@ export class ProcedureUtils<
       TInput
     >
   ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, USelectData, UInitialData>> {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
 
     if (typeof this.options.liveOptions === 'function') {
       optionsIn = this.options.liveOptions(optionsIn) as any
@@ -808,7 +812,7 @@ export class ProcedureUtils<
       MutationOptionsIn<TClientContext, TInput, TOutput, TError, UMutationContext>
     >
   ): NoInfer<MutationOptionsOut<TInput, TOutput, TError, UMutationContext>> {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
 
     if (typeof this.options.mutationOptions === 'function') {
       optionsIn = this.options.mutationOptions(optionsIn as any) as any
