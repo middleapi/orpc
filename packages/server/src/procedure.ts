@@ -89,7 +89,7 @@ export interface ProcedureDefinition<
 >
   extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
   __TInitialContext?: (type: TInitialContext) => unknown
-  __TInjectedContext?: (type: TInjectedContext) => unknown
+  __TInjectedContext?: { type: TInjectedContext }
 
   orderedMiddlewares: OrderedMiddleware[]
   handler: ProcedureHandler<any, any, any, any>
