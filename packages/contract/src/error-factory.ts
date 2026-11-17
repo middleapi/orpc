@@ -97,6 +97,10 @@ export function error<TCode extends ORPCErrorCode, TData = unknown>(
     }
 
     static override [Symbol.hasInstance](instance: unknown): boolean {
+      if (Function.prototype[Symbol.hasInstance].call(this, instance)) {
+        return true
+      }
+
       if (!(instance instanceof ORPCError)) {
         return false
       }

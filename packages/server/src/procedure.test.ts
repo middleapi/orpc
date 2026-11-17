@@ -69,5 +69,12 @@ describe('procedure', () => {
       expect({ '~orpc': new ExtendedProcedure()['~orpc'] }).toBeInstanceOf(Procedure)
       expect({ '~orpc': new ExtendedProcedure()['~orpc'] }).not.toBeInstanceOf(ExtendedProcedure)
     })
+
+    it('match by prototype chain before the constructor body runs (Babel class transform)', () => {
+      class ExtendedProcedure extends Procedure<any, any, any, any, any> {}
+
+      expect(Object.create(ExtendedProcedure.prototype)).toBeInstanceOf(Procedure)
+      expect(Object.create(ProcedureContract.prototype)).not.toBeInstanceOf(Procedure)
+    })
   })
 })

@@ -6,7 +6,6 @@ import type {
 } from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
 import type { Promisable } from '@orpc/shared'
-import { getConstructor } from '@orpc/shared'
 
 import type { Context } from './context'
 import type { AnyMiddleware } from './middleware'
@@ -127,20 +126,18 @@ export class Procedure<
    * Checks if the given instance satisfies the {@link Procedure} class/interface.
    */
   static [Symbol.hasInstance](instance: unknown): boolean {
-    if (this !== Procedure) {
-      // fallback to default instanceof check if this is extended class
-      return Function.prototype[Symbol.hasInstance].call(this, instance)
+    if (Function.prototype[Symbol.hasInstance].call(this, instance)) {
+      return true
     }
 
-    const constructor = getConstructor(instance)
-    if (constructor === Procedure) {
-      return true
+    if (this !== Procedure) {
+      return false
     }
 
     return (
       instance instanceof ProcedureContract &&
-      Array.isArray((instance['~orpc'] as any).orderedMiddlewares) &&
-      typeof (instance['~orpc'] as any).handler === 'function'
+      Array.isArray((instance['~orpc'] as any)?.orderedMiddlewares) &&
+      typeof (instance['~orpc'] as any)?.handler === 'function'
     )
   }
 }

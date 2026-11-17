@@ -37,6 +37,12 @@ describe('lazy', () => {
       expect({ '~orpc': extendedLazy['~orpc'] }).toBeInstanceOf(Lazy)
       expect({ '~orpc': extendedLazy['~orpc'] }).not.toBeInstanceOf(ExtendedLazy)
     })
+
+    it('match by prototype chain before the constructor body runs (Babel class transform)', () => {
+      class ExtendedLazy extends Lazy<any> {}
+
+      expect(Object.create(ExtendedLazy.prototype)).toBeInstanceOf(Lazy)
+    })
   })
 })
 
