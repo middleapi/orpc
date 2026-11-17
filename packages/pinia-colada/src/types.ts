@@ -61,7 +61,7 @@ export type QueryOptionsIn<
   TError,
   TInitialData extends TOutput | undefined,
 > = (undefined extends TInput ? { input?: TInput } : { input: TInput }) &
-  (object extends TClientContext
+  ({} extends TClientContext
     ? { context?: TClientContext | undefined }
     : { context: TClientContext }) &
   Omit<DefineQueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'> &
@@ -114,7 +114,7 @@ export type InfiniteOptionsIn<
   TError,
   TPageParam,
   TInitialData extends UseInfiniteQueryData<TOutput, TPageParam> | undefined,
-> = { input: (pageParam: TPageParam) => TInput } & (object extends TClientContext
+> = { input: (pageParam: TPageParam) => TInput } & ({} extends TClientContext
   ? { context?: TClientContext | undefined }
   : { context: TClientContext }) &
   Omit<DefineInfiniteQueryOptions<TOutput, TError, TPageParam, TInitialData>, 'key' | 'query'> &
@@ -137,7 +137,7 @@ export type MutationOptionsIn<
   TOutput,
   TError,
   TMutationContext extends Record<any, any>,
-> = (object extends TClientContext
+> = ({} extends TClientContext
   ? { context?: TClientContext | undefined }
   : { context: TClientContext }) &
   Omit<UseMutationOptions<TOutput, TInput, TError, TMutationContext>, 'mutation'> &

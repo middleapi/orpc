@@ -104,6 +104,10 @@ describe('error factory', () => {
       expect(new SimpleError()).toBeInstanceOf(SimpleError)
     })
 
+    it('matches by prototype chain before the constructor sets code and data (Babel class transform)', () => {
+      expect(Object.create(TestError.prototype)).toBeInstanceOf(TestError)
+    })
+
     it('matches plain ORPCError instances with the same code and valid data', () => {
       expect(new ORPCError('TEST', { data: { value: 1 } })).toBeInstanceOf(TestError)
     })

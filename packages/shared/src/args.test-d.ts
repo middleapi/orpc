@@ -19,4 +19,19 @@ it('MaybeOptionalOptions', () => {
   // @ts-expect-error - options is invalid
   b({ b: '1' })
   b({ b: 1 })
+
+  const c = (...[options]: MaybeOptionalOptions<Record<string, unknown>>) => {
+    expectTypeOf(options).toEqualTypeOf<Record<string, unknown> | undefined>()
+  }
+
+  c()
+  c({ any: 1 })
+
+  const d = (...[options]: MaybeOptionalOptions<Record<string, unknown> & { d: number }>) => {
+    expectTypeOf(options).toEqualTypeOf<Record<string, unknown> & { d: number }>()
+  }
+
+  // @ts-expect-error - options is required
+  d()
+  d({ d: 1 })
 })

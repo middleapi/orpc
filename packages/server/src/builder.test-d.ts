@@ -156,9 +156,7 @@ describe('Builder', () => {
     it('ignores in context that requires nothing', () => {
       expectTypeOf(
         os.$context<{ db: string }>().use({} as Middleware<Context, object, unknown, any, object>),
-      ).toEqualTypeOf<
-        BuilderWithMiddlewares<{ db: string } & object, object, Record<never, never>>
-      >()
+      ).toEqualTypeOf<BuilderWithMiddlewares<{ db: string } & object, object, {}>>()
     })
 
     it('outline middleware', () => {
@@ -395,7 +393,7 @@ describe('Builder', () => {
 
 describe('os', () => {
   it('is a builder', () => {
-    expectTypeOf(os).toEqualTypeOf<Builder<DefaultInitialContext & object, Record<never, never>>>()
+    expectTypeOf(os).toEqualTypeOf<Builder<DefaultInitialContext & object, {}>>()
   })
 
   it('can deal with "has no properties in common with type" in context', async () => {
@@ -434,7 +432,7 @@ describe('os', () => {
     type ExpectedBuilder = BuilderWithMiddlewares<
       DefaultInitialContext & object,
       IntersectPick<DefaultInitialContext & object, unknown>,
-      Record<never, never>
+      {}
     >
 
     expectTypeOf(os.use(onStart(async () => {}))).toEqualTypeOf<ExpectedBuilder>()

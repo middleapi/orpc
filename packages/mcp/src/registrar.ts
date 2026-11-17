@@ -118,7 +118,7 @@ export interface McpRegistrarOptions<
  * It is optional only when an empty object satisfies the initial context.
  */
 export type McpRegistrarRegisterOptions<TInitialContext extends Context> =
-  object extends TInitialContext
+  {} extends TInitialContext
     ? { context?: Value<Promisable<TInitialContext>, [ctx: ServerContext]> | undefined }
     : { context: Value<Promisable<TInitialContext>, [ctx: ServerContext]> }
 

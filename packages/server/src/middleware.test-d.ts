@@ -44,6 +44,24 @@ describe('Middleware', () => {
     }
   })
 
+  it('optional return context when out context is an index signature', () => {
+    type T = Middleware<
+      { in: string },
+      Record<string, unknown>,
+      { input: boolean },
+      string,
+      typeof errorMap
+    >
+
+    const mid: T = ({ next }) => {
+      return next()
+    }
+
+    const midDone: T = ({ next }, input, done) => {
+      return done({ output: '123' })
+    }
+  })
+
   it('require return context', () => {
     type T = Middleware<
       { in: string },

@@ -35,6 +35,15 @@ export const COMMON_ERROR_STATUS_MAP = {
   GATEWAY_TIMEOUT: 504,
 }
 
+/**
+ * Error codes accepted by `ORPCError`: common HTTP codes plus any string.
+ * Customize the suggested codes through `Registry['ORPCErrorCode']`.
+ *
+ * @remarks
+ * A custom `ORPCErrorCode` must keep `(string & {})`, since oRPC throws its own codes.
+ *
+ * @see {@link https://orpc.dev/docs/error-handling#orpc-error-codes | Error Handling - ORPC Error Codes}
+ */
 export type ORPCErrorCode = Registry extends { ORPCErrorCode: infer T extends string }
   ? T
   : keyof typeof COMMON_ERROR_STATUS_MAP | (string & {})

@@ -37,7 +37,7 @@ describe('AugmentedContractRouter', () => {
       ProcedureContract<
         typeof inputSchema,
         typeof outputSchema,
-        MergedErrorMap<typeof errorMap, Record<never, never>>
+        MergedErrorMap<typeof errorMap, {}>
       >
     >()
 
@@ -57,7 +57,7 @@ describe('AugmentedContractRouter', () => {
       ProcedureContract<
         typeof inputSchema,
         typeof outputSchema,
-        MergedErrorMap<typeof errorMap, Record<never, never>>
+        MergedErrorMap<typeof errorMap, {}>
       >
     >()
 
@@ -81,7 +81,7 @@ describe('AugmentedContractRouter', () => {
         | ProcedureContract<
             typeof inputSchema,
             typeof outputSchema,
-            MergedErrorMap<typeof errorMap, Record<never, never>>
+            MergedErrorMap<typeof errorMap, {}>
           >
         | undefined
       nested?:

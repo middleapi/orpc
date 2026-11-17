@@ -29,15 +29,11 @@ type ExcludeORPCErrorCode<E, TCode extends string> =
   E extends ORPCError<infer UCode, any> ? ([Exclude<UCode, TCode>] extends [never] ? never : E) : E
 
 type LiteralORPCErrorCode<TCode extends string> =
-  Types.IsUnion<TCode> extends true
-    ? never
-    : Record<never, never> extends Record<TCode, unknown>
-      ? never
-      : TCode
+  Types.IsUnion<TCode> extends true ? never : {} extends Record<TCode, unknown> ? never : TCode
 
 type ORPCErrorCodeCases<E, TCases> = Types.NoExcessProperties<
   {
-    [K in ORPCErrorCodeOf<E>]?: Record<never, never> extends Record<K, unknown>
+    [K in ORPCErrorCodeOf<E>]?: {} extends Record<K, unknown>
       ? { bivarianceHack(error: ORPCErrorWithCode<E, K>): AnyEffect }['bivarianceHack']
       : (error: ORPCErrorWithCode<E, K>) => AnyEffect
   },

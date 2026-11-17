@@ -9,7 +9,7 @@ export interface MiddlewareResult<TOutContext extends Context, TOutput> {
   context: TOutContext
 }
 
-export type MiddlewareNextOptions<TOutContext extends Context> = (object extends TOutContext
+export type MiddlewareNextOptions<TOutContext extends Context> = ({} extends TOutContext
   ? { context?: TOutContext | undefined }
   : { context: TOutContext }) & {
   /** Overrides the signal for the rest of the chain. */
@@ -22,7 +22,7 @@ export interface MiddlewareNext<TOutput> {
   ): Promise<MiddlewareResult<T, TOutput>>
 }
 
-export type MiddlewareDoneOptions<TOutContext, TOutput> = (object extends TOutContext
+export type MiddlewareDoneOptions<TOutContext, TOutput> = ({} extends TOutContext
   ? { context?: TOutContext | undefined }
   : { context: TOutContext }) & { output: TOutput }
 
