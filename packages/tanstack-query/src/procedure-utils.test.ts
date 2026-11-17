@@ -617,12 +617,10 @@ describe('procedureUtils', () => {
 
 describe('skipToken queries do not share a query with unskipped ones', () => {
   const client = vi.fn(async () => '__output__')
-  const utils = new ProcedureUtils<
-    Record<never, never>,
-    { search?: string } | undefined,
-    string,
-    Error
-  >(['planet', 'list'], client)
+  const utils = new ProcedureUtils<{}, { search?: string } | undefined, string, Error>(
+    ['planet', 'list'],
+    client,
+  )
 
   it('.queryOptions', async () => {
     const unskipped = new QueryObserver(queryClient, utils.queryOptions())
@@ -675,10 +673,7 @@ describe('skipToken queries do not share a query with unskipped ones', () => {
 
 describe('structural sharing', () => {
   const client = vi.fn()
-  const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(
-    ['planet', 'list'],
-    client,
-  )
+  const utils = new ProcedureUtils<{}, undefined, any, Error>(['planet', 'list'], client)
   const planets = () => [
     { name: 'Earth', createdAt: new Date('2025-01-01'), tags: new Set(['blue']) },
   ]
@@ -767,11 +762,9 @@ describe('structural sharing', () => {
     })
 
     client.mockImplementation(async () => [new Person('Earth')])
-    const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(
-      ['planet', 'list'],
-      client,
-      { serializer },
-    )
+    const utils = new ProcedureUtils<{}, undefined, any, Error>(['planet', 'list'], client, {
+      serializer,
+    })
     const observer = new QueryObserver(queryClient, utils.queryOptions())
     onTestFinished(observer.subscribe(() => {}))
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))

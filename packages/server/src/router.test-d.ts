@@ -51,15 +51,7 @@ describe('contractedRouter', () => {
     type Router = ContractedRouter<typeof contract, { init?: boolean }>
 
     expectTypeOf<Router['ping']>().toEqualTypeOf<
-      Lazyable<
-        Procedure<
-          { init?: boolean },
-          any,
-          typeof inputSchema,
-          Schema<unknown>,
-          Record<never, never>
-        >
-      >
+      Lazyable<Procedure<{ init?: boolean }, any, typeof inputSchema, Schema<unknown>, {}>>
     >()
 
     // FIX: this should be .toEqualTypeOf
@@ -70,7 +62,7 @@ describe('contractedRouter', () => {
           any,
           Schema<void, unknown>,
           typeof outputSchema,
-          MergedErrorMap<Record<never, never>, typeof errorMap>
+          MergedErrorMap<{}, typeof errorMap>
         >
       >
     >()
@@ -99,7 +91,7 @@ describe('contractedRouter', () => {
     type P = ContractedRouter<(typeof contract)['ping'], { init?: boolean }>
 
     expectTypeOf<P>().toEqualTypeOf<
-      Procedure<{ init?: boolean }, any, typeof inputSchema, Schema<unknown>, Record<never, never>>
+      Procedure<{ init?: boolean }, any, typeof inputSchema, Schema<unknown>, {}>
     >()
   })
 })

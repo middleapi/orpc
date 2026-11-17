@@ -74,10 +74,7 @@ export class Builder<TInitialContext extends Context, TErrorMap extends ErrorMap
    *
    * @see {@link https://orpc.dev/docs/procedure | Procedure}
    */
-  static 'create'<T extends Context = DefaultInitialContext>(): Builder<
-    T & object,
-    Record<never, never>
-  > {
+  static 'create'<T extends Context = DefaultInitialContext>(): Builder<T & object, {}> {
     // Using `& object` avoids "has no properties in common with type" errors
     // when combining procedures or routers with compatible but non-overlapping contexts.
 
@@ -343,7 +340,4 @@ export class Builder<TInitialContext extends Context, TErrorMap extends ErrorMap
  *
  * @see {@link https://orpc.dev/docs/procedure | Procedure}
  */
-export const os: Builder<
-  DefaultInitialContext & object,
-  Record<never, never>
-> = /* @__PURE__ */ Builder.create()
+export const os: Builder<DefaultInitialContext & object, {}> = /* @__PURE__ */ Builder.create()

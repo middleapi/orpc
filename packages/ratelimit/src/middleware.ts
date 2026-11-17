@@ -26,7 +26,7 @@ export interface RateLimitMiddlewareOptions<TInContext extends Context, TInput> 
    */
   limiter: Value<
     Promisable<RateLimiter>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
   >
 
   /**
@@ -34,7 +34,7 @@ export interface RateLimitMiddlewareOptions<TInContext extends Context, TInput> 
    */
   key: Value<
     Promisable<string>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
   >
 
   /**
@@ -46,7 +46,7 @@ export interface RateLimitMiddlewareOptions<TInContext extends Context, TInput> 
   weight?:
     | Value<
         Promisable<number>,
-        [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+        [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
       >
     | undefined
 
