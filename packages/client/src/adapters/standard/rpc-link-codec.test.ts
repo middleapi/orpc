@@ -267,6 +267,62 @@ describe('rpcLinkCodec', () => {
       expect(request.method).toBe('PATCH')
       expect(maxUrlLengthFn).toHaveBeenCalledOnce()
     })
+
+    it.each([
+      ['sync', <T>(v: T) => v],
+      ['async', <T>(v: T) => Promise.resolve(v)],
+    ])('resolves %s option functions the same way', async (_, wrap) => {
+      const options = { context: {}, lastEventId: '1' }
+      const codec = new RPCLinkCodec({
+        url: () => wrap('/api?x=1#h' as StandardUrl),
+        method: () => wrap('GET' as const),
+        maxUrlLength: () => wrap(10),
+        headers: () => wrap({ 'x-a': '1' }),
+        fallbackMethod: 'PATCH',
+        serializer,
+      })
+
+      const request = await codec.encodeInput('input', ['ping'], options)
+
+      expect(request.url).toBe('/api/ping?x=1#h')
+      expect(request.method).toBe('PATCH')
+      expect(request.headers).toEqual({ 'x-a': '1', 'last-event-id': '1' })
+    })
+
+    it('reuses a static base url across calls and paths', async () => {
+      const codec = new RPCLinkCodec({ url: '/api?x=1#h', serializer })
+
+      const first = await codec.encodeInput('input', ['a'], { context: {} })
+      const second = await codec.encodeInput('input', ['b', 'c'], { context: {} })
+
+      expect(first.url).toBe('/api/a?x=1#h')
+      expect(second.url).toBe('/api/b/c?x=1#h')
+    })
+
+    it('re-resolves a dynamic base url on every call', async () => {
+      const urlFn = vi
+        .fn<() => StandardUrl>()
+        .mockReturnValueOnce('/one')
+        .mockReturnValueOnce('/two?x=1')
+      const codec = new RPCLinkCodec({ url: urlFn, serializer })
+
+      expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/one/ping')
+      expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe(
+        '/two/ping?x=1',
+      )
+    })
+
+    it('rejects when an option function throws synchronously', async () => {
+      const error = new Error('headers')
+      const codec = new RPCLinkCodec({
+        headers: () => {
+          throw error
+        },
+        serializer,
+      })
+
+      await expect(codec.encodeInput('input', ['ping'], { context: {} })).rejects.toBe(error)
+    })
   })
 
   describe('.decodeResponse', () => {
@@ -295,6 +351,22 @@ describe('rpcLinkCodec', () => {
       })
 
       expect(result.kind).toBe('error')
+    })
+
+    it('awaits a custom serializer that deserializes asynchronously', async () => {
+      const asyncSerializer = new RPCSerializer()
+      vi.spyOn(asyncSerializer, 'deserialize').mockImplementationOnce((data) =>
+        Promise.resolve(data),
+      )
+      const asyncCodec = new RPCLinkCodec({ serializer: asyncSerializer })
+
+      const result = await asyncCodec.decodeResponse({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.resolve('__body__'),
+      })
+
+      expect(result).toEqual({ kind: 'output', output: '__body__' })
     })
 
     it('decodes ORPCError JSON from error response', async () => {

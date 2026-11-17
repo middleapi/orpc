@@ -1,6 +1,7 @@
 import type { Promisable, Public, Value } from '@orpc/shared'
 import {
   isAsyncIteratorObject,
+  isThenable,
   mergeHttpPath,
   pathToHttpPath,
   stringifyJSON,
@@ -87,6 +88,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   private readonly expectedMethod: Exclude<RPCLinkCodecOptions<T>['method'], undefined>
   private readonly headers: Exclude<RPCLinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<RPCLinkCodecOptions<T>['serializer'], undefined>
+  private readonly parsedStaticBaseUrl: ReturnType<typeof parseStandardUrl> | undefined
 
   constructor(options: RPCLinkCodecOptions<T>) {
     this.baseUrl = options.url ?? '/'
@@ -95,6 +97,8 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     this.expectedMethod = options.method ?? this.fallbackMethod
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new RPCSerializer()
+    this.parsedStaticBaseUrl =
+      typeof this.baseUrl === 'string' ? parseStandardUrl(this.baseUrl) : undefined
   }
 
   async encodeInput(
@@ -102,15 +106,30 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     path: string[],
     options: ClientOptions<T>,
   ): Promise<StandardRequest> {
-    let headers = toResolvedStandardHeaders(await value(this.headers, options, path, input))
+    let rawHeaders = value(this.headers, options, path, input)
+    if (isThenable(rawHeaders)) {
+      rawHeaders = await rawHeaders
+    }
+    let headers = toResolvedStandardHeaders(rawHeaders)
     if (options.lastEventId !== undefined) {
       headers = mergeStandardHeaders(headers, { 'last-event-id': options.lastEventId })
     }
 
-    const expectedMethod = await value(this.expectedMethod, options, path, input)
-    const baseUrl = await value(this.baseUrl, options, path, input)
+    let expectedMethod = value(this.expectedMethod, options, path, input)
+    if (isThenable(expectedMethod)) {
+      expectedMethod = await expectedMethod
+    }
 
-    const [pathname, search, hash] = parseStandardUrl(baseUrl)
+    let parsedBaseUrl = this.parsedStaticBaseUrl
+    if (parsedBaseUrl === undefined) {
+      let baseUrl = value(this.baseUrl, options, path, input)
+      if (isThenable(baseUrl)) {
+        baseUrl = await baseUrl
+      }
+      parsedBaseUrl = parseStandardUrl(baseUrl)
+    }
+
+    const [pathname, search, hash] = parsedBaseUrl
     const newPathname: StandardUrl = mergeHttpPath(pathname, pathToHttpPath(path))
     const serialized = this.serializer.serialize(input)
 
@@ -121,7 +140,10 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
       !(serialized instanceof FormData) &&
       !isAsyncIteratorObject(serialized)
     ) {
-      const maxUrlLength = await value(this.maxUrlLength, options, path, input)
+      let maxUrlLength = value(this.maxUrlLength, options, path, input)
+      if (isThenable(maxUrlLength)) {
+        maxUrlLength = await maxUrlLength
+      }
       const mergedSearch = new URLSearchParams(search)
       mergedSearch.append('data', stringifyJSON(serialized) ?? '')
       const url = `${newPathname}?${mergedSearch}${hash ?? ''}` as StandardUrl
@@ -153,17 +175,21 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     const body = await response.resolveBody()
 
-    const deserialized = await (async () => {
-      try {
-        return this.serializer.deserialize(body)
-      } catch (cause) {
-        throw new MalformedResponseError({
-          message: isOk ? 'Invalid RPC response format.' : undefined,
-          response: { status: response.status, headers: response.headers, body },
-          cause,
-        })
-      }
-    })()
+    let deserialized: unknown
+    try {
+      deserialized = this.serializer.deserialize(body)
+    } catch (cause) {
+      throw new MalformedResponseError({
+        message: isOk ? 'Invalid RPC response format.' : undefined,
+        response: { status: response.status, headers: response.headers, body },
+        cause,
+      })
+    }
+
+    // A custom serializer may deserialize asynchronously; its rejection is not wrapped.
+    if (isThenable(deserialized)) {
+      deserialized = await deserialized
+    }
 
     if (!isOk) {
       if (isORPCErrorJson(deserialized)) {

@@ -1,6 +1,24 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-import { captureAsyncContext, promiseWithResolvers } from './promise'
+import { captureAsyncContext, isThenable, promiseWithResolvers } from './promise'
+
+it.each([
+  [Promise.resolve(1), true],
+  // oxlint-disable-next-line unicorn/no-thenable
+  [{ then: () => {} }, true],
+  // oxlint-disable-next-line unicorn/no-thenable
+  [Object.assign(() => {}, { then: () => {} }), true],
+  [undefined, false],
+  [null, false],
+  ['/api', false],
+  [1, false],
+  [{}, false],
+  // oxlint-disable-next-line unicorn/no-thenable
+  [{ then: 1 }, false],
+  [() => {}, false],
+])('isThenable(%o) is %s', (value, expected) => {
+  expect(isThenable(value)).toBe(expected)
+})
 
 describe('promiseWithResolvers', () => {
   it('resolves the promise', async () => {

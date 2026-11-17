@@ -1,4 +1,16 @@
 /**
+ * Whether `value` is a promise or any other thenable. Lets hot paths skip `await`
+ * (and its microtask) for values that are already resolved.
+ */
+export function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  )
+}
+
+/**
  * Creates a promise together with its associated `resolve` and `reject`
  * functions.
  *
