@@ -44,4 +44,9 @@ it('resolveMaybeOptionalOptions', () => {
   // also accepts any optional-options tuple, not only `MaybeOptionalOptions`
   const b = (...rest: [options?: { b?: number }]) => resolveMaybeOptionalOptions(rest)
   expectTypeOf(b).returns.toEqualTypeOf<{ b?: number }>()
+
+  // never returns `undefined`, even when `T` includes it
+  expectTypeOf(resolveMaybeOptionalOptions<{ c: number } | undefined>([])).toEqualTypeOf<{
+    c: number
+  }>()
 })
