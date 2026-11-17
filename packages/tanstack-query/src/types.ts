@@ -64,7 +64,7 @@ export type QueryOptionsIn<
  * Rest parameters of `.queryOptions`: optional when input and context are.
  * Cheaper than `MaybeOptionalOptions<QueryOptionsIn<...>>`.
  */
-export type QueryOptionsRest<
+export type QueryOptionsInRest<
   TClientContext extends ClientContext,
   TInput,
   TOutput,
@@ -106,7 +106,7 @@ export type StreamedOptionsIn<
  * Rest parameters of `.streamedOptions`: optional when input and context are.
  * Cheaper than `MaybeOptionalOptions<StreamedOptionsIn<...>>`.
  */
-export type StreamedOptionsRest<
+export type StreamedOptionsInRest<
   TClientContext extends ClientContext,
   TInput,
   TOutput,
@@ -158,7 +158,7 @@ export type LiveOptionsIn<
  * Rest parameters of `.liveOptions`: optional when input and context are.
  * Cheaper than `MaybeOptionalOptions<LiveOptionsIn<...>>`.
  */
-export type LiveOptionsRest<
+export type LiveOptionsInRest<
   TClientContext extends ClientContext,
   TInput,
   TOutput,
@@ -239,7 +239,7 @@ export type MutationOptionsIn<
  * Rest parameters of `.mutationOptions`: optional when context is.
  * Cheaper than `MaybeOptionalOptions<MutationOptionsIn<...>>`.
  */
-export type MutationOptionsRest<
+export type MutationOptionsInRest<
   TClientContext extends ClientContext,
   TInput,
   TOutput,

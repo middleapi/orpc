@@ -2,13 +2,13 @@ import type { MaybeOptionalOptions } from '@orpc/shared'
 
 import type {
   LiveOptionsIn,
-  LiveOptionsRest,
+  LiveOptionsInRest,
   MutationOptionsIn,
-  MutationOptionsRest,
+  MutationOptionsInRest,
   QueryOptionsIn,
-  QueryOptionsRest,
+  QueryOptionsInRest,
   StreamedOptionsIn,
-  StreamedOptionsRest,
+  StreamedOptionsInRest,
 } from './types'
 
 type OptionalContext = { batch?: boolean }
@@ -31,9 +31,9 @@ describe('options rest types', () => {
     >()
   })
 
-  it('QueryOptionsRest matches MaybeOptionalOptions', () => {
+  it('QueryOptionsInRest matches MaybeOptionalOptions', () => {
     type Check<C extends OptionalContext | IndexContext, I> = [
-      QueryOptionsRest<C, I, number, Error, number, undefined>,
+      QueryOptionsInRest<C, I, number, Error, number, undefined>,
       MaybeOptionalOptions<QueryOptionsIn<C, I, number, Error, number, undefined>>,
     ]
 
@@ -51,47 +51,49 @@ describe('options rest types', () => {
     >()
   })
 
-  it('StreamedOptionsRest and LiveOptionsRest match MaybeOptionalOptions', () => {
+  it('StreamedOptionsInRest and LiveOptionsInRest match MaybeOptionalOptions', () => {
     expectTypeOf<
-      StreamedOptionsRest<OptionalContext, string | undefined, number, Error, number, undefined>
+      StreamedOptionsInRest<OptionalContext, string | undefined, number, Error, number, undefined>
     >().toEqualTypeOf<
       MaybeOptionalOptions<
         StreamedOptionsIn<OptionalContext, string | undefined, number, Error, number, undefined>
       >
     >()
     expectTypeOf<
-      StreamedOptionsRest<RequiredContext, string | undefined, number, Error, number, undefined>
+      StreamedOptionsInRest<RequiredContext, string | undefined, number, Error, number, undefined>
     >().toEqualTypeOf<
       MaybeOptionalOptions<
         StreamedOptionsIn<RequiredContext, string | undefined, number, Error, number, undefined>
       >
     >()
     expectTypeOf<
-      LiveOptionsRest<OptionalContext, string | undefined, number, Error, number, undefined>
+      LiveOptionsInRest<OptionalContext, string | undefined, number, Error, number, undefined>
     >().toEqualTypeOf<
       MaybeOptionalOptions<
         LiveOptionsIn<OptionalContext, string | undefined, number, Error, number, undefined>
       >
     >()
     expectTypeOf<
-      LiveOptionsRest<OptionalContext, string, number, Error, number, undefined>
+      LiveOptionsInRest<OptionalContext, string, number, Error, number, undefined>
     >().toEqualTypeOf<
       MaybeOptionalOptions<LiveOptionsIn<OptionalContext, string, number, Error, number, undefined>>
     >()
   })
 
-  it('MutationOptionsRest matches MaybeOptionalOptions and ignores input', () => {
+  it('MutationOptionsInRest matches MaybeOptionalOptions and ignores input', () => {
     expectTypeOf<
-      MutationOptionsRest<OptionalContext, string, number, Error, unknown>
+      MutationOptionsInRest<OptionalContext, string, number, Error, unknown>
     >().toEqualTypeOf<
       MaybeOptionalOptions<MutationOptionsIn<OptionalContext, string, number, Error, unknown>>
     >()
     expectTypeOf<
-      MutationOptionsRest<RequiredContext, string, number, Error, unknown>
+      MutationOptionsInRest<RequiredContext, string, number, Error, unknown>
     >().toEqualTypeOf<
       MaybeOptionalOptions<MutationOptionsIn<RequiredContext, string, number, Error, unknown>>
     >()
-    expectTypeOf<MutationOptionsRest<IndexContext, string, number, Error, unknown>>().toEqualTypeOf<
+    expectTypeOf<
+      MutationOptionsInRest<IndexContext, string, number, Error, unknown>
+    >().toEqualTypeOf<
       MaybeOptionalOptions<MutationOptionsIn<IndexContext, string, number, Error, unknown>>
     >()
   })
