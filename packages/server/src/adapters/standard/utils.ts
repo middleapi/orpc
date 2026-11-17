@@ -8,7 +8,7 @@ export type FriendlyStandardHandlerHandleOptions<T extends Context> = Omit<
   StandardHandlerHandleOptions<T>,
   'context'
 > &
-  (object extends T
+  ({} extends T
     ? { context?: Value<Promisable<T>, [request: StandardLazyRequest]> | undefined }
     : { context: Value<Promisable<T>, [request: StandardLazyRequest]> })
 

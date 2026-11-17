@@ -1,5 +1,5 @@
 import type { AnyMetaPlugin, Meta } from '@orpc/contract'
-import { getConstructor, isNonPrimitive } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 export interface LazyDefinition<T> {
   meta: Meta
@@ -18,14 +18,12 @@ export class Lazy<T> {
    * Checks if the given instance satisfies the {@link Lazy} class/interface.
    */
   static [Symbol.hasInstance](instance: unknown): boolean {
-    if (this !== Lazy) {
-      // fallback to default instanceof check if this is extended class
-      return Function.prototype[Symbol.hasInstance].call(this, instance)
+    if (Function.prototype[Symbol.hasInstance].call(this, instance)) {
+      return true
     }
 
-    const constructor = getConstructor(instance)
-    if (constructor === Lazy) {
-      return true
+    if (this !== Lazy) {
+      return false
     }
 
     return (

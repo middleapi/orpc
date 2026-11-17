@@ -93,10 +93,24 @@ describe('RouterClient', () => {
     >()
   })
 
-  it('maps an optional key to never', () => {
-    type OptionalRouter = { ping?: typeof router.ping }
+  it('maps optional keys', () => {
+    type OptionalRouter = {
+      ping?: typeof router.ping
+      nested?: { pong?: typeof router.nested.pong }
+      lazy?: typeof router.lazy
+    }
 
-    expectTypeOf<RouterClient<OptionalRouter>>().toEqualTypeOf<{ ping?: never }>()
+    expectTypeOf<RouterClient<OptionalRouter>>().toEqualTypeOf<{
+      ping?: ProcedureClient<object, typeof schema1, typeof schema2, object> | undefined
+      nested?:
+        | {
+            pong?:
+              | ProcedureClient<object, typeof schema3, typeof schema2, typeof errorMap>
+              | undefined
+          }
+        | undefined
+      lazy?: { peng: ProcedureClient<object, typeof schema1, Schema<string>, object> } | undefined
+    }>()
   })
 
   it('support single procedure', () => {
@@ -111,5 +125,27 @@ describe('RouterClient', () => {
 describe('createRouterClient', () => {
   it('accepts an untyped router', () => {
     const _client: AnyNestedClient = createRouterClient({} as any, {})
+  })
+
+  it('optional options if context is an index signature', () => {
+    const router = { ping: os.$context<Record<string, unknown>>().handler(() => 'output') }
+
+    void createRouterClient(router)
+    void createRouterClient(router, { context: { any: 1 } })
+  })
+
+  it('requires options if context is required', () => {
+    const router = { ping: os.$context<{ auth: boolean }>().handler(() => 'output') }
+
+    // @ts-expect-error - options is required
+    void createRouterClient(router)
+    void createRouterClient(router, { context: { auth: true } })
+  })
+
+  it('can be assigned to a recursive client type while passing context', () => {
+    const router = { ping: os.$context<{ db: string }>().handler(() => 1) }
+
+    const _client: AnyNestedClient = createRouterClient(router, { context: { db: 'db' } })
+    const _client2: AnyNestedClient = createRouterClient(router, { context: () => ({ db: 'db' }) })
   })
 })

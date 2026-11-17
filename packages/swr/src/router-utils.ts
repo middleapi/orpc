@@ -7,11 +7,13 @@ import type { OperationKeyPrefixOptions } from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { SharedUtils } from './shared-utils'
 
-export type RouterUtils<T extends AnyNestedClient> =
+export type RouterUtils<T extends AnyNestedClient> = RouterUtilsInternal<T>
+
+export type RouterUtilsInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? RouterUtils<T[K]> : never
+        [K in keyof T]: RouterUtilsInternal<T[K] & {}>
       } & Public<SharedUtils<unknown>>
 
 export interface RouterUtilsOptions extends OperationKeyPrefixOptions {

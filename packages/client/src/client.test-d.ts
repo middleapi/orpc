@@ -3,9 +3,10 @@ import type { RouterClient } from '@orpc/server'
 import { os, type } from '@orpc/server'
 import type { PromiseWithError } from '@orpc/shared'
 
+import type { ORPCClientScoped, ORPCClientScopedOptions } from './client'
 import { createORPCClient } from './client'
 import type { ORPCError } from './error'
-import type { ClientLink } from './types'
+import type { AnyNestedClient, Client, ClientLink, InferClientContext } from './types'
 
 const router = {
   ping: os.input(type<number>()).handler(() => 'pong'),
@@ -128,5 +129,36 @@ describe('createORPCClient', () => {
         },
       },
     )
+  })
+})
+
+describe('ORPCClientScoped', () => {
+  it('maps optional procedures', () => {
+    type Scoped = ORPCClientScoped<{
+      ping?: Client<{ cache: string }, number, string, Error>
+      nested?: {
+        pong?: Client<{ cache: string }, string, number, TypeError>
+      }
+    }>
+
+    expectTypeOf<Scoped['ping']>().toEqualTypeOf<
+      ORPCClientScopedOptions<{ cache: string }, number, string, Error> | undefined
+    >()
+    expectTypeOf<NonNullable<Scoped['nested']>['pong']>().toEqualTypeOf<
+      ORPCClientScopedOptions<{ cache: string }, string, number, TypeError> | undefined
+    >()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as RouterClient<typeof router>
+
+    const scoped = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => ORPCClientScoped<T>
+    const _scoped: Recursive = scoped(client, { context: {} })
   })
 })

@@ -51,15 +51,7 @@ describe('contractedRouter', () => {
     type Router = ContractedRouter<typeof contract, { init?: boolean }>
 
     expectTypeOf<Router['ping']>().toEqualTypeOf<
-      Lazyable<
-        Procedure<
-          { init?: boolean },
-          any,
-          typeof inputSchema,
-          Schema<unknown>,
-          Record<never, never>
-        >
-      >
+      Lazyable<Procedure<{ init?: boolean }, any, typeof inputSchema, Schema<unknown>, {}>>
     >()
 
     // FIX: this should be .toEqualTypeOf
@@ -70,7 +62,7 @@ describe('contractedRouter', () => {
           any,
           Schema<void, unknown>,
           typeof outputSchema,
-          MergedErrorMap<Record<never, never>, typeof errorMap>
+          MergedErrorMap<{}, typeof errorMap>
         >
       >
     >()
@@ -80,11 +72,26 @@ describe('contractedRouter', () => {
     expectTypeOf<Exclude<Router['nested'], Lazy<any>>['pong']>().toEqualTypeOf<Router['pong']>()
   })
 
+  it('maps optional keys', () => {
+    type Router = ContractedRouter<
+      { ping?: typeof ping; nested?: { pong?: typeof pong } },
+      { init?: boolean }
+    >
+
+    type Ping = ContractedRouter<typeof ping, { init?: boolean }>
+    type Pong = ContractedRouter<typeof pong, { init?: boolean }>
+
+    expectTypeOf<Router>().toEqualTypeOf<{
+      ping?: Lazyable<Ping> | undefined
+      nested?: Lazyable<{ pong?: Lazyable<Pong> | undefined }> | undefined
+    }>()
+  })
+
   it('support single procedure', () => {
     type P = ContractedRouter<(typeof contract)['ping'], { init?: boolean }>
 
     expectTypeOf<P>().toEqualTypeOf<
-      Procedure<{ init?: boolean }, any, typeof inputSchema, Schema<unknown>, Record<never, never>>
+      Procedure<{ init?: boolean }, any, typeof inputSchema, Schema<unknown>, {}>
     >()
   })
 })
@@ -234,5 +241,44 @@ describe('infer utilities', () => {
     type RouterError = InferRouterError<typeof errorRouter>
     expectTypeOf<InferRouterError<LazyRouter>>().toEqualTypeOf<RouterError>()
     expectTypeOf<InferRouterError<LazyableRouter>>().toEqualTypeOf<RouterError>()
+  })
+  it('supports optional keys', () => {
+    type OptionalRouter = {
+      ping?: typeof errorRouter.ping
+      nested?: Lazyable<{ ping?: typeof errorRouter.nested.ping }>
+    }
+
+    expectTypeOf<InferRouterInitialContexts<OptionalRouter>>().toEqualTypeOf<{
+      ping?: { init1?: boolean } | undefined
+      nested?: { ping?: { init3?: boolean } | undefined } | undefined
+    }>()
+
+    expectTypeOf<InferRouterFinalContexts<OptionalRouter>>().toEqualTypeOf<{
+      ping?: { init1?: boolean } | undefined
+      nested?: { ping?: { init3?: boolean } | undefined } | undefined
+    }>()
+
+    expectTypeOf<InferRouterInputs<OptionalRouter>>().toEqualTypeOf<{
+      ping?: { input: number } | undefined
+      nested?: { ping?: { input: number } | undefined } | undefined
+    }>()
+
+    expectTypeOf<InferRouterOutputs<OptionalRouter>>().toEqualTypeOf<{
+      ping?: { output: number } | undefined
+      nested?: { ping?: { value: boolean } | undefined } | undefined
+    }>()
+
+    expectTypeOf<InferRouterErrors<OptionalRouter>>().toEqualTypeOf<{
+      ping?: ORPCError<'AUTH', unknown> | ThrowableError | undefined
+      nested?:
+        | { ping?: ORPCError<'RATE_LIMITED', { retryAfter: number }> | ThrowableError | undefined }
+        | undefined
+    }>()
+
+    expectTypeOf<InferRouterError<OptionalRouter>>().toEqualTypeOf<
+      | ORPCError<'AUTH', unknown>
+      | ORPCError<'RATE_LIMITED', { retryAfter: number }>
+      | ThrowableError
+    >()
   })
 })

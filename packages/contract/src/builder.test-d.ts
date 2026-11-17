@@ -29,7 +29,7 @@ const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 describe('ContractBuilder', () => {
   it('is a contract procedure', () => {
     expectTypeOf(builder).toExtend<
-      ProcedureContract<Schema<void, unknown>, Schema<unknown, unknown>, Record<never, never>>
+      ProcedureContract<Schema<void, unknown>, Schema<unknown, unknown>, {}>
     >()
   })
 
@@ -91,6 +91,6 @@ describe('ContractBuilder', () => {
 
 describe('oc', () => {
   it('is a contract builder', () => {
-    expectTypeOf(oc).toEqualTypeOf<ContractBuilder<Record<never, never>>>()
+    expectTypeOf(oc).toEqualTypeOf<ContractBuilder<{}>>()
   })
 })

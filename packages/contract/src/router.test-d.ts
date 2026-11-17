@@ -46,6 +46,14 @@ const errorRouter = {
   },
 }
 
+type OptionalRouter = {
+  ping?: typeof ping
+  nested?: {
+    pong?: typeof pong
+    notFound?: typeof notFound
+  }
+}
+
 it('InferRouterContractInputs', () => {
   type Inputs = InferRouterContractInputs<typeof router>
 
@@ -54,6 +62,13 @@ it('InferRouterContractInputs', () => {
 
   expectTypeOf<Inputs['nested']['ping']>().toEqualTypeOf<{ schema1: string }>()
   expectTypeOf<Inputs['nested']['pong']>().toEqualTypeOf<void>()
+
+  expectTypeOf<
+    InferRouterContractInputs<{ ping?: typeof ping; nested?: { ping?: typeof ping } }>
+  >().toEqualTypeOf<{
+    ping?: { schema1: string } | undefined
+    nested?: { ping?: { schema1: string } | undefined } | undefined
+  }>()
 })
 
 it('InferRouterContractOutputs', () => {
@@ -64,6 +79,11 @@ it('InferRouterContractOutputs', () => {
 
   expectTypeOf<Outputs['nested']['ping']>().toEqualTypeOf<{ schema2: number }>()
   expectTypeOf<Outputs['nested']['pong']>().toEqualTypeOf<unknown>()
+
+  expectTypeOf<InferRouterContractOutputs<OptionalRouter>>().toEqualTypeOf<{
+    ping?: { schema2: number } | undefined
+    nested?: { pong?: unknown; notFound?: unknown } | undefined
+  }>()
 })
 
 it('InferRouterContractErrorMap', () => {
@@ -74,6 +94,13 @@ it('InferRouterContractErrorMap', () => {
   expectTypeOf<{
     BAD_GATEWAY: { data: typeof schema1 }
   }>().toExtend<InferRouterContractErrorMap<typeof router>>()
+
+  expectTypeOf<InferRouterContractErrorMap<OptionalRouter>>().toEqualTypeOf<
+    InferRouterContractErrorMap<{
+      ping: typeof ping
+      nested: { pong: typeof pong; notFound: typeof notFound }
+    }>
+  >()
 })
 
 it('InferRouterContractErrors', () => {
@@ -85,6 +112,16 @@ it('InferRouterContractErrors', () => {
   expectTypeOf<Errors['nested']['notFound']>().toEqualTypeOf<
     ORPCError<'NOT_FOUND', { schema2: number }> | ThrowableError
   >()
+
+  expectTypeOf<InferRouterContractErrors<OptionalRouter>>().toEqualTypeOf<{
+    ping?: ThrowableError | undefined
+    nested?:
+      | {
+          pong?: ORPCError<'BAD_GATEWAY', { schema1: number }> | ThrowableError | undefined
+          notFound?: ORPCError<'NOT_FOUND', { schema2: number }> | ThrowableError | undefined
+        }
+      | undefined
+  }>()
 })
 
 it('InferRouterContractError', () => {
@@ -92,5 +129,9 @@ it('InferRouterContractError', () => {
     | ORPCError<'BAD_GATEWAY', { schema1: number }>
     | ORPCError<'NOT_FOUND', { schema2: number }>
     | ThrowableError
+  >()
+
+  expectTypeOf<InferRouterContractError<OptionalRouter>>().toEqualTypeOf<
+    InferRouterContractError<typeof errorRouter>
   >()
 })

@@ -37,7 +37,7 @@ describe('AugmentedContractRouter', () => {
       ProcedureContract<
         typeof inputSchema,
         typeof outputSchema,
-        MergedErrorMap<typeof errorMap, Record<never, never>>
+        MergedErrorMap<typeof errorMap, {}>
       >
     >()
 
@@ -57,7 +57,7 @@ describe('AugmentedContractRouter', () => {
       ProcedureContract<
         typeof inputSchema,
         typeof outputSchema,
-        MergedErrorMap<typeof errorMap, Record<never, never>>
+        MergedErrorMap<typeof errorMap, {}>
       >
     >()
 
@@ -68,5 +68,33 @@ describe('AugmentedContractRouter', () => {
         MergedErrorMap<typeof errorMap, { PONG: { message: string } }>
       >
     >()
+  })
+
+  it('maps optional keys', () => {
+    type Augmented = AugmentedContractRouter<
+      { ping?: typeof ping; nested?: { pong?: typeof pong } },
+      typeof errorMap
+    >
+
+    expectTypeOf<Augmented>().toEqualTypeOf<{
+      ping?:
+        | ProcedureContract<
+            typeof inputSchema,
+            typeof outputSchema,
+            MergedErrorMap<typeof errorMap, {}>
+          >
+        | undefined
+      nested?:
+        | {
+            pong?:
+              | ProcedureContract<
+                  Schema<void, unknown>,
+                  Schema<unknown, unknown>,
+                  MergedErrorMap<typeof errorMap, { PONG: { message: string } }>
+                >
+              | undefined
+          }
+        | undefined
+    }>()
   })
 })

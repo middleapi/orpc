@@ -35,8 +35,11 @@ export {
 } from './router-utils'
 export type {
   AugmentedRouter,
+  AugmentedRouterInternal,
   AugmentedRouterWithMiddlewares,
+  AugmentedRouterWithMiddlewaresInternal,
   UnlaziedRouter,
+  UnlaziedRouterInternal,
   WalkProcedureContractsLazyResult,
 } from './router-utils'
 

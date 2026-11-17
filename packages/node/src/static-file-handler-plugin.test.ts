@@ -73,10 +73,7 @@ describe('staticFileHandlerPlugin', () => {
     rmSync(baseDir, { recursive: true, force: true })
   })
 
-  function createAgent(
-    handler: RPCHandler<Record<never, never>>,
-    options: { prefix?: `/${string}` } = {},
-  ) {
+  function createAgent(handler: RPCHandler<{}>, options: { prefix?: `/${string}` } = {}) {
     return request(async (req: IncomingMessage, response: ServerResponse) => {
       const result = await handler.handle(req as any, response as any, { context: {}, ...options })
 
