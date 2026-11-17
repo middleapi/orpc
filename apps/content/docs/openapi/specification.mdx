@@ -327,24 +327,6 @@ interface User {
 }
 ```
 
-### Converting Types Directly
-
-```ts
-import {
-  openTypeScriptProject,
-  TypeToJsonSchemaConverter,
-} from '@orpc/experimental-openapi-inference'
-
-const project = openTypeScriptProject({ file: './src/models.ts' })
-
-try {
-  const converter = new TypeToJsonSchemaConverter(project.checker, project.program)
-  const [jsonSchema, optional] = converter.convert(project.getExportType('User').type)
-} finally {
-  project.close()
-}
-```
-
 ### Limitations
 
 - Types carry no runtime validation: JSDoc tags only document constraints, so keep a converter schema to validate input.

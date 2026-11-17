@@ -306,7 +306,7 @@ function splitBodies(
  *
  * Named types are emitted as `$defs`. Conversions share a cache, so reuse one converter per program.
  *
- * @see {@link https://orpc.dev/docs/openapi/specification#converting-types-directly | OpenAPI Specification - Converting Types Directly}
+ * @see {@link https://orpc.dev/docs/openapi/specification#type-inference | OpenAPI Specification - Type Inference}
  */
 export class TypeToJsonSchemaConverter {
   private readonly defsMode: 'named' | 'recursive'

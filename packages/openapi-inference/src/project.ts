@@ -73,7 +73,7 @@ export interface TypeScriptProject {
  *
  * Call `close()` when done, otherwise the compiler process keeps running.
  *
- * @see {@link https://orpc.dev/docs/openapi/specification#converting-types-directly | OpenAPI Specification - Converting Types Directly}
+ * @see {@link https://orpc.dev/docs/openapi/specification#type-inference | OpenAPI Specification - Type Inference}
  */
 export function openTypeScriptProject(options: TypeScriptProjectOptions): TypeScriptProject {
   const file = toAbsolutePath(options.file)
