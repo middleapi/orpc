@@ -29,21 +29,24 @@ import type {
   InfiniteOptionsIn,
   InfiniteOptionsOut,
   LiveOptionsIn,
+  LiveOptionsRest,
   MutationKeyOptions,
   MutationOptionsIn,
   MutationOptionsOut,
+  MutationOptionsRest,
   OperationContext,
-  ProcedureUtilsOptionsRest,
   QueryKeyOptions,
   QueryOptionsIn,
   QueryOptionsOut,
+  QueryOptionsRest,
   StreamedKeyOptions,
   StreamedOptionsIn,
   StreamedOptionsOut,
+  StreamedOptionsRest,
 } from './types'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
-function resolveProcedureUtilsOptionsRest<T>(rest: [options?: T]): T {
+function resolveOptionsRest<T>(rest: [options?: T]): T {
   return rest[0] ?? ({} as T) // only undefined when options are optional
 }
 
@@ -435,13 +438,9 @@ export class ProcedureUtils<
    * Generate options used for useQuery/useSuspenseQuery/prefetchQuery/...
    */
   queryOptions<USelectData = TOutput, UInitialData = undefined>(
-    ...rest: ProcedureUtilsOptionsRest<
-      TClientContext,
-      QueryOptionsIn<TClientContext, TInput, TOutput, TError, USelectData, UInitialData>,
-      TInput
-    >
+    ...rest: QueryOptionsRest<TClientContext, TInput, TOutput, TError, USelectData, UInitialData>
   ): NoInfer<QueryOptionsOut<TOutput, TError, USelectData, UInitialData>> {
-    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
+    let optionsIn = resolveOptionsRest(rest)
 
     if (typeof this.options.queryOptions === 'function') {
       optionsIn = this.options.queryOptions(optionsIn) as any
@@ -521,22 +520,18 @@ export class ProcedureUtils<
    * The query never returns to pending once it has data.
    */
   streamedOptions<USelectData = InferStreamedQueryOutput<TOutput>, UInitialData = undefined>(
-    ...rest: ProcedureUtilsOptionsRest<
+    ...rest: StreamedOptionsRest<
       TClientContext,
-      StreamedOptionsIn<
-        TClientContext,
-        TInput,
-        InferStreamedQueryOutput<TOutput>,
-        TError,
-        USelectData,
-        UInitialData
-      >,
-      TInput
+      TInput,
+      InferStreamedQueryOutput<TOutput>,
+      TError,
+      USelectData,
+      UInitialData
     >
   ): NoInfer<
     StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>
   > {
-    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
+    let optionsIn = resolveOptionsRest(rest)
 
     if (typeof this.options.streamedOptions === 'function') {
       optionsIn = this.options.streamedOptions(optionsIn) as any
@@ -621,20 +616,16 @@ export class ProcedureUtils<
    * Works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
    */
   liveOptions<USelectData = InferLiveQueryOutput<TOutput>, UInitialData = undefined>(
-    ...rest: ProcedureUtilsOptionsRest<
+    ...rest: LiveOptionsRest<
       TClientContext,
-      LiveOptionsIn<
-        TClientContext,
-        TInput,
-        InferLiveQueryOutput<TOutput>,
-        TError,
-        USelectData,
-        UInitialData
-      >,
-      TInput
+      TInput,
+      InferLiveQueryOutput<TOutput>,
+      TError,
+      USelectData,
+      UInitialData
     >
   ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, USelectData, UInitialData>> {
-    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
+    let optionsIn = resolveOptionsRest(rest)
 
     if (typeof this.options.liveOptions === 'function') {
       optionsIn = this.options.liveOptions(optionsIn) as any
@@ -807,12 +798,9 @@ export class ProcedureUtils<
    * Generate options used for useMutation/...
    */
   mutationOptions<UMutationContext>(
-    ...rest: ProcedureUtilsOptionsRest<
-      TClientContext,
-      MutationOptionsIn<TClientContext, TInput, TOutput, TError, UMutationContext>
-    >
+    ...rest: MutationOptionsRest<TClientContext, TInput, TOutput, TError, UMutationContext>
   ): NoInfer<MutationOptionsOut<TInput, TOutput, TError, UMutationContext>> {
-    let optionsIn = resolveProcedureUtilsOptionsRest(rest)
+    let optionsIn = resolveOptionsRest(rest)
 
     if (typeof this.options.mutationOptions === 'function') {
       optionsIn = this.options.mutationOptions(optionsIn as any) as any

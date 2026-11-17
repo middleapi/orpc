@@ -2,16 +2,20 @@ import type { MaybeOptionalOptions } from '@orpc/shared'
 
 import type {
   LiveOptionsIn,
+  LiveOptionsRest,
   MutationOptionsIn,
-  ProcedureUtilsOptionsRest,
+  MutationOptionsRest,
   QueryOptionsIn,
+  QueryOptionsRest,
   StreamedOptionsIn,
+  StreamedOptionsRest,
 } from './types'
 
 type OptionalContext = { batch?: boolean }
 type RequiredContext = { batch: boolean }
+type IndexContext = Record<string, unknown>
 
-describe('ProcedureUtilsOptionsRest', () => {
+describe('options rest types', () => {
   it('only input and context can make options required', () => {
     expectTypeOf<{}>().toExtend<
       QueryOptionsIn<OptionalContext, string | undefined, number, Error, number, undefined>
@@ -27,47 +31,68 @@ describe('ProcedureUtilsOptionsRest', () => {
     >()
   })
 
-  it('matches MaybeOptionalOptions', () => {
-    type Query<TContext extends OptionalContext, TInput> = QueryOptionsIn<
-      TContext,
-      TInput,
-      number,
-      Error,
-      number,
-      undefined
-    >
+  it('QueryOptionsRest matches MaybeOptionalOptions', () => {
+    type Check<C extends OptionalContext | IndexContext, I> = [
+      QueryOptionsRest<C, I, number, Error, number, undefined>,
+      MaybeOptionalOptions<QueryOptionsIn<C, I, number, Error, number, undefined>>,
+    ]
 
-    type Mutation<TContext extends OptionalContext> = MutationOptionsIn<
-      TContext,
-      string,
-      number,
-      Error,
-      unknown
-    >
+    expectTypeOf<Check<OptionalContext, string | undefined>[0]>().toEqualTypeOf<
+      Check<OptionalContext, string | undefined>[1]
+    >()
+    expectTypeOf<Check<OptionalContext, string>[0]>().toEqualTypeOf<
+      Check<OptionalContext, string>[1]
+    >()
+    expectTypeOf<Check<RequiredContext, string | undefined>[0]>().toEqualTypeOf<
+      Check<RequiredContext, string | undefined>[1]
+    >()
+    expectTypeOf<Check<IndexContext, undefined>[0]>().toEqualTypeOf<
+      Check<IndexContext, undefined>[1]
+    >()
+  })
 
+  it('StreamedOptionsRest and LiveOptionsRest match MaybeOptionalOptions', () => {
     expectTypeOf<
-      ProcedureUtilsOptionsRest<
-        OptionalContext,
-        Query<OptionalContext, string | undefined>,
-        string | undefined
+      StreamedOptionsRest<OptionalContext, string | undefined, number, Error, number, undefined>
+    >().toEqualTypeOf<
+      MaybeOptionalOptions<
+        StreamedOptionsIn<OptionalContext, string | undefined, number, Error, number, undefined>
       >
-    >().toEqualTypeOf<MaybeOptionalOptions<Query<OptionalContext, string | undefined>>>()
+    >()
     expectTypeOf<
-      ProcedureUtilsOptionsRest<OptionalContext, Query<OptionalContext, string>, string>
-    >().toEqualTypeOf<MaybeOptionalOptions<Query<OptionalContext, string>>>()
-    expectTypeOf<
-      ProcedureUtilsOptionsRest<
-        RequiredContext,
-        Query<RequiredContext, string | undefined>,
-        string | undefined
+      StreamedOptionsRest<RequiredContext, string | undefined, number, Error, number, undefined>
+    >().toEqualTypeOf<
+      MaybeOptionalOptions<
+        StreamedOptionsIn<RequiredContext, string | undefined, number, Error, number, undefined>
       >
-    >().toEqualTypeOf<MaybeOptionalOptions<Query<RequiredContext, string | undefined>>>()
+    >()
     expectTypeOf<
-      ProcedureUtilsOptionsRest<Record<string, unknown>, Query<Record<string, unknown>, undefined>>
-    >().toEqualTypeOf<MaybeOptionalOptions<Query<Record<string, unknown>, undefined>>>()
+      LiveOptionsRest<OptionalContext, string | undefined, number, Error, number, undefined>
+    >().toEqualTypeOf<
+      MaybeOptionalOptions<
+        LiveOptionsIn<OptionalContext, string | undefined, number, Error, number, undefined>
+      >
+    >()
+    expectTypeOf<
+      LiveOptionsRest<OptionalContext, string, number, Error, number, undefined>
+    >().toEqualTypeOf<
+      MaybeOptionalOptions<LiveOptionsIn<OptionalContext, string, number, Error, number, undefined>>
+    >()
+  })
 
+  it('MutationOptionsRest matches MaybeOptionalOptions and ignores input', () => {
     expectTypeOf<
-      ProcedureUtilsOptionsRest<OptionalContext, Mutation<OptionalContext>>
-    >().toEqualTypeOf<MaybeOptionalOptions<Mutation<OptionalContext>>>()
+      MutationOptionsRest<OptionalContext, string, number, Error, unknown>
+    >().toEqualTypeOf<
+      MaybeOptionalOptions<MutationOptionsIn<OptionalContext, string, number, Error, unknown>>
+    >()
+    expectTypeOf<
+      MutationOptionsRest<RequiredContext, string, number, Error, unknown>
+    >().toEqualTypeOf<
+      MaybeOptionalOptions<MutationOptionsIn<RequiredContext, string, number, Error, unknown>>
+    >()
+    expectTypeOf<MutationOptionsRest<IndexContext, string, number, Error, unknown>>().toEqualTypeOf<
+      MaybeOptionalOptions<MutationOptionsIn<IndexContext, string, number, Error, unknown>>
+    >()
   })
 })
