@@ -347,6 +347,6 @@ try {
 
 ### Limitations
 
-- Types carry no validation rules. Add them with JSDoc tags or keep a converter schema.
+- Types carry no runtime validation: JSDoc tags only document constraints, so keep a converter schema to validate input.
 - [Custom serializer handlers](/docs/openapi/serializer#custom-serializers) are not reflected.
 - Generation throws on types the compiler cannot resolve, like an import through a missing path alias or `baseUrl`.
