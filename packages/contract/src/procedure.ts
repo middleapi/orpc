@@ -1,4 +1,4 @@
-import { getConstructor, isNonPrimitive } from '@orpc/shared'
+import { isNonPrimitive } from '@orpc/shared'
 
 import type { ErrorMap } from './error'
 import type { AnyMetaPlugin, Meta } from './meta'
@@ -37,14 +37,12 @@ export class ProcedureContract<
    * Checks if the given instance satisfies the {@link ProcedureContract} class/interface.
    */
   static [Symbol.hasInstance](instance: unknown): boolean {
-    if (this !== ProcedureContract) {
-      // fallback to default instanceof check if this is extended class
-      return Function.prototype[Symbol.hasInstance].call(this, instance)
+    if (Function.prototype[Symbol.hasInstance].call(this, instance)) {
+      return true
     }
 
-    const constructor = getConstructor(instance)
-    if (constructor === ProcedureContract) {
-      return true
+    if (this !== ProcedureContract) {
+      return false
     }
 
     return (

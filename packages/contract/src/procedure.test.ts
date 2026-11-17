@@ -50,5 +50,11 @@ describe('procedureContract', () => {
         ExtendedProcedureContract,
       )
     })
+
+    it('match by prototype chain before the constructor body runs (Babel class transform)', () => {
+      class ExtendedProcedureContract extends ProcedureContract<any, any, any> {}
+
+      expect(Object.create(ExtendedProcedureContract.prototype)).toBeInstanceOf(ProcedureContract)
+    })
   })
 })
