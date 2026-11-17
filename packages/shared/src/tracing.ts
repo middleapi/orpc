@@ -162,16 +162,28 @@ export function toSpanAttributeValue(data: unknown): string {
   }
 }
 
-export async function runWithSpan<T>(
+export function runWithSpan<T>(
   options: string | StartSpanOptions,
   fn: (span?: TracingSpan) => Promisable<T>,
 ): Promise<T> {
   const tracer = getTracer()
 
   if (!tracer) {
-    return fn()
+    try {
+      return Promise.resolve(fn())
+    } catch (e) {
+      return Promise.reject(e)
+    }
   }
 
+  return runWithTracerSpan(tracer, options, fn)
+}
+
+async function runWithTracerSpan<T>(
+  tracer: Tracer,
+  options: string | StartSpanOptions,
+  fn: (span?: TracingSpan) => Promisable<T>,
+): Promise<T> {
   const name = typeof options === 'string' ? options : options.name
   const parent = typeof options === 'string' ? undefined : options.parent
 
