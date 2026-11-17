@@ -62,6 +62,9 @@ describe('ProcedureUtilsOptionsRest', () => {
         string | undefined
       >
     >().toEqualTypeOf<MaybeOptionalOptions<Query<RequiredContext, string | undefined>>>()
+    expectTypeOf<
+      ProcedureUtilsOptionsRest<Record<string, unknown>, Query<Record<string, unknown>, undefined>>
+    >().toEqualTypeOf<MaybeOptionalOptions<Query<Record<string, unknown>, undefined>>>()
 
     expectTypeOf<
       ProcedureUtilsOptionsRest<OptionalContext, Mutation<OptionalContext>>
