@@ -60,6 +60,23 @@ export type QueryOptionsIn<
     'queryKey' | '_defaulted' | '_optimisticResults'
   > & { queryKey?: QueryKey | undefined; initialData?: TInitialData }
 
+/**
+ * Rest parameters of `.queryOptions`: optional when input and context are.
+ * Cheaper than `MaybeOptionalOptions<QueryOptionsIn<...>>`.
+ */
+export type QueryOptionsInRest<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+  TSelectData,
+  TInitialData,
+> = undefined extends TInput
+  ? {} extends TClientContext
+    ? [options?: QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
+    : [options: QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
+  : [options: QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
+
 export type QueryOptionsOut<TOutput, TError, TSelectData, TInitialData> = Pick<
   QueryObserverOptions<TOutput, TError, TSelectData, TOutput, DataTag<QueryKey, TOutput, TError>>,
   'queryKey' | 'throwOnError' | 'select' | 'retryDelay'
@@ -85,6 +102,41 @@ export type StreamedOptionsIn<
   queryFnOptions?: SerializableStreamedQueryOptions | undefined
 } & SettleOnFirstDataOptions
 
+/**
+ * Rest parameters of `.streamedOptions`: optional when input and context are.
+ * Cheaper than `MaybeOptionalOptions<StreamedOptionsIn<...>>`.
+ */
+export type StreamedOptionsInRest<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+  TSelectData,
+  TInitialData,
+> = undefined extends TInput
+  ? {} extends TClientContext
+    ? [
+        options?: StreamedOptionsIn<
+          TClientContext,
+          TInput,
+          TOutput,
+          TError,
+          TSelectData,
+          TInitialData
+        >,
+      ]
+    : [
+        options: StreamedOptionsIn<
+          TClientContext,
+          TInput,
+          TOutput,
+          TError,
+          TSelectData,
+          TInitialData
+        >,
+      ]
+  : [options: StreamedOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
+
 export type StreamedOptionsOut<TOutput, TError, TSelectData, TInitialData> = QueryOptionsOut<
   TOutput,
   TError,
@@ -101,6 +153,23 @@ export type LiveOptionsIn<
   TInitialData,
 > = QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData> &
   SettleOnFirstDataOptions
+
+/**
+ * Rest parameters of `.liveOptions`: optional when input and context are.
+ * Cheaper than `MaybeOptionalOptions<LiveOptionsIn<...>>`.
+ */
+export type LiveOptionsInRest<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+  TSelectData,
+  TInitialData,
+> = undefined extends TInput
+  ? {} extends TClientContext
+    ? [options?: LiveOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
+    : [options: LiveOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
+  : [options: LiveOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>]
 
 export type InfiniteKeyOptions<TInput, TPageParam> =
   | Pick<
@@ -165,6 +234,20 @@ export type MutationOptionsIn<
   ? { context?: TClientContext | undefined }
   : { context: TClientContext }) &
   MutationOptionsOut<TInput, TOutput, TError, TMutationContext>
+
+/**
+ * Rest parameters of `.mutationOptions`: optional when context is.
+ * Cheaper than `MaybeOptionalOptions<MutationOptionsIn<...>>`.
+ */
+export type MutationOptionsInRest<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+  TMutationContext,
+> = {} extends TClientContext
+  ? [options?: MutationOptionsIn<TClientContext, TInput, TOutput, TError, TMutationContext>]
+  : [options: MutationOptionsIn<TClientContext, TInput, TOutput, TError, TMutationContext>]
 
 export type MutationOptionsOut<TInput, TOutput, TError, TMutationContext> = MutationObserverOptions<
   TOutput,

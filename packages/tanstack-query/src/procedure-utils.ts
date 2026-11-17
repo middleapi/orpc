@@ -29,18 +29,26 @@ import type {
   InfiniteOptionsIn,
   InfiniteOptionsOut,
   LiveOptionsIn,
+  LiveOptionsInRest,
   MutationKeyOptions,
   MutationOptionsIn,
   MutationOptionsOut,
+  MutationOptionsInRest,
   OperationContext,
   QueryKeyOptions,
   QueryOptionsIn,
   QueryOptionsOut,
+  QueryOptionsInRest,
   StreamedKeyOptions,
   StreamedOptionsIn,
   StreamedOptionsOut,
+  StreamedOptionsInRest,
 } from './types'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
+
+function resolveOptionsInRest<T>(rest: [options?: T]): T {
+  return rest[0] ?? ({} as T) // only undefined when options are optional
+}
 
 export interface ProcedureUtilsQueryInterceptorOptions<
   TClientContext extends ClientContext,
@@ -430,11 +438,9 @@ export class ProcedureUtils<
    * Generate options used for useQuery/useSuspenseQuery/prefetchQuery/...
    */
   queryOptions<USelectData = TOutput, UInitialData = undefined>(
-    ...rest: MaybeOptionalOptions<
-      QueryOptionsIn<TClientContext, TInput, TOutput, TError, USelectData, UInitialData>
-    >
+    ...rest: QueryOptionsInRest<TClientContext, TInput, TOutput, TError, USelectData, UInitialData>
   ): NoInfer<QueryOptionsOut<TOutput, TError, USelectData, UInitialData>> {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveOptionsInRest(rest)
 
     if (typeof this.options.queryOptions === 'function') {
       optionsIn = this.options.queryOptions(optionsIn) as any
@@ -514,20 +520,18 @@ export class ProcedureUtils<
    * The query never returns to pending once it has data.
    */
   streamedOptions<USelectData = InferStreamedQueryOutput<TOutput>, UInitialData = undefined>(
-    ...rest: MaybeOptionalOptions<
-      StreamedOptionsIn<
-        TClientContext,
-        TInput,
-        InferStreamedQueryOutput<TOutput>,
-        TError,
-        USelectData,
-        UInitialData
-      >
+    ...rest: StreamedOptionsInRest<
+      TClientContext,
+      TInput,
+      InferStreamedQueryOutput<TOutput>,
+      TError,
+      USelectData,
+      UInitialData
     >
   ): NoInfer<
     StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, USelectData, UInitialData>
   > {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveOptionsInRest(rest)
 
     if (typeof this.options.streamedOptions === 'function') {
       optionsIn = this.options.streamedOptions(optionsIn) as any
@@ -612,18 +616,16 @@ export class ProcedureUtils<
    * Works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
    */
   liveOptions<USelectData = InferLiveQueryOutput<TOutput>, UInitialData = undefined>(
-    ...rest: MaybeOptionalOptions<
-      LiveOptionsIn<
-        TClientContext,
-        TInput,
-        InferLiveQueryOutput<TOutput>,
-        TError,
-        USelectData,
-        UInitialData
-      >
+    ...rest: LiveOptionsInRest<
+      TClientContext,
+      TInput,
+      InferLiveQueryOutput<TOutput>,
+      TError,
+      USelectData,
+      UInitialData
     >
   ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, USelectData, UInitialData>> {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveOptionsInRest(rest)
 
     if (typeof this.options.liveOptions === 'function') {
       optionsIn = this.options.liveOptions(optionsIn) as any
@@ -796,11 +798,9 @@ export class ProcedureUtils<
    * Generate options used for useMutation/...
    */
   mutationOptions<UMutationContext>(
-    ...rest: MaybeOptionalOptions<
-      MutationOptionsIn<TClientContext, TInput, TOutput, TError, UMutationContext>
-    >
+    ...rest: MutationOptionsInRest<TClientContext, TInput, TOutput, TError, UMutationContext>
   ): NoInfer<MutationOptionsOut<TInput, TOutput, TError, UMutationContext>> {
-    let optionsIn = resolveMaybeOptionalOptions(rest)
+    let optionsIn = resolveOptionsInRest(rest)
 
     if (typeof this.options.mutationOptions === 'function') {
       optionsIn = this.options.mutationOptions(optionsIn as any) as any
