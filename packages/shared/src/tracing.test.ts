@@ -178,6 +178,28 @@ describe('tracing', () => {
       expect(fn).toHaveBeenCalledWith()
     })
 
+    describe('without tracer', () => {
+      it('returns the promise from fn as is', () => {
+        const promise = Promise.resolve('out')
+        expect(runWithSpan('test', () => promise)).toBe(promise)
+      })
+
+      it('wraps a sync value in a promise', async () => {
+        const result = runWithSpan('test', () => 'out')
+        expect(result).toBeInstanceOf(Promise)
+        expect(await result).toBe('out')
+      })
+
+      it('turns a sync throw into a rejected promise', async () => {
+        const error = new Error('fail')
+        const result = runWithSpan('test', () => {
+          throw error
+        })
+        expect(result).toBeInstanceOf(Promise)
+        await expect(result).rejects.toBe(error)
+      })
+    })
+
     it('starts active span, runs function and ends span', async () => {
       const tracer = createMockTracer()
       const mockSpan = createMockSpan()
