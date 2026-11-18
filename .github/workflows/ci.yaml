@@ -39,11 +39,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - uses: pnpm/action-setup@v6
 
       - run: pnpm i
-
-      - run: pnpm runtime set node 22
 
       - run: pnpm run test:coverage
         env:
