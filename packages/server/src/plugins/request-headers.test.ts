@@ -1,6 +1,7 @@
 import type { RequestHeadersPluginContext } from './request-headers'
 import { OpenAPIHandler } from '../../../openapi/src/adapters/fetch/openapi-handler'
 import { os } from '../builder'
+import { BatchHandlerPlugin } from './batch'
 import { RequestHeadersPlugin } from './request-headers'
 
 describe('requestHeadersPlugin', () => {
@@ -110,5 +111,63 @@ describe('requestHeadersPlugin', () => {
 
     // The existing reqHeaders should be preserved
     expect(interceptor.mock.calls[0]![0].context.reqHeaders).toBe(existingHeaders)
+  })
+
+  it('leaves out invalid batch subrequest headers instead of throwing', async () => {
+    let capturedHeaders: Headers | undefined
+
+    const router = os
+      .$context<RequestHeadersPluginContext>()
+      .use(({ context, next }) => {
+        capturedHeaders = context.reqHeaders
+        return next()
+      })
+      .route({
+        method: 'GET',
+        path: '/ping',
+      })
+      .handler(() => 'pong')
+
+    const handler = new OpenAPIHandler(router, {
+      plugins: [
+        new RequestHeadersPlugin(),
+        new BatchHandlerPlugin(),
+      ],
+    })
+
+    const { response } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-orpc-batch': 'buffered',
+      },
+      body: JSON.stringify([
+        {
+          url: 'https://example.com/ping',
+          method: 'GET',
+          headers: {
+            'a b': '1',
+            '': '2',
+            'x-newline': 'a\nb',
+            'x-non-latin1': '中',
+            'x-object': { toString: 1 },
+            'x-mixed': ['valid', 'a\nb'],
+            'x-valid': 'value',
+          },
+        },
+      ]),
+    }))
+
+    expect(response?.status).toBe(207)
+    await expect(response?.json()).resolves.toEqual([
+      expect.objectContaining({ index: 0, status: 200, body: 'pong' }),
+    ])
+
+    expect(Object.fromEntries(capturedHeaders!)).toEqual({
+      'content-type': 'application/json',
+      'x-mixed': 'valid',
+      'x-orpc-batch': 'buffered',
+      'x-valid': 'value',
+    })
   })
 })
