@@ -374,18 +374,6 @@ export default [
     "type": "User"
   },
   {
-    "name": "Sam",
-    "login": "SSam0419",
-    "avatar": "https://avatars.githubusercontent.com/u/102863520?u=3c89611f549d5070be232eb4532f690c8f2e7a65&v=4",
-    "link": "https://lee-sam.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Backer",
-    "tierLevel": 1,
-    "amount": 5,
-    "createdAt": "2025-11-18T05:36:22Z",
-    "type": "User"
-  },
-  {
     "name": "Titoine",
     "login": "Titoine",
     "avatar": "https://avatars.githubusercontent.com/u/3514286?u=1bb1e86b0c99c8a1121372e56d51a177eea12191&v=4",
@@ -851,6 +839,18 @@ export default [
     "tierLevel": 0,
     "amount": -1,
     "createdAt": "2025-11-17T14:33:48Z",
+    "type": "User"
+  },
+  {
+    "name": "Sam",
+    "login": "SSam0419",
+    "avatar": "https://avatars.githubusercontent.com/u/102863520?u=3c89611f549d5070be232eb4532f690c8f2e7a65&v=4",
+    "link": "https://lee-sam.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Past Sponsor",
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-11-18T05:36:22Z",
     "type": "User"
   },
   {
