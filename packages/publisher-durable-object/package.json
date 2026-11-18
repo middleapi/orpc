@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-publisher-durable-object",
   "type": "module",
-  "version": "1.16.2",
+  "version": "1.16.3",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
