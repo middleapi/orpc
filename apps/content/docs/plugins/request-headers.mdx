@@ -32,6 +32,10 @@ const example = base
 This allows procedures to run safely even without `RequestHeadersHandlerPlugin`, such as in direct calls.
 :::
 
+:::info[Why can a header be missing from `reqHeaders`?]
+Header names and values that `Headers` rejects are left out. Batch subrequests can carry them because their headers come from the request body.
+:::
+
 :::tip
 Combine with [Cookie Helpers](/docs/helpers/cookie) for streamlined cookie management.
 :::
