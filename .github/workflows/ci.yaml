@@ -41,9 +41,9 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
-      - run: pnpm i
-
       - run: pnpm runtime set node 22
+
+      - run: pnpm i
 
       - run: pnpm run test:coverage
         env:
