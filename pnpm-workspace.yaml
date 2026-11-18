@@ -50,3 +50,9 @@ minimumReleaseAgeExclude:
   - '@standard-server/shared@0.16.0'
   - blume@2.2.1
   - effect@4.0.0
+
+# Experimental v13 lockfile format (pnpm >= 12.19): one entry per package version,
+# one line per value, with trailing commas, so a dependency update touches fewer
+# lines and concurrent PRs hit fewer pnpm-lock.yaml merge conflicts.
+lockfile:
+  format: v13
