@@ -2030,7 +2030,9 @@ describe('batchLinkPlugin', () => {
 
       expect(urls()).not.toContain('MAPPED_SECRET')
       expect(batches()).toHaveLength(1)
-      expect(singles().map(({ url }) => url)).toEqual(['/secret'])
+      expect(singles().map(({ url, headers }) => [url, headers['x-secret']])).toEqual([
+        ['/secret', undefined],
+      ])
     })
 
     it.each([

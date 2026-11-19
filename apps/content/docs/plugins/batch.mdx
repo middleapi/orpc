@@ -275,6 +275,8 @@ Headers shared by every request in a batch move to the batch request. Other head
 
 A `GET` batch carries its subrequests in the URL, where access logs and proxies can record them, so headers never go there. `GET` requests are batched only with requests that have identical headers, and a request that still has headers of its own after `mapSubrequest` is sent individually.
 
+`mapSubrequest` maps only the requests sent in a batch. A request sent individually is sent as it was before mapping, so a header that `mapSubrequest` adds does not reach it. Set such headers on the link instead.
+
 ## Response Headers
 
 In `buffered` mode, the batch response carries the cookies and `Vary` fields of its subresponses, and the headers they all share. In `streaming` mode, it carries only the cookies of the first subresponse to respond. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.

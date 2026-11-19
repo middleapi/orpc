@@ -221,6 +221,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
   /**
    * Map each subrequest in the batch before it is sent.
    * A GET subrequest that still has headers is left out of the batch, so they never reach the batch URL.
+   * A request sent individually is sent as it was before mapping, so headers added here do not reach it.
    *
    * @default Removes headers that are duplicated with the batch headers
    */
