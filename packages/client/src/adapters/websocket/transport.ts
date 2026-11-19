@@ -140,6 +140,13 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
   decodePeerMessage?: DecodePeerMessageOptions | undefined
 }
 
+interface Connection {
+  websocket: WebSocketLike
+  peer: ClientPeer
+  isHealthy: () => boolean
+  closeReason: () => undefined | AbortError
+}
+
 export class WebSocketLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
   private readonly connect: WebSocketLinkTransportOptions<T>['connect']
   private readonly reconnectEnabled: boolean
@@ -184,14 +191,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
   private totalAttempt = 0
   private attempt = 0
-  private current:
-    | undefined
-    | Promise<void | {
-        websocket: WebSocketLike
-        peer: ClientPeer
-        isHealthy: () => boolean
-        closeReason: () => undefined | AbortError
-      }>
+  private current: undefined | Promise<void | Connection>
   private async getConnectedPeer(): Promise<ClientPeer> {
     const current = this.current
     const resolved = await current
@@ -305,7 +305,6 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       const openedAt = Date.now()
-      // A socket still closing has no `closedAt` yet, so it is measured up to now
       const isHealthy = () =>
         receivedMessage || (closedAt ?? Date.now()) - openedAt >= HEALTHY_CONNECTION_DURATION
 
