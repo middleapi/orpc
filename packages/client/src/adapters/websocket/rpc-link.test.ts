@@ -769,7 +769,7 @@ describe('rpcLink', () => {
       expect(connect).toHaveBeenCalledTimes(3)
     })
 
-    it('give up with the last close reason as the cause', async () => {
+    it('fail every waiting call with the last close reason when giving up', async () => {
       const connect = createRejectingConnect()
       const orpc = createORPCClient(
         new RPCLink({ connect, reconnect: { delay: () => 0, maxAttempt: 2 } }),
@@ -785,9 +785,11 @@ describe('rpcLink', () => {
       await expect(call('1')).resolves.toEqual(closed)
       await expect(call('2')).resolves.toEqual(closed)
 
-      const error = await call('3')
-      expect(error).toEqual(new AbortError('WebSocket reconnect failed after 2 attempt(s)'))
-      expect(error.cause).toEqual(closed)
+      const errors = await Promise.all([call('3'), call('4')])
+      for (const error of errors) {
+        expect(error).toEqual(new AbortError('WebSocket reconnect failed after 2 attempt(s)'))
+        expect(error.cause).toEqual(closed)
+      }
       expect(connect).toHaveBeenCalledTimes(2)
     })
 

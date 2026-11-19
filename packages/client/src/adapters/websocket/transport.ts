@@ -208,10 +208,6 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       this.attempt = 0
     }
 
-    if (this.attempt >= this.reconnectMaxAttempt) {
-      this.giveUp(resolved?.closeReason())
-    }
-
     if (this.totalAttempt >= this.reconnectMaxTotalAttempt) {
       throw new AbortError(
         `WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`,
@@ -219,6 +215,11 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     }
 
     this.current = (async () => {
+      // Rejecting `current` lets the `.catch` below fail every call waiting on it
+      if (this.attempt >= this.reconnectMaxAttempt) {
+        throw resolved?.closeReason() ?? new AbortError('WebSocket is already closing or closed')
+      }
+
       this.totalAttempt += 1
       this.attempt += 1
 
@@ -315,17 +316,15 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       if (this.attempt >= this.reconnectMaxAttempt) {
-        this.giveUp(error)
+        const attempt = this.attempt
+        this.attempt = 0
+        this.current = undefined
+        throw new AbortError(`WebSocket reconnect failed after ${attempt} attempt(s)`, {
+          cause: error,
+        })
       }
     })
 
     return this.getConnectedPeer()
-  }
-
-  private giveUp(cause?: unknown): never {
-    const attempt = this.attempt
-    this.attempt = 0
-    this.current = undefined
-    throw new AbortError(`WebSocket reconnect failed after ${attempt} attempt(s)`, { cause })
   }
 }
