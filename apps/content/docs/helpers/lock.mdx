@@ -104,7 +104,7 @@ const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
 
 :::warning[Streaming Procedures]
-The lock middleware does not support streaming responses, such as procedures that return an [AsyncIteratorObject](/docs/async-iterator-object) (for example `async function*` handlers) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array). The lock is released as soon as the stream object is created, before the stream runs, so streams sharing a key can run concurrently, and nested calls from inside the stream skip locking through deduplication even though no lock is held.
+The lock middleware does not support streaming responses, such as procedures that return an [AsyncIteratorObject](/docs/async-iterator-object) (for example `async function*` handlers) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array). The lock is released once the handler returns the stream, so the work the stream does while it is consumed, such as the body of an `async function*` handler, runs without the lock. Streams sharing a key can then run concurrently. Nested calls made from inside the stream with the same context, `locker`, and `key` also skip locking through deduplication, even though no lock is held.
 :::
 
 :::info[Automatic Deduplication]

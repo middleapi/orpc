@@ -87,8 +87,8 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
  *
  * @remarks
  * **Warning**: Not supported for streaming responses, such as an event iterator (e.g. an
- * `async function*` handler) or a `ReadableStream`: the lock is released as soon as the
- * stream object is created, before the stream runs.
+ * `async function*` handler) or a `ReadableStream`: the lock is released once the handler
+ * returns the stream, so the work the stream does while it is consumed runs without the lock.
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#lock-middleware | Lock Helpers - Lock Middleware}
  */
