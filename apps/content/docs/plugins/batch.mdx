@@ -269,6 +269,14 @@ const link = new RPCLink({
 Per-request data passed through the link's [`headers` option](/docs/rpc/link#url-and-header-options) is resolved for each request, so it is safe without `scope`.
 :::
 
+## Request Headers
+
+Headers shared by every request in a batch are sent on the batch request. Other headers stay on each subrequest.
+
+A `GET` batch puts only the headers listed in `allowedUrlHeaders` in its URL, by default `traceparent` and `tracestate`. After `mapSubrequest`, `GET` requests with other headers are batched only with requests that have the same headers, once the `headers` option moves them to the batch request. The rest are sent individually.
+
+Requests sent individually skip the `headers` and `mapSubrequest` options.
+
 ## Response Headers
 
 In `buffered` mode, the batch response carries the cookies and `Vary` fields of its subresponses, and the headers they all share. In `streaming` mode, it carries only the cookies of the first subresponse to respond. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.
