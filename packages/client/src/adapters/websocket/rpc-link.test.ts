@@ -769,6 +769,28 @@ describe('rpcLink', () => {
       expect(connect).toHaveBeenCalledTimes(3)
     })
 
+    it('give up with the last close reason as the cause', async () => {
+      const connect = createRejectingConnect()
+      const orpc = createORPCClient(
+        new RPCLink({ connect, reconnect: { delay: () => 0, maxAttempt: 2 } }),
+      ) as any
+
+      const call = async (input: string) => {
+        const result = orpc.ping(input).catch((error: unknown) => error)
+        await vi.advanceTimersByTimeAsync(100)
+        return result
+      }
+
+      const closed = new AbortError('WebSocket closed (code 4001: unauthorized)')
+      await expect(call('1')).resolves.toEqual(closed)
+      await expect(call('2')).resolves.toEqual(closed)
+
+      const error = await call('3')
+      expect(error).toEqual(new AbortError('WebSocket reconnect failed after 2 attempt(s)'))
+      expect(error.cause).toEqual(closed)
+      expect(connect).toHaveBeenCalledTimes(2)
+    })
+
     it('count as failed even when the next call comes much later', async () => {
       const connect = createRejectingConnect()
       const orpc = createORPCClient(

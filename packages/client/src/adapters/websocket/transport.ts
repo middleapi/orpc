@@ -186,7 +186,12 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
   private attempt = 0
   private current:
     | undefined
-    | Promise<void | { websocket: WebSocketLike; peer: ClientPeer; isHealthy: () => boolean }>
+    | Promise<void | {
+        websocket: WebSocketLike
+        peer: ClientPeer
+        isHealthy: () => boolean
+        closeReason: () => undefined | AbortError
+      }>
   private async getConnectedPeer(): Promise<ClientPeer> {
     const current = this.current
     const resolved = await current
@@ -204,7 +209,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     }
 
     if (this.attempt >= this.reconnectMaxAttempt) {
-      this.giveUp()
+      this.giveUp(resolved?.closeReason())
     }
 
     if (this.totalAttempt >= this.reconnectMaxTotalAttempt) {
@@ -304,7 +309,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       const isHealthy = () =>
         receivedMessage || (closedAt ?? Date.now()) - openedAt >= HEALTHY_CONNECTION_DURATION
 
-      return { websocket, peer, isHealthy }
+      return { websocket, peer, isHealthy, closeReason: () => closeReason }
     })().catch((error) => {
       if (!this.reconnectEnabled) {
         throw error
