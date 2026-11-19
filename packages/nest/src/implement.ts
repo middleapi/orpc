@@ -150,6 +150,9 @@ function implementRouterContract(
   propertyKey: string,
   descriptor: TypedPropertyDescriptor<(...args: any[]) => any>,
 ): void {
+  // captured now because decorators above @Implement can replace `descriptor.value` in place
+  const originalMethod = descriptor.value!
+
   for (const [key, childContract] of Object.entries(contract)) {
     let methodName = `${propertyKey}_${key}`
 
@@ -158,14 +161,16 @@ function implementRouterContract(
       methodName = `${propertyKey}_${key}_${i++}`
     }
 
-    target[methodName] = async function (...args: any[]) {
-      const router = await descriptor.value!.apply(this, args)
+    const method = async function (this: unknown, ...args: any[]) {
+      const router = await target[propertyKey].apply(this, args)
       return getRouter(router, [key])
     }
 
-    Object.setPrototypeOf(target[methodName], descriptor.value!)
+    target[methodName] = method
 
     queueMicrotask(() => {
+      inheritFunctionMetadata(method, originalMethod, target[propertyKey])
+
       for (const p of Reflect.getOwnMetadataKeys(target, propertyKey)) {
         Reflect.defineMetadata(
           p,
@@ -196,6 +201,39 @@ function implementRouterContract(
       })
     } else {
       implementRouterContract(childContract, target, methodName, childDescriptor)
+    }
+  }
+}
+
+/**
+ * Makes function-level metadata (guards, interceptors, `@SetMetadata`, ...) visible on a synthesized method.
+ * Must run after all decorators: one that replaces the decorated function moves every decorator above it
+ * onto the replacement, and if it does not copy metadata, the ones below it stay on the original function.
+ */
+function inheritFunctionMetadata(
+  method: (...args: any[]) => any,
+  originalMethod: (...args: any[]) => any,
+  finalMethod: (...args: any[]) => any,
+): void {
+  Object.setPrototypeOf(method, finalMethod)
+
+  if (finalMethod === originalMethod) {
+    return
+  }
+
+  for (const key of Reflect.getMetadataKeys(originalMethod)) {
+    const originalValue = Reflect.getMetadata(key, originalMethod)
+    const finalValue = Reflect.getMetadata(key, finalMethod)
+
+    if (finalValue === undefined) {
+      Reflect.defineMetadata(key, originalValue, method)
+    } else if (Array.isArray(originalValue) && Array.isArray(finalValue)) {
+      // list metadata accumulates across decorators, so a replacement must not drop earlier entries
+      Reflect.defineMetadata(
+        key,
+        [...originalValue.filter((item) => !finalValue.includes(item)), ...finalValue],
+        method,
+      )
     }
   }
 }

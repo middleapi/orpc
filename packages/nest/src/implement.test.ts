@@ -1603,6 +1603,240 @@ describe('compatibility', () => {
     })
   })
 
+  describe('router-based implementation keeps decorators around a method-replacing decorator', () => {
+    const contract = {
+      ping: oc.meta(openapi({ path: '/wrapped/ping' })),
+      nested: {
+        pong: oc.meta(openapi({ path: '/wrapped/pong' })),
+      },
+    }
+
+    const router = () => ({
+      ping: implement(contract.ping).handler(() => 'ping'),
+      nested: {
+        pong: implement(contract.nested.pong).handler(() => 'pong'),
+      },
+    })
+
+    const paths = ['/wrapped/ping', '/wrapped/pong']
+
+    const wrapperCalled = vi.fn()
+
+    const wrapMethod = (original: any, copyMetadata: boolean) => {
+      const wrapped = function (this: unknown, ...args: unknown[]) {
+        wrapperCalled()
+        return original.apply(this, args)
+      }
+
+      if (copyMetadata) {
+        for (const key of Reflect.getOwnMetadataKeys(original)) {
+          Reflect.defineMetadata(key, Reflect.getOwnMetadata(key, original), wrapped)
+        }
+      }
+
+      return wrapped
+    }
+
+    const InPlaceWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+      descriptor.value = wrapMethod(descriptor.value, true) as any
+    }
+
+    const NewDescriptorWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+      return { ...descriptor, value: wrapMethod(descriptor.value, true) as any }
+    }
+
+    const NonCopyingWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+      descriptor.value = wrapMethod(descriptor.value, false) as any
+    }
+
+    const guardCalls = vi.fn()
+
+    class DenyGuard implements CanActivate {
+      canActivate() {
+        guardCalls('deny')
+        return false
+      }
+    }
+
+    class AllowAboveGuard implements CanActivate {
+      canActivate() {
+        guardCalls('above')
+        return true
+      }
+    }
+
+    class AllowBelowGuard implements CanActivate {
+      canActivate() {
+        guardCalls('below')
+        return true
+      }
+    }
+
+    class RolesGuard implements CanActivate {
+      canActivate(ctx: ExecutionContext) {
+        const roles: string[] | undefined = new Reflector().get('roles', ctx.getHandler())
+        return !roles || roles.includes(ctx.switchToHttp().getRequest().headers['x-role'])
+      }
+    }
+
+    const createServer = async (controller: new () => unknown) => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [controller],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+
+      return app.getHttpServer()
+    }
+
+    describe.each([
+      ['a wrapper mutating the descriptor', InPlaceWrap],
+      ['a wrapper returning a new descriptor', NewDescriptorWrap],
+      ['a wrapper that does not copy metadata', NonCopyingWrap],
+    ] as const)('with %s', (_, Wrap) => {
+      it('applies a guard above the wrapper to every route', async () => {
+        @Controller()
+        class ImplController {
+          @UseGuards(DenyGuard)
+          @Wrap()
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          expect((await supertest(server).post(path)).status).toBe(403)
+        }
+      })
+
+      it('applies a guard below the wrapper to every route', async () => {
+        @Controller()
+        class ImplController {
+          @Wrap()
+          @UseGuards(DenyGuard)
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          expect((await supertest(server).post(path)).status).toBe(403)
+        }
+      })
+
+      it('runs guards from both sides of the wrapper in decorator order', async () => {
+        @Controller()
+        class ImplController {
+          @UseGuards(AllowAboveGuard)
+          @Wrap()
+          @UseGuards(AllowBelowGuard)
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          guardCalls.mockClear()
+
+          expect((await supertest(server).post(path)).status).toBe(200)
+          expect(guardCalls.mock.calls).toEqual([['below'], ['above']])
+        }
+      })
+
+      it('exposes @SetMetadata above the wrapper to a class-level guard', async () => {
+        @Controller()
+        @UseGuards(RolesGuard)
+        class ImplController {
+          @SetMetadata('roles', ['admin'])
+          @Wrap()
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          expect((await supertest(server).post(path)).status).toBe(403)
+          expect((await supertest(server).post(path).set('x-role', 'admin')).status).toBe(200)
+        }
+      })
+
+      it('exposes @SetMetadata below the wrapper to a class-level guard', async () => {
+        @Controller()
+        @UseGuards(RolesGuard)
+        class ImplController {
+          @Wrap()
+          @SetMetadata('roles', ['admin'])
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          expect((await supertest(server).post(path)).status).toBe(403)
+          expect((await supertest(server).post(path).set('x-role', 'admin')).status).toBe(200)
+        }
+      })
+
+      it('calls the wrapper and returns the procedure output on every route', async () => {
+        @Controller()
+        class ImplController {
+          @Wrap()
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        const pingRes = await supertest(server).post('/wrapped/ping')
+        expect(pingRes.status).toBe(200)
+        expect(pingRes.body).toEqual('ping')
+        expect(wrapperCalled).toHaveBeenCalledTimes(1)
+
+        const pongRes = await supertest(server).post('/wrapped/pong')
+        expect(pongRes.status).toBe(200)
+        expect(pongRes.body).toEqual('pong')
+        expect(wrapperCalled).toHaveBeenCalledTimes(2)
+      })
+    })
+
+    it.each([
+      ['a wrapper mutating the descriptor', InPlaceWrap],
+      ['a wrapper returning a new descriptor', NewDescriptorWrap],
+    ] as const)('procedure-based implementation applies a guard above %s', async (_, Wrap) => {
+      @Controller()
+      class ImplController {
+        @UseGuards(DenyGuard)
+        @Wrap()
+        @Implement(contract.ping)
+        ping() {
+          return implement(contract.ping).handler(() => 'ping')
+        }
+      }
+
+      const server = await createServer(ImplController)
+
+      expect((await supertest(server).post('/wrapped/ping')).status).toBe(403)
+    })
+  })
+
   describe('router-based implementation applies method-level interceptors to synthesized methods', () => {
     const contract = {
       ping: oc.meta(openapi({ path: '/intercepted/ping' })),
