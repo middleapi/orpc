@@ -306,10 +306,46 @@ function readReferencePaths(tsconfig: string): string[] {
 
 /**
  * Removes the comments and trailing commas of JSON with comments, keeping strings as they are.
+ * Scans the text once, dropping a comma when the next token past whitespace and comments closes
+ * an array or object, so no input can make it backtrack.
  */
 function stripJsonComments(text: string): string {
-  return text.replace(
-    /("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\/|,(?=\s*(?:\/\/[^\n]*\s*|\/\*[\s\S]*?\*\/\s*)*[\]}])/gu,
-    (_match, string: string | undefined) => string ?? '',
-  )
+  const output: string[] = []
+  let pendingComma: number | undefined
+  let index = 0
+
+  while (index < text.length) {
+    const char = text[index]!
+    const next = text[index + 1]
+
+    if (char === '"') {
+      let end = index + 1
+      while (end < text.length && text[end] !== '"') {
+        end += text[end] === '\\' ? 2 : 1
+      }
+      end = Math.min(end + 1, text.length)
+      output.push(text.slice(index, end))
+      pendingComma = undefined
+      index = end
+    } else if (char === '/' && next === '/') {
+      const end = text.indexOf('\n', index + 2)
+      index = end === -1 ? text.length : end
+    } else if (char === '/' && next === '*') {
+      const end = text.indexOf('*/', index + 2)
+      index = end === -1 ? text.length : end + 2
+    } else {
+      if (char === ',') {
+        pendingComma = output.length
+      } else if ((char === ']' || char === '}') && pendingComma !== undefined) {
+        output[pendingComma] = ''
+        pendingComma = undefined
+      } else if (!/\s/u.test(char)) {
+        pendingComma = undefined
+      }
+      output.push(char)
+      index++
+    }
+  }
+
+  return output.join('')
 }

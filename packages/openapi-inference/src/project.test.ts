@@ -105,6 +105,58 @@ describe('openTypeScriptProject', () => {
     ).toEqual([`Using the compiler options of "${path.join(root, 'app/tsconfig.json')}".`])
   })
 
+  // the old trailing comma regex backtracked exponentially on these, never finishing
+  it('reads the references of tsconfigs with a slash banner and back-to-back block comments', () => {
+    write(
+      'tsconfig.json',
+      `{
+        "files": [],
+        "references": [{ "path": "./app" }],
+        ${'/* reference */'.repeat(40)}
+      }`,
+    )
+    write(
+      'app/tsconfig.json',
+      `{
+        "compilerOptions": {
+          "strict": true,
+          ${'/'.repeat(80)}
+          "noEmit": true,
+${'          /* option */\n'.repeat(40)}
+        },
+        "include": ["."],
+      }`,
+    )
+    write('app/router.ts', 'export const router = 1\n')
+
+    expect(
+      open({ file: path.join(root, 'app/router.ts'), tsconfig: root }, (project) =>
+        project.describeConfig(),
+      ),
+    ).toEqual([`Using the compiler options of "${path.join(root, 'app/tsconfig.json')}".`])
+  })
+
+  it('reads the references of a solution tsconfig keeping strings with comment markers and commas', () => {
+    write(
+      'tsconfig.json',
+      `{
+        "files": [],
+        "references": [
+          { "path": "./*/../a,b//c", }, // trailing commas before comments
+          /* and */
+        ],
+      }`,
+    )
+    write('a,b/c/tsconfig.json', JSON.stringify({ include: ['.'] }))
+    write('a,b/c/router.ts', 'export const router = 1\n')
+
+    expect(
+      open({ file: path.join(root, 'a,b/c/router.ts'), tsconfig: root }, (project) =>
+        project.describeConfig(),
+      ),
+    ).toEqual([`Using the compiler options of "${path.join(root, 'a,b/c/tsconfig.json')}".`])
+  })
+
   it('lists no exports of a script, read from a path relative to the current working directory', () => {
     write('tsconfig.json', JSON.stringify({ include: ['*.ts'] }))
     write('script.ts', 'const router = 1\n')
