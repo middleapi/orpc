@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import {
+  appendFileSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -1043,6 +1044,31 @@ describe('staticFileHandlerPlugin', () => {
 
     const freshRes = await agent.get('/old.txt').set('if-modified-since', past.toUTCString())
     expect(freshRes.status).toBe(304)
+  })
+
+  it('never sends more bytes than content-length when the file grows after stat', async ({
+    onTestFinished,
+  }) => {
+    const growingPath = path.join(rootDir, 'growing.txt')
+    const growingEmptyPath = path.join(rootDir, 'growing-empty.txt')
+    writeFileSync(growingPath, 'hello world')
+    writeFileSync(growingEmptyPath, '')
+    onTestFinished(() => {
+      rmSync(growingPath, { force: true })
+      rmSync(growingEmptyPath, { force: true })
+    })
+
+    const handler = new FetchRPCHandler({}, { plugins: [new StaticFileHandlerPlugin({ rootDir })] })
+
+    const served = await handler.handle(new Request('https://example.com/growing.txt'))
+    appendFileSync(growingPath, ' + appended')
+    expect(served.response!.headers.get('content-length')).toBe('11')
+    expect(await served.response!.text()).toBe('hello world')
+
+    const servedEmpty = await handler.handle(new Request('https://example.com/growing-empty.txt'))
+    appendFileSync(growingEmptyPath, 'appended')
+    expect(servedEmpty.response!.headers.get('content-length')).toBe('0')
+    expect(await servedEmpty.response!.text()).toBe('')
   })
 
   describe('tracing', () => {
