@@ -5,7 +5,6 @@ import {
   AsyncIteratorClass,
   isAsyncIteratorObject,
   listenAbort,
-  override,
   runWithSignal,
   toArray,
 } from '@orpc/shared'
@@ -36,11 +35,11 @@ export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandl
       const output = await interceptorOptions.next({ ...interceptorOptions, signal })
 
       if (isAsyncIteratorObject(output)) {
-        return override(output, syncAsyncIterator(output, signal, cancel))
+        return syncAsyncIterator(output, signal, cancel)
       }
 
       if (output instanceof ReadableStream) {
-        return override(output, syncReadableStream(output, signal, cancel))
+        return syncReadableStream(output, signal, cancel)
       }
 
       return output

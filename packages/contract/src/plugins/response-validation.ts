@@ -2,7 +2,7 @@ import type { ClientContext } from '@orpc/client'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { ThrowableError } from '@orpc/shared'
-import { isAsyncIteratorObject, override, toArray } from '@orpc/shared'
+import { isAsyncIteratorObject, toArray } from '@orpc/shared'
 
 import { ValidationError } from '../error'
 import { reconcileORPCError } from '../error-utils'
@@ -43,14 +43,8 @@ export class ResponseValidationLinkPlugin<
             if (isAsyncIteratorObject(output)) {
               /**
                * Errors thrown while consuming the iterator must be reconciled too.
-               *
-               * @warning
-               * Remember use `override` for AsyncIteratorObject to remain other special properties
                */
-              return override(
-                output,
-                wrapAsyncIteratorPreservingEventMeta(output, { mapError: reconcileError }),
-              ) as typeof output
+              return wrapAsyncIteratorPreservingEventMeta(output, { mapError: reconcileError })
             }
 
             return output

@@ -3,7 +3,6 @@ import {
   AbortError,
   anyAbortSignal,
   isAsyncIteratorObject,
-  override,
   toArray,
   value,
   wrapAsyncIterator,
@@ -102,8 +101,8 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
             return {
               ...response,
               body: isIterator
-                ? override(body, wrapAsyncIterator(body, { onFinish }))
-                : override(body, wrapReadableStream(body, { onFinish })),
+                ? wrapAsyncIterator(body, { onFinish })
+                : wrapReadableStream(body, { onFinish }),
             }
           }
         }

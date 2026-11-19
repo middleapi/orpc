@@ -4,7 +4,6 @@ import {
   intercept,
   isAsyncIteratorObject,
   ORPC_NAME,
-  override,
   runWithSpan,
   traceAsyncIterator,
   traceReadableStream,
@@ -80,17 +79,9 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
       span?.setAttribute('rpc.method', path.join('.'))
 
       if (getTracer() && isAsyncIteratorObject(input)) {
-        /**
-         * @warning
-         * Remember use `override` for AsyncIteratorObject to remain other special properties
-         */
-        input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
+        input = traceAsyncIterator('consume_async_iterator_object_input', input)
       } else if (getTracer() && input instanceof ReadableStream) {
-        /**
-         * @warning
-         * Remember use `override` for ReadableStream to remain other special properties
-         */
-        input = override(input, traceReadableStream('consume_octet_stream_input', input))
+        input = traceReadableStream('consume_octet_stream_input', input)
       }
 
       return intercept(
@@ -144,20 +135,10 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
           if (getTracer() && isAsyncIteratorObject(output)) {
             /**
              * Do not pass the active span as parent here, as it is a lazy span.
-             *
-             * @warning
-             * Remember use `override` for AsyncIteratorObject to remain other special properties
              */
-            return override(
-              output,
-              traceAsyncIterator('consume_async_iterator_object_output', output),
-            )
+            return traceAsyncIterator('consume_async_iterator_object_output', output)
           } else if (getTracer() && output instanceof ReadableStream) {
-            /**
-             * @warning
-             * Remember use `override` for ReadableStream to remain other special properties
-             */
-            return override(output, traceReadableStream('consume_octet_stream_output', output))
+            return traceReadableStream('consume_octet_stream_output', output)
           }
 
           return output

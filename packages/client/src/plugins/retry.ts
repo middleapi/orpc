@@ -1,12 +1,5 @@
 import type { Promisable, Value } from '@orpc/shared'
-import {
-  AsyncIteratorClass,
-  isAsyncIteratorObject,
-  override,
-  sleep,
-  toArray,
-  value,
-} from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 
 import type {
@@ -226,50 +219,47 @@ export class RetryLinkPlugin<
 
       let current = output
 
-      return override(
-        () => current,
-        new AsyncIteratorClass(
-          async () => {
-            while (true) {
-              try {
-                const item = await current.next()
-                const meta = getEventMeta(item.value)
+      return new AsyncIteratorClass(
+        async () => {
+          while (true) {
+            try {
+              const item = await current.next()
+              const meta = getEventMeta(item.value)
 
-                lastEventId = meta?.id ?? lastEventId
-                lastEventRetry = meta?.retry ?? lastEventRetry
+              lastEventId = meta?.id ?? lastEventId
+              lastEventRetry = meta?.retry ?? lastEventRetry
 
-                return item
-              } catch (error) {
-                const meta = getEventMeta(error)
+              return item
+            } catch (error) {
+              const meta = getEventMeta(error)
 
-                lastEventId = meta?.id ?? lastEventId
-                lastEventRetry = meta?.retry ?? lastEventRetry
+              lastEventId = meta?.id ?? lastEventId
+              lastEventRetry = meta?.retry ?? lastEventRetry
 
-                const asyncIteratorObject = await callNext({ error })
-                if (!isAsyncIteratorObject(asyncIteratorObject)) {
-                  throw new TypeError(
-                    'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.',
-                    { cause: error },
-                  )
-                }
+              const asyncIteratorObject = await callNext({ error })
+              if (!isAsyncIteratorObject(asyncIteratorObject)) {
+                throw new TypeError(
+                  'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.',
+                  { cause: error },
+                )
+              }
 
-                current = asyncIteratorObject
+              current = asyncIteratorObject
 
-                if (isIteratorAborted) {
-                  await current.return?.()
-                  throw error
-                }
+              if (isIteratorAborted) {
+                await current.return?.()
+                throw error
               }
             }
-          },
-          async ({ kind }) => {
-            isIteratorAborted = true
+          }
+        },
+        async ({ kind }) => {
+          isIteratorAborted = true
 
-            if (kind === 'cancelled') {
-              await current.return?.()
-            }
-          },
-        ),
+          if (kind === 'cancelled') {
+            await current.return?.()
+          }
+        },
       )
     }
 

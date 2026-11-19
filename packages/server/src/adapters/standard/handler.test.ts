@@ -621,20 +621,16 @@ describe('standardHandler', () => {
       ['readable stream', (body: AsyncIterable<unknown>) => ReadableStream.from(body)],
     ])('%s body', (_, toBody) => {
       it('keeps the request span active and open until the body is drained', async () => {
-        const body = Object.assign(
-          toBody(
-            (async function* () {
-              yield 'a'
-              yield 'b'
-            })(),
-          ),
-          { custom: 'kept' },
+        const body = toBody(
+          (async function* () {
+            yield 'a'
+            yield 'b'
+          })(),
         )
 
         const wrapped = await handleBody(body)
 
         expect(wrapped).not.toBe(body)
-        expect(wrapped.custom).toBe('kept')
         expect(span.end).not.toHaveBeenCalled()
 
         tracer.withActiveSpan.mockClear()

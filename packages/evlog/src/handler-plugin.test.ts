@@ -257,8 +257,7 @@ describe('evlogHandlerPlugin', () => {
       yield 2
     }
 
-    const iterator = source() as unknown as AsyncIterable<number> & { meta: string }
-    iterator.meta = 'preserved'
+    const iterator = source()
 
     const result = await routing({
       next: vi.fn().mockResolvedValue({
@@ -272,7 +271,6 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/iterable'),
     })
 
-    expect((result.response.body as typeof iterator).meta).toBe('preserved')
     await expect(collectIterator(result.response.body as AsyncIterable<number>)).resolves.toEqual([
       1, 2,
     ])
@@ -348,9 +346,7 @@ describe('evlogHandlerPlugin', () => {
         controller.enqueue('chunk-2')
         controller.close()
       },
-    }) as ReadableStream<string> & { meta: string }
-
-    stream.meta = 'preserved'
+    })
 
     const result = await routing({
       next: vi.fn().mockResolvedValue({
@@ -364,7 +360,6 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/stream'),
     })
 
-    expect((result.response.body as typeof stream).meta).toBe('preserved')
     await expect(collectStream(result.response.body as ReadableStream<string>)).resolves.toEqual([
       'chunk-1',
       'chunk-2',

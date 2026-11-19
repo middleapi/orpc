@@ -11,7 +11,6 @@ const isAsyncIteratorObject = SharedV2Module.isAsyncIteratorObject
 const ValidationError = ContractModule.ValidationError
 const createORPCErrorConstructorMapSpy = vi.spyOn(ContractModule, 'createORPCErrorConstructorMap')
 const reconcileErrorSpy = vi.spyOn(ContractModule, 'reconcileORPCError')
-const overrideSpy = vi.spyOn(SharedV2Module, 'override')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -1080,7 +1079,7 @@ describe('createProcedureClient', () => {
     )
   })
 
-  it('trace output AsyncIteratorObject and use override for proxy', async () => {
+  it('trace output AsyncIteratorObject', async () => {
     const handlerIterator = (async function* () {
       yield 'event'
       return 'result'
@@ -1091,16 +1090,13 @@ describe('createProcedureClient', () => {
 
     const iterator = (await client()) as any
     expect(iterator).toSatisfy(isAsyncIteratorObject)
-
-    expect(overrideSpy).toHaveBeenCalledTimes(1)
-    expect(overrideSpy).toHaveBeenCalledWith(handlerIterator, expect.any(Object))
-    expect(iterator).toBe(overrideSpy.mock.results[0]!.value)
+    expect(iterator).not.toBe(handlerIterator)
 
     await expect(iterator.next()).resolves.toEqual({ value: 'event', done: false })
     await expect(iterator.next()).resolves.toEqual({ value: 'result', done: true })
   })
 
-  it('trace output readable stream and use override for proxy', async () => {
+  it('trace output readable stream', async () => {
     const handlerStream = new ReadableStream({
       start(controller) {
         controller.enqueue('event')
@@ -1113,10 +1109,7 @@ describe('createProcedureClient', () => {
 
     const stream = (await client()) as any
     expect(stream).toBeInstanceOf(ReadableStream)
-
-    expect(overrideSpy).toHaveBeenCalledTimes(1)
-    expect(overrideSpy).toHaveBeenCalledWith(handlerStream, expect.any(Object))
-    expect(stream).toBe(overrideSpy.mock.results[0]!.value)
+    expect(stream).not.toBe(handlerStream)
 
     const reader = stream.getReader()
     await expect(reader.read()).resolves.toEqual({ value: 'event', done: false })
@@ -1143,7 +1136,7 @@ describe('createProcedureClient', () => {
 
       const iterator = (await createProcedureClient(procedure)()) as any
       expect(iterator).toSatisfy(isAsyncIteratorObject)
-      expect(overrideSpy).toHaveBeenCalledWith(handlerIterator, expect.any(Object))
+      expect(iterator).not.toBe(handlerIterator)
 
       await expect(iterator.next()).rejects.toThrow(reconciledError)
       expect(reconcileErrorSpy).toHaveBeenCalledWith(errorMap, error)
@@ -1154,7 +1147,6 @@ describe('createProcedureClient', () => {
       handler.mockResolvedValueOnce(handlerStream as any)
 
       await expect(createProcedureClient(procedure)()).resolves.toBe(handlerStream)
-      expect(overrideSpy).not.toHaveBeenCalled()
     })
   })
 
