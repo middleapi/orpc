@@ -103,6 +103,10 @@ const locker = new MemoryLocker()
 const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
 
+:::warning[Streaming Procedures]
+The lock middleware does not support procedures that return an [AsyncIteratorObject](/docs/async-iterator-object), such as `async function*` handlers. The lock is released as soon as the iterator is created, before the handler body runs, so streams sharing a key can run concurrently, and nested calls from inside the stream skip locking through deduplication even though no lock is held.
+:::
+
 :::info[Automatic Deduplication]
 When the same `locker` and `key` combination is used multiple times in a single request chain, the `lock` middleware acquires the lock only once, so a procedure never waits for a lock it already holds. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
 :::

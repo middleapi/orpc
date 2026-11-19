@@ -85,6 +85,9 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
  * sharing the same key never run concurrently. Rejects with a `CONFLICT` error
  * when the lock cannot be acquired before the timeout elapses.
  *
+ * @warning Not supported for procedures that return an event iterator (e.g. `async function*`
+ * handlers): the lock is released as soon as the iterator is created, before the stream runs.
+ *
  * @see {@link https://orpc.dev/docs/helpers/lock#lock-middleware | Lock Helpers - Lock Middleware}
  */
 export function lock<TInContext extends Context, TInput>({
