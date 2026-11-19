@@ -2,7 +2,6 @@ import type {
   Promisable,
   Tracer,
   TracingAttributeValue,
-  TracingException,
   TracingExceptionLevel,
   TracingSpan,
 } from '@orpc/shared'
@@ -28,11 +27,22 @@ class CloudflareSpan implements TracingSpan {
     // Workers Traces have no custom span events
   }
 
-  recordException(level: TracingExceptionLevel, exception: TracingException): void {
-    this.span.recordException(exception)
+  recordException(level: TracingExceptionLevel, error: unknown): void {
+    // Workers read the name, message, stack and code of an error themselves
+    const exception = error instanceof Error ? error : String(error)
+
+    try {
+      this.span.recordException(exception)
+    } catch {
+      // An error can hold values Workers fail to read, e.g. a symbol as `code`
+      this.span.recordException(String(error))
+    }
 
     if (level === 'error') {
-      this.span.setStatus({ code: 'error', message: exception.message })
+      this.span.setStatus({
+        code: 'error',
+        message: typeof exception === 'string' ? exception : exception.message,
+      })
     }
   }
 

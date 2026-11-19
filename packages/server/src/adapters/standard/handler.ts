@@ -11,7 +11,6 @@ import {
   recordSpanError,
   runWithSpan,
   toArray,
-  toTracingException,
   traceAsyncIterator,
   traceReadableStream,
   value,
@@ -297,7 +296,7 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                            * inside the event stream, already logged by the client interceptor.
                            */
                           if (!(error instanceof EventStreamErrorEvent)) {
-                            span.recordException('error', toTracingException(error))
+                            span.recordException('error', error)
                           }
                         },
                         onFinish() {
@@ -327,7 +326,7 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                            * Any error here is internal (interceptor/framework), not business logic.
                            * Indicates unexpected handler failure.
                            */
-                          span.recordException('error', toTracingException(error))
+                          span.recordException('error', error)
                         },
                         onFinish() {
                           span.end()
@@ -345,7 +344,7 @@ class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                * Any error here is internal (interceptor/framework), not business logic.
                * Always recorded as an error, even when it is an abort error.
                */
-              span.recordException('error', toTracingException(e))
+              span.recordException('error', e)
               span.end()
               throw e
             }

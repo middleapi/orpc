@@ -188,23 +188,51 @@ describe('cloudflareTracer', () => {
     it('records error level exceptions natively and marks the span as failed', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
-      const exception = { name: 'TypeError', message: 'boom', stack: 'stack', code: 'CODE' }
+      const error = new TypeError('boom')
 
-      span.recordException('error', exception)
+      span.recordException('error', error)
 
-      expect(fake.recordException).toHaveBeenCalledWith(exception)
+      expect(fake.recordException).toHaveBeenCalledExactlyOnceWith(error)
       expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message: 'boom' })
     })
 
     it('records info level exceptions natively without marking the span as failed', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
-      const exception = { name: 'AbortError', message: 'aborted', stack: 'stack' }
+      const error = Object.assign(new Error('aborted'), { name: 'AbortError' })
 
-      span.recordException('info', exception)
+      span.recordException('info', error)
 
-      expect(fake.recordException).toHaveBeenCalledWith(exception)
+      expect(fake.recordException).toHaveBeenCalledExactlyOnceWith(error)
       expect(fake.setStatus).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['thrown', 'thrown'],
+      [123, '123'],
+    ])('records %j, which is not an error, as its string form', (thrown, message) => {
+      const fake = createFakeSpan()
+      const span = new CloudflareSpan(fake as any)
+
+      span.recordException('error', thrown)
+
+      expect(fake.recordException).toHaveBeenCalledExactlyOnceWith(message)
+      expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message })
+    })
+
+    it('records the string form of an error Workers fail to read', () => {
+      const fake = createFakeSpan()
+      const span = new CloudflareSpan(fake as any)
+      const error = Object.assign(new Error('boom'), { code: Symbol('code') })
+
+      fake.recordException.mockImplementationOnce(() => {
+        throw new TypeError('Cannot convert a Symbol value to a string')
+      })
+      span.recordException('error', error)
+
+      expect(fake.recordException).toHaveBeenNthCalledWith(1, error)
+      expect(fake.recordException).toHaveBeenNthCalledWith(2, 'Error: boom')
+      expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message: 'boom' })
     })
   })
 
@@ -224,8 +252,8 @@ describe('cloudflareTracer', () => {
         span.setAttribute('path', ['a', 'b'])
         span.addEvent('event')
         span.updateName('renamed')
-        span.recordException('info', { name: 'AbortError', message: 'aborted' })
-        span.recordException('error', { name: 'TypeError', message: 'boom', code: 'CODE' })
+        span.recordException('info', Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        span.recordException('error', Object.assign(new TypeError('boom'), { code: 'CODE' }))
 
         expect((tracer.getActiveSpan() as CloudflareSpan).span).toBe((span as CloudflareSpan).span)
 

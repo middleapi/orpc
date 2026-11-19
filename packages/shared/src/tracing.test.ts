@@ -7,7 +7,6 @@ import {
   setTracer,
   startSpan,
   toSpanAttributeValue,
-  toTracingException,
 } from './tracing'
 
 function createMockSpan() {
@@ -87,10 +86,7 @@ describe('tracing', () => {
       const error = new Error('test')
       recordSpanError(mockSpan, error)
 
-      expect(mockSpan.recordException).toHaveBeenCalledWith(
-        'error',
-        expect.objectContaining({ message: 'test', name: 'Error' }),
-      )
+      expect(mockSpan.recordException).toHaveBeenCalledWith('error', error)
     })
 
     it('records AbortError at info level', () => {
@@ -99,10 +95,7 @@ describe('tracing', () => {
       error.name = 'AbortError'
       recordSpanError(mockSpan, error)
 
-      expect(mockSpan.recordException).toHaveBeenCalledWith(
-        'info',
-        expect.objectContaining({ message: 'aborted', name: 'AbortError' }),
-      )
+      expect(mockSpan.recordException).toHaveBeenCalledWith('info', error)
     })
   })
 
@@ -121,34 +114,6 @@ describe('tracing', () => {
       const mockSpan = createMockSpan() as any
       setSpanAttributeIfDefined(mockSpan, 'key', 'value')
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('key', 'value')
-    })
-  })
-
-  describe('toTracingException', () => {
-    it('converts error to exception', () => {
-      const error = new Error('test')
-      error.stack = 'stack'
-      const exception = toTracingException(error)
-      expect(exception).toEqual({ message: 'test', name: 'Error', stack: 'stack' })
-    })
-
-    it('includes numeric code', () => {
-      const error = new Error('test') as any
-      error.code = 123
-      const exception = toTracingException(error)
-      expect(exception.code).toBe(123)
-    })
-
-    it('includes string code', () => {
-      const error = new Error('test') as any
-      error.code = 'CODE'
-      const exception = toTracingException(error)
-      expect(exception.code).toBe('CODE')
-    })
-
-    it('converts non-error to exception', () => {
-      expect(toTracingException('test')).toEqual({ message: 'test' })
-      expect(toTracingException(123)).toEqual({ message: '123' })
     })
   })
 
@@ -225,10 +190,7 @@ describe('tracing', () => {
       const fn = vi.fn().mockRejectedValue(error)
 
       await expect(runWithSpan('test', fn)).rejects.toThrow('fail')
-      expect(mockSpan.recordException).toHaveBeenCalledWith(
-        'error',
-        expect.objectContaining({ message: 'fail' }),
-      )
+      expect(mockSpan.recordException).toHaveBeenCalledWith('error', error)
       expect(mockSpan.end).toHaveBeenCalledTimes(1)
     })
 

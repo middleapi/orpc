@@ -10,7 +10,6 @@ import type {
   Promisable,
   Tracer,
   TracingAttributeValue,
-  TracingException,
   TracingExceptionLevel,
   TracingSpan,
 } from '@orpc/shared'
@@ -43,11 +42,22 @@ export class OpenTelemetrySpan implements TracingSpan {
     this.span.addEvent(name)
   }
 
-  recordException(level: TracingExceptionLevel, exception: TracingException): void {
-    this.span.recordException(exception)
+  recordException(level: TracingExceptionLevel, error: unknown): void {
+    // OpenTelemetry reads the name, message, stack and code of an error itself
+    const exception = error instanceof Error ? error : String(error)
+
+    try {
+      this.span.recordException(exception)
+    } catch {
+      // An error can hold values OpenTelemetry fails to read, e.g. a `code` without `toString`
+      this.span.recordException(String(error))
+    }
 
     if (level === 'error') {
-      this.span.setStatus({ code: SpanStatusCode.ERROR, message: exception.message })
+      this.span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: typeof exception === 'string' ? exception : exception.message,
+      })
     }
   }
 
