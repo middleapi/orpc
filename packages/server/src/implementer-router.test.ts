@@ -319,4 +319,29 @@ describe('createRouterImplementer', () => {
       })
     })
   })
+
+  it.each([undefined, null])('skips %s contract entries', (entry) => {
+    const sparse = {
+      ping: oc.output(z.string()),
+      missing: entry,
+      use: entry,
+      nested: { ping: oc.output(z.string()), missing: entry },
+    } as any
+
+    const implementer = createRouterImplementer(sparse, config) as any
+
+    expect(implementer.missing).toBeUndefined()
+    expect(implementer.nested.missing).toBeUndefined()
+    expect(implementer.use).toBeTypeOf('function')
+
+    const router = implementer.router({
+      ping: implementer.ping.handler(() => 'pong'),
+      nested: { ping: implementer.nested.ping.handler(() => 'pong') },
+    })
+    const entries = vi.fn()
+
+    RouterUtilsModule.walkProcedureContractsSync(router, entries)
+
+    expect(entries.mock.calls.map(([, path]) => path)).toEqual([['ping'], ['nested', 'ping']])
+  })
 })

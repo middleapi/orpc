@@ -36,6 +36,7 @@ import { StandardHandler } from '@orpc/server/standard'
 import type { AnyFunction, Promisable } from '@orpc/shared'
 import {
   isAsyncIteratorObject,
+  isNonPrimitive,
   listenAbort,
   mergeHttpPath,
   NullProtoObj,
@@ -162,6 +163,10 @@ function implementRouterContract(
   const originalMethod = descriptor.value!
 
   for (const [key, childContract] of Object.entries(contract)) {
+    if (!isNonPrimitive(childContract)) {
+      continue
+    }
+
     let methodName = `${propertyKey}_${key}`
 
     let i = 0
@@ -206,7 +211,7 @@ function implementRouterContract(
         routeDecorator(target, methodName, childDescriptor)
       })
     } else {
-      implementRouterContract(childContract, target, methodName, childDescriptor)
+      implementRouterContract(childContract as RouterContract, target, methodName, childDescriptor)
     }
   }
 }

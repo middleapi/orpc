@@ -74,9 +74,13 @@ const router = {
   p1: procedure1,
   p2: procedure2,
   invalid: 'invalid' as any,
+  undefined: undefined as any,
+  null: null as any,
   nested: callable({
     p1: callable(procedure1),
     invalid: 'invalid' as any,
+    undefined: undefined as any,
+    null: null as any,
   }),
   lazy: new Lazy({
     loader: async () => ({
@@ -84,6 +88,8 @@ const router = {
         p1: procedure1,
         nested: callable({ p1: procedure1 }),
         invalid: 'invalid' as any,
+        undefined: undefined as any,
+        null: null as any,
       },
     }),
     meta: { lazy: true },

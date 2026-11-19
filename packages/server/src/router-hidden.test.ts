@@ -21,3 +21,7 @@ it('withHiddenRouterContract & getHiddenRouterContract', () => {
     contract.ping,
   )
 })
+
+it.each([undefined, null])('getHiddenRouterContract returns undefined for %s', (router) => {
+  expect(getHiddenRouterContract(router)).toBeUndefined()
+})
