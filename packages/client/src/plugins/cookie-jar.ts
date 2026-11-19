@@ -148,6 +148,8 @@ export class CookieJar {
       !domainMatch(target.hostname, domain) ||
       (/^__(?:secure|host)-/i.test(parsed.name) && !parsed.secure) ||
       (/^__host-/i.test(parsed.name) && (!hostOnly || parsed.path !== '/')) ||
+      // A nameless cookie is sent as its bare value, so it must not pass for a prefixed one, see RFC 6265bis
+      (!parsed.name && /^__(?:secure|host)-/i.test(parsed.value)) ||
       // Insecure origins can neither set nor overwrite secure cookies, see "leave secure cookies alone" in RFC 6265bis
       (!secureUrl &&
         (parsed.secure ||
@@ -219,6 +221,7 @@ export class CookieJar {
 
 /**
  * Appends jar cookies to an existing `cookie` header, skipping names it already has.
+ * Names are compared as a server reads the header, so a nameless cookie whose value is `a=b` counts as `a`.
  * Returns `undefined` when the jar adds nothing.
  */
 function mergeCookieHeader(
@@ -232,8 +235,8 @@ function mergeCookieHeader(
   const explicitNames = new Set(explicit.map((pair) => splitCookiePair(pair)[0]))
 
   const pairs = cookies
-    .filter((cookie) => !explicitNames.has(cookie.name))
     .map((cookie) => (cookie.name ? `${cookie.name}=${cookie.value}` : cookie.value))
+    .filter((pair) => !explicitNames.has(splitCookiePair(pair)[0]))
 
   return pairs.length ? [...explicit, ...pairs].join('; ') : undefined
 }
