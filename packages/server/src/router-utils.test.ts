@@ -2,6 +2,8 @@ import * as ContractModule from '@orpc/contract'
 import { getOwn } from '@orpc/shared'
 import { z } from 'zod'
 
+import { RPCHandler } from './adapters/fetch/rpc-handler'
+import { os } from './builder'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { withHiddenRouterContract } from './router-hidden'
@@ -422,11 +424,82 @@ describe('walkProcedureContractsSync', () => {
     expect(entries).toHaveBeenNthCalledWith(3, router.nested.p1, ['custom', 'nested', 'p1'])
   })
 
-  it('ignores invalid roots', () => {
+  it.each(['invalid', undefined, null])('ignores the invalid root %s', (root) => {
     const entries = vi.fn()
 
-    expect(walkProcedureContractsSync('invalid' as any, entries)).toEqual([])
+    expect(walkProcedureContractsSync(root as any, entries)).toEqual([])
     expect(entries).not.toHaveBeenCalled()
+  })
+})
+
+describe('null and undefined router entries', () => {
+  const ping = os.handler(() => 'pong')
+  const sparse = {
+    ping,
+    missing: undefined,
+    empty: null,
+    nested: { ping, missing: undefined, empty: null },
+  } as any
+  const lazy = os.lazy(async () => ({ default: sparse }))
+  const sparseWithLazy = { ...sparse, lazy }
+
+  function rpcRequest(path: string) {
+    return new Request(`https://example.com${path}`, { method: 'POST' })
+  }
+
+  it('walkProcedureContractsSync skips them and keeps the remaining routes', () => {
+    const entries = vi.fn()
+
+    const lazyResults = walkProcedureContractsSync(sparseWithLazy, entries)
+
+    expect(entries.mock.calls.map(([, path]) => path)).toEqual([['ping'], ['nested', 'ping']])
+    expect(lazyResults).toEqual([{ path: ['lazy'], router: lazy }])
+  })
+
+  it('walkProcedureContractsAsync skips them, also inside lazy routers', async () => {
+    const entries = vi.fn()
+
+    await walkProcedureContractsAsync(sparseWithLazy, entries)
+
+    expect(entries.mock.calls.map(([, path]) => path)).toEqual([
+      ['ping'],
+      ['nested', 'ping'],
+      ['lazy', 'ping'],
+      ['lazy', 'nested', 'ping'],
+    ])
+  })
+
+  it('walkProcedureContractsAsync skips a lazy router resolving to them', async () => {
+    const entries = vi.fn()
+
+    await walkProcedureContractsAsync(
+      {
+        ping,
+        lazyUndefined: os.lazy(async () => ({ default: undefined as any })),
+        lazyNull: os.lazy(async () => ({ default: null as any })),
+      },
+      entries,
+    )
+
+    expect(entries.mock.calls.map(([, path]) => path)).toEqual([['ping']])
+  })
+
+  it('rpcHandler serves the remaining routes, also inside lazy routers', async () => {
+    const handler = new RPCHandler(sparseWithLazy)
+
+    for (const path of ['/ping', '/nested/ping', '/lazy/ping', '/lazy/nested/ping']) {
+      const { matched, response } = await handler.handle(rpcRequest(path))
+
+      expect(matched).toBe(true)
+      expect(response?.status).toBe(200)
+    }
+
+    for (const path of ['/missing', '/empty', '/nested/missing', '/lazy/missing', '/lazy/empty']) {
+      await expect(handler.handle(rpcRequest(path))).resolves.toEqual({
+        matched: false,
+        response: undefined,
+      })
+    }
   })
 })
 

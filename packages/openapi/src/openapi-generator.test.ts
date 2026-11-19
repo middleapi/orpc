@@ -1,6 +1,7 @@
 import { oc } from '@orpc/contract'
 import type { JsonSchema } from '@orpc/json-schema'
 import { visitJsonSchemaRefs } from '@orpc/json-schema'
+import { os } from '@orpc/server'
 import * as arktype from 'arktype'
 import * as z from 'zod'
 
@@ -68,6 +69,28 @@ describe('openAPIGenerator basic & options', () => {
         { version: '3.1.2' },
       ),
     ).rejects.toThrow('QUERY operations require OpenAPI 3.2, but version "3.1.2" was requested.')
+  })
+
+  it('skips null and undefined router entries, also inside lazy routers', async () => {
+    const ping = os.handler(() => 'pong')
+    const sparse: any = {
+      ping,
+      missing: undefined,
+      empty: null,
+      nested: { ping, missing: undefined },
+    }
+
+    const doc = await generator.generate({
+      ...sparse,
+      lazy: os.lazy(async () => ({ default: sparse })),
+    })
+
+    expect(Object.keys(doc.paths ?? {})).toEqual([
+      '/ping',
+      '/nested/ping',
+      '/lazy/ping',
+      '/lazy/nested/ping',
+    ])
   })
 
   it('merges the provided base document and serialize the result', async () => {

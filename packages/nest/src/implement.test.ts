@@ -1452,6 +1452,47 @@ describe('compatibility', () => {
     expect(req!.url).toBe('/injection')
   })
 
+  it('router-based implementation skips null and undefined contract entries', async () => {
+    const ping = oc.meta(openapi({ path: '/ping' }))
+    const nestedPing = oc.meta(openapi({ path: '/nested/ping' }))
+    const contract: any = {
+      ping,
+      missing: undefined,
+      empty: null,
+      nested: { ping: nestedPing, missing: undefined, empty: null },
+    }
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      sparse() {
+        return {
+          ping: implement(ping).handler(() => 'pong'),
+          nested: { ping: implement(nestedPing).handler(() => 'nested pong') },
+        }
+      }
+    }
+
+    expect(Object.getOwnPropertyNames(ImplController.prototype)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/_(missing|empty)/)]),
+    )
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res = await supertest(app.getHttpServer()).post('/ping')
+    expect(res.status).toBe(200)
+    expect(res.text).toContain('pong')
+
+    const nestedRes = await supertest(app.getHttpServer()).post('/nested/ping')
+    expect(nestedRes.status).toBe(200)
+    expect(nestedRes.text).toContain('nested pong')
+  })
+
   it('router-based implementation controller can handle conflict method names and reflect all metadata on new methods regardless of decorator order', async () => {
     const contract = {
       ping: oc.meta(openapi({ path: '/ping' })),

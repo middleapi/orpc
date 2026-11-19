@@ -1,7 +1,7 @@
 import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
 import { ProcedureContract } from '@orpc/contract'
 import type { IntersectPick, Public } from '@orpc/shared'
-import { bindMethods, omit, setOwn } from '@orpc/shared'
+import { bindMethods, isNonPrimitive, omit, setOwn } from '@orpc/shared'
 
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import { ProcedureImplementer } from './implementer-procedure'
@@ -246,6 +246,10 @@ function toPlainRouterContract<T extends RouterContract>(contract: T): T {
     ) as T
   }
 
+  if (!isNonPrimitive(contract)) {
+    return contract
+  }
+
   let copied: Record<string, RouterContract> | undefined
 
   for (const [key, child] of Object.entries(contract as Record<string, RouterContract>)) {
@@ -282,6 +286,10 @@ function createRouterImplementerInternal<
   const implementer: Record<string, any> = {}
 
   for (const [key, child] of Object.entries(contract)) {
+    if (!isNonPrimitive(child)) {
+      continue
+    }
+
     setOwn(
       implementer,
       key,

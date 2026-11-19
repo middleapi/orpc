@@ -51,6 +51,37 @@ describe('openapiHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
+  it('skips null and undefined router entries, also inside lazy routers', async () => {
+    const ping = os.handler(() => 'pong')
+    const sparse: any = {
+      ping,
+      missing: undefined,
+      empty: null,
+      nested: { ping, missing: undefined },
+    }
+    const handler = new OpenAPIHandler({
+      ...sparse,
+      lazy: os.lazy(async () => ({ default: sparse })),
+    })
+
+    for (const path of ['/ping', '/nested/ping', '/lazy/ping', '/lazy/nested/ping']) {
+      const { matched, response } = await handler.handle(
+        new Request(`https://example.com${path}`, { method: 'POST' }),
+      )
+
+      expect(matched).toBe(true)
+      expect(response?.status).toBe(200)
+    }
+
+    for (const path of ['/missing', '/empty', '/nested/missing', '/lazy/missing']) {
+      const { matched } = await handler.handle(
+        new Request(`https://example.com${path}`, { method: 'POST' }),
+      )
+
+      expect(matched).toBe(false)
+    }
+  })
+
   it('routes an OpenAPILink call with a raw char to its static route, not a dynamic sibling', async () => {
     const router = {
       beta: os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta'),
