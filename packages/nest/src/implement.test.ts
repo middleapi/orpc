@@ -1027,6 +1027,28 @@ describe('@Implement', async () => {
           }
         })
 
+        it('keeps guards when their metadata key is set to undefined on the other side of the wrapper', async () => {
+          @Controller()
+          class ImplController {
+            @SetMetadata('__guards__', undefined)
+            @Wrap()
+            @UseGuards(recordingGuard('below'))
+            @Implement(contract)
+            router() {
+              return router()
+            }
+          }
+
+          const server = await createServer(ImplController)
+
+          for (const path of paths) {
+            guardCalls.mockClear()
+
+            expect((await supertest(server).post(path)).status).toBe(200)
+            expect(guardCalls.mock.calls).toEqual([['below']])
+          }
+        })
+
         it('calls the wrapper and returns the procedure output on every route', async () => {
           @Controller()
           class ImplController {

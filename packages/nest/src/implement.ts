@@ -143,10 +143,11 @@ function inheritFunctionMetadata(
       Reflect.defineMetadata(key, originalValue, method)
     }
     else if (ACCUMULATED_METADATA_KEYS.has(key)) {
-      const finalValue = Reflect.getMetadata(key, finalMethod)
+      const originalItems: unknown[] = toArray(originalValue)
+      const finalItems: unknown[] = toArray(Reflect.getMetadata(key, finalMethod))
       Reflect.defineMetadata(
         key,
-        [...originalValue.filter((item: unknown) => !finalValue.includes(item)), ...finalValue],
+        [...originalItems.filter(item => !finalItems.includes(item)), ...finalItems],
         method,
       )
     }
