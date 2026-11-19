@@ -137,12 +137,12 @@ function inheritFunctionMetadata(
     }
 
     const originalValue = Reflect.getMetadata(key, originalMethod)
-    const finalValue = Reflect.getMetadata(key, finalMethod)
 
-    if (finalValue === undefined) {
+    if (!Reflect.hasMetadata(key, finalMethod)) {
       Reflect.defineMetadata(key, originalValue, method)
     }
     else if (ACCUMULATED_METADATA_KEYS.has(key)) {
+      const finalValue = Reflect.getMetadata(key, finalMethod)
       Reflect.defineMetadata(
         key,
         [...originalValue.filter((item: unknown) => !finalValue.includes(item)), ...finalValue],

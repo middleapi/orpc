@@ -951,6 +951,7 @@ describe('@Implement', async () => {
             reflector.get('above', ctx.getHandler()),
             reflector.get('below', ctx.getHandler()),
             reflector.get('roles', ctx.getHandler()),
+            reflector.get('cleared', ctx.getHandler()),
           )
           return true
         }
@@ -1000,7 +1001,9 @@ describe('@Implement', async () => {
           class ImplController {
             @SetMetadata('above', 'above-value')
             @SetMetadata('roles', ['admin'])
+            @SetMetadata('cleared', undefined)
             @Wrap()
+            @SetMetadata('cleared', 'below-value')
             @SetMetadata('roles', ['user'])
             @SetMetadata('below', 'below-value')
             @Implement(contract)
@@ -1015,9 +1018,12 @@ describe('@Implement', async () => {
             handlerMeta.mockClear()
 
             expect((await supertest(server).post(path)).status).toBe(200)
-            expect(handlerMeta).toHaveBeenCalledExactlyOnceWith('above-value', 'below-value', [
-              'admin',
-            ])
+            expect(handlerMeta).toHaveBeenCalledExactlyOnceWith(
+              'above-value',
+              'below-value',
+              ['admin'],
+              undefined,
+            )
           }
         })
 
