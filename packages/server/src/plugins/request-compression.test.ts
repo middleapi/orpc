@@ -207,6 +207,56 @@ describe('requestCompressionHandlerPlugin', () => {
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), '__MOCKED__')
   })
 
+  const binaryContentTypes = ['text/csv', 'application/octet-stream', undefined]
+
+  it.each(binaryContentTypes)(
+    'should decode a binary body as a file, content-type: %s',
+    async (contentType) => {
+      const body = compress('a,b\n1,2\n', 'gzip')
+
+      const { response } = await handler.handle(
+        new Request('http://localhost', {
+          method: 'POST',
+          headers: {
+            ...(contentType && { 'content-type': contentType }),
+            'content-encoding': 'gzip',
+            'content-length': body.length.toString(),
+          },
+          body,
+        }),
+      )
+
+      expect(response?.status).toBe(200)
+      const input = procedureHandler.mock.calls[0]![0].input
+      expect(input).toBeInstanceOf(File)
+      expect(await input.text()).toBe('a,b\n1,2\n')
+    },
+  )
+
+  it.each(binaryContentTypes)(
+    'should decode a binary body as a file with Node.js adapter, content-type: %s',
+    async (contentType) => {
+      const nodeHandler = new NodeRPCHandler(procedure, {
+        plugins: [new RequestCompressionHandlerPlugin()],
+      })
+
+      const request = supertest((req: any, res: any) => {
+        void nodeHandler.handle(req, res)
+      })
+        .post('/')
+        .set('content-encoding', 'gzip')
+
+      const response = await (contentType ? request.set('content-type', contentType) : request)
+        .send(compress('a,b\n1,2\n', 'gzip'))
+        .buffer(true)
+
+      expect(response.status).toBe(200)
+      const input = procedureHandler.mock.calls[0]![0].input
+      expect(input).toBeInstanceOf(File)
+      expect(await input.text()).toBe('a,b\n1,2\n')
+    },
+  )
+
   it('should work with Node.js adapter', async () => {
     const nodeHandler = new NodeRPCHandler(procedure, {
       plugins: [new RequestCompressionHandlerPlugin()],

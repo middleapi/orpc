@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client'
 import { isCompressionEncoding, parseContentEncodings, toArray } from '@orpc/shared'
-import { flattenStandardHeader } from '@standard-server/core'
+import { flattenStandardHeader, resolveStandardBodyHint } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
 import type {
@@ -82,7 +82,9 @@ export class RequestCompressionHandlerPlugin<
               headers: toFetchHeaders(decompressedHeaders),
             })
 
-            return toStandardBody(response, { hint })
+            return toStandardBody(response, {
+              hint: hint ?? resolveStandardBodyHint(interceptorOptions.request.headers),
+            })
           },
         },
       })
