@@ -33,7 +33,7 @@ import type {
   StandardHandlerCodecResolvedProcedure,
 } from '@orpc/server/standard'
 import { StandardHandler } from '@orpc/server/standard'
-import type { Promisable } from '@orpc/shared'
+import type { AnyFunction, Promisable } from '@orpc/shared'
 import {
   isAsyncIteratorObject,
   isNonPrimitive,
@@ -76,6 +76,15 @@ const MethodDecoratorMap = {
   DELETE: Delete,
   OPTIONS: Options,
 }
+
+// Nest appends to these keys across decorators, while any other metadata is replaced
+const ACCUMULATED_METADATA_KEYS = new Set([
+  '__guards__',
+  '__interceptors__',
+  '__pipes__',
+  '__exceptionFilters__',
+  '__headers__',
+])
 
 /**
  * Decorator that implements an oRPC contract (procedure or router contract)
@@ -151,6 +160,8 @@ function implementRouterContract(
   propertyKey: string,
   descriptor: TypedPropertyDescriptor<(...args: any[]) => any>,
 ): void {
+  const originalMethod = descriptor.value!
+
   for (const [key, childContract] of Object.entries(contract)) {
     if (!isNonPrimitive(childContract)) {
       continue
@@ -164,13 +175,15 @@ function implementRouterContract(
     }
 
     target[methodName] = async function (...args: any[]) {
-      const router = await descriptor.value!.apply(this, args)
+      const router = await target[propertyKey].apply(this, args)
       return getRouter(router, [key])
     }
 
-    Object.setPrototypeOf(target[methodName], descriptor.value!)
+    const childDescriptor = Object.getOwnPropertyDescriptor(target, methodName)!
 
     queueMicrotask(() => {
+      inheritFunctionMetadata(childDescriptor.value, originalMethod, target[propertyKey])
+
       for (const p of Reflect.getOwnMetadataKeys(target, propertyKey)) {
         Reflect.defineMetadata(
           p,
@@ -190,8 +203,6 @@ function implementRouterContract(
       }
     })
 
-    const childDescriptor = Object.getOwnPropertyDescriptor(target, methodName)!
-
     if (childContract instanceof ProcedureContract) {
       const routeDecorator = toNestRouteDecorator(childContract)
 
@@ -201,6 +212,35 @@ function implementRouterContract(
       })
     } else {
       implementRouterContract(childContract as RouterContract, target, methodName, childDescriptor)
+    }
+  }
+}
+
+function inheritFunctionMetadata(
+  method: AnyFunction,
+  originalMethod: AnyFunction,
+  finalMethod: AnyFunction,
+): void {
+  Object.setPrototypeOf(method, finalMethod)
+
+  if (finalMethod === originalMethod) {
+    return
+  }
+
+  // a replacement that does not copy metadata leaves it only on the original function
+  for (const key of Reflect.getMetadataKeys(originalMethod)) {
+    const originalValue = Reflect.getMetadata(key, originalMethod)
+
+    if (!Reflect.hasMetadata(key, finalMethod)) {
+      Reflect.defineMetadata(key, originalValue, method)
+    } else if (ACCUMULATED_METADATA_KEYS.has(key)) {
+      const originalItems: unknown[] = toArray(originalValue)
+      const finalItems: unknown[] = toArray(Reflect.getMetadata(key, finalMethod))
+      Reflect.defineMetadata(
+        key,
+        [...originalItems.filter((item) => !finalItems.includes(item)), ...finalItems],
+        method,
+      )
     }
   }
 }
