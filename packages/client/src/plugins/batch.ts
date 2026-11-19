@@ -5,6 +5,7 @@ import {
   isAsyncIteratorObject,
   isDeepEqual,
   loadBytes,
+  omit,
   once,
   promiseWithResolvers,
   safeEncodeURIComponent,
@@ -202,6 +203,14 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
     | undefined
 
   /**
+   * Lowercase names of headers a GET batch may carry in its URL.
+   * A GET subrequest left with any other header is batched only with ones left with the same headers.
+   *
+   * @default ['traceparent', 'tracestate']
+   */
+  allowedUrlHeaders?: readonly string[] | undefined
+
+  /**
    * Headers used for the batch request.
    * Requests sent individually do not get them.
    *
@@ -267,6 +276,10 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
   private readonly mode: Exclude<BatchLinkPluginOptions<T>['mode'], undefined>
   private readonly batchUrl: Exclude<BatchLinkPluginOptions<T>['url'], undefined>
   private readonly maxUrlLength: Exclude<BatchLinkPluginOptions<T>['maxUrlLength'], undefined>
+  private readonly allowedUrlHeaders: Exclude<
+    BatchLinkPluginOptions<T>['allowedUrlHeaders'],
+    undefined
+  >
   private readonly batchHeaders: Exclude<BatchLinkPluginOptions<T>['headers'], undefined>
   private readonly mapSubrequest: Exclude<BatchLinkPluginOptions<T>['mapSubrequest'], undefined>
   private readonly mapSubresponse: Exclude<BatchLinkPluginOptions<T>['mapSubresponse'], undefined>
@@ -288,6 +301,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         return `${pathname}/__batch__`
       })
     this.maxUrlLength = options.maxUrlLength ?? 2083
+    this.allowedUrlHeaders = options.allowedUrlHeaders ?? ['traceparent', 'tracestate']
     this.batchHeaders =
       options.headers ??
       (async (options) => {
@@ -466,10 +480,12 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
       /**
        * A GET batch carries its subrequests in the URL, where access logs and proxies record them,
-       * so a header left on a subrequest must stay out of it.
+       * so a header left on a subrequest must stay out of it unless `allowedUrlHeaders` lists it.
        */
       const parts =
-        method === 'GET' ? splitBySubrequestHeaders(groupItems, subrequests) : [groupItems]
+        method === 'GET'
+          ? splitBySubrequestHeaders(groupItems, subrequests, this.allowedUrlHeaders)
+          : [groupItems]
 
       if (parts.length > 1) {
         await Promise.all(
@@ -649,17 +665,19 @@ type BatchLinkPluginItem<T extends ClientContext> = [
 ]
 
 /**
- * Groups items by the headers left on their subrequest, so re-batching a group lets the batch headers
- * lift them. Headers left on every item alike cannot be lifted, so those items are sent alone.
+ * Groups items by the headers left on their subrequest, apart from the allowed URL headers, so re-batching
+ * a group lets the batch headers lift them. Headers left on every item alike cannot be lifted, so those
+ * items are sent alone.
  */
 function splitBySubrequestHeaders<T extends ClientContext>(
   items: BatchLinkPluginItem<T>[],
   subrequests: StandardRequest[],
+  allowedUrlHeaders: readonly string[],
 ): BatchLinkPluginItem<T>[][] {
   const parts: { headers: StandardHeaders; items: BatchLinkPluginItem<T>[] }[] = []
 
   for (const [index, item] of items.entries()) {
-    const { headers } = subrequests[index]!
+    const headers = omit(subrequests[index]!.headers, allowedUrlHeaders)
     const sameHeaders = parts.find((part) => isDeepEqual(part.headers, headers))
 
     if (sameHeaders) {

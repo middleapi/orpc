@@ -2074,6 +2074,38 @@ describe('batchLinkPlugin', () => {
       expect(urls()).not.toContain('REQUEST_')
     })
 
+    it('batches calls whose differing headers are allowed in the URL', async () => {
+      const { callAll, urls, sent, batches } = makeHeadersLink({
+        a: { authorization: 'Bearer USER_A_TOKEN', traceparent: 'TRACE_A' },
+        b: { authorization: 'Bearer USER_A_TOKEN', traceparent: 'TRACE_B' },
+      })
+
+      await expect(callAll('a', 'b')).resolves.toEqual(['result-0', 'result-1'])
+
+      expect(sent()).toHaveLength(1)
+      expect(batches()[0]!.headers.authorization).toBe('Bearer USER_A_TOKEN')
+      expect(urls()).not.toContain('USER_A_TOKEN')
+      expect(urls()).toContain('TRACE_A')
+      expect(urls()).toContain('TRACE_B')
+    })
+
+    it.each([
+      ['an empty allowedUrlHeaders', { allowedUrlHeaders: [] }, 'traceparent', 2],
+      ['a custom allowedUrlHeaders', { allowedUrlHeaders: ['x-request-id'] }, 'x-request-id', 1],
+    ] satisfies [string, Partial<BatchLinkPluginOptions<TestContext>>, string, number][])(
+      'follows %s',
+      async (_, options, header, requests) => {
+        const { callAll, sent } = makeHeadersLink(
+          { a: { [header]: 'VALUE_A' }, b: { [header]: 'VALUE_B' } },
+          options,
+        )
+
+        await callAll('a', 'b')
+
+        expect(sent()).toHaveLength(requests)
+      },
+    )
+
     it('keeps batching POST calls with different headers in the body', async () => {
       const { callAll, sent, batches } = makeHeadersLink(
         {
