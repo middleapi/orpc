@@ -2,7 +2,7 @@ import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/com
 import type { ContractRouter } from '@orpc/contract'
 import type { Router } from '@orpc/server'
 import type { StandardParams } from '@orpc/server/standard'
-import type { Promisable } from '@orpc/shared'
+import type { AnyFunction, Promisable } from '@orpc/shared'
 import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
@@ -38,6 +38,15 @@ const MethodDecoratorMap = {
   OPTIONS: Options,
 }
 
+// Nest appends to these keys across decorators, while any other metadata is replaced
+const ACCUMULATED_METADATA_KEYS = new Set([
+  '__guards__',
+  '__interceptors__',
+  '__pipes__',
+  '__exceptionFilters__',
+  '__headers__',
+])
+
 /**
  * Decorator in controller handler to implement a oRPC contract.
  *
@@ -72,6 +81,8 @@ export function Implement<T extends ContractRouter<any>>(
   }
 
   return (target, propertyKey, descriptor) => {
+    const originalMethod = descriptor.value!
+
     for (const key in contract) {
       let methodName = `${propertyKey}_${key}`
 
@@ -81,11 +92,18 @@ export function Implement<T extends ContractRouter<any>>(
       }
 
       target[methodName] = async function (...args: any[]) {
-        const router = await descriptor.value!.apply(this, args)
+        const router = await target[propertyKey].apply(this, args)
         return getRouter(router, [key])
       }
 
-      Object.setPrototypeOf(target[methodName], descriptor.value!)
+      const childDescriptor = Object.getOwnPropertyDescriptor(target, methodName)!
+
+      // the child is implemented synchronously below and snapshots interceptors through this link
+      Object.setPrototypeOf(childDescriptor.value, originalMethod)
+
+      queueMicrotask(() => {
+        inheritFunctionMetadata(childDescriptor.value, originalMethod, target[propertyKey])
+      })
 
       for (const p of Reflect.getOwnMetadataKeys(target, propertyKey)) {
         Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target, propertyKey), target, methodName)
@@ -95,7 +113,43 @@ export function Implement<T extends ContractRouter<any>>(
         Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target.constructor, propertyKey), target.constructor, methodName)
       }
 
-      Implement(get(contract, [key]) as any)(target, methodName, Object.getOwnPropertyDescriptor(target, methodName)!)
+      Implement(get(contract, [key]) as any)(target, methodName, childDescriptor)
+    }
+  }
+}
+
+function inheritFunctionMetadata(
+  method: AnyFunction,
+  originalMethod: AnyFunction,
+  finalMethod: AnyFunction,
+): void {
+  Object.setPrototypeOf(method, finalMethod)
+
+  if (finalMethod === originalMethod) {
+    return
+  }
+
+  // a replacement that does not copy metadata leaves it only on the original function
+  for (const key of Reflect.getMetadataKeys(originalMethod)) {
+    // own keys are the child's route decorators plus `__interceptors__`, snapshotted through the
+    // synchronous link: it holds the interceptors below @Implement, but not the ones above it
+    if (Reflect.hasOwnMetadata(key, method)) {
+      continue
+    }
+
+    const originalValue = Reflect.getMetadata(key, originalMethod)
+
+    if (!Reflect.hasMetadata(key, finalMethod)) {
+      Reflect.defineMetadata(key, originalValue, method)
+    }
+    else if (ACCUMULATED_METADATA_KEYS.has(key)) {
+      const originalItems: unknown[] = toArray(originalValue)
+      const finalItems: unknown[] = toArray(Reflect.getMetadata(key, finalMethod))
+      Reflect.defineMetadata(
+        key,
+        [...originalItems.filter(item => !finalItems.includes(item)), ...finalItems],
+        method,
+      )
     }
   }
 }

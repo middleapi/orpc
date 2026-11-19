@@ -1,11 +1,11 @@
-import type { CanActivate, ExecutionContext } from '@nestjs/common'
+import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { NodeHttpRequest } from '@orpc/standard-server-node'
 import type { Request } from 'express'
 import type { FastifyReply } from 'fastify'
 import FastifyCookie from '@fastify/cookie'
 import { HonoAdapter } from '@mnigos/platform-hono'
-import { Controller, Req, Res, UseGuards } from '@nestjs/common'
-import { REQUEST } from '@nestjs/core'
+import { Controller, Req, Res, SetMetadata, UseGuards, UseInterceptors } from '@nestjs/common'
+import { Reflector, REQUEST } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
 import { oc, ORPCError } from '@orpc/contract'
@@ -870,6 +870,251 @@ describe('@Implement', async () => {
           expect.stringContaining('foo=bar'),
         ],
       }))
+    })
+
+    describe('@Implement keeps decorators around a method-replacing decorator', () => {
+      const contract = {
+        ping: oc.route({ path: '/wrapped/ping' }),
+        nested: {
+          pong: oc.route({ path: '/wrapped/pong' }),
+        },
+      }
+
+      const router = () => ({
+        ping: implement(contract.ping).handler(() => 'ping'),
+        nested: {
+          pong: implement(contract.nested.pong).handler(() => 'pong'),
+        },
+      })
+
+      const paths = ['/wrapped/ping', '/wrapped/pong']
+
+      const wrapperCalled = vi.fn()
+
+      const wrapMethod = (original: any, copyMetadata: boolean): any => {
+        const wrapped = function (this: unknown, ...args: unknown[]) {
+          wrapperCalled()
+          return original.apply(this, args)
+        }
+
+        if (copyMetadata) {
+          for (const key of Reflect.getOwnMetadataKeys(original)) {
+            Reflect.defineMetadata(key, Reflect.getOwnMetadata(key, original), wrapped)
+          }
+        }
+
+        return wrapped
+      }
+
+      const InPlaceWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+        descriptor.value = wrapMethod(descriptor.value, true)
+      }
+
+      const NewDescriptorWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+        return { ...descriptor, value: wrapMethod(descriptor.value, true) }
+      }
+
+      const NonCopyingWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+        descriptor.value = wrapMethod(descriptor.value, false)
+      }
+
+      const guardCalls = vi.fn()
+
+      const recordingGuard = (name: string): CanActivate => ({
+        canActivate() {
+          guardCalls(name)
+          return true
+        },
+      })
+
+      class DenyGuard implements CanActivate {
+        canActivate() {
+          return false
+        }
+      }
+
+      const interceptorCalls = vi.fn()
+
+      class RecordingInterceptor implements NestInterceptor {
+        intercept(_ctx: ExecutionContext, next: CallHandler) {
+          interceptorCalls()
+          return next.handle()
+        }
+      }
+
+      const handlerMeta = vi.fn()
+
+      class MetaGuard implements CanActivate {
+        canActivate(ctx: ExecutionContext) {
+          const reflector = new Reflector()
+          handlerMeta(
+            reflector.get('above', ctx.getHandler()),
+            reflector.get('below', ctx.getHandler()),
+            reflector.get('roles', ctx.getHandler()),
+            reflector.get('cleared', ctx.getHandler()),
+          )
+          return true
+        }
+      }
+
+      const createServer = async (controller: new () => unknown) => {
+        const moduleRef = await Test.createTestingModule({
+          controllers: [controller],
+        }).compile()
+
+        const app = moduleRef.createNestApplication()
+        await app.init()
+
+        return app.getHttpServer()
+      }
+
+      describe.each([
+        ['a wrapper mutating the descriptor', InPlaceWrap],
+        ['a wrapper returning a new descriptor', NewDescriptorWrap],
+        ['a wrapper that does not copy metadata', NonCopyingWrap],
+      ] as const)('with %s', (_, Wrap) => {
+        it('runs guards from both sides of the wrapper in decorator order', async () => {
+          @Controller()
+          class ImplController {
+            @UseGuards(recordingGuard('above'))
+            @Wrap()
+            @UseGuards(recordingGuard('below'))
+            @Implement(contract)
+            router() {
+              return router()
+            }
+          }
+
+          const server = await createServer(ImplController)
+
+          for (const path of paths) {
+            guardCalls.mockClear()
+
+            expect((await supertest(server).post(path)).status).toBe(200)
+            expect(guardCalls.mock.calls).toEqual([['below'], ['above']])
+          }
+        })
+
+        it('exposes @SetMetadata from both sides of the wrapper and lets the outermost value win', async () => {
+          @Controller()
+          @UseGuards(MetaGuard)
+          class ImplController {
+            @SetMetadata('above', 'above-value')
+            @SetMetadata('roles', ['admin'])
+            @SetMetadata('cleared', undefined)
+            @Wrap()
+            @SetMetadata('cleared', 'below-value')
+            @SetMetadata('roles', ['user'])
+            @SetMetadata('below', 'below-value')
+            @Implement(contract)
+            router() {
+              return router()
+            }
+          }
+
+          const server = await createServer(ImplController)
+
+          for (const path of paths) {
+            handlerMeta.mockClear()
+
+            expect((await supertest(server).post(path)).status).toBe(200)
+            expect(handlerMeta).toHaveBeenCalledExactlyOnceWith(
+              'above-value',
+              'below-value',
+              ['admin'],
+              undefined,
+            )
+          }
+        })
+
+        it('keeps guards when their metadata key is set to undefined on the other side of the wrapper', async () => {
+          @Controller()
+          class ImplController {
+            @SetMetadata('__guards__', undefined)
+            @Wrap()
+            @UseGuards(recordingGuard('below'))
+            @Implement(contract)
+            router() {
+              return router()
+            }
+          }
+
+          const server = await createServer(ImplController)
+
+          for (const path of paths) {
+            guardCalls.mockClear()
+
+            expect((await supertest(server).post(path)).status).toBe(200)
+            expect(guardCalls.mock.calls).toEqual([['below']])
+          }
+        })
+
+        it('calls the wrapper and returns the procedure output on every route', async () => {
+          @Controller()
+          class ImplController {
+            @Wrap()
+            @Implement(contract)
+            router() {
+              return router()
+            }
+          }
+
+          const server = await createServer(ImplController)
+
+          const pingRes = await supertest(server).post('/wrapped/ping')
+          expect(pingRes.status).toBe(200)
+          expect(pingRes.body).toEqual('ping')
+          expect(wrapperCalled).toHaveBeenCalledTimes(1)
+
+          const pongRes = await supertest(server).post('/wrapped/pong')
+          expect(pongRes.status).toBe(200)
+          expect(pongRes.body).toEqual('pong')
+          expect(wrapperCalled).toHaveBeenCalledTimes(2)
+        })
+
+        it('runs interceptors below @Implement and still responds through @Implement', async () => {
+          @Controller()
+          class ImplController {
+            @Wrap()
+            @Implement(contract)
+            @UseInterceptors(RecordingInterceptor)
+            router() {
+              return router()
+            }
+          }
+
+          const server = await createServer(ImplController)
+
+          const pingRes = await supertest(server).post('/wrapped/ping')
+          expect(pingRes.status).toBe(200)
+          expect(pingRes.body).toEqual('ping')
+          expect(interceptorCalls).toHaveBeenCalledTimes(1)
+
+          const pongRes = await supertest(server).post('/wrapped/pong')
+          expect(pongRes.status).toBe(200)
+          expect(pongRes.body).toEqual('pong')
+          expect(interceptorCalls).toHaveBeenCalledTimes(2)
+        })
+      })
+
+      it.each([
+        ['a wrapper mutating the descriptor', InPlaceWrap],
+        ['a wrapper returning a new descriptor', NewDescriptorWrap],
+      ] as const)('procedure-based implementation applies a guard above %s', async (_, Wrap) => {
+        @Controller()
+        class ImplController {
+          @UseGuards(DenyGuard)
+          @Wrap()
+          @Implement(contract.ping)
+          ping() {
+            return router().ping
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        expect((await supertest(server).post('/wrapped/ping')).status).toBe(403)
+      })
     })
   })
 })
