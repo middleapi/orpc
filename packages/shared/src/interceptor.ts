@@ -1,7 +1,6 @@
 import { isAsyncIteratorObject } from '@standard-server/shared'
 
 import { wrapAsyncIterator } from './iterator'
-import { override } from './proxy'
 import { wrapReadableStream } from './stream'
 import type { Promisable } from './types'
 import type { PromiseWithError, ThrowableError } from './types'
@@ -144,16 +143,9 @@ export function onAsyncIteratorObjectError<
       return output
     }
 
-    /**
-     * @warning
-     * Remember use `override` for AsyncIteratorObject to remain other special properties
-     */
-    return override(
-      output,
-      wrapAsyncIterator(output, {
-        onError: (error) => callback(error, options, ...rest),
-      }),
-    )
+    return wrapAsyncIterator(output, {
+      onError: (error) => callback(error, options, ...rest),
+    })
   }
 }
 
@@ -188,16 +180,9 @@ export function onReadableStreamError<TOptions extends { next: () => any }, TRes
       return output
     }
 
-    /**
-     * @warning
-     * Remember use `override` for ReadableStream to remain other special properties
-     */
-    return override(
-      output,
-      wrapReadableStream(output, {
-        onError: (error) => callback(error, options, ...rest),
-      }),
-    )
+    return wrapReadableStream(output, {
+      onError: (error) => callback(error, options, ...rest),
+    })
   }
 }
 

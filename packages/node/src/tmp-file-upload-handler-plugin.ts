@@ -16,7 +16,6 @@ import type {
 import type { Promisable, Value } from '@orpc/shared'
 import {
   isAsyncIteratorObject,
-  override,
   toArray,
   value,
   wrapAsyncIterator,
@@ -222,14 +221,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
               matched: true,
               response: {
                 ...result.response,
-                /**
-                 * @warning
-                 * Remember use `override` for AsyncIteratorObject to remain other special properties
-                 */
-                body: override(
-                  body,
-                  wrapAsyncIterator(body, { onFinish: () => tmpFiles.cleanup() }),
-                ),
+                body: wrapAsyncIterator(body, { onFinish: () => tmpFiles.cleanup() }),
               },
             }
           }
@@ -241,14 +233,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
               matched: true,
               response: {
                 ...result.response,
-                /**
-                 * @warning
-                 * Remember use `override` for ReadableStream to remain other special properties
-                 */
-                body: override(
-                  body,
-                  wrapReadableStream(body, { onFinish: () => tmpFiles.cleanup() }),
-                ),
+                body: wrapReadableStream(body, { onFinish: () => tmpFiles.cleanup() }),
               },
             }
           }

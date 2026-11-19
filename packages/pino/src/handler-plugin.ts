@@ -11,7 +11,6 @@ import {
   isAbortError,
   isAsyncIteratorObject,
   ORPC_NAME,
-  override,
   toArray,
   wrapReadableStream,
 } from '@orpc/shared'
@@ -206,33 +205,19 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {
-        /**
-         * @remarks
-         * **Warning**: Remember use `override` for AsyncIteratorObject to remain other special properties
-         */
-        return override(
-          output,
-          wrapAsyncIteratorPreservingEventMeta(output, {
-            onError: (error) => {
-              logProcedureError(getLogger(context), error, this.procedureErrorLevel)
-            },
-          }),
-        )
+        return wrapAsyncIteratorPreservingEventMeta(output, {
+          onError: (error) => {
+            logProcedureError(getLogger(context), error, this.procedureErrorLevel)
+          },
+        })
       }
 
       if (output instanceof ReadableStream) {
-        /**
-         * @remarks
-         * **Warning**: Remember use `override` for ReadableStream to remain other special properties
-         */
-        return override(
-          output,
-          wrapReadableStream(output, {
-            onError: (error) => {
-              logProcedureError(getLogger(context), error, this.procedureErrorLevel)
-            },
-          }),
-        )
+        return wrapReadableStream(output, {
+          onError: (error) => {
+            logProcedureError(getLogger(context), error, this.procedureErrorLevel)
+          },
+        })
       }
 
       return output

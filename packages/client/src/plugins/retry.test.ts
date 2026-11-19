@@ -614,43 +614,5 @@ describe('retryLinkPlugin', () => {
       expect(clean).toHaveBeenCalledTimes(1)
       expect(clean).toHaveBeenCalledWith(false)
     })
-
-    it('reset special AsyncIteratorObject properties after retry', async () => {
-      const codec = makeCodec()
-      const transport = makeTransport()
-
-      let callCount = 0
-      vi.mocked(codec.decodeResponse).mockImplementation(async () => {
-        callCount++
-
-        const gen = (async function* () {
-          throw new Error('ITER_FAIL')
-        })()
-
-        Object.defineProperty(gen, 'specialProperty', {
-          value: `specialValue:${callCount}`,
-          configurable: true,
-        })
-
-        return {
-          kind: 'output',
-          output: gen,
-        }
-      })
-
-      const link = new StandardLink(codec, transport, {
-        plugins: [new RetryLinkPlugin()],
-      })
-
-      const iterator = (await link.call(
-        ['planet', 'create'],
-        { name: 'Earth' },
-        { context: { retry: 1, retryDelay: 0 } },
-      )) as AsyncIterator<any>
-
-      expect((iterator as any).specialProperty).toEqual('specialValue:1')
-      await expect(iterator.next()).rejects.toThrow('ITER_FAIL')
-      expect((iterator as any).specialProperty).toEqual('specialValue:2')
-    })
   })
 })

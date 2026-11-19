@@ -22,7 +22,6 @@ import {
   intercept,
   isAsyncIteratorObject,
   mergeTwoLevels,
-  override,
   resolveMaybeOptionalOptions,
   runWithSpan,
   toArray,
@@ -142,28 +141,13 @@ export function createProcedureClient<
          * @warning
          * If remove this return, can be breaking change
          * because AsyncIteratorClass convert `.throw` to `.return` (rarely used)
-         *
-         * @warning
-         * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        return override(
-          output,
-          wrapAsyncIteratorPreservingEventMeta(
-            getTracer()
-              ? traceAsyncIterator('consume_async_iterator_object_output', output)
-              : output,
-            { mapError: reconcileError },
-          ),
+        return wrapAsyncIteratorPreservingEventMeta(
+          getTracer() ? traceAsyncIterator('consume_async_iterator_object_output', output) : output,
+          { mapError: reconcileError },
         ) as typeof output
       } else if (getTracer() && (output as unknown) instanceof ReadableStream) {
-        /**
-         * @warning
-         * Remember use `override` for ReadableStream to remain other special properties
-         */
-        return override(
-          output,
-          traceReadableStream('consume_octet_stream_output', output),
-        ) as typeof output
+        return traceReadableStream('consume_octet_stream_output', output) as typeof output
       }
 
       return output

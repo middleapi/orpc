@@ -1,6 +1,6 @@
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import type { AsyncIteratorClass } from '@orpc/shared'
-import { isAsyncIteratorObject, ORPC_NAME, override } from '@orpc/shared'
+import { isAsyncIteratorObject, ORPC_NAME } from '@orpc/shared'
 
 import { ValidationError } from './error'
 import type { AnySchema, Schema } from './schema'
@@ -65,7 +65,7 @@ export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TR
           },
         })
 
-        return { value: override(iterator, mapped) }
+        return { value: mapped }
       },
     },
   }

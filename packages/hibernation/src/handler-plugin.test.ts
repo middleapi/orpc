@@ -2,6 +2,7 @@ import { oc } from '@orpc/contract'
 import { eventIterator, implement, os } from '@orpc/server'
 import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import { RPCHandler } from '@orpc/server/websocket'
+import { getTracer, setTracer, wrapAsyncIterator } from '@orpc/shared'
 import {
   decodePeerMessage,
   encodePeerMessage,
@@ -65,17 +66,8 @@ describe('hibernationHandlerPlugin', () => {
       resolveBody: () => Promise.resolve(undefined),
     }) as any
 
-  it('sets body as HibernationAsyncIteratorClass if output is HibernationAsyncIteratorClass', async () => {
-    const { response } = await handler.handle(createRequest('/ping'), {
-      context: {},
-    })
-
-    expect(response!.status).toBe(200)
-    expect(response!.body).toBeInstanceOf(HibernationAsyncIteratorClass)
-  })
-
-  it.each(['/withOutputSchema', '/withOutputSchemaAndMiddleware', '/contract'])(
-    'sets body as HibernationAsyncIteratorClass even when %s declares an event iterator output schema',
+  it.each(['/ping', '/withOutputSchema', '/withOutputSchemaAndMiddleware', '/contract'])(
+    'sets body as HibernationAsyncIteratorClass if the handler of %s returns one',
     async (url) => {
       const { response } = await handler.handle(createRequest(url), {
         context: {},
@@ -85,6 +77,98 @@ describe('hibernationHandlerPlugin', () => {
       expect(response!.body).toBeInstanceOf(HibernationAsyncIteratorClass)
     },
   )
+
+  it.each([
+    ['after the hibernation callback has run', true],
+    ['when the peer cancels before the hibernation callback', false],
+  ])('finishes the iterators wrapping the output %s', async (_, runCallback) => {
+    const onFinish = vi.fn()
+
+    interceptor.mockImplementationOnce(async ({ next }) => {
+      const response = await next()
+      return { ...response, body: wrapAsyncIterator(response.body, { onFinish }) }
+    })
+
+    const { response } = await handler.handle(createRequest('/withOutputSchema'), {
+      context: {},
+    })
+
+    const body = response!.body as HibernationAsyncIteratorClass<string>
+    expect(body).toBeInstanceOf(HibernationAsyncIteratorClass)
+
+    if (runCallback) {
+      await body['~callback']!('19')
+      expect(callback).toHaveBeenCalledExactlyOnceWith('19')
+    }
+
+    expect(onFinish).not.toHaveBeenCalled()
+
+    await expect(body.return()).resolves.toEqual({ done: true, value: undefined })
+    await body.return()
+
+    expect(onFinish).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays outside the tracing interceptor and ends the request span once the body is returned', async () => {
+    const createSpan = () => ({
+      setAttribute: vi.fn(),
+      updateName: vi.fn(),
+      addEvent: vi.fn(),
+      recordException: vi.fn(),
+      end: vi.fn(),
+    })
+    const span = createSpan()
+    const tracer = {
+      startSpan: vi.fn(createSpan),
+      // the request span is the first active span started
+      startActiveSpan: vi
+        .fn((_name, _parent, fn) => fn(createSpan()))
+        .mockImplementationOnce((_name, _parent, fn) => fn(span)),
+      withActiveSpan: vi.fn((_span, fn) => fn()),
+      getActiveSpan: () => span,
+    }
+
+    const previousTracer = getTracer()
+    setTracer(tracer as any)
+    onTestFinished(() => setTracer(previousTracer))
+
+    const { response } = await new StandardHandler(new RPCHandlerCodec(router), options).handle(
+      createRequest('/ping'),
+      { context: {} },
+    )
+
+    const body = response!.body as HibernationAsyncIteratorClass<string>
+    expect(body).toBeInstanceOf(HibernationAsyncIteratorClass)
+
+    await body['~callback']!('19')
+    expect(span.end).not.toHaveBeenCalled()
+
+    await body.return()
+    expect(span.end).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes the same procedure copy to middlewares on every request', async () => {
+    const procedures: unknown[] = []
+    const handler = new StandardHandler(
+      new RPCHandlerCodec({
+        ping: os
+          .use(({ next, procedure }) => {
+            procedures.push(procedure)
+            return next()
+          })
+          .handler(() => new HibernationAsyncIteratorClass<string>(callback)),
+      }),
+      options,
+    )
+
+    for (let i = 0; i < 2; i++) {
+      const { response } = await handler.handle(createRequest('/ping'), { context: {} })
+      expect(response!.body).toBeInstanceOf(HibernationAsyncIteratorClass)
+    }
+
+    expect(procedures).toHaveLength(2)
+    expect(procedures[0]).toBe(procedures[1])
+  })
 
   it('does not hibernate a regular iterator with an output schema', async () => {
     const { response } = await handler.handle(createRequest('/iteratorWithOutputSchema'), {

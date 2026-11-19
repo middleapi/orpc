@@ -256,6 +256,16 @@ describe('timeoutHandlerPlugin', () => {
     expect(text).not.toContain('event: error')
   })
 
+  it('should not start the streaming timeout for non-streaming responses', async () => {
+    procedure_handler.mockResolvedValueOnce('success')
+    const handler = makeHandler({ timeout: 1000, streamingTimeout: 5000 })
+
+    const { response } = await handler.handle(new Request('http://localhost'))
+
+    expect(response?.status).toBe(200)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('should support dynamic streamingTimeout based on interceptor options', async () => {
     const streamingTimeout = vi.fn(({ context }: any) => context.streamingTimeout)
     const handler = makeHandler(

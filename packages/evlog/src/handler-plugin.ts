@@ -10,7 +10,6 @@ import {
   isAbortError,
   isAsyncIteratorObject,
   ORPC_NAME,
-  override,
   sleep,
   toArray,
   wrapReadableStream,
@@ -140,30 +139,23 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
               ...result,
               response: {
                 ...result.response,
-                /**
-                 * @remarks
-                 * **Warning**: Remember use `override` for AsyncIteratorObject to remain other special properties
-                 */
-                body: override(
-                  result.response.body,
-                  wrapAsyncIteratorPreservingEventMeta(result.response.body, {
-                    runWith,
-                    onError: (error) => {
-                      /**
-                       * Errors here are internal (interceptor/framework) failures,
-                       * except `EventStreamErrorEvent`: a business error the protocol delivers
-                       * inside the event stream, already logged by the client interceptor.
-                       */
-                      if (!(error instanceof EventStreamErrorEvent)) {
-                        logger.error(toErrorOrString(error))
-                      }
-                    },
-                    onFinish: async () => {
-                      await sleep(0) // dealing with "log.error() called after the wide event was emitted"
-                      await finish({ status: result.response?.status })
-                    },
-                  }),
-                ),
+                body: wrapAsyncIteratorPreservingEventMeta(result.response.body, {
+                  runWith,
+                  onError: (error) => {
+                    /**
+                     * Errors here are internal (interceptor/framework) failures,
+                     * except `EventStreamErrorEvent`: a business error the protocol delivers
+                     * inside the event stream, already logged by the client interceptor.
+                     */
+                    if (!(error instanceof EventStreamErrorEvent)) {
+                      logger.error(toErrorOrString(error))
+                    }
+                  },
+                  onFinish: async () => {
+                    await sleep(0) // dealing with "log.error() called after the wide event was emitted"
+                    await finish({ status: result.response?.status })
+                  },
+                }),
               },
             }
           }
@@ -173,27 +165,20 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
               ...result,
               response: {
                 ...result.response,
-                /**
-                 * @remarks
-                 * **Warning**: Remember use `override` for ReadableStream to remain other special properties
-                 */
-                body: override(
-                  result.response.body,
-                  wrapReadableStream(result.response.body, {
-                    runWith,
-                    onError: (error) => {
-                      /**
-                       * Any error here is internal (interceptor/framework), not business logic.
-                       * Indicates unexpected handler failure.
-                       */
-                      logger.error(toErrorOrString(error))
-                    },
-                    onFinish: async () => {
-                      await sleep(0) // dealing with "log.error() called after the wide event was emitted"
-                      await finish({ status: result.response?.status })
-                    },
-                  }),
-                ),
+                body: wrapReadableStream(result.response.body, {
+                  runWith,
+                  onError: (error) => {
+                    /**
+                     * Any error here is internal (interceptor/framework), not business logic.
+                     * Indicates unexpected handler failure.
+                     */
+                    logger.error(toErrorOrString(error))
+                  },
+                  onFinish: async () => {
+                    await sleep(0) // dealing with "log.error() called after the wide event was emitted"
+                    await finish({ status: result.response?.status })
+                  },
+                }),
               },
             }
           }
@@ -261,33 +246,19 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {
-        /**
-         * @remarks
-         * **Warning**: Remember use `override` for AsyncIteratorObject to remain other special properties
-         */
-        return override(
-          output,
-          wrapAsyncIteratorPreservingEventMeta(output, {
-            onError: (error) => {
-              logProcedureError(logger, error, this.procedureErrorLevel)
-            },
-          }),
-        )
+        return wrapAsyncIteratorPreservingEventMeta(output, {
+          onError: (error) => {
+            logProcedureError(logger, error, this.procedureErrorLevel)
+          },
+        })
       }
 
       if (output instanceof ReadableStream) {
-        /**
-         * @remarks
-         * **Warning**: Remember use `override` for ReadableStream to remain other special properties
-         */
-        return override(
-          output,
-          wrapReadableStream(output, {
-            onError: (error) => {
-              logProcedureError(logger, error, this.procedureErrorLevel)
-            },
-          }),
-        )
+        return wrapReadableStream(output, {
+          onError: (error) => {
+            logProcedureError(logger, error, this.procedureErrorLevel)
+          },
+        })
       }
 
       return output
