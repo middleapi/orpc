@@ -273,9 +273,9 @@ Per-request data passed through the link's [`headers` option](/docs/rpc/link#url
 
 Headers shared by every request in a batch move to the batch request. Other headers stay on their subrequest, which travels in the body of a `POST` batch.
 
-A `GET` batch carries its subrequests in the URL, where access logs and proxies can record them, so headers never go there. `GET` requests are batched only with requests that have identical headers, and a request that still has headers of its own after `mapSubrequest` is sent individually.
+A `GET` batch carries its subrequests in the URL, where access logs and proxies can record them, so headers never go there. `GET` requests are batched only with requests that have identical headers, and a request that still has headers of its own after `mapSubrequest` is sent individually. A header that differs on every call, such as the `traceparent` header that client tracing adds, keeps every `GET` request out of a batch. Use `POST` to batch such requests.
 
-`mapSubrequest` maps only the requests sent in a batch. A request sent individually is sent as it was before mapping, so a header that `mapSubrequest` adds does not reach it. Set such headers on the link instead.
+The `headers` and `mapSubrequest` options apply only to requests sent in a batch. A request sent individually is sent as it was, so a header that only these options add does not reach it. Set such headers on the link instead.
 
 ## Response Headers
 

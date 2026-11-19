@@ -203,6 +203,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
 
   /**
    * Headers used for the batch request.
+   * A request sent individually does not get them.
    *
    * @default Common headers among all subrequests in the batch.
    */
