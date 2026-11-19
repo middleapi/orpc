@@ -122,6 +122,7 @@ describe('cookieJarLinkPlugin', () => {
       'session=explicit; lang=en; theme=dark',
     ],
     [['a=1', ' ', 'b=2'], ['a=jar', 'c=jar'], 'a=1; b=2; c=jar'],
+    ['session=explicit', ['=session=jar', 'theme=dark'], 'session=explicit; theme=dark'],
   ])('sends cookie header %j with jar cookies %j as %j', async (cookie, jarCookies, expected) => {
     const jar = new CookieJar()
     jarCookies.forEach((jarCookie) => jar.setCookie(`${jarCookie}; Path=/`, origin))
@@ -131,6 +132,26 @@ describe('cookieJarLinkPlugin', () => {
 
     expect(sentCookie(transport, 0)).toEqual(expected)
   })
+
+  it.each([
+    ['http://api.example.com', '=__Host-session=evil; Path=/'],
+    ['https://cdn.example.com', '=__Secure-session=evil; Secure; Domain=example.com; Path=/'],
+    ['http://api.example.com', '__Host-session=evil; Path=/'],
+  ])(
+    'does not let %s pass a nameless cookie off as a prefixed one with %s',
+    async (attackerOrigin, setCookie) => {
+      const jar = new CookieJar()
+      const attackerTransport = createTransport({ headers: { 'set-cookie': setCookie } })
+      const transport = createTransport()
+
+      await createLink({ jar, origin: attackerOrigin }, attackerTransport).call(['ping'], 'input', {
+        context: {},
+      })
+      await createLink({ jar }, transport).call(['ping'], 'input', { context: {} })
+
+      expect(sentCookie(transport, 0)).toBeUndefined()
+    },
+  )
 
   it('picks the jar per request', async () => {
     const jars = { alice: new CookieJar(), bob: new CookieJar() }
@@ -462,6 +483,24 @@ describe('cookieJar', () => {
 
     expect(jar.getCookies()).toHaveLength(stored ? 1 : 0)
   })
+
+  it.each([
+    ['=__Host-session=evil; Path=/', false],
+    ['=__Host-session=evil; Secure; Path=/', false],
+    ['=__host-session=evil; Secure; Path=/', false],
+    ['= __Secure-session=evil; Secure', false],
+    ['=__SECURE-session=evil; Secure', false],
+    ['__Host-session; Secure; Path=/', false],
+    ['=__Hostsession=1; Path=/', true],
+    ['=session=1; Path=/', true],
+  ])(
+    'applies the cookie prefix rules to the value of nameless %s: stored %s',
+    (setCookie, stored) => {
+      jar.setCookie(setCookie, site)
+
+      expect(jar.getCookies()).toHaveLength(stored ? 1 : 0)
+    },
+  )
 
   describe('expiration', () => {
     it('expires a cookie after Max-Age seconds', () => {
