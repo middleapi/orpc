@@ -1603,7 +1603,7 @@ describe('compatibility', () => {
     })
   })
 
-  describe('router-based implementation keeps decorators around a method-replacing decorator', () => {
+  describe('@Implement keeps decorators around a method-replacing decorator', () => {
     const contract = {
       ping: oc.meta(openapi({ path: '/wrapped/ping' })),
       nested: {
@@ -1622,7 +1622,7 @@ describe('compatibility', () => {
 
     const wrapperCalled = vi.fn()
 
-    const wrapMethod = (original: any, copyMetadata: boolean) => {
+    const wrapMethod = (original: any, copyMetadata: boolean): any => {
       const wrapped = function (this: unknown, ...args: unknown[]) {
         wrapperCalled()
         return original.apply(this, args)
@@ -1638,44 +1638,43 @@ describe('compatibility', () => {
     }
 
     const InPlaceWrap = (): MethodDecorator => (_target, _key, descriptor) => {
-      descriptor.value = wrapMethod(descriptor.value, true) as any
+      descriptor.value = wrapMethod(descriptor.value, true)
     }
 
     const NewDescriptorWrap = (): MethodDecorator => (_target, _key, descriptor) => {
-      return { ...descriptor, value: wrapMethod(descriptor.value, true) as any }
+      return { ...descriptor, value: wrapMethod(descriptor.value, true) }
     }
 
     const NonCopyingWrap = (): MethodDecorator => (_target, _key, descriptor) => {
-      descriptor.value = wrapMethod(descriptor.value, false) as any
+      descriptor.value = wrapMethod(descriptor.value, false)
     }
 
     const guardCalls = vi.fn()
 
+    const recordingGuard = (name: string): CanActivate => ({
+      canActivate() {
+        guardCalls(name)
+        return true
+      },
+    })
+
     class DenyGuard implements CanActivate {
       canActivate() {
-        guardCalls('deny')
         return false
       }
     }
 
-    class AllowAboveGuard implements CanActivate {
-      canActivate() {
-        guardCalls('above')
-        return true
-      }
-    }
+    const handlerMeta = vi.fn()
 
-    class AllowBelowGuard implements CanActivate {
-      canActivate() {
-        guardCalls('below')
-        return true
-      }
-    }
-
-    class RolesGuard implements CanActivate {
+    class MetaGuard implements CanActivate {
       canActivate(ctx: ExecutionContext) {
-        const roles: string[] | undefined = new Reflector().get('roles', ctx.getHandler())
-        return !roles || roles.includes(ctx.switchToHttp().getRequest().headers['x-role'])
+        const reflector = new Reflector()
+        handlerMeta(
+          reflector.get('above', ctx.getHandler()),
+          reflector.get('below', ctx.getHandler()),
+          reflector.get('roles', ctx.getHandler()),
+        )
+        return true
       }
     }
 
@@ -1695,48 +1694,12 @@ describe('compatibility', () => {
       ['a wrapper returning a new descriptor', NewDescriptorWrap],
       ['a wrapper that does not copy metadata', NonCopyingWrap],
     ] as const)('with %s', (_, Wrap) => {
-      it('applies a guard above the wrapper to every route', async () => {
-        @Controller()
-        class ImplController {
-          @UseGuards(DenyGuard)
-          @Wrap()
-          @Implement(contract)
-          router() {
-            return router()
-          }
-        }
-
-        const server = await createServer(ImplController)
-
-        for (const path of paths) {
-          expect((await supertest(server).post(path)).status).toBe(403)
-        }
-      })
-
-      it('applies a guard below the wrapper to every route', async () => {
-        @Controller()
-        class ImplController {
-          @Wrap()
-          @UseGuards(DenyGuard)
-          @Implement(contract)
-          router() {
-            return router()
-          }
-        }
-
-        const server = await createServer(ImplController)
-
-        for (const path of paths) {
-          expect((await supertest(server).post(path)).status).toBe(403)
-        }
-      })
-
       it('runs guards from both sides of the wrapper in decorator order', async () => {
         @Controller()
         class ImplController {
-          @UseGuards(AllowAboveGuard)
+          @UseGuards(recordingGuard('above'))
           @Wrap()
-          @UseGuards(AllowBelowGuard)
+          @UseGuards(recordingGuard('below'))
           @Implement(contract)
           router() {
             return router()
@@ -1753,12 +1716,15 @@ describe('compatibility', () => {
         }
       })
 
-      it('exposes @SetMetadata above the wrapper to a class-level guard', async () => {
+      it('exposes @SetMetadata from both sides of the wrapper and lets the outermost value win', async () => {
         @Controller()
-        @UseGuards(RolesGuard)
+        @UseGuards(MetaGuard)
         class ImplController {
+          @SetMetadata('above', 'above-value')
           @SetMetadata('roles', ['admin'])
           @Wrap()
+          @SetMetadata('roles', ['user'])
+          @SetMetadata('below', 'below-value')
           @Implement(contract)
           router() {
             return router()
@@ -1768,28 +1734,12 @@ describe('compatibility', () => {
         const server = await createServer(ImplController)
 
         for (const path of paths) {
-          expect((await supertest(server).post(path)).status).toBe(403)
-          expect((await supertest(server).post(path).set('x-role', 'admin')).status).toBe(200)
-        }
-      })
+          handlerMeta.mockClear()
 
-      it('exposes @SetMetadata below the wrapper to a class-level guard', async () => {
-        @Controller()
-        @UseGuards(RolesGuard)
-        class ImplController {
-          @Wrap()
-          @SetMetadata('roles', ['admin'])
-          @Implement(contract)
-          router() {
-            return router()
-          }
-        }
-
-        const server = await createServer(ImplController)
-
-        for (const path of paths) {
-          expect((await supertest(server).post(path)).status).toBe(403)
-          expect((await supertest(server).post(path).set('x-role', 'admin')).status).toBe(200)
+          expect((await supertest(server).post(path)).status).toBe(200)
+          expect(handlerMeta).toHaveBeenCalledExactlyOnceWith('above-value', 'below-value', [
+            'admin',
+          ])
         }
       })
 
@@ -1827,7 +1777,7 @@ describe('compatibility', () => {
         @Wrap()
         @Implement(contract.ping)
         ping() {
-          return implement(contract.ping).handler(() => 'ping')
+          return router().ping
         }
       }
 
