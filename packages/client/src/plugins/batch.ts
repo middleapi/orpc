@@ -3,6 +3,7 @@ import {
   captureAsyncContext,
   defer,
   isAsyncIteratorObject,
+  isDeepEqual,
   loadBytes,
   once,
   promiseWithResolvers,
@@ -465,20 +466,19 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
        * A GET batch carries its subrequests in the URL, where access logs and proxies record them,
        * so a header left on a subrequest must stay out of it.
        */
-      if (method === 'GET') {
-        const parts = splitBySubrequestHeaders(groupItems, subrequests)
+      const parts =
+        method === 'GET' ? splitBySubrequestHeaders(groupItems, subrequests) : [groupItems]
 
-        if (parts.length > 1) {
-          await Promise.all(
-            parts.map((part) =>
-              part[0] === groupItems[0]
-                ? this.executeBatch(method, group, part)
-                : this.executeBatchInOwnContext(method, group, part),
-            ),
-          )
+      if (parts.length > 1) {
+        await Promise.all(
+          parts.map((part) =>
+            part[0] === groupItems[0]
+              ? this.executeBatch(method, group, part)
+              : this.executeBatchInOwnContext(method, group, part),
+          ),
+        )
 
-          return
-        }
+        return
       }
 
       let batchResponse: StandardLazyResponse
@@ -647,51 +647,31 @@ type BatchLinkPluginItem<T extends ClientContext> = [
 ]
 
 /**
- * Splits items whose subrequests still have headers from the rest, keeping items with identical
- * headers together so the batch headers can lift them. Items whose headers stay on the subrequest
- * even when they are all identical are separated, so each is sent on its own.
- *
- * @returns a single part when no subrequest has headers.
+ * Groups items by the headers left on their subrequest, so re-batching a group lets the batch headers
+ * lift them. Headers left on every item alike cannot be lifted, so those items are sent alone.
  */
 function splitBySubrequestHeaders<T extends ClientContext>(
   items: BatchLinkPluginItem<T>[],
   subrequests: StandardRequest[],
 ): BatchLinkPluginItem<T>[][] {
-  const withoutHeaders: BatchLinkPluginItem<T>[] = []
-  const byHeaders = new Map<string, BatchLinkPluginItem<T>[]>()
+  const parts: { headers: StandardHeaders; items: BatchLinkPluginItem<T>[] }[] = []
 
   for (const [index, item] of items.entries()) {
-    const definedHeaders = Object.entries(subrequests[index]!.headers)
-      .filter(([, value]) => value !== undefined)
-      // oxlint-disable-next-line unicorn/no-array-sort
-      .sort(([a], [b]) => (a < b ? -1 : 1))
-
-    if (definedHeaders.length === 0) {
-      withoutHeaders.push(item)
-      continue
-    }
-
-    const key = stringifyJSON(definedHeaders)
-    const sameHeaders = byHeaders.get(key)
+    const { headers } = subrequests[index]!
+    const sameHeaders = parts.find((part) => isDeepEqual(part.headers, headers))
 
     if (sameHeaders) {
-      sameHeaders.push(item)
+      sameHeaders.items.push(item)
     } else {
-      byHeaders.set(key, [item])
+      parts.push({ headers, items: [item] })
     }
   }
 
-  const parts = withoutHeaders.length > 0 ? [withoutHeaders] : []
-
-  for (const sameHeaders of byHeaders.values()) {
-    if (sameHeaders.length < items.length) {
-      parts.push(sameHeaders)
-    } else {
-      parts.push(...sameHeaders.map((item) => [item]))
-    }
+  if (parts.length === 1 && !isDeepEqual(parts[0]!.headers, {})) {
+    return items.map((item) => [item])
   }
 
-  return parts
+  return parts.map((part) => part.items)
 }
 
 /**
