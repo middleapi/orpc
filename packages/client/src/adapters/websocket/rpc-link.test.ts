@@ -689,6 +689,37 @@ describe('rpcLink', () => {
     expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 2 })
   })
 
+  it('treats a healthy socket that is still closing as healthy', async ({ onTestFinished }) => {
+    vi.useFakeTimers()
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+
+    const firstSocket = createWs()
+    const secondSocket = createWs(WEBSOCKET_CONNECTING)
+    const connect = vi
+      .fn()
+      .mockImplementationOnce(() => firstSocket)
+      .mockImplementationOnce(() => secondSocket)
+      .mockImplementation(() => createWs(WEBSOCKET_CONNECTING))
+    const orpc = createORPCClient(
+      new RPCLink({ connect, connectOnInit: true, reconnect: true }),
+    ) as any
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    firstSocket.readyState = WEBSOCKET_CLOSING
+
+    void orpc.ping('input').catch(() => {})
+    await vi.advanceTimersByTimeAsync(0)
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+
+    // the late close event must not reset the new cycle
+    await firstSocket.close()
+    await secondSocket.close()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 2 })
+  })
+
   describe('connections that close right after opening', () => {
     beforeEach(() => {
       vi.useFakeTimers()
@@ -736,6 +767,20 @@ describe('rpcLink', () => {
 
       await vi.advanceTimersByTimeAsync(10_000)
       expect(connect).toHaveBeenCalledTimes(3)
+    })
+
+    it('count as failed even when the next call comes much later', async () => {
+      const connect = createRejectingConnect()
+      const orpc = createORPCClient(
+        new RPCLink({ connect, connectOnInit: true, reconnect: true }),
+      ) as any
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      void orpc.ping('input').catch(() => {})
+      await vi.advanceTimersByTimeAsync(2_000)
+
+      expect(connect).toHaveBeenCalledTimes(2)
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
     })
 
     it('reset the attempt once the server sends a message', async () => {
