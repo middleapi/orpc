@@ -323,3 +323,7 @@ const link = new RPCLink({
   },
 })
 ```
+
+:::info
+A connection proves healthy once it receives a message from the server or stays open for 5 seconds. Only then does `attempt` reset to 1. A server that closes connections right after the handshake, for example to reject authentication, gets the `delay` backoff and the `maxAttempt` limit instead of an immediate reconnect loop.
+:::

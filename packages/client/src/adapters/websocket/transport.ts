@@ -26,6 +26,8 @@ import type { StandardLinkTransport } from '../standard/index'
 const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
 const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
+const HEALTHY_CONNECTION_DURATION = 5_000
+
 export type WebSocketLike = Pick<
   WebSocket,
   'addEventListener' | 'removeEventListener' | 'send' | 'readyState'
@@ -42,7 +44,10 @@ export interface WebSocketLinkTransportAttemptInfo {
   /**
    * Attempt number within the current (re)connect cycle.
    * Starts at 1, increments on each consecutive failure, and resets to 1
-   * once a connection succeeds or the cycle gives up. Use this for backoff calculations.
+   * once a connection proves healthy or the cycle gives up. Use this for backoff calculations.
+   *
+   * A connection proves healthy when it receives a message from the server or stays
+   * open for 5 seconds. A connection that closes sooner counts as a failure.
    */
   attempt: number
 }
@@ -192,6 +197,10 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       return this.getConnectedPeer()
     }
 
+    if (this.attempt >= this.reconnectMaxAttempt) {
+      this.giveUp()
+    }
+
     if (this.totalAttempt >= this.reconnectMaxTotalAttempt) {
       throw new AbortError(
         `WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`,
@@ -218,6 +227,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       let closeReason: undefined | AbortError
+      let openedAt = Infinity
 
       const peer = new ClientPeer(async (message) => {
         // `send` silently discards data once the socket is closed, so requests would never settle
@@ -249,6 +259,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
             event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
           const result = decodePeerMessage(message, this.decodePeerMessageOptions)
           if (result.matched && isServerPeerSendMessage(result.message)) {
+            this.attempt = 0
             // Not awaited: `peer.message` runs handling message may be slow,
             // and awaiting it would block decoding of subsequent messages.
             void peer.message(result.message)
@@ -258,6 +269,12 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
       websocket.addEventListener('close', async (event) => {
         closeReason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
+
+        // Reset before the `onClose` listener below reconnects
+        if (Date.now() - openedAt >= HEALTHY_CONNECTION_DURATION) {
+          this.attempt = 0
+        }
+
         connectingResolvers?.resolve()
         await peer.close(closeReason)
       })
@@ -280,7 +297,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         })
       }
 
-      this.attempt = 0
+      openedAt = Date.now()
       return { websocket, peer }
     })().catch((error) => {
       if (!this.reconnectEnabled) {
@@ -288,15 +305,17 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       if (this.attempt >= this.reconnectMaxAttempt) {
-        const attempt = this.attempt
-        this.attempt = 0
-        this.current = undefined
-        throw new AbortError(`WebSocket reconnect failed after ${attempt} attempt(s)`, {
-          cause: error,
-        })
+        this.giveUp(error)
       }
     })
 
     return this.getConnectedPeer()
+  }
+
+  private giveUp(cause?: unknown): never {
+    const attempt = this.attempt
+    this.attempt = 0
+    this.current = undefined
+    throw new AbortError(`WebSocket reconnect failed after ${attempt} attempt(s)`, { cause })
   }
 }
