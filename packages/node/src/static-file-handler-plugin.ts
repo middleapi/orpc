@@ -292,11 +292,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     headers['content-length'] = `${end - start + 1}`
 
     const body: ReadableStream<Uint8Array<ArrayBuffer>> =
-      request.method === 'HEAD'
+      request.method === 'HEAD' || end < start
         ? new ReadableStream({ start: (controller) => controller.close() })
-        : toWebReadableStream(
-            createReadStream(filePath, status === 206 ? { start, end } : undefined),
-          )
+        : toWebReadableStream(createReadStream(filePath, { start, end }))
 
     return { status, headers, body }
   }
