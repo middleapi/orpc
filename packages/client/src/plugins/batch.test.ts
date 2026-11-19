@@ -1868,6 +1868,260 @@ describe('batchLinkPlugin', () => {
     })
   })
 
+  describe('method GET subrequest headers', () => {
+    /**
+     * A link whose call to `path[0]` sends the headers `headersByPath` has for it.
+     */
+    function makeHeadersLink(
+      headersByPath: Record<string, Record<string, string>>,
+      options: Partial<ConstructorParameters<typeof BatchLinkPlugin<TestContext>>[0]> = {},
+      method: 'GET' | 'POST' = 'GET',
+    ) {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path) => ({
+        method,
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: headersByPath[path[0]!] ?? {},
+        body: undefined,
+      }))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], ...options })],
+      })
+
+      const sent = () => vi.mocked(transport.send).mock.calls.map(([request]) => request)
+
+      return {
+        link,
+        sent,
+        batches: () => sent().filter((request) => request.headers['orpc-batch']),
+        singles: () => sent().filter((request) => !request.headers['orpc-batch']),
+      }
+    }
+
+    function decodedUrls(requests: StandardRequest[]): string {
+      return requests.map((request) => decodeURIComponent(request.url)).join('\n')
+    }
+
+    it('sends calls with different headers individually instead of writing them to the URL', async () => {
+      const { link, sent, batches, singles } = makeHeadersLink({
+        a: { authorization: 'Bearer USER_A_TOKEN' },
+        b: { authorization: 'Bearer USER_B_TOKEN' },
+      })
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['not-batched', 'not-batched'])
+
+      expect(decodedUrls(sent())).not.toContain('USER_')
+      expect(batches()).toHaveLength(0)
+      expect(singles().map(({ url, headers }) => [url, headers.authorization])).toEqual([
+        ['/a', 'Bearer USER_A_TOKEN'],
+        ['/b', 'Bearer USER_B_TOKEN'],
+      ])
+    })
+
+    it('keeps the header of an authenticated call out of the URL when batched with a public call', async () => {
+      const { link, sent, batches, singles } = makeHeadersLink({
+        private: { authorization: 'Bearer USER_A_TOKEN' },
+      })
+
+      await expect(
+        Promise.all([
+          link.call(['private'], {}, { context: {} }),
+          link.call(['public'], {}, { context: {} }),
+        ]),
+      ).resolves.toEqual(['not-batched', 'not-batched'])
+
+      expect(decodedUrls(sent())).not.toContain('USER_A_TOKEN')
+      expect(batches()).toHaveLength(0)
+      expect(singles().find(({ url }) => url === '/private')?.headers.authorization).toBe(
+        'Bearer USER_A_TOKEN',
+      )
+      expect(singles().find(({ url }) => url === '/public')?.headers.authorization).toBeUndefined()
+    })
+
+    it('keeps both shared and differing headers on a call that cannot join the batch', async () => {
+      const { link, sent, singles } = makeHeadersLink({
+        a: { 'x-shared': 'SHARED', 'cookie': 'session=COOKIE_A' },
+        b: { 'x-shared': 'SHARED', 'cookie': 'session=COOKIE_B' },
+      })
+
+      await Promise.all([
+        link.call(['a'], {}, { context: {} }),
+        link.call(['b'], {}, { context: {} }),
+      ])
+
+      expect(decodedUrls(sent())).not.toContain('COOKIE_')
+      expect(singles().map(({ headers }) => headers)).toEqual([
+        { 'x-shared': 'SHARED', 'cookie': 'session=COOKIE_A' },
+        { 'x-shared': 'SHARED', 'cookie': 'session=COOKIE_B' },
+      ])
+    })
+
+    it('still batches the calls that share identical headers', async () => {
+      const { link, sent, batches, singles } = makeHeadersLink({
+        a1: { 'authorization': 'Bearer USER_A_TOKEN', 'x-tenant': 'ACME' },
+        // Same headers in a different order
+        a2: { 'x-tenant': 'ACME', 'authorization': 'Bearer USER_A_TOKEN' },
+        b: { authorization: 'Bearer USER_B_TOKEN' },
+        public1: {},
+        public2: {},
+      })
+
+      await expect(
+        Promise.all(
+          ['a1', 'a2', 'b', 'public1', 'public2'].map((path) =>
+            link.call([path], {}, { context: {} }),
+          ),
+        ),
+      ).resolves.toHaveLength(5)
+
+      expect(decodedUrls(sent())).not.toContain('USER_')
+      expect(decodedUrls(sent())).not.toContain('ACME')
+      expect(sent()).toHaveLength(3)
+
+      expect(
+        batches()
+          .map((request) => extractBatchMessagesFromRequest(request).map((m) => m.json.url))
+          .toSorted((a, b) => a[0].localeCompare(b[0])),
+      ).toEqual([
+        ['/a1', '/a2'],
+        ['/public1', '/public2'],
+      ])
+      expect(batches().find((r) => r.headers.authorization)?.headers).toEqual({
+        'authorization': 'Bearer USER_A_TOKEN',
+        'x-tenant': 'ACME',
+        'orpc-batch': 'buffered',
+      })
+      expect(singles().map(({ url, headers }) => [url, headers.authorization])).toEqual([
+        ['/b', 'Bearer USER_B_TOKEN'],
+      ])
+    })
+
+    it('batches every call when all of them share identical headers', async () => {
+      const shared = { authorization: 'Bearer USER_A_TOKEN' }
+      const { link, sent, batches } = makeHeadersLink({ a: shared, b: shared })
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['result-0', 'result-1'])
+
+      expect(sent()).toHaveLength(1)
+      expect(batches()[0]!.headers.authorization).toBe('Bearer USER_A_TOKEN')
+      expect(decodedUrls(sent())).not.toContain('USER_A_TOKEN')
+    })
+
+    it('keeps headers out of the URL when a batch of identical headers is split by maxUrlLength', async () => {
+      const shared = { authorization: 'Bearer USER_A_TOKEN' }
+      const { link, sent, singles } = makeHeadersLink({ a: shared, b: shared }, { maxUrlLength: 1 })
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['not-batched', 'not-batched'])
+
+      expect(decodedUrls(sent())).not.toContain('USER_A_TOKEN')
+      expect(singles().map(({ headers }) => headers.authorization)).toEqual([
+        'Bearer USER_A_TOKEN',
+        'Bearer USER_A_TOKEN',
+      ])
+    })
+
+    it('sends a call individually when a custom mapSubrequest adds a header to it', async () => {
+      const { link, sent, batches, singles } = makeHeadersLink(
+        {},
+        {
+          mapSubrequest: ({ request }) =>
+            request.url === '/secret'
+              ? { ...request, headers: { ...request.headers, 'x-secret': 'MAPPED_SECRET' } }
+              : request,
+        },
+      )
+
+      await expect(
+        Promise.all(['secret', 'a', 'b'].map((path) => link.call([path], {}, { context: {} }))),
+      ).resolves.toEqual(['not-batched', 'result-0', 'result-1'])
+
+      expect(decodedUrls(sent())).not.toContain('MAPPED_SECRET')
+      expect(batches()).toHaveLength(1)
+      expect(singles().map(({ url }) => url)).toEqual(['/secret'])
+    })
+
+    it('sends calls individually when a custom mapSubrequest keeps their identical headers', async () => {
+      const shared = { authorization: 'Bearer USER_A_TOKEN' }
+      const { link, sent, batches, singles } = makeHeadersLink(
+        { a: shared, b: shared },
+        { mapSubrequest: ({ request }) => request },
+      )
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['not-batched', 'not-batched'])
+
+      expect(decodedUrls(sent())).not.toContain('USER_A_TOKEN')
+      expect(batches()).toHaveLength(0)
+      expect(singles().map(({ headers }) => headers.authorization)).toEqual([
+        'Bearer USER_A_TOKEN',
+        'Bearer USER_A_TOKEN',
+      ])
+    })
+
+    it('sends calls individually when a custom headers option lifts none of their headers', async () => {
+      const shared = { authorization: 'Bearer USER_A_TOKEN' }
+      const { link, sent, batches } = makeHeadersLink(
+        { a: shared, b: shared },
+        { headers: () => ({}) },
+      )
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['not-batched', 'not-batched'])
+
+      expect(decodedUrls(sent())).not.toContain('USER_A_TOKEN')
+      expect(batches()).toHaveLength(0)
+    })
+
+    it('batches calls whose differing headers a custom mapSubrequest removes', async () => {
+      const { link, sent, batches } = makeHeadersLink(
+        {
+          a: { 'x-request-id': 'REQUEST_A' },
+          b: { 'x-request-id': 'REQUEST_B' },
+        },
+        { mapSubrequest: ({ request }) => ({ ...request, headers: {} }) },
+      )
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['result-0', 'result-1'])
+
+      expect(sent()).toHaveLength(1)
+      expect(batches()).toHaveLength(1)
+      expect(decodedUrls(sent())).not.toContain('REQUEST_')
+    })
+
+    it('keeps batching POST calls with different headers in the body', async () => {
+      const { link, sent, batches } = makeHeadersLink(
+        {
+          a: { authorization: 'Bearer USER_A_TOKEN' },
+          b: { authorization: 'Bearer USER_B_TOKEN' },
+        },
+        {},
+        'POST',
+      )
+
+      await expect(
+        Promise.all([link.call(['a'], {}, { context: {} }), link.call(['b'], {}, { context: {} })]),
+      ).resolves.toEqual(['result-0', 'result-1'])
+
+      expect(sent()).toHaveLength(1)
+      expect(
+        extractBatchMessagesFromRequest(batches()[0]!).map((m) => m.json.headers.authorization),
+      ).toEqual(['Bearer USER_A_TOKEN', 'Bearer USER_B_TOKEN'])
+    })
+  })
+
   describe('async context', () => {
     const storage = new AsyncLocalStorage<string>()
 
@@ -1906,6 +2160,30 @@ describe('batchLinkPlugin', () => {
         Promise.all([
           storage.run('alice', () => link.call(['get'], {}, { context: {} })),
           storage.run('bob', () => link.call(['post'], {}, { context: {} })),
+        ]),
+      ).resolves.toEqual(['alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it("sends a GET request left out of the batch for its headers in its caller's async context", async () => {
+      const codec = makeUserCodec()
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path) => ({
+        method: 'GET',
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: { 'x-user': path[0]! },
+        body: undefined,
+      }))
+
+      const transport = makeUserTransport()
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await expect(
+        Promise.all([
+          storage.run('alice', () => link.call(['alice'], {}, { context: {} })),
+          storage.run('bob', () => link.call(['bob'], {}, { context: {} })),
         ]),
       ).resolves.toEqual(['alice', 'bob'])
 

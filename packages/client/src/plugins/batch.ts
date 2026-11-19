@@ -219,6 +219,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
 
   /**
    * Map each subrequest in the batch before it is sent.
+   * A GET subrequest that still has headers is left out of the batch, so they never reach the batch URL.
    *
    * @default Removes headers that are duplicated with the batch headers
    */
@@ -459,6 +460,27 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       const subrequests = groupItems.map(([subOptions]) =>
         this.mapSubrequest(subOptions, { url, headers }),
       )
+
+      /**
+       * A GET batch carries its subrequests in the URL, where access logs and proxies record them,
+       * so a header left on a subrequest must stay out of it.
+       */
+      if (method === 'GET') {
+        const parts = splitBySubrequestHeaders(groupItems, subrequests)
+
+        if (parts.length > 1) {
+          await Promise.all(
+            parts.map((part) =>
+              part[0] === groupItems[0]
+                ? this.executeBatch(method, group, part)
+                : this.executeBatchInOwnContext(method, group, part),
+            ),
+          )
+
+          return
+        }
+      }
+
       let batchResponse: StandardLazyResponse
       let markRequestSent: (() => void) | undefined
       const openRequestIds = new Set<string>()
@@ -623,6 +645,54 @@ type BatchLinkPluginItem<T extends ClientContext> = [
   reject: (e: unknown) => void,
   runInOwnContext: ReturnType<typeof captureAsyncContext>,
 ]
+
+/**
+ * Splits items whose subrequests still have headers from the rest, keeping items with identical
+ * headers together so the batch headers can lift them. Items whose headers stay on the subrequest
+ * even when they are all identical are separated, so each is sent on its own.
+ *
+ * @returns a single part when no subrequest has headers.
+ */
+function splitBySubrequestHeaders<T extends ClientContext>(
+  items: BatchLinkPluginItem<T>[],
+  subrequests: StandardRequest[],
+): BatchLinkPluginItem<T>[][] {
+  const withoutHeaders: BatchLinkPluginItem<T>[] = []
+  const byHeaders = new Map<string, BatchLinkPluginItem<T>[]>()
+
+  for (const [index, item] of items.entries()) {
+    const definedHeaders = Object.entries(subrequests[index]!.headers)
+      .filter(([, value]) => value !== undefined)
+      // oxlint-disable-next-line unicorn/no-array-sort
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+
+    if (definedHeaders.length === 0) {
+      withoutHeaders.push(item)
+      continue
+    }
+
+    const key = stringifyJSON(definedHeaders)
+    const sameHeaders = byHeaders.get(key)
+
+    if (sameHeaders) {
+      sameHeaders.push(item)
+    } else {
+      byHeaders.set(key, [item])
+    }
+  }
+
+  const parts = withoutHeaders.length > 0 ? [withoutHeaders] : []
+
+  for (const sameHeaders of byHeaders.values()) {
+    if (sameHeaders.length < items.length) {
+      parts.push(sameHeaders)
+    } else {
+      parts.push(...sameHeaders.map((item) => [item]))
+    }
+  }
+
+  return parts
+}
 
 /**
  * Whether the server sends nothing more for the subrequest after this message.
