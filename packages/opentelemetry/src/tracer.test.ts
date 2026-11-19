@@ -135,16 +135,14 @@ describe('openTelemetryTracer', () => {
     const tracer = createTracer()
 
     const failed = tracer.startSpan('failed')
-    failed.recordException('error', {
-      name: 'Error',
-      message: 'boom',
-      stack: 'stack',
-      code: 'CODE',
-    })
+    failed.recordException(
+      'error',
+      Object.assign(new Error('boom'), { stack: 'stack', code: 'CODE' }),
+    )
     failed.end()
 
     const aborted = tracer.startSpan('aborted')
-    aborted.recordException('info', { name: 'AbortError', message: 'aborted' })
+    aborted.recordException('info', Object.assign(new Error('aborted'), { name: 'AbortError' }))
     aborted.end()
 
     const failedSpan = finishedSpan('failed')
@@ -159,6 +157,39 @@ describe('openTelemetryTracer', () => {
     const abortedSpan = finishedSpan('aborted')
     expect(abortedSpan.status).toEqual({ code: SpanStatusCode.UNSET })
     expect(abortedSpan.events[0]?.name).toBe('exception')
+  })
+
+  it('records numeric codes and values that are not errors', () => {
+    const tracer = createTracer()
+
+    const coded = tracer.startSpan('coded')
+    coded.recordException('error', Object.assign(new Error('boom'), { code: 123 }))
+    coded.end()
+
+    const thrown = tracer.startSpan('thrown')
+    thrown.recordException('error', 123)
+    thrown.end()
+
+    expect(finishedSpan('coded').events[0]?.attributes).toMatchObject({
+      'exception.type': '123',
+      'exception.message': 'boom',
+    })
+
+    const thrownSpan = finishedSpan('thrown')
+    expect(thrownSpan.status).toEqual({ code: SpanStatusCode.ERROR, message: '123' })
+    expect(thrownSpan.events[0]?.attributes).toEqual({ 'exception.message': '123' })
+  })
+
+  it('records the string form of an error OpenTelemetry fails to read', () => {
+    const tracer = createTracer()
+
+    const span = tracer.startSpan('unreadable')
+    span.recordException('error', Object.assign(new Error('boom'), { code: Object.create(null) }))
+    span.end()
+
+    const unreadableSpan = finishedSpan('unreadable')
+    expect(unreadableSpan.status).toEqual({ code: SpanStatusCode.ERROR, message: 'boom' })
+    expect(unreadableSpan.events[0]?.attributes).toEqual({ 'exception.message': 'Error: boom' })
   })
 
   it('injects the trace context of a span into headers', () => {

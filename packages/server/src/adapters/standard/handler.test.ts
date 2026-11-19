@@ -611,10 +611,7 @@ describe('standardHandler', () => {
 
         await expect(handler.handle(makeRequest(), OPTIONS)).rejects.toBe(error)
 
-        expect(span.recordException).toHaveBeenCalledExactlyOnceWith(
-          'error',
-          expect.objectContaining({ message: 'interceptor failure' }),
-        )
+        expect(span.recordException).toHaveBeenCalledExactlyOnceWith('error', error)
         expect(span.end).toHaveBeenCalledTimes(1)
       },
     )

@@ -5,13 +5,6 @@ const TRACER_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_TRACER')
 
 export type TracingAttributeValue = string | number | boolean | string[] | number[] | boolean[]
 
-export interface TracingException {
-  name?: string
-  message: string
-  stack?: string
-  code?: string | number
-}
-
 export type TracingHeaders = Record<string, string | string[] | undefined>
 
 export type TracingExceptionLevel = 'error' | 'info'
@@ -27,9 +20,10 @@ export interface TracingSpan {
    */
   addEvent(name: string): void
   /**
-   * Records an exception on the span. The `error` level also marks the span as failed.
+   * Records a thrown value on the span, the backend decides how to serialize it.
+   * The `error` level also marks the span as failed.
    */
-  recordException(level: TracingExceptionLevel, exception: TracingException): void
+  recordException(level: TracingExceptionLevel, error: unknown): void
   end(): void
 }
 
@@ -105,7 +99,7 @@ export function recordSpanError(span: TracingSpan | undefined, error: unknown): 
   }
 
   // DO NOT treat aborted error as error if happen during business logic (assumed)
-  span.recordException(isAbortError(error) ? 'info' : 'error', toTracingException(error))
+  span.recordException(isAbortError(error) ? 'info' : 'error', error)
 }
 
 export function setSpanAttributeIfDefined(
@@ -118,24 +112,6 @@ export function setSpanAttributeIfDefined(
   }
 
   span.setAttribute(key, value)
-}
-
-export function toTracingException(error: unknown): TracingException {
-  if (error instanceof Error) {
-    const exception: TracingException = {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-    }
-
-    if ('code' in error && (typeof error.code === 'string' || typeof error.code === 'number')) {
-      exception.code = error.code
-    }
-
-    return exception
-  }
-
-  return { message: String(error) }
 }
 
 export function toSpanAttributeValue(data: unknown): string {
