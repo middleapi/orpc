@@ -131,7 +131,8 @@ function inheritFunctionMetadata(
 
   // a replacement that does not copy metadata leaves it only on the original function
   for (const key of Reflect.getMetadataKeys(originalMethod)) {
-    // set by the synchronous implementation of the child, already including the original values
+    // own keys are the child's route decorators plus `__interceptors__`, snapshotted through the
+    // synchronous link: it holds the interceptors below @Implement, but not the ones above it
     if (Reflect.hasOwnMetadata(key, method)) {
       continue
     }
