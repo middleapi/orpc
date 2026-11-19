@@ -73,6 +73,9 @@ const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' })
 // PageLayout's own graph would describe the post as a second, TechArticle
 // node, so it is turned off below.
 const siteBase = (config.site ?? '').replace(/\/$/, '')
+// PageLayout only derives the generated OG card for static routes, not for a
+// dynamic one like this, though Blume renders a card for every blog entry.
+const ogImage = siteBase && config.og.enabled ? `${siteBase}/og${route.path}.png` : undefined
 const postJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'BlogPosting',
@@ -82,7 +85,7 @@ const postJsonLd = {
   'mainEntityOfPage': `${siteBase}${route.path}`,
   ...(date ? { datePublished: date.toISOString() } : {}),
   ...(tags.length > 0 ? { keywords: tags.join(', ') } : {}),
-  ...(siteBase ? { image: `${siteBase}/og${route.path}.png` } : {}),
+  ...(ogImage ? { image: ogImage } : {}),
   ...(authors.length > 0
     ? {
         author: authors.map(author => ({
@@ -107,6 +110,9 @@ const postJsonLd = {
   searchEnabled={config.search.enabled}
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
+  ogImage={ogImage}
+  ogImageAlt={entry.data.title}
+  ogImageSize={{ width: 1200, height: 630 }}
   page={{ title: `${entry.data.title} - ${config.title}`, description: entry.data.description, route: route.path }}
   structuredDataEnabled={false}
   x={config.x}

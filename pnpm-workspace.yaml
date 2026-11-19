@@ -48,5 +48,4 @@ minimumReleaseAgeExclude:
   - '@standard-server/node@0.16.0'
   - '@standard-server/peer@0.16.0'
   - '@standard-server/shared@0.16.0'
-  - blume@2.2.1
   - effect@4.0.0

@@ -32,7 +32,7 @@
     "@tanstack/svelte-query": "^6.3.9",
     "@tanstack/vue-query": "^5.105.3",
     "@types/node": "^26.6.6",
-    "blume": "^2.2.6",
+    "blume": "^2.2.7",
     "effect": "^4.1.2",
     "pino": "^10.4.0",
     "superjson": "^2.2.6",
