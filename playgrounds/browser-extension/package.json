@@ -1,7 +1,7 @@
 {
   "name": "@orpc/browser-extension-playground",
   "type": "module",
-  "version": "1.16.3",
+  "version": "1.16.4",
   "private": true,
   "description": "manifest.json description",
   "scripts": {
