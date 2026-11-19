@@ -680,10 +680,156 @@ describe('rpcLink', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(connect).toHaveBeenCalledTimes(1)
 
+    await vi.advanceTimersByTimeAsync(5_000)
     await firstSocket.close()
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect(connect).toHaveBeenCalledTimes(3)
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 2 })
+  })
+
+  it('treats a healthy socket that is still closing as healthy', async ({ onTestFinished }) => {
+    vi.useFakeTimers()
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+
+    const firstSocket = createWs()
+    const secondSocket = createWs(WEBSOCKET_CONNECTING)
+    const connect = vi
+      .fn()
+      .mockImplementationOnce(() => firstSocket)
+      .mockImplementationOnce(() => secondSocket)
+      .mockImplementation(() => createWs(WEBSOCKET_CONNECTING))
+    const orpc = createORPCClient(
+      new RPCLink({ connect, connectOnInit: true, reconnect: true }),
+    ) as any
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    firstSocket.readyState = WEBSOCKET_CLOSING
+
+    void orpc.ping('input').catch(() => {})
+    await vi.advanceTimersByTimeAsync(0)
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+
+    // the late close event must not reset the new cycle
+    await firstSocket.close()
+    await secondSocket.close()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 2 })
+  })
+
+  describe('connections that close right after opening', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const createRejectingConnect = () =>
+      vi.fn((_info: { totalAttempt: number; attempt: number }) => {
+        const ws = createWs()
+        setTimeout(() => ws.close({ code: 4001, reason: 'unauthorized' }))
+        return ws
+      })
+
+    it('keep the default backoff instead of reconnecting without delay', async () => {
+      const connect = createRejectingConnect()
+
+      createORPCClient(new RPCLink({ connect, connectOnInit: true, reconnect: { onClose: true } }))
+
+      await vi.advanceTimersByTimeAsync(1_000)
+      expect(connect).toHaveBeenCalledTimes(1)
+      expect(connect).toHaveBeenNthCalledWith(1, { totalAttempt: 1, attempt: 1 })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(connect).toHaveBeenCalledTimes(2)
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(connect).toHaveBeenCalledTimes(3)
+      expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 3 })
+    })
+
+    it('count toward maxAttempt', async () => {
+      const connect = createRejectingConnect()
+
+      createORPCClient(
+        new RPCLink({
+          connect,
+          connectOnInit: true,
+          reconnect: { delay: () => 0, maxAttempt: 3, onClose: true },
+        }),
+      )
+
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(connect).toHaveBeenCalledTimes(3)
+    })
+
+    it('fail every waiting call with the last close reason when giving up', async () => {
+      const connect = createRejectingConnect()
+      const orpc = createORPCClient(
+        new RPCLink({ connect, reconnect: { delay: () => 0, maxAttempt: 2 } }),
+      ) as any
+
+      const call = async (input: string) => {
+        const result = orpc.ping(input).catch((error: unknown) => error)
+        await vi.advanceTimersByTimeAsync(100)
+        return result
+      }
+
+      const closed = new AbortError('WebSocket closed (code 4001: unauthorized)')
+      await expect(call('1')).resolves.toEqual(closed)
+      await expect(call('2')).resolves.toEqual(closed)
+
+      const errors = await Promise.all([call('3'), call('4')])
+      for (const error of errors) {
+        expect(error).toEqual(new AbortError('WebSocket reconnect failed after 2 attempt(s)'))
+        expect(error.cause).toEqual(closed)
+      }
+      expect(connect).toHaveBeenCalledTimes(2)
+    })
+
+    it('count as failed even when the next call comes much later', async () => {
+      const connect = createRejectingConnect()
+      const orpc = createORPCClient(
+        new RPCLink({ connect, connectOnInit: true, reconnect: true }),
+      ) as any
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      void orpc.ping('input').catch(() => {})
+      await vi.advanceTimersByTimeAsync(2_000)
+
+      expect(connect).toHaveBeenCalledTimes(2)
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+    })
+
+    it('reset the attempt once the server sends a message', async () => {
+      const firstSocket = createWs()
+      const secondSocket = createWs()
+      const connect = vi
+        .fn()
+        .mockImplementationOnce(() => firstSocket)
+        .mockImplementationOnce(() => secondSocket)
+      const orpc = createORPCClient(new RPCLink({ connect, reconnect: true })) as any
+
+      const call = orpc.ping('first')
+
+      await vi.waitFor(() => expect(firstSocket.send).toHaveBeenCalledTimes(1))
+      await firstSocket.receive(
+        await createResponseMessage({ id: getSentRequest(firstSocket).message.id }),
+      )
+      await expect(call).resolves.toEqual('pong')
+      await firstSocket.close()
+
+      void orpc.ping('second').catch(() => {})
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+    })
   })
 
   // `ws` is EventEmitter-based, so an `error` event without a listener throws and crashes the process

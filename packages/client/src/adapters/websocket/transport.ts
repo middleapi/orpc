@@ -26,6 +26,8 @@ import type { StandardLinkTransport } from '../standard/index'
 const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
 const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
+const HEALTHY_CONNECTION_DURATION = 5_000
+
 export type WebSocketLike = Pick<
   WebSocket,
   'addEventListener' | 'removeEventListener' | 'send' | 'readyState'
@@ -42,7 +44,10 @@ export interface WebSocketLinkTransportAttemptInfo {
   /**
    * Attempt number within the current (re)connect cycle.
    * Starts at 1, increments on each consecutive failure, and resets to 1
-   * once a connection succeeds or the cycle gives up. Use this for backoff calculations.
+   * once a connection proves healthy or the cycle gives up. Use this for backoff calculations.
+   *
+   * A connection proves healthy when it receives a message from the server or stays
+   * open for 5 seconds. A connection that closes sooner counts as a failure.
    */
   attempt: number
 }
@@ -135,6 +140,13 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
   decodePeerMessage?: DecodePeerMessageOptions | undefined
 }
 
+interface Connection {
+  websocket: WebSocketLike
+  peer: ClientPeer
+  isHealthy: () => boolean
+  closeReason: () => undefined | AbortError
+}
+
 export class WebSocketLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
   private readonly connect: WebSocketLinkTransportOptions<T>['connect']
   private readonly reconnectEnabled: boolean
@@ -179,7 +191,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
   private totalAttempt = 0
   private attempt = 0
-  private current: undefined | Promise<void | { websocket: WebSocketLike; peer: ClientPeer }>
+  private current: undefined | Promise<void | Connection>
   private async getConnectedPeer(): Promise<ClientPeer> {
     const current = this.current
     const resolved = await current
@@ -192,6 +204,10 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       return this.getConnectedPeer()
     }
 
+    if (resolved?.isHealthy()) {
+      this.attempt = 0
+    }
+
     if (this.totalAttempt >= this.reconnectMaxTotalAttempt) {
       throw new AbortError(
         `WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`,
@@ -199,6 +215,11 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     }
 
     this.current = (async () => {
+      // Rejecting `current` lets the `.catch` below fail every call waiting on it
+      if (this.attempt >= this.reconnectMaxAttempt) {
+        throw resolved?.closeReason() ?? new AbortError('WebSocket is already closing or closed')
+      }
+
       this.totalAttempt += 1
       this.attempt += 1
 
@@ -218,6 +239,8 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       let closeReason: undefined | AbortError
+      let closedAt: undefined | number
+      let receivedMessage = false
 
       const peer = new ClientPeer(async (message) => {
         // `send` silently discards data once the socket is closed, so requests would never settle
@@ -249,6 +272,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
             event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
           const result = decodePeerMessage(message, this.decodePeerMessageOptions)
           if (result.matched && isServerPeerSendMessage(result.message)) {
+            receivedMessage = true
             // Not awaited: `peer.message` runs handling message may be slow,
             // and awaiting it would block decoding of subsequent messages.
             void peer.message(result.message)
@@ -258,6 +282,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
       websocket.addEventListener('close', async (event) => {
         closeReason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
+        closedAt = Date.now()
         connectingResolvers?.resolve()
         await peer.close(closeReason)
       })
@@ -280,8 +305,11 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         })
       }
 
-      this.attempt = 0
-      return { websocket, peer }
+      const openedAt = Date.now()
+      const isHealthy = () =>
+        receivedMessage || (closedAt ?? Date.now()) - openedAt >= HEALTHY_CONNECTION_DURATION
+
+      return { websocket, peer, isHealthy, closeReason: () => closeReason }
     })().catch((error) => {
       if (!this.reconnectEnabled) {
         throw error
