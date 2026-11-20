@@ -128,6 +128,19 @@ async function bootstrap() {
 NestJS only limits the bodies it parses itself. Bodies parsed by oRPC (other content types, or every body when `bodyParser: false` is set) have no size limit, so cap them with [Request Limit](/docs/plugins/request-limit) or [Tmp File Upload](/docs/plugins/tmp-file-upload).
 :::
 
+:::tip
+With the Fastify adapter, content types Fastify has no parser for, such as `multipart/form-data`, are rejected with `415`. Register a catch-all parser that leaves the body unread so oRPC can parse it. Learn more in the [Fastify Adapter](/docs/adapters/fastify) documentation.
+
+```ts
+const fastify = app.getHttpAdapter().getInstance()
+
+fastify.addContentTypeParser('*', (request, payload, done) => {
+  done(null, undefined)
+})
+```
+
+:::
+
 ## Configuration
 
 Configure `@orpc/nest` by importing `ORPCModule` into your NestJS module. It supports the same
