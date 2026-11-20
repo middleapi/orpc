@@ -153,7 +153,6 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 
 ```ts title="lib/orpc.server.ts"
 import { createRouterClient } from '@orpc/server'
-import { headers } from 'next/headers'
 
 globalThis.$client = createRouterClient(router, {
   /**
@@ -163,14 +162,18 @@ globalThis.$client = createRouterClient(router, {
    * only include context that's safe to reuse globally.
    * For per-request context, use middleware context or pass a function as the initial context.
    */
-  context: async () => ({
-    headers: await headers(), // provide headers if initial context required
-  }),
+  context: async () => {
+    const { headers } = await import('next/headers')
+
+    return {
+      headers: await headers(), // provide headers if initial context required
+    }
+  },
 })
 ```
 
 </CodeGroup>
 
 :::warning
-`import.meta.env.SSR` requires [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack), the default bundler since Next.js 16. On webpack builds, guard with `typeof window === 'undefined'` instead, which Next.js also replaces at build time. Either way, do not add `import 'server-only'` to `orpc.server.ts`: it would fail the build.
+`import.meta.env.SSR` requires [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack), the default bundler since Next.js 16. On webpack builds, guard with `typeof window === 'undefined'` instead, which Next.js also replaces at build time. Either way, do not add `import 'server-only'` or a static `next/headers` import to `orpc.server.ts`: either would fail the build.
 :::
