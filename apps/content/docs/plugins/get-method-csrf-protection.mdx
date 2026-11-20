@@ -43,6 +43,16 @@ const handler = new RPCHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
+## Custom Error
+
+By default the plugin throws `FORBIDDEN`. Use `error` to throw your own, which is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+
+```ts
+new GetMethodCsrfProtectionHandlerPlugin({
+  error: () => new ORPCError('CSRF_BLOCKED'),
+})
+```
+
 ## Cookie Requirements
 
 Mark authentication cookies `SameSite=Lax` or `SameSite=Strict` explicitly. Do not rely on browser defaults: only Chrome treats unmarked cookies as `Lax`, while Firefox and Safari treat them like `SameSite=None`, and Chrome still sends fresh unmarked cookies on cross-site `POST` for [two minutes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#lax).

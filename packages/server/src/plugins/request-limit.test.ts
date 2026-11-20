@@ -1,5 +1,6 @@
 import zlib from 'node:zlib'
 
+import { ORPCError } from '@orpc/client'
 import supertest from 'supertest'
 
 import { RPCHandler } from '../adapters/fetch/index'
@@ -111,6 +112,34 @@ describe('requestLimitHandlerPlugin', () => {
     expect(matched).toBe(true)
     await expect(response!.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
     expect(response!.status).toBe(413)
+    expect(procedureHandler).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['content-length exceeds the limit', { 'content-length': '22' }, {}],
+    ['the streamed body exceeds the limit', { 'content-type': 'application/json' }, size22Json],
+  ])('throws the custom error when %s', async (_, headers, body) => {
+    const error = vi.fn(() => new ORPCError('TOO_BIG'))
+    const handler = new RPCHandler(
+      { ping: os.errors({ TOO_BIG: {} }).handler(procedureHandler) },
+      { plugins: [new RequestLimitHandlerPlugin({ maxBodySize: 21, error })] },
+    )
+
+    const { response } = await handler.handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      }),
+    )
+
+    await expect(response!.json()).resolves.toMatchObject({
+      json: { code: 'TOO_BIG', defined: true },
+    })
+    expect(response!.status).toBe(400)
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ request: expect.any(Object), context: {} }),
+    )
     expect(procedureHandler).not.toHaveBeenCalled()
   })
 

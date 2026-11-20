@@ -222,6 +222,28 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
       expect(deletePlanet).not.toHaveBeenCalled()
     })
 
+    it('throws the custom error, defined when the procedure declares it', async () => {
+      const error = vi.fn(() => new ORPCError('CSRF'))
+      const handler = new RPCHandler(
+        { deletePlanet: os.errors({ CSRF: {} }).handler(deletePlanet) },
+        {
+          allowMethods: ['GET', ...RPC_DEFAULT_ALLOW_METHODS],
+          plugins: [new GetMethodCsrfProtectionHandlerPlugin({ error })],
+        },
+      )
+
+      const { response } = await handler.handle(createGetRequest(CROSS_SITE_NAVIGATION))
+
+      expect(response!.status).toBe(400)
+      await expect(response!.json()).resolves.toMatchObject({
+        json: { code: 'CSRF', defined: true },
+      })
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ path: ['deletePlanet'], request: expect.any(Object) }),
+      )
+      expect(deletePlanet).not.toHaveBeenCalled()
+    })
+
     it.each([
       [
         'a cross-site fetch, where browsers withhold SameSite=Lax cookies',

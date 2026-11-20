@@ -1,5 +1,7 @@
+import type { AnyORPCError } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
-import { toArray } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
+import { toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
@@ -7,14 +9,22 @@ import type {
   StandardHandlerOptions,
   StandardHandlerPlugin,
   StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
 } from '../adapters/standard/index'
 import type { Context } from '../context'
 
-export interface RequestLimitHandlerPluginOptions {
+export interface RequestLimitHandlerPluginOptions<T extends Context = Context> {
   /**
    * The maximum allowed request body size in bytes.
    */
   maxBodySize: number
+
+  /**
+   * The error to throw when the body exceeds `maxBodySize`.
+   *
+   * @default ORPCError('PAYLOAD_TOO_LARGE')
+   */
+  error?: Value<AnyORPCError, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 }
 
 /**
@@ -39,13 +49,16 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
   before: string[] = ['~request-compression']
 
   private readonly maxBodySize: number
+  private readonly error: Exclude<RequestLimitHandlerPluginOptions<T>['error'], undefined>
 
-  constructor(options: RequestLimitHandlerPluginOptions) {
+  constructor(options: NoInfer<RequestLimitHandlerPluginOptions<T>>) {
     this.maxBodySize = options.maxBodySize
+    this.error = options.error ?? (() => new ORPCError('PAYLOAD_TOO_LARGE'))
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const maxBodySize = this.maxBodySize
+    const error = this.error
 
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
       next,
@@ -61,7 +74,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
             )
 
             if (Number.isFinite(contentLength) && contentLength > maxBodySize) {
-              throw new ORPCError('PAYLOAD_TOO_LARGE')
+              throw value(error, interceptorOptions)
             }
 
             const stream = await interceptorOptions.request.resolveBody('octet-stream')
@@ -78,7 +91,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
                   currentBodySize += chunk.byteLength
 
                   if (currentBodySize > maxBodySize) {
-                    controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+                    controller.error(value(error, interceptorOptions))
                     return
                   }
 
