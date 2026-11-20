@@ -48,8 +48,14 @@ To mock a client call that fails with a [typesafe error](/docs/error-handling#ty
 
 ```ts
 import { createORPCErrorConstructorMap } from '@orpc/contract'
+import { vi } from 'vitest'
+import * as z from 'zod'
 
-const errors = createORPCErrorConstructorMap(router.planet.find['~orpc'].errorMap)
+const errors = createORPCErrorConstructorMap({
+  NOT_FOUND: {
+    data: z.object({ id: z.number() }),
+  },
+})
 
 const findPlanetMock = vi.fn().mockRejectedValue(errors.NOT_FOUND({ data: { id: 123 } }))
 ```

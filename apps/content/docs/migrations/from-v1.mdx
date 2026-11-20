@@ -430,8 +430,13 @@ const handler = new RPCHandler(router)
 
 ```ts v2
 import { createORPCErrorConstructorMap } from '@orpc/contract'
+import * as z from 'zod'
 
-const errors = createORPCErrorConstructorMap(contract.planet.find['~orpc'].errorMap)
+const errors = createORPCErrorConstructorMap({
+  NOT_FOUND: {
+    data: z.object({ id: z.number() }),
+  },
+})
 
 const notFound = errors.NOT_FOUND({ data: { id: 123 } })
 ```
