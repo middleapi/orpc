@@ -1,4 +1,4 @@
-import { call, os, type } from '@orpc/server'
+import { call, ORPCError, os, type } from '@orpc/server'
 
 import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import { ratelimit, RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
@@ -36,6 +36,31 @@ describe('ratelimit', () => {
     })
 
     expect(limiter.limit).toHaveBeenCalledWith('key', {})
+  })
+
+  it('throws the custom error when limit exceeded', async () => {
+    const result: RateLimitResult = { success: false, limit: 10, remaining: 0, reset: 123 }
+    const limiter = createLimiter(result)
+    const error = vi.fn(
+      (result: RateLimitResult) => new ORPCError('RATE_LIMITED', { data: { reset: result.reset } }),
+    )
+    const procedure = os
+      .errors({ RATE_LIMITED: { data: type<{ reset: number }>() } })
+      .input(type<{ id: string }>())
+      .use(ratelimit({ limiter, key: 'key', error }))
+      .handler(() => 'ok')
+
+    await expect(call(procedure, { id: '1' }, { context: {} })).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      defined: true,
+      data: { reset: 123 },
+    })
+
+    expect(error).toHaveBeenCalledWith(
+      result,
+      expect.objectContaining({ path: [], next: expect.any(Function) }),
+      { id: '1' },
+    )
   })
 
   it('can config limit weight', async () => {

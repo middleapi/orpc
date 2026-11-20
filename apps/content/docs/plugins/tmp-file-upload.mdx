@@ -105,6 +105,15 @@ A multipart body splits across the first two limits, fields and part headers aga
 
 With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 
+To reject with your own error instead, use `error`. It is [defined](/docs/error-handling) when the matched procedure declares it.
+
+```ts
+new TmpFileUploadHandlerPlugin({
+  maxBodySize: { memory: 1024 * 1024, file: 100 * 1024 * 1024, stream: 1024 * 1024 * 1024 },
+  error: () => new ORPCError('TOO_BIG'),
+})
+```
+
 ## Keeping Small Uploads in Memory
 
 Uploads up to `spoolThreshold` stay in memory as plain `File`s, so small and empty files never cost a temporary file.

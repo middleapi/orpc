@@ -1,11 +1,11 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
+import type { AnyORPCError, Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import { toArray, value } from '@orpc/shared'
 
 import type { RateLimitHandlerPluginContext } from './handler-plugin'
 import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
-import type { RateLimiter } from './types'
+import type { RateLimiter, RateLimitResult } from './types'
 
 export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_RATELIMIT_MIDDLEWARE_CONTEXT',
@@ -59,6 +59,22 @@ export interface RateLimitMiddlewareOptions<TInContext extends Context, TInput> 
    * @default true
    */
   dedupe?: boolean | undefined
+
+  /**
+   * The error to throw when the limit is exceeded.
+   *
+   * @default ORPCError('TOO_MANY_REQUESTS') with `limit`, `remaining` and `reset` as data
+   */
+  error?:
+    | Value<
+        AnyORPCError,
+        [
+          result: RateLimitResult,
+          options: MiddlewareOptions<TInContext, unknown, {}>,
+          input: TInput,
+        ]
+      >
+    | undefined
 }
 
 /**
@@ -69,6 +85,14 @@ export interface RateLimitMiddlewareOptions<TInContext extends Context, TInput> 
  */
 export function ratelimit<TInContext extends Context, TInput>({
   dedupe = true,
+  error = (result) =>
+    new ORPCError('TOO_MANY_REQUESTS', {
+      data: {
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: result.reset,
+      },
+    }),
   ...options
 }: RateLimitMiddlewareOptions<TInContext, TInput>): Middleware<
   TInContext,
@@ -105,13 +129,7 @@ export function ratelimit<TInContext extends Context, TInput>({
     }
 
     if (!result.success) {
-      throw new ORPCError('TOO_MANY_REQUESTS', {
-        data: {
-          limit: result.limit,
-          remaining: result.remaining,
-          reset: result.reset,
-        },
-      })
+      throw value(error, result, middlewareOptions, input)
     }
 
     return middlewareOptions.next({

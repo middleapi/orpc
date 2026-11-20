@@ -1649,6 +1649,53 @@ describe('tmpFileUploadHandlerPlugin', () => {
     })
   })
 
+  describe('custom error', () => {
+    const json = Buffer.from(JSON.stringify({ padding: 'x'.repeat(64) }))
+    const jsonHeaders = { 'content-type': 'application/json' }
+
+    it.each([
+      ['a declared length', { ...jsonHeaders, 'content-length': String(json.length) }, json],
+      ['a streamed body', jsonHeaders, json],
+      [
+        'a multipart field',
+        multipartHeaders,
+        createMultipartBody([
+          { header: 'Content-Disposition: form-data; name="field"', content: 'x'.repeat(64) },
+        ]).body,
+      ],
+    ])('throws the custom error when %s exceeds the limit', async (_, headers, body) => {
+      const error = vi.fn(() => new ORPCError('TOO_BIG'))
+      const plugin = new TmpFileUploadHandlerPlugin({
+        tmpDir,
+        maxBodySize: { memory: 10, file: Number.POSITIVE_INFINITY, stream: 10 },
+        error,
+      })
+      const interceptorOptions = {
+        context: {},
+        prefix: undefined,
+        request: {
+          method: 'POST',
+          url: '/upload',
+          headers,
+          resolveBody: async () => toStream(body),
+        } as any,
+      }
+
+      await plugin.init({}).routingInterceptors![0]!({
+        ...interceptorOptions,
+        next: async (nextOptions) => {
+          await expect(nextOptions!.request.resolveBody()).rejects.toSatisfy(
+            (e) => e instanceof ORPCError && e.code === 'TOO_BIG',
+          )
+
+          return { matched: false }
+        },
+      })
+
+      expect(error).toHaveBeenCalledExactlyOnceWith(interceptorOptions)
+    })
+  })
+
   describe('spool threshold', () => {
     it('creates no tmp files for a flood of empty file parts before the procedure runs', async () => {
       const { agent, captured } = createAgent({

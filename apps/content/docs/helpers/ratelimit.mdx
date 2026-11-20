@@ -93,6 +93,20 @@ const result = await call(procedure, { email: 'user@example.com' }, { context: {
 When the same `limiter` and `key` combination is used multiple times in a single request chain, the `ratelimit` middleware performs the rate limit check only once. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
 :::
 
+:::tip[Custom Error]
+By default the middleware throws `TOO_MANY_REQUESTS`. Use `error` to throw your own, which is [defined](/docs/error-handling) when the procedure declares it:
+
+```ts
+ratelimit({
+  limiter,
+  key,
+  error: (result) =>
+    new ORPCError('RATE_LIMITED', { data: { retryAfter: result.reset - Date.now() } }),
+})
+```
+
+:::
+
 :::tip[Conditional Limiter]
 You can choose different limiters dynamically based on the request context:
 

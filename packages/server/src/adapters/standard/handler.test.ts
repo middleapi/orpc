@@ -32,7 +32,7 @@ function makeCodec() {
 function makeResolved(overrides: Record<string, unknown> = {}) {
   return {
     path: ['ping'],
-    procedure: {} as any,
+    procedure: { '~orpc': { errorMap: {} } } as any,
     decodeInput: vi.fn().mockResolvedValue('__input__'),
     ...overrides,
   }
@@ -436,6 +436,78 @@ describe('standardHandler', () => {
         ['ping'],
         OPTIONS,
       )
+    })
+
+    it('reconciles errors thrown outside the procedure call with the procedure error map', async () => {
+      const procedure = { '~orpc': { errorMap: { PAYLOAD_TOO_LARGE: {} } } } as any
+      const declared = new ORPCError('PAYLOAD_TOO_LARGE')
+      codec.resolveProcedure.mockResolvedValue(
+        makeResolved({ procedure, decodeInput: vi.fn().mockRejectedValue(declared) }),
+      )
+      codec.encodeError.mockResolvedValue({ status: 413, headers: {}, body: 'too large' })
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      const error = codec.encodeError.mock.calls[0]?.[0]
+      expect(error).toBeInstanceOf(ORPCError)
+      expect(error.code).toBe('PAYLOAD_TOO_LARGE')
+      expect(error.defined).toBe(true)
+    })
+
+    it('reconciles errors thrown by interceptors with the procedure error map', async () => {
+      const procedure = { '~orpc': { errorMap: { FORBIDDEN: {} } } } as any
+      handler = new StandardHandler(codec as any, {
+        interceptors: [
+          () => {
+            throw new ORPCError('FORBIDDEN')
+          },
+        ],
+      })
+      codec.resolveProcedure.mockResolvedValue(makeResolved({ procedure }))
+      codec.encodeError.mockResolvedValue({ status: 403, headers: {}, body: 'forbidden' })
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      const error = codec.encodeError.mock.calls[0]?.[0]
+      expect(error.code).toBe('FORBIDDEN')
+      expect(error.defined).toBe(true)
+    })
+
+    it('reconciles errors an interceptor throws in place of a procedure error', async () => {
+      const procedure = { '~orpc': { errorMap: { FORBIDDEN: {} } } } as any
+      handler = new StandardHandler(codec as any, {
+        interceptors: [
+          async ({ next }) => {
+            try {
+              return await next()
+            } catch {
+              throw new ORPCError('FORBIDDEN')
+            }
+          },
+        ],
+      })
+      client.mockRejectedValue(new ORPCError('BAD_GATEWAY'))
+      codec.resolveProcedure.mockResolvedValue(makeResolved({ procedure }))
+      codec.encodeError.mockResolvedValue({ status: 403, headers: {}, body: 'forbidden' })
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      const error = codec.encodeError.mock.calls[0]?.[0]
+      expect(error.code).toBe('FORBIDDEN')
+      expect(error.defined).toBe(true)
+    })
+
+    it('does not reconcile errors from the procedure call again', async () => {
+      const procedure = { '~orpc': { errorMap: { BAD_GATEWAY: {} } } } as any
+      const procedureError = new ORPCError('BAD_GATEWAY')
+      client.mockRejectedValue(procedureError)
+
+      codec.resolveProcedure.mockResolvedValue(makeResolved({ procedure }))
+      codec.encodeError.mockResolvedValue({ status: 502, headers: {}, body: 'bad gateway' })
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      expect(codec.encodeError.mock.calls[0]?.[0]).toBe(procedureError)
     })
 
     it('wraps non-ORPCError from procedure call as INTERNAL_SERVER_ERROR', async () => {
