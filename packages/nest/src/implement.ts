@@ -336,7 +336,7 @@ export class ImplementInterceptor implements NestInterceptor {
           })
         }
 
-        if (nestBody instanceof HttpException) {
+        if (nestBody instanceof ORPCHttpException) {
           throw nestBody
         }
 
@@ -345,6 +345,14 @@ export class ImplementInterceptor implements NestInterceptor {
     )
   }
 }
+
+/**
+ * The `HttpException` oRPC throws to let NestJS send an error response.
+ * Exception filters can use it to tell oRPC error responses apart from other exceptions.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/nest#error-handling | Implement oRPC contract with NestJS - Error Handling}
+ */
+export class ORPCHttpException extends HttpException {}
 
 /**
  * Mirrors `toNodeHttpBody` from `@standard-server/node`, but returns a body NestJS can respond with.
@@ -410,7 +418,7 @@ function toNestHttpBody(
       headers['standard-server'] = getRequiredStandardBodyHint('json', headers)
     }
 
-    return [new HttpException(body, status), headers]
+    return [new ORPCHttpException(body, status), headers]
   }
 
   headers['content-type'] ??= 'application/json'

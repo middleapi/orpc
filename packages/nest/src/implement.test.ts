@@ -30,7 +30,7 @@ import supertest from 'supertest'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 
-import { Implement } from './implement'
+import { Implement, ORPCHttpException } from './implement'
 import type { NestStandardLazyRequest } from './module'
 import { ORPCModule } from './module'
 
@@ -1279,7 +1279,9 @@ describe('error handling', () => {
       expect(res.body).toEqual(error.toJSON())
 
       expect(catchErrorSpy).toHaveBeenCalledTimes(1)
-      expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(error.toJSON(), 404))
+      expect(catchErrorSpy).toHaveBeenCalledWith(new ORPCHttpException(error.toJSON(), 404))
+      expect(catchErrorSpy.mock.calls[0]![0]).toBeInstanceOf(ORPCHttpException)
+      expect(catchErrorSpy.mock.calls[0]![0]).toBeInstanceOf(HttpException)
     })
 
     it('should throw INTERNAL_SERVER_ERROR for non-ORPCError', async () => {
@@ -1293,7 +1295,7 @@ describe('error handling', () => {
       expect(res.body).toEqual(expectedError.toJSON())
 
       expect(catchErrorSpy).toHaveBeenCalledTimes(1)
-      expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(expectedError.toJSON(), 500))
+      expect(catchErrorSpy).toHaveBeenCalledWith(new ORPCHttpException(expectedError.toJSON(), 500))
     })
 
     it.each([
@@ -1339,7 +1341,9 @@ describe('error handling', () => {
         expect(res.headers['content-length']).toEqual('22')
         expect(res.body).toEqual({ code: 'BAD_REQUEST' })
 
-        expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException({ code: 'BAD_REQUEST' }, 400))
+        expect(catchErrorSpy).toHaveBeenCalledWith(
+          new ORPCHttpException({ code: 'BAD_REQUEST' }, 400),
+        )
       },
     )
 
