@@ -98,7 +98,24 @@ When you use the `@Implement` decorator with a router contract, under the hood i
 
 ## Error Handling
 
-By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows an `ORPCHttpException` (a subclass of `HttpException`) to NestJS. Exception filters that catch everything should pass `ORPCHttpException` through, otherwise they replace the oRPC error response. If you want NestJS to catch the original error instead, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
+By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows an `ORPCHttpException` (a subclass of `HttpException`) to NestJS. If you want NestJS to catch the original error instead, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
+
+An exception filter that catches everything replaces the oRPC error response unless it delegates `ORPCHttpException` to NestJS:
+
+```ts
+import { ORPCHttpException } from '@orpc/nest'
+
+@Catch()
+export class CatchEverythingFilter extends BaseExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    if (exception instanceof ORPCHttpException) {
+      return super.catch(exception, host)
+    }
+
+    // ...
+  }
+}
+```
 
 :::tip
 Learn how to customize input and output validation errors in [Validation Errors](/docs/recipes/validation-customization#custom-validation-errors) and the [ORPCModule](#configuration) section.

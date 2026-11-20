@@ -3,8 +3,15 @@ import { once } from 'node:events'
 import { request as httpRequest } from 'node:http'
 
 import FastifyCookie from '@fastify/cookie'
-import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from '@nestjs/common'
+import type {
+  ArgumentsHost,
+  CallHandler,
+  CanActivate,
+  ExecutionContext,
+  NestInterceptor,
+} from '@nestjs/common'
 import {
+  Catch,
   Controller,
   HttpException,
   Req,
@@ -14,7 +21,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
-import { Reflector } from '@nestjs/core'
+import { BaseExceptionFilter, Reflector } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { NodeAdapter } from '@nestjs/platform-node'
 import { Test } from '@nestjs/testing'
@@ -1269,7 +1276,7 @@ describe('error handling', () => {
     // express and fastify append a charset to a content-type set by the response, the node adapter sends it as is
     const charset = adapter instanceof NodeAdapter ? '' : '; charset=utf-8'
 
-    it('should throw HttpException for regular errors', async () => {
+    it('should throw ORPCHttpException for regular errors', async () => {
       const error = new ORPCError('NOT_FOUND', { data: 'test data' })
       handler.mockRejectedValueOnce(error)
 
@@ -1316,7 +1323,7 @@ describe('error handling', () => {
         },
       },
     ])(
-      'should respect or override response headers of HttpException $name a content-type',
+      'should respect or override response headers of ORPCHttpException $name a content-type',
       async ({ headers, expected }) => {
         routingInterceptor.mockResolvedValueOnce({
           matched: true,
@@ -2285,6 +2292,74 @@ describe('compatibility', () => {
         expect(res.statusCode).toEqual(413)
         expect(res.body).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' })
       })
+    })
+  })
+})
+
+describe('catch-all exception filter', () => {
+  const contract = oc.meta(openapi({ path: '/catch-all' }))
+
+  const handler = vi.fn()
+
+  @Controller()
+  class ImplController {
+    @Implement(contract)
+    error() {
+      return implement(contract).handler(handler)
+    }
+  }
+
+  @Catch()
+  class CatchEverythingFilter extends BaseExceptionFilter {
+    override catch(exception: unknown, host: ArgumentsHost) {
+      if (exception instanceof ORPCHttpException) {
+        return super.catch(exception, host)
+      }
+
+      this.applicationRef!.reply(host.switchToHttp().getResponse(), { custom: true }, 500)
+    }
+  }
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
+  ] as const)('with %s', async (_, adapter) => {
+    const routingInterceptor = vi.fn(({ next }) => next())
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [ORPCModule.forRoot({ routingInterceptors: [routingInterceptor] })],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    app.useGlobalFilters(new CatchEverythingFilter(app.getHttpAdapter()))
+    await app.init()
+
+    if (adapter instanceof FastifyAdapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    afterAll(async () => {
+      await app.close()
+    })
+
+    it('can pass ORPCHttpException through to keep the oRPC error response', async () => {
+      const error = new ORPCError('NOT_FOUND', { data: 'test data' })
+      handler.mockRejectedValueOnce(error)
+
+      const res = await supertest(app.getHttpServer()).post('/catch-all')
+
+      expect(res.statusCode).toEqual(404)
+      expect(res.body).toEqual(error.toJSON())
+    })
+
+    it('still handles other exceptions', async () => {
+      routingInterceptor.mockRejectedValueOnce(new Error('not an oRPC error response'))
+
+      const res = await supertest(app.getHttpServer()).post('/catch-all')
+
+      expect(res.statusCode).toEqual(500)
+      expect(res.body).toEqual({ custom: true })
     })
   })
 })
