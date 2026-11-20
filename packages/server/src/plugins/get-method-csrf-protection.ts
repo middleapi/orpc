@@ -1,5 +1,7 @@
+import type { AnyORPCError } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
-import { toArray } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
+import { toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 
 import type {
@@ -9,6 +11,15 @@ import type {
   StandardHandlerPlugin,
 } from '../adapters/standard/index'
 import type { Context } from '../context'
+
+export interface GetMethodCsrfProtectionHandlerPluginOptions<T extends Context> {
+  /**
+   * The error to throw when a request is blocked.
+   *
+   * @default ORPCError('FORBIDDEN')
+   */
+  error?: Value<AnyORPCError, [options: StandardHandlerInterceptorOptions<T>]> | undefined
+}
 
 /**
  * Adds Cross-Site Request Forgery (CSRF) protection that makes the safe `GET` method as
@@ -31,6 +42,17 @@ export class GetMethodCsrfProtectionHandlerPlugin<
 > implements StandardHandlerPlugin<T> {
   name = '~get-method-csrf-protection'
 
+  private readonly error: Exclude<
+    GetMethodCsrfProtectionHandlerPluginOptions<T>['error'],
+    undefined
+  >
+
+  constructor(options: NoInfer<GetMethodCsrfProtectionHandlerPluginOptions<T>> = {}) {
+    this.error =
+      options.error ??
+      (() => new ORPCError('FORBIDDEN', { message: 'Request blocked by CSRF protection.' }))
+  }
+
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     /**
      * Batch sub-requests are judged individually here, which is safe: navigations cannot
@@ -42,7 +64,7 @@ export class GetMethodCsrfProtectionHandlerPlugin<
         return interceptorOptions.next()
       }
 
-      throw new ORPCError('FORBIDDEN', { message: 'Request blocked by CSRF protection.' })
+      throw value(this.error, interceptorOptions)
     }
 
     return {

@@ -5,7 +5,7 @@ import { appendFile, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import type { Context } from '@orpc/server'
+import type { AnyORPCError, Context } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
 import type {
   StandardHandlerOptions,
@@ -105,6 +105,13 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    * @default 64 * 1024
    */
   spoolThreshold?: number | undefined
+
+  /**
+   * The error to throw when a body exceeds its `maxBodySize` limit.
+   *
+   * @default ORPCError('PAYLOAD_TOO_LARGE')
+   */
+  error?: Value<AnyORPCError, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 }
 
 /**
@@ -176,6 +183,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     undefined
   >
   private readonly spoolThreshold: number
+  private readonly error: Exclude<TmpFileUploadHandlerPluginOptions<T>['error'], undefined>
 
   constructor(options: TmpFileUploadHandlerPluginOptions<T> = {}) {
     this.tmpDir = options.tmpDir ?? tmpdir()
@@ -185,6 +193,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       stream: Number.POSITIVE_INFINITY,
     }
     this.spoolThreshold = options.spoolThreshold ?? 64 * 1024
+    this.error = options.error ?? (() => new ORPCError('PAYLOAD_TOO_LARGE'))
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -269,6 +278,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     }
 
     const maxBodySize = await value(this.maxBodySize, interceptorOptions)
+    const createError = () => value(this.error, interceptorOptions)
 
     /**
      * A form-data hint always means multipart here, even though it can also
@@ -277,21 +287,28 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
      * parser, which would fall back to urlencoded form data.
      */
     if (resolvedHint === 'form-data') {
-      return this.parseMultipartBody(request, tmpFiles, maxBodySize)
+      return this.parseMultipartBody(request, tmpFiles, maxBodySize, createError)
     }
 
     if (resolvedHint === 'file') {
-      return this.parseFileBody(request, tmpFiles, maxBodySize)
+      return this.parseFileBody(request, tmpFiles, maxBodySize, createError)
     }
 
     if (resolvedHint === 'json' || resolvedHint === 'url-search-params') {
-      return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.memory)
+      return this.parseLimitedBody(request, hint, resolvedHint, createError, maxBodySize.memory)
     }
 
     // Streams are consumed on the fly, but the decoder buffers each event whole, however fast the stream is read
     const eventLimit =
       resolvedHint === 'event-stream' ? maxBodySize.memory : Number.POSITIVE_INFINITY
-    return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream, eventLimit)
+    return this.parseLimitedBody(
+      request,
+      hint,
+      resolvedHint,
+      createError,
+      maxBodySize.stream,
+      eventLimit,
+    )
   }
 
   /**
@@ -302,6 +319,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     request: StandardLazyRequest,
     hint: StandardBodyHint | undefined,
     resolvedHint: StandardBodyHint,
+    createError: () => AnyORPCError,
     limit: number,
     eventLimit = Number.POSITIVE_INFINITY,
   ): Promise<StandardBody> {
@@ -309,7 +327,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return request.resolveBody(hint)
     }
 
-    assertContentLengthWithin(request.headers, limit)
+    assertContentLengthWithin(request.headers, limit, createError)
 
     const stream = await request.resolveBody('octet-stream')
 
@@ -321,7 +339,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     // An event can't outgrow a limit at or above the total one
     const fits = eventLimit < limit ? createEventSizeCheck(eventLimit) : undefined
 
-    const response = new Response(limitStream(stream, limit, fits), {
+    const response = new Response(limitStream(stream, limit, createError, fits), {
       headers: toFetchHeaders(request.headers),
     })
 
@@ -332,8 +350,9 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     request: StandardLazyRequest,
     tmpFiles: RequestTmpFiles,
     maxBodySize: TmpFileUploadHandlerPluginMaxBodySize,
+    createError: () => AnyORPCError,
   ): Promise<StandardBody> {
-    assertContentLengthWithin(request.headers, maxBodySize.file)
+    assertContentLengthWithin(request.headers, maxBodySize.file, createError)
 
     const stream = await request.resolveBody('octet-stream')
 
@@ -351,8 +370,8 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
     const upload = new UploadWriter(
       tmpFiles,
-      new Budget(maxBodySize.memory),
-      new Budget(maxBodySize.file),
+      new Budget(maxBodySize.memory, createError),
+      new Budget(maxBodySize.file, createError),
       this.spoolThreshold,
     )
 
@@ -367,6 +386,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     request: StandardLazyRequest,
     tmpFiles: RequestTmpFiles,
     maxBodySize: TmpFileUploadHandlerPluginMaxBodySize,
+    createError: () => AnyORPCError,
   ): Promise<StandardBody> {
     const contentType = flattenStandardHeader(request.headers['content-type'])
     const boundary =
@@ -384,7 +404,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
      */
     const totalLimit = maxBodySize.memory + maxBodySize.file
 
-    assertContentLengthWithin(request.headers, totalLimit)
+    assertContentLengthWithin(request.headers, totalLimit, createError)
 
     const stream = await request.resolveBody('octet-stream')
 
@@ -394,11 +414,13 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     }
 
     const limited =
-      totalLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, totalLimit)
+      totalLimit === Number.POSITIVE_INFINITY
+        ? stream
+        : limitStream(stream, totalLimit, createError)
 
     const form = new FormData()
-    const memory = new Budget(maxBodySize.memory)
-    const file = new Budget(maxBodySize.file)
+    const memory = new Budget(maxBodySize.memory, createError)
+    const file = new Budget(maxBodySize.file, createError)
 
     await parseMultipart(limited, boundary, (part) => {
       const name = part.name
@@ -442,11 +464,15 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
  * Rejects early when the declared length already exceeds the limit. The length
  * can lie, so the streaming enforcement stays either way.
  */
-function assertContentLengthWithin(headers: StandardHeaders, limit: number): void {
+function assertContentLengthWithin(
+  headers: StandardHeaders,
+  limit: number,
+  createError: () => AnyORPCError,
+): void {
   const contentLength = Number(flattenStandardHeader(headers['content-length']))
 
   if (Number.isFinite(contentLength) && contentLength > limit) {
-    throw new ORPCError('PAYLOAD_TOO_LARGE')
+    throw createError()
   }
 }
 
@@ -457,6 +483,7 @@ function assertContentLengthWithin(headers: StandardHeaders, limit: number): voi
 function limitStream(
   stream: ReadableStream<Uint8Array>,
   limit: number,
+  createError: () => AnyORPCError,
   fits: (chunk: Uint8Array) => boolean = () => true,
 ): ReadableStream<Uint8Array> {
   let total = 0
@@ -467,7 +494,7 @@ function limitStream(
         total += chunk.byteLength
 
         if (total > limit || !fits(chunk)) {
-          controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+          controller.error(createError())
           return
         }
 
@@ -546,11 +573,14 @@ function indexOrEnd(bytes: Buffer, byte: number, from: number): number {
 class Budget {
   private used = 0
 
-  constructor(private readonly limit: number) {}
+  constructor(
+    private readonly limit: number,
+    private readonly createError: () => AnyORPCError,
+  ) {}
 
   charge(size: number): void {
     if (!this.tryCharge(size)) {
-      throw new ORPCError('PAYLOAD_TOO_LARGE')
+      throw this.createError()
     }
   }
 

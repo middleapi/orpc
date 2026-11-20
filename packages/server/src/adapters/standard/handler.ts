@@ -1,5 +1,6 @@
 import { ORPCError, toORPCError } from '@orpc/client'
 import type { ErrorMap, Schema } from '@orpc/contract'
+import { reconcileORPCError } from '@orpc/contract'
 import type { Interceptor, Promisable, Value } from '@orpc/shared'
 import {
   getTracer,
@@ -163,6 +164,8 @@ export class StandardHandler<T extends Context> {
         span?.setAttribute('rpc.system', ORPC_NAME)
         span?.setAttribute('rpc.method', path.join('.'))
 
+        let procedureErrors: Set<unknown> | undefined
+
         try {
           const response = await intercept(
             this.interceptors,
@@ -203,6 +206,9 @@ export class StandardHandler<T extends Context> {
               const output = await client(input, {
                 signal: request.signal,
                 lastEventId: flattenStandardHeader(request.headers['last-event-id']),
+              }).catch((error) => {
+                ;(procedureErrors ??= new Set()).add(error)
+                throw error
               })
               step = undefined
 
@@ -225,7 +231,18 @@ export class StandardHandler<T extends Context> {
             recordSpanError(span, e)
           }
 
-          const response = await this.codec.encodeError(toORPCError(e), procedure, path, {
+          const error = toORPCError(e)
+
+          /**
+           * The procedure client already reconciles what it rejects with,
+           * reconciling again would validate (and possibly transform) the data twice.
+           * An interceptor can call the procedure more than once, so every rejection is tracked.
+           */
+          const reconciled = procedureErrors?.has(e)
+            ? error
+            : await reconcileORPCError(procedure['~orpc'].errorMap, error)
+
+          const response = await this.codec.encodeError(reconciled, procedure, path, {
             context,
             prefix,
           })
