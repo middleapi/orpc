@@ -1,5 +1,6 @@
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
+import { RethrowHandlerPlugin } from '@orpc/server/plugins'
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 
 import { openapi } from '../../meta'
@@ -112,5 +113,26 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
+  })
+})
+
+describe('openapiHandler with RethrowHandlerPlugin', () => {
+  const ping = vi.fn()
+  const handler = new OpenAPIHandler(
+    { ping: os.meta(openapi({ method: 'POST', path: '/ping' })).handler(ping) },
+    { plugins: [new RethrowHandlerPlugin({ filter: (error) => !(error instanceof ORPCError) })] },
+  )
+
+  it('responds 400 to a malformed body instead of rethrowing it', async () => {
+    const { response } = await handler.handle(
+      new Request('http://localhost/ping', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad',
+      }),
+    )
+
+    expect(response?.status).toBe(400)
+    expect(ping).not.toHaveBeenCalled()
   })
 })
