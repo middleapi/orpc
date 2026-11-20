@@ -13,7 +13,7 @@ import type {
 } from '../adapters/standard/index'
 import type { Context } from '../context'
 
-export interface RequestLimitHandlerPluginOptions<T extends Context> {
+export interface RequestLimitHandlerPluginOptions<T extends Context = Context> {
   /**
    * The maximum allowed request body size in bytes.
    */

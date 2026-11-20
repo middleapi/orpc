@@ -34,7 +34,7 @@ When used with [Request Compression](/docs/plugins/request-compression), `maxBod
 
 ## Custom Error
 
-By default the plugin throws `PAYLOAD_TOO_LARGE`. Use `error` to throw your own, which is [defined](/docs/error-handling) when the matched procedure declares it.
+By default the plugin throws `PAYLOAD_TOO_LARGE`. Use `error` to throw your own, which is [defined](/docs/error-handling) when the matched procedure declares it. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
 
 ```ts
 new RequestLimitHandlerPlugin({

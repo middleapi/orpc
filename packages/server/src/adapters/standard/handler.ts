@@ -164,7 +164,7 @@ export class StandardHandler<T extends Context> {
         span?.setAttribute('rpc.system', ORPC_NAME)
         span?.setAttribute('rpc.method', path.join('.'))
 
-        let procedureFailure: { error: unknown } | undefined
+        let procedureErrors: Set<unknown> | undefined
 
         try {
           const response = await intercept(
@@ -196,7 +196,7 @@ export class StandardHandler<T extends Context> {
                 signal: request.signal,
                 lastEventId: flattenStandardHeader(request.headers['last-event-id']),
               }).catch((error) => {
-                procedureFailure = { error }
+                ;(procedureErrors ??= new Set()).add(error)
                 throw error
               })
               step = undefined
@@ -231,11 +231,11 @@ export class StandardHandler<T extends Context> {
           /**
            * The procedure client already reconciles what it rejects with,
            * reconciling again would validate (and possibly transform) the data twice.
+           * An interceptor can call the procedure more than once, so every rejection is tracked.
            */
-          const reconciled =
-            procedureFailure?.error === e
-              ? error
-              : await reconcileORPCError(procedure['~orpc'].errorMap, error)
+          const reconciled = procedureErrors?.has(e)
+            ? error
+            : await reconcileORPCError(procedure['~orpc'].errorMap, error)
 
           const response = await this.codec.encodeError(reconciled, procedure, path, {
             context,

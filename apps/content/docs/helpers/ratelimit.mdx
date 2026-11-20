@@ -94,14 +94,13 @@ When the same `limiter` and `key` combination is used multiple times in a single
 :::
 
 :::tip[Custom Error]
-By default the middleware throws `TOO_MANY_REQUESTS`. Use `error` to throw your own, which is [defined](/docs/error-handling) when the procedure declares it:
+By default the middleware throws `TOO_MANY_REQUESTS`. Use `error` to throw your own, which is [defined](/docs/error-handling) when the procedure declares it. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
 
 ```ts
 ratelimit({
   limiter,
   key,
-  error: (result) =>
-    new ORPCError('RATE_LIMITED', { data: { retryAfter: result.reset - Date.now() } }),
+  error: (result) => new ORPCError('RATE_LIMITED', { data: { reset: result.reset } }),
 })
 ```
 

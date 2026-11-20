@@ -510,6 +510,30 @@ describe('standardHandler', () => {
       expect(codec.encodeError.mock.calls[0]?.[0]).toBe(procedureError)
     })
 
+    it('does not reconcile an earlier procedure error an interceptor rethrows after retrying', async () => {
+      const procedure = { '~orpc': { errorMap: { BAD_GATEWAY: {} } } } as any
+      const first = new ORPCError('BAD_GATEWAY')
+      client.mockRejectedValueOnce(first).mockRejectedValueOnce(new ORPCError('BAD_GATEWAY'))
+      handler = new StandardHandler(codec as any, {
+        interceptors: [
+          async ({ next }) => {
+            try {
+              return await next()
+            } catch (error) {
+              await next().catch(() => {})
+              throw error
+            }
+          },
+        ],
+      })
+      codec.resolveProcedure.mockResolvedValue(makeResolved({ procedure }))
+      codec.encodeError.mockResolvedValue({ status: 502, headers: {}, body: 'bad gateway' })
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      expect(codec.encodeError.mock.calls[0]?.[0]).toBe(first)
+    })
+
     it('wraps non-ORPCError from procedure call as INTERNAL_SERVER_ERROR', async () => {
       client.mockRejectedValue(new Error('unexpected'))
 
