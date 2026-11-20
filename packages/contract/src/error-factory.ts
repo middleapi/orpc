@@ -156,6 +156,8 @@ export type ORPCErrorConstructorMap<out T extends ErrorMap> = {
  *
  * throw errorMap.NOT_FOUND()
  * ```
+ *
+ * @see {@link https://orpc.dev/docs/error-handling#creating-defined-errors | Error Handling - Creating Defined Errors}
  */
 export function createORPCErrorConstructorMap<T extends ErrorMap>(
   errorMap: T,

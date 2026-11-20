@@ -422,6 +422,28 @@ const handler = new RPCHandler(router)
 
 </CodeGroup>
 
+### `defined` removed from `ORPCError` options
+
+`ORPCError` no longer accepts a `defined` option. Passing it fails to typecheck, and in JavaScript it is silently ignored, so the error is not defined. To create a defined error outside a handler, for example to mock a client in tests, use [`createORPCErrorConstructorMap`](/docs/error-handling#creating-defined-errors).
+
+<CodeGroup>
+
+```ts v2
+import { createORPCErrorConstructorMap } from '@orpc/contract'
+
+const errors = createORPCErrorConstructorMap(contract.planet.find['~orpc'].errorMap)
+
+const notFound = errors.NOT_FOUND({ data: { id: 123 } })
+```
+
+```ts v1
+import { ORPCError } from '@orpc/client'
+
+const notFound = new ORPCError('NOT_FOUND', { defined: true, data: { id: 123 } })
+```
+
+</CodeGroup>
+
 ### `safe` result changed
 
 The third element of the `safe` result is now the typed error itself (or `null`) instead of a boolean, and a fourth `isSuccess` element was added. See [Client Error Handling](/docs/client/error-handling).
