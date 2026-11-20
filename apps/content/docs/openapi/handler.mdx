@@ -94,7 +94,7 @@ const handler = new OpenAPIHandler(router, {
 
 ### Interceptors
 
-These interceptors run only for matched requests, after routing and before error handling (but can't use `ORPCError` for [typesafe errors](/docs/error-handling#orpcerror-compatibility)). Use them when you need access to the matched procedure.
+These interceptors run only for matched requests, after routing and before error handling, and can use `ORPCError` for [typesafe errors](/docs/error-handling#orpcerror-compatibility). Use them when you need access to the matched procedure.
 
 :::tip
 In most cases, `interceptors` are the best choice. They provide more context, are easier to work with, and run before error handling.
