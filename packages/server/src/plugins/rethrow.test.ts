@@ -102,3 +102,43 @@ describe('rethrowHandlerPlugin', () => {
     )
   })
 })
+
+describe('rethrowHandlerPlugin with malformed requests', () => {
+  const procedure_handler = vi.fn()
+  const filter = vi.fn((error: unknown) => !(error instanceof ORPCError))
+  const handler = new RPCHandler(os.handler(procedure_handler), {
+    allowMethods: ['GET', 'POST'],
+    plugins: [new RethrowHandlerPlugin({ filter })],
+  })
+
+  const post = (body: string) =>
+    new Request('http://localhost', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    })
+
+  it.each([
+    ['body', post('{bad')],
+    ['query', new Request('http://localhost?data=%7Bbad')],
+  ])(
+    'passes %s decode failures to the filter as BAD_REQUEST and does not rethrow them',
+    async (_, request) => {
+      const { response } = await handler.handle(request)
+
+      expect(response?.status).toBe(400)
+      expect(procedure_handler).not.toHaveBeenCalled()
+      expect(filter).toHaveBeenCalledOnce()
+      expect(filter.mock.calls[0]![0]).toSatisfy(
+        (error) => error instanceof ORPCError && error.code === 'BAD_REQUEST',
+      )
+    },
+  )
+
+  it('still rethrows procedure errors', async () => {
+    const error = new TypeError('__TEST__')
+    procedure_handler.mockRejectedValueOnce(error)
+
+    await expect(handler.handle(post('{}'))).rejects.toBe(error)
+  })
+})

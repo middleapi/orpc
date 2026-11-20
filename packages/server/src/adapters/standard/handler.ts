@@ -138,7 +138,7 @@ export class StandardHandler<T extends Context> {
       async ({ context, prefix, request }) => {
         const span = getTracer()?.getActiveSpan()
 
-        let step: 'decode_input' | 'call_procedure' | undefined
+        let step: 'call_procedure' | undefined
 
         const matchedOrNot = await runWithSpan('find_procedure', () =>
           this.codec.resolveProcedure(request, { context, prefix }),
@@ -172,9 +172,20 @@ export class StandardHandler<T extends Context> {
             { context, prefix, request, path, procedure, decodeInput },
 
             async ({ context, prefix, request, path, procedure, decodeInput }) => {
-              step = 'decode_input'
-              let input = await runWithSpan('decode_input', decodeInput)
               step = undefined
+
+              let input: unknown
+              try {
+                input = await runWithSpan('decode_input', decodeInput)
+              } catch (e) {
+                // Convert here so interceptors see the same error the client gets.
+                throw e instanceof ORPCError
+                  ? e
+                  : new ORPCError('BAD_REQUEST', {
+                      message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                      cause: e,
+                    })
+              }
 
               if (getTracer() && isAsyncIteratorObject(input)) {
                 input = traceAsyncIterator('consume_async_iterator_object_input', input)
@@ -220,13 +231,7 @@ export class StandardHandler<T extends Context> {
             recordSpanError(span, e)
           }
 
-          const error =
-            step === 'decode_input' && !(e instanceof ORPCError)
-              ? new ORPCError('BAD_REQUEST', {
-                  message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                  cause: e,
-                })
-              : toORPCError(e)
+          const error = toORPCError(e)
 
           /**
            * The procedure client already reconciles what it rejects with,

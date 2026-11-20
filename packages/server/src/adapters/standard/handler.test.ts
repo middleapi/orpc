@@ -380,8 +380,10 @@ describe('standardHandler', () => {
   })
 
   describe('error handling', () => {
-    it('wraps non-ORPCError decode failures as BAD_REQUEST', async () => {
+    it('wraps non-ORPCError decode failures as BAD_REQUEST before interceptors see them', async () => {
       const cause = new Error('invalid body')
+      const interceptor = vi.fn(({ next }) => next())
+      handler = new StandardHandler(codec as any, { interceptors: [interceptor] })
       codec.resolveProcedure.mockResolvedValue(
         makeResolved({ decodeInput: vi.fn().mockRejectedValue(cause) }),
       )
@@ -399,6 +401,7 @@ describe('standardHandler', () => {
       expect(error).toBeInstanceOf(ORPCError)
       expect(error.code).toBe('BAD_REQUEST')
       expect(error.cause).toBe(cause)
+      await expect(interceptor.mock.results[0]!.value).rejects.toBe(error)
     })
 
     it('passes ORPCError decode failures through without wrapping', async () => {
