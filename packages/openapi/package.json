@@ -114,17 +114,22 @@
     "@standard-server/aws-lambda": "~0.16.0",
     "@types/swagger-ui": "^5.32.1",
     "fastify": "^5.12.8",
+    "swagger-ui": "^5.34.1",
     "zod": "^4.6.7"
   },
   "peerDependencies": {
     "@scalar/api-reference": ">=1.57.2",
-    "@types/swagger-ui": ">=5.32.0"
+    "@types/swagger-ui": ">=5.32.0",
+    "swagger-ui": ">=5.32.6"
   },
   "peerDependenciesMeta": {
     "@scalar/api-reference": {
       "optional": true
     },
     "@types/swagger-ui": {
+      "optional": true
+    },
+    "swagger-ui": {
       "optional": true
     }
   }
