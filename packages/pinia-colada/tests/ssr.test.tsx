@@ -12,7 +12,7 @@ import { createSSRApp, defineComponent, h, nextTick, ref, watch } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 
 import type { RouterUtils } from '../src/index'
-import { createRouterUtils, StreamQuerySSRUtilsPlugin } from '../src/index'
+import { createPiniaColadaUtils, StreamQuerySSRUtilsPlugin } from '../src/index'
 import { createChunkController } from './__shared__/utils'
 
 type StreamClient = { stream: Client<object, undefined, AsyncIterable<number>, Error> }
@@ -44,7 +44,7 @@ describe.each([
         return server.stream()
       }),
     } as unknown as StreamClient
-    const utils = createRouterUtils(client, {
+    const utils = createPiniaColadaUtils(client, {
       plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })],
     })
     const pinia = createPinia()
@@ -72,7 +72,7 @@ describe.each([
     expect(started).toHaveBeenCalledTimes(1)
 
     const client = { stream: vi.fn(() => browser.stream()) } as unknown as StreamClient
-    const utils = createRouterUtils(client, {
+    const utils = createPiniaColadaUtils(client, {
       plugins: [new StreamQuerySSRUtilsPlugin({ isServer: false })],
     })
 

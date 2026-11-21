@@ -7,8 +7,9 @@ export type {
 } from './key'
 export * from './meta'
 export type { RouterUtilsPlugin } from './plugin'
-export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
+export { mergeProcedureUtilsOptions } from './procedure-utils'
 export type {
+  ProcedureUtils,
   ProcedureUtilsInfiniteInterceptor,
   ProcedureUtilsInfiniteInterceptorOptions,
   ProcedureUtilsLiveInterceptor,
@@ -22,16 +23,37 @@ export type {
   ProcedureUtilsStreamedInterceptor,
   ProcedureUtilsStreamedInterceptorOptions,
 } from './procedure-utils'
-export * from './router-utils'
 export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
-export { SharedUtils } from './shared-utils'
+export type {
+  RouterUtils,
+  RouterUtilsInternal,
+  RouterUtilsOptions,
+  RouterUtilsScoped,
+  RouterUtilsScopedInternal,
+} from './router-utils'
+export type { SharedUtils } from './shared-utils'
 export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
 export * from './structural-sharing'
-export * from './types'
-export {
-  OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
-  type OperationContext as TanstackQueryOperationContext,
+export { OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL } from './types'
+export type {
+  InferLiveQueryOutput,
+  InferStreamedQueryOutput,
+  InfiniteKeyOptions,
+  InfiniteOptionsIn,
+  InfiniteOptionsOut,
+  LiveOptionsIn,
+  MutationKeyOptions,
+  MutationOptionsIn,
+  MutationOptionsOut,
+  OperationType,
+  QueryKeyOptions,
+  QueryOptionsIn,
+  QueryOptionsOut,
+  StreamedKeyOptions,
+  StreamedOptionsIn,
+  StreamedOptionsOut,
+  OperationContext as TanstackQueryOperationContext,
 } from './types'
 
 export type { AnyNestedClient } from '@orpc/client'

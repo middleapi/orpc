@@ -12,17 +12,27 @@ import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsOptions } from './procedure-utils'
 import { mergeProcedureUtilsOptions } from './procedure-utils'
 
+export interface CreateHydrationOptionsOptions {
+  /**
+   * Serializes query data when dehydrating, and deserializes it when hydrating.
+   * Pass the serializer your link uses so custom types are supported.
+   *
+   * @default new RPCJsonSerializer()
+   */
+  serializer?: Public<RPCJsonSerializer> | undefined
+}
+
 /**
  * Creates `dehydrate` and `hydrate` query client defaults that preserve oRPC types.
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#custom-serializers | TanStack Query Integration - Custom Serializers}
  */
-export function createHydrationOptions(
-  serializer: Public<RPCJsonSerializer> = new RPCJsonSerializer(),
-): {
+export function createHydrationOptions(options: CreateHydrationOptionsOptions = {}): {
   dehydrate: { serializeData: (data: unknown) => RPCJsonSerialization }
   hydrate: { deserializeData: (data: RPCJsonSerialization) => unknown }
 } {
+  const serializer = options.serializer ?? new RPCJsonSerializer()
+
   return {
     dehydrate: {
       serializeData(data) {

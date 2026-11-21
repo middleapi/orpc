@@ -87,7 +87,7 @@ export type QueryOptionsOut<TOutput, TError, TSelectData, TInitialData> = Pick<
 
 export type StreamedKeyOptions<TInput> =
   | ((undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken }) & {
-      queryFnOptions?: SerializableStreamedQueryOptions | undefined
+      fnOptions?: SerializableStreamedQueryOptions | undefined
     })
   | { queryKey: QueryKey }
 
@@ -99,7 +99,7 @@ export type StreamedOptionsIn<
   TSelectData,
   TInitialData,
 > = QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData> & {
-  queryFnOptions?: SerializableStreamedQueryOptions | undefined
+  fnOptions?: SerializableStreamedQueryOptions | undefined
 } & SettleOnFirstDataOptions
 
 /**

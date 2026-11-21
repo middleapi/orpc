@@ -11,6 +11,12 @@ export type HTTPRouterUtils<
   TContext extends Context,
 > = HTTPRouterUtilsInternal<T, TContext>
 
+/**
+ * The recursion behind {@link HTTPRouterUtils}. Exported only so TypeScript can name it
+ * in declarations emitted for generic code, do not use it directly.
+ *
+ * @internal
+ */
 export type HTTPRouterUtilsInternal<T, TContext extends Context> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>
     ? HTTPProcedureUtils<TContext, UInputSchema, UOutputSchema, UErrorMap>

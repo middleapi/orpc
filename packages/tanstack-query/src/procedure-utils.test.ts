@@ -60,7 +60,7 @@ describe('procedureUtils', () => {
         input: 1,
       })
 
-      keyedUtils.streamedKey({ input: 1, queryFnOptions: { maxChunks: 1 } } as any)
+      keyedUtils.streamedKey({ input: 1, fnOptions: { maxChunks: 1 } } as any)
       expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], {
         prefix: '__prefix__',
         serializer,
@@ -184,7 +184,7 @@ describe('procedureUtils', () => {
       const options = utils.streamedOptions({
         input: { search: '__search__' },
         context: { batch: '__batch__' },
-        queryFnOptions: {
+        fnOptions: {
           refetchMode: 'append',
         },
       })
@@ -236,7 +236,7 @@ describe('procedureUtils', () => {
     it('passes settleOnFirstData to the query function, not to the key or the query options', async () => {
       const options = utils.streamedOptions({
         input: { search: '__search__' },
-        queryFnOptions: { maxChunks: 2 },
+        fnOptions: { maxChunks: 2 },
         settleOnFirstData: true,
       })
 

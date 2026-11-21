@@ -9,6 +9,12 @@ import { SharedUtils } from './shared-utils'
 
 export type RouterUtils<T extends AnyNestedClient> = RouterUtilsInternal<T>
 
+/**
+ * The recursion behind {@link RouterUtils}. Exported only so TypeScript can name it
+ * in declarations emitted for generic code, do not use it directly.
+ *
+ * @internal
+ */
 export type RouterUtilsInternal<T> =
   T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>

@@ -4,3 +4,12 @@ it('exports createTanstackQueryUtils, TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL', 
     TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL: expect.any(Symbol),
   })
 })
+
+it('does not export generic names or utils classes', async () => {
+  const exports = await import('./index')
+
+  expect(exports).not.toHaveProperty('createRouterUtils')
+  expect(exports).not.toHaveProperty('OPERATION_CONTEXT_SYMBOL')
+  expect(exports).not.toHaveProperty('ProcedureUtils')
+  expect(exports).not.toHaveProperty('SharedUtils')
+})

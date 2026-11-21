@@ -451,7 +451,7 @@ export class ProcedureUtils<
     const queryKey = this.queryKey(optionsIn)
 
     return {
-      structuralSharing: createStructuralSharing(this.options.serializer),
+      structuralSharing: createStructuralSharing({ serializer: this.options.serializer }),
       ...(optionsIn as any),
       queryKey,
       queryFn: (fnContext) => {
@@ -507,7 +507,7 @@ export class ProcedureUtils<
       this.key({
         type: 'streamed',
         input: (optionsIn as any).input,
-        fnOptions: (optionsIn as any).queryFnOptions,
+        fnOptions: (optionsIn as any).fnOptions,
       })
 
     return queryKey as DataTag<QueryKey, InferStreamedQueryOutput<TOutput>, TError>
@@ -579,7 +579,7 @@ export class ProcedureUtils<
 
                 return output
               },
-              { ...optionsIn.queryFnOptions, settleOnFirstData },
+              { ...optionsIn.fnOptions, settleOnFirstData },
             )(fnContext)
           },
         )
@@ -637,7 +637,7 @@ export class ProcedureUtils<
     const { settleOnFirstData, ...queryOptions } = optionsIn
 
     return {
-      structuralSharing: createStructuralSharing(this.options.serializer),
+      structuralSharing: createStructuralSharing({ serializer: this.options.serializer }),
       ...(queryOptions as any),
       queryKey,
       queryFn: (fnContext) => {
@@ -740,7 +740,7 @@ export class ProcedureUtils<
     const queryKey = this.infiniteKey(optionsIn)
 
     return {
-      structuralSharing: createStructuralSharing(this.options.serializer),
+      structuralSharing: createStructuralSharing({ serializer: this.options.serializer }),
       ...(optionsIn as any),
       queryKey,
       queryFn: (fnContext) => {

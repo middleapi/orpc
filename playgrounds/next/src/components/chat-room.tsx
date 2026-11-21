@@ -13,7 +13,7 @@ export function ChatRoom() {
     orpc.message.subscribe.streamedOptions({
       input: { channel: CHANNEL },
       context: { retry: Infinity },
-      queryFnOptions: { maxChunks: 10 },
+      fnOptions: { maxChunks: 10 },
     }),
   )
 

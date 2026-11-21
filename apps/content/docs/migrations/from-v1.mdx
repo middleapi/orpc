@@ -1193,9 +1193,12 @@ orpc.live.experimental_liveOptions({ input: {} })
 
 `experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCJsonSerializer` (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)).
 
+Each integration now exports its factory, operation context symbol and type only under the package-specific names: the generic `createRouterUtils`, `OPERATION_CONTEXT_SYMBOL` and `OperationContext` exports were removed. For TanStack Query, use `createTanstackQueryUtils`, `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` and `TanstackQueryOperationContext`. `ProcedureUtils` and `SharedUtils` are exported as types only.
+
 Streamed queries changed (see [Streamed Query Options](/docs/integrations/tanstack-query#streamed-query-options)):
 
 - `refetchMode: 'reset'` keeps the old data until the new stream connects, then sets it to `[]`. (v1 cleared it immediately, returning the query to `pending`.)
+- `queryFnOptions` is now `fnOptions`, the same name `.key({ type: 'streamed', fnOptions })` uses.
 - `refetchMode: 'replace'` was removed. To keep the old data until the stream ends, collect the stream in a custom `queryFn`:
 
 ```ts
@@ -1207,7 +1210,7 @@ orpc.streamed.streamedOptions({
 
 ### SWR and Pinia Colada
 
-`@orpc/experimental-react-swr` is now `@orpc/swr` (see [SWR Integration](/docs/integrations/swr)), and `@orpc/vue-colada` is now `@orpc/pinia-colada` with `createORPCVueColadaUtils` renamed to `createPiniaColadaUtils` (see [Pinia Colada Integration](/docs/integrations/pinia-colada)). Both switched from `path` to `prefix`, same as TanStack Query.
+`@orpc/experimental-react-swr` is now `@orpc/swr` (see [SWR Integration](/docs/integrations/swr)), and `@orpc/vue-colada` is now `@orpc/pinia-colada` with `createORPCVueColadaUtils` renamed to `createPiniaColadaUtils` (see [Pinia Colada Integration](/docs/integrations/pinia-colada)). Both switched from `path` to `prefix`, same as TanStack Query, and both dropped the generic exports too: use `createSWRUtils`, `SWR_OPERATION_CONTEXT_SYMBOL` and `SWROperationContext`, or `createPiniaColadaUtils`, `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` and `PiniaColadaOperationContext`.
 
 In SWR, `.subscriber` with `refetchMode: 'reset'` now sets the data to `[]` when the stream connects, instead of `undefined`.
 
@@ -1402,5 +1405,8 @@ These renames still compile through deprecated aliases, so you can migrate them 
 | `useOptimisticServerAction`  | `useOptimisticServerFunction` | `@orpc/next/hooks`               |
 | `createFormAction`           | `createServerFormFunction`    | `@orpc/next`                     |
 | `createORPCVueColadaUtils`   | `createPiniaColadaUtils`      | `@orpc/pinia-colada`             |
+| `createRouterUtils`          | `createTanstackQueryUtils`    | `@orpc/tanstack-query`           |
+| `createRouterUtils`          | `createPiniaColadaUtils`      | `@orpc/pinia-colada`             |
+| `createRouterUtils`          | `createSWRUtils`              | `@orpc/swr`                      |
 
 If anything is missing from this guide, check the corresponding page in the v2 docs, or open an issue on [GitHub](https://github.com/middleapi/orpc/issues).

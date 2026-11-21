@@ -158,8 +158,8 @@ describe('structuralSharing', () => {
   })
 
   describe('with a serializer', () => {
-    const sharing = createStructuralSharing(
-      new RPCJsonSerializer({
+    const sharing = createStructuralSharing({
+      serializer: new RPCJsonSerializer({
         handlers: {
           person: {
             condition: (value) => value instanceof Person,
@@ -173,7 +173,7 @@ describe('structuralSharing', () => {
           },
         },
       }),
-    )
+    })
 
     it('keeps equal instances of types with custom handlers', () => {
       const old = { people: [new Person('Earth', new Date('2025-01-01'))] }
@@ -199,8 +199,8 @@ describe('structuralSharing', () => {
     })
 
     it('compares dates with own fields through a custom date handler', () => {
-      const zoned = createStructuralSharing(
-        new RPCJsonSerializer({
+      const zoned = createStructuralSharing({
+        serializer: new RPCJsonSerializer({
           handlers: {
             date: {
               condition: (value) => value instanceof Date,
@@ -210,7 +210,7 @@ describe('structuralSharing', () => {
             },
           },
         }),
-      )
+      })
 
       const old = Object.assign(new Date(0), { zone: 'UTC' })
       const next = Object.assign(new Date(0), { zone: 'PST' })
@@ -244,8 +244,8 @@ describe('structuralSharing', () => {
   })
 
   describe('with an OpenAPI serializer', () => {
-    const sharing = createStructuralSharing(
-      new OpenAPIJsonSerializer({
+    const sharing = createStructuralSharing({
+      serializer: new OpenAPIJsonSerializer({
         handlers: {
           person: {
             condition: (value) => value instanceof Person,
@@ -253,7 +253,7 @@ describe('structuralSharing', () => {
           },
         },
       }),
-    )
+    })
 
     it.each([
       ['bigint and string members', new Set([1n]), new Set(['1'])],
