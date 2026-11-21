@@ -26,12 +26,12 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
     | undefined
 
   /**
-   * Maximum number of retries after the first request, before returning the response as-is.
-   * The first request is not counted: `2` allows up to 3 attempts in total, and `0` disables retries.
+   * Maximum number of attempts in total, before returning the response as-is.
+   * The first request is counted: `3` allows up to 2 retries, and `1` disables retries.
    *
-   * @default 2
+   * @default 3
    */
-  maxRetries?:
+  maxAttempts?:
     | Value<
         number,
         [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
@@ -62,7 +62,7 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
  */
 export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
   private readonly shouldRetry: Exclude<RetryAfterLinkPluginOptions<T>['shouldRetry'], undefined>
-  private readonly maxRetries: Exclude<RetryAfterLinkPluginOptions<T>['maxRetries'], undefined>
+  private readonly maxAttempts: Exclude<RetryAfterLinkPluginOptions<T>['maxAttempts'], undefined>
   private readonly timeout: Exclude<RetryAfterLinkPluginOptions<T>['timeout'], undefined>
 
   name = '~retry-after'
@@ -74,7 +74,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
         response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS ||
         response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE)
 
-    this.maxRetries = options.maxRetries ?? 2
+    this.maxAttempts = options.maxAttempts ?? 3
     this.timeout = options.timeout ?? 5 * 60 * 1000 // 5 minutes
   }
 
@@ -91,9 +91,11 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
       }
 
       const startTime = Date.now()
-      let retryCount = 0
+      let attemptCount = 0
 
       while (true) {
+        attemptCount++
+
         const response = await interceptorOptions.next()
 
         if (!value(this.shouldRetry, response, interceptorOptions)) {
@@ -106,7 +108,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
           return response
         }
 
-        if (retryCount >= value(this.maxRetries, response, interceptorOptions)) {
+        if (attemptCount >= value(this.maxAttempts, response, interceptorOptions)) {
           return response
         }
 
@@ -125,8 +127,6 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
         if (interceptorOptions.signal?.aborted) {
           return response
         }
-
-        retryCount++
       }
     }
 

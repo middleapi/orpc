@@ -981,21 +981,19 @@ const retryPlugin = new RetryLinkPlugin({
 
 ### Retry After Plugin
 
-[`RetryAfterLinkPlugin`](/docs/plugins/retry-after) options now follow the Retry Plugin's naming and counting. `condition` was renamed to `shouldRetry`, and `maxAttempts` was replaced by `maxRetries`, which does not count the first request. Subtract one from your v1 value:
+The `condition` option of [`RetryAfterLinkPlugin`](/docs/plugins/retry-after) was renamed to `shouldRetry`, matching the Retry Plugin:
 
 <CodeGroup>
 
 ```ts v2
 const retryAfterPlugin = new RetryAfterLinkPlugin({
   shouldRetry: (response) => response.status === 429,
-  maxRetries: 2, // 3 attempts in total
 })
 ```
 
 ```ts v1
 const retryAfterPlugin = new RetryAfterPlugin({
   condition: (response) => response.status === 429,
-  maxAttempts: 3,
 })
 ```
 

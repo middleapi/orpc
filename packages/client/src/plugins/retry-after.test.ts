@@ -176,11 +176,11 @@ describe('retryAfterLinkPlugin', () => {
     })
   })
 
-  it('should respect maxRetries option, not counting the first request', async () => {
+  it('should respect maxAttempts option, counting the first request', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
 
-    const maxRetries = vi.fn(() => 2)
+    const maxAttempts = vi.fn(() => 2)
 
     vi.mocked(transport.send).mockResolvedValue({
       status: 429,
@@ -189,15 +189,15 @@ describe('retryAfterLinkPlugin', () => {
     } satisfies StandardLazyResponse)
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new RetryAfterLinkPlugin({ maxRetries })],
+      plugins: [new RetryAfterLinkPlugin({ maxAttempts })],
     })
 
     const promise = link.call(['test'], 'input', { context: { context: true } })
     await vi.runAllTimersAsync()
 
     expect(await promise).toBe('rate limited')
-    expect(transport.send).toHaveBeenCalledTimes(3)
-    expect(maxRetries).toHaveBeenCalledWith(
+    expect(transport.send).toHaveBeenCalledTimes(2)
+    expect(maxAttempts).toHaveBeenCalledWith(
       expect.objectContaining({ status: 429 }),
       expect.objectContaining({ context: { context: true } }),
     )
