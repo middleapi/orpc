@@ -54,7 +54,7 @@ export type InferRouterInitialContextsInternal<T> = T extends {
       }
 
 /**
- * Infer all current context of the router.
+ * Infer all final contexts of the router.
  *
  * @remarks
  * **Note**: A procedure is a router too.
