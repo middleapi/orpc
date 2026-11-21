@@ -22,14 +22,9 @@ describe('oRPCError', () => {
     expect(error.message).toBe('Bad Gateway')
   })
 
-  it('can force write .defined', () => {
-    const error = new ORPCError('BAD_GATEWAY')
-
-    expect(error.defined).toBe(false)
-
-    ;(error.defined as any) = true
-
-    expect(error.defined).toBe(true)
+  it('ignores a defined option', () => {
+    // @ts-expect-error - defined is not an option
+    expect(new ORPCError('BAD_GATEWAY', { defined: true }).defined).toBe(false)
   })
 
   it('.toJSON', () => {

@@ -28,9 +28,13 @@ describe('ORPCError', () => {
     const _error23: ORPCError<'CODE', 'required'> = new ORPCError('CODE', { data: 'invalid' })
   })
 
-  it('not allow write .defined property', () => {
-    const error = new ORPCError('CODE')
+  it('not allow write .defined, .code and .data properties', () => {
+    const error = new ORPCError('CODE', { data: 1 })
     // @ts-expect-error - not allow write
     error.defined = true as any
+    // @ts-expect-error - not allow write
+    error.code = 'CODE'
+    // @ts-expect-error - not allow write
+    error.data = 2
   })
 })

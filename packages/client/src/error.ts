@@ -33,7 +33,7 @@ export const COMMON_ERROR_STATUS_MAP = {
   BAD_GATEWAY: 502,
   SERVICE_UNAVAILABLE: 503,
   GATEWAY_TIMEOUT: 504,
-}
+} as const
 
 /**
  * Error codes accepted by `ORPCError`: common HTTP codes plus any string.
@@ -90,10 +90,10 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
 
   /**
    * @remarks
-   * **Note**: The `__branch` property is used for type branding, helping TypeScript distinguish
+   * **Note**: The `__brand` property is used for type branding, helping TypeScript distinguish
    * an `ORPCError` instance from plain objects with a similar structure.
    */
-  override readonly name = 'ORPCError' as 'ORPCError' & { __branch: 'ORPCError' }
+  override readonly name = 'ORPCError' as 'ORPCError' & { __brand: 'ORPCError' }
 
   /**
    * Indicates whether the error matches a definition in the procedure's `.errors` map,
@@ -101,8 +101,8 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
    */
   readonly defined: boolean = false
 
-  code: TCode
-  data: TData
+  readonly code: TCode
+  readonly data: TData
 
   constructor(code: TCode, ...rest: MaybeOptionalOptions<ORPCErrorOptions<TData>>) {
     const options = resolveMaybeOptionalOptions(rest)
