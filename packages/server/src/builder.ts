@@ -42,10 +42,10 @@ export interface DefaultInitialContext {}
 
 export interface BuilderDefinition<
   TInputSchema extends AnySchema,
-  TInjectedContext extends AnySchema,
+  TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 >
-  extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap>, ProcedureConfig {
+  extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
   orderedMiddlewares: OrderedMiddleware[]
 }
 
@@ -206,9 +206,16 @@ export class Builder<TInitialContext extends Context, TErrorMap extends ErrorMap
     $OutContext extends IntersectPick<TInitialContext, $OutContext>,
     $Input,
     $Output = any, // $Output = any by default is important to make middleware can be used in any output by default
+    $InContext extends Context = TInitialContext,
   >(
-    middleware: Middleware<TInitialContext, $OutContext, $Input, $Output, TErrorMap>,
-  ): DecoratedMiddleware<TInitialContext, $OutContext, $Input, $Output, TErrorMap> {
+    middleware: Middleware<$InContext | TInitialContext, $OutContext, $Input, $Output, TErrorMap>,
+  ): DecoratedMiddleware<
+    MergedInitialContext<TInitialContext, object, $InContext>,
+    $OutContext,
+    $Input,
+    $Output,
+    TErrorMap
+  > {
     const allMiddlewares = [
       ...this['~orpc'].orderedMiddlewares.map(({ middleware }) => middleware),
       middleware,

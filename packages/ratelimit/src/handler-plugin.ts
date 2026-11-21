@@ -18,7 +18,7 @@ export interface RateLimitHandlerPluginContext {
     /**
      * The result of the ratelimiter after applying limits
      */
-    checks: { procedure: AnyProcedure; path: string[]; result: RateLimitResult }[]
+    checks: { procedure: AnyProcedure; path: readonly string[]; result: RateLimitResult }[]
   }
 }
 
