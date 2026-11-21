@@ -6,7 +6,7 @@ import { os } from './builder'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import * as ProcedureClient from './procedure-client'
-import { call, createContractProcedure, createGuardedProcedureLazy } from './procedure-utils'
+import { call, createContractedProcedure, createGuardedProcedureLazy } from './procedure-utils'
 
 const createProcedureClientSpy = vi.spyOn(ProcedureClient, 'createProcedureClient')
 
@@ -49,7 +49,7 @@ it('createGuardedProcedureLazy', async () => {
   )
 })
 
-it('createContractProcedure', () => {
+it('createContractedProcedure', () => {
   const metaPlugin1: AnyMetaPlugin = {
     name: 'plugin1',
     init: (meta) => ({ ...meta, plugin1: true }),
@@ -72,18 +72,20 @@ it('createContractProcedure', () => {
     .output(z.object({ greeting: z.string() }))
     .meta(metaPlugin1)
 
-  const contractProcedure = createContractProcedure(procedure, contract)
+  const contractedProcedure = createContractedProcedure(procedure, contract)
 
-  expect(contractProcedure).toBeInstanceOf(Procedure)
+  expect(contractedProcedure).toBeInstanceOf(Procedure)
 
-  expect(contractProcedure['~orpc'].inputSchemas).toBe(procedure['~orpc'].inputSchemas)
-  expect(contractProcedure['~orpc'].outputSchemas).toBe(procedure['~orpc'].outputSchemas)
-  expect(contractProcedure['~orpc'].handler).toBe(procedure['~orpc'].handler)
-  expect(contractProcedure['~orpc'].orderedMiddlewares).toBe(procedure['~orpc'].orderedMiddlewares)
+  expect(contractedProcedure['~orpc'].inputSchemas).toBe(procedure['~orpc'].inputSchemas)
+  expect(contractedProcedure['~orpc'].outputSchemas).toBe(procedure['~orpc'].outputSchemas)
+  expect(contractedProcedure['~orpc'].handler).toBe(procedure['~orpc'].handler)
+  expect(contractedProcedure['~orpc'].orderedMiddlewares).toBe(
+    procedure['~orpc'].orderedMiddlewares,
+  )
 
-  expect(contractProcedure['~orpc'].errorMap).toBe(contract['~orpc'].errorMap)
-  expect(contractProcedure['~orpc'].meta).toBe(contract['~orpc'].meta)
-  expect(contractProcedure['~orpc'].metaPlugins).toBe(contract['~orpc'].metaPlugins)
+  expect(contractedProcedure['~orpc'].errorMap).toBe(contract['~orpc'].errorMap)
+  expect(contractedProcedure['~orpc'].meta).toBe(contract['~orpc'].meta)
+  expect(contractedProcedure['~orpc'].metaPlugins).toBe(contract['~orpc'].metaPlugins)
 })
 
 it('call', async () => {

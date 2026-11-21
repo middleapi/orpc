@@ -2,9 +2,9 @@ import type {
   ContractBuilder,
   MergedErrorMap,
   MergedSchema,
-  ProcedureContractBuilderWithInput,
-  ProcedureContractBuilderWithInputOutput,
-  ProcedureContractBuilderWithOutput,
+  ContractBuilderWithInput,
+  ContractBuilderWithInputOutput,
+  ContractBuilderWithOutput,
 } from '@orpc/contract'
 import { error } from '@orpc/contract'
 import type {
@@ -57,67 +57,61 @@ it('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into C
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInput<Schema<string, number>, typeof errorMap>
+    ContractBuilderWithInput<Schema<string, number>, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithOutput<Schema<string, number>, typeof errorMap>
+    ContractBuilderWithOutput<Schema<string, number>, typeof errorMap>
   >()
 })
 
-describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ProcedureContractBuilderWithInput', async () => {
-  const builder = {} as ProcedureContractBuilderWithInput<typeof schema1, typeof errorMap>
+describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ContractBuilderWithInput', async () => {
+  const builder = {} as ContractBuilderWithInput<typeof schema1, typeof errorMap>
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
-    ProcedureContractBuilderWithInput<
+    ContractBuilderWithInput<
       typeof schema1,
       MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>
     >
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInput<
-      MergedSchema<Schema<string, number>, typeof schema1>,
-      typeof errorMap
-    >
+    ContractBuilderWithInput<MergedSchema<Schema<string, number>, typeof schema1>, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<typeof schema1, Schema<string, number>, typeof errorMap>
+    ContractBuilderWithInputOutput<typeof schema1, Schema<string, number>, typeof errorMap>
   >()
 })
 
-describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ProcedureContractBuilderWithOutput', async () => {
-  const builder = {} as ProcedureContractBuilderWithOutput<typeof schema2, typeof errorMap>
+describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ContractBuilderWithOutput', async () => {
+  const builder = {} as ContractBuilderWithOutput<typeof schema2, typeof errorMap>
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
-    ProcedureContractBuilderWithOutput<
+    ContractBuilderWithOutput<
       typeof schema2,
       MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>
     >
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<Schema<string, number>, typeof schema2, typeof errorMap>
+    ContractBuilderWithInputOutput<Schema<string, number>, typeof schema2, typeof errorMap>
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithOutput<
-      MergedSchema<Schema<string, number>, typeof schema2>,
-      typeof errorMap
-    >
+    ContractBuilderWithOutput<MergedSchema<Schema<string, number>, typeof schema2>, typeof errorMap>
   >()
 })
 
-describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ProcedureContractBuilderWithInputOutput', async () => {
-  const builder = {} as ProcedureContractBuilderWithInputOutput<
+describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> into ContractBuilderWithInputOutput', async () => {
+  const builder = {} as ContractBuilderWithInputOutput<
     typeof schema1,
     typeof schema2,
     typeof errorMap
   >
 
   expectTypeOf(builder.errors(effectErrorMap)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<
+    ContractBuilderWithInputOutput<
       typeof schema1,
       typeof schema2,
       MergedErrorMap<typeof errorMap, ExpectedEffectErrorMap>
@@ -125,7 +119,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
   >()
 
   expectTypeOf(builder.input(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<
+    ContractBuilderWithInputOutput<
       MergedSchema<Schema<string, number>, typeof schema1>,
       typeof schema2,
       typeof errorMap
@@ -133,7 +127,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> .errors<EffectSchema> 
   >()
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
-    ProcedureContractBuilderWithInputOutput<
+    ContractBuilderWithInputOutput<
       typeof schema1,
       MergedSchema<Schema<string, number>, typeof schema2>,
       typeof errorMap

@@ -8,7 +8,7 @@ import type { AnyProcedure } from '../../procedure'
 import { Procedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
 import type { WalkProcedureContractsLazyResult } from '../../router-utils'
-import { resolveContractProcedure, walkProcedureContractsSync } from '../../router-utils'
+import { resolveContractedProcedure, walkProcedureContractsSync } from '../../router-utils'
 
 /**
  * Methods that can invoke procedures by default. Browsers cannot trigger them
@@ -228,7 +228,7 @@ export class RPCMatcher {
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
-    entry.procedure = await resolveContractProcedure(this.rootRouter, entry.contract, entry.path)
+    entry.procedure = await resolveContractedProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
   }

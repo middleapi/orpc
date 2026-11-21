@@ -11,7 +11,7 @@ import * as RouterUtilsModule from './router-utils'
 
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
-const augmentContractRouterSpy = vi.spyOn(RouterUtilsModule, 'augmentContractRouter')
+const augmentRouterContractSpy = vi.spyOn(RouterUtilsModule, 'augmentRouterContract')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -203,8 +203,8 @@ describe('contractBuilder', () => {
     }
 
     const applied = builder.router(router)
-    expect(applied).toBe(augmentContractRouterSpy.mock.results[0]?.value)
-    expect(augmentContractRouterSpy).toHaveBeenCalledOnce()
-    expect(augmentContractRouterSpy).toHaveBeenCalledWith(router, builder['~orpc'])
+    expect(applied).toBe(augmentRouterContractSpy.mock.results[0]?.value)
+    expect(augmentRouterContractSpy).toHaveBeenCalledOnce()
+    expect(augmentRouterContractSpy).toHaveBeenCalledWith(router, builder['~orpc'])
   })
 })

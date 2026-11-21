@@ -79,75 +79,55 @@ declare module '@orpc/contract' {
 
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInput<Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): ContractBuilderWithInput<Schema<S['Encoded'], S['Type']>, TErrorMap>
 
     output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithOutput<Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): ContractBuilderWithOutput<Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
-  interface ProcedureContractBuilderWithInput<
-    TInputSchema extends AnySchema,
-    TErrorMap extends ErrorMap,
-  > {
+  interface ContractBuilderWithInput<TInputSchema extends AnySchema, TErrorMap extends ErrorMap> {
     errors<T extends EffectErrorMap>(
       errors: T,
-    ): ProcedureContractBuilderWithInput<
-      TInputSchema,
-      MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>
-    >
+    ): ContractBuilderWithInput<TInputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
 
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInput<
+    ): ContractBuilderWithInput<
       MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>,
       TErrorMap
     >
 
     output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<
-      TInputSchema,
-      Schema<S['Encoded'], S['Type']>,
-      TErrorMap
-    >
+    ): ContractBuilderWithInputOutput<TInputSchema, Schema<S['Encoded'], S['Type']>, TErrorMap>
   }
 
-  interface ProcedureContractBuilderWithOutput<
-    TOutputSchema extends AnySchema,
-    TErrorMap extends ErrorMap,
-  > {
+  interface ContractBuilderWithOutput<TOutputSchema extends AnySchema, TErrorMap extends ErrorMap> {
     errors<T extends EffectErrorMap>(
       errors: T,
-    ): ProcedureContractBuilderWithOutput<
-      TOutputSchema,
-      MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>
-    >
+    ): ContractBuilderWithOutput<TOutputSchema, MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>>
 
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<
-      Schema<S['Encoded'], S['Type']>,
-      TOutputSchema,
-      TErrorMap
-    >
+    ): ContractBuilderWithInputOutput<Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
 
     output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithOutput<
+    ): ContractBuilderWithOutput<
       MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>,
       TErrorMap
     >
   }
 
-  interface ProcedureContractBuilderWithInputOutput<
+  interface ContractBuilderWithInputOutput<
     TInputSchema extends AnySchema,
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
     errors<T extends EffectErrorMap>(
       errors: T,
-    ): ProcedureContractBuilderWithInputOutput<
+    ): ContractBuilderWithInputOutput<
       TInputSchema,
       TOutputSchema,
       MergedErrorMap<TErrorMap, ToStandardErrorMap<T>>
@@ -155,7 +135,7 @@ declare module '@orpc/contract' {
 
     input<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<
+    ): ContractBuilderWithInputOutput<
       MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>,
       TOutputSchema,
       TErrorMap
@@ -163,7 +143,7 @@ declare module '@orpc/contract' {
 
     output<S extends EffectSchema.ConstraintDecoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<
+    ): ContractBuilderWithInputOutput<
       TInputSchema,
       MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>,
       TErrorMap
