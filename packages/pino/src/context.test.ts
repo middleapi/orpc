@@ -9,3 +9,10 @@ it('getPinoLogger', async () => {
   const logger = pino()
   expect(getPinoLogger({ [PINO_LOGGER_CONTEXT_SYMBOL]: logger })).toBe(logger)
 })
+
+it('deprecated aliases', async () => {
+  const context = await import('./context')
+
+  expect(context.LOGGER_CONTEXT_SYMBOL).toBe(context.PINO_LOGGER_CONTEXT_SYMBOL)
+  expect(context.getLogger).toBe(context.getPinoLogger)
+})

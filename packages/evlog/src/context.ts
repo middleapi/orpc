@@ -21,3 +21,20 @@ export interface EvlogLoggerContext {
 export function getEvlogLogger(context: EvlogLoggerContext): RequestLogger | undefined {
   return context[EVLOG_LOGGER_CONTEXT_SYMBOL]
 }
+
+export {
+  /**
+   * @deprecated Use `EVLOG_LOGGER_CONTEXT_SYMBOL` instead.
+   */
+  EVLOG_LOGGER_CONTEXT_SYMBOL as LOGGER_CONTEXT_SYMBOL,
+  /**
+   * @deprecated Use `getEvlogLogger` instead.
+   */
+  getEvlogLogger as getLogger,
+}
+export type {
+  /**
+   * @deprecated Use `EvlogLoggerContext` instead.
+   */
+  EvlogLoggerContext as LoggerContext,
+}
