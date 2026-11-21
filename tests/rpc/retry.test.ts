@@ -53,7 +53,7 @@ describe('retry plugin', () => {
     new RPCLink({
       origin: 'http://localhost',
       fetch: fetchSpy,
-      plugins: [new RetryLinkPlugin({ default: { retry: 3, retryDelay: 0 } })],
+      plugins: [new RetryLinkPlugin({ default: { maxRetries: 3, retryDelay: 0 } })],
     }),
   )
 

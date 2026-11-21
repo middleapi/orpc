@@ -14,11 +14,11 @@ import type { ClientContext } from '../types'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   /**
-   * Override condition to determine whether to retry or not.
+   * Determine whether to retry a response.
    *
    * @default ((response) => response.status === 429 || response.status === 503)
    */
-  condition?:
+  shouldRetry?:
     | Value<
         boolean,
         [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
@@ -26,11 +26,12 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
     | undefined
 
   /**
-   * Maximum attempts before giving up retries.
+   * Maximum number of retries after the first request, before returning the response as-is.
+   * The first request is not counted: `2` allows up to 3 attempts in total, and `0` disables retries.
    *
-   * @default 3
+   * @default 2
    */
-  maxAttempts?:
+  maxRetries?:
     | Value<
         number,
         [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
@@ -60,20 +61,20 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
  * @see {@link https://orpc.dev/docs/plugins/retry-after | Retry After Plugin}
  */
 export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  private readonly condition: Exclude<RetryAfterLinkPluginOptions<T>['condition'], undefined>
-  private readonly maxAttempts: Exclude<RetryAfterLinkPluginOptions<T>['maxAttempts'], undefined>
+  private readonly shouldRetry: Exclude<RetryAfterLinkPluginOptions<T>['shouldRetry'], undefined>
+  private readonly maxRetries: Exclude<RetryAfterLinkPluginOptions<T>['maxRetries'], undefined>
   private readonly timeout: Exclude<RetryAfterLinkPluginOptions<T>['timeout'], undefined>
 
   name = '~retry-after'
 
   constructor(options: RetryAfterLinkPluginOptions<T> = {}) {
-    this.condition =
-      options.condition ??
+    this.shouldRetry =
+      options.shouldRetry ??
       ((response) =>
         response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS ||
         response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE)
 
-    this.maxAttempts = options.maxAttempts ?? 3
+    this.maxRetries = options.maxRetries ?? 2
     this.timeout = options.timeout ?? 5 * 60 * 1000 // 5 minutes
   }
 
@@ -90,14 +91,12 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
       }
 
       const startTime = Date.now()
-      let attemptCount = 0
+      let retryCount = 0
 
       while (true) {
-        attemptCount++
-
         const response = await interceptorOptions.next()
 
-        if (!value(this.condition, response, interceptorOptions)) {
+        if (!value(this.shouldRetry, response, interceptorOptions)) {
           return response
         }
 
@@ -107,7 +106,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
           return response
         }
 
-        if (attemptCount >= value(this.maxAttempts, response, interceptorOptions)) {
+        if (retryCount >= value(this.maxRetries, response, interceptorOptions)) {
           return response
         }
 
@@ -126,6 +125,8 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
         if (interceptorOptions.signal?.aborted) {
           return response
         }
+
+        retryCount++
       }
     }
 

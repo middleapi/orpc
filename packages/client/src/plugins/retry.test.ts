@@ -103,7 +103,11 @@ describe('retryLinkPlugin', () => {
     })
 
     await expect(
-      link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }),
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { maxRetries: 1, retryDelay: 0 } },
+      ),
     ).rejects.toThrow('FAIL')
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
@@ -125,7 +129,7 @@ describe('retryLinkPlugin', () => {
       link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 5, retryDelay: 0, shouldRetry } },
+        { context: { maxRetries: 5, retryDelay: 0, shouldRetry } },
       ),
     ).rejects.toThrow('FAIL')
 
@@ -147,7 +151,11 @@ describe('retryLinkPlugin', () => {
     })
 
     await expect(
-      link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0 } }),
+      link.call(
+        ['planet', 'create'],
+        { name: 'Earth' },
+        { context: { maxRetries: 3, retryDelay: 0 } },
+      ),
     ).rejects.toBe(error)
 
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
@@ -171,7 +179,7 @@ describe('retryLinkPlugin', () => {
       link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 3, retryDelay: 0, shouldRetry: true } },
+        { context: { maxRetries: 3, retryDelay: 0, shouldRetry: true } },
       ),
     ).resolves.toBe('OK')
 
@@ -204,7 +212,7 @@ describe('retryLinkPlugin', () => {
       link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 3, retryDelay: 0, onRetry } },
+        { context: { maxRetries: 3, retryDelay: 0, onRetry } },
       ),
     ).resolves.toBe('OK')
 
@@ -231,7 +239,7 @@ describe('retryLinkPlugin', () => {
       link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 3, retryDelay: 0 }, signal: controller.signal },
+        { context: { maxRetries: 3, retryDelay: 0 }, signal: controller.signal },
       ),
     ).rejects.toThrow('AbortError')
 
@@ -247,7 +255,7 @@ describe('retryLinkPlugin', () => {
       .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new RetryLinkPlugin({ default: { retry: 1, retryDelay: 0 } })],
+      plugins: [new RetryLinkPlugin({ default: { maxRetries: 1, retryDelay: 0 } })],
     })
 
     await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: {} })).resolves.toBe(
@@ -268,7 +276,7 @@ describe('retryLinkPlugin', () => {
       .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new RetryLinkPlugin({ default: { retry: 1 } })],
+      plugins: [new RetryLinkPlugin({ default: { maxRetries: 1 } })],
     })
 
     const callPromise = link.call(['planet', 'create'], { name: 'Earth' }, { context: {} })
@@ -302,7 +310,7 @@ describe('retryLinkPlugin', () => {
     const callPromise = link.call(
       ['planet', 'create'],
       { name: 'Earth' },
-      { context: { retry: 3, retryDelay: 5000, onRetry }, signal: controller.signal },
+      { context: { maxRetries: 3, retryDelay: 5000, onRetry }, signal: controller.signal },
     )
 
     await vi.advanceTimersByTimeAsync(1)
@@ -334,7 +342,7 @@ describe('retryLinkPlugin', () => {
       link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 1, retryDelay, onRetry } },
+        { context: { maxRetries: 1, retryDelay, onRetry } },
       ),
     ).rejects.toThrow('DELAY_FAIL')
 
@@ -379,7 +387,7 @@ describe('retryLinkPlugin', () => {
       const iterator = (await link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 1, shouldRetry }, lastEventId: 'init-id' },
+        { context: { maxRetries: 1, shouldRetry }, lastEventId: 'init-id' },
       )) as AsyncIterator<any>
 
       await expect(iterator.next()).resolves.toEqual({ done: false, value: { phase: 'first' } })
@@ -423,7 +431,7 @@ describe('retryLinkPlugin', () => {
       const iterator = (await link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 1, retryDelay: 0 } },
+        { context: { maxRetries: 1, retryDelay: 0 } },
       )) as AsyncIterator<any>
 
       await expect(iterator.next()).rejects.toBeInstanceOf(TypeError)
@@ -454,7 +462,7 @@ describe('retryLinkPlugin', () => {
       const iterator = (await link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 1, retryDelay: 0 } },
+        { context: { maxRetries: 1, retryDelay: 0 } },
       )) as AsyncIterator<any>
 
       await iterator.next()
@@ -515,7 +523,7 @@ describe('retryLinkPlugin', () => {
       const iterator = (await link.call(
         ['planet', 'create'],
         { name: 'Earth' },
-        { context: { retry: 1, retryDelay: 50 } },
+        { context: { maxRetries: 1, retryDelay: 50 } },
       )) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
@@ -555,7 +563,7 @@ describe('retryLinkPlugin', () => {
       })
 
       const iterator = (await link.call(['stream'], undefined, {
-        context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry },
+        context: { maxRetries: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry },
       })) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
@@ -596,7 +604,7 @@ describe('retryLinkPlugin', () => {
       })
 
       const iterator = (await link.call(['stream'], undefined, {
-        context: { retry: 3, retryDelay: 1000, onRetry },
+        context: { maxRetries: 3, retryDelay: 1000, onRetry },
       })) as AsyncIterator<any>
 
       const nextPromise = iterator.next()

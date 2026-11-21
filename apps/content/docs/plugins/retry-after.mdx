@@ -25,15 +25,15 @@ Requests whose body is a [`ReadableStream`](/docs/binary-data#readablestreamuint
 
 ## Options
 
-By default, the plugin retries only requests that receive a `429` (Too Many Requests) or `503` (Service Unavailable) status code. It times out after 5 minutes and allows up to 3 retry attempts. You can customize this behavior with the following options:
+By default, the plugin retries only requests that receive a `429` (Too Many Requests) or `503` (Service Unavailable) status code. It allows up to 2 retries after the first request, 3 attempts in total, and stops retrying once the total wait would exceed 5 minutes. You can customize this behavior with the following options:
 
 ```ts
 const link = new RPCLink({
   plugins: [
     new RetryAfterLinkPlugin({
-      condition: (response) => [429, 503].includes(response.status),
+      shouldRetry: (response) => [429, 503].includes(response.status),
       timeout: 5 * 60 * 1000, // 5 minutes
-      maxAttempts: 3,
+      maxRetries: 2, // Retries after the first request, so up to 3 attempts in total
     }),
   ],
 })

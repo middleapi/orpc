@@ -264,7 +264,7 @@ const link = new RPCLink({
 })
 
 const updates = await client.liveUpdates(undefined, {
-  context: { retry: Number.POSITIVE_INFINITY },
+  context: { maxRetries: Number.POSITIVE_INFINITY },
 })
 
 for await (const update of updates) {

@@ -27,7 +27,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ## Usage
 
-By default, retries are disabled. To enable retries, set the `retry` count in the request context:
+By default, retries are disabled. To enable retries, set `maxRetries` in the request context:
 
 ```ts twoslash
 import { router } from './shared/planet'
@@ -40,7 +40,7 @@ const planets = await client.planet.list(
   { limit: 10 },
   {
     context: {
-      retry: 3, // Maximum retry attempts
+      maxRetries: 3, // Retries after the first call, so up to 4 attempts in total
       retryDelay: 2000, // Delay between retries in ms
       shouldRetry: (options) => true, // Determines whether to retry based on the error
       onRetry: (options) => {
@@ -58,8 +58,8 @@ const planets = await client.planet.list(
 :::info
 The following context options control retry behavior:
 
-- **retry:** Maximum number of retry attempts before throwing an error _(default: `0`)_.
-- **retryDelay:** Delay between retry attempts _(default: `(o) => o.lastEventRetry ?? 2000`)_.
+- **maxRetries:** Maximum number of retries after the first call before throwing an error. The first call is not counted, so `3` allows up to 4 attempts in total _(default: `0`)_.
+- **retryDelay:** Delay before each retry, in milliseconds _(default: `(o) => o.lastEventRetry ?? 2000`)_.
 - **shouldRetry:** Function that determines whether a retry should be attempted _(default: `(o) => isRetryableError(o.error)`, see [Client Error Responses](#client-error-responses))_.
 
 You can override the default retry behavior globally by passing `default` options when initializing the plugin:
@@ -71,7 +71,7 @@ const link = new RPCLink<ClientContext>({
   plugins: [
     new RetryLinkPlugin({
       default: {
-        retry: 0,
+        maxRetries: 0,
         retryDelay: (o) => o.lastEventRetry ?? 2000,
         shouldRetry: (o) => isRetryableError(o.error),
       },
@@ -94,7 +94,7 @@ const planets = await client.planet.list(
   { limit: 10 },
   {
     context: {
-      retry: 3,
+      maxRetries: 3,
       shouldRetry: ({ error }) =>
         isRetryableError(error) || (error instanceof ORPCError && error.code === 'CONFLICT'),
     },
@@ -119,7 +119,7 @@ const link = new RPCLink<ClientContext>({
   plugins: [
     new RetryLinkPlugin({
       default: {
-        retry: ({ input }) => (isStreamedInput(input) ? 0 : 3),
+        maxRetries: ({ input }) => (isStreamedInput(input) ? 0 : 3),
       },
     }),
   ],
@@ -137,7 +137,7 @@ To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/d
 ```ts
 const streaming = await client.streaming('the input', {
   context: {
-    retry: Number.POSITIVE_INFINITY,
+    maxRetries: Number.POSITIVE_INFINITY,
   },
 })
 
