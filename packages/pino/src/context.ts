@@ -27,20 +27,3 @@ export interface PinoLoggerContext {
 export function getPinoLogger(context: PinoLoggerContext): Logger | undefined {
   return context[PINO_LOGGER_CONTEXT_SYMBOL]
 }
-
-export {
-  /**
-   * @deprecated Use `PINO_LOGGER_CONTEXT_SYMBOL` instead.
-   */
-  PINO_LOGGER_CONTEXT_SYMBOL as LOGGER_CONTEXT_SYMBOL,
-  /**
-   * @deprecated Use `getPinoLogger` instead.
-   */
-  getPinoLogger as getLogger,
-}
-export type {
-  /**
-   * @deprecated Use `PinoLoggerContext` instead.
-   */
-  PinoLoggerContext as LoggerContext,
-}
