@@ -49,7 +49,6 @@ To mock a client call that fails with a [typesafe error](/docs/error-handling#ty
 ```ts
 import { createORPCErrorConstructorMap } from '@orpc/contract'
 import { vi } from 'vitest'
-import * as z from 'zod'
 
 const errors = createORPCErrorConstructorMap({
   NOT_FOUND: {

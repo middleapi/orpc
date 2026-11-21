@@ -113,7 +113,6 @@ Outside a handler, for example when mocking a client in tests, use `createORPCEr
 
 ```ts
 import { createORPCErrorConstructorMap } from '@orpc/contract'
-import * as z from 'zod'
 
 const errors = createORPCErrorConstructorMap({
   NOT_FOUND: {
