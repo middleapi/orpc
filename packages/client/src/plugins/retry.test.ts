@@ -4,7 +4,7 @@ import { withEventMeta } from '@standard-server/core'
 
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
 import { StandardLink } from '../adapters/standard/index'
-import { MalformedResponseError, ORPCError, ResponseError } from '../error'
+import { ConnectionClosedError, MalformedResponseError, ORPCError, ResponseError } from '../error'
 import type { RetryLinkPluginContext } from './retry'
 import { isRetryableError, RetryLinkPlugin } from './retry'
 
@@ -66,12 +66,14 @@ describe('isRetryableError', () => {
     expect(isRetryableError(new MalformedResponseError({ response }))).toBe(expected)
   })
 
-  it.each([new ORPCError('BAD_REQUEST'), new TypeError('Failed to fetch'), 'FAIL'])(
-    'errors without a response -> true (%s)',
-    (error) => {
-      expect(isRetryableError(error)).toBe(true)
-    },
-  )
+  it.each([
+    new ORPCError('BAD_REQUEST'),
+    new TypeError('Failed to fetch'),
+    new ConnectionClosedError('WebSocket closed'),
+    'FAIL',
+  ])('errors without a response -> true (%s)', (error) => {
+    expect(isRetryableError(error)).toBe(true)
+  })
 })
 
 describe('retryLinkPlugin', () => {

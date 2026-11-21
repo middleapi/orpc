@@ -192,6 +192,17 @@ export class ResponseError extends Error {
   }
 }
 
+/**
+ * Error thrown by links over a persistent connection, such as WebSocket or MessagePort,
+ * when a call cannot complete because the connection closed, was lost, or could not be
+ * (re)established. Unlike an `AbortError`, it is a failure, not a cancellation.
+ *
+ * @see {@link https://orpc.dev/docs/client/error-handling#transport-errors | Client Error Handling - Transport Errors}
+ */
+export class ConnectionClosedError extends Error {
+  override readonly name = 'ConnectionClosedError'
+}
+
 export interface MalformedResponseErrorOptions extends ResponseErrorOptions {
   /**
    * @default inferred from the response body or status

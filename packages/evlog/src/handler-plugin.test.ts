@@ -1,5 +1,5 @@
 import { ORPCError, RPCSerializer } from '@orpc/client'
-import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
+import { AbortError, ORPC_NAME, sleep, TimeoutError } from '@orpc/shared'
 import { EventStreamErrorEvent } from '@standard-server/core'
 import type { LogLevel } from 'evlog'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -501,6 +501,24 @@ describe('evlogHandlerPlugin', () => {
 
     expect(logger.error).toHaveBeenCalledWith(abortError)
     expect(logger.setLevel).toHaveBeenCalledWith('info')
+
+    logger.error.mockClear()
+    logger.setLevel.mockClear()
+
+    // A timeout is a failure, not a benign abort
+    const timeoutError = new TimeoutError('reason')
+
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(timeoutError),
+        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(timeoutError)
+
+    expect(logger.error).toHaveBeenCalledWith(timeoutError)
+    expect(logger.setLevel).not.toHaveBeenCalled()
 
     logger.error.mockClear()
     logger.setLevel.mockClear()

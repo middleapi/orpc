@@ -98,7 +98,8 @@ export function recordSpanError(span: TracingSpan | undefined, error: unknown): 
     return
   }
 
-  // DO NOT treat aborted error as error if happen during business logic (assumed)
+  // DO NOT treat aborted error as error if happen during business logic (assumed).
+  // Timeouts and closed connections are not aborts, so they are recorded as errors.
   span.recordException(isAbortError(error) ? 'info' : 'error', error)
 }
 

@@ -75,3 +75,33 @@ const safeClient = createSafeClient(client)
 
 const [error, data] = await safeClient.doSomething({ id: '123' })
 ```
+
+## Transport Errors
+
+Not every error comes from your procedures. Calls can also fail before a response arrives, and each case has its own error so you can tell them apart:
+
+| Error                   | When                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AbortError`            | You cancelled the call through its `signal`. The call rejects with the signal's reason, an `AbortError` by default.                                                                |
+| `TimeoutError`          | The call exceeded the [Timeout Plugin](/docs/plugins/timeout#handling-timeouts) limit.                                                                                             |
+| `ConnectionClosedError` | The [WebSocket](/docs/adapters/websocket#connection-errors) or [MessagePort](/docs/adapters/message-port#connection-errors) connection closed, was lost, or could not be reopened. |
+
+```ts
+import { ConnectionClosedError, TimeoutError } from '@orpc/client'
+
+try {
+  const data = await client.doSomething({ id: '123' })
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    // took too long
+  } else if (error instanceof ConnectionClosedError) {
+    // connection closed or lost
+  } else if (error instanceof Error && error.name === 'AbortError') {
+    // cancelled, usually safe to ignore
+  }
+}
+```
+
+:::info
+Only `AbortError` is a cancellation. `TimeoutError` and `ConnectionClosedError` are failures: tracing records them as errors, and the [Retry Plugin](/docs/plugins/retry) treats a `ConnectionClosedError` as retryable.
+:::

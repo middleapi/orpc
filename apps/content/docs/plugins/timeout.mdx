@@ -7,7 +7,7 @@ sidebar:
 
 ## Client
 
-Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with an `AbortError`:
+Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with a [`TimeoutError`](#handling-timeouts):
 
 ```ts
 import { TimeoutLinkPlugin } from '@orpc/client/plugins'
@@ -27,7 +27,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ## Server
 
-Use `TimeoutHandlerPlugin` to abort the request signal with an `AbortError` when handling exceeds the timeout:
+Use `TimeoutHandlerPlugin` to abort the request signal with a [`TimeoutError`](#handling-timeouts) when handling exceeds the timeout:
 
 ```ts handler
 import { TimeoutHandlerPlugin } from '@orpc/server/plugins'
@@ -98,6 +98,30 @@ const handler = new RPCHandler(router, {
 
 :::info
 Return `null` or `undefined` to disable the timeout, which is useful for excluding long-lived requests. Any number always enables the timeout.
+:::
+
+## Handling Timeouts
+
+Both plugins abort with a `TimeoutError`, named like the one `AbortSignal.timeout()` uses, so a timeout is distinguishable from a cancellation, which stays an `AbortError`. On the client it is what the call rejects with, on the server it is the `signal.reason`:
+
+```ts
+import { TimeoutError } from '@orpc/client' // or '@orpc/server'
+
+try {
+  await client.planet.list()
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    // the call exceeded the timeout
+  }
+}
+```
+
+:::tip
+Check `error.name === 'TimeoutError'` instead to also match timeouts from your own `AbortSignal.timeout()` signals.
+:::
+
+:::info
+A timeout is a failure, not a cancellation: [OpenTelemetry](/docs/integrations/opentelemetry) spans record it as an error, and the [Pino](/docs/integrations/pino) and [Evlog](/docs/integrations/evlog) integrations log it at `error` level rather than `info`.
 :::
 
 ## Learn More

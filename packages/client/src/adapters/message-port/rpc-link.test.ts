@@ -1,7 +1,8 @@
-import { AbortError, sleep } from '@orpc/shared'
+import { sleep } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 
 import { createORPCClient } from '../../client'
+import { ConnectionClosedError } from '../../error'
 import { RPCLink } from './rpc-link'
 
 describe('rpcLink', () => {
@@ -83,7 +84,9 @@ describe('rpcLink', () => {
     const port = createPort()
     const orpc = createORPCClient(new RPCLink({ port })) as any
 
-    const promise = expect(orpc.ping('input')).rejects.toThrow(new AbortError('MessagePort closed'))
+    const promise = expect(orpc.ping('input')).rejects.toThrow(
+      new ConnectionClosedError('MessagePort closed'),
+    )
 
     await sleep(0)
 
@@ -98,7 +101,10 @@ describe('rpcLink', () => {
 
     onClose()
 
-    await expect(orpc.ping('input')).rejects.toThrow(new AbortError('MessagePort closed'))
+    await expect(orpc.ping('input')).rejects.toThrow(
+      new ConnectionClosedError('MessagePort closed'),
+    )
+    await expect(orpc.ping('input')).rejects.toBeInstanceOf(ConnectionClosedError)
     expect(port.postMessage).not.toHaveBeenCalled()
   })
 

@@ -1,6 +1,6 @@
 import type { Value } from '@orpc/shared'
 import {
-  AbortError,
+  TimeoutError,
   anyAbortSignal,
   isAsyncIteratorObject,
   toArray,
@@ -42,7 +42,7 @@ export interface TimeoutHandlerPluginOptions<T extends Context> {
 }
 
 /**
- * The Timeout Handler Plugin aborts the request signal with an `AbortError`
+ * The Timeout Handler Plugin aborts the request signal with a `TimeoutError`
  * when handling exceeds a configured timeout. It only aborts the signal,
  * the procedure must honor it to stop early and produce the response.
  *
@@ -74,7 +74,7 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
       const controller = new AbortController()
 
       const abortWithTimeout = (ms: number) => {
-        controller.abort(new AbortError(`Request timed out after ${ms}ms`))
+        controller.abort(new TimeoutError(`Request timed out after ${ms}ms`))
       }
 
       const timeoutId = hasTimeout ? setTimeout(abortWithTimeout, timeoutMs, timeoutMs) : undefined
