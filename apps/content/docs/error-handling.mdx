@@ -107,6 +107,26 @@ const exampleProcedure = os
   })
 ```
 
+### Creating Defined Errors
+
+Outside a handler, for example when mocking a client in tests, use `createORPCErrorConstructorMap` to create defined errors from an error map. It returns the same constructors as the `errors` object, so `isDefinedError` returns `true` for the errors they create.
+
+```ts
+import { createORPCErrorConstructorMap } from '@orpc/contract'
+
+const errors = createORPCErrorConstructorMap({
+  NOT_FOUND: {
+    data: z.object({ id: z.number() }),
+  },
+})
+
+const notFound = errors.NOT_FOUND({ data: { id: 123 } }) // notFound.defined === true
+```
+
+:::info
+Codes missing from the error map create errors that are not defined.
+:::
+
 ## Error Factory
 
 An error factory lets you define an error once and reuse it anywhere, keeping error handling consistent across your project.
