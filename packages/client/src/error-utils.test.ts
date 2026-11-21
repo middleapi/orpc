@@ -214,7 +214,7 @@ describe('cloneORPCError', () => {
     const cloned = cloneORPCError(original)
 
     // Modifying cloned data doesn't affect original
-    cloned.data = 2
+    ;(cloned.data as any) = 2
 
     expect(original.data).toBe(1)
     expect(cloned.data).toBe(2)

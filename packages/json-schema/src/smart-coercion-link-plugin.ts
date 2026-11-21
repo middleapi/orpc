@@ -3,6 +3,7 @@ import { cloneORPCError, ORPCError } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { AnySchema, ErrorMap, RouterContract } from '@orpc/contract'
 import { getProcedureContractOrThrow } from '@orpc/contract'
+import type { Writable } from '@orpc/shared'
 import { getOwn, toArray } from '@orpc/shared'
 
 import type { JsonSchemaCoercerOptions } from './coercer'
@@ -76,7 +77,10 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
             }
 
             const cloned = cloneORPCError(error)
-            cloned.data = this.coerceValue([dataSchema], cloned.data)
+            ;(cloned.data as Writable<typeof cloned.data>) = this.coerceValue(
+              [dataSchema],
+              cloned.data,
+            )
             throw cloned
           }
         },
