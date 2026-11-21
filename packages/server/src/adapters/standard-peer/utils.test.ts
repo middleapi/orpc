@@ -1,3 +1,4 @@
+import type { AnyORPCError } from '@orpc/client'
 import type { StandardLazyRequest } from '@standard-server/core'
 
 import { createStandardPeerRequestHandler } from './utils'
@@ -41,6 +42,11 @@ describe('createStandardPeerRequestHandler', () => {
   it('returns 404 response when no procedure matched', async () => {
     const handler = {
       handle: vi.fn(async () => ({ matched: false, response: undefined })),
+      encodeError: vi.fn((error: AnyORPCError) => ({
+        status: 404,
+        headers: {},
+        body: error.toJSON(),
+      })),
     } as any
 
     const handleRequest = createStandardPeerRequestHandler(handler, { context: { context: true } })
@@ -53,13 +59,18 @@ describe('createStandardPeerRequestHandler', () => {
       signal: new AbortController().signal,
     })
 
-    expect(result).toEqual({ status: 404, headers: {}, body: 'No procedure matched' })
+    expect(result).toEqual({
+      status: 404,
+      headers: {},
+      body: { defined: false, code: 'NOT_FOUND', message: 'No procedure matched' },
+    })
     expect(handler.handle).toHaveBeenCalledTimes(1)
   })
 
   it('context fallback to empty object when it undefined', async () => {
     const handler = {
       handle: vi.fn(async () => ({ matched: false, response: undefined })),
+      encodeError: vi.fn(),
     } as any
 
     const handleRequest = createStandardPeerRequestHandler(handler, {})
@@ -80,6 +91,7 @@ describe('createStandardPeerRequestHandler', () => {
   it('forwards a context function unresolved so the handler resolves it after its prefix check', async () => {
     const handler = {
       handle: vi.fn(async () => ({ matched: false, response: undefined })),
+      encodeError: vi.fn(),
     } as any
 
     const context = vi.fn(() => ({ db: 'postgres' }))

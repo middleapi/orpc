@@ -1,4 +1,11 @@
+import { createORPCClient } from '@orpc/client'
+import { RPCLink } from '@orpc/client/fetch'
+import { BatchLinkPlugin } from '@orpc/client/plugins'
+import type { RouterClient } from '@orpc/server'
 import { ORPCError, os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
+import { BatchHandlerPlugin, RequestLimitHandlerPlugin } from '@orpc/server/plugins'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { promiseWithResolvers } from '@orpc/shared'
 import { sleep } from '@standard-server/shared'
 import { z } from 'zod'
@@ -266,5 +273,68 @@ describe('batch plugin: QUERY over node-http', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(fetchSpy.mock.calls[0]![1]).toEqual(expect.objectContaining({ method: 'QUERY' }))
+  })
+})
+
+describe('batch plugin: batch-level refusals', () => {
+  function createClient(plugins: StandardHandlerPlugin<{}>[]) {
+    const ping = vi.fn(async (_options: unknown, input: string) => input)
+    const router = { ping: os.input(z.string()).handler(ping) }
+    const handler = new RPCHandler(router, { plugins })
+
+    const link = new RPCLink({
+      url: '/rpc',
+      origin: 'http://localhost',
+      fetch: async (url, init) => {
+        const { response } = await handler.handle(new Request(url, init), { prefix: '/rpc' })
+
+        return response ?? new Response('Not Found', { status: 404 })
+      },
+      plugins: [new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] })],
+    })
+
+    return { client: createORPCClient<RouterClient<typeof router>>(link), ping }
+  }
+
+  it('rejects every call with the error a plugin refused the batch body with', async () => {
+    const { client, ping } = createClient([
+      new BatchHandlerPlugin(),
+      new RequestLimitHandlerPlugin({
+        maxBodySize: 10,
+        error: new ORPCError('PAYLOAD_TOO_LARGE', { message: 'Too big', data: { max: 10 } }),
+      }),
+    ])
+
+    const results = await Promise.allSettled([client.ping('alpha'), client.ping('beta')])
+
+    for (const result of results) {
+      expect(result).toMatchObject({
+        status: 'rejected',
+        reason: expect.objectContaining({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Too big',
+          data: { max: 10 },
+        }),
+      })
+      expect((result as PromiseRejectedResult).reason).toBeInstanceOf(ORPCError)
+    }
+
+    expect(ping).not.toHaveBeenCalled()
+  })
+
+  it('rejects every call with PAYLOAD_TOO_LARGE when the batch exceeds the server maxSize', async () => {
+    const { client, ping } = createClient([new BatchHandlerPlugin({ maxSize: 1 })])
+
+    const results = await Promise.allSettled([client.ping('alpha'), client.ping('beta')])
+
+    for (const result of results) {
+      expect(result).toMatchObject({
+        status: 'rejected',
+        reason: expect.objectContaining({ code: 'PAYLOAD_TOO_LARGE' }),
+      })
+      expect((result as PromiseRejectedResult).reason).toBeInstanceOf(ORPCError)
+    }
+
+    expect(ping).not.toHaveBeenCalled()
   })
 })

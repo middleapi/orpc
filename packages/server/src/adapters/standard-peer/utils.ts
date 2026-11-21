@@ -2,7 +2,10 @@ import type { StandardLazyRequest, StandardResponse } from '@standard-server/cor
 
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index'
+import {
+  createNoProcedureMatchedError,
+  resolveFriendlyStandardHandlerHandleOptions,
+} from '../standard/index'
 
 export function createStandardPeerRequestHandler<T extends Context>(
   handler: StandardHandler<T>,
@@ -13,6 +16,6 @@ export function createStandardPeerRequestHandler<T extends Context>(
       request,
       resolveFriendlyStandardHandlerHandleOptions(options),
     )
-    return response ?? { status: 404, headers: {}, body: 'No procedure matched' }
+    return response ?? handler.encodeError(createNoProcedureMatchedError())
   }
 }

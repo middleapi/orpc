@@ -243,6 +243,9 @@ describe('batchHandlerPlugin', () => {
       expect(body).toHaveLength(1)
       expect(body[0]).toMatchObject({ kind: 'response', id: '0' })
       expect(body[0].json.status).toBe(404)
+      expect(body[0].json.body).toEqual({
+        json: { defined: false, code: 'NOT_FOUND', message: 'No procedure matched' },
+      })
     })
 
     it('returns 400 for invalid batch body', async () => {
@@ -255,7 +258,9 @@ describe('batchHandlerPlugin', () => {
       )
 
       expect(response!.status).toBe(400)
-      expect(await response!.text()).toContain('Invalid batch request body')
+      expect(await response!.json()).toEqual({
+        json: { defined: false, code: 'BAD_REQUEST', message: 'Invalid batch request' },
+      })
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
@@ -271,7 +276,7 @@ describe('batchHandlerPlugin', () => {
         )
 
         expect(response!.status).toBe(400)
-        expect(await response!.text()).toContain('Invalid batch request body')
+        expect(await response!.text()).toContain('Invalid batch request')
         expect(handlerFn).toHaveBeenCalledTimes(0)
       },
     )
@@ -288,11 +293,11 @@ describe('batchHandlerPlugin', () => {
       )
 
       expect(response!.status).toBe(400)
-      expect(await response!.text()).toContain('Invalid batch request body')
+      expect(await response!.text()).toContain('Invalid batch request')
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
-    it('returns the ORPCError message a body plugin throws while resolving the batch body', async () => {
+    it('returns the ORPCError a body plugin throws while resolving the batch body', async () => {
       const handler = new RPCHandler(router, {
         plugins: [new BatchHandlerPlugin(), new RequestCompressionHandlerPlugin()],
       })
@@ -309,12 +314,18 @@ describe('batchHandlerPlugin', () => {
         }),
       )
 
-      expect(response!.status).toBe(400)
-      expect(await response!.text()).toContain('Too many content encodings.')
+      expect(response!.status).toBe(415)
+      expect(await response!.json()).toEqual({
+        json: {
+          defined: false,
+          code: 'UNSUPPORTED_MEDIA_TYPE',
+          message: 'Too many content encodings.',
+        },
+      })
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
-    it('returns the ORPCError message a body plugin raises while streaming the batch body', async () => {
+    it('returns the ORPCError a body plugin raises while streaming the batch body', async () => {
       const handler = new RPCHandler(router, {
         plugins: [new BatchHandlerPlugin(), new RequestLimitHandlerPlugin({ maxBodySize: 10 })],
       })
@@ -325,8 +336,42 @@ describe('batchHandlerPlugin', () => {
         }),
       )
 
-      expect(response!.status).toBe(400)
-      expect(await response!.text()).toContain(new ORPCError('PAYLOAD_TOO_LARGE').message)
+      expect(response!.status).toBe(413)
+      expect(await response!.json()).toEqual({
+        json: new ORPCError('PAYLOAD_TOO_LARGE').toJSON(),
+      })
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('keeps the code, status, message and data of a custom error a body plugin raises', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [
+          new BatchHandlerPlugin(),
+          new RequestLimitHandlerPlugin({
+            maxBodySize: 10,
+            error: new ORPCError('TOO_MANY_REQUESTS', {
+              message: 'Slow down',
+              data: { limit: 10 },
+            }),
+          }),
+        ],
+      })
+
+      const { response } = await handler.handle(
+        createBatchRequest({
+          messages: [makePeerRequestMessage('0', '/ping')],
+        }),
+      )
+
+      expect(response!.status).toBe(429)
+      expect(await response!.json()).toEqual({
+        json: {
+          defined: false,
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Slow down',
+          data: { limit: 10 },
+        },
+      })
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
@@ -344,6 +389,13 @@ describe('batchHandlerPlugin', () => {
       )
 
       expect(response!.status).toBe(413)
+      expect(await response!.json()).toEqual({
+        json: {
+          defined: false,
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Batch request size exceeds the maximum allowed size',
+        },
+      })
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
@@ -374,7 +426,9 @@ describe('batchHandlerPlugin', () => {
 
       const body = (await response!.json()) as any
       expect(body[0].json.status).toBe(500)
-      expect(body[0].json.body).toBe('Internal server error')
+      expect(body[0].json.body).toEqual({
+        json: new ORPCError('INTERNAL_SERVER_ERROR').toJSON(),
+      })
       expect(rejectSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -405,7 +459,9 @@ describe('batchHandlerPlugin', () => {
 
       const body = (await response!.json()) as any
       expect(body[0].json.status).toBe(500)
-      expect(body[0].json.body).toBe('Internal server error')
+      expect(body[0].json.body).toEqual({
+        json: new ORPCError('INTERNAL_SERVER_ERROR').toJSON(),
+      })
       expect(rejectSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -722,7 +778,7 @@ describe('batchHandlerPlugin', () => {
       )
 
       expect(response!.status).toBe(400)
-      expect(await response!.text()).toContain('Invalid batch request data parameter')
+      expect(await response!.text()).toContain('Invalid batch request')
     })
 
     it.each(INVALID_MESSAGE_IDS)(
@@ -741,7 +797,7 @@ describe('batchHandlerPlugin', () => {
         )
 
         expect(response!.status).toBe(400)
-        expect(await response!.text()).toContain('Invalid batch request data parameter')
+        expect(await response!.text()).toContain('Invalid batch request')
         expect(handlerFn).toHaveBeenCalledTimes(0)
       },
     )
@@ -760,7 +816,7 @@ describe('batchHandlerPlugin', () => {
       )
 
       expect(response!.status).toBe(400)
-      expect(await response!.text()).toContain('Invalid batch request data parameter')
+      expect(await response!.text()).toContain('Invalid batch request')
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 

@@ -116,6 +116,7 @@ describe('standardHandler', () => {
     expect(routingInterceptor).toHaveBeenCalledTimes(1)
     expect(routingInterceptor).toHaveBeenCalledWith({
       next: expect.any(Function),
+      encodeError: expect.any(Function),
       request,
       context: OPTIONS.context,
       prefix: OPTIONS.prefix,

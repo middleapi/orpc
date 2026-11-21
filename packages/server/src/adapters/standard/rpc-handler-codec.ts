@@ -106,9 +106,9 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
 
   encodeError(
     error: AnyORPCError,
-    _procedure: AnyProcedure,
-    _path: string[],
-    _options: ResolvedStandardHandlerHandleOptions<T>,
+    _procedure?: AnyProcedure,
+    _path?: string[],
+    _options?: ResolvedStandardHandlerHandleOptions<T>,
   ): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 

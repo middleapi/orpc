@@ -162,6 +162,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     await interceptor({
       context: {},
       prefix: undefined,
+      encodeError: vi.fn(),
       request: {
         method: 'POST',
         url: '/upload',
@@ -589,6 +590,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     const result = await interceptor({
       context: {},
       prefix: undefined,
+      encodeError: vi.fn(),
       request: {
         method: 'POST',
         url: '/upload',
@@ -1092,6 +1094,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
       await plugin.init({}).routingInterceptors![0]!({
         context: {},
         prefix: undefined,
+        encodeError: vi.fn(),
         request: {
           method: 'POST',
           url: '/upload',
@@ -1572,6 +1575,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
       await interceptor({
         context: options.context,
         prefix: undefined,
+        encodeError: vi.fn(),
         request: {
           method: 'POST',
           url: '/upload',
@@ -1673,6 +1677,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
       const interceptorOptions = {
         context: {},
         prefix: undefined,
+        encodeError: vi.fn(),
         request: {
           method: 'POST',
           url: '/upload',

@@ -18,6 +18,7 @@ import {
   ServerPeer,
 } from '@standard-server/peer'
 
+import { createNoProcedureMatchedError } from '../adapters/standard/index'
 import type {
   StandardHandlerOptions,
   StandardHandlerPlugin,
@@ -69,17 +70,6 @@ function isClientPeerSendMessages(maybe: unknown): maybe is ClientPeerSendMessag
     Array.isArray(maybe) &&
     maybe.every((m: unknown) => isPeerMessage(m) && isClientPeerSendMessage(m))
   )
-}
-
-/**
- * Errors should not occur at the routing interceptor level.
- * Reject the promise so it can be handled by the unhandledRejection handler
- * for global logging or error handling.
- */
-function internalError(err: unknown): StandardResponse {
-  void Promise.reject(err)
-
-  return { status: 500, headers: {}, body: 'Internal server error' }
 }
 
 /**
@@ -337,83 +327,28 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       let messages: ClientPeerSendMessage[]
 
       try {
-        if (interceptorOptions.request.method === 'GET') {
-          const [, search] = parseStandardUrl(interceptorOptions.request.url)
-          const params = new URLSearchParams(search)
-          const data = params.getAll('data').at(-1)
-
-          if (!data) {
-            return {
-              matched: true,
-              response: {
-                status: 400,
-                headers: {},
-                body: 'Missing data parameter for batch request',
-              },
-            }
-          }
-
-          const mightBeMessages: unknown = JSON.parse(data)
-
-          if (!isClientPeerSendMessages(mightBeMessages)) {
-            return {
-              matched: true,
-              response: { status: 400, headers: {}, body: 'Invalid batch request data parameter' },
-            }
-          }
-
-          messages = mightBeMessages
-        } else {
-          const mightBeMessages = await interceptorOptions.request.resolveBody()
-
-          if (!isClientPeerSendMessages(mightBeMessages)) {
-            return {
-              matched: true,
-              response: { status: 400, headers: {}, body: 'Invalid batch request body' },
-            }
-          }
-
-          messages = mightBeMessages
-        }
+        messages = await this.readMessages(interceptorOptions)
       } catch (error) {
-        return {
-          matched: true,
-          response: {
-            status: 400,
-            headers: {},
-            body: error instanceof ORPCError ? error.message : 'Invalid batch request',
-          },
-        }
+        /**
+         * A refusal thrown while the body is read, such as the Request Limit Plugin's, is kept as is.
+         */
+        const refusal =
+          error instanceof ORPCError
+            ? error
+            : new ORPCError('BAD_REQUEST', { message: 'Invalid batch request', cause: error })
+
+        return { matched: true, response: await interceptorOptions.encodeError(refusal) }
       }
 
-      const outerMethod = interceptorOptions.request.method
-      if (
-        (outerMethod === 'GET' || outerMethod === 'QUERY') &&
-        messages.some(
-          (message) => message.kind === 'request' && message.json.method !== outerMethod,
-        )
-      ) {
-        return {
-          matched: true,
-          response: {
-            status: 400,
-            headers: {},
-            body: `${outerMethod} batch requests only accept ${outerMethod} sub-requests`,
-          },
-        }
-      }
+      /**
+       * Errors should not occur at the routing interceptor level.
+       * Reject the promise so it can be handled by the unhandledRejection handler
+       * for global logging or error handling.
+       */
+      const internalError = async (err: unknown): Promise<StandardResponse> => {
+        void Promise.reject(err)
 
-      const maxSize = await value(this.maxSize, interceptorOptions)
-
-      if (messages.length > maxSize) {
-        return {
-          matched: true,
-          response: {
-            status: 413,
-            headers: {},
-            body: 'Batch request size exceeds the maximum allowed size',
-          },
-        }
+        return interceptorOptions.encodeError(new ORPCError('INTERNAL_SERVER_ERROR'))
       }
 
       const status = await value(this.successStatus, interceptorOptions)
@@ -494,9 +429,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           const result = await interceptorOptions.next({ ...interceptorOptions, request })
           response = result.matched
             ? result.response
-            : { status: 404, headers: {}, body: 'No procedure matched' }
+            : await interceptorOptions.encodeError(createNoProcedureMatchedError())
         } catch (err) {
-          response = internalError(err)
+          response = await internalError(err)
         }
 
         markReady({
@@ -609,5 +544,51 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       ...options,
       routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
+  }
+
+  /**
+   * Reads the subrequest messages of a batch request, throwing the error to refuse it with.
+   */
+  private async readMessages(
+    options: StandardHandlerRoutingInterceptorOptions<T>,
+  ): Promise<ClientPeerSendMessage[]> {
+    const { request } = options
+    let messages: unknown
+
+    if (request.method === 'GET') {
+      const [, search] = parseStandardUrl(request.url)
+      const data = new URLSearchParams(search).getAll('data').at(-1)
+
+      if (!data) {
+        throw new ORPCError('BAD_REQUEST', { message: 'Missing data parameter for batch request' })
+      }
+
+      messages = JSON.parse(data)
+    } else {
+      messages = await request.resolveBody()
+    }
+
+    if (!isClientPeerSendMessages(messages)) {
+      throw new ORPCError('BAD_REQUEST', { message: 'Invalid batch request' })
+    }
+
+    if (
+      (request.method === 'GET' || request.method === 'QUERY') &&
+      messages.some(
+        (message) => message.kind === 'request' && message.json.method !== request.method,
+      )
+    ) {
+      throw new ORPCError('BAD_REQUEST', {
+        message: `${request.method} batch requests only accept ${request.method} sub-requests`,
+      })
+    }
+
+    if (messages.length > (await value(this.maxSize, options))) {
+      throw new ORPCError('PAYLOAD_TOO_LARGE', {
+        message: 'Batch request size exceeds the maximum allowed size',
+      })
+    }
+
+    return messages
   }
 }

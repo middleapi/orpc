@@ -162,6 +162,22 @@ const handler = new RPCHandler(router, {
 })
 ```
 
+To refuse a request there, respond with `encodeError`, which encodes an `ORPCError` the same way the handler encodes procedure errors:
+
+```ts
+const handler = new RPCHandler(router, {
+  routingInterceptors: [
+    async ({ next, encodeError }) => {
+      if (condition) {
+        return { matched: true, response: await encodeError(new ORPCError('FORBIDDEN')) }
+      }
+
+      return next()
+    },
+  ],
+})
+```
+
 ### Interceptors
 
 These interceptors run only for matched requests, after routing and before error handling, and can use `ORPCError` for [typesafe errors](/docs/error-handling#orpcerror-compatibility). Use them when you need access to the matched procedure.

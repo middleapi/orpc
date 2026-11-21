@@ -49,7 +49,7 @@ const link = new RPCLink({
 
 ## Max Size
 
-Both plugins limit how many requests a batch holds with `maxSize`, and each side defaults to `DEFAULT_BATCH_MAX_SIZE` (10) independently. The client splits a larger group into several batches, while the server rejects a larger batch with a `413` for every request in it, so keep the client limit at or below the server's.
+Both plugins limit how many requests a batch holds with `maxSize`, and each side defaults to `DEFAULT_BATCH_MAX_SIZE` (10) independently. The client splits a larger group into several batches, while the server rejects a larger batch with a `PAYLOAD_TOO_LARGE` error (`413`) for every request in it, so keep the client limit at or below the server's.
 
 <CodeGroup>
 
@@ -81,6 +81,12 @@ const link = new RPCLink({
 ```
 
 </CodeGroup>
+
+## Refused Batches
+
+When the server refuses a whole batch, it answers with a regular error response instead of a batch response, and every call in the batch rejects with that `ORPCError`. A malformed batch is a `BAD_REQUEST`, a batch above `maxSize` is a `PAYLOAD_TOO_LARGE`, and an error another plugin throws while the batch body is read, such as the [Request Limit Plugin](/docs/plugins/request-limit)'s, keeps its code, status, message, and data.
+
+A subrequest that matches no procedure fails on its own with a `NOT_FOUND` error, without affecting the rest of the batch.
 
 ## Response Modes
 

@@ -1,3 +1,4 @@
+import type { AnyORPCError } from '@orpc/client'
 import { ORPCError, toORPCError } from '@orpc/client'
 import type { ErrorMap, Schema } from '@orpc/contract'
 import { reconcileORPCError } from '@orpc/contract'
@@ -68,6 +69,12 @@ export interface StandardHandlerRoutingInterceptorOptions<
   T extends Context,
 > extends ResolvedStandardHandlerHandleOptions<T> {
   request: StandardLazyRequest
+
+  /**
+   * Encodes an error the way the handler encodes procedure errors, so a routing interceptor
+   * can refuse a request with the same error response a procedure would send.
+   */
+  encodeError: (error: AnyORPCError) => Promisable<StandardResponse>
 }
 export type StandardHandlerRoutingInterceptor<T extends Context> = Interceptor<
   StandardHandlerRoutingInterceptorOptions<T>,
@@ -120,6 +127,14 @@ export class StandardHandler<T extends Context> {
     this.clientInterceptors = options.clientInterceptors
   }
 
+  /**
+   * Encodes an error raised outside a procedure, such as a request no procedure matched,
+   * the way the handler encodes procedure errors.
+   */
+  encodeError(error: AnyORPCError): Promisable<StandardResponse> {
+    return this.codec.encodeError(error)
+  }
+
   async handle(
     request: StandardLazyRequest,
     options: StandardHandlerHandleOptions<T>,
@@ -134,7 +149,7 @@ export class StandardHandler<T extends Context> {
 
     return intercept(
       this.routingInterceptors,
-      { context, prefix, request },
+      { context, prefix, request, encodeError: (error) => this.encodeError(error) },
       async ({ context, prefix, request }) => {
         const span = getTracer()?.getActiveSpan()
 
