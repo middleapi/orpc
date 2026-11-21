@@ -61,6 +61,6 @@ it('works', async () => {
   expect(response?.status).toBe(429)
   expect(response?.headers.get('RateLimit-Limit')).toBe('5')
   expect(response?.headers.get('RateLimit-Remaining')).toBe('0')
-  expect(response?.headers.get('RateLimit-Reset')).toBeTypeOf('string')
-  expect(response?.headers.get('Retry-After')).toBeTypeOf('string')
+  expect(response?.headers.get('RateLimit-Reset')).toBe('1') // seconds left in the 1s window
+  expect(response?.headers.get('Retry-After')).toBe('1')
 })

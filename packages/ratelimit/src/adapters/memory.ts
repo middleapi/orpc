@@ -25,6 +25,9 @@ export interface MemoryRateLimiterOptions {
  * Rate limiter adapter backed by in-memory storage. Enforces a fixed-window
  * limit, with optional blocking mode.
  *
+ * Each key has its own fixed window, which starts at the first request that
+ * consumes quota. A rejected request does not consume quota.
+ *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export class MemoryRateLimiter implements RateLimiter {
@@ -32,8 +35,8 @@ export class MemoryRateLimiter implements RateLimiter {
   private readonly window: number
   private readonly timeout: number
 
-  private current: Map<string, { used: number }> = new Map()
-  private currentEpochStart: number = Date.now()
+  private readonly entries: Map<string, { used: number; reset: number }> = new Map()
+  private nextSweepAt: number = 0
 
   constructor(options: MemoryRateLimiterOptions) {
     this.maxRequests = options.maxRequests
@@ -47,38 +50,59 @@ export class MemoryRateLimiter implements RateLimiter {
     return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
   }
 
-  private rotateIfNeeded(now: number): void {
-    if (now < this.currentEpochStart + this.window) {
+  /**
+   * Drops expired windows at most once per window, so keys that are never
+   * seen again do not stay in memory.
+   */
+  private sweepIfNeeded(now: number): void {
+    if (now < this.nextSweepAt) {
       return
     }
 
-    this.current = new Map()
-    this.currentEpochStart = now
+    for (const [key, entry] of this.entries) {
+      if (entry.reset <= now) {
+        this.entries.delete(key)
+      }
+    }
+
+    this.nextSweepAt = now + this.window
   }
 
   private checkLimit(key: string, weight: number): Required<RateLimitResult> {
     const now = Date.now()
-    this.rotateIfNeeded(now)
+    this.sweepIfNeeded(now)
 
-    let entry = this.current.get(key)
+    let entry = this.entries.get(key)
+
+    if (entry && entry.reset <= now) {
+      this.entries.delete(key)
+      entry = undefined
+    }
+
+    const used = entry?.used ?? 0
+    const success = used + weight <= this.maxRequests
+
+    if (!success) {
+      return {
+        success,
+        limit: this.maxRequests,
+        remaining: Math.max(0, this.maxRequests - used),
+        reset: entry?.reset ?? now + this.window,
+      }
+    }
 
     if (!entry) {
-      entry = { used: 0 }
-      this.current.set(key, entry)
+      entry = { used: 0, reset: now + this.window }
+      this.entries.set(key, entry)
     }
 
-    const reset = this.currentEpochStart + this.window
-    const success = entry.used + weight <= this.maxRequests
-
-    if (success) {
-      entry.used += weight
-    }
+    entry.used += weight
 
     return {
       success,
       limit: this.maxRequests,
-      remaining: Math.max(0, this.maxRequests - entry.used),
-      reset,
+      remaining: this.maxRequests - entry.used,
+      reset: entry.reset,
     }
   }
 }

@@ -6,15 +6,15 @@ export interface RateLimitResult {
   /**
    * Maximum number of requests allowed within a window.
    */
-  limit?: number
+  limit?: number | undefined
   /**
    * How many requests the user has left within the current window.
    */
-  remaining?: number
+  remaining?: number | undefined
   /**
    * Unix timestamp in milliseconds when the limits are reset.
    */
-  reset?: number
+  reset?: number | undefined
 }
 
 export interface RateLimitOptions {
@@ -30,6 +30,9 @@ export interface RateLimitOptions {
 /**
  * Standard interface for checking and enforcing rate limits.
  * Implement it for custom strategies, or use one of the provided adapters.
+ *
+ * A rejected request should not consume quota, which is what the built-in
+ * fixed-window adapters do.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit | Rate Limit Helpers}
  */

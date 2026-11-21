@@ -136,7 +136,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
   )
 
   it(
-    'uses an empty prefix when none is provided',
+    'uses the default prefix when none is provided',
     async () => {
       const limiter = await createTestingRateLimiter({
         prefix: undefined,
@@ -207,6 +207,42 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
       await expect(limiter.limit(key)).resolves.toMatchObject({
         success: false,
         limit: 3,
+        remaining: 0,
+      })
+    },
+    { timeout: 20_000 },
+  )
+
+  it(
+    'does not count rejected requests',
+    async () => {
+      const limiter = await createTestingRateLimiter()
+      const key = 'rejected-not-counted'
+
+      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+        success: true,
+        remaining: 1,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: false,
+          limit: 3,
+          remaining: 1,
+        })
+      }
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+
+      // a request that can never fit does not start a window for a new key
+      const oversized = await limiter.limit('oversized', { weight: 4 })
+      expect(oversized).toMatchObject({ success: false, limit: 3, remaining: 3 })
+      expect(oversized.reset).toBeGreaterThan(Date.now())
+      await expect(limiter.limit('oversized', { weight: 3 })).resolves.toMatchObject({
+        success: true,
         remaining: 0,
       })
     },
@@ -288,7 +324,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
         await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
           success: false,
           limit: 2,
-          remaining: 0,
+          remaining: 1, // the rejected request consumed nothing
         })
       },
       { timeout: 20_000 },

@@ -2,11 +2,13 @@ import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
 import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
- * Consumes `ARGV[1]` points from the counter at `KEYS[1]`, starts a window of
- * `ARGV[2]` milliseconds when the counter is new, and replies with `[used, ttl]`.
+ * Consumes `ARGV[1]` points from the counter at `KEYS[1]` when that keeps it within
+ * the limit `ARGV[3]`, and leaves the counter untouched otherwise, so a rejected
+ * request costs nothing. A window of `ARGV[2]` milliseconds starts when the key
+ * gets its first points. Replies with `[success, used, ttl]`.
  * Kept on one line because `EVAL` sends it with every call.
  */
-const FIXED_WINDOW_SCRIPT = `local c=redis.call('INCRBY',KEYS[1],ARGV[1]) if c==tonumber(ARGV[1]) then redis.call('PEXPIRE',KEYS[1],ARGV[2]) end return {c,redis.call('PTTL',KEYS[1])}`
+const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local c=tonumber(redis.call('GET',KEYS[1]) or 0) local t=redis.call('PTTL',KEYS[1]) local s=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) s=1 end if t<0 then t=tonumber(ARGV[2]) if c>0 then redis.call('PEXPIRE',KEYS[1],t) end end return {s,c,t}`
 
 /**
  * Options shared by every Redis-backed rate limiter adapter.
@@ -17,7 +19,7 @@ export interface BaseRedisRateLimiterOptions {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default ''
+   * @default 'orpc:ratelimit:'
    */
   prefix?: string | undefined
 
@@ -45,6 +47,9 @@ export interface BaseRedisRateLimiterOptions {
  * the fixed-window script, and the blocking logic, so every adapter built on
  * it shares counters with the others regardless of the Redis client in use.
  *
+ * Each key has its own fixed window, which starts at the first request that
+ * consumes quota. A rejected request does not consume quota.
+ *
  * Extend it and implement `evalScript` to support another Redis client.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
@@ -56,7 +61,7 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   protected readonly timeout: number
 
   constructor(options: BaseRedisRateLimiterOptions) {
-    this.keyPrefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? 'orpc:ratelimit:'
     this.maxRequests = options.maxRequests
     this.window = options.window
     this.timeout = options.timeout ?? 0
@@ -75,14 +80,14 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   }
 
   private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
-    const [used, ttl] = (await this.evalScript(
+    const [success, used, ttl] = (await this.evalScript(
       FIXED_WINDOW_SCRIPT,
       [key],
-      [String(weight), String(this.window)],
-    )) as [used: number, ttl: number]
+      [String(weight), String(this.window), String(this.maxRequests)],
+    )) as [success: number, used: number, ttl: number]
 
     return {
-      success: used <= this.maxRequests,
+      success: success === 1,
       limit: this.maxRequests,
       remaining: Math.max(0, this.maxRequests - used),
       reset: Date.now() + ttl,
