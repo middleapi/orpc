@@ -45,7 +45,7 @@ export interface RetryLinkPluginContext {
    *
    * @default 0
    */
-  maxRetries?:
+  retry?:
     | Value<
         Promisable<number>,
         [Omit<StandardLinkInterceptorOptions<RetryLinkPluginContext>, 'next'>]
@@ -125,7 +125,7 @@ export function isRetryableError(error: unknown): boolean {
 export class RetryLinkPlugin<
   T extends RetryLinkPluginContext & ClientContext,
 > implements StandardLinkPlugin<T> {
-  private readonly defaultMaxRetries: Exclude<RetryLinkPluginContext['maxRetries'], undefined>
+  private readonly defaultRetry: Exclude<RetryLinkPluginContext['retry'], undefined>
   private readonly defaultRetryDelay: Exclude<RetryLinkPluginContext['retryDelay'], undefined>
   private readonly defaultShouldRetry: Exclude<RetryLinkPluginContext['shouldRetry'], undefined>
   private readonly defaultOnRetry: RetryLinkPluginContext['onRetry']
@@ -133,7 +133,7 @@ export class RetryLinkPlugin<
   name = '~retry'
 
   constructor(options: RetryLinkPluginOptions<T> = {}) {
-    this.defaultMaxRetries = options.default?.maxRetries ?? 0
+    this.defaultRetry = options.default?.retry ?? 0
     this.defaultRetryDelay = options.default?.retryDelay ?? ((o) => o.lastEventRetry ?? 2000)
     this.defaultShouldRetry = options.default?.shouldRetry ?? ((o) => isRetryableError(o.error))
     this.defaultOnRetry = options.default?.onRetry
@@ -142,10 +142,7 @@ export class RetryLinkPlugin<
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
-      const maxRetries = await value(
-        callOptions.context.maxRetries ?? this.defaultMaxRetries,
-        callOptions,
-      )
+      const maxRetries = await value(callOptions.context.retry ?? this.defaultRetry, callOptions)
 
       const retryDelay = callOptions.context.retryDelay ?? this.defaultRetryDelay
       const shouldRetry = callOptions.context.shouldRetry ?? this.defaultShouldRetry

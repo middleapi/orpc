@@ -979,23 +979,9 @@ const retryPlugin = new RetryLinkPlugin({
 })
 ```
 
-The `retry` context option was renamed to `maxRetries`. It still counts retries after the first call, so the value stays the same:
-
-<CodeGroup>
-
-```ts v2
-const planets = await client.planet.list({ limit: 10 }, { context: { maxRetries: 3 } })
-```
-
-```ts v1
-const planets = await client.planet.list({ limit: 10 }, { context: { retry: 3 } })
-```
-
-</CodeGroup>
-
 ### Retry After Plugin
 
-[`RetryAfterLinkPlugin`](/docs/plugins/retry-after) options now match the Retry Plugin. `condition` was renamed to `shouldRetry`, and `maxAttempts` was replaced by `maxRetries`, which does not count the first request. Subtract one from your v1 value:
+[`RetryAfterLinkPlugin`](/docs/plugins/retry-after) options now follow the Retry Plugin's naming and counting. `condition` was renamed to `shouldRetry`, and `maxAttempts` was replaced by `maxRetries`, which does not count the first request. Subtract one from your v1 value:
 
 <CodeGroup>
 

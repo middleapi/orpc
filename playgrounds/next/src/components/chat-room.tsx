@@ -12,7 +12,7 @@ export function ChatRoom() {
   const query = useQuery(
     orpc.message.subscribe.streamedOptions({
       input: { channel: CHANNEL },
-      context: { maxRetries: Infinity },
+      context: { retry: Infinity },
       queryFnOptions: { maxChunks: 10 },
     }),
   )
