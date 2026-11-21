@@ -8,7 +8,7 @@ import * as ProcedureUtils from '../../procedure-utils'
 import { withHiddenRouterContract } from '../../router-hidden'
 import { RPCMatcher } from './rpc-matcher'
 
-const createContractProcedureSpy = vi.spyOn(ProcedureUtils, 'createContractProcedure')
+const createContractedProcedureSpy = vi.spyOn(ProcedureUtils, 'createContractedProcedure')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -418,22 +418,22 @@ describe('rpcMatcher', () => {
       const r1 = await matcher.match('POST', '/ping', undefined)
       expect(r1).toBeDefined()
       expect(r1!.path).toEqual(['ping'])
-      expect(createContractProcedureSpy).toHaveBeenCalledTimes(1)
-      expect(createContractProcedureSpy).toHaveBeenNthCalledWith(1, router.ping, contract.ping)
+      expect(createContractedProcedureSpy).toHaveBeenCalledTimes(1)
+      expect(createContractedProcedureSpy).toHaveBeenNthCalledWith(1, router.ping, contract.ping)
       expect(r1!.procedure).not.toBe(procedure1)
-      expect(r1!.procedure).toBe(createContractProcedureSpy.mock.results[0]!.value)
+      expect(r1!.procedure).toBe(createContractedProcedureSpy.mock.results[0]!.value)
 
       const r2 = await matcher.match('POST', '/nested/echo', undefined)
       expect(r2).toBeDefined()
       expect(r2!.path).toEqual(['nested', 'echo'])
-      expect(createContractProcedureSpy).toHaveBeenCalledTimes(2)
-      expect(createContractProcedureSpy).toHaveBeenNthCalledWith(
+      expect(createContractedProcedureSpy).toHaveBeenCalledTimes(2)
+      expect(createContractedProcedureSpy).toHaveBeenNthCalledWith(
         2,
         router.nested.echo,
         contract.nested.echo,
       )
       expect(r2!.procedure).not.toBe(procedure2)
-      expect(r2!.procedure).toBe(createContractProcedureSpy.mock.results[1]!.value)
+      expect(r2!.procedure).toBe(createContractedProcedureSpy.mock.results[1]!.value)
 
       const r3 = await matcher.match('POST', '/lazy/info', undefined)
       expect(r3).toBeUndefined() // lazy is not in contract, so no match
@@ -441,10 +441,10 @@ describe('rpcMatcher', () => {
       const r4 = await matcher.match('POST', '/api/ping', '/api')
       expect(r4).toBeDefined()
       expect(r4!.path).toEqual(['ping'])
-      // no need to call createContractProcedure again for the same procedure
-      expect(createContractProcedureSpy).toHaveBeenCalledTimes(2)
+      // no need to call createContractedProcedure again for the same procedure
+      expect(createContractedProcedureSpy).toHaveBeenCalledTimes(2)
       expect(r4!.procedure).not.toBe(router.ping)
-      expect(r4!.procedure).toBe(createContractProcedureSpy.mock.results[0]!.value)
+      expect(r4!.procedure).toBe(createContractedProcedureSpy.mock.results[0]!.value)
 
       expect(lazyLazyLoader).toHaveBeenCalledTimes(0)
       expect(lazyLoader).toHaveBeenCalledTimes(0)

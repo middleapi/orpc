@@ -38,7 +38,7 @@ import {
   DEFAULT_ERROR_STATUS,
   DEFAULT_SUCCESS_STATUS,
   EventStreamErrorEvent,
-  resolveContractProcedure,
+  resolveContractedProcedure,
   walkProcedureContractsAsync,
 } from '@orpc/server'
 import type {
@@ -361,7 +361,7 @@ class McpMatcher {
       routes.set(pathToHttpPath(path), {
         path,
         contract,
-        procedure: await resolveContractProcedure(this.router, contract, path),
+        procedure: await resolveContractedProcedure(this.router, contract, path),
         inputJsonSchema: resolveToolInputJsonSchema(
           this.converter,
           toArray(contract['~orpc'].inputSchemas),

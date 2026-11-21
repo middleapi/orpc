@@ -4,14 +4,14 @@ import { isNonPrimitive, pathToHttpPath, toArray } from '@orpc/shared'
 
 import { getOpenAPIMeta, openapi } from './meta'
 
-export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract> =
-  PopulatedContractRouterOpenAPIPathsInternal<T>
+export type PopulatedRouterContractOpenAPIPaths<T extends RouterContract> =
+  PopulatedRouterContractOpenAPIPathsInternal<T>
 
-export type PopulatedContractRouterOpenAPIPathsInternal<T> =
+export type PopulatedRouterContractOpenAPIPathsInternal<T> =
   T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
     ? ProcedureContract<UInputSchema, UOutputSchema, UErrors>
     : {
-        [K in keyof T]: PopulatedContractRouterOpenAPIPathsInternal<T[K] & {}>
+        [K in keyof T]: PopulatedRouterContractOpenAPIPathsInternal<T[K] & {}>
       }
 
 export interface PopulateRouterContractOpenAPIPathsOptions {
@@ -32,7 +32,7 @@ export interface PopulateRouterContractOpenAPIPathsOptions {
 export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
   router: T,
   options: PopulateRouterContractOpenAPIPathsOptions = {},
-): PopulatedContractRouterOpenAPIPaths<T> {
+): PopulatedRouterContractOpenAPIPaths<T> {
   const path = toArray(options.path)
 
   if (router instanceof ProcedureContract) {

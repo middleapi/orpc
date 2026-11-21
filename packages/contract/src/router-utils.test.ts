@@ -6,7 +6,7 @@ import type { AnyMetaPlugin } from './meta'
 import * as MetaUtilsModule from './meta-utils'
 import { ProcedureContract } from './procedure'
 import {
-  augmentContractRouter,
+  augmentRouterContract,
   getProcedureContractOrThrow,
   getRouterContract,
   minifyRouterContract,
@@ -88,10 +88,10 @@ const router = {
   }),
 }
 
-describe('augmentContractRouter', () => {
+describe('augmentRouterContract', () => {
   function createAugmentOptions() {
     return {
-      meta: { base: 'augmentContractRouter' },
+      meta: { base: 'augmentRouterContract' },
       errorMap: {
         OVERRIDE: {
           data: schema1,
@@ -132,7 +132,7 @@ describe('augmentContractRouter', () => {
 
   it('augments every procedure in nested routers', () => {
     const options = createAugmentOptions()
-    const augmented = augmentContractRouter(router, options)
+    const augmented = augmentRouterContract(router, options)
 
     expect(augmented).not.toBe(router)
     expect(augmented.nested).not.toBe(router.nested)
@@ -149,7 +149,7 @@ describe('augmentContractRouter', () => {
 
   it('augments a procedure passed as the root router', () => {
     const options = createAugmentOptions()
-    const augmented = augmentContractRouter(router.pong, options)
+    const augmented = augmentRouterContract(router.pong, options)
 
     expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
     expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(1)
@@ -160,7 +160,7 @@ describe('augmentContractRouter', () => {
   it('supports function-like routers passed as the root router', () => {
     const options = createAugmentOptions()
     const functionRouter = callable(router.nested)
-    const augmented = augmentContractRouter(functionRouter, options)
+    const augmented = augmentRouterContract(functionRouter, options)
 
     expect(augmented).not.toBe(functionRouter)
     expect(augmented.invalid).toBe('invalid')
@@ -175,7 +175,7 @@ describe('augmentContractRouter', () => {
     const options = createAugmentOptions()
     const invalid = 'invalid' as any
 
-    expect(augmentContractRouter(invalid, options)).toBe(invalid)
+    expect(augmentRouterContract(invalid, options)).toBe(invalid)
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
     expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
   })
@@ -186,7 +186,7 @@ describe('augmentContractRouter', () => {
       ['__proto__', router.ping],
       ['other', router.pong],
     ])
-    const augmented = augmentContractRouter(protoRouter, options) as any
+    const augmented = augmentRouterContract(protoRouter, options) as any
 
     expect(Object.getPrototypeOf(augmented)).toBe(Object.prototype)
     expect(Object.keys(augmented)).toEqual(['__proto__', 'other'])

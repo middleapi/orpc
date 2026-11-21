@@ -3,14 +3,11 @@ import { z } from 'zod'
 
 import type { ContractBuilder } from './builder'
 import { oc } from './builder'
-import type {
-  ProcedureContractBuilderWithInput,
-  ProcedureContractBuilderWithOutput,
-} from './builder-variants'
+import type { ContractBuilderWithInput, ContractBuilderWithOutput } from './builder-variants'
 import type { MergedErrorMap } from './error-utils'
 import type { Meta, MetaPlugin } from './meta'
 import type { ProcedureContract } from './procedure'
-import type { AugmentedContractRouter } from './router-utils'
+import type { AugmentedRouterContract } from './router-utils'
 import type { Schema } from './schema'
 
 const errorMap = {
@@ -59,7 +56,7 @@ describe('ContractBuilder', () => {
 
   it('.input', () => {
     expectTypeOf(builder.input(schema1)).toEqualTypeOf<
-      ProcedureContractBuilderWithInput<typeof schema1, typeof errorMap>
+      ContractBuilderWithInput<typeof schema1, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -68,7 +65,7 @@ describe('ContractBuilder', () => {
 
   it('.output', () => {
     expectTypeOf(builder.output(schema2)).toEqualTypeOf<
-      ProcedureContractBuilderWithOutput<typeof schema2, typeof errorMap>
+      ContractBuilderWithOutput<typeof schema2, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -81,7 +78,7 @@ describe('ContractBuilder', () => {
     }
 
     expectTypeOf(builder.router(router)).toEqualTypeOf<
-      AugmentedContractRouter<typeof router, typeof errorMap>
+      AugmentedRouterContract<typeof router, typeof errorMap>
     >()
 
     // @ts-expect-error - invalid router

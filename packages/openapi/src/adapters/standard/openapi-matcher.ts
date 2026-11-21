@@ -3,7 +3,7 @@ import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import {
   Procedure,
-  resolveContractProcedure,
+  resolveContractedProcedure,
   unlazy,
   walkProcedureContractsSync,
 } from '@orpc/server'
@@ -158,7 +158,7 @@ export class OpenAPIMatcher {
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
-    entry.procedure = await resolveContractProcedure(this.rootRouter, entry.contract, entry.path)
+    entry.procedure = await resolveContractedProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
   }
