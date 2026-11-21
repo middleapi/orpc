@@ -38,9 +38,10 @@ A procedure without an output schema is documented with an empty response, so ch
 
 ## Compare
 
-[Install oasdiff](https://github.com/oasdiff/oasdiff#installation), then compare the document on your main branch with the current one:
+[Install oasdiff](https://github.com/oasdiff/oasdiff#installation), then regenerate the document and compare it with the one on your main branch:
 
 ```bash
+node scripts/openapi.ts
 oasdiff breaking --fail-on WARN origin/main:openapi.json openapi.json
 ```
 
