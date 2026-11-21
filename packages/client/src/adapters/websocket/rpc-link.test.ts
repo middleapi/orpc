@@ -754,7 +754,7 @@ describe('rpcLink', () => {
       expect(connect).toHaveBeenNthCalledWith(3, { totalAttempts: 3, attempt: 3 })
     })
 
-    it('count toward maxAttempt', async () => {
+    it('count toward maxAttempts', async () => {
       const connect = createRejectingConnect()
 
       createORPCClient(
