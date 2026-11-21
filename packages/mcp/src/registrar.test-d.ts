@@ -105,7 +105,7 @@ describe('mcpRegistrar', () => {
         },
         clientInterceptors: [
           ({ next, path, context }) => {
-            expectTypeOf(path).toEqualTypeOf<string[]>()
+            expectTypeOf(path).toEqualTypeOf<readonly string[]>()
             expectTypeOf(context.auth).toEqualTypeOf<string>()
             return next()
           },

@@ -41,10 +41,10 @@ export interface MiddlewareOptions<
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
 > {
   context: TInContext
-  path: string[]
+  path: readonly string[]
   procedure: AnyProcedure
   signal?: AbortSignal | undefined
-  lastEventId: string | undefined
+  lastEventId?: string | undefined
   /**
    * Invoke to continue the middleware chain.
    */
