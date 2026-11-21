@@ -4,7 +4,7 @@ import { EventStreamErrorEvent } from '@standard-server/core'
 import type { LogLevel } from 'evlog'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { LOGGER_CONTEXT_SYMBOL } from './context'
+import { EVLOG_LOGGER_CONTEXT_SYMBOL } from './context'
 import { EvlogHandlerPlugin } from './handler-plugin'
 
 const mocks = vi.hoisted(() => ({
@@ -184,7 +184,7 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger, runWith } = mockIntegration()
     const next = vi.fn(async (options: any) => {
       expect(options.context.existing).toBe(true)
-      expect(options.context[LOGGER_CONTEXT_SYMBOL]).toBe(logger)
+      expect(options.context[EVLOG_LOGGER_CONTEXT_SYMBOL]).toBe(logger)
 
       return {
         matched: true,
@@ -414,7 +414,7 @@ describe('evlogHandlerPlugin', () => {
           controller.abort('manual')
           return 'pong'
         }),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['nested', 'ping'],
         request: createRequest('/ping', { signal: controller.signal }),
       }),
@@ -436,7 +436,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockResolvedValue('done'),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping', { signal: alreadyAborted.signal }),
       }),
@@ -459,7 +459,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockRejectedValue(businessError),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping'),
       }),
@@ -476,7 +476,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockRejectedValue(unexpectedError),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping'),
       }),
@@ -493,7 +493,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockRejectedValue(abortError),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping'),
       }),
@@ -510,7 +510,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockRejectedValue(internalError),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping'),
       }),
@@ -550,7 +550,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockRejectedValue(businessError),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping'),
       }),
@@ -568,7 +568,7 @@ describe('evlogHandlerPlugin', () => {
     await expect(
       interceptor({
         next: vi.fn().mockRejectedValue(otherError),
-        context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
         path: ['ping'],
         request: createRequest('/ping'),
       }),
@@ -602,7 +602,7 @@ describe('evlogHandlerPlugin', () => {
 
     const output = await client({
       next: vi.fn().mockResolvedValue(source()),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
     })
 
     await expect(collectIterator(output as AsyncIterable<unknown>)).rejects.toThrow(streamError)
@@ -624,7 +624,7 @@ describe('evlogHandlerPlugin', () => {
           },
         }),
       ),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
     })
 
     await expect(collectStream(output as ReadableStream<unknown>)).rejects.toThrow(abortError)
