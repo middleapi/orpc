@@ -85,8 +85,12 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
  * @see {@link https://orpc.dev/docs/plugins/dedupe | Dedupe Plugin}
  */
 export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~dedupe'
-  before: string[] = ['~batch']
+  readonly name = '~dedupe'
+
+  /**
+   * Wraps batch, so only deduplicated calls are batched.
+   */
+  readonly before: readonly string[] = ['~batch']
 
   private readonly groups: DedupeLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<DedupeLinkPluginOptions<T>['filter'], undefined>

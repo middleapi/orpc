@@ -26,14 +26,17 @@ interface PluginContext {
  * @see {@link https://orpc.dev/docs/integrations/hibernation | Hibernation Integration}
  */
 export class HibernationHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~hibernation'
+  readonly name = '~hibernation'
 
   /**
    * Must wrap every routing interceptor that replaces async iterator response bodies.
    */
-  after: string[] = ['~tracing']
+  readonly after: readonly string[] = ['~tracing']
 
-  before: string[] = ['~batch']
+  /**
+   * Runs inside batch.
+   */
+  readonly before: readonly string[] = ['~batch']
 
   private readonly CONTEXT_SYMBOL = Symbol('ORPC_HIBERNATION_HANDLER_PLUGIN_CONTEXT')
 

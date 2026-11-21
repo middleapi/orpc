@@ -50,3 +50,59 @@ Plugins add reusable behavior through the `plugins` option. Handler plugins (`..
 - [Static File](/docs/plugins/static-file) (server): serve static files next to your procedures.
 - [Tmp File Upload](/docs/plugins/tmp-file-upload) (server): stream large uploads to temporary files.
 - [OpenAPI Reference](/docs/plugins/openapi-reference) (server): serve Scalar or Swagger UI and the OpenAPI document.
+
+## Custom Plugins
+
+A plugin has a `name` and an `init` method that receives the handler or link options and returns new ones:
+
+```ts
+import type { Context } from '@orpc/server'
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
+
+export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+  readonly name = 'logging'
+  readonly after = ['~batch']
+
+  init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    return {
+      ...options,
+      routingInterceptors: [
+        async ({ next, request }) => {
+          console.log(request.method, request.url.pathname)
+          return next()
+        },
+        ...(options.routingInterceptors ?? []),
+      ],
+    }
+  }
+}
+```
+
+Link plugins use `StandardLinkPlugin` and `StandardLinkOptions` from `@orpc/client/standard`.
+
+## Plugin Order
+
+Plugins can position themselves relative to others by name:
+
+- `before: ['~x']`: initialize before `~x`.
+- `after: ['~x']`: initialize after `~x`.
+
+Unknown names are ignored. A cycle throws.
+
+:::warning
+`before` and `after` order the `init` calls, not the interceptors.
+:::
+
+What init order means for interceptors depends on where a plugin adds its own:
+
+- **Prepends**: initialized later means it wraps the earlier plugins.
+- **Appends**: initialized later means it runs inside the earlier plugins.
+- A prepended interceptor always wraps an appended one, whatever the init order.
+
+Most built-in handler plugins prepend, so `after: ['~batch']` runs once per batch request and `before: ['~batch']` runs once per call in the batch.
+
+### Built-in Plugin Names
+
+Built-in plugin names start with `~`, such as `~batch` and `~cors`. Do not use the `~` prefix for your own plugins.
+
+`~tracing` is always present on handlers. It creates the request span.

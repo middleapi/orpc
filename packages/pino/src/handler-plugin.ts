@@ -69,15 +69,13 @@ export interface PinoHandlerPluginOptions<T extends Context> {
  * @see {@link https://orpc.dev/docs/integrations/pino | Pino Integration}
  */
 export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~pino'
+  readonly name = '~pino'
 
   /**
-   * - Logging interceptors should run after tracing interceptors
-   *   so they execute within the active request span.
-   * - Logging interceptors should run after batch interceptors
-   *   so they log each individual request instead of the batch request.
+   * Runs inside tracing, batch, and hibernation: logs each individual request,
+   * within its span.
    */
-  before: string[] = ['~tracing', '~batch', '~hibernation']
+  readonly before: readonly string[] = ['~tracing', '~batch', '~hibernation']
 
   private readonly logger: Exclude<PinoHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateRequestId: Exclude<

@@ -64,7 +64,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
   private readonly maxAttempts: Exclude<RetryAfterLinkPluginOptions<T>['maxAttempts'], undefined>
   private readonly timeout: Exclude<RetryAfterLinkPluginOptions<T>['timeout'], undefined>
 
-  name = '~retry-after'
+  readonly name = '~retry-after'
 
   constructor(options: RetryAfterLinkPluginOptions<T> = {}) {
     this.condition =

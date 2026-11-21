@@ -36,12 +36,12 @@ export interface MethodOverrideHandlerPluginOptions {
  * @see {@link https://orpc.dev/docs/plugins/method-override | Method Override Plugin}
  */
 export class MethodOverrideHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~method-override'
+  readonly name = '~method-override'
 
   /**
-   * Should override batch sub-request methods, not the original batch request.
+   * Runs inside batch: overrides sub-request methods, not the batch request's.
    */
-  before: string[] = ['~batch']
+  readonly before: readonly string[] = ['~batch']
 
   private readonly param: string
   private readonly methods: ReadonlySet<string>

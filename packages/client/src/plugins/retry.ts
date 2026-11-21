@@ -128,7 +128,7 @@ export class RetryLinkPlugin<
   private readonly defaultShouldRetry: Exclude<RetryLinkPluginContext['shouldRetry'], undefined>
   private readonly defaultOnRetry: RetryLinkPluginContext['onRetry']
 
-  name = '~retry'
+  readonly name = '~retry'
 
   constructor(options: RetryLinkPluginOptions<T> = {}) {
     this.defaultRetry = options.default?.retry ?? 0

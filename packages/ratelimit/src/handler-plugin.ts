@@ -29,7 +29,7 @@ export interface RateLimitHandlerPluginContext {
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#handler-plugin | Rate Limit Helpers - Handler Plugin}
  */
 export class RateLimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~ratelimit'
+  readonly name = '~ratelimit'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     // oxlint-disable-next-line unicorn/consistent-function-scoping

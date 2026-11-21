@@ -36,12 +36,12 @@ export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> 
 export class ResponseCompressionLinkPlugin<
   T extends ClientContext,
 > implements StandardLinkPlugin<T> {
-  name = '~response-compression'
+  readonly name = '~response-compression'
 
   /**
-   * Decompression should wrap the final batch response instead of sub-responses.
+   * Runs inside batch: decompresses the batch response, not sub-responses.
    */
-  after: string[] = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   private readonly encodings: Exclude<
     ResponseCompressionLinkPluginOptions<T>['encodings'],

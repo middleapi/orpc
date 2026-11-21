@@ -41,12 +41,12 @@ export class CookieJarLinkPlugin<T extends ClientContext> implements StandardLin
   private readonly origin: CookieJarLinkPluginOptions<T>['origin']
   private readonly jar: Exclude<CookieJarLinkPluginOptions<T>['jar'], undefined>
 
-  name = '~cookie-jar'
+  readonly name = '~cookie-jar'
 
   /**
-   * Runs per call, before batching, so each call gets the cookies it would get on its own.
+   * Wraps batch, so each call gets the cookies it would get on its own.
    */
-  before: string[] = ['~batch']
+  readonly before: readonly string[] = ['~batch']
 
   constructor(options: NoInfer<CookieJarLinkPluginOptions<T>>) {
     this.origin = options.origin

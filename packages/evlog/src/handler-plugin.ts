@@ -62,15 +62,13 @@ export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlog
  * @see {@link https://orpc.dev/docs/integrations/evlog | Evlog Integration}
  */
 export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~evlog'
+  readonly name = '~evlog'
 
   /**
-   * - Logging interceptors should run after tracing interceptors
-   *   so they execute within the active request span.
-   * - Logging interceptors should run after batch interceptors
-   *   so they log each individual request instead of the batch request.
+   * Runs inside tracing, batch, and hibernation: logs each individual request,
+   * within its span.
    */
-  before: string[] = ['~tracing', '~batch', '~hibernation']
+  readonly before: readonly string[] = ['~tracing', '~batch', '~hibernation']
 
   private readonly logAbort: Exclude<EvlogHandlerPluginOptions<T>['logAbort'], undefined>
   private readonly procedureErrorLevel: Exclude<

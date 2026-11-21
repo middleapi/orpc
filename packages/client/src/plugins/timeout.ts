@@ -25,12 +25,12 @@ export interface TimeoutLinkPluginOptions<T extends ClientContext> {
 export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
   private readonly timeout: TimeoutLinkPluginOptions<T>['timeout']
 
-  name = '~timeout'
+  readonly name = '~timeout'
 
   /**
-   * Should abort if the total retry time exceeds the configured timeout
+   * Wraps retry: the timeout covers all attempts.
    */
-  after: string[] = ['~retry']
+  readonly after: readonly string[] = ['~retry']
 
   constructor(options: NoInfer<TimeoutLinkPluginOptions<T>>) {
     this.timeout = options.timeout

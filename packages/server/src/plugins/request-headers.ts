@@ -57,7 +57,7 @@ export interface RequestHeadersHandlerPluginContext {
 export class RequestHeadersHandlerPlugin<
   T extends RequestHeadersHandlerPluginContext,
 > implements StandardHandlerPlugin<T> {
-  name = '~request-headers'
+  readonly name = '~request-headers'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     return {
