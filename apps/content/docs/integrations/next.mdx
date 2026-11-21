@@ -225,7 +225,7 @@ import { getIssueMessage, onSuccessDeferred, parseFormData } from '@orpc/next'
 
 export function MyComponent() {
   const [todos, setTodos] = useState<Todo[]>([])
-  const { execute, optimisticState } = useOptimisticServerFunction(someAction, {
+  const { execute, optimisticState, error } = useOptimisticServerFunction(someAction, {
     optimisticPassthrough: todos,
     optimisticReducer: (currentState, newTodo) => [...currentState, newTodo],
     interceptors: [
