@@ -979,6 +979,26 @@ const retryPlugin = new RetryLinkPlugin({
 })
 ```
 
+### Retry After Plugin
+
+The `condition` option of [`RetryAfterLinkPlugin`](/docs/plugins/retry-after) was renamed to `shouldRetry`, matching the Retry Plugin:
+
+<CodeGroup>
+
+```ts v2
+const retryAfterPlugin = new RetryAfterLinkPlugin({
+  shouldRetry: (response) => response.status === 429,
+})
+```
+
+```ts v1
+const retryAfterPlugin = new RetryAfterPlugin({
+  condition: (response) => response.status === 429,
+})
+```
+
+</CodeGroup>
+
 ## Contract-First
 
 Contract types and utilities changed word order from `ContractRouter*` to `RouterContract*`. Deprecated aliases exist for all of them. See [Procedure Contract](/docs/contract/procedure) and [Router Contract](/docs/contract/router).
