@@ -3,6 +3,8 @@ import type { Redis } from '@upstash/redis'
 import type { BaseRedisLockerOptions } from './base-redis'
 import { BaseRedisLocker } from './base-redis'
 
+export interface UpstashLockerOptions extends BaseRedisLockerOptions {}
+
 /**
  * Locker adapter for Upstash Redis. Acquires locks with `SET NX PX` and releases
  * them atomically with a Lua script, so it shares locks with `RedisLocker`.
@@ -13,7 +15,7 @@ import { BaseRedisLocker } from './base-redis'
 export class UpstashLocker extends BaseRedisLocker {
   constructor(
     private readonly redis: Redis,
-    private readonly options: BaseRedisLockerOptions,
+    private readonly options: UpstashLockerOptions,
   ) {
     super(options)
   }

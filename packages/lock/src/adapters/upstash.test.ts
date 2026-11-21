@@ -202,6 +202,22 @@ it('prefix creates a locker that appends the prefix and shares the client', asyn
   })
 })
 
+it('prefixes keys with orpc:lock: by default', async () => {
+  const redis = { set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 1) }
+  const locker = new UpstashLocker(redis as any, { ttl: 1000 })
+
+  await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
+  expect(redis.set).toHaveBeenCalledWith('orpc:lock:key', expect.any(String), {
+    nx: true,
+    px: 1000,
+  })
+  expect(redis.eval).toHaveBeenCalledWith(
+    expect.any(String),
+    ['orpc:lock:key'],
+    [expect.any(String)],
+  )
+})
+
 it('preserves the callback outcome when the release fails', async () => {
   const redis = {
     set: vi.fn(async () => 'OK'),

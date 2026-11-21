@@ -10,9 +10,10 @@ export interface MemoryLockerOptions {
    * Guards against holders that never release the lock.
    * Can be overridden per call.
    *
-   * @default undefined (held until released)
+   * Required, like in every other adapter, so swapping adapters never changes
+   * whether a stuck holder can block a key forever.
    */
-  ttl?: number | undefined
+  ttl: number
 
   /**
    * How long to wait for a lock to become available, in milliseconds.
@@ -41,12 +42,12 @@ interface MemoryLockEntry {
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
 export class MemoryLocker implements Locker {
-  private readonly ttl: number | undefined
+  private readonly ttl: number
   private readonly timeout: number
 
   private readonly entries = new Map<string, MemoryLockEntry>()
 
-  constructor(options: MemoryLockerOptions = {}) {
+  constructor(options: MemoryLockerOptions) {
     this.ttl = options.ttl
     this.timeout = options.timeout ?? 10_000
   }
@@ -72,9 +73,7 @@ export class MemoryLocker implements Locker {
       this.entries.set(key, entry)
     }
 
-    if (ttl !== undefined) {
-      entry.expiry = setTimeout(() => this.release(key, token), ttl)
-    }
+    entry.expiry = setTimeout(() => this.release(key, token), ttl)
 
     try {
       return await fn({ waited })

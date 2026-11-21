@@ -70,7 +70,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
   /**
    * Subscribes to a specific event using a callback function.
-   * Returns an unsubscribe function to remove the listener.
+   * Resolves with an unsubscribe function to remove the listener, once the subscription is established.
    *
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
@@ -83,11 +83,11 @@ export abstract class Publisher<T extends Record<string, object>> {
 
   /**
    * Subscribes to a specific event using a callback function.
-   * Returns an unsubscribe function to remove the listener.
+   * Resolves with an unsubscribe function to remove the listener, once the subscription is established.
    *
    * @example
    * ```ts
-   * const unsubscribe = publisher.subscribe('event', (payload) => {
+   * const unsubscribe = await publisher.subscribe('event', (payload) => {
    *   console.log(payload)
    * }, {
    *   lastEventId,
@@ -97,7 +97,7 @@ export abstract class Publisher<T extends Record<string, object>> {
    * })
    *
    * // Later
-   * unsubscribe()
+   * await unsubscribe()
    * ```
    */
   subscribe<K extends keyof T & string>(

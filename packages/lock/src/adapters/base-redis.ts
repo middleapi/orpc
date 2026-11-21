@@ -20,8 +20,9 @@ return 0
 export interface BaseRedisLockerOptions {
   /**
    * The prefix to use for Redis keys.
+   * Set it to isolate locks when several apps share one Redis instance.
    *
-   * @default ''
+   * @default 'orpc:lock:'
    */
   prefix?: string | undefined
 
@@ -65,7 +66,7 @@ export abstract class BaseRedisLocker implements Locker {
   protected readonly retryInterval: number
 
   constructor(options: BaseRedisLockerOptions) {
-    this.keyPrefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? 'orpc:lock:'
     this.ttl = options.ttl
     this.timeout = options.timeout ?? 10_000
     this.retryInterval = options.retryInterval ?? 100

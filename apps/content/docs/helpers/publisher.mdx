@@ -112,9 +112,9 @@ const publisher = new RedisPublisher<Events>(client, {
    * The prefix to use for Redis keys and Pub/Sub channels.
    * Set it to isolate events when several apps share one Redis instance.
    *
-   * @default ''
+   * @default 'orpc:publisher:'
    */
-  prefix: '',
+  prefix: 'orpc:publisher:',
 
   /**
    * Serializer for serialize and deserialize payloads.
@@ -145,6 +145,7 @@ const publisher = new RedisPublisher<Events>(client, {
 })
 
 // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+// Its keys and channels start with `orpc:publisher:tenant:123:`
 const tenantPublisher = publisher.prefix('tenant:123:')
 ```
 
@@ -159,9 +160,9 @@ const publisher = new UpstashPublisher<Events>(redis, {
    * The prefix to use for Redis keys and Pub/Sub channels.
    * Set it to isolate events when several apps share one Redis instance.
    *
-   * @default ''
+   * @default 'orpc:publisher:'
    */
-  prefix: '',
+  prefix: 'orpc:publisher:',
 
   /**
    * Serializer for serialize and deserialize payloads.
@@ -192,6 +193,7 @@ const publisher = new UpstashPublisher<Events>(redis, {
 })
 
 // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+// Its keys and channels start with `orpc:publisher:tenant:123:`
 const tenantPublisher = publisher.prefix('tenant:123:')
 ```
 
@@ -217,9 +219,9 @@ const publisher = new BunRedisPublisher<Events>(redis, {
    * The prefix to use for Redis keys and Pub/Sub channels.
    * Set it to isolate events when several apps share one Redis instance.
    *
-   * @default ''
+   * @default 'orpc:publisher:'
    */
-  prefix: '',
+  prefix: 'orpc:publisher:',
 
   /**
    * Serializer for serialize and deserialize payloads.
@@ -250,6 +252,7 @@ const publisher = new BunRedisPublisher<Events>(redis, {
 })
 
 // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+// Its keys and channels start with `orpc:publisher:tenant:123:`
 const tenantPublisher = publisher.prefix('tenant:123:')
 ```
 

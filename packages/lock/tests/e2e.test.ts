@@ -33,7 +33,7 @@ it('works', async () => {
   }
 
   const handler = new RPCHandler(router)
-  const locker = new MemoryLocker()
+  const locker = new MemoryLocker({ ttl: 60_000 })
 
   const request = (id: string) =>
     new Request('https://example.com/generate', {

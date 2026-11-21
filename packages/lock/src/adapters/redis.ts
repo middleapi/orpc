@@ -3,6 +3,8 @@ import type { RedisClientType } from 'redis'
 import type { BaseRedisLockerOptions } from './base-redis'
 import { BaseRedisLocker } from './base-redis'
 
+export interface RedisLockerOptions extends BaseRedisLockerOptions {}
+
 /**
  * Locker adapter for Redis. Acquires locks with `SET NX PX` and releases them
  * atomically with a Lua script, so every instance using the same server shares
@@ -13,7 +15,7 @@ import { BaseRedisLocker } from './base-redis'
 export class RedisLocker extends BaseRedisLocker {
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
-    private readonly options: BaseRedisLockerOptions,
+    private readonly options: RedisLockerOptions,
   ) {
     super(options)
   }
