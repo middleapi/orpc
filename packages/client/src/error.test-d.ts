@@ -37,4 +37,12 @@ describe('ORPCError', () => {
     // @ts-expect-error - not allow write
     error.data = 2
   })
+
+  it('toJSON returns a writable shape', () => {
+    const json = new ORPCError('CODE', { data: 1 }).toJSON()
+    json.defined = true
+    json.code = 'CODE'
+    json.message = 'message'
+    json.data = 2
+  })
 })

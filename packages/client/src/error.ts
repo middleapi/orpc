@@ -151,14 +151,14 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
   }
 }
 
-export interface ORPCErrorJSON<TCode extends string, TData> extends Pick<
-  ORPCError<TCode, TData>,
-  'code' | 'message' | 'data'
-> {
-  /**
-   * remove readonly
-   */
+/**
+ * Plain serialized form of an `ORPCError`. Unlike the class, its fields are writable.
+ */
+export interface ORPCErrorJSON<TCode extends string, TData> {
   defined: boolean
+  code: TCode
+  message: string
+  data: TData
 }
 
 export type AnyORPCError = ORPCError<any, any>
