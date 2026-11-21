@@ -11,7 +11,7 @@ Your project does not need [`openapi` metadata](/docs/openapi/specification#meta
 
 ## Generate the Document
 
-Write the OpenAPI document of your router to a file, and commit it.
+Write the OpenAPI document of your router to a file, and commit it to your main branch. The comparison needs it there as a baseline.
 
 ```ts scripts/openapi.ts
 import { writeFile } from 'node:fs/promises'
@@ -41,7 +41,7 @@ A procedure without an output schema is documented with an empty response, so ch
 [Install oasdiff](https://github.com/oasdiff/oasdiff#installation), then compare the document on your main branch with the current one:
 
 ```bash
-oasdiff breaking --fail-on ERR origin/main:openapi.json openapi.json
+oasdiff breaking --fail-on WARN origin/main:openapi.json openapi.json
 ```
 
 The command exits with a non-zero code when it finds a breaking change.
