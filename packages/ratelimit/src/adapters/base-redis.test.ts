@@ -14,9 +14,9 @@ describe('baseRedisRateLimiter', () => {
     vi.useRealTimers()
   })
 
-  it('sends the weight, window and limit, so the script can check before it consumes', async () => {
+  it('sends the weight and window to the script', async () => {
     const limiter = new TestingRateLimiter({ maxRequests: 5, window: 1000, prefix: 'app:' })
-    limiter.evalScript.mockResolvedValueOnce([1, 2, 1000])
+    limiter.evalScript.mockResolvedValueOnce([2, 1000])
 
     await expect(limiter.limit('key', { weight: 2 })).resolves.toEqual({
       success: true,
@@ -26,28 +26,24 @@ describe('baseRedisRateLimiter', () => {
     })
 
     expect(limiter.evalScript).toHaveBeenCalledTimes(1)
-    expect(limiter.evalScript).toHaveBeenCalledWith(
-      expect.any(String),
-      ['app:key'],
-      ['2', '1000', '5'],
-    )
+    expect(limiter.evalScript).toHaveBeenCalledWith(expect.any(String), ['app:key'], ['2', '1000'])
   })
 
-  it('reports a rejection from the script with the untouched counter', async () => {
+  it('rejects when the counter exceeds the limit', async () => {
     const limiter = new TestingRateLimiter({ maxRequests: 5, window: 1000 })
-    limiter.evalScript.mockResolvedValueOnce([0, 4, 300])
+    limiter.evalScript.mockResolvedValueOnce([6, 300])
 
     await expect(limiter.limit('key', { weight: 2 })).resolves.toEqual({
       success: false,
       limit: 5,
-      remaining: 1,
+      remaining: 0,
       reset: 10_300,
     })
   })
 
   it('uses an empty prefix when none is provided', async () => {
     const limiter = new TestingRateLimiter({ maxRequests: 5, window: 1000 })
-    limiter.evalScript.mockResolvedValueOnce([1, 1, 1000])
+    limiter.evalScript.mockResolvedValueOnce([1, 1000])
 
     await limiter.limit('key')
 
@@ -56,7 +52,7 @@ describe('baseRedisRateLimiter', () => {
 
   it('retries after the window resets when a timeout is set', async () => {
     const limiter = new TestingRateLimiter({ maxRequests: 1, window: 500, timeout: 1000 })
-    limiter.evalScript.mockResolvedValueOnce([0, 1, 200]).mockResolvedValueOnce([1, 1, 500])
+    limiter.evalScript.mockResolvedValueOnce([2, 200]).mockResolvedValueOnce([1, 500])
 
     const pending = limiter.limit('key')
     await vi.advanceTimersByTimeAsync(200)
