@@ -6,6 +6,14 @@ import { MemoryRateLimiter } from '../src/adapters/memory'
 import type { RateLimiter } from '../src/index'
 import { ratelimit, RateLimitHandlerPlugin } from '../src/index'
 
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 it('works', async () => {
   const router = {
     login: os

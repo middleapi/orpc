@@ -73,7 +73,11 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
           'ratelimit-reset': secondsUntilReset,
         }
 
-        if (result.response.status >= 400 && !mostConstrained.result.success) {
+        if (
+          result.response.status >= 400 &&
+          !mostConstrained.result.success &&
+          secondsUntilReset !== undefined
+        ) {
           headers['retry-after'] = secondsUntilReset
         }
 

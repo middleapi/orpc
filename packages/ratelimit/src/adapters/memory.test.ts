@@ -252,6 +252,19 @@ describe('memoryRateLimiter', () => {
   })
 
   describe('cleanup', () => {
+    it('resets an expired key even when the clock moved backward', async () => {
+      const limiter = new MemoryRateLimiter({ maxRequests: 1, window: 1000 })
+
+      vi.setSystemTime(1000)
+      expect(await limiter.limit('a')).toMatchObject({ success: true, reset: 2000 })
+
+      vi.setSystemTime(0)
+      expect(await limiter.limit('b')).toMatchObject({ success: true, reset: 1000 })
+
+      vi.setSystemTime(1000) // b expired, but a is still first in the map
+      expect(await limiter.limit('b')).toMatchObject({ success: true, reset: 2000 })
+    })
+
     it('drops expired keys from memory', async () => {
       const limiter = new MemoryRateLimiter({ maxRequests: 5, window: 1000 })
 

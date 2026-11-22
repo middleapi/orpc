@@ -11,6 +11,15 @@ describe('ratelimitHandlerPlugin', () => {
     plugins: [new RateLimitHandlerPlugin()],
   })
 
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_700_000_000_000)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('adds rate limit headers to a successful response after a limit check', async () => {
     const reset = Date.now() + 60000
 
@@ -62,34 +71,27 @@ describe('ratelimitHandlerPlugin', () => {
   })
 
   it('reports ratelimit-reset as seconds until reset, rounded up and never negative', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(1_700_000_000_000)
-
-    try {
-      for (const [offset, expected] of [
-        [1500, '2'],
-        [1000, '1'],
-        [1, '1'],
-        [0, '0'],
-        [-5000, '0'],
-      ] as const) {
-        handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-          context[RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL].checks.push({
-            path,
-            procedure,
-            result: { success: false, limit: 10, remaining: 0, reset: Date.now() + offset },
-          })
-
-          throw new ORPCError('TOO_MANY_REQUESTS')
+    for (const [offset, expected] of [
+      [1500, '2'],
+      [1000, '1'],
+      [1, '1'],
+      [0, '0'],
+      [-5000, '0'],
+    ] as const) {
+      handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
+        context[RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL].checks.push({
+          path,
+          procedure,
+          result: { success: false, limit: 10, remaining: 0, reset: Date.now() + offset },
         })
 
-        const { response } = await handler.handle(new Request('http://localhost:3000'))
+        throw new ORPCError('TOO_MANY_REQUESTS')
+      })
 
-        expect(response!.headers.get('ratelimit-reset')).toBe(expected)
-        expect(response!.headers.get('retry-after')).toBe(expected)
-      }
-    } finally {
-      vi.useRealTimers()
+      const { response } = await handler.handle(new Request('http://localhost:3000'))
+
+      expect(response!.headers.get('ratelimit-reset')).toBe(expected)
+      expect(response!.headers.get('retry-after')).toBe(expected)
     }
   })
 

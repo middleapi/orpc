@@ -66,6 +66,13 @@ export class MemoryRateLimiter implements RateLimiter {
     this.sweep(now)
 
     let entry = this.entries.get(key)
+
+    // the sweep can miss it when the clock moved backward
+    if (entry && entry.reset <= now) {
+      this.entries.delete(key)
+      entry = undefined
+    }
+
     const success = (entry?.used ?? 0) + weight <= this.maxRequests
 
     if (success) {
