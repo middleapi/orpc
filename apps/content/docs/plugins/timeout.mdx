@@ -102,10 +102,10 @@ Return `null` or `undefined` to disable the timeout, which is useful for excludi
 
 ## Handling Timeouts
 
-Both plugins abort with a `TimeoutError`, so a timeout is distinguishable from a cancellation (`AbortError`):
+Both plugins abort with a `TimeoutError`, so a timeout is distinguishable from a cancellation (`AbortError`). With `TimeoutLinkPlugin`, the call rejects with it:
 
 ```ts
-import { TimeoutError } from '@orpc/client' // or '@orpc/server'
+import { TimeoutError } from '@orpc/client'
 
 try {
   await client.planet.list()
@@ -114,6 +114,18 @@ try {
     // the call exceeded the timeout
   }
 }
+```
+
+With `TimeoutHandlerPlugin`, it is the `signal.reason` inside the procedure. It is not sent to the client:
+
+```ts
+import { TimeoutError } from '@orpc/server'
+
+const example = os.handler(async ({ signal }) => {
+  if (signal?.reason instanceof TimeoutError) {
+    // handling exceeded the timeout
+  }
+})
 ```
 
 :::tip
