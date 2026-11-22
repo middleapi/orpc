@@ -31,7 +31,7 @@ The `decrypt` helper accepts `undefined` or `null` as encrypted value and return
 ## Format
 
 ```txt
-base64url(salt || iv || ciphertext || tag)
+base64url(salt[16] || iv[12] || ciphertext || tag[16])
 ```
 
 AES-256-GCM with a PBKDF2-HMAC-SHA256 key (60,000 iterations).
