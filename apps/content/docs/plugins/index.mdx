@@ -68,8 +68,10 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
       ...options,
       routingInterceptors: [
         async ({ next, request }) => {
-          console.log(request.method, request.url)
-          return next()
+          const start = performance.now()
+          const result = await next()
+          console.log(`${request.method} took ${performance.now() - start}ms`)
+          return result
         },
         ...(options.routingInterceptors ?? []),
       ],
