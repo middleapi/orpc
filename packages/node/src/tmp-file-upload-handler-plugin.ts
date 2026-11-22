@@ -164,18 +164,18 @@ export class TmpFile extends File {
  * @see {@link https://orpc.dev/docs/plugins/tmp-file-upload | Tmp File Upload Plugin}
  */
 export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~tmp-file-upload'
+  readonly name = '~tmp-file-upload'
 
   /**
-   * Should parse the original request body instead of batched sub-requests.
+   * Wraps batch: parses the original request body, not sub-requests.
    */
-  after: string[] = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   /**
-   * Should run inside the limit and compression plugins, so spooling receives
+   * Runs inside the limit and compression plugins, so spooling receives
    * the size-checked, decompressed bytes.
    */
-  before: string[] = ['~request-limit', '~request-compression']
+  readonly before: readonly string[] = ['~request-limit', '~request-compression']
 
   private readonly tmpDir: string
   private readonly maxBodySize: Exclude<

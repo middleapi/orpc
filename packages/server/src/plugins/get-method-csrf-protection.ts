@@ -40,7 +40,7 @@ export interface GetMethodCsrfProtectionHandlerPluginOptions<T extends Context> 
 export class GetMethodCsrfProtectionHandlerPlugin<
   T extends Context,
 > implements StandardHandlerPlugin<T> {
-  name = '~get-method-csrf-protection'
+  readonly name = '~get-method-csrf-protection'
 
   private readonly error: Exclude<
     GetMethodCsrfProtectionHandlerPluginOptions<T>['error'],

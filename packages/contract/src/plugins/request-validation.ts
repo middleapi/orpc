@@ -27,7 +27,7 @@ export interface RequestValidationLinkPluginOptions<_T extends ClientContext> {
  * @see {@link https://orpc.dev/docs/plugins/request-validation | Request Validation Plugin}
  */
 export class RequestValidationLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~request-validation'
+  readonly name = '~request-validation'
 
   private readonly forwardValidatedInput: boolean
 

@@ -4,6 +4,12 @@ import { sortPlugins } from '@orpc/shared'
 import type { Context } from '../../context'
 import type { StandardHandlerOptions } from './handler'
 
+/**
+ * A handler plugin. `before` and `after` order the `init()` calls, not the interceptors.
+ * The built-in `~tracing` plugin is always present.
+ *
+ * @see {@link https://orpc.dev/docs/plugins#plugin-order | Plugins - Plugin Order}
+ */
 export interface StandardHandlerPlugin<T extends Context> extends OrderablePlugin {
   /**
    * Initializes the plugin and returns new handler options.

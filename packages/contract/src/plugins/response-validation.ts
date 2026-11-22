@@ -18,7 +18,7 @@ import { getProcedureContractOrThrow } from '../router-utils'
 export class ResponseValidationLinkPlugin<
   T extends ClientContext,
 > implements StandardLinkPlugin<T> {
-  name = '~response-validation'
+  readonly name = '~response-validation'
 
   constructor(private readonly contract: RouterContract) {}
 

@@ -29,11 +29,12 @@ export interface ResponseHeadersHandlerPluginContext {
 export class ResponseHeadersHandlerPlugin<
   T extends ResponseHeadersHandlerPluginContext,
 > implements StandardHandlerPlugin<T> {
-  name = '~response-headers'
+  readonly name = '~response-headers'
+
   /**
-   * Interceptors should run after batch interceptors so headers are applied to each sub-response.
+   * Runs inside batch, so headers apply to each sub-response.
    */
-  before: string[] = ['~batch']
+  readonly before: readonly string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     return {

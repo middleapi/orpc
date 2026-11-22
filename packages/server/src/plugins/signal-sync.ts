@@ -21,7 +21,7 @@ import type { ProcedureClientInterceptor } from '../procedure-client'
  * @see {@link https://orpc.dev/docs/plugins/signal-sync | Signal Sync Plugin}
  */
 export class SignalSyncHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~signal-sync'
+  readonly name = '~signal-sync'
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     // oxlint-disable-next-line unicorn/consistent-function-scoping

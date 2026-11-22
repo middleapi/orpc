@@ -26,12 +26,12 @@ const textEncoder = /* @__PURE__ */ new TextEncoder()
  * @see {@link https://orpc.dev/docs/plugins/head-method | HEAD Method Plugin}
  */
 export class HeadMethodHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~head-method'
+  readonly name = '~head-method'
 
   /**
-   * Discard the body after response compression, so `HEAD` reports the same `Content-Encoding` as `GET`.
+   * Wraps response compression, so `HEAD` reports the same `Content-Encoding` as `GET`.
    */
-  after: string[] = ['~response-compression']
+  readonly after: readonly string[] = ['~response-compression']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     // oxlint-disable-next-line unicorn/consistent-function-scoping

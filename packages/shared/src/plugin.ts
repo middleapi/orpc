@@ -1,18 +1,30 @@
+/**
+ * A plugin ordered relative to others by name.
+ *
+ * `before` and `after` order the `init()` calls, not the interceptors:
+ * - A plugin that prepends its interceptor and is initialized later wraps the earlier ones.
+ * - A plugin that appends its interceptor and is initialized later runs inside the earlier ones.
+ * - A prepended interceptor always wraps an appended one, whatever the init order.
+ */
 export interface OrderablePlugin {
-  /** Unique name of the plugin, used for ordering and identification. */
-  name: string
+  /**
+   * Name other plugins refer to in `before` and `after`.
+   * The `~` prefix is reserved for built-in plugins.
+   */
+  readonly name: string
 
-  /** Plugins this plugin should execute before. */
-  before?: string[] | undefined
+  /** Plugins to initialize after this one. Unknown names are ignored. */
+  readonly before?: readonly string[] | undefined
 
-  /** Plugins this plugin should execute after. */
-  after?: string[] | undefined
+  /** Plugins to initialize before this one. Unknown names are ignored. */
+  readonly after?: readonly string[] | undefined
 }
 
 /**
- * Sorts plugins based on their `before` and `after` dependencies.
+ * Sorts plugins into init order by their `before` and `after`.
+ * Throws on a circular dependency.
  */
-export function sortPlugins<T extends OrderablePlugin>(plugins: T[]): T[] {
+export function sortPlugins<T extends OrderablePlugin>(plugins: readonly T[]): T[] {
   const pluginCount = plugins.length
 
   const pluginIdToIndices = new Map<string, number[]>()
@@ -80,7 +92,7 @@ export function sortPlugins<T extends OrderablePlugin>(plugins: T[]): T[] {
 }
 
 function findCyclicPlugin<T extends OrderablePlugin>(
-  plugins: T[],
+  plugins: readonly T[],
   dependencies: number[][],
   placed: Set<number>,
 ): T {

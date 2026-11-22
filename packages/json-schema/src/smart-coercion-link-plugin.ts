@@ -24,12 +24,12 @@ export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions
  * @see {@link https://orpc.dev/docs/plugins/smart-coercion | Smart Coercion Plugin}
  */
 export class SmartCoercionLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~smart-coercion'
+  readonly name = '~smart-coercion'
 
   /**
-   * Output and error values should be coerced before validation.
+   * Runs inside response validation, so values are coerced before validation.
    */
-  after: string[] = ['~response-validation']
+  readonly after: readonly string[] = ['~response-validation']
 
   private readonly converter: DelegatingJsonSchemaConverter
   private readonly coercer: JsonSchemaCoercer
