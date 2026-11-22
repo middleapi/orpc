@@ -28,7 +28,7 @@ export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkP
   readonly name = '~timeout'
 
   /**
-   * Wraps retry: the timeout covers all attempts.
+   * Wraps retry: the timeout applies to the total retry time, not each attempt.
    */
   readonly after: readonly string[] = ['~retry']
 
