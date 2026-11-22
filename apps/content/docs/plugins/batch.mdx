@@ -244,7 +244,7 @@ The wait starts when the first request is queued, so no request waits longer tha
 
 On the server, requests from different users can be batched together. If your transport reads per-request data (in `fetch`, `origin`, and so on), set `scope` to a value unique to the incoming request.
 
-On Cloudflare Workers, always set `scope` this way: a request cannot use I/O started by another request, so requests batched across incoming requests can fail or hang.
+On Cloudflare Workers, set `scope` whenever a client at module scope serves concurrent incoming requests. Under the [`handle_cross_request_promise_resolution`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#handle-cross-request-promise-resolution-correctly) compatibility flag (default since 2024-10-14), a batch runs in the incoming request that queued it first, so the other requests in it hang once that request ends.
 
 ```ts
 import { AsyncLocalStorage } from 'node:async_hooks'
