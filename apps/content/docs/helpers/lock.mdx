@@ -108,7 +108,7 @@ const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
 
 :::tip[Custom Error]
-Use `error` to throw your own error instead of `CONFLICT`.
+Use `error` to throw your own error instead of `CONFLICT`. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response), and is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the procedure declares.
 
 ```ts
 lock({
