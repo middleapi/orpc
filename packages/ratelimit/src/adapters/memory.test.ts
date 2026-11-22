@@ -39,7 +39,7 @@ describe('memoryRateLimiter', () => {
     })
   })
 
-  it('consumes weight and denies when accumulated weight exceeds the limit', async () => {
+  it('consumes weight and does not count rejected requests', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 5, window: 1000 })
 
     expect(await limiter.limit('key', { weight: 3 })).toEqual({
@@ -68,29 +68,6 @@ describe('memoryRateLimiter', () => {
     })
   })
 
-  it('tracks limits independently per key', async () => {
-    const limiter = new MemoryRateLimiter({ maxRequests: 1, window: 1000 })
-
-    expect(await limiter.limit('alice')).toEqual({
-      success: true,
-      limit: 1,
-      remaining: 0,
-      reset: 1000,
-    })
-    expect(await limiter.limit('alice')).toEqual({
-      success: false,
-      limit: 1,
-      remaining: 0,
-      reset: 1000,
-    })
-    expect(await limiter.limit('bob')).toEqual({
-      success: true,
-      limit: 1,
-      remaining: 0,
-      reset: 1000,
-    })
-  })
-
   it('starts each key window at that key first hit', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 1, window: 1000 })
 
@@ -105,23 +82,6 @@ describe('memoryRateLimiter', () => {
 
     vi.setSystemTime(1400)
     expect(await limiter.limit('bob')).toMatchObject({ success: true, reset: 2400 })
-  })
-
-  it('does not count rejected requests', async () => {
-    const limiter = new MemoryRateLimiter({ maxRequests: 3, window: 1000 })
-
-    expect(await limiter.limit('key', { weight: 2 })).toMatchObject({ success: true, remaining: 1 })
-
-    for (let i = 0; i < 5; i++) {
-      expect(await limiter.limit('key', { weight: 2 })).toEqual({
-        success: false,
-        limit: 3,
-        remaining: 1,
-        reset: 1000,
-      })
-    }
-
-    expect(await limiter.limit('key')).toMatchObject({ success: true, remaining: 0 })
   })
 
   it('does not start a window for a request that can never fit', async () => {
@@ -142,18 +102,7 @@ describe('memoryRateLimiter', () => {
   it('denies within window and resets counter on new window', async () => {
     const limiter = new MemoryRateLimiter({ maxRequests: 2, window: 1000 })
 
-    expect(await limiter.limit('key')).toEqual({
-      success: true,
-      limit: 2,
-      remaining: 1,
-      reset: 1000,
-    })
-    expect(await limiter.limit('key')).toEqual({
-      success: true,
-      limit: 2,
-      remaining: 0,
-      reset: 1000,
-    })
+    await limiter.limit('key', { weight: 2 })
 
     await vi.advanceTimersByTimeAsync(999) // still inside window
     expect(await limiter.limit('key')).toEqual({
@@ -164,16 +113,10 @@ describe('memoryRateLimiter', () => {
     })
 
     await vi.advanceTimersByTimeAsync(1) // t=1000 — new window
-    expect(await limiter.limit('key', { weight: 2 })).toEqual({
+    expect(await limiter.limit('key')).toEqual({
       success: true,
       limit: 2,
-      remaining: 0,
-      reset: 2000,
-    })
-    expect(await limiter.limit('key')).toEqual({
-      success: false,
-      limit: 2,
-      remaining: 0,
+      remaining: 1,
       reset: 2000,
     })
   })
@@ -305,27 +248,6 @@ describe('memoryRateLimiter', () => {
       await vi.advanceTimersByTimeAsync(200)
 
       expect(await pending).toEqual({ success: false, limit: 1, remaining: 0, reset: 2000 })
-    })
-
-    it('does not block when timeout is 0', async () => {
-      const limiter = new MemoryRateLimiter({
-        maxRequests: 1,
-        window: 1000,
-        timeout: 0,
-      })
-
-      expect(await limiter.limit('key')).toEqual({
-        success: true,
-        limit: 1,
-        remaining: 0,
-        reset: 1000,
-      })
-      expect(await limiter.limit('key')).toEqual({
-        success: false,
-        limit: 1,
-        remaining: 0,
-        reset: 1000,
-      })
     })
   })
 

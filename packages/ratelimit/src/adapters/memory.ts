@@ -35,7 +35,6 @@ export class MemoryRateLimiter implements RateLimiter {
   private readonly timeout: number
 
   private readonly entries: Map<string, { used: number; reset: number }> = new Map()
-  private nextSweepAt: number = 0
 
   constructor(options: MemoryRateLimiterOptions) {
     this.maxRequests = options.maxRequests
@@ -50,57 +49,39 @@ export class MemoryRateLimiter implements RateLimiter {
   }
 
   /**
-   * Drops expired windows, at most once per window.
+   * Drops expired windows. Entries are in reset order, so it stops at the first live one.
    */
-  private sweepIfNeeded(now: number): void {
-    if (now < this.nextSweepAt) {
-      return
-    }
-
+  private sweep(now: number): void {
     for (const [key, entry] of this.entries) {
-      if (entry.reset <= now) {
-        this.entries.delete(key)
+      if (entry.reset > now) {
+        break
       }
-    }
 
-    this.nextSweepAt = now + this.window
+      this.entries.delete(key)
+    }
   }
 
   private checkLimit(key: string, weight: number): Required<RateLimitResult> {
     const now = Date.now()
-    this.sweepIfNeeded(now)
+    this.sweep(now)
 
     let entry = this.entries.get(key)
+    const success = (entry?.used ?? 0) + weight <= this.maxRequests
 
-    if (entry && entry.reset <= now) {
-      this.entries.delete(key)
-      entry = undefined
-    }
-
-    const used = entry?.used ?? 0
-    const success = used + weight <= this.maxRequests
-
-    if (!success) {
-      return {
-        success,
-        limit: this.maxRequests,
-        remaining: Math.max(0, this.maxRequests - used),
-        reset: entry?.reset ?? now + this.window,
+    if (success) {
+      if (!entry) {
+        entry = { used: 0, reset: now + this.window }
+        this.entries.set(key, entry)
       }
-    }
 
-    if (!entry) {
-      entry = { used: 0, reset: now + this.window }
-      this.entries.set(key, entry)
+      entry.used += weight
     }
-
-    entry.used += weight
 
     return {
       success,
       limit: this.maxRequests,
-      remaining: this.maxRequests - entry.used,
-      reset: entry.reset,
+      remaining: this.maxRequests - (entry?.used ?? 0),
+      reset: entry?.reset ?? now + this.window,
     }
   }
 }
