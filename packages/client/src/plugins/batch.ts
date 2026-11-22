@@ -266,7 +266,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
  * @see {@link https://orpc.dev/docs/plugins/batch | Batch Plugin}
  */
 export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~batch'
+  readonly name = '~batch'
 
   private readonly groups: BatchLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<BatchLinkPluginOptions<T>['filter'], undefined>

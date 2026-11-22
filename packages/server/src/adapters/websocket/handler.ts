@@ -74,11 +74,15 @@ export class WebSocketHandler<T extends Context> {
     const encoded = toStringOrBytes(data)
     const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
 
+    if (!result.matched || !isClientPeerSendMessage(result.message)) {
+      return { matched: false }
+    }
+
     let peer = this.peers.get(ws)
 
     // Closed (e.g. a Blob finished loading after close): a new peer here would leak and never be aborted.
     if (peer === null) {
-      return result
+      return { matched: true }
     }
 
     if (!peer) {
@@ -91,14 +95,12 @@ export class WebSocketHandler<T extends Context> {
       )
     }
 
-    if (result.matched && isClientPeerSendMessage(result.message)) {
-      await peer.message(
-        result.message,
-        createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
-      )
-    }
+    await peer.message(
+      result.message,
+      createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
+    )
 
-    return result
+    return { matched: true }
   }
 
   /**

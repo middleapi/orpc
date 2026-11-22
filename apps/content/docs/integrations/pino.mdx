@@ -71,15 +71,15 @@ const plugin = new PinoHandlerPlugin({
 
 ## Using the Logger in Your Code
 
-You can access the logger from the context object using the `getLogger` function:
+You can access the logger from the context object using the `getPinoLogger` function:
 
 ```ts
-import { getLogger, LoggerContext } from '@orpc/pino'
+import { getPinoLogger, PinoLoggerContext } from '@orpc/pino'
 
-interface ServerContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends PinoLoggerContext {} // [!code highlight]
 
 const procedure = os.$context<ServerContext>().handler(({ context }) => {
-  const logger = getLogger(context) // [!code highlight]
+  const logger = getPinoLogger(context) // [!code highlight]
 
   logger?.info('Processing request')
   logger?.debug({ userId: 123 }, 'User data')
@@ -93,12 +93,12 @@ const procedure = os.$context<ServerContext>().handler(({ context }) => {
 You can provide a custom logger instance for specific requests by passing it through the context. This is especially useful when integrating with [pino-http](https://github.com/pinojs/pino-http) for enhanced HTTP logging:
 
 ```ts
-import { LOGGER_CONTEXT_SYMBOL, LoggerContext, PinoHandlerPlugin } from '@orpc/pino'
+import { PINO_LOGGER_CONTEXT_SYMBOL, PinoLoggerContext, PinoHandlerPlugin } from '@orpc/pino'
 
 const logger = pino()
 const httpLogger = pinoHttp({ logger })
 
-interface ServerContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends PinoLoggerContext {} // [!code highlight]
 
 const router = {
   ping: os.$context<ServerContext>().handler(() => 'pong'),
@@ -116,7 +116,7 @@ const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api',
     context: {
-      [LOGGER_CONTEXT_SYMBOL]: req.log, // [!code highlight]
+      [PINO_LOGGER_CONTEXT_SYMBOL]: req.log, // [!code highlight]
     },
   })
 

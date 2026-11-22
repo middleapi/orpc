@@ -176,7 +176,7 @@ describe('retryAfterLinkPlugin', () => {
     })
   })
 
-  it('should respect maxAttempts option', async () => {
+  it('should respect maxAttempts option, counting the first request', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
 
@@ -203,7 +203,7 @@ describe('retryAfterLinkPlugin', () => {
     )
   })
 
-  describe('timeout and custom condition', () => {
+  describe('timeout and custom shouldRetry', () => {
     it('should stop retrying after timeout', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
@@ -231,7 +231,7 @@ describe('retryAfterLinkPlugin', () => {
       )
     })
 
-    it('should respect custom condition', async () => {
+    it('should respect custom shouldRetry', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 
@@ -252,10 +252,10 @@ describe('retryAfterLinkPlugin', () => {
         } satisfies StandardLazyResponse
       })
 
-      const condition = vi.fn((response: StandardLazyResponse) => response.status === 400)
+      const shouldRetry = vi.fn((response: StandardLazyResponse) => response.status === 400)
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new RetryAfterLinkPlugin({ condition })],
+        plugins: [new RetryAfterLinkPlugin({ shouldRetry })],
       })
 
       const promise = link.call(['test'], 'input', { context: {} })
@@ -263,7 +263,7 @@ describe('retryAfterLinkPlugin', () => {
 
       expect(await promise).toBe('success')
       expect(transport.send).toHaveBeenCalledTimes(2)
-      expect(condition).toHaveBeenCalledWith(
+      expect(shouldRetry).toHaveBeenCalledWith(
         expect.objectContaining({ status: 400 }),
         expect.objectContaining({ context: {} }),
       )

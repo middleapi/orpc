@@ -21,7 +21,7 @@ export interface SmartCoercionHandlerPluginOptions extends JsonSchemaCoercerOpti
  * @see {@link https://orpc.dev/docs/plugins/smart-coercion | Smart Coercion Plugin}
  */
 export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~smart-coercion'
+  readonly name = '~smart-coercion'
 
   private readonly converter: DelegatingJsonSchemaConverter
   private readonly coercer: JsonSchemaCoercer

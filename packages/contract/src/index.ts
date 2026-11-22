@@ -47,9 +47,9 @@ export {
   minifyRouterContract,
 } from './router-utils'
 export type {
-  AugmentContractRouterOptions,
-  AugmentedContractRouter,
-  AugmentedContractRouterInternal,
+  AugmentRouterContractOptions,
+  AugmentedRouterContract,
+  AugmentedRouterContractInternal,
 } from './router-utils'
 export {
   /**

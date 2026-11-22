@@ -1,6 +1,6 @@
 import type { RequestLogger } from 'evlog'
 
-export const LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+export const EVLOG_LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_EVLOG_LOGGER_CONTEXT',
 )
 
@@ -9,8 +9,8 @@ export const LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
  *
  * @see {@link https://orpc.dev/docs/integrations/evlog#without-asynclocalstorage | Evlog Integration - Without AsyncLocalStorage}
  */
-export interface LoggerContext {
-  [LOGGER_CONTEXT_SYMBOL]?: RequestLogger | undefined
+export interface EvlogLoggerContext {
+  [EVLOG_LOGGER_CONTEXT_SYMBOL]?: RequestLogger | undefined
 }
 
 /**
@@ -18,6 +18,6 @@ export interface LoggerContext {
  *
  * @see {@link https://orpc.dev/docs/integrations/evlog#without-asynclocalstorage | Evlog Integration - Without AsyncLocalStorage}
  */
-export function getLogger(context: LoggerContext): RequestLogger | undefined {
-  return context[LOGGER_CONTEXT_SYMBOL]
+export function getEvlogLogger(context: EvlogLoggerContext): RequestLogger | undefined {
+  return context[EVLOG_LOGGER_CONTEXT_SYMBOL]
 }

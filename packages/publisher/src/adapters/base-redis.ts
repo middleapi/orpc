@@ -84,7 +84,7 @@ interface SerializedEvent {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export abstract class BaseRedisPublisher<T extends Record<string, object>> extends Publisher<T> {
-  protected readonly eventPrefix: string
+  protected readonly keyPrefix: string
   protected readonly serializer: Public<RPCJsonSerializer>
   protected readonly resumeEnabled: boolean
   protected readonly resumeTtl: number
@@ -92,14 +92,14 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   /**
    * Tests switch this to `=` for deterministic trimming.
    */
-  protected readonly xTrimExactness: '~' | '=' = '~'
+  private readonly xTrimExactness: '~' | '=' = '~'
 
   private readonly lastTrimTimes = new Map<string, number>()
 
   constructor({ prefix, serializer, resume, ...options }: BaseRedisPublisherOptions = {}) {
     super(options)
 
-    this.eventPrefix = prefix ?? ''
+    this.keyPrefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
     this.resumeEnabled = resume !== undefined && resume !== false
     this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
@@ -139,7 +139,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected abstract readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]>
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const channel = `${this.eventPrefix}${event}`
+    const channel = `${this.keyPrefix}${event}`
     const data = this.serializePayload(payload)
 
     if (!this.resumeEnabled) {
@@ -179,7 +179,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     listener: (payload: T[K]) => void,
     { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
   ): Promise<() => Promise<void>> {
-    const channel = `${this.eventPrefix}${event}`
+    const channel = `${this.keyPrefix}${event}`
 
     let pendingPayloads: T[K][] | undefined = []
     const resumedIds = new Set<string>()

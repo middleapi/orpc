@@ -1,6 +1,6 @@
 import type {
   AnyProcedureContract,
-  AugmentContractRouterOptions,
+  AugmentRouterContractOptions,
   ErrorMap,
   MergedErrorMap,
   RouterContract,
@@ -15,7 +15,7 @@ import { Lazy, unlazy } from './lazy'
 import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, ProcedureConfig, ProcedureDefinition } from './procedure'
 import { Procedure } from './procedure'
-import { createContractProcedure } from './procedure-utils'
+import { createContractedProcedure } from './procedure-utils'
 import type { AnyRouter } from './router'
 import { getHiddenRouterContract } from './router-hidden'
 
@@ -124,7 +124,7 @@ export type AugmentedRouterWithMiddlewaresInternal<
       }
 
 interface AugmentRouterOptions<TErrorMap extends ErrorMap>
-  extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
+  extends AugmentRouterContractOptions<TErrorMap>, ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 
@@ -261,7 +261,7 @@ export function augmentImplementedRouter<
  *
  * @throws {TypeError} If a contract-first procedure has no valid implementation.
  */
-export async function resolveContractProcedure(
+export async function resolveContractedProcedure(
   router: AnyRouter,
   contract: AnyProcedureContract,
   path: readonly string[],
@@ -279,7 +279,7 @@ export async function resolveContractProcedure(
     )
   }
 
-  return createContractProcedure(maybeProcedure, contract)
+  return createContractedProcedure(maybeProcedure, contract)
 }
 
 export function getRouter<T extends Lazyable<AnyRouter | undefined>>(

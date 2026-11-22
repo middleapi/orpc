@@ -52,7 +52,7 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
   private readonly timeout: TimeoutHandlerPluginOptions<T>['timeout']
   private readonly streamingTimeout: TimeoutHandlerPluginOptions<T>['streamingTimeout']
 
-  name = '~timeout'
+  readonly name = '~timeout'
 
   constructor(options: NoInfer<TimeoutHandlerPluginOptions<T>>) {
     this.timeout = options.timeout

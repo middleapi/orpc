@@ -140,7 +140,7 @@ export class OpenAPIReferenceHandlerPlugin<
   T extends Context,
   TProvider extends OpenAPIReferenceHandlerPluginProvider,
 > implements StandardHandlerPlugin<T> {
-  name = '~openapi-reference'
+  readonly name = '~openapi-reference'
 
   private readonly spec: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['spec']
   private readonly allow: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['allow']

@@ -82,14 +82,13 @@ export interface CORSHandlerPluginOptions<T extends Context> {
 export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   private readonly options: CORSHandlerPluginOptions<T>
 
-  name = '~cors'
+  readonly name = '~cors'
 
   /**
-   * - Do not create spans for CORS preflight requests.
-   * - Run CORS interceptors before batch interceptors so headers are applied to
-   *  the actual response rather than sub-responses.
+   * Wraps tracing and batch: no spans for preflight requests,
+   * and headers go on the actual response, not sub-responses.
    */
-  after: string[] = ['~tracing', '~batch']
+  readonly after: readonly string[] = ['~tracing', '~batch']
 
   constructor(options: CORSHandlerPluginOptions<T> = {}) {
     const defaults: CORSHandlerPluginOptions<T> = {

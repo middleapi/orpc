@@ -35,11 +35,11 @@ export type WebSocketLike = Pick<
 
 export interface WebSocketLinkTransportAttemptInfo {
   /**
-   * Total number of connection attempts for this transport's lifetime.
+   * Total number of connection attempts for this transport's lifetime, this one included.
    * Starts at 1 on the first attempt, increments on every subsequent
    * attempt, and never resets.
    */
-  totalAttempt: number
+  totalAttempts: number
 
   /**
    * Attempt number within the current (re)connect cycle.
@@ -65,22 +65,23 @@ export interface WebSocketLinkTransportReconnectOptions {
 
   /**
    * Maximum number of consecutive failed attempts before giving up.
+   * It counts every attempt of a (re)connect cycle, the first one included (see `attempt`),
+   * so it should be at least 1.
    * When reached, calls waiting for the connection fail, and the next
    * call starts a new reconnect cycle.
-   * Should greater than 1
    *
    * @default Infinity
    */
-  maxAttempt?: number | undefined
+  maxAttempts?: number | undefined
 
   /**
    * Maximum number of connection attempts over the transport's lifetime,
-   * successful ones included (see `totalAttempt`).
+   * successful ones included (see `totalAttempts`).
    * When reached, calls that need a new connection fail instead of connecting.
    *
    * @default Infinity
    */
-  maxTotalAttempt?: number | undefined
+  maxTotalAttempts?: number | undefined
 
   /**
    * Whether to proactively reconnect right after the socket closes,
@@ -165,8 +166,8 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
     this.reconnectEnabled = options.reconnect !== undefined && options.reconnect !== false
     this.reconnectDelay = reconnect.delay ?? ((info) => (info.attempt === 1 ? 0 : 2_000))
-    this.reconnectMaxAttempt = reconnect.maxAttempt ?? Infinity
-    this.reconnectMaxTotalAttempt = reconnect.maxTotalAttempt ?? Infinity
+    this.reconnectMaxAttempt = reconnect.maxAttempts ?? Infinity
+    this.reconnectMaxTotalAttempt = reconnect.maxTotalAttempts ?? Infinity
     this.reconnectOnCloseEnabled =
       this.reconnectEnabled && reconnect.onClose !== undefined && reconnect.onClose !== false
     this.reconnectOnCloseDelay = onClose.delay ?? 0
@@ -227,7 +228,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       this.attempt += 1
 
       const info: WebSocketLinkTransportAttemptInfo = {
-        totalAttempt: this.totalAttempt,
+        totalAttempts: this.totalAttempt,
         attempt: this.attempt,
       }
 

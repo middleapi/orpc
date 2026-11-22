@@ -99,6 +99,29 @@ describe('lock', () => {
     expect(handler).not.toHaveBeenCalled()
   })
 
+  it('throws the custom error when the lock cannot be acquired in time', async () => {
+    const error = new LockTimeoutError('key')
+    const locker: Locker = { lock: vi.fn().mockRejectedValue(error) }
+    const custom = new ORPCError('LOCKED', { data: { key: 'key' } })
+    const createError = vi.fn(() => custom)
+    const procedure = os
+      .input(type<any>())
+      .use(lock({ locker, key: 'key', error: createError }))
+      .handler(() => 'ok')
+
+    await expect(
+      call(procedure, '__input__', { context: { __context__: true }, path: ['__path__'] }),
+    ).rejects.toBe(custom)
+    expect(createError).toHaveBeenCalledExactlyOnceWith(
+      error,
+      expect.objectContaining({ path: ['__path__'], context: { __context__: true } }),
+      '__input__',
+    )
+
+    const direct = os.use(lock({ locker, key: 'key', error: custom })).handler(() => 'ok')
+    await expect(call(direct, undefined, { context: {} })).rejects.toBe(custom)
+  })
+
   it('passes through other acquisition errors', async () => {
     const error = new Error('connection lost')
     const locker: Locker = { lock: vi.fn().mockRejectedValue(error) }

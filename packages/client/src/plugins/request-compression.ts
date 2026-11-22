@@ -59,12 +59,12 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
 export class RequestCompressionLinkPlugin<
   T extends ClientContext,
 > implements StandardLinkPlugin<T> {
-  name = '~request-compression'
+  readonly name = '~request-compression'
 
   /**
-   * Compression should be done after batching, to compress the final request
+   * Runs inside batch: compresses the final batch request.
    */
-  after: string[] = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   private readonly encoding: Exclude<RequestCompressionLinkPluginOptions<T>['encoding'], undefined>
   private readonly threshold: Exclude<

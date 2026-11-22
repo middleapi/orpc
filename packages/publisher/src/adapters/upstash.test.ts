@@ -394,8 +394,8 @@ describe.concurrent(
       expect(received.date).toEqual(new Date('2024-01-01'))
       expect(received.person).toEqual(new Person('John Doe', new Date('2023-01-01')))
 
-      const keys = await redis.keys(`${(publisher as any).eventPrefix}*`)
-      expect(keys).toContain(`${(publisher as any).eventPrefix}${event}`)
+      const keys = await redis.keys(`${(publisher as any).keyPrefix}*`)
+      expect(keys).toContain(`${(publisher as any).keyPrefix}${event}`)
 
       await unsub1()
     })
@@ -517,7 +517,7 @@ describe.concurrent(
       const onError = vi.fn()
 
       const unsubscribe = await publisher.subscribe(event, listener, { onError })
-      const channel = `${(publisher as any).eventPrefix}${event}`
+      const channel = `${(publisher as any).keyPrefix}${event}`
       const subscription = (publisher as any).subscriptionMap.get(channel)
 
       if (!subscription) {

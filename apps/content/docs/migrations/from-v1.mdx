@@ -726,6 +726,8 @@ wss.on('connection', (ws) => {
 
 </CodeGroup>
 
+`handler.message()` now resolves to `{ matched: boolean }`, which is `false` when the message is not an oRPC client message. See [Handling Messages Manually](/docs/adapters/websocket#handling-messages-manually).
+
 ## Server Plugins
 
 Handler plugins were renamed with a `HandlerPlugin` suffix. Deprecated aliases exist unless noted:
@@ -978,6 +980,26 @@ const retryPlugin = new RetryLinkPlugin({
   default: { shouldRetry: true },
 })
 ```
+
+### Retry After Plugin
+
+The `condition` option of [`RetryAfterLinkPlugin`](/docs/plugins/retry-after) was renamed to `shouldRetry`, matching the Retry Plugin:
+
+<CodeGroup>
+
+```ts v2
+const retryAfterPlugin = new RetryAfterLinkPlugin({
+  shouldRetry: (response) => response.status === 429,
+})
+```
+
+```ts v1
+const retryAfterPlugin = new RetryAfterPlugin({
+  condition: (response) => response.status === 429,
+})
+```
+
+</CodeGroup>
 
 ## Contract-First
 
@@ -1267,7 +1289,7 @@ The `@orpc/server/hibernation` subpath became the `@orpc/hibernation` package. `
 
 ### Logging and tracing
 
-`@orpc/experimental-pino` is now `@orpc/pino`, with `LoggingHandlerPlugin` renamed to `PinoHandlerPlugin` (see [Pino Integration](/docs/integrations/pino)). `@orpc/otel` is now `@orpc/opentelemetry`, and context propagation works out of the box (see [OpenTelemetry Integration](/docs/integrations/opentelemetry)).
+`@orpc/experimental-pino` is now `@orpc/pino`, with `LoggingHandlerPlugin` renamed to `PinoHandlerPlugin`, `getLogger` to `getPinoLogger`, `LoggerContext` to `PinoLoggerContext`, and `CONTEXT_LOGGER_SYMBOL` to `PINO_LOGGER_CONTEXT_SYMBOL` (see [Pino Integration](/docs/integrations/pino)). `@orpc/otel` is now `@orpc/opentelemetry`, and context propagation works out of the box (see [OpenTelemetry Integration](/docs/integrations/opentelemetry)).
 
 ## Helpers
 

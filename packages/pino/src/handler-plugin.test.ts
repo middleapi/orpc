@@ -4,7 +4,7 @@ import { AbortError, TimeoutError } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+import { getPinoLogger, PINO_LOGGER_CONTEXT_SYMBOL } from './context'
 import { PinoHandlerPlugin } from './handler-plugin'
 
 const globalSpies = {
@@ -357,7 +357,7 @@ describe('pinoHandlerPlugin', () => {
     const handler = new StandardHandler(
       createCodec(
         os.handler(({ context }) => {
-          capturedBindings = getLogger(context)?.bindings()
+          capturedBindings = getPinoLogger(context)?.bindings()
           return 'pong'
         }),
       ) as any,
@@ -559,7 +559,7 @@ describe('pinoHandlerPlugin', () => {
 
       await handler.handle(createRequest('GET', '/ping'), {
         prefix: undefined,
-        context: { [LOGGER_CONTEXT_SYMBOL]: loggerWithReq },
+        context: { [PINO_LOGGER_CONTEXT_SYMBOL]: loggerWithReq },
       })
 
       const setBindingsCalls = globalSpies.setBindings.mock.calls

@@ -205,6 +205,37 @@ describe('RouterImplementer', () => {
       >()
     })
 
+    it('outline middleware', () => {
+      const middleware = {} as Middleware<
+        { auth: boolean; g?: boolean },
+        { more: string },
+        unknown,
+        any,
+        InferRouterContractErrorMap<TContract>
+      >
+
+      expectTypeOf(implementer.middleware(middleware)).toEqualTypeOf<
+        DecoratedMiddleware<
+          MergedInitialContext<{ auth: boolean }, object, { auth: boolean; g?: boolean }>,
+          { more: string },
+          unknown,
+          any,
+          object
+        >
+      >()
+
+      implementer.middleware(
+        // @ts-expect-error - TInContext is not satisfy expected
+        {} as Middleware<
+          { something: string },
+          object,
+          unknown,
+          any,
+          InferRouterContractErrorMap<TContract>
+        >,
+      )
+    })
+
     it('with TOutContext', () => {
       expectTypeOf(
         implementer.middleware(({ next }) => next({ context: { more: 'yes' } })),
@@ -800,6 +831,41 @@ describe('RouterImplementerWithMiddlewares', () => {
       expectTypeOf(mid).toEqualTypeOf<
         DecoratedMiddleware<{ auth: boolean }, { extra: boolean }, unknown, any, object>
       >()
+    })
+
+    it('outline middleware', () => {
+      const middleware = {} as Middleware<
+        { auth: boolean; extra: boolean; g?: boolean },
+        { more: string },
+        unknown,
+        any,
+        InferRouterContractErrorMap<TContract>
+      >
+
+      expectTypeOf(implementer.middleware(middleware)).toEqualTypeOf<
+        DecoratedMiddleware<
+          MergedInitialContext<
+            { auth: boolean },
+            { extra: boolean },
+            { auth: boolean; extra: boolean; g?: boolean }
+          >,
+          MergedContext<{ extra: boolean }, { more: string }>,
+          unknown,
+          any,
+          object
+        >
+      >()
+
+      implementer.middleware(
+        // @ts-expect-error - TInContext is not satisfy expected
+        {} as Middleware<
+          { something: string },
+          object,
+          unknown,
+          any,
+          InferRouterContractErrorMap<TContract>
+        >,
+      )
     })
 
     it('with TOutContext', () => {

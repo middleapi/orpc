@@ -220,12 +220,12 @@ export function MyComponent() {
 ```tsx useOptimisticServerFunction
 'use client'
 
-import { useOptimisticServerAction } from '@orpc/next/hooks'
+import { useOptimisticServerFunction } from '@orpc/next/hooks'
 import { getIssueMessage, onSuccessDeferred, parseFormData } from '@orpc/next'
 
 export function MyComponent() {
   const [todos, setTodos] = useState<Todo[]>([])
-  const { execute, optimisticState } = useOptimisticServerAction(someAction, {
+  const { execute, optimisticState, error } = useOptimisticServerFunction(someAction, {
     optimisticPassthrough: todos,
     optimisticReducer: (currentState, newTodo) => [...currentState, newTodo],
     interceptors: [

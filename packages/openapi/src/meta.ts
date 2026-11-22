@@ -19,7 +19,7 @@ export interface OpenAPIMeta {
    * and `{+param}` to allow slashes in the matched value.
    *
    * @example `/users`, `/users/{id}`, `/files/{+path}`
-   * @default Router segments joined by `'/`
+   * @default Router segments joined by `/`
    */
   path?: `/${string}` | undefined
 
@@ -127,18 +127,18 @@ export interface OpenAPIMeta {
    *
    * Each key maps a query parameter name to one of the following strategies:
    *
-   * | Strategy                 | Encoded                   | Decoded                        | OpenAPI Parameter Style            |
-   * |--------------------------|---------------------------|--------------------------------|------------------------------------|
-   * | `primitive`              | `?a=1&a=2`                | `{ a: '2' }`                   | `form` / `explode: false`          |
-   * | `array`                  | `?a=1&a=2`                | `{ a: ['1', '2'] }`            | `form` / `explode: true`           |
-   * | `comma-delimited-array`  | `?a=1,2,3`                | `{ a: ['1', '2', '3'] }`       | `form` / `explode: false`          |
-   * | `comma-delimited-object` | `?a=A,1,B,2`              | `{ a: { A: '1', B: '2' } }`    | `form` / `explode: false`          |
-   * | `space-delimited-array`  | `?a=1 2 3`                | `{ a: ['1', '2', '3'] }`       | `spaceDelimited` / `explode: false`|
-   * | `space-delimited-object` | `?a=A 1 B 2`              | `{ a: { A: '1', B: '2' } }`    | `spaceDelimited` / `explode: false`|
-   * | `pipe-delimited-array`   | `?a=1\|2\|3`              | `{ a: ['1', '2', '3'] }`       | `pipeDelimited` / `explode: false` |
-   * | `pipe-delimited-object`  | `?a=A\|1\|B\|2`           | `{ a: { A: '1', B: '2' } }`    | `pipeDelimited` / `explode: false` |
-   * | `json`                   | `?meta={"key":"value"}`   | `{ meta: { key: 'value' } }`   | `content: application/json`        |
-   * | _default_              | `?a[]=1&a[]=2&b=3&c[d]=4` | `{a:['1', '2'], b:3, c:{d:4}}` | `deepObject` / `explode: true`     |
+   * | Strategy                 | Encoded                   | Decoded                                    | OpenAPI Parameter Style                  |
+   * |--------------------------|---------------------------|--------------------------------------------|------------------------------------------|
+   * | `primitive`              | `?a=1&a=2`                | `{ a: '2' }`                               | `form` / `explode: true`                 |
+   * | `array`                  | `?a=1&a=2`                | `{ a: ['1', '2'] }`                        | `form` / `explode: true`                 |
+   * | `comma-delimited-array`  | `?a=1,2,3`                | `{ a: ['1', '2', '3'] }`                   | `form` / `explode: false`                |
+   * | `comma-delimited-object` | `?a=A,1,B,2`              | `{ a: { A: '1', B: '2' } }`                | `form` / `explode: false`                |
+   * | `space-delimited-array`  | `?a=1 2 3`                | `{ a: ['1', '2', '3'] }`                   | `spaceDelimited` / `explode: false`      |
+   * | `space-delimited-object` | `?a=A 1 B 2`              | `{ a: { A: '1', B: '2' } }`                | `spaceDelimited` / `explode: false`      |
+   * | `pipe-delimited-array`   | `?a=1\|2\|3`              | `{ a: ['1', '2', '3'] }`                   | `pipeDelimited` / `explode: false`       |
+   * | `pipe-delimited-object`  | `?a=A\|1\|B\|2`           | `{ a: { A: '1', B: '2' } }`                | `pipeDelimited` / `explode: false`       |
+   * | `json`                   | `?meta={"key":"value"}`   | `{ meta: { key: 'value' } }`               | `content: application/json`              |
+   * | _default_                | `?a[]=1&a[]=2&b=3&c[d]=4` | `{ a: ['1', '2'], b: '3', c: { d: '4' } }` | `form` or `deepObject` / `explode: true` |
    *
    * **Strategy details:**
    *
@@ -147,7 +147,7 @@ export interface OpenAPIMeta {
    * - **`*-delimited-array`**: Splits the last value on the delimiter (`,`, space, or `|`) into an array.
    * - **`*-delimited-object`**: Splits the last value on the delimiter into alternating key–value pairs.
    * - **`json`**: Parses the last value as JSON; falls back to the raw string if parsing fails.
-   * - **`undefined`**: Standard bracket-notation decoding This is the default.
+   * - **`undefined`**: Standard bracket-notation decoding. This is the default.
    *
    * **Note**: With `array` and `*-delimited-*`, a missing parameter is decoded as `[]` or `{}`. With the others, it is decoded as `undefined`.
    *
@@ -156,7 +156,7 @@ export interface OpenAPIMeta {
    * @example
    * ```ts
    * // GET /search?keyword=abc&tags=a,b,c&meta={"key":"value"}
-   * const queryParsing = {
+   * const queryStyles = {
    *   keyword: 'primitive',
    *   tags: 'comma-delimited-array',
    *   meta: 'json',
@@ -368,9 +368,9 @@ export interface OpenAPIPrefixMetaPlugin<
 export interface OpenAPIFunction {
   (meta: OpenAPIMeta): OpenAPIMetaPlugin<any, any, any>
   method(method: OpenAPIMeta['method']): OpenAPIMethodMetaPlugin<any, any, any>
-  path(method: OpenAPIMeta['path']): OpenAPIPathMetaPlugin<any, any, any>
-  spec(method: OpenAPIMeta['spec']): OpenAPISpecMetaPlugin<any, any, any>
-  prefix(method: OpenAPIMeta['prefix']): OpenAPIPrefixMetaPlugin<any, any, any>
+  path(path: OpenAPIMeta['path']): OpenAPIPathMetaPlugin<any, any, any>
+  spec(spec: OpenAPIMeta['spec']): OpenAPISpecMetaPlugin<any, any, any>
+  prefix(prefix: OpenAPIMeta['prefix']): OpenAPIPrefixMetaPlugin<any, any, any>
 }
 
 /**

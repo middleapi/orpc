@@ -28,7 +28,7 @@ export type {
 export * from './router-client'
 export {
   getRouter,
-  resolveContractProcedure,
+  resolveContractedProcedure,
   unlazyRouter,
   walkProcedureContractsAsync,
   walkProcedureContractsSync,

@@ -47,14 +47,14 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
   ) {
     super(options)
 
-    const keyPrefix = redis.options?.keyPrefix
+    const clientKeyPrefix = redis.options?.keyPrefix
 
-    if (keyPrefix !== undefined && typeof keyPrefix !== 'string') {
+    if (clientKeyPrefix !== undefined && typeof clientKeyPrefix !== 'string') {
       throw new TypeError('RedisPublisher only supports a string keyPrefix on the Redis client.')
     }
 
     this.subscriber = options.subscriber ?? redis.duplicate()
-    this.channelPrefix = keyPrefix ?? ''
+    this.channelPrefix = clientKeyPrefix ?? ''
 
     if (!subscriberOnErrors.has(this.subscriber)) {
       const onErrors: Array<(error: ThrowableError) => void> = []
@@ -78,7 +78,7 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     return new RedisPublisher(this.redis, {
       ...this.options,
       subscriber: this.subscriber,
-      prefix: `${this.eventPrefix}${prefix}`,
+      prefix: `${this.keyPrefix}${prefix}`,
     })
   }
 

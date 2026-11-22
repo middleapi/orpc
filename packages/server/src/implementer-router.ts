@@ -75,8 +75,8 @@ export class SharedRouterImplementer<
   middleware<
     $OutContext extends IntersectPick<TInitialContext, $OutContext>,
     $Input,
-    $InContext extends Context = TInitialContext,
     $Output = any, // $Output = any by default is important to make middleware can be used in any output by default
+    $InContext extends Context = TInitialContext,
   >(
     middleware: Middleware<
       $InContext | TInitialContext,
@@ -157,8 +157,8 @@ export interface SharedRouterImplementerWithMiddlewares<
       $OutContext
     >,
     $Input,
-    $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
     $Output = any, // $Output = any by default is important to make middleware can be used in any output by default
+    $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
   >(
     middleware: Middleware<
       $InContext | MergedContext<TInitialContext, TInjectedContext>,

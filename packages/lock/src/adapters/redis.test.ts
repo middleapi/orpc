@@ -221,6 +221,14 @@ describe.concurrent(
   },
 )
 
+it('does not prefix keys by default', async () => {
+  const redis = { isOpen: true, set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 1) }
+  const locker = new RedisLocker(redis as any, { ttl: 1000 })
+
+  await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
+  expect(redis.set).toHaveBeenCalledWith('key', expect.any(String), expect.anything())
+})
+
 it('preserves the callback outcome when the release fails', async () => {
   const redis = {
     isOpen: true,

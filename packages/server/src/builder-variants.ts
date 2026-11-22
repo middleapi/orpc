@@ -94,8 +94,8 @@ export interface BuilderWithMiddlewares<
       $OutContext
     >,
     $Input,
+    $Output = any, // $Output = any by default is important to make middleware can be used in any output by default
     $InContext extends Context = MergedContext<TInitialContext, TInjectedContext>,
-    $Output = any, // $Output = any by default is important to make middleware can be used in any output by default,
   >(
     middleware: Middleware<
       $InContext | MergedContext<TInitialContext, TInjectedContext>,

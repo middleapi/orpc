@@ -35,7 +35,7 @@ export interface RethrowHandlerPluginOptions<T extends Context> {
  * @see {@link https://orpc.dev/docs/plugins/rethrow | Rethrow Handler Plugin}
  */
 export class RethrowHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~rethrow'
+  readonly name = '~rethrow'
 
   private readonly filter: RethrowHandlerPluginOptions<T>['filter']
   private readonly CONTEXT_SYMBOL = Symbol('ORPC_RETHROW_HANDLER_PLUGIN_CONTEXT')
