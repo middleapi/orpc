@@ -28,7 +28,8 @@ export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkP
   readonly name = '~timeout'
 
   /**
-   * Wraps retry: the timeout applies to the total retry time, not each attempt.
+   * Wraps retry: one timeout applies until the call returns, not to each attempt.
+   * It does not cover retries while an async iterator is consumed.
    */
   readonly after: readonly string[] = ['~retry']
 
