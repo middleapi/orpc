@@ -27,3 +27,15 @@ const decryptedData = await decrypt(encryptedData, secret)
 :::info
 The `decrypt` helper accepts `undefined` or `null` as encrypted value and returns `undefined` for invalid inputs, enabling seamless handling of optional data.
 :::
+
+## Format
+
+```txt
+base64url(salt || iv || ciphertext || tag)
+```
+
+AES-256-GCM with a PBKDF2-HMAC-SHA256 key (60,000 iterations).
+
+:::info
+Use a long random secret rather than a password.
+:::
