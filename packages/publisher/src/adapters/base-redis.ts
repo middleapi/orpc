@@ -29,7 +29,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    * The prefix to use for Redis keys and Pub/Sub channels.
    * Set it to isolate events when several apps share one Redis instance.
    *
-   * @default 'orpc:publisher:'
+   * @default ''
    */
   prefix?: string | undefined
 
@@ -101,7 +101,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   constructor({ prefix, serializer, resume, ...options }: BaseRedisPublisherOptions = {}) {
     super(options)
 
-    this.keyPrefix = prefix ?? 'orpc:publisher:'
+    this.keyPrefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
     this.resumeEnabled = resume !== undefined && resume !== false
     this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000

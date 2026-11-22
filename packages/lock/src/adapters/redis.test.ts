@@ -221,12 +221,12 @@ describe.concurrent(
   },
 )
 
-it('prefixes keys with orpc:lock: by default', async () => {
+it('does not prefix keys by default', async () => {
   const redis = { isOpen: true, set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 1) }
   const locker = new RedisLocker(redis as any, { ttl: 1000 })
 
   await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
-  expect(redis.set).toHaveBeenCalledWith('orpc:lock:key', expect.any(String), expect.anything())
+  expect(redis.set).toHaveBeenCalledWith('key', expect.any(String), expect.anything())
 })
 
 it('preserves the callback outcome when the release fails', async () => {

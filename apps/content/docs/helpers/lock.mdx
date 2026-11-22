@@ -172,9 +172,9 @@ const locker = new RedisLocker(client, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:lock:'
+   * @default ''
    */
-  prefix: 'orpc:lock:',
+  prefix: '',
 
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
@@ -200,7 +200,6 @@ const locker = new RedisLocker(client, {
 })
 
 // Creates a locker with an extra prefix that shares this client, e.g. per tenant
-// Its keys start with `orpc:lock:tenant:123:`
 const tenantLocker = locker.prefix('tenant:123:')
 ```
 
@@ -218,9 +217,9 @@ const locker = new UpstashLocker(redis, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:lock:'
+   * @default ''
    */
-  prefix: 'orpc:lock:',
+  prefix: '',
 
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
@@ -246,7 +245,6 @@ const locker = new UpstashLocker(redis, {
 })
 
 // Creates a locker with an extra prefix that shares this client, e.g. per tenant
-// Its keys start with `orpc:lock:tenant:123:`
 const tenantLocker = locker.prefix('tenant:123:')
 ```
 
@@ -262,9 +260,9 @@ const locker = new BunRedisLocker(redis, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:lock:'
+   * @default ''
    */
-  prefix: 'orpc:lock:',
+  prefix: '',
 
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
@@ -290,7 +288,6 @@ const locker = new BunRedisLocker(redis, {
 })
 
 // Creates a locker with an extra prefix that shares this client, e.g. per tenant
-// Its keys start with `orpc:lock:tenant:123:`
 const tenantLocker = locker.prefix('tenant:123:')
 ```
 
