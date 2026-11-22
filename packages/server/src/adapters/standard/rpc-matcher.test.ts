@@ -172,9 +172,9 @@ describe('standardRPCMatcher', () => {
   it('lazy router inside lazy router with concurrent requests', async () => {
     const base = os.$context<any>()
 
-    let resolveNested!: (value: { default: any }) => void
+    const resolvers: ((value: { default: any }) => void)[] = []
     const nestedLoader = vi.fn(() => new Promise<{ default: any }>((resolve) => {
-      resolveNested = resolve
+      resolvers.push(resolve)
     }))
     const pingLoader = vi.fn(() => Promise.resolve({ default: ping }))
 
@@ -183,20 +183,22 @@ describe('standardRPCMatcher', () => {
       pong,
       nested: base.lazy(nestedLoader),
     }))
+    const initSpy = vi.spyOn(rpcMatcher, 'init')
 
     const match1 = rpcMatcher.match('POST', '/nested/ping')
     const match2 = rpcMatcher.match('POST', '/nested/ping')
     // non-matching request should not wait for or drop pending lazy routers
     const match3 = rpcMatcher.match('POST', '/pong')
 
-    expect(nestedLoader).toHaveBeenCalledTimes(1)
+    // each request loads on its own
+    expect(nestedLoader).toHaveBeenCalledTimes(2)
 
     expect(await match3).toEqual({
       path: ['pong'],
       procedure: pong,
     })
 
-    resolveNested({ default: { ping: base.lazy(pingLoader) } })
+    resolvers.forEach(resolve => resolve({ default: { ping: base.lazy(pingLoader) } }))
 
     expect(await match1).toEqual({
       path: ['nested', 'ping'],
@@ -208,17 +210,49 @@ describe('standardRPCMatcher', () => {
       procedure: ping,
     })
 
-    expect(nestedLoader).toHaveBeenCalledTimes(1)
-    expect(pingLoader).toHaveBeenCalledTimes(1)
+    // but each lazy router is indexed once
+    expect(initSpy.mock.calls.map(([, path]) => path)).toEqual([['nested'], ['nested', 'ping']])
 
     // subsequent requests still work without reloading
+    const nestedCalls = nestedLoader.mock.calls.length
+    const pingCalls = pingLoader.mock.calls.length
+
     expect(await rpcMatcher.match('POST', '/nested/ping')).toEqual({
       path: ['nested', 'ping'],
       procedure: ping,
     })
 
-    expect(nestedLoader).toHaveBeenCalledTimes(1)
-    expect(pingLoader).toHaveBeenCalledTimes(1)
+    expect(nestedLoader).toHaveBeenCalledTimes(nestedCalls)
+    expect(pingLoader).toHaveBeenCalledTimes(pingCalls)
+    expect(initSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('a lazy router load that never settles does not block other requests', async () => {
+    const base = os.$context<any>()
+
+    const nestedLoader = vi.fn()
+      // e.g. on Cloudflare Workers, the request that started this load has ended
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValue({ default: { ping } })
+
+    const rpcMatcher = new StandardRPCMatcher()
+    rpcMatcher.init(base.router({
+      nested: base.lazy(nestedLoader),
+    }))
+
+    void rpcMatcher.match('POST', '/nested/ping')
+
+    expect(await rpcMatcher.match('POST', '/nested/ping')).toEqual({
+      path: ['nested', 'ping'],
+      procedure: ping,
+    })
+
+    expect(await rpcMatcher.match('POST', '/nested/ping')).toEqual({
+      path: ['nested', 'ping'],
+      procedure: ping,
+    })
+
+    expect(nestedLoader).toHaveBeenCalledTimes(2)
   })
 
   it('multiple lazy routers with lazy router inside lazy router', async () => {
@@ -254,6 +288,8 @@ describe('standardRPCMatcher', () => {
       planets: base.lazy(planetsLoader),
       unused: base.lazy(unusedLoader),
     }))
+    const initSpy = vi.spyOn(rpcMatcher, 'init')
+    const indexedPaths = () => initSpy.mock.calls.map(([, path]) => path!.join('.')).sort()
 
     // concurrent requests across different lazy branches
     const [match1, match2, match3] = await Promise.all([
@@ -277,25 +313,25 @@ describe('standardRPCMatcher', () => {
       procedure: pong,
     })
 
-    expect(usersLoader).toHaveBeenCalledTimes(1)
-    expect(userFindLoader).toHaveBeenCalledTimes(1)
-    expect(planetsLoader).toHaveBeenCalledTimes(1)
-    expect(planetNestedLoader).toHaveBeenCalledTimes(1)
-    expect(planetDeepLoader).toHaveBeenCalledTimes(1)
+    // each matched lazy router is indexed once
+    expect(indexedPaths()).toEqual(['planets', 'planets.nested', 'planets.nested.deep', 'users', 'users.find'])
 
     // routers not matched by any request stay lazy
     expect(userListLoader).toHaveBeenCalledTimes(0)
     expect(unusedLoader).toHaveBeenCalledTimes(0)
 
     // remaining pending routers still resolvable afterwards
+    const usersCalls = usersLoader.mock.calls.length
+
     expect(await rpcMatcher.match('POST', '/users/list')).toEqual({
       path: ['users', 'list'],
       procedure: pong,
     })
 
-    expect(usersLoader).toHaveBeenCalledTimes(1)
+    expect(usersLoader).toHaveBeenCalledTimes(usersCalls)
     expect(userListLoader).toHaveBeenCalledTimes(1)
     expect(unusedLoader).toHaveBeenCalledTimes(0)
+    expect(indexedPaths()).toEqual(['planets', 'planets.nested', 'planets.nested.deep', 'users', 'users.find', 'users.list'])
   })
 
   it('lazy router can retry after loader failure', async () => {

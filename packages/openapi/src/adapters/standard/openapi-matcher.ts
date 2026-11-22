@@ -32,7 +32,6 @@ export class StandardOpenAPIMatcher implements StandardMatcher {
   private readonly pendingRouters: (LazyTraverseContractProceduresOptions & {
     httpPathPrefix: HTTPPath
     laziedPrefix: string | undefined
-    initPromise?: Promise<void>
   }) [] = []
 
   constructor(options: StandardOpenAPIMatcherOptions = {}) {
@@ -92,19 +91,15 @@ export class StandardOpenAPIMatcher implements StandardMatcher {
       }
 
       /**
-       * Memoize the init work and only remove the pending router after it finishes,
-       * so concurrent requests share a single init instead of re-initializing
-       * the same router or dropping pending routers pushed by each other.
+       * Don't share the load across requests: on Cloudflare Workers a promise can't settle
+       * once the request that created it ends. The first load to finish indexes the router.
        */
-      pendingRouter.initPromise ??= unlazy(pendingRouter.router).then(({ default: router }) => {
+      const { default: router } = await unlazy(pendingRouter.router)
+
+      if (this.pendingRouters.includes(pendingRouter)) {
         this.init(router, pendingRouter.path)
         this.pendingRouters.splice(this.pendingRouters.indexOf(pendingRouter), 1)
-      }).catch((error) => {
-        pendingRouter.initPromise = undefined // allow retrying on failure
-        throw error
-      })
-
-      await pendingRouter.initPromise
+      }
     }
 
     const match = findRoute(this.tree, method, pathname)
