@@ -19,7 +19,7 @@ export interface BaseRedisRateLimiterOptions {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:ratelimit:'
+   * @default ''
    */
   prefix?: string | undefined
 
@@ -61,7 +61,7 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   protected readonly timeout: number
 
   constructor(options: BaseRedisRateLimiterOptions) {
-    this.keyPrefix = options.prefix ?? 'orpc:ratelimit:'
+    this.keyPrefix = options.prefix ?? ''
     this.maxRequests = options.maxRequests
     this.window = options.window
     this.timeout = options.timeout ?? 0

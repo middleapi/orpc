@@ -45,17 +45,13 @@ describe('baseRedisRateLimiter', () => {
     })
   })
 
-  it("defaults the key prefix to 'orpc:ratelimit:'", async () => {
+  it('uses an empty prefix when none is provided', async () => {
     const limiter = new TestingRateLimiter({ maxRequests: 5, window: 1000 })
     limiter.evalScript.mockResolvedValueOnce([1, 1, 1000])
 
     await limiter.limit('key')
 
-    expect(limiter.evalScript).toHaveBeenCalledWith(
-      expect.any(String),
-      ['orpc:ratelimit:key'],
-      expect.any(Array),
-    )
+    expect(limiter.evalScript).toHaveBeenCalledWith(expect.any(String), ['key'], expect.any(Array))
   })
 
   it('retries after the window resets when a timeout is set', async () => {

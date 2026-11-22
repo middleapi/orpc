@@ -220,9 +220,9 @@ const limiter = new RedisRateLimiter(client, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:ratelimit:'
+   * @default ''
    */
-  prefix: 'orpc:ratelimit:',
+  prefix: '',
 
   /**
    * Maximum number of requests allowed within the window.
@@ -261,9 +261,9 @@ const limiter = new UpstashRateLimiter(redis, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:ratelimit:'
+   * @default ''
    */
-  prefix: 'orpc:ratelimit:',
+  prefix: '',
 
   /**
    * Maximum number of requests allowed within the window.
@@ -300,9 +300,9 @@ const limiter = new BunRedisRateLimiter(redis, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:ratelimit:'
+   * @default ''
    */
-  prefix: 'orpc:ratelimit:',
+  prefix: '',
 
   /**
    * Maximum number of requests allowed within the window.

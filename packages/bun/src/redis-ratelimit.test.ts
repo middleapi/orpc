@@ -136,7 +136,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
   )
 
   it(
-    'uses the default prefix when none is provided',
+    'uses an empty prefix when none is provided',
     async () => {
       const limiter = await createTestingRateLimiter({
         prefix: undefined,

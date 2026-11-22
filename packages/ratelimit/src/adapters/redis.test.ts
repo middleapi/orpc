@@ -121,7 +121,7 @@ describe.concurrent(
       expect(Math.abs(denied.reset - first.reset)).toBeLessThanOrEqual(tolerance)
     })
 
-    it('uses the default prefix when none is provided', async () => {
+    it('uses an empty prefix when none is provided', async () => {
       const limiter = await createTestingRateLimiter({
         prefix: undefined,
         maxRequests: 3,
