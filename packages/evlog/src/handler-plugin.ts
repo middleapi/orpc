@@ -28,9 +28,9 @@ import type {
 } from 'evlog/toolkit'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
 
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+import { getEvlogLogger, EVLOG_LOGGER_CONTEXT_SYMBOL } from './context'
 
-export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlogOptions {
+export interface EvlogHandlerPluginOptions extends BaseEvlogOptions {
   /**
    * AsyncLocalStorage instance backing `useLogger()`.
    */
@@ -72,9 +72,9 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
    */
   before: string[] = ['~tracing', '~batch', '~hibernation']
 
-  private readonly logAbort: Exclude<EvlogHandlerPluginOptions<T>['logAbort'], undefined>
+  private readonly logAbort: Exclude<EvlogHandlerPluginOptions['logAbort'], undefined>
   private readonly procedureErrorLevel: Exclude<
-    EvlogHandlerPluginOptions<T>['procedureErrorLevel'],
+    EvlogHandlerPluginOptions['procedureErrorLevel'],
     undefined
   >
   private readonly integration: FrameworkIntegrationHelpers<{ request: StandardRequest }>
@@ -85,7 +85,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
     logAbort,
     procedureErrorLevel,
     ...evlogOptions
-  }: EvlogHandlerPluginOptions<T> = {}) {
+  }: EvlogHandlerPluginOptions = {}) {
     this.evlogOptions = evlogOptions
     this.logAbort = logAbort ?? false
     this.procedureErrorLevel = procedureErrorLevel ?? ((_, level) => level)
@@ -128,7 +128,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
             ...interceptorOptions,
             context: {
               ...interceptorOptions.context,
-              [LOGGER_CONTEXT_SYMBOL]: logger,
+              [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger,
             },
           }),
         )
@@ -201,7 +201,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
 
     const interceptor: StandardHandlerInterceptor<T> = async ({ next, context, path, request }) => {
-      const logger = getLogger(context)
+      const logger = getEvlogLogger(context)
       logger?.set({ rpc: { system: ORPC_NAME, method: path.join('.') } })
 
       if (this.logAbort) {
@@ -242,7 +242,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
       next,
       context,
     }) => {
-      const logger = getLogger(context)
+      const logger = getEvlogLogger(context)
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {
@@ -284,7 +284,7 @@ function toErrorOrString(error: unknown) {
 function logProcedureError(
   logger: RequestLogger | undefined,
   error: unknown,
-  procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<any>['procedureErrorLevel'], undefined>,
+  procedureErrorLevel: Exclude<EvlogHandlerPluginOptions['procedureErrorLevel'], undefined>,
 ) {
   if (!logger) {
     return

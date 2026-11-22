@@ -6,7 +6,7 @@ import type { Logger } from 'pino'
  *
  * @see {@link https://orpc.dev/docs/integrations/pino#providing-custom-logger-per-request | Pino Integration - Providing Custom Logger per Request}
  */
-export const LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+export const PINO_LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_PINO_LOGGER_CONTEXT',
 )
 
@@ -15,8 +15,8 @@ export const LOGGER_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
  *
  * @see {@link https://orpc.dev/docs/integrations/pino#using-the-logger-in-your-code | Pino Integration - Using the Logger in Your Code}
  */
-export interface LoggerContext {
-  [LOGGER_CONTEXT_SYMBOL]?: Logger | undefined
+export interface PinoLoggerContext {
+  [PINO_LOGGER_CONTEXT_SYMBOL]?: Logger | undefined
 }
 
 /**
@@ -24,6 +24,6 @@ export interface LoggerContext {
  *
  * @see {@link https://orpc.dev/docs/integrations/pino#using-the-logger-in-your-code | Pino Integration - Using the Logger in Your Code}
  */
-export function getLogger(context: LoggerContext): Logger | undefined {
-  return context[LOGGER_CONTEXT_SYMBOL]
+export function getPinoLogger(context: PinoLoggerContext): Logger | undefined {
+  return context[PINO_LOGGER_CONTEXT_SYMBOL]
 }

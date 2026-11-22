@@ -101,12 +101,12 @@ const handler = new RPCHandler(router, {
 If you do not want to use AsyncLocalStorage, or your runtime does not support it, you can still read the logger from the context.
 
 ```ts
-import { getLogger, LoggerContext } from '@orpc/evlog'
+import { getEvlogLogger, EvlogLoggerContext } from '@orpc/evlog'
 
-interface ServerContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends EvlogLoggerContext {} // [!code highlight]
 
 const procedure = os.$context<ServerContext>().handler(({ context }) => {
-  const logger = getLogger(context) // [!code highlight]
+  const logger = getEvlogLogger(context) // [!code highlight]
 
   logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
 
