@@ -93,6 +93,24 @@ describe('ratelimitHandlerPlugin', () => {
     }
   })
 
+  it('omits ratelimit-reset and retry-after when the limiter reports no reset', async () => {
+    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
+      context[RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL].checks.push({
+        path,
+        procedure,
+        result: { success: false },
+      })
+
+      throw new ORPCError('TOO_MANY_REQUESTS')
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost:3000'))
+
+    expect(response!.status).toBe(429)
+    expect(response!.headers.get('ratelimit-reset')).toBe(null)
+    expect(response!.headers.get('retry-after')).toBe(null)
+  })
+
   it('skips rate limit headers when no limit check ran for the request', async () => {
     const { response } = await handler.handle(new Request('http://localhost:3000'))
 
