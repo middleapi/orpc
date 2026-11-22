@@ -330,7 +330,7 @@ A connection proves healthy once it receives a message from the server or stays 
 
 ### Connection Errors
 
-When the socket closes, pending calls reject with a `ConnectionClosedError`, and so do new calls when the socket is closed and reconnecting is disabled or gave up. It is distinct from the `AbortError` of a cancelled call, so you can branch on it or retry it with the [Retry Plugin](/docs/plugins/retry):
+When the connection closes, pending calls reject with a `ConnectionClosedError`, as do new calls when it cannot be reopened:
 
 ```ts
 import { ConnectionClosedError } from '@orpc/client'
@@ -339,7 +339,7 @@ try {
   await client.planet.list()
 } catch (error) {
   if (error instanceof ConnectionClosedError) {
-    // the connection closed, was lost, or could not be reopened
+    // connection closed or lost
   }
 }
 ```

@@ -102,7 +102,7 @@ Return `null` or `undefined` to disable the timeout, which is useful for excludi
 
 ## Handling Timeouts
 
-Both plugins abort with a `TimeoutError`, named like the one `AbortSignal.timeout()` uses, so a timeout is distinguishable from a cancellation, which stays an `AbortError`. On the client it is what the call rejects with, on the server it is the `signal.reason`:
+Both plugins abort with a `TimeoutError`, so a timeout is distinguishable from a cancellation (`AbortError`):
 
 ```ts
 import { TimeoutError } from '@orpc/client' // or '@orpc/server'
@@ -117,11 +117,7 @@ try {
 ```
 
 :::tip
-Check `error.name === 'TimeoutError'` instead to also match timeouts from your own `AbortSignal.timeout()` signals.
-:::
-
-:::info
-A timeout is a failure, not a cancellation: [OpenTelemetry](/docs/integrations/opentelemetry) spans record it as an error, and the [Pino](/docs/integrations/pino) and [Evlog](/docs/integrations/evlog) integrations log it at `error` level rather than `info`.
+Check `error.name === 'TimeoutError'` to also match `AbortSignal.timeout()`.
 :::
 
 ## Learn More
