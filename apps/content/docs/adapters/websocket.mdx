@@ -239,6 +239,8 @@ const app = App()
 `handler.message()` resolves to `{ matched: boolean }`. It is `false` when the message is not an oRPC client message, so you can share one connection with your own messages:
 
 ```ts
+ws.binaryType = 'arraybuffer' // `message()` does not load Blob data
+
 ws.addEventListener('message', async (event) => {
   const { matched } = await handler.message(ws, event.data)
 
