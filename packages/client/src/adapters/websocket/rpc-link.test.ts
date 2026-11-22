@@ -403,6 +403,31 @@ describe('rpcLink', () => {
     expect(connect).toHaveBeenCalledTimes(1)
   })
 
+  it('gives up when the socket is closing without a close reason and no attempts are left', async () => {
+    const ws = createWs()
+    const connect = vi.fn(() => ws)
+    const orpc = createORPCClient(
+      new RPCLink({
+        connect,
+        reconnect: { delay: () => 0, maxAttempts: 1 },
+      }),
+    ) as any
+
+    orpc.ping('first').catch(() => {})
+    await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
+
+    ws.readyState = WEBSOCKET_CLOSING
+
+    const error = await orpc.ping('second').catch((error: unknown) => error)
+
+    expect(error).toBeInstanceOf(ConnectionClosedError)
+    expect(error).toMatchObject({
+      message: 'WebSocket reconnect failed after 1 attempt(s)',
+      cause: new ConnectionClosedError('WebSocket is already closing or closed'),
+    })
+    expect(connect).toHaveBeenCalledTimes(1)
+  })
+
   it('fails every call waiting on a reconnect cycle that gives up', async () => {
     const connect = vi.fn(() => Promise.reject(new Error('temporary outage')))
     const orpc = createORPCClient(
