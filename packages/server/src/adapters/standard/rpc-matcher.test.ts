@@ -169,17 +169,14 @@ describe('rpcMatcher', () => {
     expect(loader).toHaveBeenCalledTimes(3)
   })
 
-  it('resolves a deep lazy chain for concurrent matches without losing or reloading routers', async () => {
+  it('resolves a deep lazy chain for concurrent matches without losing or re-indexing routers', async () => {
     const leaf = os.handler(() => 'ok')
-    const loads: Record<string, number> = {}
 
     /** `l1` -> `l2` -> `l3`, each lazy, each also exposing a `leaf` procedure beside the next level */
     function lazyLevel(depth: number): Lazy<any> {
       return new Lazy({
         meta: {},
         loader: async () => {
-          loads[`l${depth}`] = (loads[`l${depth}`] ?? 0) + 1
-
           // settle after a different number of microtask turns per level, so they interleave
           for (let i = 0; i < 5 - depth; i++) {
             await Promise.resolve()
@@ -193,6 +190,7 @@ describe('rpcMatcher', () => {
     }
 
     const matcher = new RPCMatcher({ l1: lazyLevel(1) })
+    const indexSpy = vi.spyOn(matcher as any, 'index')
 
     const paths = ['/l1/leaf', '/l1/l2/leaf', '/l1/l2/l3/leaf'] as const
     const results = await Promise.all(
@@ -211,12 +209,60 @@ describe('rpcMatcher', () => {
       'l1/l2/l3/leaf',
     ])
 
-    // every level is loaded exactly once even though six matches raced for it
-    expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+    // every level is indexed exactly once even though six matches raced to load it
+    const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
+    expect(indexed()).toEqual(['l1', 'l1/l2', 'l1/l2/l3'])
 
-    // and the deepest route stays matchable afterwards
+    // and the deepest route stays matchable afterwards without indexing again
     await expect(matcher.match('POST', '/l1/l2/l3/leaf', undefined)).resolves.toBeDefined()
-    expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+    expect(indexed()).toEqual(['l1', 'l1/l2', 'l1/l2/l3'])
+  })
+
+  it('does not tie a match to the lazy router load of another match', async () => {
+    const ping = os.handler(() => 'pong')
+    let calls = 0
+    // the first load never settles, like one created by a Cloudflare Workers request that has ended
+    const loader = vi.fn(() =>
+      ++calls === 1 ? new Promise<never>(() => {}) : Promise.resolve({ default: { ping } }),
+    )
+    const matcher = new RPCMatcher({ runs: new Lazy({ loader, meta: {} }) })
+    const indexSpy = vi.spyOn(matcher as any, 'index')
+
+    void matcher.match('POST', '/runs/ping', undefined)
+    const result = await matcher.match('POST', '/runs/ping', undefined)
+
+    expect(result?.path).toEqual(['runs', 'ping'])
+    expect(result?.procedure).toBe(ping)
+    expect(loader).toHaveBeenCalledTimes(2)
+
+    // later matches reuse the indexed router instead of loading again
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toBeDefined()
+    expect(loader).toHaveBeenCalledTimes(2)
+    expect(indexSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('indexes a lazy router once when a slower concurrent load settles later', async () => {
+    const first = os.handler(() => 'first')
+    const second = os.handler(() => 'second')
+    let resolveFirst!: (value: { default: any }) => void
+    const loader = vi
+      .fn()
+      .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+      .mockResolvedValueOnce({ default: { ping: second } })
+    const matcher = new RPCMatcher({ runs: new Lazy({ loader, meta: {} }) })
+
+    const slow = matcher.match('POST', '/runs/ping', undefined)
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toMatchObject({
+      procedure: second,
+    })
+
+    resolveFirst({ default: { ping: first } })
+
+    // the slower load is dropped, so both matches use the router indexed first
+    await expect(slow).resolves.toMatchObject({ procedure: second })
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toMatchObject({
+      procedure: second,
+    })
   })
 
   it('looks up lazy prefixes no deeper than the deepest pending lazy router', async () => {

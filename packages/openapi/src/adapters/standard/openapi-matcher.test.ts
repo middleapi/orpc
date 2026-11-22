@@ -747,12 +747,10 @@ describe('openAPIMatcher', () => {
       expect(projectLoader).toHaveBeenCalledTimes(1)
     })
 
-    it('resolves a deep lazy chain for concurrent matches without losing or reloading routers', async () => {
+    it('resolves a deep lazy chain for concurrent matches without losing or re-indexing routers', async () => {
       const leaf1 = os.meta(openapi({ method: 'GET', path: '/leaf1' })).handler(() => '1')
       const leaf2 = os.meta(openapi({ method: 'GET', path: '/leaf2' })).handler(() => '2')
       const leaf3 = os.meta(openapi({ method: 'GET', path: '/leaf3' })).handler(() => '3')
-
-      const loads = { l1: 0, l2: 0, l3: 0 }
 
       /** settle after N microtask turns so the three levels interleave */
       const settle = async (turns: number) => {
@@ -762,24 +760,22 @@ describe('openAPIMatcher', () => {
       }
 
       const l3 = os.meta(openapi({ prefix: '/p3' })).lazy(async () => {
-        loads.l3++
         await settle(2)
         return { default: { leaf3 } }
       })
 
       const l2 = os.meta(openapi({ prefix: '/p2' })).lazy(async () => {
-        loads.l2++
         await settle(3)
         return { default: { leaf2, l3 } }
       })
 
       const matcher = new OpenAPIMatcher({
         lazy: os.lazy(async () => {
-          loads.l1++
           await settle(4)
           return { default: { leaf1, l2 } }
         }),
       })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
 
       const paths = ['/leaf1', '/p2/leaf2', '/p2/p3/leaf3'] as const
       const results = await Promise.all(
@@ -798,12 +794,61 @@ describe('openAPIMatcher', () => {
         'lazy/l2/l3/leaf3',
       ])
 
-      // every level is loaded exactly once even though six matches raced for it
-      expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+      // every level is indexed exactly once even though six matches raced to load it
+      const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
+      expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
 
-      // and the deepest route stays matchable afterwards
+      // and the deepest route stays matchable afterwards without indexing again
       await expect(matcher.match('GET', '/p2/p3/leaf3', undefined)).resolves.toBeDefined()
-      expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+      expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
+    })
+
+    it('does not tie a match to the lazy router load of another match', async () => {
+      const ping = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'pong')
+      let calls = 0
+      // the first load never settles, like one created by a Cloudflare Workers request that has ended
+      const loader = vi.fn(() =>
+        ++calls === 1 ? new Promise<never>(() => {}) : Promise.resolve({ default: { ping } }),
+      )
+      const matcher = new OpenAPIMatcher({ runs: os.lazy(loader) })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
+
+      void matcher.match('GET', '/ping', undefined)
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toEqual({
+        path: ['runs', 'ping'],
+        procedure: ping,
+        params: undefined,
+      })
+      expect(loader).toHaveBeenCalledTimes(2)
+
+      // later matches reuse the indexed router instead of loading again
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toBeDefined()
+      expect(loader).toHaveBeenCalledTimes(2)
+      expect(indexSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('indexes a lazy router once when a slower concurrent load settles later', async () => {
+      const first = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'first')
+      const second = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'second')
+      let resolveFirst!: (value: { default: any }) => void
+      const loader = vi
+        .fn()
+        .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+        .mockResolvedValueOnce({ default: { ping: second } })
+      const matcher = new OpenAPIMatcher({ runs: os.lazy(loader) })
+
+      const slow = matcher.match('GET', '/ping', undefined)
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
+        procedure: second,
+      })
+
+      resolveFirst({ default: { ping: first } })
+
+      // the slower load is dropped, so both matches use the router indexed first
+      await expect(slow).resolves.toMatchObject({ procedure: second })
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
+        procedure: second,
+      })
     })
   })
 

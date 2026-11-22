@@ -330,7 +330,7 @@ export class McpRegistrar<T extends AnyRouter> {
  * Lazy routers and contract-first implementations are loaded on first use and reused afterward.
  */
 class McpMatcher {
-  private routes: Promise<Map<`/${string}`, McpRoute>> | undefined
+  private routes: Map<`/${string}`, McpRoute> | undefined
 
   constructor(
     private readonly router: AnyRouter,
@@ -338,12 +338,19 @@ class McpMatcher {
     private readonly filter: McpRegistrarOptions<any>['filter'],
   ) {}
 
-  resolveRoutes(): Promise<Map<`/${string}`, McpRoute>> {
-    return (this.routes ??= this.loadRoutes().catch((error) => {
-      // retry on the next call, such as when a lazy router failed to load
-      this.routes = undefined
-      throw error
-    }))
+  /**
+   * Each call loads on its own until one succeeds, instead of sharing an in-flight promise:
+   * on Cloudflare Workers, a promise can never settle once the request that created it ends.
+   */
+  async resolveRoutes(): Promise<Map<`/${string}`, McpRoute>> {
+    if (this.routes !== undefined) {
+      return this.routes
+    }
+
+    const routes = await this.loadRoutes()
+
+    // the first load to finish wins, so every caller gets the same routes
+    return (this.routes ??= routes)
   }
 
   async match(pathname: `/${string}`): Promise<McpRoute | undefined> {

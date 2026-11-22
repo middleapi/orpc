@@ -60,11 +60,6 @@ interface TreeEntry {
   procedure?: AnyProcedure | undefined
 }
 
-interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
-  /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
-  loading?: Promise<void> | undefined
-}
-
 export class RPCMatcher {
   private readonly filter: Exclude<RPCMatcherOptions['filter'], undefined>
   private readonly allowMethodsSet: undefined | ReadonlySet<StandardMethod>
@@ -74,7 +69,7 @@ export class RPCMatcher {
   private readonly rootRouter: AnyRouter
 
   private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
-  private readonly pendingLazyRouters: Map<string, PendingLazyRouter> = new Map()
+  private readonly pendingLazyRouters: Map<string, WalkProcedureContractsLazyResult> = new Map()
   /** segment count of the deepest pending key, never lowered so it stays an upper bound */
   private maxPendingLazyRouterDepth = 0
 
@@ -194,7 +189,7 @@ export class RPCMatcher {
       const pending = this.pendingLazyRouters.get(httpPathPrefix)
 
       if (pending !== undefined) {
-        return this.loadPendingLazyRouter(httpPathPrefix, pending).then(() =>
+        return this.indexPendingLazyRouter(httpPathPrefix, pending).then(() =>
           this.resolvePendingLazyRouters(pathname),
         )
       }
@@ -203,27 +198,23 @@ export class RPCMatcher {
     }
   }
 
-  private loadPendingLazyRouter(httpPathPrefix: string, pending: PendingLazyRouter): Promise<void> {
-    if (pending.loading === undefined) {
-      pending.loading = this.indexPendingLazyRouter(httpPathPrefix, pending).catch((error) => {
-        pending.loading = undefined
-        throw error
-      })
-    }
-
-    return pending.loading
-  }
-
+  /**
+   * Each match loads on its own instead of sharing an in-flight promise:
+   * on Cloudflare Workers, a promise can never settle once the request that created it ends.
+   */
   private async indexPendingLazyRouter(
     httpPathPrefix: string,
-    pending: PendingLazyRouter,
+    pending: WalkProcedureContractsLazyResult,
   ): Promise<void> {
     const { default: router } = await unlazy(pending.router)
 
-    this.index(router, pending.path)
+    // a concurrent match may have indexed it already, and indexing twice would revive
+    // nested lazy routers that were already resolved
+    if (this.pendingLazyRouters.get(httpPathPrefix) !== pending) {
+      return
+    }
 
-    // removed only once indexed, so a concurrent match never observes this router as
-    // neither pending nor indexed
+    this.index(router, pending.path)
     this.pendingLazyRouters.delete(httpPathPrefix)
   }
 
