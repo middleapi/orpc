@@ -82,7 +82,7 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
   /**
    * The error to throw when the lock cannot be acquired before the timeout elapses.
    *
-   * @default ORPCError('CONFLICT') with the `LockTimeoutError` as cause
+   * @default ORPCError('CONFLICT')
    */
   error?:
     | Value<
@@ -98,8 +98,8 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
 
 /**
  * Creates a middleware that runs oRPC procedures under a lock, so that calls
- * sharing the same key never run concurrently. Rejects with a `CONFLICT` error,
- * or the one from `error`, when the lock cannot be acquired before the timeout elapses.
+ * sharing the same key never run concurrently. Rejects with a `CONFLICT` error
+ * when the lock cannot be acquired before the timeout elapses.
  *
  * @remarks
  * **Warning**: Not supported for streaming responses, such as an event iterator (e.g. an

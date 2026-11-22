@@ -90,9 +90,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected readonly resumeTtl: number
 
   /**
-   * Approximate trimming is cheaper. Not part of the extension surface.
-   *
-   * @internal tests switch this to `=` for deterministic trimming.
+   * Tests switch this to `=` for deterministic trimming.
    */
   private readonly xTrimExactness: '~' | '=' = '~'
 

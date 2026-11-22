@@ -48,8 +48,8 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 
 ### Options
 
-- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Defaults to the `ttl` of the adapter, which every adapter requires.
-- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses. Defaults to the `timeout` of the adapter.
+- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Defaults to the adapter's `ttl`.
+- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses. Defaults to the adapter's `timeout`.
 - `signal`: stops waiting early and rejects with the abort reason. Has no effect once the lock is acquired.
 
 ```ts
@@ -60,13 +60,13 @@ await locker.lock('report:123', () => generateReport('123'), {
 })
 ```
 
-:::info[Why `ttl` is required]
-Every adapter requires a `ttl` and none provides a default, because the right value depends on how long your work takes. Too short and the lock expires while the work is still running, letting another holder in. Too long and a crashed or stuck holder blocks its key for that long. The memory adapter requires it as well, so replacing it with a distributed adapter never changes how stuck holders are handled.
+:::info
+Every adapter requires a `ttl`, since the right value depends on how long your work takes.
 :::
 
 ## Lock Middleware
 
-The `lock` helper creates middleware that runs [procedures](/docs/procedure) under a lock, so that calls sharing the same key never run concurrently. When the lock cannot be acquired before the timeout elapses, the procedure rejects with a `CONFLICT` error, or with a custom error of your choice. The request `signal` is forwarded, so a call stops waiting as soon as the client disconnects.
+The `lock` helper creates middleware that runs [procedures](/docs/procedure) under a lock, so that calls sharing the same key never run concurrently. When the lock cannot be acquired before the timeout elapses, the procedure rejects with a `CONFLICT` error. The request `signal` is forwarded, so a call stops waiting as soon as the client disconnects.
 
 ```ts
 import { lock, Locker } from '@orpc/experimental-lock'
@@ -108,7 +108,7 @@ const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
 
 :::tip[Custom Error]
-By default the middleware throws `CONFLICT` with the `LockTimeoutError` as its `cause`. Use `error` to throw your own, which is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+Use `error` to throw your own error instead of `CONFLICT`.
 
 ```ts
 lock({

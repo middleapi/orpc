@@ -20,7 +20,6 @@ return 0
 export interface BaseRedisLockerOptions {
   /**
    * The prefix to use for Redis keys.
-   * Set it to isolate locks when several apps share one Redis instance.
    *
    * @default ''
    */

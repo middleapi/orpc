@@ -9,9 +9,6 @@ export interface MemoryLockerOptions {
    * How long a lock is held before it expires automatically, in milliseconds.
    * Guards against holders that never release the lock.
    * Can be overridden per call.
-   *
-   * Required, like in every other adapter, so swapping adapters never changes
-   * whether a stuck holder can block a key forever.
    */
   ttl: number
 

@@ -70,7 +70,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
   /**
    * Subscribes to a specific event using a callback function.
-   * Resolves with an unsubscribe function to remove the listener, once the subscription is established.
+   * Resolves with an unsubscribe function to remove the listener.
    *
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
@@ -83,7 +83,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
   /**
    * Subscribes to a specific event using a callback function.
-   * Resolves with an unsubscribe function to remove the listener, once the subscription is established.
+   * Resolves with an unsubscribe function to remove the listener.
    *
    * @example
    * ```ts
