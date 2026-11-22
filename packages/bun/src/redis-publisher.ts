@@ -51,7 +51,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
   prefix(prefix: string): BunRedisPublisher<T> {
     const publisher = new BunRedisPublisher<T>(this.redis, {
       ...this.options,
-      prefix: `${this.eventPrefix}${prefix}`,
+      prefix: `${this.keyPrefix}${prefix}`,
     })
 
     // Share the lazily created subscriber, which reports its errors to `onErrors` of this publisher.

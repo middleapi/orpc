@@ -34,7 +34,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
   prefix(prefix: string): UpstashPublisher<T> {
     return new UpstashPublisher(this.redis, {
       ...this.options,
-      prefix: `${this.eventPrefix}${prefix}`,
+      prefix: `${this.keyPrefix}${prefix}`,
     })
   }
 

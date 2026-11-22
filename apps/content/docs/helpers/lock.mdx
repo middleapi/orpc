@@ -30,7 +30,7 @@ import { MemoryLocker } from '@orpc/experimental-lock/memory'
 declare function generateReport(id: string): Promise<{ url: string }>
 declare const cache: { get: (key: string) => Promise<{ url: string } | undefined> }
 // ---cut---
-const locker = new MemoryLocker()
+const locker = new MemoryLocker({ ttl: 30_000 })
 
 const report = await locker.lock('report:123', async ({ waited }) => {
   if (waited) {
@@ -48,8 +48,8 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 
 ### Options
 
-- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Each adapter has its own default.
-- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses.
+- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Defaults to the adapter's `ttl`.
+- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses. Defaults to the adapter's `timeout`.
 - `signal`: stops waiting early and rejects with the abort reason. Has no effect once the lock is acquired.
 
 ```ts
@@ -59,6 +59,10 @@ await locker.lock('report:123', () => generateReport('123'), {
   signal: request.signal,
 })
 ```
+
+:::info
+Every adapter requires a `ttl`, since the right value depends on how long your work takes.
+:::
 
 ## Lock Middleware
 
@@ -98,10 +102,23 @@ const procedure = os
     return await generateReport(input.id)
   })
 
-const locker = new MemoryLocker()
+const locker = new MemoryLocker({ ttl: 30_000 })
 
 const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
+
+:::tip[Custom Error]
+Use `error` to throw your own error instead of `CONFLICT`. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response), and is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the procedure declares.
+
+```ts
+lock({
+  locker,
+  key,
+  error: (error) => new ORPCError('LOCKED', { data: { key: error.key } }),
+})
+```
+
+:::
 
 :::warning[Streaming Procedures]
 The lock middleware does not support streaming responses, such as procedures that return an [AsyncIteratorObject](/docs/async-iterator-object) (for example `async function*` handlers) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array). The lock is released once the handler returns the stream, so the work the stream does while it is consumed, such as the body of an `async function*` handler, runs without the lock. Streams sharing a key can then run concurrently. Nested calls made from inside the stream with the same context, `locker`, and `key` also skip locking through deduplication, even though no lock is held.
@@ -124,8 +141,6 @@ const locker = new MemoryLocker({
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
    * Can be overridden per call.
-   *
-   * @default undefined (held until released)
    */
   ttl: 30_000,
 

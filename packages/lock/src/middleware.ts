@@ -1,4 +1,4 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
+import type { AnyORPCError, Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import { toArray, value } from '@orpc/shared'
@@ -78,6 +78,22 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
    * @default true
    */
   dedupe?: boolean | undefined
+
+  /**
+   * The error to throw when the lock cannot be acquired before the timeout elapses.
+   *
+   * @default ORPCError('CONFLICT')
+   */
+  error?:
+    | Value<
+        AnyORPCError,
+        [
+          error: LockTimeoutError,
+          options: MiddlewareOptions<TInContext, unknown, {}>,
+          input: TInput,
+        ]
+      >
+    | undefined
 }
 
 /**
@@ -94,6 +110,7 @@ export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
  */
 export function lock<TInContext extends Context, TInput>({
   dedupe = true,
+  error: timeoutError = (error) => new ORPCError('CONFLICT', { cause: error }),
   ...options
 }: LockMiddlewareOptions<TInContext, TInput>): Middleware<
   TInContext,
@@ -145,7 +162,7 @@ export function lock<TInContext extends Context, TInput>({
       )
     } catch (error) {
       if (!acquired && error instanceof LockTimeoutError) {
-        throw new ORPCError('CONFLICT', { cause: error })
+        throw value(timeoutError, error, middlewareOptions, input)
       }
 
       throw error
