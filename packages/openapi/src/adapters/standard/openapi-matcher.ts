@@ -134,15 +134,11 @@ export class OpenAPIMatcher {
     }
   }
 
-  /**
-   * Each match loads on its own instead of sharing an in-flight promise:
-   * on Cloudflare Workers, a promise can never settle once the request that created it ends.
-   */
+  /** Not shared across matches: on Cloudflare Workers, a promise never settles once its request ends. */
   private async indexPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
     const { default: router } = await unlazy(pending.router)
 
-    // a concurrent match may have indexed it already, and indexing twice would add its
-    // routes twice and revive nested lazy routers that were already resolved
+    // already indexed by a concurrent match
     if (!this.pendingLazyRouters.has(pending)) {
       return
     }

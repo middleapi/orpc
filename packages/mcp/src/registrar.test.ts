@@ -9,6 +9,7 @@ import { openapi, OpenAPISerializer } from '@orpc/openapi'
 import { implement, os } from '@orpc/server'
 import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
+import { promiseWithResolvers } from '@orpc/shared'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { z } from 'zod'
 
@@ -1371,33 +1372,13 @@ describe('mcpRegistrar', () => {
       expect(loader).toHaveBeenCalledTimes(2)
     })
 
-    it('does not tie a registration to the router load of another registration', async () => {
-      const ping = os.handler(() => 'pong')
-      let calls = 0
-      // the first load never settles, like one created by a Cloudflare Workers request that has ended
-      const loader = vi.fn(() =>
-        ++calls === 1 ? new Promise<never>(() => {}) : Promise.resolve({ default: { ping } }),
-      )
-
-      const registrar = new McpRegistrar({ planet: os.lazy(loader) })
-
-      void registrar.register(createTestServer())
-      expect(Object.keys((await registrar.register(createTestServer())).tools)).toEqual([
-        'planet_ping',
-      ])
-
-      // later registrations reuse the loaded routes
-      await registrar.register(createTestServer())
-      expect(loader).toHaveBeenCalledTimes(2)
-    })
-
-    it('keeps the routes of the first load to finish when concurrent loads settle later', async () => {
+    it('resolves routes while another call is still loading, and drops the slower load', async () => {
       const first = os.handler(() => 'first')
       const second = os.handler(() => 'second')
-      let resolveFirst!: (value: { default: any }) => void
+      const firstLoad = promiseWithResolvers<{ default: any }>()
       const loader = vi
         .fn()
-        .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+        .mockReturnValueOnce(firstLoad.promise)
         .mockResolvedValueOnce({ default: { ping: second } })
 
       const registrar = new McpRegistrar({ planet: os.lazy(loader) })
@@ -1407,7 +1388,7 @@ describe('mcpRegistrar', () => {
       const routes = await matcher.resolveRoutes()
       expect(routes.get('/planet/ping').procedure['~orpc'].handler).toBe(second['~orpc'].handler)
 
-      resolveFirst({ default: { ping: first } })
+      firstLoad.resolve({ default: { ping: first } })
 
       await expect(slow).resolves.toBe(routes)
       await expect(matcher.resolveRoutes()).resolves.toBe(routes)

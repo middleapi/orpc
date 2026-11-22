@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract'
 import { call, implement, os } from '@orpc/server'
+import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
 
 import { getOpenAPIMeta, openapi } from '../../meta'
@@ -794,46 +795,20 @@ describe('openAPIMatcher', () => {
         'lazy/l2/l3/leaf3',
       ])
 
-      // every level is indexed exactly once even though six matches raced to load it
       const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
       expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
 
-      // and the deepest route stays matchable afterwards without indexing again
       await expect(matcher.match('GET', '/p2/p3/leaf3', undefined)).resolves.toBeDefined()
       expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
     })
 
-    it('does not tie a match to the lazy router load of another match', async () => {
-      const ping = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'pong')
-      let calls = 0
-      // the first load never settles, like one created by a Cloudflare Workers request that has ended
-      const loader = vi.fn(() =>
-        ++calls === 1 ? new Promise<never>(() => {}) : Promise.resolve({ default: { ping } }),
-      )
-      const matcher = new OpenAPIMatcher({ runs: os.lazy(loader) })
-      const indexSpy = vi.spyOn(matcher as any, 'index')
-
-      void matcher.match('GET', '/ping', undefined)
-      await expect(matcher.match('GET', '/ping', undefined)).resolves.toEqual({
-        path: ['runs', 'ping'],
-        procedure: ping,
-        params: undefined,
-      })
-      expect(loader).toHaveBeenCalledTimes(2)
-
-      // later matches reuse the indexed router instead of loading again
-      await expect(matcher.match('GET', '/ping', undefined)).resolves.toBeDefined()
-      expect(loader).toHaveBeenCalledTimes(2)
-      expect(indexSpy).toHaveBeenCalledTimes(1)
-    })
-
-    it('indexes a lazy router once when a slower concurrent load settles later', async () => {
+    it('matches while another match is still loading, and drops the slower load', async () => {
       const first = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'first')
       const second = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'second')
-      let resolveFirst!: (value: { default: any }) => void
+      const firstLoad = promiseWithResolvers<{ default: any }>()
       const loader = vi
         .fn()
-        .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+        .mockReturnValueOnce(firstLoad.promise)
         .mockResolvedValueOnce({ default: { ping: second } })
       const matcher = new OpenAPIMatcher({ runs: os.lazy(loader) })
 
@@ -842,9 +817,8 @@ describe('openAPIMatcher', () => {
         procedure: second,
       })
 
-      resolveFirst({ default: { ping: first } })
+      firstLoad.resolve({ default: { ping: first } })
 
-      // the slower load is dropped, so both matches use the router indexed first
       await expect(slow).resolves.toMatchObject({ procedure: second })
       await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
         procedure: second,

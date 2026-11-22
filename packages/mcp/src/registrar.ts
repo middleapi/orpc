@@ -338,10 +338,7 @@ class McpMatcher {
     private readonly filter: McpRegistrarOptions<any>['filter'],
   ) {}
 
-  /**
-   * Each call loads on its own until one succeeds, instead of sharing an in-flight promise:
-   * on Cloudflare Workers, a promise can never settle once the request that created it ends.
-   */
+  /** Not shared across calls: on Cloudflare Workers, a promise never settles once its request ends. */
   async resolveRoutes(): Promise<Map<`/${string}`, McpRoute>> {
     if (this.routes !== undefined) {
       return this.routes
@@ -349,12 +346,11 @@ class McpMatcher {
 
     const routes = await this.loadRoutes()
 
-    // the first load to finish wins, so every caller gets the same routes
     return (this.routes ??= routes)
   }
 
   async match(pathname: `/${string}`): Promise<McpRoute | undefined> {
-    return (await this.resolveRoutes()).get(pathname)
+    return (this.routes ?? (await this.resolveRoutes())).get(pathname)
   }
 
   private async loadRoutes(): Promise<Map<`/${string}`, McpRoute>> {
