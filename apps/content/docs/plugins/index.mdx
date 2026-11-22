@@ -68,7 +68,7 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
       ...options,
       routingInterceptors: [
         async ({ next, request }) => {
-          console.log(request.method, request.url.pathname)
+          console.log(request.method, request.url)
           return next()
         },
         ...(options.routingInterceptors ?? []),
@@ -99,7 +99,7 @@ What init order means for interceptors depends on where a plugin adds its own:
 - **Appends**: initialized later means it runs inside the earlier plugins.
 - A prepended interceptor always wraps an appended one, whatever the init order.
 
-Most built-in handler plugins prepend, so `after: ['~batch']` runs once per batch request and `before: ['~batch']` runs once per call in the batch.
+Most built-in handler plugins prepend a routing interceptor, so `after: ['~batch']` runs once per batch request and `before: ['~batch']` runs once per call in the batch. Regular `interceptors` always run once per call.
 
 ### Built-in Plugin Names
 
