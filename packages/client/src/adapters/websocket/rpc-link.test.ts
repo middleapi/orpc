@@ -160,7 +160,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(new RPCLink({ connect, connectOnInit: true })) as any
 
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(1))
-    expect(connect).toHaveBeenCalledWith({ totalAttempt: 1, attempt: 1 })
+    expect(connect).toHaveBeenCalledWith({ totalAttempts: 1, attempt: 1 })
 
     const promise = orpc.ping('input')
 
@@ -188,7 +188,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(new RPCLink({ connect, connectOnInit: true })) as any
 
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(1))
-    expect(connect).toHaveBeenCalledWith({ totalAttempt: 1, attempt: 1 })
+    expect(connect).toHaveBeenCalledWith({ totalAttempts: 1, attempt: 1 })
     expect(unhandledRejectionHandler).toHaveBeenCalledTimes(0) // no background error
   })
 
@@ -368,7 +368,7 @@ describe('rpcLink', () => {
     const promise = orpc.ping('input')
 
     await vi.waitFor(() => expect(openSocket.send).toHaveBeenCalledTimes(1))
-    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 2 })
     expect(closedSocket.send).toHaveBeenCalledTimes(0)
     expect(closedSocket.addEventListener).toHaveBeenCalledTimes(0)
 
@@ -386,7 +386,7 @@ describe('rpcLink', () => {
         connect,
         reconnect: {
           delay,
-          maxAttempt: 1,
+          maxAttempts: 1,
         },
       }),
     ) as any
@@ -394,7 +394,7 @@ describe('rpcLink', () => {
     await expect(orpc.ping('input')).rejects.toThrow(
       'WebSocket reconnect failed after 1 attempt(s)',
     )
-    expect(delay).toHaveBeenCalledWith({ totalAttempt: 1, attempt: 1 })
+    expect(delay).toHaveBeenCalledWith({ totalAttempts: 1, attempt: 1 })
     expect(connect).toHaveBeenCalledTimes(1)
   })
 
@@ -403,7 +403,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { delay: () => 0, maxAttempt: 3 },
+        reconnect: { delay: () => 0, maxAttempts: 3 },
       }),
     ) as any
 
@@ -441,7 +441,7 @@ describe('rpcLink', () => {
       const orpc = createORPCClient(
         new RPCLink({
           connect,
-          reconnect: { delay: () => 0, maxAttempt: 2 },
+          reconnect: { delay: () => 0, maxAttempts: 2 },
         }),
       ) as any
 
@@ -454,7 +454,7 @@ describe('rpcLink', () => {
       const secondCall = orpc.ping('second')
 
       await vi.waitFor(() => expect(recoveredSocket.send).toHaveBeenCalledTimes(1))
-      expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 1 })
+      expect(connect).toHaveBeenNthCalledWith(3, { totalAttempts: 3, attempt: 1 })
 
       const request = getSentRequest(recoveredSocket)
       await recoveredSocket.receive(
@@ -464,7 +464,7 @@ describe('rpcLink', () => {
     },
   )
 
-  it('stops connecting once maxTotalAttempt is reached, successful attempts included', async () => {
+  it('stops connecting once maxTotalAttempts is reached, successful attempts included', async () => {
     const firstSocket = createWs()
     const connect = vi
       .fn()
@@ -473,7 +473,7 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(
       new RPCLink({
         connect,
-        reconnect: { delay: () => 0, maxTotalAttempt: 3 },
+        reconnect: { delay: () => 0, maxTotalAttempts: 3 },
       }),
     ) as any
 
@@ -520,13 +520,13 @@ describe('rpcLink', () => {
     const promise = orpc.ping('input')
 
     await vi.advanceTimersByTimeAsync(0)
-    expect(connect).toHaveBeenNthCalledWith(1, { totalAttempt: 1, attempt: 1 })
+    expect(connect).toHaveBeenNthCalledWith(1, { totalAttempts: 1, attempt: 1 })
 
     await vi.advanceTimersByTimeAsync(1_999)
     expect(connect).toHaveBeenCalledTimes(1)
 
     await vi.advanceTimersByTimeAsync(1)
-    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 2 })
     expect(recoveredSocket.send).toHaveBeenCalledTimes(1)
 
     const request = getSentRequest(recoveredSocket)
@@ -565,8 +565,8 @@ describe('rpcLink', () => {
     const secondCall = orpc.ping('second')
 
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
-    expect(connect).toHaveBeenNthCalledWith(1, { totalAttempt: 1, attempt: 1 })
-    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+    expect(connect).toHaveBeenNthCalledWith(1, { totalAttempts: 1, attempt: 1 })
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 1 })
     await vi.waitFor(() => expect(secondSocket.send).toHaveBeenCalledTimes(1))
 
     const secondRequest = getSentRequest(secondSocket)
@@ -635,7 +635,7 @@ describe('rpcLink', () => {
       new RPCLink({
         connect,
         reconnect: {
-          maxAttempt: 1,
+          maxAttempts: 1,
           onClose: { delay: 0 },
         },
       }),
@@ -673,7 +673,7 @@ describe('rpcLink', () => {
       new RPCLink({
         connect,
         connectOnInit: true,
-        reconnect: { delay: () => 0, maxAttempt: 2, onClose: true },
+        reconnect: { delay: () => 0, maxAttempts: 2, onClose: true },
       }),
     )
 
@@ -685,8 +685,8 @@ describe('rpcLink', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect(connect).toHaveBeenCalledTimes(3)
-    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
-    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 2 })
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 1 })
+    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempts: 3, attempt: 2 })
   })
 
   it('treats a healthy socket that is still closing as healthy', async ({ onTestFinished }) => {
@@ -711,13 +711,13 @@ describe('rpcLink', () => {
 
     void orpc.ping('input').catch(() => {})
     await vi.advanceTimersByTimeAsync(0)
-    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 1 })
 
     // the late close event must not reset the new cycle
     await firstSocket.close()
     await secondSocket.close()
     await vi.advanceTimersByTimeAsync(2_000)
-    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 2 })
+    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempts: 3, attempt: 2 })
   })
 
   describe('connections that close right after opening', () => {
@@ -730,7 +730,7 @@ describe('rpcLink', () => {
     })
 
     const createRejectingConnect = () =>
-      vi.fn((_info: { totalAttempt: number; attempt: number }) => {
+      vi.fn((_info: { totalAttempts: number; attempt: number }) => {
         const ws = createWs()
         setTimeout(() => ws.close({ code: 4001, reason: 'unauthorized' }))
         return ws
@@ -743,25 +743,25 @@ describe('rpcLink', () => {
 
       await vi.advanceTimersByTimeAsync(1_000)
       expect(connect).toHaveBeenCalledTimes(1)
-      expect(connect).toHaveBeenNthCalledWith(1, { totalAttempt: 1, attempt: 1 })
+      expect(connect).toHaveBeenNthCalledWith(1, { totalAttempts: 1, attempt: 1 })
 
       await vi.advanceTimersByTimeAsync(2_000)
       expect(connect).toHaveBeenCalledTimes(2)
-      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 2 })
 
       await vi.advanceTimersByTimeAsync(2_000)
       expect(connect).toHaveBeenCalledTimes(3)
-      expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 3 })
+      expect(connect).toHaveBeenNthCalledWith(3, { totalAttempts: 3, attempt: 3 })
     })
 
-    it('count toward maxAttempt', async () => {
+    it('count toward maxAttempts', async () => {
       const connect = createRejectingConnect()
 
       createORPCClient(
         new RPCLink({
           connect,
           connectOnInit: true,
-          reconnect: { delay: () => 0, maxAttempt: 3, onClose: true },
+          reconnect: { delay: () => 0, maxAttempts: 3, onClose: true },
         }),
       )
 
@@ -772,7 +772,7 @@ describe('rpcLink', () => {
     it('fail every waiting call with the last close reason when giving up', async () => {
       const connect = createRejectingConnect()
       const orpc = createORPCClient(
-        new RPCLink({ connect, reconnect: { delay: () => 0, maxAttempt: 2 } }),
+        new RPCLink({ connect, reconnect: { delay: () => 0, maxAttempts: 2 } }),
       ) as any
 
       const call = async (input: string) => {
@@ -804,7 +804,7 @@ describe('rpcLink', () => {
       await vi.advanceTimersByTimeAsync(2_000)
 
       expect(connect).toHaveBeenCalledTimes(2)
-      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 2 })
     })
 
     it('reset the attempt once the server sends a message', async () => {
@@ -828,7 +828,7 @@ describe('rpcLink', () => {
       void orpc.ping('second').catch(() => {})
       await vi.advanceTimersByTimeAsync(0)
 
-      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
+      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempts: 2, attempt: 1 })
     })
   })
 

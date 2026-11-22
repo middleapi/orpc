@@ -40,7 +40,7 @@ const planets = await client.planet.list(
   { limit: 10 },
   {
     context: {
-      retry: 3, // Maximum retry attempts
+      retry: 3, // Retries after the first call, so up to 4 attempts in total
       retryDelay: 2000, // Delay between retries in ms
       shouldRetry: (options) => true, // Determines whether to retry based on the error
       onRetry: (options) => {
@@ -58,8 +58,8 @@ const planets = await client.planet.list(
 :::info
 The following context options control retry behavior:
 
-- **retry:** Maximum number of retry attempts before throwing an error _(default: `0`)_.
-- **retryDelay:** Delay between retry attempts _(default: `(o) => o.lastEventRetry ?? 2000`)_.
+- **retry:** Maximum number of retries after the first call before throwing an error. The first call is not counted, so `3` allows up to 4 attempts in total _(default: `0`)_.
+- **retryDelay:** Delay before each retry, in milliseconds _(default: `(o) => o.lastEventRetry ?? 2000`)_.
 - **shouldRetry:** Function that determines whether a retry should be attempted _(default: `(o) => isRetryableError(o.error)`, see [Client Error Responses](#client-error-responses))_.
 
 You can override the default retry behavior globally by passing `default` options when initializing the plugin:

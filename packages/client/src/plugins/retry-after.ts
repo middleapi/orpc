@@ -14,11 +14,11 @@ import type { ClientContext } from '../types'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   /**
-   * Override condition to determine whether to retry or not.
+   * Determine whether to retry a response.
    *
    * @default ((response) => response.status === 429 || response.status === 503)
    */
-  condition?:
+  shouldRetry?:
     | Value<
         boolean,
         [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
@@ -26,7 +26,8 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
     | undefined
 
   /**
-   * Maximum attempts before giving up retries.
+   * Maximum number of attempts in total, before returning the response as-is.
+   * The first request is counted: `3` allows up to 2 retries, and `1` disables retries.
    *
    * @default 3
    */
@@ -60,15 +61,15 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
  * @see {@link https://orpc.dev/docs/plugins/retry-after | Retry After Plugin}
  */
 export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  private readonly condition: Exclude<RetryAfterLinkPluginOptions<T>['condition'], undefined>
+  private readonly shouldRetry: Exclude<RetryAfterLinkPluginOptions<T>['shouldRetry'], undefined>
   private readonly maxAttempts: Exclude<RetryAfterLinkPluginOptions<T>['maxAttempts'], undefined>
   private readonly timeout: Exclude<RetryAfterLinkPluginOptions<T>['timeout'], undefined>
 
   name = '~retry-after'
 
   constructor(options: RetryAfterLinkPluginOptions<T> = {}) {
-    this.condition =
-      options.condition ??
+    this.shouldRetry =
+      options.shouldRetry ??
       ((response) =>
         response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS ||
         response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE)
@@ -97,7 +98,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
 
         const response = await interceptorOptions.next()
 
-        if (!value(this.condition, response, interceptorOptions)) {
+        if (!value(this.shouldRetry, response, interceptorOptions)) {
           return response
         }
 

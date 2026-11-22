@@ -20,12 +20,13 @@ export interface RetryLinkPluginAttemptOptions<
   lastEventRetry: number | undefined
 
   /**
-   * Current retry attempt number, starting at 1.
+   * Number of attempts made so far, the first call included.
+   * It is `1` when the first call has just failed, so it is also the number of the retry being decided.
    */
   attempt: number
 
   /**
-   * Error that triggered this retry attempt.
+   * Error from the latest attempt, the one this retry would follow.
    */
   error: unknown
 }
@@ -38,7 +39,8 @@ export interface RetryLinkPluginAttemptOptions<
  */
 export interface RetryLinkPluginContext {
   /**
-   * Maximum retry attempts before throwing.
+   * Maximum number of retries after the first call, before throwing.
+   * The first call is not counted: `3` allows up to 4 attempts in total, and `0` disables retries.
    * Use `Number.POSITIVE_INFINITY` for infinite retries (e.g. for AsyncIteratorObject).
    *
    * @default 0
@@ -140,13 +142,13 @@ export class RetryLinkPlugin<
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
-      const maxAttempts = await value(callOptions.context.retry ?? this.defaultRetry, callOptions)
+      const maxRetries = await value(callOptions.context.retry ?? this.defaultRetry, callOptions)
 
       const retryDelay = callOptions.context.retryDelay ?? this.defaultRetryDelay
       const shouldRetry = callOptions.context.shouldRetry ?? this.defaultShouldRetry
       const onRetry = callOptions.context.onRetry ?? this.defaultOnRetry
 
-      if (maxAttempts <= 0) {
+      if (maxRetries <= 0) {
         return next(callOptions)
       }
 
@@ -164,7 +166,7 @@ export class RetryLinkPlugin<
           let retryDelayMs = 0
 
           if (currentError) {
-            if (isIteratorAborted || attempt > maxAttempts) {
+            if (isIteratorAborted || attempt > maxRetries) {
               throw currentError.error
             }
 
