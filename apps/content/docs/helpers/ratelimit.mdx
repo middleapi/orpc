@@ -48,13 +48,6 @@ if (!result.success) {
 }
 ```
 
-### Algorithm
-
-The memory and Redis-based adapters use the same fixed-window algorithm:
-
-- Each key has its own window, starting at its first request.
-- Rejected requests do not consume quota.
-
 ### Blocking Mode
 
 Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request still fails right away when its window will not reset before the timeout elapses.
@@ -319,7 +312,7 @@ const tenantLimiter = limiter.prefix('tenant:123:')
 
 ### Cloudflare
 
-Uses the Workers Rate Limiting binding, so limits are configured in your Worker settings rather than in the adapter. The binding counts requests its own way, so the [algorithm](#algorithm) above does not apply.
+Uses the Workers Rate Limiting binding, so limits are configured in your Worker settings rather than in the adapter.
 
 ```ts
 import { CloudflareRateLimiter } from '@orpc/cloudflare'

@@ -1344,7 +1344,7 @@ const example = os
 
 Blocking mode is now a flat `timeout` option: replace `blockingUntilReady: { enabled: true, timeout }` with `timeout`.
 
-The memory and Redis-based adapters now share one [algorithm](/docs/helpers/ratelimit#algorithm): windows are per key, and rejected requests no longer consume quota.
+The memory and Redis-based adapters now use per-key windows, and rejected requests no longer consume quota.
 
 `RateLimitHandlerPlugin` now sends `RateLimit-Reset` in seconds until the reset, not as a Unix timestamp in milliseconds.
 
