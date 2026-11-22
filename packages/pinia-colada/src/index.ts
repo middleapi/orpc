@@ -29,7 +29,7 @@ export {
    */
   createRouterUtils as createORPCVueColadaUtils,
 } from './router-utils'
-export { createRouterUtils as createPiniaColadaUtils } from './router-utils'
+export { createRouterUtils, createRouterUtils as createPiniaColadaUtils } from './router-utils'
 export type {
   RouterUtils,
   RouterUtilsInternal,

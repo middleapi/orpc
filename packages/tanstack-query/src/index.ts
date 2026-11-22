@@ -23,7 +23,7 @@ export type {
   ProcedureUtilsStreamedInterceptor,
   ProcedureUtilsStreamedInterceptorOptions,
 } from './procedure-utils'
-export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
+export { createRouterUtils, createRouterUtils as createTanstackQueryUtils } from './router-utils'
 export type {
   RouterUtils,
   RouterUtilsInternal,

@@ -1,6 +1,6 @@
 export type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
 export type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
-export { createRouterUtils as createSWRUtils } from './router-utils'
+export { createRouterUtils, createRouterUtils as createSWRUtils } from './router-utils'
 export type { RouterUtils, RouterUtilsInternal, RouterUtilsOptions } from './router-utils'
 export type { SharedUtils } from './shared-utils'
 export { OPERATION_CONTEXT_SYMBOL as SWR_OPERATION_CONTEXT_SYMBOL } from './types'

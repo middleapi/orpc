@@ -6,10 +6,10 @@ it('exports createPiniaColadaUtils, PINIA_COLADA_OPERATION_CONTEXT_SYMBOL, Strea
   })
 })
 
-it('does not export generic names or utils classes', async () => {
+it('exports createRouterUtils, but no generic context symbol or utils classes', async () => {
   const exports = await import('./index')
 
-  expect(exports).not.toHaveProperty('createRouterUtils')
+  expect(exports).toHaveProperty('createRouterUtils')
   expect(exports).not.toHaveProperty('OPERATION_CONTEXT_SYMBOL')
   expect(exports).not.toHaveProperty('ProcedureUtils')
   expect(exports).not.toHaveProperty('SharedUtils')
