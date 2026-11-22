@@ -1344,9 +1344,9 @@ const example = os
 
 Blocking mode is now a flat `timeout` option: replace `blockingUntilReady: { enabled: true, timeout }` with `timeout`.
 
-The memory and Redis-based adapters now share one [algorithm](/docs/helpers/ratelimit#algorithm): each key has its own fixed window starting at its first request, and rejected requests no longer consume quota.
+The memory and Redis-based adapters now share one [algorithm](/docs/helpers/ratelimit#algorithm): windows are per key, and rejected requests no longer consume quota.
 
-`RateLimitHandlerPlugin` now sends `RateLimit-Reset` as the number of seconds until the reset, like `Retry-After`, instead of a Unix timestamp in milliseconds.
+`RateLimitHandlerPlugin` now sends `RateLimit-Reset` in seconds until the reset, not as a Unix timestamp in milliseconds.
 
 `UpstashRateLimiter` now takes an Upstash `Redis` client, like the other Upstash adapters, instead of an `@upstash/ratelimit` instance. It enforces a fixed window with `maxRequests` and `window`, shares counters with `RedisRateLimiter`, and no longer takes `waitUntil`.
 

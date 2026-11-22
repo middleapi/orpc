@@ -50,17 +50,14 @@ if (!result.success) {
 
 ### Algorithm
 
-The memory and Redis-based adapters share the same fixed-window algorithm, so switching between them does not change behavior:
+The memory and Redis-based adapters use the same fixed-window algorithm:
 
-- **Per-key windows**: each key has its own window of `window` milliseconds, starting at the first request that consumes quota for that key. When it ends, the next request starts a new one.
-- **Rejected requests are free**: a request passes only when its `weight` still fits in the key's window. One that does not fit is rejected without consuming anything, so a client that keeps retrying does not push its own reset further away, and a smaller request can still use what is left.
-- **Result**: `limit` is `maxRequests`, `remaining` is the quota left in the key's window, and `reset` is the Unix timestamp in milliseconds at which that window ends.
-
-[`CloudflareRateLimiter`](#cloudflare) is the exception: the Workers Rate Limiting binding runs its own algorithm and only reports `success`.
+- Each key has its own window, starting at its first request.
+- Rejected requests do not consume quota.
 
 ### Blocking Mode
 
-Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request still fails right away when its window will not reset before the timeout elapses. Waiting consumes no quota.
+Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request still fails right away when its window will not reset before the timeout elapses.
 
 ```ts
 const limiter = new MemoryRateLimiter({
@@ -155,14 +152,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-| Header                | Value                                                                  |
-| --------------------- | ---------------------------------------------------------------------- |
-| `RateLimit-Limit`     | Maximum number of requests allowed within a window                     |
-| `RateLimit-Remaining` | Requests left in the current window                                    |
-| `RateLimit-Reset`     | Seconds until the window resets, rounded up                            |
-| `Retry-After`         | Same value as `RateLimit-Reset`, only on a rejected request's response |
-
-`RateLimit-Reset` is a number of seconds from now, as in the [IETF RateLimit header drafts](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/), not the timestamp found in `result.reset`. A header is omitted when the limiter does not report its value.
+`RateLimit-Reset` and `Retry-After` are the number of seconds until the limit resets.
 
 :::info
 You can combine this plugin with [Retry After Plugin](/docs/plugins/retry-after) to enable automatic client-side retries based on server rate limiting headers.
@@ -204,7 +194,7 @@ const limiter = new MemoryRateLimiter({
 
 ### Redis
 
-Stores counters in Redis, so every instance using the same server enforces the same limits. Keys are stored as `prefix + key`, and limiters with the same prefix share counters.
+Stores counters in Redis, so every instance using the same server enforces the same limits.
 
 ```ts
 import { RedisRateLimiter } from '@orpc/ratelimit/redis'
@@ -329,7 +319,7 @@ const tenantLimiter = limiter.prefix('tenant:123:')
 
 ### Cloudflare
 
-Uses the Workers Rate Limiting binding, so limits are configured in your Worker settings rather than in the adapter. The binding decides how requests are counted, so the [algorithm](#algorithm) above does not apply: it reports only `success`, and a request with a `weight` above `1` that gets rejected partway has already consumed part of it.
+Uses the Workers Rate Limiting binding, so limits are configured in your Worker settings rather than in the adapter. The binding counts requests its own way, so the [algorithm](#algorithm) above does not apply.
 
 ```ts
 import { CloudflareRateLimiter } from '@orpc/cloudflare'

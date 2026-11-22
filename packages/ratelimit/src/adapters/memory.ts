@@ -25,8 +25,7 @@ export interface MemoryRateLimiterOptions {
  * Rate limiter adapter backed by in-memory storage. Enforces a fixed-window
  * limit, with optional blocking mode.
  *
- * Each key has its own fixed window, which starts at the first request that
- * consumes quota. A rejected request does not consume quota.
+ * Windows are per key, and rejected requests do not consume quota.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
@@ -51,8 +50,7 @@ export class MemoryRateLimiter implements RateLimiter {
   }
 
   /**
-   * Drops expired windows at most once per window, so keys that are never
-   * seen again do not stay in memory.
+   * Drops expired windows, at most once per window.
    */
   private sweepIfNeeded(now: number): void {
     if (now < this.nextSweepAt) {

@@ -26,8 +26,7 @@ export interface RateLimitHandlerPluginContext {
  * Automatically adds HTTP rate limiting headers (`RateLimit-*` and `Retry-After`)
  * to responses when used with the `ratelimit` middleware.
  *
- * `RateLimit-Reset` and `Retry-After` are both the number of seconds until the
- * limit resets, rounded up, as in the IETF RateLimit header drafts.
+ * `RateLimit-Reset` and `Retry-After` are in seconds until the limit resets.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#handler-plugin | Rate Limit Helpers - Handler Plugin}
  */

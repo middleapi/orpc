@@ -2,10 +2,9 @@ import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
 import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
- * Consumes `ARGV[1]` points from the counter at `KEYS[1]` when that keeps it within
- * the limit `ARGV[3]`, and leaves the counter untouched otherwise, so a rejected
- * request costs nothing. A window of `ARGV[2]` milliseconds starts when the key
- * gets its first points. Replies with `[success, used, ttl]`.
+ * Consumes `ARGV[1]` points from the counter at `KEYS[1]` if it stays within the
+ * limit `ARGV[3]`, starts a window of `ARGV[2]` milliseconds when the counter is
+ * new, and replies with `[success, used, ttl]`.
  * Kept on one line because `EVAL` sends it with every call.
  */
 const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local c=tonumber(redis.call('GET',KEYS[1]) or 0) local t=redis.call('PTTL',KEYS[1]) local s=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) s=1 end if t<0 then t=tonumber(ARGV[2]) if c>0 then redis.call('PEXPIRE',KEYS[1],t) end end return {s,c,t}`
@@ -47,8 +46,7 @@ export interface BaseRedisRateLimiterOptions {
  * the fixed-window script, and the blocking logic, so every adapter built on
  * it shares counters with the others regardless of the Redis client in use.
  *
- * Each key has its own fixed window, which starts at the first request that
- * consumes quota. A rejected request does not consume quota.
+ * Windows are per key, and rejected requests do not consume quota.
  *
  * Extend it and implement `evalScript` to support another Redis client.
  *
