@@ -122,8 +122,14 @@ With `TimeoutHandlerPlugin`, it is the `signal.reason` inside the procedure. It 
 import { TimeoutError } from '@orpc/server'
 
 const example = os.handler(async ({ signal }) => {
-  if (signal?.reason instanceof TimeoutError) {
-    // handling exceeded the timeout
+  try {
+    return await fetchPlanets({ signal })
+  } catch (error) {
+    if (signal?.reason instanceof TimeoutError) {
+      // handling exceeded the timeout
+    }
+
+    throw error
   }
 })
 ```
