@@ -138,6 +138,17 @@ describe('rpcHandler', () => {
 
     expect(result2.matched).toBe(true)
     expect(peer.send).toHaveBeenCalledTimes(1)
+
+    // a server message is not for the handler
+    const serverMessage = await createMessage({
+      rawData: await encodePeerMessage(
+        { id: '19', kind: 'response', json: { status: 200, headers: {} } } as any,
+        { prefix: 'orpc:' },
+      ),
+    })
+
+    expect(await handler.message(peer as any, serverMessage as any)).toEqual({ matched: false })
+    expect(peer.send).toHaveBeenCalledTimes(1)
   })
 
   it('can encode messages with prefix', async () => {
