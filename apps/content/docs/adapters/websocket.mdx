@@ -234,6 +234,24 @@ const app = App()
 
 </CodeGroup>
 
+### Handling Messages Manually
+
+`handler.message()` resolves to `{ matched: boolean }`. It is `false` when the message is not an oRPC client message, so you can share one connection with your own messages:
+
+```ts
+ws.addEventListener('message', async (event) => {
+  const { matched } = await handler.message(ws, event.data)
+
+  if (!matched) {
+    // not an oRPC message, handle it yourself
+  }
+})
+```
+
+:::info
+Unlike HTTP adapters, `matched` does not mean a procedure matched. An unknown procedure still counts as matched, and the client receives a `404` response.
+:::
+
 ## Client Adapters
 
 | Adapter     | Target                                                                          |

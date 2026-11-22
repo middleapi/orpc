@@ -726,6 +726,8 @@ wss.on('connection', (ws) => {
 
 </CodeGroup>
 
+`handler.message()` now resolves to `{ matched: boolean }`, which is `false` when the message is not an oRPC client message. See [Handling Messages Manually](/docs/adapters/websocket#handling-messages-manually).
+
 ## Server Plugins
 
 Handler plugins were renamed with a `HandlerPlugin` suffix. Deprecated aliases exist unless noted:
