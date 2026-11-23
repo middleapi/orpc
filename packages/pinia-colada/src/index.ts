@@ -22,56 +22,29 @@ export type {
   ProcedureUtilsStreamedInterceptor,
   ProcedureUtilsStreamedInterceptorOptions,
 } from './procedure-utils'
+export * from './router-utils'
 export {
   /**
    * @deprecated Use `createPiniaColadaUtils` instead.
    */
   createRouterUtils as createORPCVueColadaUtils,
 } from './router-utils'
-export { createRouterUtils, createRouterUtils as createPiniaColadaUtils } from './router-utils'
-export type {
-  RouterUtils,
-  RouterUtilsInternal,
-  RouterUtilsOptions,
-  RouterUtilsScoped,
-  RouterUtilsScopedInternal,
-} from './router-utils'
+export { createRouterUtils as createPiniaColadaUtils } from './router-utils'
 export { SharedUtils } from './shared-utils'
 export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
+export * from './types'
 export {
   /**
    * @deprecated Use `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` instead.
    */
   OPERATION_CONTEXT_SYMBOL,
   OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL,
-} from './types'
-export type {
   /**
    * @deprecated Use `PiniaColadaOperationContext` instead.
    */
-  OperationContext,
-} from './types'
-export type {
-  InferLiveQueryOutput,
-  InferStreamedQueryOutput,
-  InfiniteKeyOptions,
-  InfiniteOptionsIn,
-  InfiniteOptionsOut,
-  LiveOptionsIn,
-  MutationKeyOptions,
-  MutationOptionsIn,
-  MutationOptionsOut,
-  OperationType,
-  OperationContext as PiniaColadaOperationContext,
-  QueryKeyOptions,
-  QueryOptionsIn,
-  QueryOptionsOut,
-  StreamedKeyOptions,
-  StreamedOptionsIn,
-  StreamedOptionsOut,
-  UseMutationFnContext,
-  UseQueryFnContext,
+  type OperationContext,
+  type OperationContext as PiniaColadaOperationContext,
 } from './types'
 
 export type { AnyNestedClient } from '@orpc/client'
