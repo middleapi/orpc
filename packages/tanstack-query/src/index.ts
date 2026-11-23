@@ -35,7 +35,19 @@ export type { SharedUtils } from './shared-utils'
 export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
 export * from './structural-sharing'
-export { OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL } from './types'
+export {
+  /**
+   * @deprecated Use `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` instead.
+   */
+  OPERATION_CONTEXT_SYMBOL,
+  OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
+} from './types'
+export type {
+  /**
+   * @deprecated Use `TanstackQueryOperationContext` instead.
+   */
+  OperationContext,
+} from './types'
 export type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,

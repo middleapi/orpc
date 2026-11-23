@@ -1193,7 +1193,7 @@ orpc.live.experimental_liveOptions({ input: {} })
 
 `experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCJsonSerializer` (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)).
 
-Each integration now exports its operation context symbol and type only under the package-specific names: the generic `OPERATION_CONTEXT_SYMBOL` and `OperationContext` exports were removed. For TanStack Query, use `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` and `TanstackQueryOperationContext`. `ProcedureUtils` and `SharedUtils` are exported as types only.
+`ProcedureUtils` and `SharedUtils` are exported as types only.
 
 Streamed queries changed (see [Streamed Query Options](/docs/integrations/tanstack-query#streamed-query-options)):
 
@@ -1210,7 +1210,7 @@ orpc.streamed.streamedOptions({
 
 ### SWR and Pinia Colada
 
-`@orpc/experimental-react-swr` is now `@orpc/swr` (see [SWR Integration](/docs/integrations/swr)), and `@orpc/vue-colada` is now `@orpc/pinia-colada` with `createORPCVueColadaUtils` renamed to `createPiniaColadaUtils` (see [Pinia Colada Integration](/docs/integrations/pinia-colada)). Both switched from `path` to `prefix`, same as TanStack Query, and both dropped the generic context exports too: use `SWR_OPERATION_CONTEXT_SYMBOL` and `SWROperationContext`, or `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` and `PiniaColadaOperationContext`.
+`@orpc/experimental-react-swr` is now `@orpc/swr` (see [SWR Integration](/docs/integrations/swr)), and `@orpc/vue-colada` is now `@orpc/pinia-colada` with `createORPCVueColadaUtils` renamed to `createPiniaColadaUtils` (see [Pinia Colada Integration](/docs/integrations/pinia-colada)). Both switched from `path` to `prefix`, same as TanStack Query.
 
 In SWR, `.subscriber` with `refetchMode: 'reset'` now sets the data to `[]` when the stream connects, instead of `undefined`.
 

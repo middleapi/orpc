@@ -40,7 +40,19 @@ export type {
 export type { SharedUtils } from './shared-utils'
 export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
-export { OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL } from './types'
+export {
+  /**
+   * @deprecated Use `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` instead.
+   */
+  OPERATION_CONTEXT_SYMBOL,
+  OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL,
+} from './types'
+export type {
+  /**
+   * @deprecated Use `PiniaColadaOperationContext` instead.
+   */
+  OperationContext,
+} from './types'
 export type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
