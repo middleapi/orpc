@@ -32,17 +32,6 @@ export interface SWROperationContext {
   }
 }
 
-/**
- * @deprecated Use `SWR_OPERATION_CONTEXT_SYMBOL` instead.
- */
-export const OPERATION_CONTEXT_SYMBOL: typeof SWR_OPERATION_CONTEXT_SYMBOL =
-  SWR_OPERATION_CONTEXT_SYMBOL
-
-/**
- * @deprecated Use `SWROperationContext` instead.
- */
-export type OperationContext = SWROperationContext
-
 export type KeyOptions<TInput> = undefined extends TInput ? { input?: TInput } : { input: TInput }
 
 export type MatcherStrategy = 'exact' | 'partial'
