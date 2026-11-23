@@ -348,19 +348,3 @@ const link = new RPCLink({
 :::info
 A connection proves healthy once it receives a message from the server or stays open for 5 seconds. Only then does `attempt` reset to 1. A server that closes connections right after the handshake, for example to reject authentication, gets the `delay` backoff and the `maxAttempts` limit instead of an immediate reconnect loop.
 :::
-
-### Connection Errors
-
-When the connection closes, pending calls reject with a `ConnectionClosedError`, as do new calls when it cannot be reopened:
-
-```ts
-import { ConnectionClosedError } from '@orpc/client'
-
-try {
-  await client.planet.list()
-} catch (error) {
-  if (error instanceof ConnectionClosedError) {
-    // connection closed or lost
-  }
-}
-```

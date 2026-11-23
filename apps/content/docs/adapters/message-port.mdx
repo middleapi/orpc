@@ -64,22 +64,6 @@ clientPort.start()
 The examples above only show how to configure the link. For examples of creating a typesafe client, see [RPC Link](/docs/rpc/link#typesafe-clients).
 :::
 
-## Connection Errors
-
-When the port closes, calls reject with a `ConnectionClosedError`:
-
-```ts
-import { ConnectionClosedError } from '@orpc/client'
-
-try {
-  await client.planet.list()
-} catch (error) {
-  if (error instanceof ConnectionClosedError) {
-    // connection closed or lost
-  }
-}
-```
-
 ## Handling Messages Manually
 
 `handler.message()` resolves to `{ matched: boolean }`. It is `false` when the message is not an oRPC client message, so you can share one port with your own messages:

@@ -7,7 +7,7 @@ sidebar:
 
 ## Client
 
-Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with a [`TimeoutError`](#handling-timeouts):
+Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with a [`TimeoutError`](/docs/client/error-handling#transport-errors):
 
 ```ts
 import { TimeoutLinkPlugin } from '@orpc/client/plugins'
@@ -27,7 +27,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ## Server
 
-Use `TimeoutHandlerPlugin` to abort the request signal with a [`TimeoutError`](#handling-timeouts) when handling exceeds the timeout:
+Use `TimeoutHandlerPlugin` to abort the request signal with a `TimeoutError` when handling exceeds the timeout:
 
 ```ts handler
 import { TimeoutHandlerPlugin } from '@orpc/server/plugins'
@@ -98,44 +98,6 @@ const handler = new RPCHandler(router, {
 
 :::info
 Return `null` or `undefined` to disable the timeout, which is useful for excluding long-lived requests. Any number always enables the timeout.
-:::
-
-## Handling Timeouts
-
-Both plugins abort with a `TimeoutError`, so a timeout is distinguishable from a cancellation (`AbortError`). With `TimeoutLinkPlugin`, the call rejects with it:
-
-```ts
-import { TimeoutError } from '@orpc/client'
-
-try {
-  await client.planet.list()
-} catch (error) {
-  if (error instanceof TimeoutError) {
-    // the call exceeded the timeout
-  }
-}
-```
-
-With `TimeoutHandlerPlugin`, it is the `signal.reason` inside the procedure. It is not sent to the client:
-
-```ts
-import { TimeoutError } from '@orpc/server'
-
-const example = os.handler(async ({ signal }) => {
-  try {
-    return await fetchPlanets({ signal })
-  } catch (error) {
-    if (signal?.reason instanceof TimeoutError) {
-      // handling exceeded the timeout
-    }
-
-    throw error
-  }
-})
-```
-
-:::tip
-Check `error.name === 'TimeoutError'` to also match `AbortSignal.timeout()`.
 :::
 
 ## Learn More
