@@ -9,6 +9,7 @@ import { openapi, OpenAPISerializer } from '@orpc/openapi'
 import { implement, os } from '@orpc/server'
 import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
+import { promiseWithResolvers } from '@orpc/shared'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { z } from 'zod'
 
@@ -1369,6 +1370,28 @@ describe('mcpRegistrar', () => {
         'planet_ping',
       ])
       expect(loader).toHaveBeenCalledTimes(2)
+    })
+
+    it('resolves routes while another call is still loading, and drops the slower load', async () => {
+      const first = os.handler(() => 'first')
+      const second = os.handler(() => 'second')
+      const firstLoad = promiseWithResolvers<{ default: any }>()
+      const loader = vi
+        .fn()
+        .mockReturnValueOnce(firstLoad.promise)
+        .mockResolvedValueOnce({ default: { ping: second } })
+
+      const registrar = new McpRegistrar({ planet: os.lazy(loader) })
+      const matcher = (registrar as any).matcher
+
+      const slow = matcher.resolveRoutes()
+      const routes = await matcher.resolveRoutes()
+      expect(routes.get('/planet/ping').procedure['~orpc'].handler).toBe(second['~orpc'].handler)
+
+      firstLoad.resolve({ default: { ping: first } })
+
+      await expect(slow).resolves.toBe(routes)
+      await expect(matcher.resolveRoutes()).resolves.toBe(routes)
     })
 
     it('registers on multiple servers', async () => {

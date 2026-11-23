@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
 
 import { os } from '../../builder'
@@ -169,17 +170,14 @@ describe('rpcMatcher', () => {
     expect(loader).toHaveBeenCalledTimes(3)
   })
 
-  it('resolves a deep lazy chain for concurrent matches without losing or reloading routers', async () => {
+  it('resolves a deep lazy chain for concurrent matches without losing or re-indexing routers', async () => {
     const leaf = os.handler(() => 'ok')
-    const loads: Record<string, number> = {}
 
     /** `l1` -> `l2` -> `l3`, each lazy, each also exposing a `leaf` procedure beside the next level */
     function lazyLevel(depth: number): Lazy<any> {
       return new Lazy({
         meta: {},
         loader: async () => {
-          loads[`l${depth}`] = (loads[`l${depth}`] ?? 0) + 1
-
           // settle after a different number of microtask turns per level, so they interleave
           for (let i = 0; i < 5 - depth; i++) {
             await Promise.resolve()
@@ -193,6 +191,7 @@ describe('rpcMatcher', () => {
     }
 
     const matcher = new RPCMatcher({ l1: lazyLevel(1) })
+    const indexSpy = vi.spyOn(matcher as any, 'index')
 
     const paths = ['/l1/leaf', '/l1/l2/leaf', '/l1/l2/l3/leaf'] as const
     const results = await Promise.all(
@@ -211,12 +210,34 @@ describe('rpcMatcher', () => {
       'l1/l2/l3/leaf',
     ])
 
-    // every level is loaded exactly once even though six matches raced for it
-    expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+    const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
+    expect(indexed()).toEqual(['l1', 'l1/l2', 'l1/l2/l3'])
 
-    // and the deepest route stays matchable afterwards
     await expect(matcher.match('POST', '/l1/l2/l3/leaf', undefined)).resolves.toBeDefined()
-    expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+    expect(indexed()).toEqual(['l1', 'l1/l2', 'l1/l2/l3'])
+  })
+
+  it('matches while another match is still loading, and drops the slower load', async () => {
+    const first = os.handler(() => 'first')
+    const second = os.handler(() => 'second')
+    const firstLoad = promiseWithResolvers<{ default: any }>()
+    const loader = vi
+      .fn()
+      .mockReturnValueOnce(firstLoad.promise)
+      .mockResolvedValueOnce({ default: { ping: second } })
+    const matcher = new RPCMatcher({ runs: new Lazy({ loader, meta: {} }) })
+
+    const slow = matcher.match('POST', '/runs/ping', undefined)
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toMatchObject({
+      procedure: second,
+    })
+
+    firstLoad.resolve({ default: { ping: first } })
+
+    await expect(slow).resolves.toMatchObject({ procedure: second })
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toMatchObject({
+      procedure: second,
+    })
   })
 
   it('looks up lazy prefixes no deeper than the deepest pending lazy router', async () => {

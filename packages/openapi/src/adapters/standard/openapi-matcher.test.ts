@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract'
 import { call, implement, os } from '@orpc/server'
+import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
 
 import { getOpenAPIMeta, openapi } from '../../meta'
@@ -747,12 +748,10 @@ describe('openAPIMatcher', () => {
       expect(projectLoader).toHaveBeenCalledTimes(1)
     })
 
-    it('resolves a deep lazy chain for concurrent matches without losing or reloading routers', async () => {
+    it('resolves a deep lazy chain for concurrent matches without losing or re-indexing routers', async () => {
       const leaf1 = os.meta(openapi({ method: 'GET', path: '/leaf1' })).handler(() => '1')
       const leaf2 = os.meta(openapi({ method: 'GET', path: '/leaf2' })).handler(() => '2')
       const leaf3 = os.meta(openapi({ method: 'GET', path: '/leaf3' })).handler(() => '3')
-
-      const loads = { l1: 0, l2: 0, l3: 0 }
 
       /** settle after N microtask turns so the three levels interleave */
       const settle = async (turns: number) => {
@@ -762,24 +761,22 @@ describe('openAPIMatcher', () => {
       }
 
       const l3 = os.meta(openapi({ prefix: '/p3' })).lazy(async () => {
-        loads.l3++
         await settle(2)
         return { default: { leaf3 } }
       })
 
       const l2 = os.meta(openapi({ prefix: '/p2' })).lazy(async () => {
-        loads.l2++
         await settle(3)
         return { default: { leaf2, l3 } }
       })
 
       const matcher = new OpenAPIMatcher({
         lazy: os.lazy(async () => {
-          loads.l1++
           await settle(4)
           return { default: { leaf1, l2 } }
         }),
       })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
 
       const paths = ['/leaf1', '/p2/leaf2', '/p2/p3/leaf3'] as const
       const results = await Promise.all(
@@ -798,12 +795,65 @@ describe('openAPIMatcher', () => {
         'lazy/l2/l3/leaf3',
       ])
 
-      // every level is loaded exactly once even though six matches raced for it
-      expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+      const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
+      expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
 
-      // and the deepest route stays matchable afterwards
       await expect(matcher.match('GET', '/p2/p3/leaf3', undefined)).resolves.toBeDefined()
-      expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+      expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
+    })
+
+    it('matches while another match is still loading, and drops the slower load', async () => {
+      const first = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'first')
+      const second = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'second')
+      const firstLoad = promiseWithResolvers<{ default: any }>()
+      const loader = vi
+        .fn()
+        .mockReturnValueOnce(firstLoad.promise)
+        .mockResolvedValueOnce({ default: { ping: second } })
+      const matcher = new OpenAPIMatcher({ runs: os.lazy(loader) })
+
+      const slow = matcher.match('GET', '/ping', undefined)
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
+        procedure: second,
+      })
+
+      firstLoad.resolve({ default: { ping: first } })
+
+      await expect(slow).resolves.toMatchObject({ procedure: second })
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
+        procedure: second,
+      })
+    })
+
+    it('indexes lazy routers sharing a prefix once each while one load is stuck', async () => {
+      const find = os.meta(openapi({ method: 'GET', path: '/find' })).handler(() => 'find')
+      const list = os.meta(openapi({ method: 'GET', path: '/list' })).handler(() => 'list')
+      const stuckLoad = promiseWithResolvers<{ default: any }>()
+      const findLoader = vi
+        .fn()
+        .mockReturnValueOnce(stuckLoad.promise)
+        .mockResolvedValue({ default: { find } })
+      const matcher = new OpenAPIMatcher({
+        a: os.meta(openapi({ prefix: '/users' })).lazy(findLoader),
+        b: os.meta(openapi({ prefix: '/users' })).lazy(async () => ({ default: { list } })),
+      })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
+
+      const stuck = matcher.match('GET', '/users/find', undefined)
+      const [found, listed] = await Promise.all([
+        matcher.match('GET', '/users/find', undefined),
+        matcher.match('GET', '/users/list', undefined),
+      ])
+
+      expect(found).toMatchObject({ path: ['a', 'find'] })
+      expect(listed).toMatchObject({ path: ['b', 'list'] })
+
+      stuckLoad.resolve({ default: { find } })
+
+      await expect(stuck).resolves.toMatchObject({ path: ['a', 'find'] })
+      expect(
+        indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/')).toSorted(),
+      ).toEqual(['a', 'b'])
     })
   })
 
