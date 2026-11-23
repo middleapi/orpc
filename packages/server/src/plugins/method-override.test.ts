@@ -142,14 +142,14 @@ describe('methodOverrideHandlerPlugin', () => {
   it('does not re-encode the remaining query string', async () => {
     const { next } = await invokeInterceptor({
       method: 'POST',
-      url: '/a?q=a%20b+c&_method=DELETE&redirect=/x?y=1,2&e=%7E*&flag&&k=#h',
+      url: '/a?q=a%20b+c&_method=DELETE&redirect=/x?y=1,2&e=%7E*&flag&&k=&?_method=keep#h',
     })
 
     expect(next).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         request: expect.objectContaining({
           method: 'DELETE',
-          url: '/a?q=a%20b+c&redirect=/x?y=1,2&e=%7E*&flag&&k=#h',
+          url: '/a?q=a%20b+c&redirect=/x?y=1,2&e=%7E*&flag&&k=&?_method=keep#h',
         }),
       }),
     )
