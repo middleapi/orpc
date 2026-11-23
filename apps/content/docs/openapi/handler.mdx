@@ -92,7 +92,22 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
-To refuse a request there, respond with `encodeError`, which encodes an `ORPCError` the way procedure errors are encoded: `{ matched: true, response: await encodeError(new ORPCError('FORBIDDEN')) }`.
+:::tip
+Use `encodeError` to respond with an `ORPCError`, encoded the way procedure errors are. For example, to answer unmatched requests with a `NOT_FOUND` error:
+
+```ts
+;async ({ next, encodeError }) => {
+  const result = await next()
+
+  if (!result.matched) {
+    return { matched: true, response: await encodeError(new ORPCError('NOT_FOUND')) }
+  }
+
+  return result
+}
+```
+
+:::
 
 ### Interceptors
 
