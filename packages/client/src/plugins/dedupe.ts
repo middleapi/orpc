@@ -69,6 +69,14 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
   scope?: ((options: StandardLinkTransportInterceptorOptions<T>) => unknown) | undefined
 
   /**
+   * Lowercase names of headers left out of the deduplication key.
+   * The shared request carries the first request's values.
+   *
+   * @default ['traceparent', 'tracestate']
+   */
+  ignoredHeaders?: readonly string[] | undefined
+
+  /**
    * How long (in ms) to wait for more identical requests before sending,
    * counted from the first queued request.
    * With `0`, only requests made in the same event loop tick are deduplicated.
@@ -95,6 +103,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
   private readonly groups: DedupeLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<DedupeLinkPluginOptions<T>['filter'], undefined>
   private readonly scope: Exclude<DedupeLinkPluginOptions<T>['scope'], undefined>
+  private readonly ignoredHeaders: Exclude<DedupeLinkPluginOptions<T>['ignoredHeaders'], undefined>
   private readonly wait: Exclude<DedupeLinkPluginOptions<T>['wait'], undefined>
 
   private readonly queue: Map<
@@ -107,6 +116,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
     this.filter =
       options.filter ?? (({ request }) => request.method === 'GET' || request.method === 'QUERY')
     this.scope = options.scope ?? (() => undefined)
+    this.ignoredHeaders = options.ignoredHeaders ?? ['traceparent', 'tracestate']
     this.wait = options.wait ?? 0
   }
 
@@ -167,7 +177,11 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
       groups.set(group, queue)
     }
 
-    const requestKey = createRequestKey(caller.options.path, caller.options.request)
+    const requestKey = createRequestKey(
+      caller.options.path,
+      caller.options.request,
+      this.ignoredHeaders,
+    )
     const matched = queue.get(requestKey)
 
     if (matched) {
@@ -270,11 +284,21 @@ function canDedupeRequest(request: StandardRequest): boolean {
   )
 }
 
-function createRequestKey(path: string[], request: StandardRequest): string {
+function createRequestKey(
+  path: string[],
+  request: StandardRequest,
+  ignoredHeaders: readonly string[],
+): string {
+  const headers = { ...request.headers }
+
+  for (const name of ignoredHeaders) {
+    delete headers[name]
+  }
+
   return stringifyJSON({
     path,
     body: request.body,
-    headers: request.headers,
+    headers,
     method: request.method,
     url: request.url,
   } satisfies Omit<StandardRequest, 'signal'> & { path: string[] })

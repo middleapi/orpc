@@ -28,6 +28,8 @@ const link = new RPCLink({
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
 :::
 
+Requests are identical when their path, method, URL, body, and headers match. Headers listed in `ignoredHeaders` (default `traceparent` and `tracestate`) are not compared, and the shared request carries those of the first request.
+
 ## Filter
 
 By default, the plugin deduplicates `GET` and `QUERY` requests. You can customize this behavior by providing a `filter` function.
