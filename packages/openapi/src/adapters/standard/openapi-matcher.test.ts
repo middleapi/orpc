@@ -263,6 +263,45 @@ describe('standardOpenAPIMatcher', () => {
     expect(nestedLoader).toHaveBeenCalledTimes(2)
   })
 
+  it('matches while another match is still loading, and drops the slower load', async () => {
+    const base = os.$context<any>()
+
+    let resolveFirst!: (value: { default: any }) => void
+    const nestedLoader = vi.fn()
+      .mockReturnValueOnce(new Promise((resolve) => {
+        resolveFirst = resolve
+      }))
+      .mockResolvedValueOnce({ default: { pong } })
+
+    const rpcMatcher = new StandardOpenAPIMatcher()
+    rpcMatcher.init(base.router({
+      nested: base.lazy(nestedLoader),
+    }))
+    const initSpy = vi.spyOn(rpcMatcher, 'init')
+
+    const slow = rpcMatcher.match('POST', '/nested/pong')
+
+    expect(await rpcMatcher.match('POST', '/nested/pong')).toEqual({
+      path: ['nested', 'pong'],
+      procedure: pong,
+    })
+
+    // the slower load finishes with a different router, which must not be indexed
+    resolveFirst({ default: { pong: ping } })
+
+    expect(await slow).toEqual({
+      path: ['nested', 'pong'],
+      procedure: pong,
+    })
+
+    expect(await rpcMatcher.match('POST', '/nested/pong')).toEqual({
+      path: ['nested', 'pong'],
+      procedure: pong,
+    })
+
+    expect(initSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('multiple lazy routers with lazy router inside lazy router', async () => {
     const base = os.$context<any>()
 
