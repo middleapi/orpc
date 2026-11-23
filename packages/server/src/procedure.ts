@@ -17,8 +17,8 @@ export interface ProcedureHandlerOptions<
 > {
   context: TCurrentContext
   input: TInput
-  path: string[]
-  procedure: Procedure<Context, Context, AnySchema, AnySchema, ErrorMap>
+  path: readonly string[]
+  procedure: AnyProcedure
   signal?: AbortSignal | undefined
   lastEventId?: string | undefined
   errors: TErrorConstructorMap

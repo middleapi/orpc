@@ -3,7 +3,7 @@ import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import {
   Procedure,
-  resolveContractProcedure,
+  resolveContractedProcedure,
   unlazy,
   walkProcedureContractsSync,
 } from '@orpc/server'
@@ -32,8 +32,6 @@ interface TreeEntry {
 
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
   matcher?: ReturnType<typeof createPrefixMatcher> | undefined
-  /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
-  loading?: Promise<void> | undefined
 }
 
 export class OpenAPIMatcher {
@@ -131,34 +129,26 @@ export class OpenAPIMatcher {
   private async loadPendingLazyRouters(pathname: `/${string}`): Promise<void> {
     for (const pending of this.pendingLazyRouters) {
       if (pending.matcher === undefined || pending.matcher(pathname)) {
-        await this.loadPendingLazyRouter(pending)
+        await this.indexPendingLazyRouter(pending)
       }
     }
   }
 
-  private loadPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
-    if (pending.loading === undefined) {
-      pending.loading = this.indexPendingLazyRouter(pending).catch((error) => {
-        pending.loading = undefined
-        throw error
-      })
-    }
-
-    return pending.loading
-  }
-
+  /** Not shared across matches: on Cloudflare Workers, a promise never settles once its request ends. */
   private async indexPendingLazyRouter(pending: PendingLazyRouter): Promise<void> {
     const { default: router } = await unlazy(pending.router)
 
-    this.index(router, pending.path)
+    // already indexed by a concurrent match
+    if (!this.pendingLazyRouters.has(pending)) {
+      return
+    }
 
-    // removed only once indexed, so a concurrent match never observes this router as
-    // neither pending nor indexed
+    this.index(router, pending.path)
     this.pendingLazyRouters.delete(pending)
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
-    entry.procedure = await resolveContractProcedure(this.rootRouter, entry.contract, entry.path)
+    entry.procedure = await resolveContractedProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
   }

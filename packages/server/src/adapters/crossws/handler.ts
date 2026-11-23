@@ -67,11 +67,15 @@ export class experimental_CrosswsHandler<T extends Context> {
         : (message.uint8Array() as Uint8Array<ArrayBuffer>)
     const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
 
+    if (!result.matched || !isClientPeerSendMessage(result.message)) {
+      return { matched: false }
+    }
+
     let peer = this.peers.get(ws)
 
     // Closed: a new peer here would leak and its requests would never be aborted.
     if (peer === null) {
-      return result
+      return { matched: true }
     }
 
     if (!peer) {
@@ -83,14 +87,12 @@ export class experimental_CrosswsHandler<T extends Context> {
       )
     }
 
-    if (result.matched && isClientPeerSendMessage(result.message)) {
-      await peer.message(
-        result.message,
-        createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
-      )
-    }
+    await peer.message(
+      result.message,
+      createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
+    )
 
-    return result
+    return { matched: true }
   }
 
   /**

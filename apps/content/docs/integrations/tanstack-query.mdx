@@ -80,7 +80,7 @@ Use `.streamedOptions` to build query options for an [AsyncIteratorObject](/docs
 const query = useQuery(
   orpc.streamed.streamedOptions({
     input: { id: 123 },
-    queryFnOptions: {
+    fnOptions: {
       refetchMode: 'reset',
       maxChunks: 3, // Keep only the last 3 events
     },
@@ -99,10 +99,10 @@ For a loading state, call `queryClient.resetQueries({ queryKey })` before refetc
 :::
 
 :::warning
-`queryFnOptions` is part of the query key, except for default values:
+`fnOptions` is part of the query key, except for default values:
 
 - Queries with different options get separate cache entries and separate streams. To share one, use the same options, and show fewer chunks with `select`, e.g. `select: data => data.slice(-3)`.
-- To read or write the cache by key, pass the same options: `streamedKey({ input, queryFnOptions })`.
+- To read or write the cache by key, pass the same options: `streamedKey({ input, fnOptions })`.
   :::
 
 ## Live Query Options
@@ -561,7 +561,7 @@ const queryClient = new QueryClient({
 })
 ```
 
-With an RPC [key serializer](#key-serializer), equal instances of [custom types](/docs/rpc/serializer#custom-serializers) are kept too, compared by what their handler serializes them to. For queries not built with oRPC utils, pass it to `createStructuralSharing(serializer)`.
+With an RPC [key serializer](#key-serializer), equal instances of [custom types](/docs/rpc/serializer#custom-serializers) are kept too, compared by what their handler serializes them to. For queries not built with oRPC utils, pass it to `createStructuralSharing({ serializer })`.
 
 ## Server-Side Rendering (SSR)
 
@@ -569,7 +569,7 @@ When [server-side rendering](/docs/recipes/optimizing-ssr) with [TanStack Query 
 
 ### Custom Serializers
 
-TanStack Query dehydrates query data as plain JSON, which cannot represent oRPC types such as `Date`, `BigInt`, `Set`, or `Map`. Pass your [RPC Serializer](/docs/rpc/serializer#custom-serializers) to `createHydrationOptions` to keep them intact.
+TanStack Query dehydrates query data as plain JSON, which cannot represent oRPC types such as `Date`, `BigInt`, `Set`, or `Map`. Pass your [RPC Serializer](/docs/rpc/serializer#custom-serializers) to `createHydrationOptions` as the `serializer` option to keep them intact.
 
 ```ts
 import { createHydrationOptions } from '@orpc/tanstack-query'
@@ -580,7 +580,7 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
     },
-    ...createHydrationOptions(serializer), // dehydrate.serializeData and hydrate.deserializeData
+    ...createHydrationOptions({ serializer }), // dehydrate.serializeData and hydrate.deserializeData
   },
 })
 ```

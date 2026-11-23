@@ -1,3 +1,4 @@
+import { decodeBase64url, encodeBase64url } from './base64url'
 import { decrypt, encrypt } from './encryption'
 
 describe('encrypt/decrypt', () => {
@@ -112,5 +113,42 @@ describe('decrypt canonical form', () => {
     }
     expect(await decrypt(`${encrypted}=`, secret)).toBeUndefined()
     expect(await decrypt(`${encrypted}==`, secret)).toBeUndefined()
+  })
+})
+
+describe('encryption wire format', () => {
+  const secret = 'wire-format-secret'
+
+  // the fixtures above pin `decrypt`, this pins `encrypt` with plain WebCrypto
+  it('is base64url(salt[16] || iv[12] || ciphertext || tag[16])', async () => {
+    const payload = decodeBase64url(await encrypt('wire-value', secret))!
+
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', hash: 'SHA-256', iterations: 60_000, salt: payload.slice(0, 16) },
+      await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, [
+        'deriveKey',
+      ]),
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt'],
+    )
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: payload.slice(16, 28) },
+      key,
+      payload.slice(28),
+    )
+
+    expect(new TextDecoder().decode(decrypted)).toBe('wire-value')
+  })
+
+  it('rejects a tampered salt, iv, ciphertext or tag', async () => {
+    const payload = decodeBase64url(await encrypt('wire-value', secret))!
+
+    for (const index of [0, 16, 28, payload.length - 1]) {
+      const tampered = payload.slice()
+      tampered[index]! ^= 1
+      expect(await decrypt(encodeBase64url(tampered), secret), `${index}`).toBeUndefined()
+    }
   })
 })

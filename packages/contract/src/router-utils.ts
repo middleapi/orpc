@@ -9,19 +9,19 @@ import type { AnyProcedureContract } from './procedure'
 import { ProcedureContract } from './procedure'
 import type { RouterContract } from './router'
 
-export type AugmentedContractRouter<
+export type AugmentedRouterContract<
   T extends RouterContract,
   TErrorMap extends ErrorMap,
-> = AugmentedContractRouterInternal<T, TErrorMap>
+> = AugmentedRouterContractInternal<T, TErrorMap>
 
-export type AugmentedContractRouterInternal<T, TErrorMap extends ErrorMap> =
+export type AugmentedRouterContractInternal<T, TErrorMap extends ErrorMap> =
   T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $Errors>
     ? ProcedureContract<$InputSchema, $OutputSchema, MergedErrorMap<TErrorMap, $Errors>>
     : {
-        [K in keyof T]: AugmentedContractRouterInternal<T[K] & {}, TErrorMap>
+        [K in keyof T]: AugmentedRouterContractInternal<T[K] & {}, TErrorMap>
       }
 
-export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {
+export interface AugmentRouterContractOptions<TErrorMap extends ErrorMap> {
   meta: Meta
   metaPlugins?: AnyMetaPlugin[] | undefined
   errorMap: TErrorMap
@@ -30,10 +30,10 @@ export interface AugmentContractRouterOptions<TErrorMap extends ErrorMap> {
 /**
  * Add capabilities without changing identity of the router contract
  */
-export function augmentContractRouter<T extends RouterContract, TErrorMap extends ErrorMap>(
+export function augmentRouterContract<T extends RouterContract, TErrorMap extends ErrorMap>(
   router: T,
-  options: AugmentContractRouterOptions<TErrorMap>,
-): AugmentedContractRouter<T, TErrorMap> {
+  options: AugmentRouterContractOptions<TErrorMap>,
+): AugmentedRouterContract<T, TErrorMap> {
   if (router instanceof ProcedureContract) {
     const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
@@ -58,7 +58,7 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
   const enhanced: Record<string, any> = {}
 
   for (const key of Object.keys(router)) {
-    setOwn(enhanced, key, augmentContractRouter(router[key]!, options))
+    setOwn(enhanced, key, augmentRouterContract(router[key]!, options))
   }
 
   return enhanced as any

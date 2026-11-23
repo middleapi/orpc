@@ -70,7 +70,7 @@ export type ProcedureClientOptions<
   TErrorMap extends ErrorMap,
   TClientContext extends ClientContext,
 > = {
-  path?: string[] | undefined
+  path?: readonly string[] | undefined
   interceptors?: ProcedureClientInterceptor<TInitialContext, TOutputSchema, TErrorMap>[] | undefined
 } & ({} extends TInitialContext
   ? { context?: Value<Promisable<TInitialContext>, [clientContext: TClientContext]> | undefined }
@@ -114,7 +114,7 @@ export function createProcedureClient<
 
     try {
       const output = await runWithSpan('call_procedure', (span) => {
-        span?.setAttribute('procedure.path', path)
+        span?.setAttribute('procedure.path', [...path])
 
         return intercept(
           options.interceptors,

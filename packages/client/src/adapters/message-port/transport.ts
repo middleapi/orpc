@@ -1,5 +1,5 @@
 import type { Promisable, Value } from '@orpc/shared'
-import { AbortError, value } from '@orpc/shared'
+import { value } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type {
   DecodePeerMessageOptions,
@@ -14,6 +14,7 @@ import {
   isServerPeerSendMessage,
 } from '@standard-server/peer'
 
+import { ConnectionClosedError } from '../../error'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard/index'
 import type { SupportedMessagePort } from './message-port'
@@ -64,7 +65,7 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
     encodePeerMessage: encodePeerMessageOptions,
     decodePeerMessage: decodePeerMessageOptions,
   }: MessagePortLinkTransportOptions<T>) {
-    let closeReason: undefined | AbortError
+    let closeReason: undefined | ConnectionClosedError
 
     this.peer = new ClientPeer(async (message) => {
       // `postMessage` silently discards data once the port is closed, so requests would never settle
@@ -110,7 +111,7 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
     })
 
     onMessagePortClose(port, async () => {
-      closeReason = new AbortError('MessagePort closed')
+      closeReason = new ConnectionClosedError('MessagePort closed')
       await this.peer.close(closeReason)
     })
   }

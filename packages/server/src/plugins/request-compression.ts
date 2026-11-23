@@ -25,12 +25,12 @@ const MAX_CONTENT_ENCODINGS = 5
 export class RequestCompressionHandlerPlugin<
   T extends Context,
 > implements StandardHandlerPlugin<T> {
-  name = '~request-compression'
+  readonly name = '~request-compression'
 
   /**
-   * Should decompress the original batch request body instead of sub-requests.
+   * Wraps batch: decompresses the original request body, not sub-requests.
    */
-  after: string[] = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     // oxlint-disable-next-line unicorn/consistent-function-scoping

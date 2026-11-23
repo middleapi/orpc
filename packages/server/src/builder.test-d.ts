@@ -236,6 +236,31 @@ describe('Builder', () => {
       >()
     })
 
+    it('outline middleware', () => {
+      const middleware = {} as Middleware<
+        { auth: boolean; g?: boolean },
+        { more: string },
+        unknown,
+        any,
+        typeof errorMap
+      >
+
+      expectTypeOf(builder.middleware(middleware)).toEqualTypeOf<
+        DecoratedMiddleware<
+          MergedInitialContext<{ auth: boolean }, object, { auth: boolean; g?: boolean }>,
+          { more: string },
+          unknown,
+          any,
+          typeof errorMap
+        >
+      >()
+
+      builder.middleware(
+        // @ts-expect-error - TInContext is not satisfy expected
+        {} as Middleware<{ something: string }, object, unknown, any, typeof errorMap>,
+      )
+    })
+
     it('with TOutContext', () => {
       expectTypeOf(
         builder.middleware(({ next }) => next({ context: { extra: true } })),

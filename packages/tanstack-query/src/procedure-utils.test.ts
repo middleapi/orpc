@@ -9,7 +9,7 @@ import {
   ProcedureUtils,
 } from './procedure-utils'
 import * as streamQueryModule from './stream-query'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL } from './types'
 
 const streamedQuerySpy = vi.spyOn(streamQueryModule, 'serializableStreamedQuery')
 
@@ -60,7 +60,7 @@ describe('procedureUtils', () => {
         input: 1,
       })
 
-      keyedUtils.streamedKey({ input: 1, queryFnOptions: { maxChunks: 1 } } as any)
+      keyedUtils.streamedKey({ input: 1, fnOptions: { maxChunks: 1 } } as any)
       expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], {
         prefix: '__prefix__',
         serializer,
@@ -122,7 +122,7 @@ describe('procedureUtils', () => {
           signal,
           context: {
             batch: '__batch__',
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: options.queryKey,
               type: 'query',
             },
@@ -184,7 +184,7 @@ describe('procedureUtils', () => {
       const options = utils.streamedOptions({
         input: { search: '__search__' },
         context: { batch: '__batch__' },
-        queryFnOptions: {
+        fnOptions: {
           refetchMode: 'append',
         },
       })
@@ -224,7 +224,7 @@ describe('procedureUtils', () => {
           signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: options.queryKey,
               type: 'streamed',
             },
@@ -236,7 +236,7 @@ describe('procedureUtils', () => {
     it('passes settleOnFirstData to the query function, not to the key or the query options', async () => {
       const options = utils.streamedOptions({
         input: { search: '__search__' },
-        queryFnOptions: { maxChunks: 2 },
+        fnOptions: { maxChunks: 2 },
         settleOnFirstData: true,
       })
 
@@ -292,7 +292,7 @@ describe('procedureUtils', () => {
           signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: options.queryKey,
               type: 'streamed',
             },
@@ -370,7 +370,7 @@ describe('procedureUtils', () => {
           signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: options.queryKey,
               type: 'live',
             },
@@ -433,7 +433,7 @@ describe('procedureUtils', () => {
           signal: expect.any(AbortSignal),
           context: {
             batch: '__batch__',
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: options.queryKey,
               type: 'live',
             },
@@ -513,7 +513,7 @@ describe('procedureUtils', () => {
           signal,
           context: {
             batch: '__batch__',
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: options.queryKey,
               type: 'infinite',
             },
@@ -592,7 +592,7 @@ describe('procedureUtils', () => {
     expect(client).toHaveBeenCalledWith('__input__', {
       context: {
         batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.mutationKey,
           type: 'mutation',
         },
@@ -1296,7 +1296,7 @@ describe('createProcedureUtils with interceptors', () => {
       input: { search: '__search__' },
       context: {
         batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.queryKey,
           type: 'query',
         },
@@ -1309,7 +1309,7 @@ describe('createProcedureUtils with interceptors', () => {
         signal,
         context: {
           batch: '__intercepted_batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
             key: options.queryKey,
             type: 'query',
           },
@@ -1354,7 +1354,7 @@ describe('createProcedureUtils with interceptors', () => {
       input: { search: '__search__' },
       context: {
         batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.queryKey,
           type: 'streamed',
         },
@@ -1371,7 +1371,7 @@ describe('createProcedureUtils with interceptors', () => {
         signal: expect.any(AbortSignal),
         context: {
           batch: '__intercepted_batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
             key: options.queryKey,
             type: 'streamed',
           },
@@ -1416,7 +1416,7 @@ describe('createProcedureUtils with interceptors', () => {
       input: { search: '__search__' },
       context: {
         batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.queryKey,
           type: 'live',
         },
@@ -1433,7 +1433,7 @@ describe('createProcedureUtils with interceptors', () => {
         signal: expect.any(AbortSignal),
         context: {
           batch: '__intercepted_batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
             key: options.queryKey,
             type: 'live',
           },
@@ -1478,7 +1478,7 @@ describe('createProcedureUtils with interceptors', () => {
       input: { search: '__search__', pageParam: '__pageParam__' },
       context: {
         batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.queryKey,
           type: 'infinite',
         },
@@ -1491,7 +1491,7 @@ describe('createProcedureUtils with interceptors', () => {
         signal,
         context: {
           batch: '__intercepted_batch__',
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
             key: options.queryKey,
             type: 'infinite',
           },
@@ -1529,7 +1529,7 @@ describe('createProcedureUtils with interceptors', () => {
       input: '__input__',
       context: {
         batch: '__batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.mutationKey,
           type: 'mutation',
         },
@@ -1539,7 +1539,7 @@ describe('createProcedureUtils with interceptors', () => {
     expect(client).toHaveBeenCalledWith('__intercepted_input__', {
       context: {
         batch: '__intercepted_batch__',
-        [OPERATION_CONTEXT_SYMBOL]: {
+        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
           key: options.mutationKey,
           type: 'mutation',
         },

@@ -13,11 +13,11 @@ import type {
   KeyOptions,
   Mutator,
   MutatorOptions,
-  OperationContext,
+  SWROperationContext,
   Subscriber,
   SubscriberOptions,
 } from './types'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { SWR_OPERATION_CONTEXT_SYMBOL } from './types'
 
 export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {}
 
@@ -74,9 +74,9 @@ export class ProcedureUtils<
 
       return this.call(input, {
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: { key, type: 'fetcher' },
+          [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'fetcher' },
           ...options.context,
-        } satisfies OperationContext as any,
+        } satisfies SWROperationContext as any,
       })
     }
   }
@@ -104,9 +104,9 @@ export class ProcedureUtils<
 
           const iterator = await this.call(input, {
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' },
+              [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' },
               ...options.context,
-            } satisfies OperationContext as any,
+            } satisfies SWROperationContext as any,
             signal: controller.signal,
           })
 
@@ -175,9 +175,9 @@ export class ProcedureUtils<
 
           const iterator = await this.call(input, {
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' },
+              [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' },
               ...options.context,
-            } satisfies OperationContext as any,
+            } satisfies SWROperationContext as any,
             signal: controller.signal,
           })
 
@@ -224,9 +224,9 @@ export class ProcedureUtils<
     return (key, { arg }) =>
       this.call(arg, {
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: { key, type: 'mutator' },
+          [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'mutator' },
           ...options.context,
-        } satisfies OperationContext as any,
+        } satisfies SWROperationContext as any,
       })
   }
 }

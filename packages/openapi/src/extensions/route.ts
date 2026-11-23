@@ -11,28 +11,20 @@ declare module '@orpc/contract' {
     route(meta: OpenAPIMeta): ContractBuilder<TErrorMap>
   }
 
-  interface ProcedureContractBuilderWithInput<
-    TInputSchema extends AnySchema,
-    TErrorMap extends ErrorMap,
-  > {
-    route(meta: OpenAPIMeta): ProcedureContractBuilderWithInput<TInputSchema, TErrorMap>
+  interface ContractBuilderWithInput<TInputSchema extends AnySchema, TErrorMap extends ErrorMap> {
+    route(meta: OpenAPIMeta): ContractBuilderWithInput<TInputSchema, TErrorMap>
   }
 
-  interface ProcedureContractBuilderWithOutput<
-    TOutputSchema extends AnySchema,
-    TErrorMap extends ErrorMap,
-  > {
-    route(meta: OpenAPIMeta): ProcedureContractBuilderWithOutput<TOutputSchema, TErrorMap>
+  interface ContractBuilderWithOutput<TOutputSchema extends AnySchema, TErrorMap extends ErrorMap> {
+    route(meta: OpenAPIMeta): ContractBuilderWithOutput<TOutputSchema, TErrorMap>
   }
 
-  interface ProcedureContractBuilderWithInputOutput<
+  interface ContractBuilderWithInputOutput<
     TInputSchema extends AnySchema,
     TOutputSchema extends AnySchema,
     TErrorMap extends ErrorMap,
   > {
-    route(
-      meta: OpenAPIMeta,
-    ): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap>
+    route(meta: OpenAPIMeta): ContractBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap>
   }
 }
 

@@ -489,9 +489,6 @@ importers:
 
   packages/bun:
     dependencies:
-      '@orpc/client':
-        specifier: workspace:*
-        version: link:../client
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:../lock
@@ -501,16 +498,19 @@ importers:
       '@orpc/ratelimit':
         specifier: workspace:*
         version: link:../ratelimit
-      '@orpc/server':
-        specifier: workspace:*
-        version: link:../server
       '@orpc/shared':
         specifier: workspace:*
         version: link:../shared
+    devDependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
       '@standard-server/core':
         specifier: ~0.16.0
         version: 0.16.0
-    devDependencies:
       '@types/bun':
         specifier: ^1.3.14
         version: 1.4.4
@@ -567,6 +567,18 @@ importers:
       '@cloudflare/vitest-plugin':
         specifier: ^1.5.0
         version: 1.5.0(@types/node@26.6.6)(vitest@4.1.11)
+      '@modelcontextprotocol/server':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@orpc/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
       '@vitest/coverage-istanbul':
         specifier: ^4.1.11
         version: 4.1.11(supports-color@10.2.2)(vitest@4.1.11)
@@ -766,9 +778,6 @@ importers:
 
   packages/nest:
     dependencies:
-      '@orpc/client':
-        specifier: workspace:*
-        version: link:../client
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract

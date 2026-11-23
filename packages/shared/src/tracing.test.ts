@@ -97,6 +97,15 @@ describe('tracing', () => {
 
       expect(mockSpan.recordException).toHaveBeenCalledWith('info', error)
     })
+
+    it.each(['TimeoutError', 'ConnectionClosedError'])('records %s at error level', (name) => {
+      const mockSpan = createMockSpan() as any
+      const error = new Error('failed')
+      error.name = name
+      recordSpanError(mockSpan, error)
+
+      expect(mockSpan.recordException).toHaveBeenCalledWith('error', error)
+    })
   })
 
   describe('setSpanAttributeIfDefined', () => {

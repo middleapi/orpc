@@ -55,13 +55,12 @@ export interface BatchResponseCompressionHandlerPluginOptions {
 export class BatchResponseCompressionHandlerPlugin<
   T extends Context,
 > implements StandardHandlerPlugin<T> {
-  name = '~batch-response-compression'
+  readonly name = '~batch-response-compression'
 
   /**
-   * Compression should be done after batching, to compress the assembled batch response
-   * rather than each subresponse inside it.
+   * Wraps batch: compresses the assembled batch response, not each subresponse.
    */
-  after: string[] = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   private readonly encodings: Exclude<
     BatchResponseCompressionHandlerPluginOptions['encodings'],

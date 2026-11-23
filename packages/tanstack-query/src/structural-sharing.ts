@@ -4,6 +4,14 @@ import { setOwn, stringifyJSON } from '@orpc/shared'
 
 export type StructuralSharing = <T>(oldData: unknown, newData: T) => T
 
+export interface CreateStructuralSharingOptions {
+  /**
+   * Compares custom types by what their handler serializes them to.
+   * Without it, only the built-in types are compared.
+   */
+  serializer?: Public<RPCJsonSerializer> | undefined
+}
+
 /**
  * Creates a `structuralSharing` function that works like TanStack Query's default, but also keeps
  * the previous reference for equal `Date`, `URL`, `Map` and `Set` values, which oRPC's serializer
@@ -14,7 +22,11 @@ export type StructuralSharing = <T>(oldData: unknown, newData: T) => T
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#structural-sharing | TanStack Query Integration - Structural Sharing}
  */
-export function createStructuralSharing(serializer?: Public<RPCJsonSerializer>): StructuralSharing {
+export function createStructuralSharing(
+  options: CreateStructuralSharingOptions = {},
+): StructuralSharing {
+  const serializer = options.serializer
+
   return (oldData, newData) => replaceEqualDeep(oldData, newData, 0, serializer)
 }
 

@@ -3,7 +3,7 @@ import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import { RetryLinkPlugin } from '@orpc/client/plugins'
 import { RPCLink } from '@orpc/client/websocket'
 import type { RouterClient } from '@orpc/server'
-import { createRouterUtils } from '@orpc/tanstack-query'
+import { createTanstackQueryUtils } from '@orpc/tanstack-query'
 
 import type { router } from '../routers'
 
@@ -16,4 +16,4 @@ const link = new RPCLink({
 
 export const client: RouterClient<typeof router, ClientContext> = createORPCClient(link)
 
-export const orpc = createRouterUtils(client)
+export const orpc = createTanstackQueryUtils(client)

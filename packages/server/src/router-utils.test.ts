@@ -9,7 +9,7 @@ import {
   augmentImplementedRouter,
   augmentRouter,
   getRouter,
-  resolveContractProcedure,
+  resolveContractedProcedure,
   unlazyRouter,
   walkProcedureContractsAsync,
   walkProcedureContractsSync,
@@ -363,28 +363,30 @@ describe('getRouter', () => {
   })
 })
 
-describe('resolveContractProcedure', () => {
+describe('resolveContractedProcedure', () => {
   const contract = oc.input(schema1).output(schema2)
 
   it('returns procedures as is', async () => {
-    expect(await resolveContractProcedure(router, procedure1, ['p1'])).toBe(procedure1)
+    expect(await resolveContractedProcedure(router, procedure1, ['p1'])).toBe(procedure1)
   })
 
   it('resolves contract-first implementations by path, including lazy ones', async () => {
-    const resolved = await resolveContractProcedure(router, contract, ['p1'])
+    const resolved = await resolveContractedProcedure(router, contract, ['p1'])
     expect(resolved).toBeInstanceOf(Procedure)
     expect(resolved['~orpc'].handler).toBe(procedure1['~orpc'].handler)
 
-    expect(await resolveContractProcedure(router, contract, ['lazy', 'p1'])).toBeInstanceOf(
+    expect(await resolveContractedProcedure(router, contract, ['lazy', 'p1'])).toBeInstanceOf(
       Procedure,
     )
   })
 
   it('throws when an implementation is missing or invalid', async () => {
-    await expect(resolveContractProcedure(router, contract, ['notExist'])).rejects.toThrow(
+    await expect(resolveContractedProcedure(router, contract, ['notExist'])).rejects.toThrow(
       '[Contract-First] Missing or invalid implementation for procedure at path: "notExist".',
     )
-    await expect(resolveContractProcedure(router, contract, ['invalid'])).rejects.toThrow(TypeError)
+    await expect(resolveContractedProcedure(router, contract, ['invalid'])).rejects.toThrow(
+      TypeError,
+    )
   })
 })
 

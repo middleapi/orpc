@@ -262,13 +262,12 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * @see {@link https://orpc.dev/docs/plugins/batch | Batch Plugin}
  */
 export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~batch'
+  readonly name = '~batch'
 
   /**
-   * Run batch interceptors inside the tracing interceptors
-   * so each subrequest gets its own span instead of sharing one batch-level span.
+   * Wraps tracing, so each subrequest gets its own span.
    */
-  after: string[] = ['~tracing']
+  readonly after: readonly string[] = ['~tracing']
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>

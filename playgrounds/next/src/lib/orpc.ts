@@ -3,7 +3,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import { BatchLinkPlugin, RetryLinkPlugin } from '@orpc/client/plugins'
 import type { RouterClient } from '@orpc/server'
-import { createRouterUtils, StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
+import { createTanstackQueryUtils, StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
 
 import type { router } from '@/routers'
 
@@ -52,6 +52,6 @@ const link = new RPCLink({
 export const client: RouterClient<typeof router, ClientContext> =
   globalThis.$client ?? createORPCClient(link)
 
-export const orpc = createRouterUtils(client, {
+export const orpc = createTanstackQueryUtils(client, {
   plugins: [new StreamQuerySSRUtilsPlugin()],
 })

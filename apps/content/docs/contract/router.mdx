@@ -60,7 +60,7 @@ const router = base.router({
 
 ## Router to Contract
 
-A normal [router](/docs/router) can be used as a contract router as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.
+A normal [router](/docs/router) can be used as a router contract as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.
 
 ```ts
 import { unlazyRouter } from '@orpc/server'
@@ -72,7 +72,7 @@ const compatibleContract = await unlazyRouter(router)
 
 Sometimes you need to import the contract on the client, for example when using [OpenAPI Link](/docs/openapi/link). If you derive the contract from a [router](/docs/router), importing it directly can be heavy and may expose internal logic. To avoid this, follow the steps below to safely minify and export the contract.
 
-1.  **Minify the Contract Router and Export to JSON**
+1.  **Minify the Router Contract and Export to JSON**
 
     ```ts
     import fs from 'node:fs'

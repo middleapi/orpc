@@ -38,7 +38,7 @@ import {
   DEFAULT_ERROR_STATUS,
   DEFAULT_SUCCESS_STATUS,
   EventStreamErrorEvent,
-  resolveContractProcedure,
+  resolveContractedProcedure,
   walkProcedureContractsAsync,
 } from '@orpc/server'
 import type {
@@ -330,7 +330,7 @@ export class McpRegistrar<T extends AnyRouter> {
  * Lazy routers and contract-first implementations are loaded on first use and reused afterward.
  */
 class McpMatcher {
-  private routes: Promise<Map<`/${string}`, McpRoute>> | undefined
+  private routes: Map<`/${string}`, McpRoute> | undefined
 
   constructor(
     private readonly router: AnyRouter,
@@ -338,16 +338,19 @@ class McpMatcher {
     private readonly filter: McpRegistrarOptions<any>['filter'],
   ) {}
 
-  resolveRoutes(): Promise<Map<`/${string}`, McpRoute>> {
-    return (this.routes ??= this.loadRoutes().catch((error) => {
-      // retry on the next call, such as when a lazy router failed to load
-      this.routes = undefined
-      throw error
-    }))
+  /** Not shared across calls: on Cloudflare Workers, a promise never settles once its request ends. */
+  async resolveRoutes(): Promise<Map<`/${string}`, McpRoute>> {
+    if (this.routes !== undefined) {
+      return this.routes
+    }
+
+    const routes = await this.loadRoutes()
+
+    return (this.routes ??= routes)
   }
 
   async match(pathname: `/${string}`): Promise<McpRoute | undefined> {
-    return (await this.resolveRoutes()).get(pathname)
+    return (this.routes ?? (await this.resolveRoutes())).get(pathname)
   }
 
   private async loadRoutes(): Promise<Map<`/${string}`, McpRoute>> {
@@ -361,7 +364,7 @@ class McpMatcher {
       routes.set(pathToHttpPath(path), {
         path,
         contract,
-        procedure: await resolveContractProcedure(this.router, contract, path),
+        procedure: await resolveContractedProcedure(this.router, contract, path),
         inputJsonSchema: resolveToolInputJsonSchema(
           this.converter,
           toArray(contract['~orpc'].inputSchemas),

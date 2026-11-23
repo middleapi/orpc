@@ -45,7 +45,7 @@ export function createGuardedProcedureLazy(lazy: Lazy<unknown>): Lazy<AnyProcedu
  * but .errors (in case implemented procedure error map is more than enough) and .meta cannot be
  * validated that way - so they must be overridden here to ensure the client always sees what the contract defines.
  */
-export function createContractProcedure<
+export function createContractedProcedure<
   TInitialContext extends Context,
   TInjectedContext extends Context,
   TInputSchema extends AnySchema,

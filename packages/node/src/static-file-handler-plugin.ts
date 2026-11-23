@@ -108,11 +108,11 @@ export interface StaticFileHandlerPluginOptions {
  * @see {@link https://orpc.dev/docs/plugins/static-file | Static File Plugin}
  */
 export class StaticFileHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~static-file'
+  readonly name = '~static-file'
 
-  after: string[] = ['~tracing']
+  readonly after: readonly string[] = ['~tracing']
 
-  before: string[] = ['~head-method']
+  readonly before: readonly string[] = ['~head-method']
 
   private readonly rootDir: string
   private readonly path: `/${string}`

@@ -45,8 +45,8 @@ describe('createHydrationOptions', () => {
       constructor(public name: string) {}
     }
 
-    const options = createHydrationOptions(
-      new RPCJsonSerializer({
+    const options = createHydrationOptions({
+      serializer: new RPCJsonSerializer({
         handlers: {
           person: {
             condition: (value) => value instanceof Person,
@@ -55,7 +55,7 @@ describe('createHydrationOptions', () => {
           },
         },
       }),
-    )
+    })
 
     expect(roundTrip({ person: new Person('Earth') }, options)).toEqual({
       person: new Person('Earth'),

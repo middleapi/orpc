@@ -1,5 +1,10 @@
 import type { DistributiveOmit } from '@orpc/shared'
 
+/**
+ * The base shape of a context.
+ *
+ * @see {@link https://orpc.dev/docs/context | Context}
+ */
 export interface Context {
   [key: PropertyKey]: any
 }

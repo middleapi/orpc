@@ -1,5 +1,5 @@
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
-import { AbortError } from '@orpc/shared'
+import { TimeoutError } from '@orpc/shared'
 
 import { RPCHandler } from '../adapters/fetch/index'
 import { os } from '../builder'
@@ -54,7 +54,7 @@ describe('timeoutHandlerPlugin', () => {
     expect(signal.aborted).toBe(false)
   })
 
-  it('should abort the signal with an AbortError and respond once the procedure honors it', async () => {
+  it('should abort the signal with a TimeoutError and respond once the procedure honors it', async () => {
     procedure_handler.mockImplementationOnce(({ signal }) => sleepWithSignal(100_000, signal))
     const handler = makeHandler({ timeout: 1000 })
 
@@ -66,7 +66,7 @@ describe('timeoutHandlerPlugin', () => {
 
     const { signal } = procedure_handler.mock.calls[0]![0]
     expect(signal.aborted).toBe(true)
-    expect(signal.reason).toBeInstanceOf(AbortError)
+    expect(signal.reason).toBeInstanceOf(TimeoutError)
     expect(signal.reason.message).toBe('Request timed out after 1000ms')
   })
 
@@ -232,7 +232,8 @@ describe('timeoutHandlerPlugin', () => {
     await vi.advanceTimersByTimeAsync(2000)
 
     await expect(nextRead).rejects.toSatisfy(
-      (error) => error instanceof AbortError && error.message === 'Request timed out after 2000ms',
+      (error) =>
+        error instanceof TimeoutError && error.message === 'Request timed out after 2000ms',
     )
   })
 

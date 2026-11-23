@@ -1,6 +1,6 @@
-import { NullProtoObj } from '@orpc/shared'
+import { isAbortError, NullProtoObj } from '@orpc/shared'
 
-import { MalformedResponseError, ORPCError, ResponseError } from './error'
+import { ConnectionClosedError, MalformedResponseError, ORPCError, ResponseError } from './error'
 
 describe('oRPCError', () => {
   it('works', () => {
@@ -22,14 +22,9 @@ describe('oRPCError', () => {
     expect(error.message).toBe('Bad Gateway')
   })
 
-  it('can force write .defined', () => {
-    const error = new ORPCError('BAD_GATEWAY')
-
-    expect(error.defined).toBe(false)
-
-    ;(error.defined as any) = true
-
-    expect(error.defined).toBe(true)
+  it('ignores a defined option', () => {
+    // @ts-expect-error - defined is not an option
+    expect(new ORPCError('BAD_GATEWAY', { defined: true }).defined).toBe(false)
   })
 
   it('.toJSON', () => {
@@ -139,6 +134,19 @@ describe('responseError', () => {
 
     expect(error.message).toBe('Received a 404 response.')
     expect('cause' in error).toBe(false)
+  })
+})
+
+describe('connectionClosedError', () => {
+  it('is a distinct error that is not named like an abort', () => {
+    const cause = new Error('cause')
+    const error = new ConnectionClosedError('closed', { cause })
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error.name).toBe('ConnectionClosedError')
+    expect(error.message).toBe('closed')
+    expect(error.cause).toBe(cause)
+    expect(isAbortError(error)).toBe(false)
   })
 })
 

@@ -2,7 +2,7 @@ import type { ProcedureContract, Schema } from '@orpc/contract'
 import { oc } from '@orpc/contract'
 import * as z from 'zod'
 
-import type { PopulatedContractRouterOpenAPIPaths } from './router-utils'
+import type { PopulatedRouterContractOpenAPIPaths } from './router-utils'
 import { populateRouterContractOpenAPIPaths } from './router-utils'
 
 const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
@@ -11,7 +11,7 @@ const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 const ping = oc.input(inputSchema).output(outputSchema)
 const pong = oc.errors({ PONG: { message: 'pong' } })
 
-describe('PopulatedContractRouterOpenAPIPaths', () => {
+describe('PopulatedRouterContractOpenAPIPaths', () => {
   it('preserves the router-contract shape', () => {
     const populated = populateRouterContractOpenAPIPaths({ ping, nested: { pong } })
 
@@ -29,7 +29,7 @@ describe('PopulatedContractRouterOpenAPIPaths', () => {
 
   it('maps optional keys', () => {
     expectTypeOf<
-      PopulatedContractRouterOpenAPIPaths<{ ping?: typeof ping; nested?: { pong?: typeof pong } }>
+      PopulatedRouterContractOpenAPIPaths<{ ping?: typeof ping; nested?: { pong?: typeof pong } }>
     >().toEqualTypeOf<{
       ping?: ProcedureContract<typeof inputSchema, typeof outputSchema, {}> | undefined
       nested?:

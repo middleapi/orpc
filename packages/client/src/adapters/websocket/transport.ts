@@ -1,6 +1,5 @@
 import type { Promisable } from '@orpc/shared'
 import {
-  AbortError,
   loadBytes,
   promiseWithResolvers,
   runWithSignal,
@@ -17,6 +16,7 @@ import {
   isServerPeerSendMessage,
 } from '@standard-server/peer'
 
+import { ConnectionClosedError } from '../../error'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard/index'
 
@@ -35,11 +35,11 @@ export type WebSocketLike = Pick<
 
 export interface WebSocketLinkTransportAttemptInfo {
   /**
-   * Total number of connection attempts for this transport's lifetime.
+   * Total number of connection attempts for this transport's lifetime, this one included.
    * Starts at 1 on the first attempt, increments on every subsequent
    * attempt, and never resets.
    */
-  totalAttempt: number
+  totalAttempts: number
 
   /**
    * Attempt number within the current (re)connect cycle.
@@ -65,22 +65,23 @@ export interface WebSocketLinkTransportReconnectOptions {
 
   /**
    * Maximum number of consecutive failed attempts before giving up.
+   * It counts every attempt of a (re)connect cycle, the first one included (see `attempt`),
+   * so it should be at least 1.
    * When reached, calls waiting for the connection fail, and the next
    * call starts a new reconnect cycle.
-   * Should greater than 1
    *
    * @default Infinity
    */
-  maxAttempt?: number | undefined
+  maxAttempts?: number | undefined
 
   /**
    * Maximum number of connection attempts over the transport's lifetime,
-   * successful ones included (see `totalAttempt`).
+   * successful ones included (see `totalAttempts`).
    * When reached, calls that need a new connection fail instead of connecting.
    *
    * @default Infinity
    */
-  maxTotalAttempt?: number | undefined
+  maxTotalAttempts?: number | undefined
 
   /**
    * Whether to proactively reconnect right after the socket closes,
@@ -144,7 +145,7 @@ interface Connection {
   websocket: WebSocketLike
   peer: ClientPeer
   isHealthy: () => boolean
-  closeReason: () => undefined | AbortError
+  closeReason: () => undefined | ConnectionClosedError
 }
 
 export class WebSocketLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
@@ -165,8 +166,8 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
     this.reconnectEnabled = options.reconnect !== undefined && options.reconnect !== false
     this.reconnectDelay = reconnect.delay ?? ((info) => (info.attempt === 1 ? 0 : 2_000))
-    this.reconnectMaxAttempt = reconnect.maxAttempt ?? Infinity
-    this.reconnectMaxTotalAttempt = reconnect.maxTotalAttempt ?? Infinity
+    this.reconnectMaxAttempt = reconnect.maxAttempts ?? Infinity
+    this.reconnectMaxTotalAttempt = reconnect.maxTotalAttempts ?? Infinity
     this.reconnectOnCloseEnabled =
       this.reconnectEnabled && reconnect.onClose !== undefined && reconnect.onClose !== false
     this.reconnectOnCloseDelay = onClose.delay ?? 0
@@ -209,7 +210,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     }
 
     if (this.totalAttempt >= this.reconnectMaxTotalAttempt) {
-      throw new AbortError(
+      throw new ConnectionClosedError(
         `WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`,
       )
     }
@@ -217,14 +218,17 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     this.current = (async () => {
       // Rejecting `current` lets the `.catch` below fail every call waiting on it
       if (this.attempt >= this.reconnectMaxAttempt) {
-        throw resolved?.closeReason() ?? new AbortError('WebSocket is already closing or closed')
+        throw (
+          resolved?.closeReason() ??
+          new ConnectionClosedError('WebSocket is already closing or closed')
+        )
       }
 
       this.totalAttempt += 1
       this.attempt += 1
 
       const info: WebSocketLinkTransportAttemptInfo = {
-        totalAttempt: this.totalAttempt,
+        totalAttempts: this.totalAttempt,
         attempt: this.attempt,
       }
 
@@ -235,10 +239,10 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         websocket.readyState !== WEBSOCKET_CONNECTING &&
         websocket.readyState !== WEBSOCKET_OPEN
       ) {
-        throw new AbortError('WebSocket is already closing or closed')
+        throw new ConnectionClosedError('WebSocket is already closing or closed')
       }
 
-      let closeReason: undefined | AbortError
+      let closeReason: undefined | ConnectionClosedError
       let closedAt: undefined | number
       let receivedMessage = false
 
@@ -281,7 +285,9 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       )
 
       websocket.addEventListener('close', async (event) => {
-        closeReason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
+        closeReason = new ConnectionClosedError(
+          `WebSocket closed (code ${event.code}: ${event.reason})`,
+        )
         closedAt = Date.now()
         connectingResolvers?.resolve()
         await peer.close(closeReason)
@@ -319,7 +325,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         const attempt = this.attempt
         this.attempt = 0
         this.current = undefined
-        throw new AbortError(`WebSocket reconnect failed after ${attempt} attempt(s)`, {
+        throw new ConnectionClosedError(`WebSocket reconnect failed after ${attempt} attempt(s)`, {
           cause: error,
         })
       }

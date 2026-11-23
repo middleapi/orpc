@@ -82,7 +82,7 @@ describe('WithEffectContext', () => {
         expectTypeOf(opts.kind).toEqualTypeOf<'middleware' | 'handler'>()
         expectTypeOf(opts.context).toEqualTypeOf<ORPCContext>()
         expectTypeOf(opts.input).toEqualTypeOf<unknown>()
-        expectTypeOf(opts.path).toEqualTypeOf<string[]>()
+        expectTypeOf(opts.path).toEqualTypeOf<readonly string[]>()
         expectTypeOf(opts.procedure).toExtend<AnyProcedure>()
         expectTypeOf(opts.signal).toEqualTypeOf<AbortSignal | undefined>()
         expectTypeOf(opts.lastEventId).toEqualTypeOf<string | undefined>()

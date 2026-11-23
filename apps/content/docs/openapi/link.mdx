@@ -126,7 +126,7 @@ Each option can also be a function to dynamically customize values per request. 
 
 ```ts
 const link = new OpenAPILink<ClientContext>(contract, {
-  origin: ({ path, context }) => {
+  origin: (options, path) => {
     if (path[0] === 'internal') {
       return 'https://internal.example.com'
     }

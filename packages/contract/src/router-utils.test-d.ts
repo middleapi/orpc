@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { oc } from './builder'
 import type { MergedErrorMap } from './error-utils'
 import type { ProcedureContract } from './procedure'
-import type { AugmentedContractRouter } from './router-utils'
+import type { AugmentedRouterContract } from './router-utils'
 import type { Schema } from './schema'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
@@ -29,9 +29,9 @@ const errorMap = {
   },
 }
 
-describe('AugmentedContractRouter', () => {
+describe('AugmentedRouterContract', () => {
   it('merges error maps', () => {
-    type Augmented = AugmentedContractRouter<typeof router, typeof errorMap>
+    type Augmented = AugmentedRouterContract<typeof router, typeof errorMap>
 
     expectTypeOf<Augmented['ping']>().toEqualTypeOf<
       ProcedureContract<
@@ -51,7 +51,7 @@ describe('AugmentedContractRouter', () => {
   })
 
   it('preserves nested structure', () => {
-    type Augmented = AugmentedContractRouter<typeof router, typeof errorMap>
+    type Augmented = AugmentedRouterContract<typeof router, typeof errorMap>
 
     expectTypeOf<Augmented['nested']['ping']>().toEqualTypeOf<
       ProcedureContract<
@@ -71,7 +71,7 @@ describe('AugmentedContractRouter', () => {
   })
 
   it('maps optional keys', () => {
-    type Augmented = AugmentedContractRouter<
+    type Augmented = AugmentedRouterContract<
       { ping?: typeof ping; nested?: { pong?: typeof pong } },
       typeof errorMap
     >

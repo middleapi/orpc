@@ -3,9 +3,8 @@ import { decodeBase64url, encodeBase64url } from './base64url'
 const PBKDF2_CONFIG = {
   name: 'PBKDF2',
   /**
-   * Below the OWASP Password Storage Cheat Sheet recommendation of 600,000 iterations
-   * for PBKDF2-HMAC-SHA256. The output does not record the iteration count, so changing
-   * it would make existing ciphertexts undecryptable; raising it needs a versioned format.
+   * Below OWASP's 600,000, but frozen: changing it would break existing ciphertexts.
+   * A stronger format can be marked with a `.` prefix, which base64url never contains.
    */
   iterations: 60_000,
   hash: 'SHA-256',

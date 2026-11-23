@@ -36,17 +36,17 @@ export interface RequestLimitHandlerPluginOptions<T extends Context = Context> {
  * @see {@link https://orpc.dev/docs/plugins/request-limit | Request Limit Plugin}
  */
 export class RequestLimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~request-limit'
+  readonly name = '~request-limit'
 
   /**
-   * Should limit the original batch request body instead of sub-requests.
+   * Wraps batch: limits the original request body, not sub-requests.
    */
-  after: string[] = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   /**
-   * Should limit the final body size instead of the compressed one.
+   * Runs inside request compression: limits the decompressed size.
    */
-  before: string[] = ['~request-compression']
+  readonly before: readonly string[] = ['~request-compression']
 
   private readonly maxBodySize: number
   private readonly error: Exclude<RequestLimitHandlerPluginOptions<T>['error'], undefined>

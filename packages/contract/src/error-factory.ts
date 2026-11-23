@@ -118,7 +118,7 @@ export function error<TCode extends ORPCErrorCode, TData = unknown>(
   }
 }
 
-export type ORPCErrorConstructorMapItemOptions<TData> = Omit<ORPCErrorOptions<TData>, 'status'>
+export type ORPCErrorConstructorMapItemOptions<TData> = ORPCErrorOptions<TData>
 
 export interface ORPCErrorConstructorMapItem<TCode extends ORPCErrorCode, TInData> {
   (

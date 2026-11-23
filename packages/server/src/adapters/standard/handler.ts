@@ -74,6 +74,11 @@ export type StandardHandlerRoutingInterceptor<T extends Context> = Interceptor<
   Promise<StandardHandlerHandleResult>
 >
 
+/**
+ * Options shared by every handler.
+ *
+ * @see {@link https://orpc.dev/docs/plugins#custom-plugins | Plugins - Custom Plugins}
+ */
 export interface StandardHandlerOptions<TContext extends Context> {
   /**
    * Fired on every request before routing, useful when you want
@@ -255,7 +260,7 @@ export class StandardHandler<T extends Context> {
 }
 
 class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
-  name = '~tracing'
+  readonly name = '~tracing'
 
   init(options: StandardHandlerOptions<any>): StandardHandlerOptions<any> {
     return {

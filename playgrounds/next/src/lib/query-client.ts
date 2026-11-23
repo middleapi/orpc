@@ -31,7 +31,7 @@ function createQueryClient(): QueryClient {
       queries: {
         staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
       },
-      ...createHydrationOptions(serializer),
+      ...createHydrationOptions({ serializer }),
     },
   })
 }

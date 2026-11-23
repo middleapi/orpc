@@ -68,7 +68,7 @@ export async function reconcileORPCError(
 
   const cloned = cloneORPCError(error)
 
-  cloned.data = validated.value
+  ;(cloned.data as Writable<typeof cloned.data>) = validated.value
   ;(cloned.defined as Writable<typeof cloned.defined>) = true
 
   return cloned
