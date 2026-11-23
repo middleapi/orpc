@@ -7,7 +7,7 @@ sidebar:
 
 ## Client
 
-Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with an `AbortError`:
+Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with a `TimeoutError`:
 
 ```ts
 import { TimeoutLinkPlugin } from '@orpc/client/plugins'
@@ -27,7 +27,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ## Server
 
-Use `TimeoutHandlerPlugin` to abort the request signal with an `AbortError` when handling exceeds the timeout:
+Use `TimeoutHandlerPlugin` to abort the request signal with a `TimeoutError` when handling exceeds the timeout:
 
 ```ts handler
 import { TimeoutHandlerPlugin } from '@orpc/server/plugins'

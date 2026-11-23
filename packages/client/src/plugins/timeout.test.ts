@@ -1,4 +1,4 @@
-import { AbortError } from '@orpc/shared'
+import { TimeoutError } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
@@ -76,7 +76,7 @@ describe('timeoutLinkPlugin', () => {
     expect(signal!.aborted).toBe(false)
   })
 
-  it('should abort with AbortError when timeout is exceeded', async () => {
+  it('should abort with TimeoutError when timeout is exceeded', async () => {
     const codec = makeCodec()
     const transport = makeAbortableTransport()
 
@@ -92,7 +92,8 @@ describe('timeoutLinkPlugin', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     await expect(promise).rejects.toSatisfy(
-      (error) => error instanceof AbortError && error.message === 'Request timed out after 1000ms',
+      (error) =>
+        error instanceof TimeoutError && error.message === 'Request timed out after 1000ms',
     )
   })
 
@@ -110,7 +111,7 @@ describe('timeoutLinkPlugin', () => {
     promise.catch(() => {})
 
     await vi.advanceTimersByTimeAsync(1000)
-    await expect(promise).rejects.toBeInstanceOf(AbortError)
+    await expect(promise).rejects.toBeInstanceOf(TimeoutError)
 
     expect(timeout).toHaveBeenCalledTimes(1)
     expect(timeout).toHaveBeenCalledWith(
@@ -187,7 +188,8 @@ describe('timeoutLinkPlugin', () => {
 
     await vi.advanceTimersByTimeAsync(1000)
     await expect(promise).rejects.toSatisfy(
-      (error) => error instanceof AbortError && error.message === 'Request timed out after 1000ms',
+      (error) =>
+        error instanceof TimeoutError && error.message === 'Request timed out after 1000ms',
     )
   })
 })

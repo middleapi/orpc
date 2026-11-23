@@ -1,11 +1,12 @@
 import type { IncomingMessage } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
-import { AbortError, promiseWithResolvers } from '@orpc/shared'
+import { promiseWithResolvers } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { WebSocketServer, WebSocket as WsWebSocket } from 'ws'
 
 import { createORPCClient } from '../../client'
+import { ConnectionClosedError } from '../../error'
 import { RPCLink } from './rpc-link'
 
 beforeEach(() => {
@@ -309,7 +310,7 @@ describe('rpcLink', () => {
     await ws.close({ code: 4001, reason: 'server restart' })
 
     await expect(orpc.ping('second')).rejects.toThrow(
-      new AbortError('WebSocket closed (code 4001: server restart)'),
+      new ConnectionClosedError('WebSocket closed (code 4001: server restart)'),
     )
     expect(ws.send).toHaveBeenCalledTimes(1)
     expect(connect).toHaveBeenCalledTimes(1)
@@ -326,7 +327,11 @@ describe('rpcLink', () => {
     )
     await ws.close()
 
-    await expect(promise).rejects.toThrow(new AbortError('WebSocket closed (code 1006: )'))
+    await expect(promise).rejects.toThrow(
+      new ConnectionClosedError('WebSocket closed (code 1006: )'),
+    )
+    await expect(promise).rejects.toBeInstanceOf(ConnectionClosedError)
+    await expect(promise).rejects.toHaveProperty('name', 'ConnectionClosedError')
     expect(ws.send).toHaveBeenCalledTimes(0)
   })
 
@@ -341,10 +346,10 @@ describe('rpcLink', () => {
       const orpc = createORPCClient(new RPCLink({ connect })) as any
 
       await expect(orpc.ping('first')).rejects.toThrow(
-        new AbortError('WebSocket is already closing or closed'),
+        new ConnectionClosedError('WebSocket is already closing or closed'),
       )
       await expect(orpc.ping('second')).rejects.toThrow(
-        new AbortError('WebSocket is already closing or closed'),
+        new ConnectionClosedError('WebSocket is already closing or closed'),
       )
       expect(ws.send).toHaveBeenCalledTimes(0)
       expect(connect).toHaveBeenCalledTimes(1)
@@ -395,6 +400,31 @@ describe('rpcLink', () => {
       'WebSocket reconnect failed after 1 attempt(s)',
     )
     expect(delay).toHaveBeenCalledWith({ totalAttempts: 1, attempt: 1 })
+    expect(connect).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up when the socket is closing without a close reason and no attempts are left', async () => {
+    const ws = createWs()
+    const connect = vi.fn(() => ws)
+    const orpc = createORPCClient(
+      new RPCLink({
+        connect,
+        reconnect: { delay: () => 0, maxAttempts: 1 },
+      }),
+    ) as any
+
+    orpc.ping('first').catch(() => {})
+    await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
+
+    ws.readyState = WEBSOCKET_CLOSING
+
+    const error = await orpc.ping('second').catch((error: unknown) => error)
+
+    expect(error).toBeInstanceOf(ConnectionClosedError)
+    expect(error).toMatchObject({
+      message: 'WebSocket reconnect failed after 1 attempt(s)',
+      cause: new ConnectionClosedError('WebSocket is already closing or closed'),
+    })
     expect(connect).toHaveBeenCalledTimes(1)
   })
 
@@ -487,7 +517,7 @@ describe('rpcLink', () => {
 
     await firstSocket.close()
 
-    const error = new AbortError('WebSocket reconnect stopped after 3 total attempt(s)')
+    const error = new ConnectionClosedError('WebSocket reconnect stopped after 3 total attempt(s)')
     await Promise.all(
       ['second', 'third'].map((input) => expect(orpc.ping(input)).rejects.toThrow(error)),
     )
@@ -781,13 +811,15 @@ describe('rpcLink', () => {
         return result
       }
 
-      const closed = new AbortError('WebSocket closed (code 4001: unauthorized)')
+      const closed = new ConnectionClosedError('WebSocket closed (code 4001: unauthorized)')
       await expect(call('1')).resolves.toEqual(closed)
       await expect(call('2')).resolves.toEqual(closed)
 
       const errors = await Promise.all([call('3'), call('4')])
       for (const error of errors) {
-        expect(error).toEqual(new AbortError('WebSocket reconnect failed after 2 attempt(s)'))
+        expect(error).toEqual(
+          new ConnectionClosedError('WebSocket reconnect failed after 2 attempt(s)'),
+        )
         expect(error.cause).toEqual(closed)
       }
       expect(connect).toHaveBeenCalledTimes(2)
@@ -856,7 +888,7 @@ describe('rpcLink', () => {
       const orpc = createORPCClient(new RPCLink({ connect: () => new WsWebSocket(url) })) as any
 
       await expect(orpc.ping('input')).rejects.toThrow(
-        new AbortError('WebSocket closed (code 1006: )'),
+        new ConnectionClosedError('WebSocket closed (code 1006: )'),
       )
     })
 
@@ -893,7 +925,7 @@ describe('rpcLink', () => {
       const orpc = createORPCClient(new RPCLink({ connect: () => new WsWebSocket(url) })) as any
 
       await expect(orpc.ping('input')).rejects.toThrow(
-        new AbortError('WebSocket closed (code 1006: )'),
+        new ConnectionClosedError('WebSocket closed (code 1006: )'),
       )
     })
   })

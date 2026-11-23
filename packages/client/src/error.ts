@@ -192,6 +192,13 @@ export class ResponseError extends Error {
   }
 }
 
+/**
+ * Error thrown by WebSocket and MessagePort links when the connection is closed or lost.
+ */
+export class ConnectionClosedError extends Error {
+  override readonly name = 'ConnectionClosedError'
+}
+
 export interface MalformedResponseErrorOptions extends ResponseErrorOptions {
   /**
    * @default inferred from the response body or status

@@ -143,6 +143,7 @@ export {
    * @deprecated Use `streamToAsyncIteratorObject` instead.
    */
   streamToAsyncIteratorObject as streamToEventIterator,
+  TimeoutError,
 } from '@orpc/shared'
 
 export type {
