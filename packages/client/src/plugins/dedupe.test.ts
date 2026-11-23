@@ -5,6 +5,7 @@ import * as SharedExperimentalV2Module from '@orpc/shared'
 import {
   AsyncIteratorClass,
   asyncIteratorToStream,
+  getTracer,
   promiseWithResolvers,
   setTracer,
   sleep,
@@ -161,11 +162,10 @@ describe('dedupeLinkPlugin', () => {
   })
 
   describe('with a tracer injecting per-call headers', () => {
-    afterEach(() => {
-      setTracer(undefined)
-    })
-
     function useTracer() {
+      const original = getTracer()
+      onTestFinished(() => setTracer(original))
+
       let spanId = 0
       const makeSpan = () => ({
         id: ++spanId,
