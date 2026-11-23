@@ -327,7 +327,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       let messages: ClientPeerSendMessage[]
 
       try {
-        messages = await this.readMessages(interceptorOptions)
+        messages = await this.readMessages(interceptorOptions.request)
       } catch (error) {
         const refusal =
           error instanceof ORPCError
@@ -335,6 +335,14 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             : new ORPCError('BAD_REQUEST', { message: 'Invalid batch request', cause: error })
 
         return { matched: true, response: await interceptorOptions.encodeError(refusal) }
+      }
+
+      if (messages.length > (await value(this.maxSize, interceptorOptions))) {
+        const tooLarge = new ORPCError('PAYLOAD_TOO_LARGE', {
+          message: 'Batch request size exceeds the maximum allowed size',
+        })
+
+        return { matched: true, response: await interceptorOptions.encodeError(tooLarge) }
       }
 
       /**
@@ -543,10 +551,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
   }
 
-  private async readMessages(
-    options: StandardHandlerRoutingInterceptorOptions<T>,
-  ): Promise<ClientPeerSendMessage[]> {
-    const { request } = options
+  private async readMessages(request: StandardLazyRequest): Promise<ClientPeerSendMessage[]> {
     let messages: unknown
 
     if (request.method === 'GET') {
@@ -574,12 +579,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
     ) {
       throw new ORPCError('BAD_REQUEST', {
         message: `${request.method} batch requests only accept ${request.method} sub-requests`,
-      })
-    }
-
-    if (messages.length > (await value(this.maxSize, options))) {
-      throw new ORPCError('PAYLOAD_TOO_LARGE', {
-        message: 'Batch request size exceeds the maximum allowed size',
       })
     }
 

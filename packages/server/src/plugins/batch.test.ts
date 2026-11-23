@@ -399,6 +399,21 @@ describe('batchHandlerPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
+    it('does not turn a failing maxSize option into a refusal', async () => {
+      const error = new Error('boom')
+      const handler = createHandler(
+        new BatchHandlerPlugin({
+          maxSize: () => {
+            throw error
+          },
+        }),
+      )
+
+      await expect(
+        handler.handle(createBatchRequest({ messages: [makePeerRequestMessage('0', '/ping')] })),
+      ).rejects.toBe(error)
+    })
+
     it('returns 500 sub-response when mapSubrequest throws', async ({ onTestFinished }) => {
       const rejectSpy = vi
         .spyOn(Promise, 'reject')
