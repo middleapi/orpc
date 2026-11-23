@@ -302,6 +302,41 @@ describe('standardOpenAPIMatcher', () => {
     expect(initSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('indexes lazy routers sharing a prefix once each while one load is stuck', async () => {
+    const base = os.$context<any>()
+
+    const find = base.route({ method: 'GET', path: '/find' }).handler(() => 'find')
+    const list = base.route({ method: 'GET', path: '/list' }).handler(() => 'list')
+
+    let resolveStuck!: (value: { default: any }) => void
+    const findLoader = vi.fn()
+      .mockReturnValueOnce(new Promise((resolve) => {
+        resolveStuck = resolve
+      }))
+      .mockResolvedValue({ default: { find } })
+
+    const rpcMatcher = new StandardOpenAPIMatcher()
+    rpcMatcher.init(base.router({
+      a: base.prefix('/users').lazy(findLoader),
+      b: base.prefix('/users').lazy(() => Promise.resolve({ default: { list } })),
+    }))
+    const initSpy = vi.spyOn(rpcMatcher, 'init')
+
+    const stuck = rpcMatcher.match('GET', '/users/find')
+    const [found, listed] = await Promise.all([
+      rpcMatcher.match('GET', '/users/find'),
+      rpcMatcher.match('GET', '/users/list'),
+    ])
+
+    expect(found).toEqual({ path: ['a', 'find'], procedure: expect.any(Object), params: undefined })
+    expect(listed).toEqual({ path: ['b', 'list'], procedure: expect.any(Object), params: undefined })
+
+    resolveStuck({ default: { find } })
+
+    expect(await stuck).toEqual({ path: ['a', 'find'], procedure: expect.any(Object), params: undefined })
+    expect(initSpy.mock.calls.map(([, path]) => path!.join('/')).sort()).toEqual(['a', 'b'])
+  })
+
   it('multiple lazy routers with lazy router inside lazy router', async () => {
     const base = os.$context<any>()
 
