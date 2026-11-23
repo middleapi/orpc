@@ -361,6 +361,52 @@ describe('memoryLocker', () => {
       await expect(timedOut).rejects.toBeInstanceOf(LockTimeoutError)
     })
 
+    it('frees the lock when every waiter timed out before the handover', async () => {
+      const locker = new MemoryLocker({ ttl: 1000, timeout: 500 })
+      const { promise: release, resolve } = promiseWithResolvers<void>()
+      const holder = locker.lock('key', () => release, { ttl: 60_000 })
+
+      let timedOut!: Promise<unknown>
+      await withoutTimers(() => {
+        timedOut = locker.lock('key', vi.fn())
+        timedOut.catch(() => {})
+      })
+
+      await vi.advanceTimersByTimeAsync(500)
+      resolve()
+      await holder
+
+      await expect(timedOut).rejects.toBeInstanceOf(LockTimeoutError)
+      const fn = vi.fn(() => 'ok')
+      await expect(locker.lock('key', fn, { timeout: 0 })).resolves.toBe('ok')
+      expect(fn).toHaveBeenCalledWith({ waited: false })
+    })
+
+    it('stops checking once settled even when its timers cannot be cleared', async () => {
+      const locker = new MemoryLocker({ ttl: 60_000 })
+      const { promise: releaseFirst, resolve: resolveFirst } = promiseWithResolvers<void>()
+      const holder = locker.lock('key', () => releaseFirst, { ttl: 100 })
+
+      const clearSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementation(() => {})
+      const waiter = locker.lock('key', () => 'ok')
+      const { promise: releaseLast, resolve: resolveLast } = promiseWithResolvers<void>()
+      const last = locker.lock('key', () => releaseLast)
+
+      await vi.advanceTimersByTimeAsync(50)
+      resolveFirst()
+      await holder
+      await expect(waiter).resolves.toBe('ok')
+
+      const spy = vi.spyOn(globalThis, 'setTimeout')
+      await vi.advanceTimersByTimeAsync(100)
+      expect(spy).not.toHaveBeenCalled()
+      spy.mockRestore()
+      clearSpy.mockRestore()
+
+      resolveLast()
+      await last
+    })
+
     it('does not expire a holder when the system clock jumps forward', async () => {
       const locker = new MemoryLocker({ ttl: 60_000 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
