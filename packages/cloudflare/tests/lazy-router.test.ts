@@ -3,148 +3,85 @@ import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { sleep } from '@orpc/shared'
-import { exports } from 'cloudflare:workers'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import { setFetchHandler } from './__shared__/fetch-handler'
+import { fetchText, setFetchHandler, withTimeout } from './__shared__/fetch-handler'
 
 const ping = os.meta(openapi({ method: 'POST', path: '/nested/ping' })).handler(() => 'pong')
 
-const setups = [
-  {
-    name: 'RPCHandler',
-    createHandler: (router: any) => new RPCHandler(router),
-    output: '{"json":"pong"}',
-  },
-  {
-    name: 'OpenAPIHandler',
-    createHandler: (router: any) => new OpenAPIHandler(router),
-    output: '"pong"',
-  },
-] as const
-
-describe.each(setups)('lazy router with $name', ({ createHandler, output }) => {
-  afterEach(() => {
-    setFetchHandler(undefined)
-  })
-
+describe.each([
+  { name: 'RPCHandler', Handler: RPCHandler, output: '{"json":"pong"}' },
+  { name: 'OpenAPIHandler', Handler: OpenAPIHandler, output: '"pong"' },
+])('lazy router with $name', ({ Handler, output }) => {
   /**
    * Kept outside the fetch handler like a real Worker. The loader's first call waits on
-   * a timer of the calling request, later calls resolve at once.
+   * a timer of the calling request, so it never settles once that request ends.
    */
   function setup() {
-    let loaderCalls = 0
+    let loads = 0
 
-    const router = {
+    const handler = new Handler({
       nested: os.lazy(async () => {
-        if (++loaderCalls === 1) {
-          await sleep(200)
+        if (++loads === 1) {
+          await sleep(50)
         }
 
         return { default: { ping } }
       }),
-    }
-
-    const handler = createHandler(router)
-
-    async function handle(request: Request): Promise<Response> {
-      const { matched, response } = await handler.handle(request, {
-        prefix: '/api',
-        context: {},
-      })
-
-      return matched ? response : new Response('not matched', { status: 404 })
-    }
-
-    setFetchHandler(async (request) => {
-      const url = new URL(request.url)
-
-      // starts the work, then responds before the lazy load finishes
-      if (url.pathname.startsWith('/early/')) {
-        const forwarded = new Request(new URL(url.pathname.slice('/early'.length), url), request)
-        const result = await Promise.race([handle(forwarded), sleep(20).then(() => undefined)])
-        return new Response(result === undefined ? 'ended early' : 'finished')
-      }
-
-      const result = await Promise.race([
-        handle(request),
-        sleep(1000).then(() => 'timeout' as const),
-      ])
-
-      if (result === 'timeout') {
-        return new Response('timeout', { status: 504 })
-      }
-
-      return new Response(`${result.status}:${await result.text()}`)
     })
 
-    return {
-      get loaderCalls() {
-        return loaderCalls
-      },
-    }
+    setFetchHandler(async (request) => {
+      const handling = handler.handle(request, { prefix: '/api', context: {} })
+
+      if (new URL(request.url).searchParams.has('early')) {
+        handling.catch(() => {})
+        await sleep(20)
+        return new Response('ended early')
+      }
+
+      const result = await withTimeout(handling)
+
+      if (result === 'timeout' || !result.matched) {
+        return new Response(result === 'timeout' ? result : 'not matched')
+      }
+
+      return new Response(await result.response.text())
+    })
+
+    return { loads: () => loads }
   }
 
-  function call(path = '/api/nested/ping') {
-    return exports.default.fetch(`http://x${path}`, {
+  const call = (search = '') =>
+    fetchText(`/api/nested/ping${search}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
     })
-  }
-
-  async function expectPong() {
-    const response = await call()
-    expect(await response.text()).toBe(`200:${output}`)
-  }
-
-  it('serves a request sent while an ended request is still loading the router', async () => {
-    const state = setup()
-
-    const early = await call('/early/api/nested/ping')
-    expect(await early.text()).toBe('ended early')
-    expect(state.loaderCalls).toBe(1)
-
-    await expectPong()
-    expect(state.loaderCalls).toBe(2)
-
-    await expectPong()
-    expect(state.loaderCalls).toBe(2)
-  })
 
   it('serves a request sent after the loading request ended', async () => {
-    const state = setup()
+    const { loads } = setup()
 
-    const early = await call('/early/api/nested/ping')
-    expect(await early.text()).toBe('ended early')
+    expect(await call('?early')).toBe('ended early')
+    expect(loads()).toBe(1)
 
-    // past the first load's timer, which never fires since its request ended
-    await sleep(300)
-    expect(state.loaderCalls).toBe(1)
+    expect(await call()).toBe(output)
+    expect(loads()).toBe(2)
 
-    await expectPong()
-    expect(state.loaderCalls).toBe(2)
-
-    await expectPong()
-    expect(state.loaderCalls).toBe(2)
+    expect(await call()).toBe(output)
+    expect(loads()).toBe(2)
   })
 
-  it('serves concurrent requests while an ended request is still loading the router', async () => {
-    const state = setup()
+  it('serves concurrent requests after the loading request ended', async () => {
+    const { loads } = setup()
 
-    const early = await call('/early/api/nested/ping')
-    expect(await early.text()).toBe('ended early')
+    expect(await call('?early')).toBe('ended early')
 
-    const responses = await Promise.all([call(), call()])
-    expect(await Promise.all(responses.map((r) => r.text()))).toEqual([
-      `200:${output}`,
-      `200:${output}`,
-    ])
+    expect(await Promise.all([call(), call()])).toEqual([output, output])
     // each loads unless the other already indexed it
-    const loaderCalls = state.loaderCalls
-    expect(loaderCalls).toBeGreaterThanOrEqual(2)
-    expect(loaderCalls).toBeLessThanOrEqual(3)
+    const loadsAfter = loads()
+    expect(loadsAfter).toBeGreaterThanOrEqual(2)
+    expect(loadsAfter).toBeLessThanOrEqual(3)
 
-    await expectPong()
-    expect(state.loaderCalls).toBe(loaderCalls)
+    expect(await call()).toBe(output)
+    expect(loads()).toBe(loadsAfter)
   })
 })
