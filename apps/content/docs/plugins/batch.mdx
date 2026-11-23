@@ -82,12 +82,6 @@ const link = new RPCLink({
 
 </CodeGroup>
 
-## Refused Batches
-
-When the server refuses a whole batch, it answers with a regular error response instead of a batch response, and every call in the batch rejects with that `ORPCError`. A malformed batch is a `BAD_REQUEST`, a batch above `maxSize` is a `PAYLOAD_TOO_LARGE`, and an error another plugin throws while the batch body is read, such as the [Request Limit Plugin](/docs/plugins/request-limit)'s, keeps its code, status, message, and data.
-
-A subrequest that matches no procedure fails on its own with a `NOT_FOUND` error, without affecting the rest of the batch.
-
 ## Response Modes
 
 In the default `buffered` mode, the server starts the batch response once every procedure has responded, so it can carry their [headers](#response-headers). The response streams only if one of them returned an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). If your client cannot read streamed responses, keep these procedures out of the batch with [`filter`](#filtering-requests).
