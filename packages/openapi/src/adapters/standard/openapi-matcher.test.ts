@@ -824,6 +824,37 @@ describe('openAPIMatcher', () => {
         procedure: second,
       })
     })
+
+    it('indexes lazy routers sharing a prefix once each while one load is stuck', async () => {
+      const find = os.meta(openapi({ method: 'GET', path: '/find' })).handler(() => 'find')
+      const list = os.meta(openapi({ method: 'GET', path: '/list' })).handler(() => 'list')
+      const stuckLoad = promiseWithResolvers<{ default: any }>()
+      const findLoader = vi
+        .fn()
+        .mockReturnValueOnce(stuckLoad.promise)
+        .mockResolvedValue({ default: { find } })
+      const matcher = new OpenAPIMatcher({
+        a: os.meta(openapi({ prefix: '/users' })).lazy(findLoader),
+        b: os.meta(openapi({ prefix: '/users' })).lazy(async () => ({ default: { list } })),
+      })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
+
+      const stuck = matcher.match('GET', '/users/find', undefined)
+      const [found, listed] = await Promise.all([
+        matcher.match('GET', '/users/find', undefined),
+        matcher.match('GET', '/users/list', undefined),
+      ])
+
+      expect(found).toMatchObject({ path: ['a', 'find'] })
+      expect(listed).toMatchObject({ path: ['b', 'list'] })
+
+      stuckLoad.resolve({ default: { find } })
+
+      await expect(stuck).resolves.toMatchObject({ path: ['a', 'find'] })
+      expect(
+        indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/')).toSorted(),
+      ).toEqual(['a', 'b'])
+    })
   })
 
   describe('contract-first routers', () => {
