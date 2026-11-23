@@ -94,7 +94,7 @@ it('case: with streamed/useQuery', async () => {
   const { result } = renderHook(() =>
     useQuery(
       orpc.stream.streamedOptions({
-        queryFnOptions: {
+        fnOptions: {
           refetchMode: 'append',
           maxChunks: 3,
         },
@@ -132,7 +132,7 @@ it('case: with streamed/useQuery', async () => {
     queryClient.getQueryData(
       orpc.stream.streamedKey({
         input: { input: 2 },
-        queryFnOptions: { refetchMode: 'append', maxChunks: 3 },
+        fnOptions: { refetchMode: 'append', maxChunks: 3 },
       }),
     ),
   ).toEqual([{ output: '0' }, { output: '1' }])

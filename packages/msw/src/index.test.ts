@@ -1,5 +1,8 @@
 it('exports createHTTPUtils', async () => {
-  await expect(import('./index')).resolves.toMatchObject({
+  const exports = await import('./index')
+
+  expect(exports).toMatchObject({
     createHTTPUtils: expect.any(Function),
+    HTTPProcedureUtils: expect.any(Function),
   })
 })

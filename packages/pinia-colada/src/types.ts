@@ -31,7 +31,7 @@ export type UseMutationFnContext = Parameters<NonNullable<UseMutationOptionsGlob
  *
  * @see {@link https://orpc.dev/docs/integrations/pinia-colada#client-context | Pinia Colada Integration - Client Context}
  */
-export const OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+export const PINIA_COLADA_OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_PINIA_COLADA_OPERATION_CONTEXT',
 ) as any
 
@@ -43,8 +43,8 @@ export type OperationType = 'query' | 'streamed' | 'live' | 'infinite' | 'mutati
  *
  * @see {@link https://orpc.dev/docs/integrations/pinia-colada#client-context | Pinia Colada Integration - Client Context}
  */
-export interface OperationContext {
-  [OPERATION_CONTEXT_SYMBOL]?: {
+export interface PiniaColadaOperationContext {
+  [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]?: {
     key: EntryKey
     type: OperationType
   }

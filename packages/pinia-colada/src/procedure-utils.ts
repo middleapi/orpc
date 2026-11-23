@@ -27,7 +27,7 @@ import type {
   MutationKeyOptions,
   MutationOptionsIn,
   MutationOptionsOut,
-  OperationContext,
+  PiniaColadaOperationContext,
   QueryKeyOptions,
   QueryOptionsIn,
   QueryOptionsOut,
@@ -37,14 +37,14 @@ import type {
   UseMutationFnContext,
   UseQueryFnContext,
 } from './types'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { PINIA_COLADA_OPERATION_CONTEXT_SYMBOL } from './types'
 
 export interface ProcedureUtilsQueryInterceptorOptions<
   TClientContext extends ClientContext,
   TInput,
 > {
   path: string[]
-  context: TClientContext & OperationContext
+  context: TClientContext & PiniaColadaOperationContext
   input: TInput
   fnContext: UseQueryFnContext
 }
@@ -91,7 +91,7 @@ export interface ProcedureUtilsInfiniteInterceptorOptions<
   TInput,
 > {
   path: string[]
-  context: TClientContext & OperationContext
+  context: TClientContext & PiniaColadaOperationContext
   input: TInput
   fnContext: UseInfiniteQueryFnContext<any, any, any, any>
 }
@@ -110,7 +110,7 @@ export interface ProcedureUtilsMutationInterceptorOptions<
   TInput,
 > {
   path: string[]
-  context: TClientContext & OperationContext
+  context: TClientContext & PiniaColadaOperationContext
   input: TInput
   fnContext: UseMutationFnContext
 }
@@ -473,12 +473,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
                 key,
                 type: 'query',
               },
               ...context,
-            } satisfies OperationContext as any,
+            } satisfies PiniaColadaOperationContext as any,
             input: input as TInput,
             fnContext,
           },
@@ -567,12 +567,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
                 key,
                 type: 'streamed',
               },
               ...context,
-            } satisfies OperationContext as any,
+            } satisfies PiniaColadaOperationContext as any,
             input: input as TInput,
             fnContext,
           },
@@ -662,12 +662,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
                 key,
                 type: 'live',
               },
               ...context,
-            } satisfies OperationContext as any,
+            } satisfies PiniaColadaOperationContext as any,
             input: input as TInput,
             fnContext,
           },
@@ -758,12 +758,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
                 key,
                 type: 'infinite',
               },
               ...context,
-            } satisfies OperationContext as any,
+            } satisfies PiniaColadaOperationContext as any,
             input: input(fnContext.pageParam) as TInput,
             fnContext,
           },
@@ -837,12 +837,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
                 key: typeof key === 'function' ? key(input) : key,
                 type: 'mutation',
               },
               ...context,
-            } satisfies OperationContext as any,
+            } satisfies PiniaColadaOperationContext as any,
             input,
             fnContext,
           },

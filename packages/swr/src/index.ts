@@ -6,8 +6,14 @@ export { createRouterUtils as createSWRUtils } from './router-utils'
 export { SharedUtils } from './shared-utils'
 export * from './types'
 export {
-  OPERATION_CONTEXT_SYMBOL as SWR_OPERATION_CONTEXT_SYMBOL,
-  type OperationContext as SWROperationContext,
+  /**
+   * @deprecated Use `SWR_OPERATION_CONTEXT_SYMBOL` instead.
+   */
+  SWR_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
+  /**
+   * @deprecated Use `SWROperationContext` instead.
+   */
+  type SWROperationContext as OperationContext,
 } from './types'
 
 export type { Public } from '@orpc/shared'

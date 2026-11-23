@@ -293,7 +293,7 @@ describe('ProcedureUtils', () => {
       expectTypeOf(
         optionalUtils.streamedKey({
           input: { search: 'search' },
-          queryFnOptions: {
+          fnOptions: {
             maxChunks: 1,
             refetchMode: 'append',
           },
@@ -301,7 +301,7 @@ describe('ProcedureUtils', () => {
       ).toExtend<QueryKey>()
 
       // @ts-expect-error - 'replace' is no longer a refetch mode
-      optionalUtils.streamedKey({ queryFnOptions: { refetchMode: 'replace' } })
+      optionalUtils.streamedKey({ fnOptions: { refetchMode: 'replace' } })
       // @ts-expect-error - settleOnFirstData is not part of the key
       optionalUtils.streamedKey({ settleOnFirstData: true })
     })
@@ -375,7 +375,7 @@ describe('ProcedureUtils', () => {
       streamUtils.streamedOptions({ initialData: () => 'invalid' })
     })
 
-    it('accepts settleOnFirstData and serializable queryFnOptions', () => {
+    it('accepts settleOnFirstData and serializable fnOptions', () => {
       streamUtils.streamedOptions({ settleOnFirstData: true })
       streamUtils.streamedOptions({ settleOnFirstData: false })
       // @ts-expect-error - invalid settleOnFirstData
@@ -390,7 +390,7 @@ describe('ProcedureUtils', () => {
         settleOnFirstData: true,
       })
 
-      streamUtils.streamedOptions({ queryFnOptions: { refetchMode: 'reset', maxChunks: 10 } })
+      streamUtils.streamedOptions({ fnOptions: { refetchMode: 'reset', maxChunks: 10 } })
     })
 
     it('return valid streamed options', () => {
@@ -1116,7 +1116,7 @@ describe('ProcedureUtilsOptions', () => {
     const _defaults: TestOptions = {
       streamedKey: {
         input: { search: 'test' },
-        queryFnOptions: { maxChunks: 10 },
+        fnOptions: { maxChunks: 10 },
       },
     }
 
@@ -1133,7 +1133,7 @@ describe('ProcedureUtilsOptions', () => {
 
         return {
           input: { search: 'test' },
-          queryFnOptions: { maxChunks: 10 },
+          fnOptions: { maxChunks: 10 },
         }
       },
     }

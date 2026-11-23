@@ -8,7 +8,7 @@ import {
   ProcedureUtils,
 } from './procedure-utils'
 import * as StreamQueryModule from './stream-query'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { PINIA_COLADA_OPERATION_CONTEXT_SYMBOL } from './types'
 
 const generateOperationKeySpy = vi.spyOn(KeyModule, 'generateOperationKey')
 const streamedQuerySpy = vi.spyOn(StreamQueryModule, 'serializableStreamedQuery')
@@ -174,7 +174,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(1, {
         signal: expect.any(AbortSignal),
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'streamed',
           },
@@ -265,7 +265,7 @@ describe('procedureUtils', () => {
           fnContext,
           context: {
             batch: true,
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: options.key,
               type: 'streamed',
             },
@@ -281,7 +281,7 @@ describe('procedureUtils', () => {
         signal: expect.any(AbortSignal),
         context: {
           batch: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'streamed',
           },
@@ -398,7 +398,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(1, {
         signal: expect.any(AbortSignal),
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'live',
           },
@@ -480,7 +480,7 @@ describe('procedureUtils', () => {
           fnContext,
           context: {
             batch: true,
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: options.key,
               type: 'live',
             },
@@ -496,7 +496,7 @@ describe('procedureUtils', () => {
         signal: expect.any(AbortSignal),
         context: {
           batch: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'live',
           },
@@ -680,7 +680,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(1, {
         signal,
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'query',
           },
@@ -704,7 +704,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(undefined, {
         signal,
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'query',
           },
@@ -722,7 +722,7 @@ describe('procedureUtils', () => {
         signal,
         context: {
           batch: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'query',
           },
@@ -747,7 +747,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(undefined, {
         signal,
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: ['__custom__'],
             type: 'query',
           },
@@ -803,7 +803,7 @@ describe('procedureUtils', () => {
           fnContext,
           context: {
             batch: true,
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: options.key,
               type: 'query',
             },
@@ -821,7 +821,7 @@ describe('procedureUtils', () => {
         context: {
           batch: true,
           extra: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'query',
           },
@@ -881,7 +881,7 @@ describe('procedureUtils', () => {
         {
           signal,
           context: {
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: options.key,
               type: 'infinite',
             },
@@ -919,7 +919,7 @@ describe('procedureUtils', () => {
           signal,
           context: {
             batch: true,
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: options.key,
               type: 'infinite',
             },
@@ -952,7 +952,7 @@ describe('procedureUtils', () => {
         {
           signal,
           context: {
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: ['__custom__'],
               type: 'infinite',
             },
@@ -1008,7 +1008,7 @@ describe('procedureUtils', () => {
           fnContext,
           context: {
             batch: true,
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: options.key,
               type: 'infinite',
             },
@@ -1025,7 +1025,7 @@ describe('procedureUtils', () => {
         signal,
         context: {
           batch: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: options.key,
             type: 'infinite',
           },
@@ -1077,7 +1077,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(1, {
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: generateOperationKeySpy.mock.results[1]!.value,
             type: 'mutation',
           },
@@ -1105,7 +1105,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(1, {
         context: {
           batch: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: generateOperationKeySpy.mock.results[1]!.value,
             type: 'mutation',
           },
@@ -1130,7 +1130,7 @@ describe('procedureUtils', () => {
       await expect(options.mutation(1, {})).resolves.toEqual('__mocked__')
       expect(client).toHaveBeenCalledWith(1, {
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: ['__custom__'],
             type: 'mutation',
           },
@@ -1182,7 +1182,7 @@ describe('procedureUtils', () => {
           fnContext,
           context: {
             batch: true,
-            [OPERATION_CONTEXT_SYMBOL]: {
+            [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
               key: generateOperationKeySpy.mock.results[0]!.value,
               type: 'mutation',
             },
@@ -1198,7 +1198,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith('__override__', {
         context: {
           batch: true,
-          [OPERATION_CONTEXT_SYMBOL]: {
+          [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
             key: generateOperationKeySpy.mock.results[0]!.value,
             type: 'mutation',
           },

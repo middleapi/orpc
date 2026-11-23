@@ -5,10 +5,14 @@ import { createRouterUtils } from './router-utils'
 import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr'
 
 it('accepts an RPCSerializer', () => {
-  createHydrationOptions(new RPCSerializer())
+  createHydrationOptions()
+  createHydrationOptions({})
+  createHydrationOptions({ serializer: new RPCSerializer() })
 
   // @ts-expect-error not a serializer
-  createHydrationOptions({})
+  createHydrationOptions({ serializer: {} })
+  // @ts-expect-error the serializer is no longer a positional argument
+  createHydrationOptions(new RPCSerializer())
 })
 
 it('StreamQuerySSRUtilsPlugin infers the client', () => {

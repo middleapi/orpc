@@ -1218,6 +1218,7 @@ orpc.live.experimental_liveOptions({ input: {} })
 Streamed queries changed (see [Streamed Query Options](/docs/integrations/tanstack-query#streamed-query-options)):
 
 - `refetchMode: 'reset'` keeps the old data until the new stream connects, then sets it to `[]`. (v1 cleared it immediately, returning the query to `pending`.)
+- `queryFnOptions` is now `fnOptions`, the same name `.key({ type: 'streamed', fnOptions })` uses.
 - `refetchMode: 'replace'` was removed. To keep the old data until the stream ends, collect the stream in a custom `queryFn`:
 
 ```ts

@@ -34,7 +34,7 @@ import type {
   MutationOptionsIn,
   MutationOptionsOut,
   MutationOptionsInRest,
-  OperationContext,
+  TanstackQueryOperationContext,
   QueryKeyOptions,
   QueryOptionsIn,
   QueryOptionsOut,
@@ -44,7 +44,7 @@ import type {
   StreamedOptionsOut,
   StreamedOptionsInRest,
 } from './types'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL } from './types'
 
 function resolveOptionsInRest<T>(rest: [options?: T]): T {
   return rest[0] ?? ({} as T) // only undefined when options are optional
@@ -55,7 +55,7 @@ export interface ProcedureUtilsQueryInterceptorOptions<
   TInput,
 > {
   path: string[]
-  context: TClientContext & OperationContext
+  context: TClientContext & TanstackQueryOperationContext
   input: TInput | SkipToken
   fnContext: QueryFunctionContext
 }
@@ -451,7 +451,7 @@ export class ProcedureUtils<
     const queryKey = this.queryKey(optionsIn)
 
     return {
-      structuralSharing: createStructuralSharing(this.options.serializer),
+      structuralSharing: createStructuralSharing({ serializer: this.options.serializer }),
       ...(optionsIn as any),
       queryKey,
       queryFn: (fnContext) => {
@@ -460,12 +460,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
                 key: queryKey,
                 type: 'query',
               },
               ...optionsIn.context,
-            } satisfies OperationContext as any,
+            } satisfies TanstackQueryOperationContext as any,
             input: optionsIn.input as TInput | SkipToken,
             fnContext,
           },
@@ -507,7 +507,7 @@ export class ProcedureUtils<
       this.key({
         type: 'streamed',
         input: (optionsIn as any).input,
-        fnOptions: (optionsIn as any).queryFnOptions,
+        fnOptions: (optionsIn as any).fnOptions,
       })
 
     return queryKey as DataTag<QueryKey, InferStreamedQueryOutput<TOutput>, TError>
@@ -551,12 +551,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
                 key: queryKey,
                 type: 'streamed',
               },
               ...optionsIn.context,
-            } satisfies OperationContext as any,
+            } satisfies TanstackQueryOperationContext as any,
             input: optionsIn.input as TInput | SkipToken,
             fnContext,
           },
@@ -579,7 +579,7 @@ export class ProcedureUtils<
 
                 return output
               },
-              { ...optionsIn.queryFnOptions, settleOnFirstData },
+              { ...optionsIn.fnOptions, settleOnFirstData },
             )(fnContext)
           },
         )
@@ -637,7 +637,7 @@ export class ProcedureUtils<
     const { settleOnFirstData, ...queryOptions } = optionsIn
 
     return {
-      structuralSharing: createStructuralSharing(this.options.serializer),
+      structuralSharing: createStructuralSharing({ serializer: this.options.serializer }),
       ...(queryOptions as any),
       queryKey,
       queryFn: (fnContext) => {
@@ -646,12 +646,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
                 key: queryKey,
                 type: 'live',
               },
               ...optionsIn.context,
-            } satisfies OperationContext as any,
+            } satisfies TanstackQueryOperationContext as any,
             input: optionsIn.input as TInput | SkipToken,
             fnContext,
           },
@@ -740,7 +740,7 @@ export class ProcedureUtils<
     const queryKey = this.infiniteKey(optionsIn)
 
     return {
-      structuralSharing: createStructuralSharing(this.options.serializer),
+      structuralSharing: createStructuralSharing({ serializer: this.options.serializer }),
       ...(optionsIn as any),
       queryKey,
       queryFn: (fnContext) => {
@@ -749,12 +749,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
                 key: queryKey,
                 type: 'infinite',
               },
               ...optionsIn.context,
-            } satisfies OperationContext as any,
+            } satisfies TanstackQueryOperationContext as any,
             input:
               optionsIn.input === skipToken
                 ? skipToken
@@ -819,12 +819,12 @@ export class ProcedureUtils<
           {
             path: this.path,
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: {
+              [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
                 key: mutationKey,
                 type: 'mutation',
               },
               ...optionsIn.context,
-            } satisfies OperationContext as any,
+            } satisfies TanstackQueryOperationContext as any,
             fnContext,
             input,
           },

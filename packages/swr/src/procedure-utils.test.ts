@@ -2,7 +2,7 @@ import { promiseWithResolvers } from '@orpc/shared'
 
 import type { OperationKey } from './key'
 import { ProcedureUtils } from './procedure-utils'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { SWR_OPERATION_CONTEXT_SYMBOL } from './types'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -45,7 +45,7 @@ describe('procedureUtils', () => {
     expect(client).toHaveBeenCalledTimes(1)
     expect(client).toHaveBeenCalledWith(
       { search: '__search__' },
-      { context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'fetcher' } } },
+      { context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'fetcher' } } },
     )
   })
 
@@ -64,7 +64,10 @@ describe('procedureUtils', () => {
     expect(client).toHaveBeenCalledWith(
       { search: '__search__' },
       {
-        context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key: prefixedKey, type: 'fetcher' } },
+        context: {
+          batch: true,
+          [SWR_OPERATION_CONTEXT_SYMBOL]: { key: prefixedKey, type: 'fetcher' },
+        },
       },
     )
   })
@@ -90,7 +93,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' } },
+          context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' } },
           signal: expect.any(AbortSignal),
         },
       )
@@ -129,7 +132,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' } },
+          context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' } },
           signal: expect.any(AbortSignal),
         },
       )
@@ -161,7 +164,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' } },
+          context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' } },
           signal: expect.any(AbortSignal),
         },
       )
@@ -322,7 +325,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' } },
+          context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' } },
           signal: expect.any(AbortSignal),
         },
       )
@@ -351,7 +354,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(
         { search: '__search__' },
         {
-          context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' } },
+          context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' } },
           signal: expect.any(AbortSignal),
         },
       )
@@ -461,7 +464,7 @@ describe('procedureUtils', () => {
     expect(client).toHaveBeenCalledTimes(1)
     expect(client).toHaveBeenCalledWith(
       { search: '__search__' },
-      { context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key: 'key', type: 'mutator' } } },
+      { context: { batch: true, [SWR_OPERATION_CONTEXT_SYMBOL]: { key: 'key', type: 'mutator' } } },
     )
   })
 })

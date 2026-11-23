@@ -7,7 +7,7 @@ import type { PromiseWithError } from '@orpc/shared'
 import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils'
 import type { ProcedureUtils } from './procedure-utils'
 import type { SharedUtils } from './shared-utils'
-import type { OperationContext } from './types'
+import type { PiniaColadaOperationContext } from './types'
 
 const contract = {
   ping: oc.meta(meta.path(['ping'])),
@@ -29,7 +29,7 @@ describe('createContractUtilsFactory', () => {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
-          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & PiniaColadaOperationContext>()
 
           const result = next()
 
@@ -43,7 +43,9 @@ describe('createContractUtilsFactory', () => {
           queryInterceptors: [
             async ({ context, next, input }) => {
               expectTypeOf(input).toEqualTypeOf<unknown>()
-              expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+              expectTypeOf(context).toEqualTypeOf<
+                { cache?: boolean } & PiniaColadaOperationContext
+              >()
 
               const result = next()
 
@@ -60,7 +62,9 @@ describe('createContractUtilsFactory', () => {
             mutationInterceptors: [
               async ({ context, next, input }) => {
                 expectTypeOf(input).toEqualTypeOf<unknown>()
-                expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+                expectTypeOf(context).toEqualTypeOf<
+                  { cache?: boolean } & PiniaColadaOperationContext
+                >()
 
                 const result = next()
 
@@ -110,7 +114,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
-          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & PiniaColadaOperationContext>()
 
           const result = next()
 
@@ -124,7 +128,9 @@ describe('createContractJsonifiedUtilsFactory', () => {
           queryInterceptors: [
             async ({ context, next, input }) => {
               expectTypeOf(input).toEqualTypeOf<unknown>()
-              expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+              expectTypeOf(context).toEqualTypeOf<
+                { cache?: boolean } & PiniaColadaOperationContext
+              >()
 
               const result = next()
 
@@ -141,7 +147,9 @@ describe('createContractJsonifiedUtilsFactory', () => {
             mutationInterceptors: [
               async ({ context, next, input }) => {
                 expectTypeOf(input).toEqualTypeOf<unknown>()
-                expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+                expectTypeOf(context).toEqualTypeOf<
+                  { cache?: boolean } & PiniaColadaOperationContext
+                >()
 
                 const result = next()
 
