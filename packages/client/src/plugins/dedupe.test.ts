@@ -5,7 +5,9 @@ import * as SharedExperimentalV2Module from '@orpc/shared'
 import {
   AsyncIteratorClass,
   asyncIteratorToStream,
+  getTracer,
   promiseWithResolvers,
+  setTracer,
   sleep,
 } from '@orpc/shared'
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
@@ -157,6 +159,108 @@ describe('dedupeLinkPlugin', () => {
 
     expect(output1).toBe(output2)
     expect(transport.send).toHaveBeenCalledTimes(1)
+  })
+
+  describe('with a tracer injecting per-call headers', () => {
+    function useTracer(extraHeader?: string) {
+      const original = getTracer()
+      onTestFinished(() => setTracer(original))
+
+      let spanId = 0
+      const makeSpan = () => ({
+        id: ++spanId,
+        setAttribute() {},
+        updateName() {},
+        addEvent() {},
+        recordException() {},
+        end() {},
+      })
+
+      setTracer({
+        startSpan: makeSpan,
+        startActiveSpan: (_name, _parent, fn) => fn(makeSpan()),
+        getActiveSpan: () => undefined,
+        withActiveSpan: (_span, fn) => fn(),
+        inject(span, headers) {
+          headers.traceparent = `00-trace-${(span as ReturnType<typeof makeSpan>).id}-01`
+          headers.tracestate = `vendor=${(span as ReturnType<typeof makeSpan>).id}`
+
+          if (extraHeader) {
+            headers[extraHeader] = `${(span as ReturnType<typeof makeSpan>).id}`
+          }
+        },
+      })
+    }
+
+    it('dedupes identical requests and sends the first one', async () => {
+      useTracer()
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      const [output1, output2] = await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(output1).toBe(output2)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(transport.send).mock.calls[0]![0].headers).toMatchObject({
+        traceparent: '00-trace-1-01',
+        tracestate: 'vendor=1',
+      })
+    })
+
+    it('dedupes requests differing only in custom `ignoredHeaders`', async () => {
+      useTracer('b3')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            ignoredHeaders: ['traceparent', 'tracestate', 'b3'],
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not dedupe requests differing in headers left out of `ignoredHeaders`', async () => {
+      useTracer()
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            ignoredHeaders: ['traceparent'],
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
   })
 
   it('does not dedupe QUERY requests with different bodies', async () => {
