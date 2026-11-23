@@ -3,6 +3,6 @@ it('exports createHTTPUtils', async () => {
 
   expect(exports).toMatchObject({
     createHTTPUtils: expect.any(Function),
+    HTTPProcedureUtils: expect.any(Function),
   })
-  expect(exports).not.toHaveProperty('HTTPProcedureUtils')
 })

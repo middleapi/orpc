@@ -7,9 +7,8 @@ export type {
 } from './key'
 export * from './meta'
 export type { RouterUtilsPlugin } from './plugin'
-export { mergeProcedureUtilsOptions } from './procedure-utils'
+export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 export type {
-  ProcedureUtils,
   ProcedureUtilsInfiniteInterceptor,
   ProcedureUtilsInfiniteInterceptorOptions,
   ProcedureUtilsLiveInterceptor,
@@ -37,7 +36,7 @@ export type {
   RouterUtilsScoped,
   RouterUtilsScopedInternal,
 } from './router-utils'
-export type { SharedUtils } from './shared-utils'
+export { SharedUtils } from './shared-utils'
 export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
 export {

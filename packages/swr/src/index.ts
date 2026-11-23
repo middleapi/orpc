@@ -1,8 +1,9 @@
 export type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
-export type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
+export { ProcedureUtils } from './procedure-utils'
+export type { ProcedureUtilsOptions } from './procedure-utils'
 export { createRouterUtils, createRouterUtils as createSWRUtils } from './router-utils'
 export type { RouterUtils, RouterUtilsInternal, RouterUtilsOptions } from './router-utils'
-export type { SharedUtils } from './shared-utils'
+export { SharedUtils } from './shared-utils'
 export {
   /**
    * @deprecated Use `SWR_OPERATION_CONTEXT_SYMBOL` instead.
