@@ -13,7 +13,7 @@ export interface MethodOverrideHandlerPluginOptions {
   /**
    * The query parameter carrying the override method.
    *
-   * @default 'method'
+   * @default '_method'
    */
   param?: string | undefined
 
@@ -47,7 +47,7 @@ export class MethodOverrideHandlerPlugin<T extends Context> implements StandardH
   private readonly methods: ReadonlySet<string>
 
   constructor(options: MethodOverrideHandlerPluginOptions = {}) {
-    this.param = options.param ?? 'method'
+    this.param = options.param ?? '_method'
     this.methods = new Set(
       (options.methods ?? ['PUT', 'PATCH', 'DELETE']).map((method) => method.toUpperCase()),
     )
@@ -78,8 +78,13 @@ export class MethodOverrideHandlerPlugin<T extends Context> implements StandardH
         return next()
       }
 
-      params.delete(this.param)
-      const url = `${pathname}${params.size ? `?${params}` : ''}${hash ?? ''}` as StandardUrl
+      // Drop only the override param, leaving the rest of the query untouched.
+      const rest = search!
+        .slice(1)
+        .split('&')
+        .filter((pair) => new URLSearchParams(pair).keys().next().value !== this.param)
+        .join('&')
+      const url = `${pathname}${rest ? `?${rest}` : ''}${hash ?? ''}` as StandardUrl
 
       return next({
         ...interceptorOptions,

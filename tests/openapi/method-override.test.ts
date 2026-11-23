@@ -38,9 +38,9 @@ describe('methodOverrideHandlerPlugin with OpenAPIHandler', () => {
     vi.clearAllMocks()
   })
 
-  it('routes a POST with ?method=DELETE to the DELETE procedure with clean input', async () => {
+  it('routes a POST with ?_method=DELETE to the DELETE procedure with clean input', async () => {
     const { matched, response } = await handler.handle(
-      new Request('https://example.com/todos/1?method=DELETE', {
+      new Request('https://example.com/todos/1?_method=DELETE', {
         method: 'POST',
         headers: {
           'content-type': 'application/x-www-form-urlencoded',
@@ -72,7 +72,7 @@ describe('methodOverrideHandlerPlugin with OpenAPIHandler', () => {
 
   it('does not leak the override param into detailed query input', async () => {
     const { matched, response } = await handler.handle(
-      new Request('https://example.com/articles/1?method=PUT&tag=news', {
+      new Request('https://example.com/articles/1?_method=PUT&tag=news', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -95,7 +95,7 @@ describe('methodOverrideHandlerPlugin with OpenAPIHandler', () => {
 
   it('silently ignores a disallowed override value', async () => {
     const { matched } = await handler.handle(
-      new Request('https://example.com/todos/1?method=FOO', {
+      new Request('https://example.com/todos/1?_method=FOO', {
         method: 'POST',
       }),
     )
