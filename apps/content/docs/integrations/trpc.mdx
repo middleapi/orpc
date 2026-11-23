@@ -23,6 +23,8 @@ const orpcRouter = toORPCRouter(trpcRouter)
 
 The result is a regular oRPC router that works with any oRPC feature. For example, you can expose it through an [RPC Handler](/docs/rpc/handler) or [OpenAPI Handler](/docs/openapi/handler), or call it directly with [Server-Side Clients](/docs/client/server-side).
 
+Input and output schemas that implement [Standard Schema](https://standardschema.dev) are carried over, including every chained `.input()`. Validation still runs inside tRPC.
+
 ### Error Formatting
 
 `toORPCRouter` does not support [tRPC Error Formatting](https://trpc.io/docs/server/error-formatting). Instead, errors thrown by tRPC are wrapped in `ORPCError`.
