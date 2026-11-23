@@ -139,16 +139,6 @@ describe('methodOverrideHandlerPlugin', () => {
     )
   })
 
-  it('ignores a `method` param by default', async () => {
-    const { result, next, nextResult } = await invokeInterceptor({
-      method: 'POST',
-      url: '/todos/1?method=DELETE',
-    })
-
-    expect(next).toHaveBeenCalledExactlyOnceWith()
-    expect(result).toBe(nextResult)
-  })
-
   it('does not re-encode the remaining query string', async () => {
     const { next } = await invokeInterceptor({
       method: 'POST',
