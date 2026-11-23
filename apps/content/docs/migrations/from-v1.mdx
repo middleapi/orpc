@@ -1193,8 +1193,6 @@ orpc.live.experimental_liveOptions({ input: {} })
 
 `experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCJsonSerializer` (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)).
 
-`ProcedureUtils` and `SharedUtils` are exported as types only.
-
 Streamed queries changed (see [Streamed Query Options](/docs/integrations/tanstack-query#streamed-query-options)):
 
 - `refetchMode: 'reset'` keeps the old data until the new stream connects, then sets it to `[]`. (v1 cleared it immediately, returning the query to `pending`.)
