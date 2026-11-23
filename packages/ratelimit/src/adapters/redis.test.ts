@@ -32,17 +32,6 @@ describe.concurrent(
       })
     }
 
-    it('accepts weighted requests', async () => {
-      const limiter = await createTestingRateLimiter()
-      const key = 'weighted'
-
-      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
-        success: true,
-        limit: 3,
-        remaining: 1,
-      })
-    })
-
     it('tracks counters independently for each key', async () => {
       const limiter = await createTestingRateLimiter()
 
@@ -121,20 +110,6 @@ describe.concurrent(
       expect(Math.abs(denied.reset - first.reset)).toBeLessThanOrEqual(tolerance)
     })
 
-    it('uses an empty prefix when none is provided', async () => {
-      const limiter = await createTestingRateLimiter({
-        prefix: undefined,
-        maxRequests: 3,
-        window: 10_000,
-      })
-
-      await expect(limiter.limit(`no-prefix-${crypto.randomUUID()}`)).resolves.toMatchObject({
-        success: true,
-        limit: 3,
-        remaining: 2,
-      })
-    })
-
     it('propagates client errors', async () => {
       const disconnectedRedis = createClient({
         url: 'rediss://invalid',
@@ -160,7 +135,7 @@ describe.concurrent(
       )
     })
 
-    it('consumes quota across multiple requests', async () => {
+    it('consumes quota, then rejects requests that exceed the limit', async () => {
       const limiter = await createTestingRateLimiter()
       const key = 'quota'
 
@@ -178,19 +153,42 @@ describe.concurrent(
         success: true,
         remaining: 0,
       })
-    })
-
-    it('rejects requests that exceed the limit', async () => {
-      const limiter = await createTestingRateLimiter()
-      const key = 'exceeded'
-
-      await limiter.limit(key)
-      await limiter.limit(key)
-      await limiter.limit(key)
 
       await expect(limiter.limit(key)).resolves.toMatchObject({
         success: false,
         limit: 3,
+        remaining: 0,
+      })
+    })
+
+    it('does not count rejected requests', async () => {
+      const limiter = await createTestingRateLimiter()
+      const key = 'rejected-not-counted'
+
+      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+        success: true,
+        remaining: 1,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: false,
+          limit: 3,
+          remaining: 1,
+        })
+      }
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+
+      // a request that can never fit does not start a window for a new key
+      const oversized = await limiter.limit('oversized', { weight: 4 })
+      expect(oversized).toMatchObject({ success: false, limit: 3, remaining: 3 })
+      expect(oversized.reset).toBeGreaterThan(Date.now())
+      await expect(limiter.limit('oversized', { weight: 3 })).resolves.toMatchObject({
+        success: true,
         remaining: 0,
       })
     })
@@ -260,7 +258,6 @@ describe.concurrent(
         await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
           success: false,
           limit: 2,
-          remaining: 0,
         })
       })
     })

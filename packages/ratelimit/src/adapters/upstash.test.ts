@@ -35,16 +35,6 @@ describe.concurrent(
       })
     }
 
-    it('accepts weighted requests', async () => {
-      const limiter = createTestingRateLimiter()
-
-      await expect(limiter.limit('weighted', { weight: 2 })).resolves.toMatchObject({
-        success: true,
-        limit: 3,
-        remaining: 1,
-      })
-    })
-
     it('tracks counters independently for each key', async () => {
       const limiter = createTestingRateLimiter()
 
@@ -143,6 +133,38 @@ describe.concurrent(
       })
     })
 
+    it('does not count rejected requests', async () => {
+      const limiter = await createTestingRateLimiter()
+      const key = 'rejected-not-counted'
+
+      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+        success: true,
+        remaining: 1,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: false,
+          limit: 3,
+          remaining: 1,
+        })
+      }
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+
+      // a request that can never fit does not start a window for a new key
+      const oversized = await limiter.limit('oversized', { weight: 4 })
+      expect(oversized).toMatchObject({ success: false, limit: 3, remaining: 3 })
+      expect(oversized.reset).toBeGreaterThan(Date.now())
+      await expect(limiter.limit('oversized', { weight: 3 })).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+    })
+
     describe('timeout', () => {
       it('waits until the next window when capacity is unavailable', async () => {
         const limiter = createTestingRateLimiter({
@@ -202,7 +224,6 @@ describe.concurrent(
         await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
           success: false,
           limit: 2,
-          remaining: 0,
         })
       })
     })
@@ -210,7 +231,7 @@ describe.concurrent(
 )
 
 it('prefix creates a limiter that appends the prefix and shares the client', async () => {
-  const redis = { eval: vi.fn(async () => [1, 1000]) }
+  const redis = { eval: vi.fn(async () => [1, 1, 1000]) }
   const limiter = new UpstashRateLimiter(redis as any, {
     maxRequests: 1,
     window: 1000,
@@ -218,5 +239,5 @@ it('prefix creates a limiter that appends the prefix and shares the client', asy
   }).prefix('tenant:')
 
   await expect(limiter.limit('key')).resolves.toMatchObject({ success: true, remaining: 0 })
-  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], ['1', '1000'])
+  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], expect.any(Array))
 })

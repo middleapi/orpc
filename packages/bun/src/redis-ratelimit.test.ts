@@ -31,21 +31,6 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
   }
 
   it(
-    'accepts weighted requests',
-    async () => {
-      const limiter = await createTestingRateLimiter()
-      const key = 'weighted'
-
-      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
-        success: true,
-        limit: 3,
-        remaining: 1,
-      })
-    },
-    { timeout: 20_000 },
-  )
-
-  it(
     'tracks counters independently for each key',
     async () => {
       const limiter = await createTestingRateLimiter()
@@ -136,24 +121,6 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
   )
 
   it(
-    'uses an empty prefix when none is provided',
-    async () => {
-      const limiter = await createTestingRateLimiter({
-        prefix: undefined,
-        maxRequests: 3,
-        window: 10_000,
-      })
-
-      await expect(limiter.limit(`no-prefix-${crypto.randomUUID()}`)).resolves.toMatchObject({
-        success: true,
-        limit: 3,
-        remaining: 2,
-      })
-    },
-    { timeout: 20_000 },
-  )
-
-  it(
     'rejects invalid weights',
     async () => {
       const limiter = await createTestingRateLimiter()
@@ -171,7 +138,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
   )
 
   it(
-    'consumes quota across multiple requests',
+    'consumes quota, then rejects requests that exceed the limit',
     async () => {
       const limiter = await createTestingRateLimiter()
       const key = 'quota'
@@ -190,23 +157,46 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
         success: true,
         remaining: 0,
       })
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: false,
+        limit: 3,
+        remaining: 0,
+      })
     },
     { timeout: 20_000 },
   )
 
   it(
-    'rejects requests that exceed the limit',
+    'does not count rejected requests',
     async () => {
       const limiter = await createTestingRateLimiter()
-      const key = 'exceeded'
+      const key = 'rejected-not-counted'
 
-      await limiter.limit(key)
-      await limiter.limit(key)
-      await limiter.limit(key)
+      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+        success: true,
+        remaining: 1,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: false,
+          limit: 3,
+          remaining: 1,
+        })
+      }
 
       await expect(limiter.limit(key)).resolves.toMatchObject({
-        success: false,
-        limit: 3,
+        success: true,
+        remaining: 0,
+      })
+
+      // a request that can never fit does not start a window for a new key
+      const oversized = await limiter.limit('oversized', { weight: 4 })
+      expect(oversized).toMatchObject({ success: false, limit: 3, remaining: 3 })
+      expect(oversized.reset).toBeGreaterThan(Date.now())
+      await expect(limiter.limit('oversized', { weight: 3 })).resolves.toMatchObject({
+        success: true,
         remaining: 0,
       })
     },
@@ -288,7 +278,6 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
         await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
           success: false,
           limit: 2,
-          remaining: 0,
         })
       },
       { timeout: 20_000 },

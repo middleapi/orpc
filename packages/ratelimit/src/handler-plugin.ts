@@ -26,6 +26,8 @@ export interface RateLimitHandlerPluginContext {
  * Automatically adds HTTP rate limiting headers (`RateLimit-*` and `Retry-After`)
  * to responses when used with the `ratelimit` middleware.
  *
+ * `RateLimit-Reset` and `Retry-After` are in seconds until the limit resets.
+ *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#handler-plugin | Rate Limit Helpers - Handler Plugin}
  */
 export class RateLimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
@@ -58,22 +60,25 @@ export class RateLimitHandlerPlugin<T extends Context> implements StandardHandle
           (a.result.remaining ?? Infinity) <= (b.result.remaining ?? Infinity) ? a : b,
         )
 
+        const { reset } = mostConstrained.result
+        const secondsUntilReset =
+          reset === undefined
+            ? undefined
+            : Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString()
+
         const headers: StandardHeaders = {
           ...result.response.headers,
           'ratelimit-limit': mostConstrained.result.limit?.toString(),
           'ratelimit-remaining': mostConstrained.result.remaining?.toString(),
-          'ratelimit-reset': mostConstrained.result.reset?.toString(),
+          'ratelimit-reset': secondsUntilReset,
         }
 
         if (
           result.response.status >= 400 &&
           !mostConstrained.result.success &&
-          mostConstrained.result.reset !== undefined
+          secondsUntilReset !== undefined
         ) {
-          headers['retry-after'] = Math.max(
-            0,
-            Math.ceil((mostConstrained.result.reset - Date.now()) / 1000),
-          ).toString()
+          headers['retry-after'] = secondsUntilReset
         }
 
         return {

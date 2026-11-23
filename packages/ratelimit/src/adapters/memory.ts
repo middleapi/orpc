@@ -25,6 +25,8 @@ export interface MemoryRateLimiterOptions {
  * Rate limiter adapter backed by in-memory storage. Enforces a fixed-window
  * limit, with optional blocking mode.
  *
+ * Windows are per key, and rejected requests do not consume quota.
+ *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export class MemoryRateLimiter implements RateLimiter {
@@ -32,8 +34,7 @@ export class MemoryRateLimiter implements RateLimiter {
   private readonly window: number
   private readonly timeout: number
 
-  private current: Map<string, { used: number }> = new Map()
-  private currentEpochStart: number = Date.now()
+  private readonly entries: Map<string, { used: number; reset: number }> = new Map()
 
   constructor(options: MemoryRateLimiterOptions) {
     this.maxRequests = options.maxRequests
@@ -47,38 +48,47 @@ export class MemoryRateLimiter implements RateLimiter {
     return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
   }
 
-  private rotateIfNeeded(now: number): void {
-    if (now < this.currentEpochStart + this.window) {
-      return
-    }
+  /**
+   * Drops expired windows. Entries are in reset order, so it stops at the first live one.
+   */
+  private sweep(now: number): void {
+    for (const [key, entry] of this.entries) {
+      if (entry.reset > now) {
+        break
+      }
 
-    this.current = new Map()
-    this.currentEpochStart = now
+      this.entries.delete(key)
+    }
   }
 
   private checkLimit(key: string, weight: number): Required<RateLimitResult> {
     const now = Date.now()
-    this.rotateIfNeeded(now)
+    this.sweep(now)
 
-    let entry = this.current.get(key)
+    let entry = this.entries.get(key)
 
-    if (!entry) {
-      entry = { used: 0 }
-      this.current.set(key, entry)
+    // the sweep can miss it when the clock moved backward
+    if (entry && entry.reset <= now) {
+      this.entries.delete(key)
+      entry = undefined
     }
 
-    const reset = this.currentEpochStart + this.window
-    const success = entry.used + weight <= this.maxRequests
+    const success = (entry?.used ?? 0) + weight <= this.maxRequests
 
     if (success) {
+      if (!entry) {
+        entry = { used: 0, reset: now + this.window }
+        this.entries.set(key, entry)
+      }
+
       entry.used += weight
     }
 
     return {
       success,
       limit: this.maxRequests,
-      remaining: Math.max(0, this.maxRequests - entry.used),
-      reset,
+      remaining: this.maxRequests - (entry?.used ?? 0),
+      reset: entry?.reset ?? now + this.window,
     }
   }
 }
