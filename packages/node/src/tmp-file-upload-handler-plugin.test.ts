@@ -16,6 +16,12 @@ import request from 'supertest'
 import { TmpFile, TmpFileUploadHandlerPlugin } from './tmp-file-upload-handler-plugin'
 
 describe('tmpFileUploadHandlerPlugin', () => {
+  const UNLIMITED = {
+    memory: Number.POSITIVE_INFINITY,
+    file: Number.POSITIVE_INFINITY,
+    stream: Number.POSITIVE_INFINITY,
+  }
+
   let tmpDir: string
 
   beforeEach(() => {
@@ -581,8 +587,8 @@ describe('tmpFileUploadHandlerPlugin', () => {
     expect(readdirSync(tmpDir)).toHaveLength(0)
   })
 
-  it('constructs without options and delegates bodiless requests untouched', async () => {
-    const plugin = new TmpFileUploadHandlerPlugin()
+  it('delegates bodiless requests untouched', async () => {
+    const plugin = new TmpFileUploadHandlerPlugin({ maxBodySize: UNLIMITED })
     const interceptor = plugin.init({}).routingInterceptors![0]!
     const resolved = Symbol('resolved')
 
@@ -1766,7 +1772,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     })
 
     it('defaults the threshold to 64 KiB', async () => {
-      const plugin = new TmpFileUploadHandlerPlugin({ tmpDir })
+      const plugin = new TmpFileUploadHandlerPlugin({ tmpDir, maxBodySize: UNLIMITED })
 
       await expectFileBody(Buffer.alloc(64 * 1024, 7), false, { plugin, chunkSize: 16 * 1024 })
       await expectFileBody(Buffer.alloc(64 * 1024 + 1, 7), true, { plugin, chunkSize: 16 * 1024 })

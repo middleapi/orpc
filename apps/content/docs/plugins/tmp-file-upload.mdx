@@ -30,6 +30,13 @@ const handler = new RPCHandler(router, {
        * @default os.tmpdir()
        */
       tmpDir: './uploads',
+
+      // Required, see "Limiting Body Sizes" below
+      maxBodySize: {
+        memory: 1024 * 1024, // 1MB
+        file: 500 * 1024 * 1024, // 500MB
+        stream: 500 * 1024 * 1024, // 500MB
+      },
     }),
   ],
 })
@@ -68,7 +75,7 @@ Node's [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options
 
 ## Limiting Body Sizes
 
-Use `maxBodySize` to limit each kind of request body by what it actually costs. All three kinds are required together, so none is left unbounded by accident; set a kind to `Number.POSITIVE_INFINITY` to deliberately leave it unlimited. A body over its limit rejects with `PAYLOAD_TOO_LARGE`.
+`maxBodySize` is required and limits each kind of request body by what it actually costs. All three kinds are required, so none is left unbounded by accident; set a kind to `Number.POSITIVE_INFINITY` to deliberately leave it unlimited. A body over its limit rejects with `PAYLOAD_TOO_LARGE`.
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -103,7 +110,7 @@ const handler = new RPCHandler(router, {
 
 A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, those held in memory against `memory` as well, and as a whole, framing included, it is bounded by the sum of both. An event stream counts against `stream` in total and each of its events against `memory`, since the decoder buffers an event until its blank line arrives. A raw binary stream reaches the procedure chunk by chunk, so only `stream` applies. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
 
-With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
+The plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 
 To reject with your own error instead, use `error`. It is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
 
@@ -122,6 +129,8 @@ Uploads up to `spoolThreshold` stay in memory as plain `File`s, so small and emp
 const handler = new RPCHandler(router, {
   plugins: [
     new TmpFileUploadHandlerPlugin({
+      maxBodySize: { memory: 1024 * 1024, file: 500 * 1024 * 1024, stream: 500 * 1024 * 1024 },
+
       /**
        * The size in bytes an uploaded file must exceed before it is
        * spooled to a temporary file. Set to `0` to spool every
