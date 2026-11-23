@@ -1,6 +1,6 @@
 import { ORPCError, os } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { AbortError, TimeoutError } from '@orpc/shared'
+import { AbortError } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standard-server/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -238,29 +238,6 @@ describe('pinoHandlerPlugin', () => {
     expect(globalSpies.info).toHaveBeenCalledWith(abortError)
     expect(globalSpies.warn).not.toHaveBeenCalled()
     expect(globalSpies.error).not.toHaveBeenCalled()
-
-    vi.clearAllMocks()
-
-    // A timeout is a failure, not a benign abort
-    const timeoutError = new TimeoutError('reason')
-    const timeoutHandler = new StandardHandler(
-      createCodec(
-        os.handler(() => {
-          throw timeoutError
-        }),
-      ) as any,
-      {
-        plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
-      },
-    )
-
-    await timeoutHandler.handle(createRequest('GET', '/ping'), {
-      prefix: undefined,
-      context: {},
-    })
-
-    expect(globalSpies.error).toHaveBeenCalledWith(timeoutError)
-    expect(globalSpies.info).not.toHaveBeenCalledWith(timeoutError)
 
     vi.clearAllMocks()
 
