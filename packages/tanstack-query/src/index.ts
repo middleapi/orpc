@@ -29,16 +29,6 @@ export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
 export * from './structural-sharing'
 export * from './types'
-export {
-  /**
-   * @deprecated Use `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` instead.
-   */
-  TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
-  /**
-   * @deprecated Use `TanstackQueryOperationContext` instead.
-   */
-  type TanstackQueryOperationContext as OperationContext,
-} from './types'
 
 export type { AnyNestedClient } from '@orpc/client'
 

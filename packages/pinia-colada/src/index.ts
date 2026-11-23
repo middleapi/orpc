@@ -23,27 +23,11 @@ export type {
   ProcedureUtilsStreamedInterceptorOptions,
 } from './procedure-utils'
 export * from './router-utils'
-export {
-  /**
-   * @deprecated Use `createPiniaColadaUtils` instead.
-   */
-  createRouterUtils as createORPCVueColadaUtils,
-} from './router-utils'
 export { createRouterUtils as createPiniaColadaUtils } from './router-utils'
 export { SharedUtils } from './shared-utils'
 export * from './ssr'
 export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
 export * from './types'
-export {
-  /**
-   * @deprecated Use `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` instead.
-   */
-  PINIA_COLADA_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
-  /**
-   * @deprecated Use `PiniaColadaOperationContext` instead.
-   */
-  type PiniaColadaOperationContext as OperationContext,
-} from './types'
 
 export type { AnyNestedClient } from '@orpc/client'
 

@@ -147,6 +147,11 @@ export function createRouterUtils<T extends AnyNestedClient>(
   return createRouterUtilsInternal(client, options, plugin)
 }
 
+/**
+ * @deprecated Use `createPiniaColadaUtils` instead.
+ */
+export const createORPCVueColadaUtils: typeof createRouterUtils = createRouterUtils
+
 function createRouterUtilsInternal<T extends AnyNestedClient>(
   client: T,
   options: RouterUtilsOptions<T>,

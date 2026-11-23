@@ -40,6 +40,17 @@ export interface TanstackQueryOperationContext {
   }
 }
 
+/**
+ * @deprecated Use `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` instead.
+ */
+export const OPERATION_CONTEXT_SYMBOL: typeof TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL =
+  TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL
+
+/**
+ * @deprecated Use `TanstackQueryOperationContext` instead.
+ */
+export type OperationContext = TanstackQueryOperationContext
+
 export type QueryKeyOptions<TInput> =
   | (undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken })
   | { queryKey: QueryKey }

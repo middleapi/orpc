@@ -50,6 +50,17 @@ export interface PiniaColadaOperationContext {
   }
 }
 
+/**
+ * @deprecated Use `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` instead.
+ */
+export const OPERATION_CONTEXT_SYMBOL: typeof PINIA_COLADA_OPERATION_CONTEXT_SYMBOL =
+  PINIA_COLADA_OPERATION_CONTEXT_SYMBOL
+
+/**
+ * @deprecated Use `PiniaColadaOperationContext` instead.
+ */
+export type OperationContext = PiniaColadaOperationContext
+
 export type QueryKeyOptions<TInput> =
   | (undefined extends TInput ? { input?: TInput } : { input: TInput })
   | { key: EntryKey }
