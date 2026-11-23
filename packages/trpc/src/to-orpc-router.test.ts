@@ -1,5 +1,5 @@
 import type { OpenAPIMeta } from '@orpc/openapi'
-import { getOpenAPIMeta, openapi } from '@orpc/openapi'
+import { getOpenAPIMeta, openapi, OpenAPIGenerator } from '@orpc/openapi'
 import {
   call,
   createRouterClient,
@@ -122,6 +122,77 @@ describe('toORPCRouter', () => {
 
     await expect(call(withoutHandlerProcedure as any, 'invalid')).resolves.toEqual('invalid') // validation not happen at oRPC level
     await expect(call((orpcRouter as any).ping, 'invalid')).rejects.toThrow('Invalid input') // validation happen at tRPC level
+  })
+
+  describe('chained inputs', () => {
+    const first = z.object({ x: z.string() })
+    const second = z.object({ y: z.number() })
+    const third = z.object({ z: z.boolean().optional() })
+
+    const orpcRouter = toORPCRouter(
+      t.router({
+        two: t.procedure
+          .input(first)
+          .input(second)
+          .query(({ input }) => input),
+        three: t.procedure
+          .input(first)
+          .input(second)
+          .input(third)
+          .mutation(({ input }) => input),
+      }),
+    )
+
+    it('keeps every input schema in the contract', () => {
+      expect(orpcRouter.two['~orpc'].inputSchemas).toEqual([first, second])
+      expect(orpcRouter.three['~orpc'].inputSchemas).toEqual([first, second, third])
+    })
+
+    it('skips non-standard parsers', () => {
+      const mixed = toORPCRouter(
+        t.router({
+          ping: (t.procedure.input(first) as any)
+            .input((value: unknown) => value)
+            .query(() => 'pong'),
+        }),
+      ) as any
+
+      expect(mixed.ping['~orpc'].inputSchemas).toEqual([first])
+    })
+
+    it('generates an OpenAPI request body with every input', async () => {
+      const spec = await new OpenAPIGenerator().generate(orpcRouter)
+
+      const properties = (path: string) => {
+        const schema = (spec.paths as any)[path].post.requestBody.content['application/json'].schema
+
+        return schema.allOf.flatMap((item: any) => Object.keys(item.properties))
+      }
+
+      expect(properties('/two')).toEqual(['x', 'y'])
+      expect(properties('/three')).toEqual(['x', 'y', 'z'])
+    })
+
+    it('calls', async () => {
+      const options = { context: { a: 'test' } }
+
+      await expect(call(orpcRouter.two, { x: 'x', y: 1 }, options)).resolves.toEqual({
+        x: 'x',
+        y: 1,
+      })
+      await expect(call(orpcRouter.three, { x: 'x', y: 1, z: true }, options)).resolves.toEqual({
+        x: 'x',
+        y: 1,
+        z: true,
+      })
+
+      await expect(call(orpcRouter.two, { y: 1 } as any, options)).rejects.toSatisfy(
+        (err: any) => err instanceof ORPCError && err.code === 'BAD_REQUEST',
+      )
+      await expect(call(orpcRouter.three, { x: 'x' } as any, options)).rejects.toSatisfy(
+        (err: any) => err instanceof ORPCError && err.code === 'BAD_REQUEST',
+      )
+    })
   })
 
   it('meta', async () => {

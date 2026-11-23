@@ -75,7 +75,9 @@ function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
 }
 
 function toORPCProcedure(procedure: AnyProcedure) {
-  const inputSchema = toStandardSchema(procedure._def.inputs.at(-1))
+  const inputSchemas = procedure._def.inputs
+    .map(toStandardSchema)
+    .filter((schema) => schema !== undefined)
   const outputSchema = toStandardSchema((procedure._def as any).output)
   const meta = (procedure._def.meta ?? {}) as ORPC.Meta
 
@@ -86,7 +88,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
     // so the tRPC meta must be a plugin too, otherwise it would be dropped.
     metaPlugins: [toTRPCMetaPlugin(meta)],
     orderedMiddlewares: [],
-    inputSchemas: inputSchema ? [inputSchema] : undefined,
+    inputSchemas: inputSchemas.length ? inputSchemas : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,
     // tRPC procedure calling already validates the input/output
     disableInputValidation: true,
