@@ -1,5 +1,5 @@
 import type { Promisable } from '@orpc/shared'
-import { promiseWithResolvers, throwIfAborted } from '@orpc/shared'
+import { listenAbort, promiseWithResolvers, throwIfAborted } from '@orpc/shared'
 
 import { LockTimeoutError } from '../error'
 import type { LockCallbackOptions, Locker, LockOptions } from '../types'
@@ -23,18 +23,23 @@ export interface MemoryLockerOptions {
 
 interface MemoryLockWaiter {
   token: object
+  ttl: number
+  deadline: number
   resolve: () => void
+  fail: (reason: unknown) => void
 }
 
 interface MemoryLockEntry {
   holder: object
-  expiry?: ReturnType<typeof setTimeout>
+  expiresAt: number
   waiters: Set<MemoryLockWaiter>
 }
 
+const MAX_TIMEOUT_DELAY = 2 ** 31 - 1
+
 /**
  * Locker adapter backed by in-memory storage, so locks are only shared within
- * the current process. Waiters acquire the lock in order, without polling.
+ * the current process. Waiters acquire the lock in order.
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
@@ -60,21 +65,26 @@ export class MemoryLocker implements Locker {
 
     throwIfAborted(options.signal)
 
-    let entry = this.entries.get(key)
+    const entry = this.releaseExpired(key)
     const waited = entry !== undefined
 
     if (entry) {
-      await this.wait(key, entry, token, timeout, options.signal)
+      await this.wait(key, entry, token, ttl, timeout, options.signal)
     } else {
-      entry = { holder: token, waiters: new Set() }
-      this.entries.set(key, entry)
+      this.entries.set(key, {
+        holder: token,
+        expiresAt: performance.now() + ttl,
+        waiters: new Set(),
+      })
     }
 
-    entry.expiry = setTimeout(() => this.release(key, token), ttl)
+    const expiry =
+      ttl <= MAX_TIMEOUT_DELAY ? setTimeout(() => this.release(key, token), ttl) : undefined
 
     try {
       return await fn({ waited })
     } finally {
+      clearTimeout(expiry)
       this.release(key, token)
     }
   }
@@ -83,6 +93,7 @@ export class MemoryLocker implements Locker {
     key: string,
     entry: MemoryLockEntry,
     token: object,
+    ttl: number,
     timeout: number,
     signal: AbortSignal | undefined,
   ): Promise<void> {
@@ -91,22 +102,78 @@ export class MemoryLocker implements Locker {
     }
 
     const { promise, resolve, reject } = promiseWithResolvers<void>()
-    const waiter: MemoryLockWaiter = { token, resolve }
-    entry.waiters.add(waiter)
+    let timedOut = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadlineTimer =
+      timeout <= MAX_TIMEOUT_DELAY
+        ? setTimeout(() => {
+            timedOut = true
+            check()
+          }, timeout)
+        : undefined
 
-    const fail = (reason: unknown) => {
-      entry.waiters.delete(waiter)
-      reject(reason)
+    const waiter: MemoryLockWaiter = {
+      token,
+      ttl,
+      deadline: performance.now() + timeout,
+      resolve,
+      fail: (reason) => {
+        entry.waiters.delete(waiter)
+        reject(reason)
+      },
     }
 
-    const timer = setTimeout(() => fail(new LockTimeoutError(key)), timeout)
-    const abortListener = () => fail(signal?.reason)
-    signal?.addEventListener('abort', abortListener, { once: true })
+    const check = () => {
+      if (!entry.waiters.has(waiter)) {
+        return
+      }
+
+      this.releaseExpired(key)
+
+      if (entry.holder === token) {
+        return
+      }
+
+      const now = performance.now()
+
+      if (timedOut || waiter.deadline <= now) {
+        waiter.fail(new LockTimeoutError(key))
+        return
+      }
+
+      // a waiter ahead may take the lock and expire within its ttl
+      let wakeAt = Math.min(waiter.deadline, entry.expiresAt)
+      for (const ahead of entry.waiters) {
+        if (ahead === waiter) {
+          break
+        }
+        wakeAt = Math.min(wakeAt, now + ahead.ttl)
+      }
+
+      timer = setTimeout(check, Math.min(MAX_TIMEOUT_DELAY, Math.max(1, wakeAt - now)))
+    }
+
+    entry.waiters.add(waiter)
+    check()
+
+    const removeAbortListener = listenAbort(signal, waiter.fail)
 
     return promise.finally(() => {
       clearTimeout(timer)
-      signal?.removeEventListener('abort', abortListener)
+      clearTimeout(deadlineTimer)
+      removeAbortListener()
     })
+  }
+
+  private releaseExpired(key: string): MemoryLockEntry | undefined {
+    let entry = this.entries.get(key)
+
+    while (entry && entry.expiresAt <= performance.now()) {
+      this.release(key, entry.holder)
+      entry = this.entries.get(key)
+    }
+
+    return entry
   }
 
   private release(key: string, token: object): void {
@@ -116,17 +183,26 @@ export class MemoryLocker implements Locker {
       return
     }
 
-    clearTimeout(entry.expiry)
-
-    const [next] = entry.waiters
-
-    if (!next) {
+    if (entry.waiters.size === 0) {
       this.entries.delete(key)
       return
     }
 
-    entry.waiters.delete(next)
-    entry.holder = next.token
-    next.resolve()
+    const now = performance.now()
+
+    for (const next of entry.waiters) {
+      if (next.deadline <= now) {
+        next.fail(new LockTimeoutError(key))
+        continue
+      }
+
+      entry.waiters.delete(next)
+      entry.holder = next.token
+      entry.expiresAt = now + next.ttl
+      next.resolve()
+      return
+    }
+
+    this.entries.delete(key)
   }
 }
