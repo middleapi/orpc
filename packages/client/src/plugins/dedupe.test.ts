@@ -162,7 +162,7 @@ describe('dedupeLinkPlugin', () => {
   })
 
   describe('with a tracer injecting per-call headers', () => {
-    function useTracer() {
+    function useTracer(extraHeader?: string) {
       const original = getTracer()
       onTestFinished(() => setTracer(original))
 
@@ -184,6 +184,10 @@ describe('dedupeLinkPlugin', () => {
         inject(span, headers) {
           headers.traceparent = `00-trace-${(span as ReturnType<typeof makeSpan>).id}-01`
           headers.tracestate = `vendor=${(span as ReturnType<typeof makeSpan>).id}`
+
+          if (extraHeader) {
+            headers[extraHeader] = `${(span as ReturnType<typeof makeSpan>).id}`
+          }
         },
       })
     }
@@ -214,7 +218,29 @@ describe('dedupeLinkPlugin', () => {
       })
     })
 
-    it('respects custom `ignoredHeaders`', async () => {
+    it('dedupes requests differing only in custom `ignoredHeaders`', async () => {
+      useTracer('b3')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            ignoredHeaders: ['traceparent', 'tracestate', 'b3'],
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not dedupe requests differing in headers left out of `ignoredHeaders`', async () => {
       useTracer()
       const codec = makeCodec()
       const transport = makeTransport()
