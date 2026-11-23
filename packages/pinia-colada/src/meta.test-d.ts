@@ -3,7 +3,7 @@ import { oc, type } from '@orpc/contract'
 import type { PromiseWithError } from '@orpc/shared'
 
 import { piniaColada } from './meta'
-import type { OperationContext } from './types'
+import type { PiniaColadaOperationContext } from './types'
 
 describe('piniaColada', () => {
   it('infers input, output and error types from the contract', () => {
@@ -16,7 +16,7 @@ describe('piniaColada', () => {
           queryInterceptors: [
             async ({ context, input, next }) => {
               expectTypeOf(input).toEqualTypeOf<string>()
-              expectTypeOf(context).toEqualTypeOf<ClientContext & OperationContext>()
+              expectTypeOf(context).toEqualTypeOf<ClientContext & PiniaColadaOperationContext>()
 
               const result = next()
 

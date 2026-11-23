@@ -15,7 +15,7 @@ export type OperationType = 'fetcher' | 'mutator' | 'subscriber' | 'liveSubscrib
  *
  * @see {@link https://orpc.dev/docs/integrations/swr#operation-context | SWR Integration - Operation Context}
  */
-export const OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+export const SWR_OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_SWR_OPERATION_CONTEXT',
 )
 
@@ -25,8 +25,8 @@ export const OPERATION_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.fo
  *
  * @see {@link https://orpc.dev/docs/integrations/swr#operation-context | SWR Integration - Operation Context}
  */
-export interface OperationContext {
-  [OPERATION_CONTEXT_SYMBOL]?: {
+export interface SWROperationContext {
+  [SWR_OPERATION_CONTEXT_SYMBOL]?: {
     key: unknown
     type: OperationType
   }

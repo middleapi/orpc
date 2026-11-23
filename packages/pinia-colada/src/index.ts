@@ -38,13 +38,11 @@ export {
   /**
    * @deprecated Use `PINIA_COLADA_OPERATION_CONTEXT_SYMBOL` instead.
    */
-  OPERATION_CONTEXT_SYMBOL,
-  OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL,
+  PINIA_COLADA_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
   /**
    * @deprecated Use `PiniaColadaOperationContext` instead.
    */
-  type OperationContext,
-  type OperationContext as PiniaColadaOperationContext,
+  type PiniaColadaOperationContext as OperationContext,
 } from './types'
 
 export type { AnyNestedClient } from '@orpc/client'

@@ -33,13 +33,11 @@ export {
   /**
    * @deprecated Use `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` instead.
    */
-  OPERATION_CONTEXT_SYMBOL,
-  OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
+  TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
   /**
    * @deprecated Use `TanstackQueryOperationContext` instead.
    */
-  type OperationContext,
-  type OperationContext as TanstackQueryOperationContext,
+  type TanstackQueryOperationContext as OperationContext,
 } from './types'
 
 export type { AnyNestedClient } from '@orpc/client'

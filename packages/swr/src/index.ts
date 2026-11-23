@@ -9,13 +9,11 @@ export {
   /**
    * @deprecated Use `SWR_OPERATION_CONTEXT_SYMBOL` instead.
    */
-  OPERATION_CONTEXT_SYMBOL,
-  OPERATION_CONTEXT_SYMBOL as SWR_OPERATION_CONTEXT_SYMBOL,
+  SWR_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
   /**
    * @deprecated Use `SWROperationContext` instead.
    */
-  type OperationContext,
-  type OperationContext as SWROperationContext,
+  type SWROperationContext as OperationContext,
 } from './types'
 
 export type { Public } from '@orpc/shared'

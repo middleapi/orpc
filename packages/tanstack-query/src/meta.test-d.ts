@@ -5,7 +5,7 @@ import type { PromiseWithError } from '@orpc/shared'
 import type { SkipToken } from '@tanstack/query-core'
 
 import { tanstackQuery } from './meta'
-import type { OperationContext } from './types'
+import type { TanstackQueryOperationContext } from './types'
 
 describe('tanstackQuery', () => {
   it('infers input, output and error types from the contract', () => {
@@ -18,7 +18,7 @@ describe('tanstackQuery', () => {
           queryInterceptors: [
             async ({ context, input, next }) => {
               expectTypeOf(input).toEqualTypeOf<string | SkipToken>()
-              expectTypeOf(context).toEqualTypeOf<ClientContext & OperationContext>()
+              expectTypeOf(context).toEqualTypeOf<ClientContext & TanstackQueryOperationContext>()
 
               const result = next()
 
