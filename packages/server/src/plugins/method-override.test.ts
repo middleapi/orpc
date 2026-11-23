@@ -155,6 +155,16 @@ describe('methodOverrideHandlerPlugin', () => {
     )
   })
 
+  it('keeps a remaining empty query component', async () => {
+    const { next } = await invokeInterceptor({ method: 'POST', url: '/a?_method=DELETE&' })
+
+    expect(next).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ method: 'DELETE', url: '/a?' }),
+      }),
+    )
+  })
+
   it('matches an encoded param name', async () => {
     const { next } = await invokeInterceptor({ method: 'POST', url: '/a?%5Fmethod=DELETE&x=1' })
 

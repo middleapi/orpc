@@ -83,8 +83,8 @@ export class MethodOverrideHandlerPlugin<T extends Context> implements StandardH
         .slice(1)
         .split('&')
         .filter((pair) => new URLSearchParams(`?${pair}`).keys().next().value !== this.param)
-        .join('&')
-      const url = `${pathname}${rest ? `?${rest}` : ''}${hash ?? ''}` as StandardUrl
+      const url =
+        `${pathname}${rest.length ? `?${rest.join('&')}` : ''}${hash ?? ''}` as StandardUrl
 
       return next({
         ...interceptorOptions,
