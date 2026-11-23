@@ -60,6 +60,10 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.5.0",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@orpc/mcp": "workspace:*",
+    "@orpc/openapi": "workspace:*",
+    "@orpc/server": "workspace:*",
     "@vitest/coverage-istanbul": "^4.1.11",
     "vitest": "^4.1.11",
     "wrangler": "^4.164.0"

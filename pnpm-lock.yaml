@@ -567,6 +567,18 @@ importers:
       '@cloudflare/vitest-plugin':
         specifier: ^1.5.0
         version: 1.5.0(@types/node@26.6.6)(vitest@4.1.11)
+      '@modelcontextprotocol/server':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@orpc/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
       '@vitest/coverage-istanbul':
         specifier: ^4.1.11
         version: 4.1.11(supports-color@10.2.2)(vitest@4.1.11)
