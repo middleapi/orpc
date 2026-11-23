@@ -75,25 +75,3 @@ const safeClient = createSafeClient(client)
 
 const [error, data] = await safeClient.doSomething({ id: '123' })
 ```
-
-## Transport Errors
-
-Calls can also fail without a response from your procedures:
-
-- `AbortError`: you cancelled the call through its `signal`.
-- `TimeoutError`: the call exceeded the [Timeout Plugin](/docs/plugins/timeout) limit.
-- `ConnectionClosedError`: the [WebSocket](/docs/adapters/websocket) or [MessagePort](/docs/adapters/message-port) connection is closed or lost.
-
-```ts
-import { ConnectionClosedError, TimeoutError } from '@orpc/client'
-
-try {
-  const data = await client.doSomething({ id: '123' })
-} catch (error) {
-  if (error instanceof TimeoutError) {
-    // took too long
-  } else if (error instanceof ConnectionClosedError) {
-    // connection closed or lost
-  }
-}
-```

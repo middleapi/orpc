@@ -194,8 +194,6 @@ export class ResponseError extends Error {
 
 /**
  * Error thrown by WebSocket and MessagePort links when the connection is closed or lost.
- *
- * @see {@link https://orpc.dev/docs/client/error-handling#transport-errors | Client Error Handling - Transport Errors}
  */
 export class ConnectionClosedError extends Error {
   override readonly name = 'ConnectionClosedError'
