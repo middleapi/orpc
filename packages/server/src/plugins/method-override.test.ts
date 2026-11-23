@@ -49,7 +49,7 @@ describe('methodOverrideHandlerPlugin', () => {
   it('ignores non-POST requests', async () => {
     const { result, next, nextResult } = await invokeInterceptor({
       method: 'GET',
-      url: '/todos/1?method=DELETE',
+      url: '/todos/1?_method=DELETE',
     })
 
     expect(next).toHaveBeenCalledExactlyOnceWith()
@@ -69,7 +69,7 @@ describe('methodOverrideHandlerPlugin', () => {
   it('overrides the method and strips the param', async () => {
     const { result, next, nextResult } = await invokeInterceptor({
       method: 'POST',
-      url: '/todos/1?method=DELETE',
+      url: '/todos/1?_method=DELETE',
     })
 
     expect(next).toHaveBeenCalledExactlyOnceWith(
@@ -81,7 +81,7 @@ describe('methodOverrideHandlerPlugin', () => {
   })
 
   it('matches the override value case-insensitively', async () => {
-    const { next } = await invokeInterceptor({ method: 'POST', url: '/todos/1?method=delete' })
+    const { next } = await invokeInterceptor({ method: 'POST', url: '/todos/1?_method=delete' })
 
     expect(next).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
@@ -93,7 +93,7 @@ describe('methodOverrideHandlerPlugin', () => {
   it('uses the last occurrence when the param is repeated and strips all of them', async () => {
     const { next } = await invokeInterceptor({
       method: 'POST',
-      url: '/todos/1?method=PUT&method=DELETE',
+      url: '/todos/1?_method=PUT&_method=DELETE',
     })
 
     expect(next).toHaveBeenCalledExactlyOnceWith(
@@ -104,7 +104,7 @@ describe('methodOverrideHandlerPlugin', () => {
   })
 
   it('preserves other query params and the hash', async () => {
-    const { next } = await invokeInterceptor({ method: 'POST', url: '/a?x=1&method=DELETE&y=2#h' })
+    const { next } = await invokeInterceptor({ method: 'POST', url: '/a?x=1&_method=DELETE&y=2#h' })
 
     expect(next).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
@@ -118,7 +118,7 @@ describe('methodOverrideHandlerPlugin', () => {
     async (method) => {
       const { result, next, nextResult } = await invokeInterceptor({
         method: 'POST',
-        url: `/todos/1?method=${method}`,
+        url: `/todos/1?_method=${method}`,
       })
 
       expect(next).toHaveBeenCalledExactlyOnceWith()
@@ -128,20 +128,56 @@ describe('methodOverrideHandlerPlugin', () => {
 
   it('honors a custom param name', async () => {
     const { next } = await invokeInterceptor(
-      { method: 'POST', url: '/todos/1?_method=DELETE&method=PUT' },
-      { param: '_method' },
+      { method: 'POST', url: '/todos/1?method=DELETE&_method=PUT' },
+      { param: 'method' },
     )
 
     expect(next).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        request: expect.objectContaining({ method: 'DELETE', url: '/todos/1?method=PUT' }),
+        request: expect.objectContaining({ method: 'DELETE', url: '/todos/1?_method=PUT' }),
+      }),
+    )
+  })
+
+  it('does not re-encode the remaining query string', async () => {
+    const { next } = await invokeInterceptor({
+      method: 'POST',
+      url: '/a?q=a%20b+c&_method=DELETE&redirect=/x?y=1,2&e=%7E*&flag&&k=&?_method=keep#h',
+    })
+
+    expect(next).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        request: expect.objectContaining({
+          method: 'DELETE',
+          url: '/a?q=a%20b+c&redirect=/x?y=1,2&e=%7E*&flag&&k=&?_method=keep#h',
+        }),
+      }),
+    )
+  })
+
+  it('keeps a remaining empty query component', async () => {
+    const { next } = await invokeInterceptor({ method: 'POST', url: '/a?_method=DELETE&' })
+
+    expect(next).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ method: 'DELETE', url: '/a?' }),
+      }),
+    )
+  })
+
+  it('matches an encoded param name', async () => {
+    const { next } = await invokeInterceptor({ method: 'POST', url: '/a?%5Fmethod=DELETE&x=1' })
+
+    expect(next).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ method: 'DELETE', url: '/a?x=1' }),
       }),
     )
   })
 
   it('honors custom allowed methods', async () => {
     const { next } = await invokeInterceptor(
-      { method: 'POST', url: '/todos/1?method=GET' },
+      { method: 'POST', url: '/todos/1?_method=GET' },
       { methods: ['get'] },
     )
 
@@ -152,7 +188,7 @@ describe('methodOverrideHandlerPlugin', () => {
     )
 
     const { next: next2 } = await invokeInterceptor(
-      { method: 'POST', url: '/todos/1?method=DELETE' },
+      { method: 'POST', url: '/todos/1?_method=DELETE' },
       { methods: ['GET'] },
     )
 
@@ -171,7 +207,7 @@ describe('methodOverrideHandlerPlugin', () => {
     )
 
     const { matched, response } = await handler.handle(
-      new Request('https://example.com/ping?method=DELETE', {
+      new Request('https://example.com/ping?_method=DELETE', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
