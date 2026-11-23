@@ -54,7 +54,7 @@ describe('uploads large files through tmp files', () => {
 
   const handler = new RPCHandler(router, {
     plugins: [
-      new TmpFileUploadHandlerPlugin({ tmpDir }),
+      new TmpFileUploadHandlerPlugin({ tmpDir, maxBodySize: UNLIMITED }),
       new RequestCompressionHandlerPlugin(),
       new RequestLimitHandlerPlugin({ maxBodySize: 256 * 1024 * 1024 }),
     ],
@@ -180,7 +180,7 @@ describe('uploads large files through tmp files', () => {
     const limitedTmpDir = mkdtempSync(path.join(tmpdir(), 'orpc-upload-e2e-limited-'))
     const limitedHandler = new RPCHandler(router, {
       plugins: [
-        new TmpFileUploadHandlerPlugin({ tmpDir: limitedTmpDir }),
+        new TmpFileUploadHandlerPlugin({ tmpDir: limitedTmpDir, maxBodySize: UNLIMITED }),
         new RequestCompressionHandlerPlugin(),
         // The compressed request carries no content-length, so the limit only trips while spooling
         new RequestLimitHandlerPlugin({ maxBodySize: 64 * 1024 }),
@@ -271,7 +271,7 @@ describe('uploads large files through tmp files', () => {
         }),
       },
       {
-        plugins: [new TmpFileUploadHandlerPlugin({ tmpDir: streamTmpDir })],
+        plugins: [new TmpFileUploadHandlerPlugin({ tmpDir: streamTmpDir, maxBodySize: UNLIMITED })],
       },
     )
 

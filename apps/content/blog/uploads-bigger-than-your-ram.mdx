@@ -115,7 +115,7 @@ Most body-limit middleware takes a single number. Once uploads spool to disk, a 
 - A byte of **upload** touches memory only as a passing chunk on its way to disk. You can afford about a thousand times more of these.
 - A byte of an **event stream** is consumed on the fly and costs almost nothing to relay.
 
-One limit prices all three at the highest rate, so the plugin takes three: `memory`, `file`, and `stream`. It even [subsumes a generic request-limit plugin](/docs/plugins/request-limit), sizing each kind of body to what it actually costs. Configuring one limit requires configuring all three, so nothing is left unbounded by accident; unlimited must be spelled `Number.POSITIVE_INFINITY`, on purpose.
+One limit prices all three at the highest rate, so the plugin takes three: `memory`, `file`, and `stream`. It even [subsumes a generic request-limit plugin](/docs/plugins/request-limit), sizing each kind of body to what it actually costs. All three are required, so nothing is left unbounded by accident; unlimited must be spelled `Number.POSITIVE_INFINITY`, on purpose.
 
 Enforcement has its own subtlety: `Content-Length` is a hint, not a fact. [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#name-content-length) allows it to be absent, and a hostile client can lie. The plugin uses the declared length only to reject oversized requests early, then counts bytes as they arrive and cuts the request off mid-stream with `413 Payload Too Large` the moment it crosses the line. A multipart body is bounded by `memory + file` in total, framing included, so bulk hidden in part headers is caught too.
 

@@ -79,22 +79,17 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    * The size limit for each kind of request body, either fixed or resolved
    * per request, so limits can follow the request itself, such as a larger
    * allowance for an authenticated user than for a guest. Every kind is
-   * required when the option is given, so none is left unbounded by accident;
-   * set a kind to `Number.POSITIVE_INFINITY` to deliberately leave it
-   * unlimited.
+   * required, so none is left unbounded by accident; set a kind to
+   * `Number.POSITIVE_INFINITY` to deliberately leave it unlimited.
    *
    * A resolver runs only when a body is parsed, so a request without one never
    * pays for it, and it receives the request as it arrived, before this plugin
    * wraps its body resolution.
-   *
-   * @default unlimited for every kind
    */
-  maxBodySize?:
-    | Value<
-        Promisable<TmpFileUploadHandlerPluginMaxBodySize>,
-        [options: StandardHandlerRoutingInterceptorOptions<T>]
-      >
-    | undefined
+  maxBodySize: Value<
+    Promisable<TmpFileUploadHandlerPluginMaxBodySize>,
+    [options: StandardHandlerRoutingInterceptorOptions<T>]
+  >
 
   /**
    * The size in bytes an uploaded file must exceed before it is spooled to a
@@ -178,20 +173,13 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
   readonly before: readonly string[] = ['~request-limit', '~request-compression']
 
   private readonly tmpDir: string
-  private readonly maxBodySize: Exclude<
-    TmpFileUploadHandlerPluginOptions<T>['maxBodySize'],
-    undefined
-  >
+  private readonly maxBodySize: TmpFileUploadHandlerPluginOptions<T>['maxBodySize']
   private readonly spoolThreshold: number
   private readonly error: Exclude<TmpFileUploadHandlerPluginOptions<T>['error'], undefined>
 
-  constructor(options: TmpFileUploadHandlerPluginOptions<T> = {}) {
+  constructor(options: TmpFileUploadHandlerPluginOptions<T>) {
     this.tmpDir = options.tmpDir ?? tmpdir()
-    this.maxBodySize = options.maxBodySize ?? {
-      memory: Number.POSITIVE_INFINITY,
-      file: Number.POSITIVE_INFINITY,
-      stream: Number.POSITIVE_INFINITY,
-    }
+    this.maxBodySize = options.maxBodySize
     this.spoolThreshold = options.spoolThreshold ?? 64 * 1024
     this.error = options.error ?? (() => new ORPCError('PAYLOAD_TOO_LARGE'))
   }
