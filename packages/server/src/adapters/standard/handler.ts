@@ -71,8 +71,7 @@ export interface StandardHandlerRoutingInterceptorOptions<
   request: StandardLazyRequest
 
   /**
-   * Encodes an error the way the handler encodes procedure errors, so a routing interceptor
-   * can refuse a request with the same error response a procedure would send.
+   * Encodes an error the way procedure errors are encoded, to refuse a request with it.
    */
   encodeError: (error: AnyORPCError) => Promisable<StandardResponse>
 }
@@ -127,10 +126,6 @@ export class StandardHandler<T extends Context> {
     this.clientInterceptors = options.clientInterceptors
   }
 
-  /**
-   * Encodes an error raised outside a procedure, such as a request no procedure matched,
-   * the way the handler encodes procedure errors.
-   */
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
     return this.codec.encodeError(error)
   }

@@ -1,4 +1,3 @@
-import type { AnyORPCError } from '@orpc/client'
 import type { StandardLazyRequest } from '@standard-server/core'
 
 import { createStandardPeerRequestHandler } from './utils'
@@ -40,13 +39,10 @@ describe('createStandardPeerRequestHandler', () => {
   })
 
   it('returns 404 response when no procedure matched', async () => {
+    const notFound = { status: 404, headers: {}, body: 'encoded' }
     const handler = {
       handle: vi.fn(async () => ({ matched: false, response: undefined })),
-      encodeError: vi.fn((error: AnyORPCError) => ({
-        status: 404,
-        headers: {},
-        body: error.toJSON(),
-      })),
+      encodeError: vi.fn(() => notFound),
     } as any
 
     const handleRequest = createStandardPeerRequestHandler(handler, { context: { context: true } })
@@ -59,11 +55,10 @@ describe('createStandardPeerRequestHandler', () => {
       signal: new AbortController().signal,
     })
 
-    expect(result).toEqual({
-      status: 404,
-      headers: {},
-      body: { defined: false, code: 'NOT_FOUND', message: 'No procedure matched' },
-    })
+    expect(result).toBe(notFound)
+    expect(handler.encodeError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'NOT_FOUND', message: 'No procedure matched' }),
+    )
     expect(handler.handle).toHaveBeenCalledTimes(1)
   })
 

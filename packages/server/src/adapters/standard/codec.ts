@@ -26,8 +26,7 @@ export interface StandardHandlerCodec<T extends Context> {
   ): Promisable<StandardResponse>
 
   /**
-   * `procedure`, `path` and `options` are only given for an error of a matched procedure,
-   * and not for one raised outside it, such as a refusal by a routing interceptor.
+   * `procedure`, `path` and `options` are only given for an error of a matched procedure.
    */
   encodeError(
     error: AnyORPCError,

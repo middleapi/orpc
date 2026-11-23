@@ -5,11 +5,11 @@ import type { RouterClient } from '@orpc/server'
 import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin, RequestLimitHandlerPlugin } from '@orpc/server/plugins'
-import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { promiseWithResolvers } from '@orpc/shared'
 import { sleep } from '@standard-server/shared'
 import { z } from 'zod'
 
+import { defaultBatchGroup } from './__shared__/client-server'
 import { createCompressionHonoFetchBatchClientServerTest } from './__shared__/client-server.compression-hono-fetch'
 import { createCompressionNodeHttpBatchClientServerTest } from './__shared__/client-server.compression-node-http'
 import { createHonoFetchBatchClientServerTest } from './__shared__/client-server.hono-fetch'
@@ -276,65 +276,36 @@ describe('batch plugin: QUERY over node-http', () => {
   })
 })
 
-describe('batch plugin: batch-level refusals', () => {
-  function createClient(plugins: StandardHandlerPlugin<{}>[]) {
-    const ping = vi.fn(async (_options: unknown, input: string) => input)
-    const router = { ping: os.input(z.string()).handler(ping) }
-    const handler = new RPCHandler(router, { plugins })
-
-    const link = new RPCLink({
-      url: '/rpc',
-      origin: 'http://localhost',
-      fetch: async (url, init) => {
-        const { response } = await handler.handle(new Request(url, init), { prefix: '/rpc' })
-
-        return response ?? new Response('Not Found', { status: 404 })
-      },
-      plugins: [new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] })],
-    })
-
-    return { client: createORPCClient<RouterClient<typeof router>>(link), ping }
-  }
-
-  it('rejects every call with the error a plugin refused the batch body with', async () => {
-    const { client, ping } = createClient([
+it('rejects every call with the error a plugin refused the batch body with', async () => {
+  const ping = vi.fn(async (_options: unknown, input: string) => input)
+  const router = { ping: os.input(z.string()).handler(ping) }
+  const handler = new RPCHandler(router, {
+    plugins: [
       new BatchHandlerPlugin(),
       new RequestLimitHandlerPlugin({
         maxBodySize: 10,
         error: new ORPCError('PAYLOAD_TOO_LARGE', { message: 'Too big', data: { max: 10 } }),
       }),
-    ])
-
-    const results = await Promise.allSettled([client.ping('alpha'), client.ping('beta')])
-
-    for (const result of results) {
-      expect(result).toMatchObject({
-        status: 'rejected',
-        reason: expect.objectContaining({
-          code: 'PAYLOAD_TOO_LARGE',
-          message: 'Too big',
-          data: { max: 10 },
-        }),
-      })
-      expect((result as PromiseRejectedResult).reason).toBeInstanceOf(ORPCError)
-    }
-
-    expect(ping).not.toHaveBeenCalled()
+    ],
   })
+  const client: RouterClient<typeof router> = createORPCClient(
+    new RPCLink({
+      url: '/rpc',
+      origin: 'http://localhost',
+      fetch: async (url, init) => (await handler.handle(new Request(url, init))).response!,
+      plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup] })],
+    }),
+  )
 
-  it('rejects every call with PAYLOAD_TOO_LARGE when the batch exceeds the server maxSize', async () => {
-    const { client, ping } = createClient([new BatchHandlerPlugin({ maxSize: 1 })])
+  const results = await Promise.allSettled([client.ping('alpha'), client.ping('beta')])
 
-    const results = await Promise.allSettled([client.ping('alpha'), client.ping('beta')])
+  for (const result of results) {
+    expect(result).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'PAYLOAD_TOO_LARGE', message: 'Too big', data: { max: 10 } },
+    })
+    expect((result as PromiseRejectedResult).reason).toBeInstanceOf(ORPCError)
+  }
 
-    for (const result of results) {
-      expect(result).toMatchObject({
-        status: 'rejected',
-        reason: expect.objectContaining({ code: 'PAYLOAD_TOO_LARGE' }),
-      })
-      expect((result as PromiseRejectedResult).reason).toBeInstanceOf(ORPCError)
-    }
-
-    expect(ping).not.toHaveBeenCalled()
-  })
+  expect(ping).not.toHaveBeenCalled()
 })

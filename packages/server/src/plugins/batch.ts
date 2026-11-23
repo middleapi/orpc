@@ -329,9 +329,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       try {
         messages = await this.readMessages(interceptorOptions)
       } catch (error) {
-        /**
-         * A refusal thrown while the body is read, such as the Request Limit Plugin's, is kept as is.
-         */
         const refusal =
           error instanceof ORPCError
             ? error
@@ -546,9 +543,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
   }
 
-  /**
-   * Reads the subrequest messages of a batch request, throwing the error to refuse it with.
-   */
   private async readMessages(
     options: StandardHandlerRoutingInterceptorOptions<T>,
   ): Promise<ClientPeerSendMessage[]> {

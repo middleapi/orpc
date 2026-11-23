@@ -22,9 +22,6 @@ export function resolveFriendlyStandardHandlerHandleOptions<T extends Context>(
   }
 }
 
-/**
- * The error answered to a request no procedure matched, by transports that must always respond.
- */
 export function createNoProcedureMatchedError(): ORPCError<'NOT_FOUND', undefined> {
   return new ORPCError('NOT_FOUND', { message: 'No procedure matched' })
 }
