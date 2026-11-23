@@ -90,15 +90,13 @@ export class StandardRPCMatcher implements StandardMatcher {
         break
       }
 
-      /**
-       * Don't share the load across requests: on Cloudflare Workers a promise can't settle
-       * once the request that created it ends. The first load to finish indexes the router.
-       */
+      // Not shared across requests: on Cloudflare Workers a promise can't settle once its request ends
       const { default: router } = await unlazy(pendingRouter.router)
+      const index = this.pendingRouters.indexOf(pendingRouter)
 
-      if (this.pendingRouters.includes(pendingRouter)) {
+      if (index !== -1) {
         this.init(router, pendingRouter.path)
-        this.pendingRouters.splice(this.pendingRouters.indexOf(pendingRouter), 1)
+        this.pendingRouters.splice(index, 1)
       }
     }
 
