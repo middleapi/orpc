@@ -205,7 +205,7 @@ describe('rpcHandlerCodec', () => {
       const codec = new RPCHandlerCodec(router, { serializer })
       const error = new ORPCError('BAD_GATEWAY')
 
-      const response = codec.encodeError(error, procedure as any, ['ping'], options as any)
+      const response = codec.encodeError(error)
 
       expect(response).toEqual({
         headers: {},
@@ -222,9 +222,7 @@ describe('rpcHandlerCodec', () => {
       const codec = new RPCHandlerCodec(router, { serializer })
       const error = new ORPCError('toString' as any)
 
-      expect(
-        (await codec.encodeError(error, procedure as any, ['ping'], options as any)).status,
-      ).toEqual(DEFAULT_ERROR_STATUS)
+      expect((await codec.encodeError(error)).status).toEqual(DEFAULT_ERROR_STATUS)
     })
 
     it('custom status with errorStatusCodes option', () => {
@@ -242,12 +240,7 @@ describe('rpcHandlerCodec', () => {
       })
 
       const overriddenError = new ORPCError('BAD_GATEWAY')
-      const overriddenResponse = codec.encodeError(
-        overriddenError,
-        procedure as any,
-        ['ping'],
-        options as any,
-      )
+      const overriddenResponse = codec.encodeError(overriddenError)
 
       expect(overriddenResponse).toEqual({
         headers: {},
@@ -256,12 +249,7 @@ describe('rpcHandlerCodec', () => {
       })
 
       const unknownError = new ORPCError('UNKNOWN_CODE' as any)
-      const fallbackResponse = codec.encodeError(
-        unknownError,
-        procedure as any,
-        ['ping'],
-        options as any,
-      )
+      const fallbackResponse = codec.encodeError(unknownError)
 
       expect(fallbackResponse).toEqual({
         headers: {},
@@ -288,12 +276,7 @@ describe('rpcHandlerCodec', () => {
       })
 
       const customizedError = new ORPCError('BAD_GATEWAY')
-      const customizedResponse = codec.encodeError(
-        customizedError,
-        procedure as any,
-        ['ping'],
-        options as any,
-      )
+      const customizedResponse = codec.encodeError(customizedError)
 
       expect(customizedResponse).toEqual({
         headers: {},
@@ -302,12 +285,7 @@ describe('rpcHandlerCodec', () => {
       })
 
       const fallbackError = new ORPCError('UNKNOWN_ERROR')
-      const fallbackResponse = codec.encodeError(
-        fallbackError,
-        procedure as any,
-        ['ping'],
-        options as any,
-      )
+      const fallbackResponse = codec.encodeError(fallbackError)
 
       expect(fallbackResponse).toEqual({
         headers: {},

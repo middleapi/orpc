@@ -252,10 +252,7 @@ export class StandardHandler<T extends Context> {
             ? error
             : await reconcileORPCError(procedure['~orpc'].errorMap, error)
 
-          const response = await this.codec.encodeError(reconciled, procedure, path, {
-            context,
-            prefix,
-          })
+          const response = await this.codec.encodeError(reconciled)
 
           return { matched: true, response }
         }

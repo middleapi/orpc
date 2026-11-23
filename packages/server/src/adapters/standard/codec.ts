@@ -25,13 +25,5 @@ export interface StandardHandlerCodec<T extends Context> {
     options: ResolvedStandardHandlerHandleOptions<T>,
   ): Promisable<StandardResponse>
 
-  /**
-   * `procedure`, `path` and `options` are only given for an error of a matched procedure.
-   */
-  encodeError(
-    error: AnyORPCError,
-    procedure?: AnyProcedure,
-    path?: string[],
-    options?: ResolvedStandardHandlerHandleOptions<T>,
-  ): Promisable<StandardResponse>
+  encodeError(error: AnyORPCError): Promisable<StandardResponse>
 }

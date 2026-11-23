@@ -434,12 +434,7 @@ describe('standardHandler', () => {
         matched: true,
         response: { status: 502, headers: {}, body: 'bad gateway' },
       })
-      expect(codec.encodeError).toHaveBeenCalledWith(
-        procedureError,
-        expect.anything(),
-        ['ping'],
-        OPTIONS,
-      )
+      expect(codec.encodeError).toHaveBeenCalledWith(procedureError)
     })
 
     it('reconciles errors thrown outside the procedure call with the procedure error map', async () => {
