@@ -745,6 +745,21 @@ function withFakeSubscribe(redis: Redis, subscribe: () => unknown): Redis {
   })
 }
 
+function createFakeRedis() {
+  const subscription = createFakeSubscription()
+  const messages: string[] = []
+  const subscribe = vi.fn(() => {
+    queueMicrotask(() => subscription.emit('subscribe', 1))
+    return subscription
+  })
+  const redis = {
+    publish: async (_channel: string, message: string) => messages.push(message),
+    subscribe,
+  } as unknown as Redis
+
+  return { redis, subscribe, subscription, messages }
+}
+
 it('prefix creates a publisher that appends the prefix and shares the client', async () => {
   const redis = { publish: vi.fn(async () => 1) }
   const publisher = new UpstashPublisher<Record<string, object>>(redis as any).prefix('tenant:')
@@ -754,16 +769,8 @@ it('prefix creates a publisher that appends the prefix and shares the client', a
 })
 
 it('does not broadcast a throwing onError to other subscribers', async () => {
-  const subscription = createFakeSubscription()
-  const messages: string[] = []
-  const redis = {
-    publish: async (_channel: string, message: string) => messages.push(message),
-    subscribe: () => {
-      queueMicrotask(() => subscription.emit('subscribe', 1))
-      return subscription
-    },
-  }
-  const publisher = new UpstashPublisher<Record<string, object>>(redis as unknown as Redis)
+  const { redis, subscription, messages } = createFakeRedis()
+  const publisher = new UpstashPublisher<Record<string, object>>(redis)
   const listener2 = vi.fn()
   const onError2 = vi.fn()
 
@@ -794,4 +801,70 @@ it('does not broadcast a throwing onError to other subscribers', async () => {
 
   await unsubscribe1()
   await unsubscribe2()
+})
+
+describe('channel isolation', () => {
+  it('drops messages reported for a channel other than the subscribed one', async () => {
+    const { redis, subscription, messages } = createFakeRedis()
+    const publisher = new UpstashPublisher<Record<string, object>>(redis).prefix('tenant:1:')
+    const listener = vi.fn()
+
+    const unsubscribe = await publisher.subscribe('invoices', listener)
+    await publisher.publish('invoices', { order: 1 })
+
+    subscription.emit('message', { channel: 'tenant:2:invoices', message: messages[0] })
+    expect(listener).not.toHaveBeenCalled()
+
+    subscription.emit('message', { channel: 'tenant:1:invoices', message: messages[0] })
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ order: 1 })
+
+    await unsubscribe()
+  })
+
+  it('rejects an event name that would redirect the subscription to another channel', async () => {
+    const { redis, subscribe } = createFakeRedis()
+    const publisher = new UpstashPublisher<Record<string, object>>(redis).prefix('tenant:1:')
+
+    await expect(publisher.subscribe('x/../tenant:2:invoices', vi.fn())).rejects.toThrow(
+      'UpstashPublisher: cannot subscribe to "tenant:1:x/../tenant:2:invoices".',
+    )
+    expect(subscribe).not.toHaveBeenCalled()
+    expect((publisher as any).listenersMap.size).toBe(0)
+  })
+
+  it.each([
+    'a/b',
+    'a\\b',
+    'a?b',
+    'a#b',
+    'a%2Fb',
+    'a,b',
+    'a\tb',
+    'a\nb',
+    'a\u0000b',
+    'a\u007Fb',
+    'trailing ',
+    '.',
+    '..',
+  ])('rejects the channel %j before subscribing', async (channel) => {
+    const { redis, subscribe } = createFakeRedis()
+    const publisher = new UpstashPublisher<Record<string, object>>(redis)
+
+    await expect(publisher.subscribe(channel, vi.fn())).rejects.toBeInstanceOf(TypeError)
+    expect(subscribe).not.toHaveBeenCalled()
+  })
+
+  it('subscribes to channels that keep the subscribe URL path intact', async () => {
+    const { redis, subscribe } = createFakeRedis()
+    const publisher = new UpstashPublisher<Record<string, object>>(redis)
+    const channels = ['user:1:inbox', 'order.created', 'a..b', '...']
+
+    const unsubscribes = await Promise.all(
+      channels.map((channel) => publisher.subscribe(channel, vi.fn())),
+    )
+
+    expect(subscribe.mock.calls).toEqual(channels.map((channel) => [channel]))
+
+    await Promise.all(unsubscribes.map((unsubscribe) => unsubscribe()))
+  })
 })
