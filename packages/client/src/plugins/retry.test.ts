@@ -194,6 +194,31 @@ describe('clientRetryPlugin', () => {
     expect(handlerFn).toHaveBeenCalledTimes(0)
   })
 
+  it('should stop waiting and not retry if signal is aborted during the retry delay', async () => {
+    vi.useFakeTimers()
+
+    handlerFn.mockRejectedValue(new Error('fail'))
+
+    const controller = new AbortController()
+    const clean = vi.fn()
+    const onRetry = vi.fn(() => clean)
+
+    const promise = client('hello', { context: { retry: 3, retryDelay: 10_000, onRetry }, signal: controller.signal })
+    const assertion = expect(promise).rejects.toThrow('Internal server error')
+
+    await vi.advanceTimersByTimeAsync(100)
+    expect(handlerFn).toHaveBeenCalledTimes(1)
+    expect(onRetry).toHaveBeenCalledTimes(1)
+
+    controller.abort()
+    await assertion
+
+    expect(handlerFn).toHaveBeenCalledTimes(1)
+    expect(clean).toHaveBeenCalledTimes(1)
+    expect(clean).toHaveBeenCalledWith(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   describe('event iterator', () => {
     it('should not retry by default', async () => {
       handlerFn.mockImplementation(async function* () {
