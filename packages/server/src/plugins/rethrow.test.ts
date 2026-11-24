@@ -193,3 +193,41 @@ describe('rethrowHandlerPlugin', () => {
     })
   })
 })
+
+describe('rethrowHandlerPlugin with malformed requests', () => {
+  const procedureHandler = vi.fn()
+  const filter = vi.fn((error: unknown) => !(error instanceof ORPCError))
+  const handler = new RPCHandler({
+    ping: os.handler(procedureHandler),
+  }, {
+    strictGetMethodPluginEnabled: false,
+    plugins: [new RethrowHandlerPlugin({ filter })],
+  })
+
+  const post = (body: string) => new Request('http://localhost/ping', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body,
+  })
+
+  it.each([
+    ['body', () => post('{bad')],
+    ['query', () => new Request('http://localhost/ping?data=%7Bbad')],
+  ])('passes %s decode failures to the filter as BAD_REQUEST and does not rethrow them', async (_, buildRequest) => {
+    const { response } = await handler.handle(buildRequest())
+
+    expect(response?.status).toBe(400)
+    expect(procedureHandler).not.toHaveBeenCalled()
+    expect(filter).toHaveBeenCalledOnce()
+    expect(filter.mock.calls[0]![0]).toSatisfy(
+      (error: unknown) => error instanceof ORPCError && error.code === 'BAD_REQUEST',
+    )
+  })
+
+  it('still rethrows procedure errors', async () => {
+    const error = new TypeError('__TEST__')
+    procedureHandler.mockRejectedValueOnce(error)
+
+    await expect(handler.handle(post('{}'))).rejects.toBe(error)
+  })
+})

@@ -83,7 +83,7 @@ export class StandardHandler<T extends Context> {
         return runWithSpan(
           { name: `${request.method} ${request.url.pathname}` },
           async (span) => {
-            let step: 'decode_input' | 'call_procedure' | undefined
+            let step: 'call_procedure' | undefined
 
             try {
               return await intercept(
@@ -113,12 +113,22 @@ export class StandardHandler<T extends Context> {
                   span?.setAttribute('rpc.system', ORPC_NAME)
                   span?.setAttribute('rpc.method', match.path.join('.'))
 
-                  step = 'decode_input'
-                  let input = await runWithSpan(
-                    { name: 'decode_input' },
-                    () => this.codec.decode(request, match.params, match.procedure),
-                  )
-                  step = undefined
+                  let input: unknown
+                  try {
+                    input = await runWithSpan(
+                      { name: 'decode_input' },
+                      () => this.codec.decode(request, match.params, match.procedure),
+                    )
+                  }
+                  catch (e) {
+                    // Convert here so interceptors (e.g. the rethrow filter) see the same error the client gets.
+                    throw e instanceof ORPCError
+                      ? e
+                      : new ORPCError('BAD_REQUEST', {
+                          message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                          cause: e,
+                        })
+                  }
 
                   if (isAsyncIteratorObject(input)) {
                     input = asyncIteratorWithSpan(
@@ -161,12 +171,7 @@ export class StandardHandler<T extends Context> {
                 setSpanError(span, e)
               }
 
-              const error = step === 'decode_input' && !(e instanceof ORPCError)
-                ? new ORPCError('BAD_REQUEST', {
-                    message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                    cause: e,
-                  })
-                : toORPCError(e)
+              const error = toORPCError(e)
 
               const response = this.codec.encodeError(error)
 
