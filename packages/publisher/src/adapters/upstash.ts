@@ -1,9 +1,16 @@
 import type { ThrowableError } from '@orpc/shared'
-import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
+import { promiseWithResolvers, stringifyJSON, tryOrUndefined } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
 
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { BaseRedisPublisher } from './base-redis'
+
+/**
+ * `@upstash/redis` puts the channel unencoded in the subscribe URL, which `fetch` may rewrite
+ * and the server may percent-decode. A `,` breaks the SDK's `message,<channel>,<data>` frames.
+ */
+// oxlint-disable-next-line no-control-regex
+const UNSAFE_SUBSCRIBE_CHANNEL_REGEX = /[\x00-\x1F\x7F/\\?#%,]| $|^\.\.?$/
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 
@@ -47,6 +54,12 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     listener: (message: unknown) => void,
     onError?: (error: ThrowableError) => void,
   ): Promise<() => Promise<void>> {
+    if (UNSAFE_SUBSCRIBE_CHANNEL_REGEX.test(channel)) {
+      throw new TypeError(
+        `UpstashPublisher: cannot subscribe to ${stringifyJSON(channel)}. A channel (prefix + event name) must not contain "/", "\\", "?", "#", "%", "," or control characters, end with a space, or be "." or "..".`,
+      )
+    }
+
     // Registered before subscribing so messages that arrive meanwhile are not lost.
     push(this.listenersMap, channel, listener)
 
@@ -106,7 +119,11 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
         ?.slice()
         .forEach((onError) => onError(error))
     })
-    subscription.on('message', ({ message }) => {
+    subscription.on('message', ({ channel: messageChannel, message }) => {
+      if (messageChannel !== channel) {
+        return
+      }
+
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
       this.listenersMap
         .get(channel)
