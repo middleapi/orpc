@@ -74,6 +74,7 @@ describe('rpcHandler', async () => {
   it('ignores malformed messages', async () => {
     onMessage({ data: 'invalid message' })
     onMessage({ data: new Blob(['{"i":"19"}']) })
+    onMessage({ data: '{"i":"19","p":{"u":"/ping","h":{"origin":5}}}' })
     await expect(handler.message(wss, '{"i":"19","t":3}')).resolves.toBeUndefined()
 
     await new Promise(resolve => setTimeout(resolve, 20))

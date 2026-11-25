@@ -153,6 +153,28 @@ describe('serializeRequestMessage & deserializeRequestMessage', () => {
   })
 })
 
+describe('deserializeRequestMessage', () => {
+  it.each([
+    ['id is not a string', { i: 1, p: { u: '/test' } }],
+    ['payload is missing', { i: '1' }],
+    ['url is not a string', { i: '1', p: { u: 1 } }],
+    ['method is not a string', { i: '1', p: { u: '/test', m: 1 } }],
+    ['headers are not an object', { i: '1', p: { u: '/test', h: 'x' } }],
+    ['headers are an array', { i: '1', p: { u: '/test', h: ['x'] } }],
+    ['a header is a number', { i: '1', p: { u: '/test', h: { origin: 1 } } }],
+    ['a header is null', { i: '1', p: { u: '/test', h: { origin: null } } }],
+    ['a header array has a non-string', { i: '1', p: { u: '/test', h: { origin: ['a', 1] } } }],
+  ])('throws if %s', (_, message) => {
+    expect(() => deserializeRequestMessage(message as any)).toThrow()
+  })
+
+  it('accepts string and string array headers', () => {
+    const [, , payload] = deserializeRequestMessage({ i: '1', p: { u: '/test', h: { a: 'a', b: ['b', 'c'], c: undefined } } } as any) as any
+
+    expect(payload.headers).toEqual({ a: 'a', b: ['b', 'c'], c: undefined })
+  })
+})
+
 describe('serializeResponseMessage & deserializeResponseMessage', () => {
   it('should serialize and deserialize a successful response', () => {
     const id = 'res-123'
