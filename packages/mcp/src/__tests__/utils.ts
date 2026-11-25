@@ -25,7 +25,7 @@ export async function connectTestClient(
 ): Promise<Client> {
   const client = new Client(
     { name: 'test-client', version: '1.0.0' },
-    { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+    { versionNegotiation: { mode: 'auto' } },
   )
   onTestFinished(() => client.close())
 
