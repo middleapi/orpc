@@ -58,11 +58,14 @@ describe('mcpRegistrar with a lazy router on Workers', () => {
   it('calls a tool through createMcpHandler in a later request after the request that started the load ends early', async () => {
     const { router, firstLoadStarted } = createLazyRouter()
     const registrar = new McpRegistrar(router)
-    const handler = createMcpHandler(async () => {
-      const server = createServer()
-      await registrar.register(server)
-      return server
-    })
+    const handler = createMcpHandler(
+      async () => {
+        const server = createServer()
+        await registrar.register(server)
+        return server
+      },
+      { legacy: 'reject' },
+    )
 
     const toolCall = () =>
       new Request('http://x/mcp', {
@@ -70,12 +73,23 @@ describe('mcpRegistrar with a lazy router on Workers', () => {
         headers: {
           'content-type': 'application/json',
           'accept': 'application/json, text/event-stream',
+          'mcp-protocol-version': '2026-07-28',
+          'mcp-method': 'tools/call',
+          'mcp-name': 'planet_find',
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: 1,
           method: 'tools/call',
-          params: { name: 'planet_find', arguments: {} },
+          params: {
+            name: 'planet_find',
+            arguments: {},
+            _meta: {
+              'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+              'io.modelcontextprotocol/clientCapabilities': {},
+              'io.modelcontextprotocol/clientInfo': { name: 'test-client', version: '1.0.0' },
+            },
+          },
         }),
       })
 
@@ -93,14 +107,13 @@ describe('mcpRegistrar with a lazy router on Workers', () => {
       expect(await fetchText('/a')).toBe('started')
 
       const text = await fetchText('/b')
-      // a stateless legacy request is answered over SSE
-      expect(JSON.parse(text.match(/^data: (.*)$/m)![1]!)).toEqual({
+      expect(JSON.parse(text)).toEqual({
         jsonrpc: '2.0',
         id: 1,
-        result: {
+        result: expect.objectContaining({
           content: [{ type: 'text', text: '{"name":"Earth"}' }],
           structuredContent: { name: 'Earth' },
-        },
+        }),
       })
     } finally {
       await handler.close()
