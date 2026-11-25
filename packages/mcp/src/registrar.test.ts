@@ -108,23 +108,6 @@ describe('mcpRegistrar', () => {
     expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(expected) }])
   })
 
-  it('returns non-object outputs as structured content', async () => {
-    const client = await createTestClient(new McpRegistrar(router))
-
-    const result = await client.callTool({ name: 'planet_list', arguments: { limit: 1 } })
-
-    expect(result.content).toEqual([{ type: 'text', text: '[{"id":1,"name":"Earth"}]' }])
-    expect(result.structuredContent).toEqual([{ id: 1, name: 'Earth' }])
-  })
-
-  it('returns string outputs as plain text', async () => {
-    const client = await createTestClient(new McpRegistrar(router))
-
-    const result = await client.callTool({ name: 'planet_describe', arguments: { id: 1 } })
-
-    expect(result.content).toEqual([{ type: 'text', text: 'A blue planet' }])
-  })
-
   it.each([
     ['string', z.string(), 'A blue planet', 'A blue planet'],
     ['number', z.number(), 8, '8'],
@@ -237,9 +220,7 @@ describe('mcpRegistrar', () => {
       expect.objectContaining({ progress: 2, message: '{"status":"deployed web"}' }),
     )
   })
-})
 
-describe('mcpRegistrar', () => {
   it('returns the registered tools by name', async () => {
     const server = createTestServer()
     const { tools } = await new McpRegistrar(router).register(server)
