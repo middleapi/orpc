@@ -1,7 +1,9 @@
 import { encodeRequestMessage, encodeResponseMessage, MessageType, ServerPeer } from '@orpc/standard-server-peer'
 import {
   createServerPeerHandleRequestFn,
+  decodeServerPeerRequestMessage,
   handleStandardServerPeerMessage,
+  isValidServerPeerRequestMessage,
 } from './utils'
 
 beforeEach(() => {
@@ -132,5 +134,42 @@ describe('createServerPeerHandleRequestFn', () => {
       { ...request, body: expect.any(Function), signal: expect.any(AbortSignal) },
       { context: { context: true } },
     )
+  })
+})
+
+describe('decodeServerPeerRequestMessage', () => {
+  it('decodes valid messages', async () => {
+    const message = await encodeRequestMessage('test', MessageType.ABORT_SIGNAL, void 0)
+
+    await expect(decodeServerPeerRequestMessage(message)).resolves.toEqual(['test', MessageType.ABORT_SIGNAL, undefined])
+  })
+
+  it('returns undefined on malformed messages', async () => {
+    await expect(decodeServerPeerRequestMessage('invalid message')).resolves.toBeUndefined()
+    await expect(decodeServerPeerRequestMessage('{"i":"test"}')).resolves.toBeUndefined()
+    await expect(decodeServerPeerRequestMessage(new TextEncoder().encode('invalid message'))).resolves.toBeUndefined()
+    await expect(decodeServerPeerRequestMessage('{"i":"test","p":{"u":"/test","h":{"origin":5}}}')).resolves.toBeUndefined()
+  })
+})
+
+describe('isValidServerPeerRequestMessage', () => {
+  const url = new URL('http://orpc/test')
+
+  it('accepts valid messages', () => {
+    expect(isValidServerPeerRequestMessage(['1', MessageType.REQUEST, { url, method: 'POST', headers: { a: 'a', b: ['b', 'c'], c: undefined }, body: undefined }])).toBe(true)
+    expect(isValidServerPeerRequestMessage(['1', MessageType.ABORT_SIGNAL, undefined])).toBe(true)
+    expect(isValidServerPeerRequestMessage(['1', MessageType.EVENT_ITERATOR, { event: 'message', data: 1 }])).toBe(true)
+  })
+
+  it.each([
+    ['id is not a string', [1, MessageType.ABORT_SIGNAL, undefined]],
+    ['method is not a string', ['1', MessageType.REQUEST, { url, method: 1, headers: {} }]],
+    ['headers are not an object', ['1', MessageType.REQUEST, { url, method: 'POST', headers: 'x' }]],
+    ['headers are an array', ['1', MessageType.REQUEST, { url, method: 'POST', headers: ['x'] }]],
+    ['a header is a number', ['1', MessageType.REQUEST, { url, method: 'POST', headers: { origin: 1 } }]],
+    ['a header is null', ['1', MessageType.REQUEST, { url, method: 'POST', headers: { origin: null } }]],
+    ['a header array has a non-string', ['1', MessageType.REQUEST, { url, method: 'POST', headers: { origin: ['a', 1] } }]],
+  ])('rejects if %s', (_, message) => {
+    expect(isValidServerPeerRequestMessage(message as any)).toBe(false)
   })
 })
