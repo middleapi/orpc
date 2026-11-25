@@ -7,8 +7,6 @@ sidebar:
 
 :::warning
 This guide assumes familiarity with the [Model Context Protocol](https://modelcontextprotocol.io/) and requires the [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/) v2.
-
-Only the [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) protocol revision is supported.
 :::
 
 ## Installation
@@ -37,7 +35,7 @@ await registrar.register(server, {
 The router, including [lazy routers](/docs/router#lazy-router), is loaded on the first `register` call and reused afterward. [Contract-first](/docs/contract-first) routers use their contract's metadata.
 :::
 
-Connect each server to a transport as described in the [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/). `register` can be called on any number of servers, such as one per request. Reject older clients in the transport, such as with `createMcpHandler(factory, { legacy: 'reject' })`.
+Connect each server to a transport as described in the [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/). `register` can be called on any number of servers, such as one per request.
 
 ## Tool Definitions
 
