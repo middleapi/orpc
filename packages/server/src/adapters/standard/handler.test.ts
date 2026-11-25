@@ -214,7 +214,7 @@ describe('standardHandler', () => {
     })
   })
 
-  it('on decode error', async () => {
+  it('on decode error, converts to BAD_REQUEST before interceptors see it', async () => {
     matcher.match.mockResolvedValue({
       path: ['ping'],
       procedure: ping,
@@ -253,6 +253,9 @@ describe('standardHandler', () => {
 
       return true
     })
+
+    // The interceptor must observe the same BAD_REQUEST error the client gets, not the raw decode failure.
+    await expect(interceptor.mock.results[0]!.value).rejects.toBe(codec.encodeError.mock.calls[0]![0])
 
     expect(interceptor).toHaveBeenCalledOnce()
     expect(interceptor).toHaveBeenCalledWith({
