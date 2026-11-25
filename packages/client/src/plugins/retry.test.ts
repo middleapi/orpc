@@ -200,23 +200,34 @@ describe('clientRetryPlugin', () => {
     handlerFn.mockRejectedValue(new Error('fail'))
 
     const controller = new AbortController()
+    const reason = new Error('aborted')
     const clean = vi.fn()
-    const onRetry = vi.fn(() => clean)
 
-    const promise = client('hello', { context: { retry: 3, retryDelay: 10_000, onRetry }, signal: controller.signal })
-    const assertion = expect(promise).rejects.toThrow('Internal server error')
+    const promise = client('hello', { context: { retry: 3, retryDelay: 10_000, onRetry: () => clean }, signal: controller.signal })
 
     await vi.advanceTimersByTimeAsync(100)
-    expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(onRetry).toHaveBeenCalledTimes(1)
+    controller.abort(reason)
 
-    controller.abort()
-    await assertion
-
+    await expect(promise).rejects.toBe(reason)
     expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(clean).toHaveBeenCalledTimes(1)
-    expect(clean).toHaveBeenCalledWith(false)
+    expect(clean).toHaveBeenCalledExactlyOnceWith(false)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should not retry if signal is aborted before the retry delay', async () => {
+    handlerFn.mockRejectedValue(new Error('fail'))
+
+    const controller = new AbortController()
+    const reason = new Error('aborted')
+    const clean = vi.fn()
+    const onRetry = () => {
+      controller.abort(reason)
+      return clean
+    }
+
+    await expect(client('hello', { context: { retry: 3, retryDelay: 10_000, onRetry }, signal: controller.signal })).rejects.toBe(reason)
+    expect(handlerFn).toHaveBeenCalledTimes(1)
+    expect(clean).toHaveBeenCalledExactlyOnceWith(false)
   })
 
   describe('event iterator', () => {

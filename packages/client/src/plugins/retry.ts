@@ -119,12 +119,13 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
 
             const retryDelayMs = await value(retryDelay, attemptOptions)
 
-            await this.delayExecution(retryDelayMs, updatedInterceptorOptions.signal)
+            const signal = interceptorOptions.signal
+            await this.delayExecution(retryDelayMs, signal)
 
-            if (isIteratorAborted || updatedInterceptorOptions.signal?.aborted) {
+            if (isIteratorAborted || signal?.aborted) {
               callback?.(false)
               callback = undefined
-              throw currentError.error
+              throw signal?.aborted ? signal.reason : currentError.error
             }
 
             attemptIndex++
@@ -206,14 +207,12 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
   private delayExecution(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve) => {
       if (signal?.aborted) {
-        resolve()
-        return
+        return resolve()
       }
 
       let timeout: ReturnType<typeof setTimeout> | undefined
       const onAbort = () => {
         clearTimeout(timeout)
-        timeout = undefined
         resolve()
       }
 
