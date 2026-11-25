@@ -100,4 +100,16 @@ describe('rpcHandler', async () => {
     await vi.waitFor(() => expect(signal?.aborted).toBe(true))
     expect(receivedMessages).toHaveLength(0)
   })
+
+  it('ignores malformed messages', async () => {
+    clientPort.postMessage('invalid message')
+    clientPort.postMessage({ i: '19' })
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(handler).not.toHaveBeenCalled()
+    expect(receivedMessages).toHaveLength(0)
+
+    clientPort.postMessage(string_request_message)
+    await vi.waitFor(() => expect(receivedMessages.length).toBe(1))
+  })
 })

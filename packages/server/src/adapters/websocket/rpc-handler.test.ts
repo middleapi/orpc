@@ -70,4 +70,13 @@ describe('rpcHandler', async () => {
     await vi.waitFor(() => expect(signal.aborted).toBe(true))
     expect(wss.send).not.toHaveBeenCalled()
   })
+
+  it('ignores malformed messages', async () => {
+    onMessage({ data: 'invalid message' })
+    onMessage({ data: new Blob(['{"i":"19"}']) })
+    await expect(handler.message(wss, '{"i":"19","t":3}')).resolves.toBeUndefined()
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(wss.send).not.toHaveBeenCalled()
+  })
 })

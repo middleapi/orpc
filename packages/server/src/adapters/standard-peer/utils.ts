@@ -1,6 +1,7 @@
-import type { EncodedMessage, ServerPeer, ServerPeerHandleRequestFn } from '@orpc/standard-server-peer'
+import type { DecodedRequestMessage, EncodedMessage, ServerPeer, ServerPeerHandleRequestFn } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandleOptions, StandardHandler } from '../standard'
+import { decodeRequestMessage } from '@orpc/standard-server-peer'
 import { resolveFriendlyStandardHandleOptions } from '../standard'
 
 export type HandleStandardServerPeerMessageOptions<T extends Context>
@@ -36,5 +37,19 @@ export function createServerPeerHandleRequestFn<T extends Context>(
     )
 
     return response ?? { status: 404, headers: {}, body: 'No procedure matched' }
+  }
+}
+
+/**
+ * Decodes a request message from a client, or returns `undefined` if it is malformed.
+ *
+ * Malformed messages are ignored, so a client cannot cause an unhandled rejection with one.
+ */
+export async function decodeServerPeerRequestMessage(message: EncodedMessage): Promise<DecodedRequestMessage | undefined> {
+  try {
+    return await decodeRequestMessage(message)
+  }
+  catch {
+    return undefined
   }
 }

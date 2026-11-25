@@ -1,6 +1,6 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
-import type { DecodedResponseMessage, serializeRequestMessage } from '@orpc/standard-server-peer'
+import type { DecodedRequestMessage, DecodedResponseMessage, serializeRequestMessage } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type {
@@ -63,18 +63,18 @@ export class MessagePortHandler<T extends Context> {
     onMessagePortMessage(port, async (message) => {
       const handleFn = createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest))
 
-      if (isObject(message)) {
-        await peer.message(
-          deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>),
-          handleFn,
-        )
+      let decodedMessage: DecodedRequestMessage
+
+      try {
+        decodedMessage = isObject(message)
+          ? deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>)
+          : await decodeRequestMessage(message)
       }
-      else {
-        await peer.message(
-          await decodeRequestMessage(message),
-          handleFn,
-        )
+      catch {
+        return // Ignore malformed messages, so they cannot cause an unhandled rejection
       }
+
+      await peer.message(decodedMessage, handleFn)
     })
 
     onMessagePortClose(port, () => {

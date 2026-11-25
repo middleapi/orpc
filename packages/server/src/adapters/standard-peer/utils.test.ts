@@ -1,6 +1,7 @@
 import { encodeRequestMessage, encodeResponseMessage, MessageType, ServerPeer } from '@orpc/standard-server-peer'
 import {
   createServerPeerHandleRequestFn,
+  decodeServerPeerRequestMessage,
   handleStandardServerPeerMessage,
 } from './utils'
 
@@ -132,5 +133,19 @@ describe('createServerPeerHandleRequestFn', () => {
       { ...request, body: expect.any(Function), signal: expect.any(AbortSignal) },
       { context: { context: true } },
     )
+  })
+})
+
+describe('decodeServerPeerRequestMessage', () => {
+  it('decodes valid messages', async () => {
+    const message = await encodeRequestMessage('test', MessageType.ABORT_SIGNAL, void 0)
+
+    await expect(decodeServerPeerRequestMessage(message)).resolves.toEqual(['test', MessageType.ABORT_SIGNAL, undefined])
+  })
+
+  it('returns undefined on malformed messages', async () => {
+    await expect(decodeServerPeerRequestMessage('invalid message')).resolves.toBeUndefined()
+    await expect(decodeServerPeerRequestMessage('{"i":"test"}')).resolves.toBeUndefined()
+    await expect(decodeServerPeerRequestMessage(new TextEncoder().encode('invalid message'))).resolves.toBeUndefined()
   })
 })

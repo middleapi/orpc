@@ -3,13 +3,13 @@ import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { HandleStandardServerPeerMessageOptions } from '../standard-peer'
 import { readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
-import { createServerPeerHandleRequestFn } from '../standard-peer'
+import { encodeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
+import { createServerPeerHandleRequestFn, decodeServerPeerRequestMessage } from '../standard-peer'
 
 export type MinimalWebsocket = Pick<WebSocket, 'addEventListener' | 'send'>
 
 export class WebsocketHandler<T extends Context> {
-  readonly #peers = new WeakMap<MinimalWebsocket, ServerPeer>()
+  readonly #peers = new WeakMap<MinimalWebsocket, ServerPeerWithoutCodec>()
   readonly #handler: StandardHandler<T>
 
   constructor(
@@ -49,12 +49,18 @@ export class WebsocketHandler<T extends Context> {
     let peer = this.#peers.get(ws)
 
     if (!peer) {
-      this.#peers.set(ws, peer = new ServerPeer(ws.send.bind(ws)))
+      this.#peers.set(ws, peer = new ServerPeerWithoutCodec(async ([id, type, payload]) => {
+        ws.send(await encodeResponseMessage(id, type, payload))
+      }))
     }
 
-    const message = data instanceof Blob
-      ? await readAsBuffer(data)
-      : data
+    const message = await decodeServerPeerRequestMessage(
+      data instanceof Blob ? await readAsBuffer(data) : data,
+    )
+
+    if (!message) {
+      return
+    }
 
     await peer.message(
       message,

@@ -6,8 +6,8 @@ import type {
   HandleStandardServerPeerMessageOptions,
 } from '../standard-peer'
 import { logError, readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
-import { createServerPeerHandleRequestFn } from '../standard-peer'
+import { encodeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
+import { createServerPeerHandleRequestFn, decodeServerPeerRequestMessage } from '../standard-peer'
 
 export class WsHandler<T extends Context> {
   constructor(
@@ -19,12 +19,18 @@ export class WsHandler<T extends Context> {
     ws: Pick<WebSocket, 'addEventListener' | 'send'>,
     ...rest: MaybeOptionalOptions<HandleStandardServerPeerMessageOptions<T>>
   ): Promise<void> {
-    const peer = new ServerPeer(ws.send.bind(ws))
+    const peer = new ServerPeerWithoutCodec(async ([id, type, payload]) => {
+      ws.send(await encodeResponseMessage(id, type, payload))
+    })
 
     ws.addEventListener('message', async (event) => {
-      const message = Array.isArray(event.data)
-        ? await readAsBuffer(new Blob(event.data))
-        : event.data
+      const message = await decodeServerPeerRequestMessage(
+        Array.isArray(event.data) ? await readAsBuffer(new Blob(event.data)) : event.data,
+      )
+
+      if (!message) {
+        return
+      }
 
       try {
         await peer.message(

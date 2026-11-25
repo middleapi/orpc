@@ -74,10 +74,22 @@ describe('rpcHandler', async () => {
     expect(wss.send).not.toHaveBeenCalled()
   })
 
+  it('ignores malformed messages', async () => {
+    onMessage({ data: 'invalid message' })
+    onMessage({ data: '{"i":"19"}' })
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(wss.send).not.toHaveBeenCalled()
+    expect(logErrorSpy).not.toHaveBeenCalled()
+  })
+
   it('logs error on message handler error instead of throwing', async () => {
-    onMessage({
-      data: 'invalid message that will cause an error',
+    wss.send.mockImplementationOnce(() => {
+      throw new Error('send failed')
     })
+
+    onMessage(string_request_message)
 
     await vi.waitFor(() => {
       expect(logErrorSpy).toHaveBeenCalledWith(expect.any(Error))
