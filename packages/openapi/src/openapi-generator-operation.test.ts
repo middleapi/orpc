@@ -1747,7 +1747,7 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
-    it('uses the common status map by default and falls back to 400 for unknown codes', () => {
+    it('uses the common error statuses by default and falls back to 400 for unknown codes', () => {
       const { ctx, operation } = createContext()
 
       buildErrorResponse(
@@ -1764,7 +1764,7 @@ describe('openAPIGenerator operation builders', () => {
       expect(Object.keys(operation.responses ?? {})).toEqual(['400', '404'])
     })
 
-    it('ignores inherited properties of the status map for prototype-named codes', () => {
+    it('ignores inherited properties of the error statuses for prototype-named codes', () => {
       const { ctx, operation } = createContext()
 
       buildErrorResponse(

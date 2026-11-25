@@ -174,7 +174,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
     ])
   })
 
-  it('supports a custom error status map and a custom error body schema', async () => {
+  it('supports custom error statuses and a custom error body schema', async () => {
     const doc = await generator.generate(
       {
         getPlanet: oc

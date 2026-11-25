@@ -227,7 +227,7 @@ describe('rpcHandlerCodec', () => {
       ).toEqual(DEFAULT_ERROR_STATUS)
     })
 
-    it('custom status with errorStatusCodes option', () => {
+    it('custom status with errorStatuses option', () => {
       const serializer = {
         serialize: vi
           .fn()
