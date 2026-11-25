@@ -7,6 +7,8 @@ sidebar:
 
 :::warning
 This guide assumes familiarity with the [Model Context Protocol](https://modelcontextprotocol.io/) and requires the [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/) v2.
+
+Only the [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) protocol revision is supported. Reject older clients in your transport, such as with `createMcpHandler(factory, { legacy: 'reject' })`.
 :::
 
 ## Installation
