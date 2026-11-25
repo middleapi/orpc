@@ -15,9 +15,6 @@ import { isNonPrimitive, ORPC_NAME } from '@orpc/shared'
 
 type JsonSchemaObject = Exclude<JsonSchema, boolean>
 
-/**
- * The key a non-object input is nested under, since MCP tool arguments must be an object.
- */
 const WRAPPED_INPUT_KEY = 'input'
 
 export interface ToolInputJsonSchema {
@@ -26,9 +23,6 @@ export interface ToolInputJsonSchema {
    */
   jsonSchema: JsonSchemaObject
 
-  /**
-   * Whether the input is nested under {@link WRAPPED_INPUT_KEY}.
-   */
   wrapped: boolean
 
   /**
@@ -37,9 +31,6 @@ export interface ToolInputJsonSchema {
   emptyAsUndefined: boolean
 }
 
-/**
- * Whether a schema synchronously rejects an empty object, or `false` when it validates asynchronously or throws.
- */
 function rejectsEmptyObject(schema: AnySchema): boolean {
   try {
     const result = schema['~standard'].validate({})
@@ -88,7 +79,6 @@ function combineConvertedSchemas(converted: [JsonSchema, boolean][]): [JsonSchem
     return converted[0]!
   }
 
-  // an unconstrained schema adds nothing to `allOf`, such as one without JSON Schema support
   const constrained = converted
     .map(([jsonSchema]) => jsonSchema)
     .filter((jsonSchema) => !isUnconstrainedSchema(jsonSchema))
@@ -101,9 +91,6 @@ function combineConvertedSchemas(converted: [JsonSchema, boolean][]): [JsonSchem
 
 /**
  * Resolves the JSON Schema advertised as a tool's `inputSchema`.
- *
- * MCP tool arguments must be an object, so an input that may not be an object
- * is nested under {@link WRAPPED_INPUT_KEY}.
  */
 export function resolveToolInputJsonSchema(
   converter: Pick<JsonSchemaConverter, 'convert'>,
@@ -140,10 +127,6 @@ export function resolveToolInputJsonSchema(
   }
 }
 
-/**
- * Unwraps tool arguments into the procedure input.
- * Empty arguments become `undefined` for inputs that accept no object.
- */
 export function resolveToolInput(args: unknown, inputJsonSchema: ToolInputJsonSchema): unknown {
   if (inputJsonSchema.emptyAsUndefined && isNonPrimitive(args) && Object.keys(args).length === 0) {
     return undefined
@@ -153,11 +136,7 @@ export function resolveToolInput(args: unknown, inputJsonSchema: ToolInputJsonSc
 }
 
 /**
- * Resolves the JSON Schema advertised as a tool's `outputSchema`,
- * or `undefined` when the output may be undefined, unconstrained, or contain binary values.
- *
- * Every output schema must describe an [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object)
- * for the yield schemas to be used, since tools return the last yielded value.
+ * Resolves the JSON Schema advertised as a tool's `outputSchema`, or `undefined` when it cannot have one.
  */
 export function resolveToolOutputJsonSchema(
   converter: Pick<JsonSchemaConverter, 'convert'>,

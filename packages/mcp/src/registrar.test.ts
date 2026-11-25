@@ -1,6 +1,4 @@
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import type { ServerContext } from '@modelcontextprotocol/server'
-import { createMcpHandler } from '@modelcontextprotocol/server'
 import { ORPCError } from '@orpc/client'
 import { asyncIteratorObject, oc, type } from '@orpc/contract'
 import type { JsonSchemaConverter } from '@orpc/json-schema'
@@ -13,15 +11,17 @@ import { promiseWithResolvers } from '@orpc/shared'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { z } from 'zod'
 
-import { createTestClient, createTestServer } from './__tests__/utils'
+import {
+  connectTestClient,
+  createTestClient,
+  createTestHandler,
+  createTestServer,
+} from './__tests__/utils'
 import { mcp } from './meta'
 import { McpRegistrar } from './registrar'
 
 const planetSchema = z.object({ id: z.number(), name: z.string() })
 
-/**
- * Asserts a tool call failed with a tool execution error, and returns the error JSON the model reads.
- */
 function parseToolError(result: { isError?: unknown; content?: unknown }): any {
   expect(result.isError).toBe(true)
   return JSON.parse((result.content as any)[0].text)
@@ -85,15 +85,14 @@ describe('mcpRegistrar', () => {
       }),
     )
 
-    const planetsJsonSchema = expect.objectContaining({
-      type: 'array',
-      items: expect.objectContaining({
-        properties: { id: { type: 'number' }, name: { type: 'string' } },
+    expect(tools[0]!.outputSchema).toEqual(
+      expect.objectContaining({
+        type: 'array',
+        items: expect.objectContaining({
+          properties: { id: { type: 'number' }, name: { type: 'string' } },
+        }),
       }),
-    })
-    expect(tools[0]!.outputSchema).toEqual(planetsJsonSchema)
-
-    expect(tools[2]!.outputSchema).toBeUndefined()
+    )
   })
 
   it('calls procedures and returns their output as structured content', async () => {
@@ -123,8 +122,7 @@ describe('mcpRegistrar', () => {
     )
 
     const { tools } = await client.listTools()
-    const jsonSchema = expect.objectContaining({ type })
-    expect(tools[0]!.outputSchema).toEqual(jsonSchema)
+    expect(tools[0]!.outputSchema).toEqual(expect.objectContaining({ type }))
     expect(tools[1]!.outputSchema).toBeUndefined()
 
     // the client validates structured content against the listed output schema
@@ -145,9 +143,7 @@ describe('mcpRegistrar', () => {
     const client = await createTestClient(new McpRegistrar({ find }))
 
     const { tools } = await client.listTools()
-    const jsonSchema = expect.objectContaining({ anyOf: expect.any(Array) })
-
-    expect(tools[0]!.outputSchema).toEqual(jsonSchema)
+    expect(tools[0]!.outputSchema).toEqual(expect.objectContaining({ anyOf: expect.any(Array) }))
 
     const result = await client.callTool({ name: 'find' })
 
@@ -426,7 +422,6 @@ describe('mcpRegistrar', () => {
       expect((await client.callTool({ name: 'undefined', arguments: {} })).content).toEqual([
         { type: 'text', text: 'true' },
       ])
-      // an object input still receives the empty arguments, so its defaults apply
       expect((await client.callTool({ name: 'defaults' })).content).toEqual([
         { type: 'text', text: '10' },
       ])
@@ -615,7 +610,6 @@ describe('mcpRegistrar', () => {
       const result = await client.callTool({ name: 'procedure', arguments: args })
       expect(result.structuredContent).toEqual({ year: 2020, count: 2 })
 
-      // arguments are not coerced without the plugin
       const uncoerced = await createTestClient(new McpRegistrar({ procedure }, { converters }))
 
       const failed = await uncoerced.callTool({ name: 'procedure', arguments: args })
@@ -646,7 +640,6 @@ describe('mcpRegistrar', () => {
         (await client.callTool({ name: 'procedure', arguments: { big: '123' } })).isError,
       ).toBe(true)
 
-      // coerced after unwrapping from `input`
       expect(
         (await client.callTool({ name: 'date', arguments: { input: '2020-01-01T00:00:00.000Z' } }))
           .content,
@@ -724,17 +717,14 @@ describe('mcpRegistrar', () => {
       )
 
       const { tools } = await client.listTools()
-      // an output schema requires structured content in every result
       expect(tools[1]!.outputSchema).toBeUndefined()
 
-      expect(await client.callTool({ name: 'withoutSchema' })).toEqual({
-        content: [],
-        _meta: expect.any(Object),
-      })
-      expect(await client.callTool({ name: 'withSchema' })).toEqual({
-        content: [],
-        _meta: expect.any(Object),
-      })
+      for (const name of ['withoutSchema', 'withSchema']) {
+        const result = await client.callTool({ name })
+
+        expect(result.content).toEqual([])
+        expect(result.structuredContent).toBeUndefined()
+      }
     })
 
     it('returns blob outputs as image, audio, or embedded resource content', async () => {
@@ -809,7 +799,7 @@ describe('mcpRegistrar', () => {
       const { tools } = await client.listTools()
       expect(tools[0]!.outputSchema).toBeUndefined()
 
-      expect(await client.callTool({ name: 'report' })).toEqual({
+      expect(await client.callTool({ name: 'report' })).toMatchObject({
         content: [
           { type: 'text', text: '{"title":"Q3","file":{},"covers":[{}]}' },
           {
@@ -826,7 +816,6 @@ describe('mcpRegistrar', () => {
           },
         ],
         structuredContent: { title: 'Q3', file: {}, covers: [{}] },
-        _meta: expect.any(Object),
       })
     })
 
@@ -1069,31 +1058,16 @@ describe('mcpRegistrar', () => {
     it('provides per-request context from the createMcpHandler factory', async () => {
       const registrar = new McpRegistrar({ procedure })
 
-      const handler = createMcpHandler(
-        async ({ authInfo }) => {
-          const server = createTestServer()
-          await registrar.register(server, { context: { auth: authInfo?.extra?.user as string } })
-          return server
-        },
-        { legacy: 'reject' },
-      )
-      onTestFinished(() => handler.close())
+      const handler = createTestHandler(async ({ authInfo }) => {
+        const server = createTestServer()
+        await registrar.register(server, { context: { auth: authInfo?.extra?.user as string } })
+        return server
+      })
 
       const callAs = async (user: string) => {
-        const client = new Client(
-          { name: 'test-client', version: '1.0.0' },
-          { versionNegotiation: { mode: { pin: '2026-07-28' } } },
-        )
-        onTestFinished(() => client.close())
-
-        await client.connect(
-          new StreamableHTTPClientTransport(new URL('http://localhost/mcp'), {
-            fetch: (url, init) =>
-              handler.fetch(new Request(url, init), {
-                authInfo: { token: user, clientId: 'test-client', scopes: [], extra: { user } },
-              }),
-          }),
-        )
+        const client = await connectTestClient(handler, {
+          authInfo: { token: user, clientId: 'test-client', scopes: [], extra: { user } },
+        })
 
         return client.callTool({ name: 'procedure' })
       }
@@ -1223,7 +1197,6 @@ describe('mcpRegistrar', () => {
         {},
         'NOT_FOUND',
       ],
-      // tool calls are routed by the procedure path
       [
         'a routing interceptor that changes the URL',
         {

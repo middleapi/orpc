@@ -222,7 +222,6 @@ export class McpRegistrar<T extends AnyRouter> {
     const { context } = resolveMaybeOptionalOptions(rest) as McpRegistrarRegisterOptions<Context>
     const tools = new Map<string, McpToolDefinition>()
 
-    // every tool is validated before anything is registered
     for (const [url, route] of await this.matcher.resolveRoutes()) {
       const tool = this.createToolDefinition(url, route, context)
       const existing = tools.get(tool.name)
@@ -285,7 +284,6 @@ export class McpRegistrar<T extends AnyRouter> {
       call: async (args, ctx) => {
         try {
           const { matched, response } = await this.handler.handle(
-            // tool calls have no HTTP request of their own, so only the trace context is carried over
             {
               method: 'POST',
               url,
@@ -313,7 +311,6 @@ export class McpRegistrar<T extends AnyRouter> {
             flattenStandardHeader(response.headers['content-type']),
           )
         } catch (e) {
-          // a tool execution error the model can read, rather than a protocol error
           return await toErrorCallToolResult(
             e instanceof EventStreamErrorEvent
               ? e.data
@@ -327,7 +324,6 @@ export class McpRegistrar<T extends AnyRouter> {
 
 /**
  * Routes tool calls to procedures by their HTTP path.
- * Lazy routers and contract-first implementations are loaded on first use and reused afterward.
  */
 class McpMatcher {
   private routes: Map<`/${string}`, McpRoute> | undefined
@@ -376,9 +372,6 @@ class McpMatcher {
   }
 }
 
-/**
- * Decodes tool arguments from the request body, and encodes outputs and errors into JSON bodies.
- */
 class McpHandlerCodec implements StandardHandlerCodec<Context> {
   constructor(
     private readonly matcher: McpMatcher,
@@ -427,16 +420,11 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
   }
 
   private serialize(data: unknown): unknown {
-    // kept as is, like the body of an OpenAPI response, so it becomes an empty tool result rather than null
-    // (blobs, nested or not, and streams are kept as is by the serializer)
+    // blobs, nested or not, and streams are kept as is by the serializer
     return data === undefined ? undefined : this.serializer.serializeJson(data).json
   }
 }
 
-/**
- * Tools return a single result, so the last event becomes the result,
- * and every event is reported as progress when the client asks for it.
- */
 async function consumeIteratorBody(
   iterator: AsyncIterable<unknown>,
   ctx: ServerContext,
@@ -486,10 +474,6 @@ function toText(json: unknown): string | undefined {
   return stringifyJSON(json)
 }
 
-/**
- * A stream has no type of its own, so it takes the content type of the response,
- * such as one a procedure sets with the Response Headers Plugin.
- */
 async function toCallToolResult(
   serialized: unknown,
   contentType?: string,
@@ -524,9 +508,6 @@ async function toErrorCallToolResult(json: unknown): Promise<CallToolResult> {
   }
 }
 
-/**
- * JSON shows a nested blob as an empty object, so each one is also embedded as a resource named by its path.
- */
 function toNestedBlobContents(json: unknown): Promise<EmbeddedResource[]> {
   const blobs: [uri: string, blob: Blob][] = []
   collectNestedBlobs(json, [], blobs)
@@ -573,9 +554,6 @@ async function toEmbeddedResource(uri: string, blob: Blob): Promise<EmbeddedReso
   }
 }
 
-/**
- * Names a blob by its path in the output and its file name, such as `file:///report/q3.pdf`.
- */
 function toResourceUri(segments: readonly string[], blob: Blob): string {
   const names = blob instanceof File && blob.name !== '' ? [...segments, blob.name] : segments
 
