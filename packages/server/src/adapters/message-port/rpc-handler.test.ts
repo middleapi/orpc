@@ -104,6 +104,7 @@ describe('rpcHandler', async () => {
   it('ignores malformed messages', async () => {
     clientPort.postMessage('invalid message')
     clientPort.postMessage({ i: '19' })
+    clientPort.postMessage({ i: '19', p: { u: '/ping', h: { origin: 5 } } })
 
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(handler).not.toHaveBeenCalled()

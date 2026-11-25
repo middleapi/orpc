@@ -1,6 +1,6 @@
 import type { EventMeta, StandardBody, StandardHeaders, StandardRequest, StandardResponse } from '@orpc/standard-server'
 import type { EncodedMessage } from './types'
-import { isAsyncIteratorObject, isObject, readAsBuffer, stringifyJSON } from '@orpc/shared'
+import { isAsyncIteratorObject, readAsBuffer, stringifyJSON } from '@orpc/shared'
 import { flattenHeader, generateContentDisposition, getFilenameFromContentDisposition } from '@orpc/standard-server'
 
 const SHORTABLE_ORIGIN = 'http://orpc'
@@ -148,30 +148,13 @@ export function deserializeRequestMessage(message: BaseMessageFormat): DecodedRe
   }
 
   const payload = message.p as SerializedRequestPayload
-  const headers = payload.h ?? {}
-  const method = payload.m ?? 'POST'
-
-  /**
-   * The message comes from the client, so check the fields that later code relies on.
-   */
-  if (typeof id !== 'string' || typeof method !== 'string' || !isStandardHeaders(headers)) {
-    throw new TypeError('Invalid request message')
-  }
 
   return [id, MessageType.REQUEST, {
     url: payload.u.startsWith('/') ? new URL(`${SHORTABLE_ORIGIN}${payload.u}`) : new URL(payload.u),
-    headers,
-    method,
+    headers: payload.h ?? {},
+    method: payload.m ?? 'POST',
     body: payload.b,
   }]
-}
-
-function isStandardHeaders(headers: unknown): headers is StandardHeaders {
-  return isObject(headers) && Object.values(headers).every(value =>
-    value === undefined
-    || typeof value === 'string'
-    || (Array.isArray(value) && value.every(item => typeof item === 'string')),
-  )
 }
 
 export function serializeResponseMessage<T extends keyof ResponseMessageMap>(

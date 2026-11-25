@@ -9,7 +9,7 @@ import type {
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { isObject, resolveMaybeOptionalOptions, value } from '@orpc/shared'
 import { decodeRequestMessage, deserializeRequestMessage, encodeResponseMessage, serializeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
-import { createServerPeerHandleRequestFn } from '../standard-peer'
+import { createServerPeerHandleRequestFn, isValidServerPeerRequestMessage } from '../standard-peer'
 
 export interface MessagePortHandlerOptions<_T extends Context> {
   /**
@@ -72,6 +72,10 @@ export class MessagePortHandler<T extends Context> {
       }
       catch {
         return // Ignore malformed messages, so they cannot cause an unhandled rejection
+      }
+
+      if (!isValidServerPeerRequestMessage(decodedMessage)) {
+        return
       }
 
       await peer.message(decodedMessage, handleFn)
