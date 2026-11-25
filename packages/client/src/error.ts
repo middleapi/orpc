@@ -4,12 +4,12 @@ import type { StandardResponse } from '@standard-server/core'
 
 /**
  * Default mapping between common oRPC error codes and HTTP status codes.
- * Handlers use it to determine response status codes; spread it to build a custom `errorStatusMap`.
+ * Handlers use it to determine response status codes; spread it to build custom `errorStatuses`.
  *
  * @see {@link https://orpc.dev/docs/rpc/handler#custom-error-response | RPC Handler - Custom Error Response}
  * @see {@link https://orpc.dev/docs/openapi/handler#custom-error-response | OpenAPI Handler - Custom Error Response}
  */
-export const COMMON_ERROR_STATUS_MAP = {
+export const COMMON_ERROR_STATUSES = {
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   PAYMENT_REQUIRED: 402,
@@ -46,7 +46,7 @@ export const COMMON_ERROR_STATUS_MAP = {
  */
 export type ORPCErrorCode = Registry extends { ORPCErrorCode: infer T extends string }
   ? T
-  : keyof typeof COMMON_ERROR_STATUS_MAP | (string & {})
+  : keyof typeof COMMON_ERROR_STATUSES | (string & {})
 
 export type ORPCErrorOptions<TData> = ErrorOptions & {
   message?: string | undefined
@@ -246,7 +246,7 @@ function inferMalformedResponseMessage(response: StandardResponse): string {
     return candidate
   }
 
-  const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(
+  const commonCode = Object.entries(COMMON_ERROR_STATUSES).find(
     ([, status]) => status === response.status,
   )?.[0]
 

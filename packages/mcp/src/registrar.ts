@@ -15,7 +15,7 @@ import {
 } from '@modelcontextprotocol/server'
 import type { AnyORPCError } from '@orpc/client'
 import {
-  COMMON_ERROR_STATUS_MAP,
+  COMMON_ERROR_STATUSES,
   ORPCError,
   toORPCError,
   wrapAsyncIteratorPreservingEventMeta,
@@ -420,7 +420,7 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
 
   encodeError(error: AnyORPCError): StandardResponse {
     return {
-      status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
+      status: getOwn(COMMON_ERROR_STATUSES, error.code) ?? DEFAULT_ERROR_STATUS,
       headers: {},
       body: this.serialize(error.toJSON()),
     }

@@ -57,7 +57,7 @@ export interface OpenAPIOperationContext {
     schemas: AnySchema[] | undefined,
     direction: JsonSchemaConverterDirection,
   ) => [JsonSchema, boolean]
-  errorStatusMap: Record<string, number>
+  errorStatuses: Record<string, number>
   errorResponseBodySchema:
     | Value<
         JsonSchema | null | undefined,
@@ -620,7 +620,7 @@ export function buildErrorResponse(
       continue
     }
 
-    const status = getOwn(ctx.errorStatusMap, code) ?? DEFAULT_ERROR_STATUS
+    const status = getOwn(ctx.errorStatuses, code) ?? DEFAULT_ERROR_STATUS
     const [dataJsonSchema, dataOptional] = ctx.convertSchemas(
       config.data !== undefined ? [config.data] : undefined,
       'output',

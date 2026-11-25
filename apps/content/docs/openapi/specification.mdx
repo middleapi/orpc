@@ -256,11 +256,11 @@ const spec = await generator.generate(router, {
 If your [OpenAPI Handler](/docs/openapi/handler#custom-error-response) uses custom error response formats, configure `OpenAPIGenerator` with the same logic so the generated document matches the actual error response formats.
 
 ```ts
-import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
+import { COMMON_ERROR_STATUSES } from '@orpc/openapi'
 
 const spec = await generator.generate(router, {
-  errorStatusMap: {
-    ...COMMON_ERROR_STATUS_MAP,
+  errorStatuses: {
+    ...COMMON_ERROR_STATUSES,
     PLANET_GONE: 410,
   },
   errorResponseBodySchema: (definedErrors, status, defaultSchema) => {

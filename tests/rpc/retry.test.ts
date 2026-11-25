@@ -89,8 +89,8 @@ describe('retry plugin', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 
-  it('does not retry errors with codes missing from the errorStatusMap', async () => {
-    // OUT_OF_STOCK is missing from the handler's errorStatusMap, so it is sent with the fallback 400 status
+  it('does not retry errors with codes missing from errorStatuses', async () => {
+    // OUT_OF_STOCK is missing from the handler's errorStatuses, so it is sent with the fallback 400 status
     await expect(client.outOfStock()).rejects.toMatchObject({ defined: true, code: 'OUT_OF_STOCK' })
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)

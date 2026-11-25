@@ -238,7 +238,7 @@ describe('rpcHandlerCodec', () => {
 
       const codec = new RPCHandlerCodec(router, {
         serializer,
-        errorStatusMap: { BAD_GATEWAY: 599 },
+        errorStatuses: { BAD_GATEWAY: 599 },
       })
 
       const overriddenError = new ORPCError('BAD_GATEWAY')

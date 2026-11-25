@@ -1,4 +1,4 @@
-import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
+import { COMMON_ERROR_STATUSES, ORPCError } from '@orpc/client'
 import { TimeoutError } from '@orpc/shared'
 
 import { RPCHandler } from '../adapters/fetch/index'
@@ -62,7 +62,7 @@ describe('timeoutHandlerPlugin', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     const { response } = await promise
-    expect(response?.status).toBe(COMMON_ERROR_STATUS_MAP.INTERNAL_SERVER_ERROR)
+    expect(response?.status).toBe(COMMON_ERROR_STATUSES.INTERNAL_SERVER_ERROR)
 
     const { signal } = procedure_handler.mock.calls[0]![0]
     expect(signal.aborted).toBe(true)
@@ -98,7 +98,7 @@ describe('timeoutHandlerPlugin', () => {
     await vi.advanceTimersByTimeAsync(100_000)
 
     const { response } = await promise
-    expect(response?.status).toBe(COMMON_ERROR_STATUS_MAP.NOT_ACCEPTABLE)
+    expect(response?.status).toBe(COMMON_ERROR_STATUSES.NOT_ACCEPTABLE)
   })
 
   it('should support dynamic timeout based on interceptor options', async () => {
@@ -111,7 +111,7 @@ describe('timeoutHandlerPlugin', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     const { response } = await promise
-    expect(response?.status).toBe(COMMON_ERROR_STATUS_MAP.INTERNAL_SERVER_ERROR)
+    expect(response?.status).toBe(COMMON_ERROR_STATUSES.INTERNAL_SERVER_ERROR)
 
     expect(timeout).toHaveBeenCalledTimes(1)
     expect(timeout).toHaveBeenCalledWith(

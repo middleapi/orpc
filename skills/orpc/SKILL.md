@@ -156,7 +156,7 @@ const server = createServer(async (req, res) => {
 server.listen(3000)
 ```
 
-Unmatched requests fall through to your own handling. By default `RPCHandler` accepts only `POST`, `PUT`, `PATCH`, and `DELETE`; enabling `GET` via `allowMethods` is a CSRF risk with cookie auth, see [RPC Handler](https://orpc.dev/docs/rpc/handler). Handler options also include `interceptors`, `routingInterceptors`, `clientInterceptors`, `plugins`, `filter`, and `errorStatusMap`. Adapters also exist for [AWS Lambda](https://orpc.dev/docs/adapters/aws-lambda), [Fastify](https://orpc.dev/docs/adapters/fastify), [WebSocket](https://orpc.dev/docs/adapters/websocket), [Message Port](https://orpc.dev/docs/adapters/message-port), and [Expo](https://orpc.dev/docs/adapters/expo).
+Unmatched requests fall through to your own handling. By default `RPCHandler` accepts only `POST`, `PUT`, `PATCH`, and `DELETE`; enabling `GET` via `allowMethods` is a CSRF risk with cookie auth, see [RPC Handler](https://orpc.dev/docs/rpc/handler). Handler options also include `interceptors`, `routingInterceptors`, `clientInterceptors`, `plugins`, `filter`, and `errorStatuses`. Adapters also exist for [AWS Lambda](https://orpc.dev/docs/adapters/aws-lambda), [Fastify](https://orpc.dev/docs/adapters/fastify), [WebSocket](https://orpc.dev/docs/adapters/websocket), [Message Port](https://orpc.dev/docs/adapters/message-port), and [Expo](https://orpc.dev/docs/adapters/expo).
 
 ## Call procedures
 

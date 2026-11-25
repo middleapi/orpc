@@ -1,5 +1,5 @@
 import type { AnyORPCError } from '@orpc/client'
-import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
+import { COMMON_ERROR_STATUSES } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import type {
@@ -37,11 +37,11 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
-   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
+   * Codes missing from it fall back to `DEFAULT_ERROR_STATUS` (400).
    *
-   * @default COMMON_ERROR_STATUS_MAP
+   * @default COMMON_ERROR_STATUSES
    */
-  errorStatusMap?: Record<string, number> | undefined
+  errorStatuses?: Record<string, number> | undefined
 
   /**
    * Customize how an ORPC error is serialized into a response body.
@@ -64,10 +64,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 
 export class OpenAPIHandlerCodecCore<T extends Context> {
   private readonly serializer: Public<OpenAPISerializer>
-  private readonly errorStatusMap: Exclude<
-    OpenAPIHandlerCodecOptions<T>['errorStatusMap'],
-    undefined
-  >
+  private readonly errorStatuses: Exclude<OpenAPIHandlerCodecOptions<T>['errorStatuses'], undefined>
   private readonly errorResponseBodyEncoder: Exclude<
     OpenAPIHandlerCodecOptions<T>['errorResponseBodyEncoder'],
     undefined
@@ -76,7 +73,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
   constructor(options: OpenAPIHandlerCodecCoreOptions<T> = {}) {
     this.serializer = options.serializer ?? new OpenAPISerializer()
-    this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
+    this.errorStatuses = options.errorStatuses ?? COMMON_ERROR_STATUSES
     this.errorResponseBodyEncoder = options.errorResponseBodyEncoder ?? ((e) => e.toJSON())
     this.errorResponseContentType = options.errorResponseContentType
   }
@@ -165,7 +162,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   }
 
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
-    const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
+    const status = getOwn(this.errorStatuses, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {
       status,

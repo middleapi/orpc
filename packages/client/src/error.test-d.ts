@@ -1,11 +1,11 @@
-import type { COMMON_ERROR_STATUS_MAP, ORPCErrorCode } from './error'
+import type { COMMON_ERROR_STATUSES, ORPCErrorCode } from './error'
 import { ORPCError } from './error'
 
 describe('ORPCErrorCode', () => {
   it('suggests common codes and accepts any string', () => {
     // oRPC relies on any string being a valid code, see docs/error-handling
     expectTypeOf<ORPCErrorCode>().toEqualTypeOf<
-      keyof typeof COMMON_ERROR_STATUS_MAP | (string & {})
+      keyof typeof COMMON_ERROR_STATUSES | (string & {})
     >()
   })
 })

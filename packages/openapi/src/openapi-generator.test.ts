@@ -769,7 +769,7 @@ describe('openAPIGenerator version', () => {
         },
         {
           version,
-          errorStatusMap: { PENGUIN_NAME_BANNED: 400, PENGUIN_COLONY_FULL: 400 },
+          errorStatuses: { PENGUIN_NAME_BANNED: 400, PENGUIN_COLONY_FULL: 400 },
         },
       )
 
