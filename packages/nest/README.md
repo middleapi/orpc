@@ -134,6 +134,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
 <table>
   <tr>
    <td align="center"><a href="https://lnmarkets.com/?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="LN Markets"><img src="https://avatars.githubusercontent.com/u/70597625?v=4" width="209" alt="LN Markets"/><br />LN Markets</a></td>
+   <td align="center"><a href="https://ibrahimsaberi.com/?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Ibrahim Saberi"><img src="https://avatars.githubusercontent.com/u/2670350?u=31c4db8dcf5d605c612676475543a228884fc74b&amp;v=4" width="209" alt="Ibrahim Saberi"/><br />Ibrahim Saberi</a></td>
   </tr>
 </table>
 
@@ -158,7 +159,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
    <td align="center"><a href="https://github.com/christ12938?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="christ12938"><img src="https://avatars.githubusercontent.com/u/25758598?v=4" width="167" alt="christ12938"/><br />christ12938</a></td>
    <td align="center"><a href="https://github.com/Ryanjso?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Ryan Soderberg"><img src="https://avatars.githubusercontent.com/u/39172778?u=5ed913c31d57e7221b75784abcad48c7ebddde27&amp;v=4" width="167" alt="Ryan Soderberg"/><br />Ryan Soderberg</a></td>
    <td align="center"><a href="https://github.com/itigoore01?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="shota"><img src="https://avatars.githubusercontent.com/u/11831107?u=c976a6dc7e055eb026304c46c99100ed22b0c8e0&amp;v=4" width="167" alt="shota"/><br />shota</a></td>
-   <td align="center"><a href="https://github.com/ellis-driscoll?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Ellis Driscoll"><img src="https://avatars.githubusercontent.com/u/70685966?u=c5f95bc33b5991d9744abe00052542e4a2ed3cb9&amp;v=4" width="167" alt="Ellis Driscoll"/><br />Ellis Driscoll</a></td>
+   <td align="center"><a href="https://ellisdriscoll.com/?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Ellis Driscoll"><img src="https://avatars.githubusercontent.com/u/70685966?u=c5f95bc33b5991d9744abe00052542e4a2ed3cb9&amp;v=4" width="167" alt="Ellis Driscoll"/><br />Ellis Driscoll</a></td>
    <td align="center"><a href="https://github.com/hoangbn?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Hoang Nguyen"><img src="https://avatars.githubusercontent.com/u/38968280?u=c90084c6de65c56facabab7ba13a72a49ddbc3e4&amp;v=4" width="167" alt="Hoang Nguyen"/><br />Hoang Nguyen</a></td>
   </tr>
   <tr>
