@@ -134,6 +134,66 @@ describe.each(PROTOCOL_ERAS)('mcpRegistrar - %s protocol', (era) => {
     expect(result.content).toEqual([{ type: 'text', text: 'A blue planet' }])
   })
 
+  it.each([
+    ['string', z.string(), 'A blue planet', 'A blue planet'],
+    ['number', z.number(), 8, '8'],
+    ['boolean', z.boolean(), false, 'false'],
+    ['null', z.null(), null, 'null'],
+    ['array', z.array(z.number()), [1, 2], '[1,2]'],
+  ])('returns %s outputs matching the listed output schema', async (type, schema, output, text) => {
+    const client = await createTestClient(
+      era,
+      new McpRegistrar({
+        typed: os.output(schema as z.ZodType).handler(() => output),
+        untyped: os.handler(() => output),
+      }),
+    )
+
+    const { tools } = await client.listTools()
+    const jsonSchema = expect.objectContaining({ type })
+
+    // the 2025 protocol requires objects, so the MCP SDK nests other schemas and values under `result`
+    expect(tools[0]!.outputSchema).toEqual(
+      era === 'legacy'
+        ? { type: 'object', properties: { result: jsonSchema }, required: ['result'] }
+        : jsonSchema,
+    )
+    expect(tools[1]!.outputSchema).toBeUndefined()
+
+    // the client validates structured content against the listed output schema
+    for (const name of ['typed', 'untyped']) {
+      const result = await client.callTool({ name })
+
+      expect(result.isError).not.toBe(true)
+      expect(result.content).toEqual([{ type: 'text', text }])
+      expect(result.structuredContent).toEqual(era === 'legacy' ? { result: output } : output)
+    }
+  })
+
+  it('returns object outputs matching a listed output schema without an object root', async () => {
+    const find = os
+      .output(z.union([planetSchema, z.array(planetSchema)]))
+      .handler(() => ({ id: 1, name: 'Earth' }))
+
+    const client = await createTestClient(era, new McpRegistrar({ find }))
+
+    const { tools } = await client.listTools()
+    const jsonSchema = expect.objectContaining({ anyOf: expect.any(Array) })
+
+    expect(tools[0]!.outputSchema).toEqual(
+      era === 'legacy'
+        ? { type: 'object', properties: { result: jsonSchema }, required: ['result'] }
+        : jsonSchema,
+    )
+
+    const result = await client.callTool({ name: 'find' })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.structuredContent).toEqual(
+      era === 'legacy' ? { result: { id: 1, name: 'Earth' } } : { id: 1, name: 'Earth' },
+    )
+  })
+
   it('reports errors as tool execution errors', async () => {
     const client = await createTestClient(era, new McpRegistrar(router))
 
