@@ -1,10 +1,15 @@
 import type { Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
-import { value } from '@orpc/shared'
+import { isDeepEqual, value } from '@orpc/shared'
 
-import type { CacheHandlerPluginContext } from './handler-plugin'
+import type { CacheHandlerPluginContext, CacheHandlerPluginLookup } from './handler-plugin'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import type { CacheContext, CacheEntry } from './types'
+
+/**
+ * The keys the `cache` middlewares further out on the procedure are filling.
+ */
+const OUTER_CACHE_KEYS_SYMBOL: unique symbol = Symbol('ORPC_OUTER_CACHE_KEYS')
 
 type MiddlewareValue<T, TInContext extends CacheContext, TInput> = Value<
   Promisable<T>,
@@ -67,37 +72,55 @@ export function cache<TInContext extends CacheContext, TInput>(
   options: CacheMiddlewareOptions<TInContext, TInput> = {},
 ): Middleware<TInContext, object, TInput, any, object> {
   return async function cache(middlewareOptions, input, done) {
-    if ((await value(options.enabled, middlewareOptions, input)) === false) {
-      return middlewareOptions.next()
+    const { context, procedure, path } = middlewareOptions
+    const pluginContext = (context as CacheHandlerPluginContext)[
+      CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL
+    ]
+    const lookupIndex = pluginContext?.caches.length ?? 0
+
+    // Recorded at its lookup position rather than appended, so the plugin finds the outermost of stacked caches first.
+    const record = (lookup: Pick<CacheHandlerPluginLookup, 'tags' | 'ttl' | 'swr'>) => {
+      pluginContext?.caches.splice(lookupIndex, 0, { procedure, path, ...lookup })
     }
 
-    const [key = [middlewareOptions.path, input], tags, ttl, swr] = await Promise.all([
+    if ((await value(options.enabled, middlewareOptions, input)) === false) {
+      const tags = await value(options.tags, middlewareOptions, input)
+      const result = await middlewareOptions.next()
+
+      // Still recorded with its tags, so clients tracking them revalidate the output.
+      record({ tags, ttl: 0, swr: 0 })
+
+      return result
+    }
+
+    const [key = [path, input], tags, ttl, swr] = await Promise.all([
       value(options.key, middlewareOptions, input),
       value(options.tags, middlewareOptions, input),
       value(options.ttl, middlewareOptions, input),
       value(options.swr, middlewareOptions, input),
     ])
 
-    const store = middlewareOptions.context['cache/store']
-    const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[
-      CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL
-    ]
-    const lookupIndex = pluginContext?.caches.length ?? 0
+    const outerKeys =
+      (context as { [OUTER_CACHE_KEYS_SYMBOL]?: unknown[] })[OUTER_CACHE_KEYS_SYMBOL] ?? []
 
-    const entry = await store.getOrSet(key, async () => (await middlewareOptions.next()).output, {
-      tags,
-      ttl,
-      swr,
-      waitUntil: middlewareOptions.context['cache/waitUntil'],
-    })
+    // An outer cache is already filling this key, and waiting for its lock would stall.
+    if (outerKeys.some((outerKey) => isDeepEqual(outerKey, key))) {
+      return middlewareOptions.next()
+    }
 
-    // Recorded at its lookup position rather than appended, so the plugin finds the outermost of stacked caches first.
-    pluginContext?.caches.splice(lookupIndex, 0, {
-      procedure: middlewareOptions.procedure,
-      path: middlewareOptions.path,
-      tags: entry.tags,
-      ...remainingLifetime(entry),
-    })
+    const entry = await context['cache/store'].getOrSet(
+      key,
+      async () => {
+        const result = await middlewareOptions.next({
+          context: { [OUTER_CACHE_KEYS_SYMBOL]: [...outerKeys, key] },
+        })
+
+        return result.output
+      },
+      { tags, ttl, swr, waitUntil: context['cache/waitUntil'] },
+    )
+
+    record({ tags: entry.tags, ...remainingLifetime(entry) })
 
     return done({ output: entry.output })
   }

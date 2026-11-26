@@ -35,7 +35,10 @@ export class TieredCacheStore implements CacheStore {
   }
 
   async revalidate(options: CacheRevalidateOptions): Promise<void> {
-    await Promise.all(this.tiers.map(({ store }) => store.revalidate(options)))
+    // Back to front, so a front tier never refills from a tier not yet revalidated.
+    for (let index = this.tiers.length - 1; index >= 0; index--) {
+      await this.tiers[index]!.store.revalidate(options)
+    }
   }
 
   private getOrSetFrom(
@@ -53,7 +56,7 @@ export class TieredCacheStore implements CacheStore {
     return store.getOrSet(key, next, {
       ...options,
       ttl: cap(options.ttl, ttl),
-      swr: cap(options.swr, swr),
+      swr: cap(options.swr ?? 0, swr),
     })
   }
 }

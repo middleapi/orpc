@@ -32,9 +32,9 @@ describe('encodeCacheKey', () => {
     )
   })
 
-  it('ignores unsupported values like blobs', () => {
-    expect(encodeCacheKey({ file: new Blob(['a']), id: 1 }, serializer)).toBe(
-      encodeCacheKey({ file: new Blob(['b']), id: 1 }, serializer),
+  it('throws on blobs', () => {
+    expect(() => encodeCacheKey({ file: new Blob(['a']), id: 1 }, serializer)).toThrow(
+      'Cache keys cannot contain Blob or File values',
     )
   })
 })

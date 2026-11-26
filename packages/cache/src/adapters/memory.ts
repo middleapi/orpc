@@ -1,14 +1,17 @@
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
-import { createCacheEntry, isCacheEntryEvicted } from '../utils'
-import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
+import { isCacheEntryEvicted } from '../utils'
+import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
 export type MemoryCacheStoreOptions = BaseKeyValueCacheStoreOptions
 
 interface MemoryCacheStoreEntry {
-  entry: CacheEntry
   /**
-   * The version each tag had when the fill started, index-aligned with the entry's tags.
+   * Kept serialized and cloned on each read, so every hit gets its own copy of the output.
+   */
+  envelope: CacheEnvelope
+  /**
+   * The version each tag had when the fill started, index-aligned with the envelope's tags.
    */
   tagVersions: readonly number[]
 }
@@ -49,7 +52,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
       return undefined
     }
 
-    return stored.entry
+    return this.decode(structuredClone(stored.envelope))
   }
 
   protected async fill(
@@ -58,18 +61,18 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     options: CacheGetOrSetOptions,
   ): Promise<CacheEntry> {
     const tagVersions = (options.tags ?? []).map((tag) => this.tagVersions.get(tag) ?? 0)
-    const { entry } = createCacheEntry(await compute(), options)
+    const { envelope, entry } = this.encode(await compute(), options)
 
     this.sweep()
-    this.entries.set(encodedKey, { entry, tagVersions })
+    this.entries.set(encodedKey, { envelope, tagVersions })
 
     return entry
   }
 
-  private shouldEvict({ entry, tagVersions }: MemoryCacheStoreEntry): boolean {
+  private shouldEvict({ envelope, tagVersions }: MemoryCacheStoreEntry): boolean {
     return (
-      isCacheEntryEvicted(entry) ||
-      !!entry.tags?.some((tag, index) => (this.tagVersions.get(tag) ?? 0) !== tagVersions[index])
+      isCacheEntryEvicted(envelope) ||
+      !!envelope.tags?.some((tag, index) => (this.tagVersions.get(tag) ?? 0) !== tagVersions[index])
     )
   }
 

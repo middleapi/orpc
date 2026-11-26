@@ -32,7 +32,7 @@ describe('memoryCacheStore', () => {
     ).resolves.toMatchObject({ output: 'other' })
   })
 
-  it('encodes complex key values, ignoring unsupported ones like blobs', async () => {
+  it('encodes complex key values', async () => {
     const store = new MemoryCacheStore()
 
     await store.getOrSet({ date: new Date(1), big: 1n }, async () => 'v')
@@ -42,11 +42,19 @@ describe('memoryCacheStore', () => {
     await expect(
       store.getOrSet({ big: 2n, date: new Date(1) }, async () => 'other'),
     ).resolves.toMatchObject({ output: 'other' })
+  })
 
-    await store.getOrSet({ file: new Blob(['a']), id: 1 }, async () => 'blobbed')
-    await expect(
-      store.getOrSet({ file: new Blob(['b']), id: 1 }, async () => 'other'),
-    ).resolves.toMatchObject({ output: 'blobbed' })
+  it('hands every hit its own copy of the output', async () => {
+    const store = new MemoryCacheStore()
+
+    await store.getOrSet('k', async () => ({ planets: ['Earth'] }))
+
+    const hit = await store.getOrSet('k', async () => 'other')
+    ;(hit.output as { planets: string[] }).planets.push('Mars')
+
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({
+      output: { planets: ['Earth'] },
+    })
   })
 
   it('supports a custom key serializer', async () => {

@@ -44,7 +44,7 @@ An entry is fresh for `ttl` milliseconds and kept for a further `swr` window, du
 
 The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). A hit returns the cached output without running the handler; a miss runs the handler once, even for concurrent callers, and stores the result. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
 
-`key` defaults to the procedure path and input. When provided, it is used as given, so procedures sharing a key share an entry. When `ttl` and `swr` add up to zero, the handler runs and nothing is stored.
+`key` defaults to the procedure path and input. When provided, it is used as given, so procedures sharing a key share an entry. A key cannot contain Blob or File values, so set `key` on procedures taking them as input. When `ttl` and `swr` add up to zero, the handler runs and nothing is stored.
 
 ```ts
 import { cache, CacheContext } from '@orpc/experimental-cache'
@@ -146,7 +146,7 @@ const handler = new RPCHandler(router, {
 :::info[Response Caches in Front]
 With `cache-control` and `cache-tag` listed, a response cache in front serves cached responses without invoking your server. Pair it with a purge-capable store, such as `experimental_WorkersCacheStore`, so revalidations purge the front cache too. Standard HTTP caches only store GET and HEAD responses, so this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
 
-`cache-control` uses `max-age`, not `s-maxage`, because [`s-maxage` carries `proxy-revalidate` semantics](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10) that forbid the stale reuse `swr` asks for. It therefore reaches browser caches too, which no tag purge can invalidate. Set your own `cache-control` when responses must stay out of them.
+`cache-control` uses `max-age`, not `s-maxage`, because [`s-maxage` carries `proxy-revalidate` semantics](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10) that forbid the stale reuse `swr` asks for. It therefore reaches browser caches too, which no tag purge can invalidate. A `cache-control` already on the response is kept, so set your own when responses must stay out of them.
 :::
 
 :::warning
@@ -154,7 +154,7 @@ A response cache in front stores responses by URL, not by `key`, and `cache-cont
 :::
 
 :::info
-When a procedure calls other procedures, only the first cache check and the first revalidation of the procedure the client called are reflected, so nested procedures never leak their tags into the response. Headers appear only on successful responses.
+When a procedure calls other procedures, only the first cache check and the revalidations of the procedure the client called are reflected, so nested procedures never leak their tags into the response. Headers appear only on successful responses.
 :::
 
 :::tip[Cross-Origin Clients]
@@ -229,7 +229,7 @@ const store = new TieredCacheStore([
 
 ### Memory
 
-Stores entries in the process. Suited to development, testing, and single-instance deployments.
+Stores entries in the process. Suited to development, testing, and single-instance deployments. Entries without a `ttl` stay in memory until revalidated, so set one on procedures with client-supplied input.
 
 ```ts
 import { MemoryCacheStore } from '@orpc/experimental-cache/memory'

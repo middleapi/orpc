@@ -107,17 +107,17 @@ describe('cacheHandlerPlugin', () => {
   describe('orpc-cache-tag & orpc-cache-tag-invalidation', () => {
     const headers = ['orpc-cache-tag', 'orpc-cache-tag-invalidation'] as const
 
-    it('reflects the first check of each kind belonging to the called procedure', async () => {
+    it('reflects the first cache check and every revalidation of the called procedure', async () => {
       const { record, handle } = createTestingHandler(headers)
       record({
         caches: [{ tags: ['planets', 'planet:1'] }, { tags: ['ignored'] }],
-        revalidations: [{ tags: ['revalidated'] }, { tags: ['ignored'] }],
+        revalidations: [{ tags: ['planets', 'planet:1'] }, { tags: ['planet:1', 'moons'] }],
       })
 
       const response = await handle()
 
       expect(response.headers.get('orpc-cache-tag')).toBe('planets,planet:1')
-      expect(response.headers.get('orpc-cache-tag-invalidation')).toBe('revalidated')
+      expect(response.headers.get('orpc-cache-tag-invalidation')).toBe('planets,planet:1,moons')
     })
 
     it('sets each header only when its own kind of check ran', async () => {
@@ -216,7 +216,7 @@ describe('cacheHandlerPlugin', () => {
       expect(response.headers.get('cache-control')).toBe('public, max-age=31536000')
     })
 
-    it('sets its headers over ones already on the response', async () => {
+    it('keeps a cache-control already on the response', async () => {
       const { record, handle } = createTestingHandler(headers, {
         'cache-control': 'private, no-store',
         'cache-tag': 'stale',
@@ -225,7 +225,17 @@ describe('cacheHandlerPlugin', () => {
 
       const response = await handle()
 
-      expect(response.headers.get('cache-control')).toBe('public, max-age=2')
+      expect(response.headers.get('cache-control')).toBe('private, no-store')
+      expect(response.headers.get('cache-tag')).toBe('planets')
+    })
+
+    it('sends no-store when nothing may be reused', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ caches: [{ tags: ['planets'], ttl: 0, swr: 0 }] })
+
+      const response = await handle()
+
+      expect(response.headers.get('cache-control')).toBe('no-store')
       expect(response.headers.get('cache-tag')).toBe('planets')
     })
 

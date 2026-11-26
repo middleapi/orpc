@@ -7,7 +7,7 @@ import type { CacheEntry, CacheGetOrSetOptions } from './types'
 /**
  * Encodes a cache key into a stable string. Strings are used verbatim; other
  * values are serialized and canonicalized, so structurally equal keys encode
- * identically. Unsupported values like blobs are ignored.
+ * identically. Throws on blobs, which cannot be encoded.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -16,7 +16,11 @@ export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerialize
     return key
   }
 
-  const { json, meta } = serializer.serializeJson(key)
+  const { json, meta, blobs } = serializer.serializeJson(key)
+
+  if (blobs?.length) {
+    throw new Error('Cache keys cannot contain Blob or File values. Set a `key` without them.')
+  }
 
   return stringifyJSON({
     j: deepSortKeys(json),

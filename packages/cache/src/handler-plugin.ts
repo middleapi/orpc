@@ -97,10 +97,10 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const {
         result: response,
         rootCache,
-        rootRevalidation,
+        rootRevalidatedTags,
       } = await nextWithRootCacheActivity(interceptorOptions)
 
-      if (rootCache === undefined && rootRevalidation === undefined) {
+      if (rootCache === undefined && !rootRevalidatedTags.length) {
         return response
       }
 
@@ -116,10 +116,15 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
       set('cache-tag', cacheTag)
       set(
         'orpc-cache-tag-invalidation',
-        rootRevalidation?.tags.length ? encodeCacheTagHeader(rootRevalidation.tags) : undefined,
+        rootRevalidatedTags.length ? encodeCacheTagHeader(rootRevalidatedTags) : undefined,
       )
 
-      if (rootCache !== undefined && this.headers.has('cache-control')) {
+      // A `cache-control` already on the response is the procedure's own choice, so it is kept.
+      if (
+        rootCache !== undefined &&
+        this.headers.has('cache-control') &&
+        response.headers['cache-control'] === undefined
+      ) {
         /**
          * `max-age` rather than `s-maxage`, which carries `proxy-revalidate`
          * semantics ([RFC 9111](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10))
@@ -130,7 +135,9 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
         const maxAge = rootCache.ttl === undefined ? 31536000 : Math.floor(rootCache.ttl / 1000)
         const staleWhileRevalidate = Math.floor((rootCache.swr ?? 0) / 1000)
         headers['cache-control'] =
-          `public, max-age=${maxAge}${staleWhileRevalidate ? `, stale-while-revalidate=${staleWhileRevalidate}` : ''}`
+          maxAge || staleWhileRevalidate
+            ? `public, max-age=${maxAge}${staleWhileRevalidate ? `, stale-while-revalidate=${staleWhileRevalidate}` : ''}`
+            : 'no-store'
       }
 
       return {
@@ -162,18 +169,18 @@ export const cacheRouterClientInterceptor: ProcedureClientInterceptor<any, any, 
     return options.next()
   }
 
-  const { result, rootCache, rootRevalidation } = await nextWithRootCacheActivity(options)
+  const { result, rootCache, rootRevalidatedTags } = await nextWithRootCacheActivity(options)
 
   linkContext.tags = [...(rootCache?.tags ?? [])]
-  linkContext.revalidatedTags = [...(rootRevalidation?.tags ?? [])]
+  linkContext.revalidatedTags = rootRevalidatedTags
 
   return result
 }
 
 /**
  * Calls `next` with a fresh plugin context and returns the result along with
- * the first cache lookup and revalidation of the procedure the client called,
- * so nested procedure calls never leak their tags.
+ * the first cache lookup and the revalidated tags of the procedure the client
+ * called, so nested procedure calls never leak their tags.
  */
 async function nextWithRootCacheActivity<TResult>({
   next,
@@ -203,6 +210,8 @@ async function nextWithRootCacheActivity<TResult>({
   return {
     result,
     rootCache: pluginContext.caches.find(isRoot),
-    rootRevalidation: pluginContext.revalidations.find(isRoot),
+    rootRevalidatedTags: [
+      ...new Set(pluginContext.revalidations.filter(isRoot).flatMap(({ tags }) => tags)),
+    ],
   }
 }

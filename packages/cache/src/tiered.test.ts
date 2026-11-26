@@ -86,6 +86,32 @@ describe('tieredCacheStore', () => {
     })
   })
 
+  it('grants no stale window to a lookup that asked for none', async () => {
+    const store = new TieredCacheStore([{ store: new MemoryCacheStore(), swr: 60_000 }])
+
+    await expect(store.getOrSet('k', async () => 'v', { ttl: 1000 })).resolves.toMatchObject({
+      expiresAt: 1000,
+      evictAt: 1000,
+    })
+  })
+
+  it('revalidates back to front, one tier at a time', async () => {
+    const front = new MemoryCacheStore()
+    const back = new MemoryCacheStore()
+    const order: string[] = []
+    vi.spyOn(front, 'revalidate').mockImplementation(async () => {
+      order.push('front')
+    })
+    vi.spyOn(back, 'revalidate').mockImplementation(async () => {
+      await Promise.resolve()
+      order.push('back')
+    })
+
+    await new TieredCacheStore([{ store: front }, { store: back }]).revalidate({ tags: ['t'] })
+
+    expect(order).toEqual(['back', 'front'])
+  })
+
   it('passes waitUntil through to every tier, and revalidates every tier', async () => {
     const front = new MemoryCacheStore()
     const back = new MemoryCacheStore()
