@@ -190,6 +190,7 @@ import { ORPCModule } from '@orpc/nest'
 @Module({
   imports: [
     ORPCModule.forRootAsync({
+      imports: [YourLoggerModule],
       inject: [YourLoggerService],
       useFactory: (logger: YourLoggerService) => ({
         interceptors: [
@@ -208,9 +209,11 @@ export class AppModule {}
 
 ### Initial Context
 
-To define [initial context](/docs/context#initial-context) for use in oRPC scopes, extend the `DefaultInitialContext` interface and provide `context` through `ORPCModule`.
+To define [initial context](/docs/context#initial-context) for use in oRPC scopes, extend the `DefaultInitialContext` interface and provide `context` through `ORPCModule.forRoot` or `ORPCModule.forRootAsync`.
 
-```ts
+<CodeGroup>
+
+```ts Static
 import { ExecutionContext } from '@nestjs/common'
 
 declare module '@orpc/server' {
@@ -238,6 +241,43 @@ declare module '@orpc/server' {
 })
 export class AppModule {}
 ```
+
+```ts title="Dynamic with Dependency Injection"
+import { ExecutionContext } from '@nestjs/common'
+import { ORPCModule } from '@orpc/nest'
+
+declare module '@orpc/server' {
+  /**
+   * Extend the context interface to enable typesafe access across oRPC scopes
+   */
+  interface DefaultInitialContext {
+    sessions: SessionStore
+    request: Request
+  }
+}
+
+@Module({
+  imports: [
+    ORPCModule.forRootAsync({
+      imports: [SessionModule],
+      inject: [SessionStore],
+      useFactory: (sessions: SessionStore) => ({
+        context: (ctx: ExecutionContext) => ({
+          sessions,
+          request: ctx.switchToHttp().getRequest() as Request,
+        }),
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+</CodeGroup>
+
+`ORPCModule.forRootAsync` resolves `inject` within its own dynamic module scope, so the factory only sees providers exported by the modules listed in its `imports` (or global modules).
+
+Controller methods decorated with `@Implement` run on the controller instance, so handlers can access NestJS providers directly through constructor injection (`this`). [oRPC middleware](/docs/middleware) runs outside the controller and only sees `context`, so pass any NestJS provider a middleware needs through the initial `context` factory above.
 
 ### Plugins
 
